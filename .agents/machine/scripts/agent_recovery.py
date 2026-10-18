@@ -452,18 +452,35 @@ def _claim_lock(path):
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-def _wrapper_identity(status_path, process_lookup=None):
-    pid = (_load("launch_status").read(status_path) or {}).get("pid")
-    if not isinstance(pid, int) or isinstance(pid, bool):
-        return None
-    try:
-        process = (process_lookup or _load("register_session").build_process_lookup())(pid)
-    except Exception:
-        return None
+def _finite_start(process):
     started = getattr(process, "started_at", None)
     if isinstance(started, bool) or not isinstance(started, (int, float)) or not math.isfinite(started):
         return None
-    return {"pid": pid, "started_at": started}
+    return started
+
+
+def _wrapper_identity(status_path, process_lookup=None):
+    status = _load("launch_status").read(status_path) or {}
+    try:
+        lookup = process_lookup or _load("register_session").build_process_lookup()
+    except Exception:
+        return None
+    identity = {}
+    for key, name in (("pid", "wrapper"), ("child_pid", "child")):
+        pid = status.get(key)
+        if pid is None and name == "child":
+            continue
+        if not isinstance(pid, int) or isinstance(pid, bool):
+            return None
+        try:
+            process = lookup(pid)
+        except Exception:
+            return None
+        started = None if process is None else _finite_start(process)
+        if process is not None and started is None:
+            return None
+        identity[name] = {"pid": pid, "started_at": started}
+    return {**identity["wrapper"], **({"child": identity["child"]} if "child" in identity else {})}
 
 
 def _launch_ended(previous, process_lookup=None):
@@ -471,10 +488,25 @@ def _launch_ended(previous, process_lookup=None):
     if not isinstance(wrapper, dict):
         return None
     try:
-        process = (process_lookup or _load("register_session").build_process_lookup())(wrapper.get("pid"))
+        lookup = process_lookup or _load("register_session").build_process_lookup()
     except Exception:
         return None
-    return process is None or getattr(process, "started_at", None) != wrapper.get("started_at")
+    ended = True
+    for recorded in (wrapper, wrapper.get("child")):
+        if not isinstance(recorded, dict):
+            continue
+        try:
+            process = lookup(recorded.get("pid"))
+        except Exception:
+            return None
+        if process is None:
+            continue
+        started = _finite_start(process)
+        if started is None:
+            ended = None
+        elif started == recorded.get("started_at"):
+            return False
+    return ended
 
 
 def _claim(host, session_id, profile, confirm_closed=False):

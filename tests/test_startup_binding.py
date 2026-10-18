@@ -57,8 +57,9 @@ class StartupBindingTests(unittest.TestCase):
         states = []
 
         def running(*_args, on_running, **_kwargs):
-            on_running()
+            on_running(4242)
             states.append(json.loads(status.read_text(encoding="utf-8"))["state"])
+            self.assertEqual(4242, json.loads(status.read_text(encoding="utf-8"))["child_pid"])
             return 0
 
         with mock.patch.object(BINDING, "run_session", side_effect=running):
@@ -150,6 +151,8 @@ class StartupBindingTests(unittest.TestCase):
                 events.append("ack")
 
         class Process:
+            pid = 4242
+
             def __init__(self, _command, **kwargs):
                 events.append("start")
                 directory = Path(kwargs["env"][BINDING.ACK_DIRECTORY_ENV])
@@ -345,6 +348,8 @@ class StartupBindingTests(unittest.TestCase):
         Active.prepared = logical
 
         class Process:
+            pid = 4242
+
             def wait(self):
                 raise KeyboardInterrupt()
 

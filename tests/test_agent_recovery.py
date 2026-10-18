@@ -141,6 +141,32 @@ class RecoveryTests(unittest.TestCase):
             wrapper.started_at = 9.0
             self.assertEqual("pending", json.loads(RECOVERY._claim("codex", "exact_id", "profile").read_text(encoding="utf-8"))["state"])
 
+    def test_launch_ends_only_when_wrapper_and_native_child_are_both_gone(self):
+        processes = {41: SimpleNamespace(started_at=5.0), 42: SimpleNamespace(started_at=6.0)}
+        receipt = {"wrapper": {"pid": 41, "started_at": 5.0, "child": {"pid": 42, "started_at": 6.0}}}
+        lookup = processes.get
+        self.assertFalse(RECOVERY._launch_ended(receipt, lookup))
+        del processes[41]
+        self.assertFalse(RECOVERY._launch_ended(receipt, lookup))
+        processes[42] = SimpleNamespace(started_at=None)
+        self.assertIsNone(RECOVERY._launch_ended(receipt, lookup))
+        processes[42] = SimpleNamespace(started_at=99.0)
+        self.assertTrue(RECOVERY._launch_ended(receipt, lookup))
+        del processes[42]
+        self.assertTrue(RECOVERY._launch_ended(receipt, lookup))
+
+    def test_wrapper_identity_records_the_native_child_and_refuses_unreadable_starts(self):
+        status = self.root / "attempt.status.json"
+        status.write_text(json.dumps({"pid": 41, "child_pid": 42, "state": "running"}), encoding="utf-8")
+        processes = {41: SimpleNamespace(started_at=5.0), 42: SimpleNamespace(started_at=6.0)}
+        self.assertEqual({"pid": 41, "started_at": 5.0, "child": {"pid": 42, "started_at": 6.0}},
+                         RECOVERY._wrapper_identity(status, processes.get))
+        del processes[41]
+        self.assertEqual({"pid": 41, "started_at": None, "child": {"pid": 42, "started_at": 6.0}},
+                         RECOVERY._wrapper_identity(status, processes.get))
+        processes[42] = SimpleNamespace(started_at=None)
+        self.assertIsNone(RECOVERY._wrapper_identity(status, processes.get))
+
     def test_untracked_receipt_is_released_only_by_confirmation_after_pending_settles(self):
         receipt = RECOVERY._claim("codex", "exact_id", "profile")
         with self.assertRaises(ValueError):
