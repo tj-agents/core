@@ -36,6 +36,7 @@ def real_agent_cli(name, claude='/bin/claude'):
     module.resolve_claude_executable = mock.Mock(return_value=claude)
     module.sync_claude_standards = mock.Mock()
     module.launch_tab = mock.Mock()
+    module.await_handoff_startup = mock.Mock()
     return module
 
 
@@ -53,6 +54,7 @@ def real_agent_cli_for_e2e(name, run, claude='/bin/claude'):
         module = _load_agent_cli_module(name)
     module.resolve_claude_executable = mock.Mock(return_value=claude)
     module.sync_claude_standards = mock.Mock()
+    module.await_handoff_startup = mock.Mock()
     return module
 
 
@@ -64,6 +66,7 @@ def real_agent_cli_for_codex(name, codex=CODEX_EXECUTABLE):
     module = _load_agent_cli_module(name)
     module.resolve_codex_executable = mock.Mock(return_value=codex)
     module.launch_tab = mock.Mock()
+    module.await_handoff_startup = mock.Mock()
     return module
 
 
@@ -73,4 +76,5 @@ def real_agent_cli_for_codex_e2e(name, run, codex=CODEX_EXECUTABLE):
     with mock.patch('subprocess.run', side_effect=run):
         module = _load_agent_cli_module(name)
     module.resolve_codex_executable = mock.Mock(return_value=codex)
+    module.await_handoff_startup = mock.Mock()
     return module
