@@ -43,36 +43,7 @@ continuation after its observed fingerprint changes; no record or skill creates 
 work by itself.
 
 When work cannot run, use `engineering:write-bug`, `engineering:write-mistake`, or
-`engineering:write-debt` to update its canonical record. A deferred or existing-owner disposition releases
-only the current callout response when a current-turn successful
-`scripts/admission.py check` has revalidated its unique
-`agent-handoff-disposition` fence. The selected entry records its stable identifier, state, current
-session/callout/prompt digest, source owner, repair goal authority and backlink, concrete reason, resolver,
-resume condition, next action, and observed evidence. A deferred entry also records
-`blocked_by` as `capability`, `dependency`, `conflict`, or `capacity`; an existing owner records its
-exact native identity, worktree, goal, process identity, and lease evidence. Missing, stale, unrelated, or
-hash-only evidence leaves the original obligation pending.
-
-```agent-handoff-disposition
-{"schema_version":1,"record_id":"B014","kind":"bug","state":"deferred","callout":{"session_id":"<session>","callout_id":"<nonce>","prompt_sha256":"<digest>"},"source_owner":"engineering/handoff","repair_goal":"<absolute-goal>","disposition":"deferred","reason":"<concrete-obstacle>","blocked_by":"capability","resolver":"<owner>","resume_condition":"<observable-condition>","next_action":"<action>","evidence":{"kind":"read-failure","path":"<absolute-observation>","sha256":"<sha256>","target":"<unreadable-target>","operation":"read","error":"<observed-error>"}}
-```
-
-Run `python <skill-directory>/scripts/admission.py check --record <absolute-register> --id B014
---session <session> --prompt-sha256 <digest> --callout-id <nonce>` in the current turn. The successful
-result is a locator only; the gate rereads the selected entry and its evidence before releasing that turn.
-
-For a selected provider, pass its canonical URI as `--record`, plus `--source-root <absolute-source-checkout>`
-and `--host codex` or `--host claude` for the actual host. Selection is read from the source primary
-checkout. The repair goal uses `Problem record: <canonical-URI>#<record-id>` as its exact backlink.
-The gate calls the same provider again when checking the receipt, so a closed, edited or unavailable
-record cannot reuse an earlier success. Use `python3` on Linux/macOS and `python` on Windows.
-
-The linked repair goal declares `Source owner: <owner>` and carries its repair authority inside
-`## Authorization`. Capability evidence names a matching `Required read capability: <absolute-path>` or
-`Required executable: <name>` entry. Dependency evidence names a matching
-`Required dependency: <artifact-id> sha256:<sha256>` entry. A record may list multiple requirements on
-separate lines or as comma-separated values. Historical authority text and undeclared observations do not
-satisfy admission.
+`engineering:write-debt` to update its canonical record with its resolver and resume condition.
 
 ## Full context transfer
 
