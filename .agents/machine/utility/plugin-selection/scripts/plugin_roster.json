@@ -13,6 +13,7 @@
     "react": [],
     "nvim": [],
     "rust": [],
+    "python": [],
     "github-actions": [],
     "template": []
   },
@@ -25,7 +26,8 @@
     "win32": ["cpp", "msvc", "win32"],
     "neovim": ["nvim"],
     "rust": ["rust"],
+    "python": ["python"],
     "github-actions": ["github-actions"],
-    "plugin-repository": ["template"]
+    "plugin-repository": ["template", "python"]
   }
 }
