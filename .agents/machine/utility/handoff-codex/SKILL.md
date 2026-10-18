@@ -27,16 +27,15 @@ rather than a new window.
 
 ## One tab, and never a second
 
-The launcher **exits non-zero** on failure and prints `Launched codex-cli <version> from <path> on
-<selection>` on success. `standards:` lines before it report the pre-launch plugin refresh and hook trust
-— and unlike `handoff-claude`/`open-claude`'s own standards check, **a failed refresh or hook trust here
-refuses the launch** (exit 1) rather than continuing on the installed plugins, the same as the PowerShell
-launcher it replaced.
+The launcher prints its successful handoff event only after this attempt's native SessionStart is
+confirmed through the startup wrapper. A terminal accepting the command is insufficient. Plugin refresh
+failures and a CLI that exits before confirmation return nonzero without a successful handoff event.
+This confirms startup; reading the goal and accepting ownership remain separate pickup evidence.
 
-Exit code **3 is distinct from every other failure**: it means the terminal control command timed out
-after the tab may already have opened, not that the launch definitely failed. Check the terminal for the
-tab before doing anything else; never relaunch automatically on exit 3. Any other non-zero exit means the
-launch did not happen.
+Exit code **3** means startup or terminal submission remains uncertain. The error retains the attempt's
+status-file path. Inspect that exact attempt before any retry; never relaunch automatically on exit 3.
+Other nonzero exits report a confirmed startup failure or a wrapper that never started. A late wrapper
+is blocked by the abandoned attempt's receipt.
 
 **Never verify a launch by listing processes, and never re-run the launcher because one looked absent.**
 A tab takes seconds to appear and a process listing is trivially misread — an unsorted `Select-Object
