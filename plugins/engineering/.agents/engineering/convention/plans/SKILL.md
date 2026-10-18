@@ -368,8 +368,7 @@ boundary makes the conversation disposable; it does not require disposing of it.
 
 **Continue in the current context by default for small and medium plans** when the next action belongs to
 the same logical workstream, the loaded goals, constraints, decisions, and evidence remain relevant and
-coherent, and the user's existing authorization covers the next phase. A Claude parent hands delegated work
-to Codex unless the user explicitly chooses local non-frontier Claude work. The parent retains ownership.
+coherent, and the user's existing authorization covers the next phase. The parent retains ownership.
 Move directly into that work after the durable
 checkpoint; do not stop for a handoff merely because planning or another phase completed.
 
