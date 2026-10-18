@@ -95,39 +95,8 @@ never let it evaporate.
   something that actually loads it. A doc reachable from nothing is loaded nowhere, which is how a convention
   goes unread until a shipped feature violates it. Check it with a hook, and fail a guidance doc that links a
   file which does not exist.
-- Keep each statement short, with selection criteria. Every added or updated authored guidance body has a
-  concrete fenced example under [Concrete examples for changed guidance](#concrete-examples-for-changed-guidance).
+- Keep each statement short, with selection criteria and an example where they clarify the decision.
   Headings that name the responsibility ("Repositories inherit the module base") help readers act.
-
-## Concrete examples for changed guidance
-
-Every added or updated authored skill, standard, or always-loaded instruction contains a concrete fenced
-example in its body. The example shows the rule's actual decision, instead of giving a reader a label that
-can mean several things. Use code, commands, configuration, or an input/output trace; when a rule defines
-collaborators, make their ownership and call site visible.
-
-Use code for code patterns; use executable commands or configuration for procedures; and use concrete
-input/output for non-code guidance. When introducing collaborators, show construction and a meaningful call
-site.
-
-```text
-Input: a changed collaborator-naming rule in a SKILL.md
-Owner: engineering:docs requires the changed guidance body to demonstrate the rule
-Call site: check_examples.py --path .agents/example/convention/query/SKILL.md
-Output: the guidance shows the interface name and its caller before the check passes
-```
-
-One relevant existing example can cover an unchanged rule. The author and reviewer decide whether it
-demonstrates the rule that changed; the mechanical check only establishes that changed authored guidance has
-a nonempty, non-placeholder fenced demonstration. Run it over committed guidance changes:
-
-```bash
-python -B .agents/engineering/convention/docs/scripts/check_examples.py --root . --base origin/main
-```
-
-For an uncommitted, explicitly selected file, use `--path` instead of `--base`. The checker ignores generated
-adapters, payloads, templates, fixtures, plans, logs, and records. It reads the specified committed `--head`
-when range mode is used, so an unrelated working-tree edit cannot satisfy the gate.
 
 ## Sort a rule by the cost of missing it, not by topic
 

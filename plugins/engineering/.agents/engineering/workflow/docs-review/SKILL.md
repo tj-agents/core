@@ -78,19 +78,6 @@ Dispatch only relevant fresh lenses, using the same immutable descriptor and con
   files; and
 - followability: each instruction has an unambiguous owner, action, and pass condition.
 
-For every changed authored skill, standard, or always-loaded instruction, verify the relevant concrete
-fenced example demonstrates the changed rule. A nonempty fence alone is insufficient: verify the example's
-types, ownership, construction, and call site where the rule defines them. Apply `engineering:docs`' required
-code, procedure, or input/output format. Run the frozen tree's example gate when it ships one:
-
-```bash
-python -B .agents/engineering/convention/docs/scripts/check_examples.py --root <source-checkout> --base <base-sha> --head <head-sha>
-```
-
-The checker reads committed files from `<head-sha>`, so it does not rely on mutable source-checkout content.
-It establishes only that an eligible changed guidance file has a usable demonstration; semantic coverage
-remains a reviewer judgment.
-
 A routine candidate dispatches one focused docs lens over the frozen tree. It verifies links and anchors,
 fences and formatting, privacy/source separation, targeted facts and prerequisites. It does not dispatch a
 native review or a second fresh code lens.

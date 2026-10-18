@@ -42,7 +42,7 @@ class ClassificationTests(unittest.TestCase):
     @staticmethod
     def results():
         return {name: {"result": "success"} for name in
-                ("select", "guard", "verify-windows", "verify-linux")}
+                ("select", "guard", "guidance-examples", "verify-windows", "verify-linux")}
 
     def test_unknown_shared_infrastructure_and_mixed_changes_use_full_coverage(self):
         for path in (".agents/hooks/hook_runtime.py", ".agents/hooks/hook_dispatch.py",
@@ -83,7 +83,7 @@ class AggregateTests(unittest.TestCase):
         results = ClassificationTests.results()
         results["verify-windows"]["result"] = results["verify-linux"]["result"] = "skipped"
         CI.required_results(CI.plan("docs", "prose"), results, "pull_request")
-        for job in ("select", "guard"):
+        for job in ("select", "guard", "guidance-examples"):
             with self.subTest(job=job):
                 broken = {**results, job: {"result": "skipped"}}
                 with self.assertRaises(ValueError):
