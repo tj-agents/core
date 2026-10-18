@@ -263,6 +263,8 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                                         running(process.pid)
                                         return process.wait()
                                     time.sleep(0.05)
+                                if process.returncode == 0 and _acknowledged(acknowledgement, token):
+                                    running(process.pid)
                                 return process.returncode
                             running(process.pid)
                             return process.wait()

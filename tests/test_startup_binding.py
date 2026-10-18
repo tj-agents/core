@@ -332,7 +332,7 @@ class StartupBindingTests(unittest.TestCase):
         child.write_text(
             "import json, os, pathlib, subprocess, sys\n"
             "mode = sys.argv[1]\n"
-            "if mode == 'ack':\n"
+            "if mode in ('ack', 'fast'):\n"
             "    subprocess.run([sys.executable, sys.argv[2], sys.argv[3]], "
             "input=json.dumps({'hook_event_name': 'SessionStart'}), text=True, check=True)\n"
             "elif mode == 'wrong':\n"
@@ -354,7 +354,8 @@ class StartupBindingTests(unittest.TestCase):
                 return None
             def acknowledge_binding(self):
                 return None
-        for mode in ("ack", "wrong", "exit"):
+        real_popen = subprocess.Popen
+        for mode in ("ack", "wrong", "exit", "fast"):
             with self.subTest(mode=mode):
                 directory = self.project / mode
                 directory.mkdir()
@@ -364,6 +365,11 @@ class StartupBindingTests(unittest.TestCase):
                 runtime = mock.Mock()
                 runtime.prepare_runtime.return_value = binding
                 reported = []
+                def start(*args, **kwargs):
+                    process = real_popen(*args, **kwargs)
+                    if mode == "fast":
+                        process.wait(timeout=10)
+                    return process
                 command = [sys.executable, str(child), mode, str(ROOT / ".agents/hooks/hook_dispatch.py"), str(gate)]
                 with mock.patch.object(BINDING, "preflight", return_value=Active()), \
                         mock.patch.object(BINDING, "native_target_for_shim", return_value="native"), \
@@ -372,11 +378,12 @@ class StartupBindingTests(unittest.TestCase):
                         mock.patch.object(BINDING, "_preseed_snapshots"), \
                         mock.patch.object(BINDING, "_converge"), \
                         mock.patch("rolling_plugins.verify_final"), \
-                        mock.patch.object(BINDING, "command_for_target", return_value=command):
+                        mock.patch.object(BINDING, "command_for_target", return_value=command), \
+                        mock.patch.object(BINDING.subprocess, "Popen", side_effect=start):
                     result = BINDING.run_session("codex", "typed", self.project, ["prompt"],
                                                  require_session_start=True, on_running=reported.append)
                 self.assertEqual(2 if mode == "exit" else 0, result)
-                self.assertEqual(1 if mode == "ack" else 0, len(reported))
+                self.assertEqual(1 if mode in ("ack", "fast") else 0, len(reported))
                 runtime.cleanup_runtime.assert_called_once()
 
     def test_codex_running_child_retains_runtime_paths_when_liveness_is_uncertain(self):
