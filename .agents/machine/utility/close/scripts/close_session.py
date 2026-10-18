@@ -16,6 +16,7 @@ import uuid
 
 MAX_TAIL = 1 << 20
 MAX_AGE = 3600
+IDENTITY = ('host', 'session_id', 'pid', 'pid_started_at')
 DONE = re.compile(r"^\s*(?:\*\*)?(?:done|all done|all complete|work complete|completed)(?:\*\*)?[.!:]?(?:\s|$)", re.I)
 KEEP_OPEN = re.compile(r"\b(?:keep|leave)\b[^.!?\n]{0,50}\bopen\b|\b(?:do not|don't|never)\s+close\b", re.I)
 
@@ -159,7 +160,9 @@ def complete():
             or not isinstance(ticket.get('nonce'), str)
             or re.fullmatch('[0-9a-f]{32}', ticket['nonce']) is None):
         raise shared.Refusal('reported closure expired or has an invalid identity')
-    if ticket.get('entry') != entry or shared.path_key(Path.cwd()) != shared.path_key(ticket['cwd']):
+    expected = ticket.get('entry')
+    if (not isinstance(expected, dict) or any(entry.get(key) != expected.get(key) for key in IDENTITY)
+            or shared.path_key(Path.cwd()) != shared.path_key(ticket['cwd'])):
         raise shared.Refusal('reported host identity or attachment changed')
     shared.awaiting_input_activity(entry)
     claim = ticket_path(session).with_suffix('.' + ticket['nonce'] + '.close-claim')
@@ -217,7 +220,7 @@ def stop(data, session):
         entry = verified_entry(shared)
         expected = ticket.get('entry')
         if not isinstance(expected, dict) or any(entry.get(key) != expected.get(key)
-                for key in ('host', 'session_id', 'pid', 'pid_started_at', 'cwd')) or entry['session_id'] != session:
+                for key in IDENTITY) or entry['session_id'] != session:
             raise shared.Refusal('prepared host identity or attachment changed')
         if shared.path_key(Path.cwd()) != shared.path_key(ticket['cwd']):
             raise shared.Refusal('prepared working directory changed')
