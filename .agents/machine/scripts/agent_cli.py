@@ -649,12 +649,13 @@ def startup_binding_script():
     return path
 
 
-def bound_terminal_arguments(host, working_directory, target, arguments):
+def bound_terminal_arguments(host, working_directory, target, arguments, status_file=None):
+    status = ["--status-file", str(status_file)] if status_file else []
     return ["-I", "-B", str(startup_binding_script()), "--host", host, "--project",
-            str(working_directory), "--target", str(target), "--", *arguments]
+            str(working_directory), "--target", str(target), *status, "--", *arguments]
 
 
-def open_claude_tab(working_directory, title, arguments, out=print):
+def open_claude_tab(working_directory, title, arguments, out=print, status_file=None):
     """Resolve the native claude executable, sync standards and open the tab.
 
     Shared by open-claude and handoff-claude so executable discovery, pre-launch standards sync and the
@@ -670,5 +671,5 @@ def open_claude_tab(working_directory, title, arguments, out=print):
     # session on Windows: launch_tab drops any forced TERM on POSIX, because the terminal that actually
     # starts the tab sets TERM for that session itself, and forcing or clearing it here would fight that.
     launch_tab(working_directory, sys.executable, title,
-               arguments=bound_terminal_arguments("claude", working_directory, claude, list(arguments)),
+               arguments=bound_terminal_arguments("claude", working_directory, claude, list(arguments), status_file),
                force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'})

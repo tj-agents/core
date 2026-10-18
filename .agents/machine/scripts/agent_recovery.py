@@ -12,9 +12,18 @@ import sys
 import threading
 import math
 from contextlib import contextmanager
+from datetime import datetime, timezone
 
 HERE = Path(__file__).resolve().parent
 SESSION_ID = re.compile(r"(?!-)[A-Za-z0-9_-]+\Z")
+TOKEN = re.compile(r"[a-z0-9]+")
+PICKUP_TIMEOUT_SECONDS = 480
+WRAPPER_TIMEOUT_SECONDS = 45
+PICKUP_INTERVAL_SECONDS = 1.0
+STORE_FIELDS = (
+    ("title", "s.title"), ("id", "s.session_id"), ("cwd", "s.cwd"), ("repo", "s.repo"), ("branch", "s.branch"),
+    ("work_item", "s.work_item"), ("work_item.title", "w.title"), ("work_item.plan_path", "w.plan_path"),
+)
 LOCKS = {}
 LOCKS_GUARD = threading.Lock()
 MODULES = {}
@@ -168,30 +177,137 @@ def _record_items(host, root, history):
             yield item
 
 
-def search(hosts=("codex", "claude"), topic=None, checkout=None, count=10, roots=None):
+class LaunchFailed(RuntimeError):
+    pass
+
+
+class LaunchUnverified(RuntimeError):
+    pass
+
+
+def _tokens(value):
+    return set(TOKEN.findall(str(value or "").casefold()))
+
+
+def _store_rows(hosts):
+    store = _load("session_store")
+    if not store.database_path().is_file():
+        return []
+    connection = store.connect()
+    try:
+        placeholders = ", ".join("?" for _ in hosts)
+        columns = ", ".join(f"{column} AS \"{name}\"" for name, column in STORE_FIELDS)
+        return [dict(row) for row in connection.execute(
+            f"SELECT s.host, s.profile, s.last_activity_at, s.started_at, s.ended_at, w.status AS work_item_status, "
+            f"{columns} FROM sessions s LEFT JOIN work_items w ON w.key = s.work_item "
+            f"WHERE s.host IN ({placeholders})", tuple(hosts))]
+    finally:
+        connection.close()
+
+
+def _store_match(row, topic):
+    if not topic:
+        return []
+    wanted = _tokens(topic)
+    fields = {name: _tokens(row.get(name)) for name, _column in STORE_FIELDS}
+    if not wanted or not wanted <= set().union(*fields.values()):
+        return None
+    return [name for name, tokens in fields.items() if tokens & wanted]
+
+
+def _iso(epoch):
+    if isinstance(epoch, bool) or not isinstance(epoch, (int, float)) or not math.isfinite(epoch):
+        return None
+    return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def _store_item(row, matched_by):
+    item = {
+        "id": row["id"], "host": row["host"], "cwd": row["cwd"], "branch": row["branch"],
+        "activity": _iso(row["last_activity_at"] or row["started_at"]),
+        "preview": row["title"] or row["work_item.title"] or "(no title)",
+        "profile": os.path.normcase(str(Path(row["profile"]).resolve())) if row["profile"] else None,
+        "matched_by": matched_by, "title": row["title"], "source": "sessions.db",
+    }
+    if row["work_item"]:
+        item["work_item"] = {"key": row["work_item"], "title": row["work_item.title"],
+                             "status": row["work_item_status"], "plan_path": row["work_item.plan_path"]}
+    item["status"] = liveness({"host": row["host"], "session": row["id"]})
+    return item
+
+
+def _store_search(hosts, topic, checkout, history):
+    try:
+        rows = _store_rows(hosts)
+    except Exception:
+        return []
+    variants = history._worktree_variants(checkout) if checkout else None
+    results = []
+    for row in rows:
+        if not row["id"] or not SESSION_ID.fullmatch(row["id"]):
+            continue
+        if variants and not history._cwd_under(row["cwd"], variants):
+            continue
+        matched_by = _store_match(row, topic)
+        if matched_by is None:
+            continue
+        results.append(_store_item(row, matched_by))
+    return results
+
+
+def _native_matched_by(item, topic, title):
+    if not topic:
+        return []
+    query = topic.casefold()
+    fields = (("id", item["session"]), ("title", title or ""))
+    matched = [name for name, value in fields if query in value.casefold()]
+    return matched or ["message"]
+
+
+def search(hosts=("codex", "claude"), topic=None, checkout=None, count=10, roots=None, include_history=False):
     if count < 1:
         raise ValueError("--count must be positive")
     history = _load("history")
-    results = []
-    for host in hosts:
+    results = [] if roots else _store_search(hosts, topic, checkout, history)
+    found = {(item["host"], item["id"]) for item in results}
+    for host in hosts if include_history or not results else ():
         root = (roots or {}).get(host) if roots else None
         root = Path(root) if root else history.history_root(host)
         if not root.is_dir():
             raise ValueError(f"No {host} history directory at {root}; select the correct profile or history root.")
         titles = _title_index(root)
         for item in _record_items(host, root, history):
+            if (host, item["session"]) in found:
+                continue
             title = titles.get(item["session"])
             if _matches(item, topic, checkout, history, title):
                 normal = _normalise(item, root)
                 normal["title"] = title
+                normal["matched_by"] = _native_matched_by(item, topic, title)
+                normal["source"] = "native-history"
                 results.append(normal)
     results.sort(key=lambda item: item.get("activity") or "", reverse=True)
     return results[:count]
 
 
+def _store_find(host, session_id):
+    try:
+        rows = [row for row in _store_rows((host,)) if row["id"] == session_id]
+    except Exception:
+        return None
+    if not rows or not rows[0]["profile"]:
+        return None
+    return _store_item(rows[0], [])
+
+
 def find(host, session_id, roots=None):
     if host not in ("codex", "claude") or not SESSION_ID.fullmatch(session_id):
         raise ValueError("A host and native session id are required.")
+    item = None if roots else _store_find(host, session_id)
+    if item:
+        if not item["cwd"] or not Path(item["cwd"]).is_dir():
+            raise ValueError("The recorded session directory is missing; refusing to resume it elsewhere.")
+        return item
     history = _load("history")
     root = Path((roots or {}).get(host) or history.history_root(host))
     if not root.is_dir():
@@ -294,6 +410,66 @@ def _receipt_state(path, host, session_id, profile, state):
     os.replace(temporary, path)
 
 
+def _history_file(host, session_id, profile):
+    root = Path(profile) / ("sessions" if host == "codex" else "projects")
+    pattern = f"*{session_id}.jsonl" if host == "codex" else f"*/{session_id}.jsonl"
+    try:
+        return next(iter(sorted(root.rglob(pattern) if host == "codex" else root.glob(pattern))), None)
+    except OSError:
+        return None
+
+
+def _modified(path):
+    try:
+        return path.stat().st_mtime if path else None
+    except OSError:
+        return None
+
+
+def _registered_since(host, session_id, since):
+    try:
+        rows = [row for row in _store_rows((host,)) if row["id"] == session_id]
+    except Exception:
+        return False
+    started = rows[0]["started_at"] if rows else None
+    return isinstance(started, (int, float)) and not isinstance(started, bool) and started >= since
+
+
+def _read_status(path):
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def await_pickup(host, session_id, status_path, since, history_path=None, timeout=PICKUP_TIMEOUT_SECONDS,
+                 wrapper_timeout=WRAPPER_TIMEOUT_SECONDS, interval=PICKUP_INTERVAL_SECONDS,
+                 clock=time.monotonic, wait=time.sleep):
+    start = clock()
+    history_before = _modified(history_path)
+    wrapper_seen = False
+    while True:
+        status = _read_status(status_path)
+        wrapper_seen = wrapper_seen or status is not None
+        if status and status.get("state") == "failed":
+            raise LaunchFailed(str(status.get("error") or f"{host} startup failed"))
+        if _registered_since(host, session_id, since):
+            return "registered in sessions.db"
+        modified = _modified(history_path)
+        if modified is not None and modified != history_before and modified >= since:
+            return "native history written"
+        if status and status.get("state") == "exited":
+            raise LaunchFailed(f"native {host} exited with {status.get('returncode')} before resuming the session")
+        elapsed = clock() - start
+        if not wrapper_seen and elapsed >= wrapper_timeout:
+            raise LaunchFailed("the terminal never started the launch; no tab ran the startup wrapper")
+        if elapsed >= timeout:
+            raise LaunchUnverified(f"{host} startup began but did not resume the session within {int(timeout)}s; "
+                                   "check the opened tab before retrying")
+        wait(interval)
+
+
 def open_session(host, session_id, prompt="Continue the requested work.", title=None, roots=None, confirm_closed=False,
                  prompt_path=None, model=None, dangerously_skip_permissions=False, cli=None):
     item = find(host, session_id, roots)
@@ -313,6 +489,10 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
     launched = False
     try:
         receipt = _claim(host, session_id, item["profile"])
+        status_path = receipt.with_suffix(".status.json")
+        status_path.unlink(missing_ok=True)
+        history_path = _history_file(host, session_id, item["profile"])
+        since = time.time()
         directory = cli.resolve_tab_directory(item["cwd"])
         label = title or f"{host.title()} {session_id[:8]}"
         instruction = cli.prompt_file_argument(prompt_path)[0] if prompt_path else prompt
@@ -326,7 +506,7 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
                 if model:
                     arguments += ["--model", model]
                 arguments.append(instruction)
-                cli.open_claude_tab(directory, label, arguments)
+                cli.open_claude_tab(directory, label, arguments, status_file=status_path)
             finally:
                 if old_profile is None:
                     os.environ.pop("CLAUDE_CONFIG_DIR", None)
@@ -344,7 +524,8 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
             try:
                 cli.launch_tab(
                     directory, sys.executable, label,
-                    cli.bound_terminal_arguments("codex", directory, executable, arguments), clear=("TERM",),
+                    cli.bound_terminal_arguments("codex", directory, executable, arguments, status_path),
+                    clear=("TERM",),
                     force={"CODEX_HOME": item["profile"]},
                 )
             finally:
@@ -353,15 +534,18 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
                 else:
                     os.environ["CODEX_HOME"] = old_profile
         launched = True
+        evidence = await_pickup(host, session_id, status_path, since, history_path)
         try:
             _receipt_state(receipt, host, session_id, item["profile"], "launched")
         except OSError:
             pass
-        return item
+        return {**item, "launch": "verified", "evidence": evidence}
     except Exception as exc:
         if receipt is not None:
             timeout_type = getattr(cli, "LaunchTimeout", None)
-            if isinstance(timeout_type, type) and isinstance(exc, timeout_type):
+            if isinstance(exc, LaunchFailed):
+                receipt.unlink(missing_ok=True)
+            elif isinstance(exc, LaunchUnverified) or (isinstance(timeout_type, type) and isinstance(exc, timeout_type)):
                 try:
                     _receipt_state(receipt, host, session_id, item["profile"], "ambiguous")
                 except OSError:
@@ -439,6 +623,7 @@ def main(argv=None):
     parser.add_argument("--topic")
     parser.add_argument("--checkout")
     parser.add_argument("--count", type=int, default=10)
+    parser.add_argument("--include-history", action="store_true")
     parser.add_argument("--prompt")
     parser.add_argument("--prompt-path")
     parser.add_argument("--model")
@@ -452,16 +637,20 @@ def main(argv=None):
         hosts = ("codex", "claude") if args.host == "both" else (args.host,)
         roots = {host: value for host, value in (("codex", args.codex_history_root), ("claude", args.claude_history_root)) if value}
         if args.operation == "search":
-            print(json.dumps(search(hosts, args.topic, args.checkout, args.count, roots), indent=2))
+            print(json.dumps(search(hosts, args.topic, args.checkout, args.count, roots, args.include_history), indent=2))
             return 0
         if args.operation == "recover":
             candidates = []
             unavailable = []
-            for host in hosts:
-                try:
-                    candidates.extend(search((host,), args.topic, args.checkout, args.count, roots))
-                except ValueError as exc:
-                    unavailable.append({"host": host, "unavailable": str(exc)})
+            try:
+                candidates = search(hosts, args.topic, args.checkout, args.count, roots, args.include_history)
+            except ValueError:
+                for host in hosts:
+                    try:
+                        candidates.extend(search((host,), args.topic, args.checkout, args.count, roots,
+                                                 args.include_history))
+                    except ValueError as exc:
+                        unavailable.append({"host": host, "unavailable": str(exc)})
             if not args.select:
                 print(json.dumps({"sessions": candidates, "unavailable": unavailable}, indent=2))
                 return 0
@@ -503,6 +692,9 @@ def main(argv=None):
                             args.prompt_path, args.model)
         print(json.dumps(item, indent=2))
         return 0
+    except LaunchUnverified as exc:
+        print(str(exc), file=sys.stderr)
+        return 3
     except (RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
