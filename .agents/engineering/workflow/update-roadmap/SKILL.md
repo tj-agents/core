@@ -12,6 +12,11 @@ Update the complete live ROADMAP → PLAN → PROGRESS graph from one authoritat
 requirement, dependency, package release, or upstream API change. Planning docs only; do not implement
 the change.
 
+Read [the shared recording contract](../../resources/problem-records.md). When a provider is selected,
+reconcile the affected canonical items and use it for live status and ownership updates. Keep substantive
+roadmap design, plans and existing graph keys, linking their canonical items; file summaries follow the
+provider's state rather than becoming another live queue. Planning-only authority still controls the work.
+
 ## Workflow
 
 1. Resolve the target roadmap and the change set or source. Ask only when more than one roadmap plausibly

@@ -1,19 +1,51 @@
-# Problem records
+# Work and problem records
 
 Bug, mistake, and debt records preserve an observed problem until its owning repair has objective
 evidence. They make the next action explicit; they do not create authority to repair, publish, dispatch,
 or schedule work.
 
+The same repository selection governs feature and task records through `engineering:write-feature`
+and `engineering:write-task`. `engineering:write-issue` classifies an untyped request and loads one
+specific writer; it supplies no separate storage or creation path.
+
 ## Repository selection
 
 A committed `.problem-records.json` in the source repository's primary checkout may select an optional
-provider with `{"schema_version":1,"provider":"plugin:utility"}`. Read this declaration before recording,
-listing or addressing problems. Load that qualified installed skill for the current host and use its
+provider with `{"schema_version":1,"provider":"plugin:utility"}`. Resolve the source primary checkout
+from Git's worktree inventory, including when invoked from a feature worktree or subdirectory. Read
+its declaration before recording, listing, updating, resolving or addressing any of the five kinds.
+Load that qualified installed skill for the current host and use its
 commands, canonical identities, configuration, publication and retention rules. Keep the common facts,
 repair ownership and evidence below. A missing or invalid selected provider is a blocker; preserve the
 observation in the active goal and report the resolver and resume condition without creating a fallback
 register. Selection requires repository authorization; never adopt a provider merely because it is installed.
 Without a declaration, the existing repository-declared register and file defaults below apply.
+
+Repository and employer policy controls which tooling may receive evidence. Installing a provider,
+selecting its plugin or opening a feature worktree does not adopt a tracker. An explicit opt-out or
+employer-owned work-item convention takes precedence; do not send its facts to a personal backend.
+
+### Selected writer procedure
+
+Use the provider's shipped commands from its actual installed skill directory, passing the absolute
+source primary checkout as its repository root. Before creation, list/read relevant existing items and
+reconcile their cause, requested outcome, source owner, legacy IDs, goals and repair links. Reuse the
+canonical item for repeated observations; add dated evidence or update its facts without changing kind
+or identity. Similar symptoms with an unknown cause do not establish duplicates.
+
+Obtain the selected kind's template/schema, supply observed facts, then validate and preview it. Let
+the provider render its managed format. Preserve one stable request identity before submitting and
+reuse it for transport reconciliation; never blindly repost after an uncertain result. Read back the
+persisted item and verify its identity, kind and facts before reporting it recorded. Read before
+updates, use the provider's concurrency controls, and attach actual acceptance/resolution evidence
+before verified closure. Its retention rules preserve remote history and legacy identities.
+
+Use the provider's list/read commands for the live queue, including items without a local plan.
+Plans, review artifacts and curated roadmaps remain source documents linked to canonical item identities;
+they do not become a parallel live backlog. Their completion does not establish item resolution.
+If a selected provider is unavailable, invalid or offline, retain unsent facts in the active task/goal as
+pending submission evidence and report the blocked operation, resolver and observable resume condition.
+Do not create a fallback register, claim synchronization or adopt another backend.
 
 Providers keep backend configuration and transport in their own package. For handoff admission they ship
 `scripts/read_problem_record.py` beside the installed skill. Core invokes it with `--root <absolute-source-primary>`
@@ -24,14 +56,14 @@ The reader requires Python 3.9 or later and must not rely on machine-local regis
 resolve the selected installed skill through Core's existing discovery. A body may contain the existing
 `agent-handoff-disposition` fence; the provider transports it and Core validates its semantics and evidence.
 
-## Record shape
+## Problem record shape
 
 Use the selected provider's canonical identity, retaining legacy identifiers when migrating records.
 For file-backed records, use one stable, kind-local identifier. Keep the identifier when details, priority, state, or repair links
 change. The root defaults use `B001` for bugs and `M001` for mistakes; an existing typed register may use
 its declared identifier syntax.
 
-Every entry records:
+Every bug, mistake or debt entry records:
 
 - **Kind:** `bug`, `mistake`, or `debt`.
 - **Observed/reported:** the date and concrete observation or direct evidence. Say whether the cause is
