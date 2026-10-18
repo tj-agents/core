@@ -492,7 +492,8 @@ class HookLifecycleTests(unittest.TestCase):
         self.assertEqual(entry, json.loads((registry / "locked-id.json").read_text(encoding="utf-8")))
         row = self._row("claude:locked-id")
         self.assertEqual("awaiting_input", row["turn_state"])
-        self.assertEqual(str(self.root), row["cwd"])
+        self.assertEqual((str(self.root), None, None, None, None),
+                         (row["cwd"], row["repo"], row["branch"], row["head"], row["work_item"]))
         self.assertEqual([], [path.name for path in registry.iterdir() if path.name.endswith(".tmp")])
 
     def test_stop_records_the_checkout_root_not_a_subdirectory_or_the_enclosing_checkout(self):
