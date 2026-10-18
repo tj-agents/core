@@ -372,7 +372,7 @@ def record_prompt(connection, handle):
 def record_stop(connection, handle, cwd, follow=None):
     checkout, repo, branch, head = _collect_checkout(cwd)
     if follow is not None and follow(checkout) is False:
-        checkout = None
+        checkout = repo = branch = head = None
     now = time.time()
     connection.execute(
         """
