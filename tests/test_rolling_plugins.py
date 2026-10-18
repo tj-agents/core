@@ -384,36 +384,49 @@ class RollingPluginsTests(unittest.TestCase):
         package = ROLLING.resolve([ROLLING.Selection('base@core', str(self.remote), 'core')], self.root / 'cache')[0]
         self.assertTrue(package.root.joinpath('payload.txt').stat().st_mode & 0o111)
 
-    def test_unpublished_main_falls_back_to_the_last_published_revision(self):
-        def gate_failing_at(failing):
-            def gate(_clone, revision, _deadline=None):
-                if revision in failing:
-                    raise ROLLING.RollingPluginError('Catalog digest drift')
-            return gate
-
-        cache = self.root / 'cache'
-        clone, unpublished = ROLLING._fetch_main(str(self.remote), cache)
-        with mock.patch.object(ROLLING, '_publication_gate', side_effect=gate_failing_at({unpublished})), \
-                self.assertRaisesRegex(ROLLING.RollingPluginError, 'Catalog digest drift'):
-            ROLLING._published_revision(clone, unpublished)
-
-        self.write(self.author / 'plugins/publication.json', {'source_fingerprint': 'one'})
+    def add_generators(self, exit_code=0):
+        digests = "import sys\nsys.exit(0)\n"
+        sync = (
+            "import argparse, pathlib, sys\n"
+            "parser = argparse.ArgumentParser(); parser.add_argument('--root'); parser.add_argument('--check', action='store_true')\n"
+            "arguments = parser.parse_args(); built = pathlib.Path(arguments.root) / 'plugins/base/generated.txt'\n"
+            f"if {exit_code}: sys.exit({exit_code})\n"
+            "if arguments.check: sys.exit(0 if built.read_text() == 'built' else 1)\n"
+            "built.write_text('built')\n"
+        )
+        (self.author / 'scripts').mkdir(exist_ok=True)
+        (self.author / 'scripts/update_catalog_digests.py').write_text(digests, encoding='utf-8')
+        (self.author / 'scripts/sync_plugin_packages.py').write_text(sync, encoding='utf-8')
         git(self.author, 'add', '-A')
-        git(self.author, 'commit', '-m', 'Regenerate packages')
+        git(self.author, 'commit', '-m', 'merged source awaiting regeneration')
         git(self.author, 'push', 'origin', 'HEAD:main')
-        regenerated = git(self.author, 'rev-parse', 'HEAD')
-        merged = self.publish('merged source awaiting regeneration')
+
+    def test_unpublished_core_main_is_generated_locally_for_startup(self):
+        self.add_generators()
+        cache = self.root / 'cache'
         clone, tip = ROLLING._fetch_main(str(self.remote), cache)
-        self.assertEqual(merged, tip)
-        with mock.patch.object(ROLLING, '_publication_gate', side_effect=gate_failing_at({tip})):
-            self.assertEqual(regenerated, ROLLING._published_revision(clone, tip))
-        self.assertEqual('one', json.loads(ROLLING._git_text(clone, regenerated, 'plugins/publication.json'))['source_fingerprint'])
-        with mock.patch.object(ROLLING, '_publication_gate', side_effect=gate_failing_at({tip, regenerated})), \
-                self.assertRaisesRegex(ROLLING.RollingPluginError, 'Catalog digest drift'):
-            ROLLING._published_revision(clone, tip)
-        with mock.patch.object(ROLLING, '_publication_gate', side_effect=gate_failing_at({regenerated})), \
-                self.assertRaisesRegex(ROLLING.RollingPluginError, 'Catalog digest drift'):
-            ROLLING._published_revision(clone, regenerated)
+        core = 'https://github.com/tj-agents/core.git'
+        catalog_cache, published = {}, set()
+        with mock.patch.object(ROLLING, 'canonical_source', return_value=core),                 mock.patch.object(ROLLING, '_fetch_main', return_value=(clone, tip)),                 mock.patch.object(ROLLING, '_publication_gate', side_effect=ROLLING.RollingPluginError('Catalog digest drift')):
+            source, generated, revision, catalog = ROLLING._state(core, cache, catalog_cache, published, ROLLING.Deadline(60))
+        self.assertEqual((core, tip), (source, revision))
+        self.assertEqual(cache / 'generated' / tip, generated)
+        self.assertEqual(['base', 'engineering'], [entry['name'] for entry in catalog['plugins']])
+        files = ROLLING._tree_files(generated, tip, 'plugins/base')
+        self.assertEqual(b'built', files['generated.txt'][0])
+        self.assertEqual(b'one', files['payload.txt'][0])
+        self.assertNotIn(ROLLING.GENERATED_MARKER, files)
+        with mock.patch.object(ROLLING, '_extract_repository', side_effect=AssertionError('rebuilt')):
+            self.assertEqual(generated, ROLLING._generated_publication(clone, tip, cache, ROLLING.Deadline(60)))
+
+    def test_a_core_main_that_cannot_be_generated_still_fails_startup(self):
+        self.add_generators(exit_code=3)
+        cache = self.root / 'cache'
+        clone, tip = ROLLING._fetch_main(str(self.remote), cache)
+        with self.assertRaisesRegex(ROLLING.RollingPluginError, 'could not be generated for startup'):
+            ROLLING._generated_publication(clone, tip, cache, ROLLING.Deadline(60))
+        self.assertFalse((cache / 'generated' / tip).exists())
+        self.assertEqual([], list((cache / 'generated').iterdir()))
 
     def test_publication_gate_runs_the_fetched_generator_in_a_bounded_subprocess(self):
         clone = self.root / 'clone'
