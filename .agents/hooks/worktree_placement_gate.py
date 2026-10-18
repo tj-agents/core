@@ -242,6 +242,17 @@ def unquote(value):
     return value
 
 
+NATIVE_CREATION_TEXT = re.compile(r"\bgit(?:\.exe)?\b.*\bworktree\b[\s\\`]+add\b", re.I | re.S)
+
+
+def bare_word(value):
+    return re.sub(r"[\"'`$\\]", "", value)
+
+
+def names_native_creation(text):
+    return bool(NATIVE_CREATION_TEXT.search(re.sub(r"[\"'`$]|\\(?=\w)", "", text)))
+
+
 def tokens_of(segment):
     try:
         return [unquote(token) for token in shlex.split(segment, posix=False)]
@@ -250,8 +261,9 @@ def tokens_of(segment):
 
 
 def git_executable(value):
-    name = value.replace("\\", "/").rsplit("/", 1)[-1].casefold()
-    return name in {"git", "git.exe"}
+    names = {bare_word(value).casefold(),
+             re.sub(r"[\"'`$]", "", value).replace("\\", "/").rsplit("/", 1)[-1].casefold()}
+    return bool(names & {"git", "git.exe"})
 
 
 def path_is_literal_absolute(value):
@@ -273,8 +285,8 @@ def worktree_add_index(tokens, start):
     index = start + 1
     while index < len(tokens):
         value = tokens[index]
-        if value == "worktree":
-            return index if index + 1 < len(tokens) and tokens[index + 1] == "add" else None
+        if bare_word(value) == "worktree":
+            return index if index + 1 < len(tokens) and bare_word(tokens[index + 1]) == "add" else None
         if value == "-C":
             index += 2
         elif value.startswith("-C") and len(value) > 2:
@@ -304,7 +316,7 @@ def branch_name(value):
 def parse_creation(segment):
     tokens = tokens_of(segment)
     if tokens is None:
-        return "invalid", None
+        return ("invalid", None) if names_native_creation(segment) else (None, None)
     start = git_start(tokens)
     add_index = worktree_add_index(tokens, start)
     if add_index is None:
@@ -379,7 +391,7 @@ def parse_creation(segment):
 def creation_segments(command, kind):
     segments = shell_segments(command, kind)
     if segments is None:
-        return [("invalid", None)] if re.search(r"\bgit(?:\.exe)?\b.*\bworktree\s+add\b", command, re.I | re.S) else []
+        return [("invalid", None)] if names_native_creation(command) else []
     creations = []
     for segment in segments:
         parsed = parse_creation(segment)
