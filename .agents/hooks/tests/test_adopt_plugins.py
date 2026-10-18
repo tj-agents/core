@@ -46,6 +46,16 @@ class AdoptPluginsTests(unittest.TestCase):
         adopt_plugins.run(self.root, ["plugin-repository"], [], "write")
         self.assertEqual(["python@tj-agents", "template@tj-agents"], self.plugins())
 
+    def test_personal_is_explicit_and_selects_only_its_capability_dependencies(self):
+        adopt_plugins.run(self.root, ["react"], [], "write")
+        self.assertNotIn("personal@tj-agents", self.plugins())
+        adopt_plugins.run(self.root, [], ["personal"], "write")
+        self.assertEqual(["base@tj-agents", "machine@tj-agents", "personal@tj-agents", "react@tj-agents"], self.plugins())
+        self.assertEqual([], adopt_plugins.run(self.root, [], ["personal"], "check"))
+        claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
+        self.assertTrue(claude["enabledPlugins"]["personal@tj-agents"])
+        self.assertIn('[plugins."personal@tj-agents"]', (self.root / ".codex/config.toml").read_text(encoding="utf-8"))
+
     def test_existing_selection_is_extended_and_unknown_packages_are_kept(self):
         self.selection.parent.mkdir()
         self.selection.write_text(json.dumps({"schema_version": 1, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}, "plugins": ["newcomer@tj-agents"]}), encoding="utf-8")

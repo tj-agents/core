@@ -16,7 +16,8 @@
     "rust": [],
     "python": [],
     "github-actions": [],
-    "template": []
+    "template": [],
+    "personal": ["base", "machine"]
   },
   "stacks": {
     "dotnet": ["dotnet"],
