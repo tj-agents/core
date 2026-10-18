@@ -224,7 +224,7 @@ def _branch_from_symbolic_ref(value):
 
 def _rev_parse_probe(cwd, timeout):
     output, timed_out = _run_git(
-        cwd, ["rev-parse", "HEAD", "--git-common-dir", "--symbolic-full-name", "HEAD"], timeout,
+        cwd, ["rev-parse", "HEAD", "--git-common-dir", "--symbolic-full-name", "HEAD", "--show-toplevel"], timeout,
     )
     if output:
         lines = output.splitlines()
@@ -232,23 +232,29 @@ def _rev_parse_probe(cwd, timeout):
             head = lines[0].strip() or None
             common_dir = lines[1].strip() or None
             branch = _branch_from_symbolic_ref(lines[2].strip())
-            return head, branch, common_dir
+            toplevel = os.path.normpath(lines[3].strip()) if len(lines) >= 4 and lines[3].strip() else None
+            return head, branch, common_dir, toplevel
     if timed_out:
-        return None, None, None
+        return None, None, None, None
     common_dir = _git(cwd, "rev-parse", "--git-common-dir", timeout=timeout)
     if not common_dir:
-        return None, None, None
+        return None, None, None, None
     symbolic = _git(cwd, "symbolic-ref", "-q", "HEAD", timeout=timeout)
     branch = _branch_from_symbolic_ref(symbolic)
-    return None, branch, common_dir
+    return None, branch, common_dir, None
 
 
-def _collect_repo_branch_head(cwd, timeout=HOOK_GIT_TIMEOUT):
-    head, branch, _common_dir = _rev_parse_probe(cwd, timeout)
+def _collect_checkout(cwd, timeout=HOOK_GIT_TIMEOUT):
+    head, branch, _common_dir, toplevel = _rev_parse_probe(cwd, timeout)
     repo = _repository_identity.repository_identity(
         cwd,
         lambda directory, *arguments: _git(directory, *arguments, timeout=timeout),
     )
+    return toplevel or str(cwd), repo, branch, head
+
+
+def _collect_repo_branch_head(cwd, timeout=HOOK_GIT_TIMEOUT):
+    _checkout, repo, branch, head = _collect_checkout(cwd, timeout)
     return repo, branch, head
 
 
@@ -351,7 +357,7 @@ def record_prompt(connection, handle):
 
 
 def record_stop(connection, handle, cwd):
-    repo, branch, head = _collect_repo_branch_head(cwd)
+    checkout, repo, branch, head = _collect_checkout(cwd)
     now = time.time()
     connection.execute(
         """
@@ -359,12 +365,13 @@ def record_stop(connection, handle, cwd):
             repo = COALESCE(?, repo), branch = COALESCE(?, branch), head = COALESCE(?, head)
         WHERE handle = ?
         """,
-        (now, str(cwd), repo, branch, head, handle),
+        (now, checkout, repo, branch, head, handle),
     )
     connection.commit()
     if repo and branch:
         attach_work_item_if_unique(connection, repo, branch, handle)
         connection.commit()
+    return checkout
 
 
 def record_prepared_stop(connection, handle, expected_activity, expected_state):
@@ -617,8 +624,7 @@ def run_hook(event, host):
             elif event == "prompt":
                 record_prompt(connection, handle)
             elif event == "stop":
-                record_stop(connection, handle, cwd)
-                follow_registered_cwd(host, session_id, cwd)
+                follow_registered_cwd(host, session_id, record_stop(connection, handle, cwd))
             elif event == "session-end":
                 end_session(connection, handle, "closed")
         finally:
