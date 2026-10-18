@@ -35,6 +35,10 @@ class RefreshCliTests(unittest.TestCase):
         path.write_text(json.dumps(value), encoding="utf-8")
 
     def install(self, host: str, identity: str, revision: str, directory: str) -> Path:
+        if host == "claude":
+            self.write(self.root / "claude/plugins/known_marketplaces.json", {
+                "tj-agents": {"source": {"source": "github", "repo": "tj-agents/marketplace"}},
+            })
         name, marketplace = identity.rsplit("@", 1)
         package = self.root / host / "plugins" / "cache" / marketplace / name
         (package / directory).mkdir(parents=True)
@@ -70,40 +74,62 @@ class RefreshCliTests(unittest.TestCase):
             "agents": {"source_type": "git", "source": "https://github.com/Concertable/agents.git"},
         }}
         self.assertEqual(REFRESH.codex_marketplaces(selection), ["base-agents"])
+        camel = {"effective_marketplace_configuration": {
+            "base-agents": {"sourceType": "git", "source": "https://github.com/tj-agents/core.git"},
+        }}
+        self.assertEqual(REFRESH.codex_marketplaces(camel), ["base-agents"])
 
     def test_claude_registry_version_must_name_the_refreshed_install(self):
         current = self.install("claude", "machine@tj-agents", MAIN, MAIN)
         self.write(self.root / "claude/plugins/installed_plugins.json", {"version": 2, "plugins": {
             "machine@tj-agents": [{"scope": "user", "installPath": str(current), "version": "61b5b1ee19f7-aee5d9df"}],
         }})
-        report = REFRESH.verify("claude", {"machine@tj-agents"}, lambda _repository: MAIN, self.environ)
+        report = REFRESH.verify("claude", {"machine@tj-agents"}, self.project, lambda _repository: MAIN, self.environ)
         self.assertEqual(len(report["problems"]), 1)
         self.assertIn("so Claude loads another copy", report["problems"][0])
 
         self.write(self.root / "claude/plugins/installed_plugins.json", {"version": 2, "plugins": {
             "machine@tj-agents": [{"scope": "user", "installPath": str(current), "version": MAIN}],
         }})
-        report = REFRESH.verify("claude", {"machine@tj-agents"}, lambda _repository: MAIN, self.environ)
+        report = REFRESH.verify("claude", {"machine@tj-agents"}, self.project, lambda _repository: MAIN, self.environ)
         self.assertEqual(report["problems"], [])
         self.assertTrue(report["packages"][0]["current"])
+
+    def test_a_project_record_loading_an_older_copy_is_reported(self):
+        current = self.install("claude", "machine@tj-agents", MAIN, MAIN)
+        older = current.parent / OLD
+        older.mkdir()
+        other = self.root / "elsewhere"
+        self.write(self.root / "claude/plugins/installed_plugins.json", {"version": 2, "plugins": {
+            "machine@tj-agents": [
+                {"scope": "user", "installPath": str(current), "version": MAIN},
+                {"scope": "local", "projectPath": str(self.project), "installPath": str(older), "version": OLD},
+                {"scope": "local", "projectPath": str(other), "installPath": str(older), "version": OLD},
+            ],
+        }})
+        report = REFRESH.verify("claude", {"machine@tj-agents"}, self.project, lambda _repository: MAIN,
+                                self.environ)
+        self.assertEqual(report["problems"], [
+            f"machine@tj-agents (local): Claude loads {OLD!r}, but the refreshed install is {MAIN!r}",
+        ])
 
     def test_stale_enabled_packages_are_reported_and_disabled_ones_ignored(self):
         self.install("codex", "machine@base-agents", OLD, "local")
         self.install("codex", "engineering@base-agents", OLD, "local")
-        report = REFRESH.verify("codex", {"machine@base-agents"}, lambda _repository: MAIN, self.environ)
+        report = REFRESH.verify("codex", {"machine@base-agents"}, self.project, lambda _repository: MAIN, self.environ)
         self.assertEqual([package["identity"] for package in report["packages"]], ["machine@base-agents"])
         self.assertEqual(report["problems"], [f"machine@base-agents is at {OLD}, main is {MAIN}"])
 
     def test_codex_reports_stale_cache_outside_machine_as_unused(self):
         self.install("codex", "machine@base-agents", MAIN, "local")
         self.install("codex", "cpp@cpp-agents", OLD, "local")
-        report = REFRESH.verify("codex", {"machine@base-agents", "cpp@cpp-agents"}, lambda _repository: MAIN,
+        report = REFRESH.verify("codex", {"machine@base-agents", "cpp@cpp-agents"}, self.project, lambda _repository: MAIN,
                                 self.environ)
         self.assertEqual(report["problems"], [])
         self.assertEqual(report["unused_stale_cache"], ["cpp@cpp-agents"])
 
     def test_no_enabled_package_is_a_problem(self):
-        report = REFRESH.verify("codex", set(), lambda _repository: MAIN, self.environ)
+        report = REFRESH.verify("codex", set(), self.project, lambda _repository: MAIN, self.environ)
         self.assertEqual(report["problems"], ["no rolling tj-agents package is installed for codex"])
 
     def test_refresh_updates_marketplaces_then_runs_the_bound_refresh(self):
