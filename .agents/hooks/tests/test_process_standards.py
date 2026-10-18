@@ -119,7 +119,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "and so is a standard that caused or failed to prevent a mistake",
             "`engineering:self-repair` in the same turn, after answering the user's direct question and before the "
             "current task resumes",
-            "That workflow owns the repair authorization, admission, disposition, and delivery procedure",
+            "That workflow owns the repair authorization and delivery procedure",
             "explicit user limits still hold",
         ):
             with self.subTest(phrase=phrase):
@@ -128,7 +128,8 @@ class ProcessStandardsTests(unittest.TestCase):
         self_repair = " ".join(authored_skill("self-repair").read_text(encoding="utf-8").split())
         for phrase in (
             "reconcile that owner and contribute the new evidence without creating a duplicate writer",
-            "A capability, dependency, conflict, or capacity obstacle is recorded as a linked deferred disposition",
+            "Fix the standard in the current session",
+            "Hand the repair off only when the user asks",
             "This standing authorization covers the bounded Core repair through implementation, tests, review, pull "
             "request, merge, and publication",
         ):
@@ -144,7 +145,7 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertTrue(section.startswith("When the user calls out a mistake, answer the direct question first"))
         for phrase in (
             "`engineering:self-repair`",
-            "required bounded source-repair handoff",
+            "repairing it in this session",
             "Existing user limits and scope gates still apply",
         ):
             with self.subTest(phrase=phrase):
@@ -153,9 +154,6 @@ class ProcessStandardsTests(unittest.TestCase):
         self_repair = " ".join(authored_skill("self-repair").read_text(encoding="utf-8").split())
         for phrase in (
             "consumed Core standard, skill, hook, workflow, or host enforcement",
-            "`engineering:handoff` in bounded side-workstream mode",
-            "native launcher reports successful submission",
-            "failed launcher is not a handoff",
             "monitoring-only",
             "Monitoring does not grant delivery authority",
             "never authorizes taking over an unrelated pending delivery",
@@ -362,8 +360,8 @@ class ProcessStandardsTests(unittest.TestCase):
         execution = " ".join(
             authored_skill("plan-execution").read_text(encoding="utf-8").split()
         )
-        self.assertIn("Lane selection does not itself transfer task ownership", lanes)
-        self.assertIn("For Codex, the parent normally continues in the same checkout", lanes)
+        self.assertIn("Lane selection never transfers task ownership", lanes)
+        self.assertIn("On either host the parent does its own work in the same checkout", lanes)
         self.assertIn("explicit path and responsibility ownership", lanes)
         self.assertIn("A small follow-up can stay with the parent", lanes)
         self.assertIn("If delegation is unavailable", lanes)
