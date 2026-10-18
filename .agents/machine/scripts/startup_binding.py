@@ -330,19 +330,37 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
         raise StartupBindingError(f"{host} startup preflight could not complete: {error}") from error
 
 
+def write_status(path: Path | None, state: str, **details: object) -> None:
+    if path is None:
+        return
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    try:
+        temporary.write_text(json.dumps({"state": state, "pid": os.getpid(), "at": time.time(), **details}),
+                             encoding="utf-8")
+        os.replace(temporary, path)
+    except OSError:
+        pass
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", choices=("claude", "codex"), required=True)
     parser.add_argument("--project", type=Path, required=True)
     parser.add_argument("--target", required=True)
+    parser.add_argument("--status-file", type=Path)
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     parsed = parser.parse_args(argv)
     arguments = parsed.arguments[1:] if parsed.arguments[:1] == ["--"] else parsed.arguments
+    write_status(parsed.status_file, "preparing")
     try:
-        return run_session(parsed.host, parsed.target, parsed.project, arguments)
+        returncode = run_session(parsed.host, parsed.target, parsed.project, arguments)
     except StartupBindingError as error:
-        print(f"standards: {parsed.host} refresh failed: {error}", file=sys.stderr)
+        message = f"standards: {parsed.host} refresh failed: {error}"
+        print(message, file=sys.stderr)
+        write_status(parsed.status_file, "failed", error=message)
         return 1
+    write_status(parsed.status_file, "exited", returncode=returncode)
+    return returncode
 
 
 if __name__ == "__main__":
