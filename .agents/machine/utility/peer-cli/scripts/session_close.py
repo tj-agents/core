@@ -319,6 +319,11 @@ def liveness(entry):
     return True if status == "live" else False if status in {"exited", "reused"} else None
 
 
+def attached_to(cwd, entry):
+    return any(nonempty_string(root) and under_or_equal(cwd, root)
+               for root in (entry.get("cwd"), entry.get("launch_cwd")))
+
+
 def own_host_and_entry(cwd=None):
     cwd = Path(cwd or os.getcwd()).resolve()
     host_names = register_session.read_host_names()
@@ -340,8 +345,7 @@ def own_host_and_entry(cwd=None):
         raise Refusal("current process is not attached to a recognized registered host")
     matches = []
     for _path, entry in entries():
-        if not valid_entry(entry) or not any(
-                nonempty_string(root) and under_or_equal(cwd, root) for root in (entry["cwd"], entry.get("launch_cwd"))):
+        if not valid_entry(entry) or not attached_to(cwd, entry):
             continue
         if (entry["pid"] == nearest.pid
                 and entry["host"] == register_session.stem(nearest.name)
