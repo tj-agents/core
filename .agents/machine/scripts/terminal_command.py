@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+from typing import Mapping
 
 import agent_cli
 
@@ -59,9 +60,22 @@ def command_for_target(target: str, arguments: list[str]) -> list[str]:
     return [target, *arguments]
 
 
-def run_target(target: str, arguments: list[str]) -> int:
+BINDING_STATE_VARIABLES = (
+    "TJ_AGENTS_STARTUP_ACK_DIRECTORY",
+    "TJ_AGENTS_STARTUP_ACK_TOKEN",
+    "TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY",
+    "TJ_AGENTS_CODEX_RUNTIME_RECEIPT",
+    "TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256",
+)
+
+
+def without_binding_state(environment: Mapping[str, str]) -> dict[str, str]:
+    return {key: value for key, value in environment.items() if key not in BINDING_STATE_VARIABLES}
+
+
+def run_target(target: str, arguments: list[str], environment: Mapping[str, str] | None = None) -> int:
     try:
-        return subprocess.run(command_for_target(target, arguments)).returncode
+        return subprocess.run(command_for_target(target, arguments), env=environment).returncode
     except OSError as error:
         print(f"terminal launcher could not start {target}: {error}", file=sys.stderr)
         return 127

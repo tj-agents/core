@@ -210,6 +210,33 @@ class StartupBindingTests(unittest.TestCase):
                 BINDING.run_session("claude", "typed", self.project, ["session"])
         terminate.assert_called_once_with(process)
 
+    def test_typed_session_without_acknowledgement_keeps_running(self):
+        prepared = self.prepared
+
+        class Active:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *details):
+                return None
+
+            def materialize_native(self, executable):
+                return prepared
+
+            acknowledge_binding = mock.Mock()
+
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.wait.return_value = 7
+        with mock.patch.object(BINDING, "preflight", return_value=Active()),                 mock.patch.object(BINDING, "native_target_for_shim", return_value="native"),                 mock.patch.object(BINDING, "_preflight_arguments", return_value={}),                 mock.patch.object(BINDING, "_converge"),                 mock.patch.object(BINDING, "_remaining", return_value=0),                 mock.patch.object(BINDING, "command_for_target", return_value=["native"]),                 mock.patch.object(BINDING.subprocess, "Popen", return_value=process) as popen,                 mock.patch.object(BINDING, "terminate_process_tree") as terminate,                 mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.project / "config")}, clear=False):
+            launched = mock.Mock()
+            self.assertEqual(7, BINDING.run_session("claude", "typed", self.project, ["session"],
+                                                    on_launch=launched, keep_unacknowledged_session=True))
+        popen.assert_called_once()
+        launched.assert_called_once_with()
+        terminate.assert_not_called()
+        Active.acknowledge_binding.assert_called_once()
+
     def test_selected_packages_without_session_start_dispatcher_fail_before_native_start(self):
         (self.root / "hooks" / "claude.json").write_text('{"hooks":{"SessionStart":[]}}', encoding="utf-8")
         prepared = self.prepared
