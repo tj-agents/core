@@ -38,13 +38,14 @@ def main(argv: list[str] | None = None) -> int:
     if command[:1] == ["--"]:
         command = command[1:]
     if not command or command[0] not in CLAUDE_NON_SESSION_COMMANDS:
-        started: list[object] = []
+        started: list[bool] = []
         try:
             if not command:
                 command = ["-n", claude_label(parsed.project)]
             flush_before_cli()
             return run_session("claude", parsed.target, parsed.project, command,
-                               on_running=lambda child_pid=None: started.append(child_pid))
+                               on_launch=lambda: started.append(True),
+                               keep_unacknowledged_session=True)
         except Exception as error:
             if started:
                 print(f"standards: Claude session ended with a standards error: {error}", file=sys.stderr)
