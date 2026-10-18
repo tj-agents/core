@@ -60,6 +60,8 @@ def toml_value(value: object) -> str:
         for key in sorted(value):
             if not isinstance(key, str):
                 raise RuntimeBindingError("Codex effective configuration contains a non-string table key")
+            if value[key] is None:
+                continue
             items.append(f"{json.dumps(key, ensure_ascii=False)} = {toml_value(value[key])}")
         return "{ " + ", ".join(items) + " }"
     raise RuntimeBindingError("Codex effective configuration contains an unsupported value")
