@@ -60,6 +60,20 @@ def _update_own_end(entry, operation, reason):
         pass
 
 
+def delete_own_session(session_id):
+    try:
+        store = register_session._load_session_store()
+        if store is None:
+            return
+        connection = store.connect()
+        try:
+            store.delete_session(connection, session_id)
+        finally:
+            connection.close()
+    except Exception:
+        pass
+
+
 def _record_own_end(entry, reason):
     _update_own_end(entry, "end_session", reason)
 
@@ -533,6 +547,10 @@ def start_observer(arguments):
     staging.mkdir(parents=True, exist_ok=False)
     for name in ("finish_reaper.py", "session_close.py", "register_session.py"):
         shutil.copy2(Path(__file__).with_name(name), staging / name)
+    store = register_session.session_store_path()
+    if store is not None:
+        for name in ("session_store.py", "repository_identity.py"):
+            shutil.copy2(store.with_name(name), staging / name)
     command = [sys.executable, str(staging / "finish_reaper.py"), *arguments]
     kwargs = {"cwd": str(state_directory()), "stdin": subprocess.DEVNULL,
               "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}

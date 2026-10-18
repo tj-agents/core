@@ -404,6 +404,11 @@ def reopen_session(connection, handle, reason):
     connection.commit()
 
 
+def delete_session(connection, session_id):
+    connection.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+    connection.commit()
+
+
 def attach_work_item_if_unique(connection, repo, branch, handle):
     row = connection.execute("SELECT work_item FROM sessions WHERE handle = ?", (handle,)).fetchone()
     if row is None or row["work_item"] is not None:

@@ -69,7 +69,7 @@ against its stable mistake ID. D002 records the later observed CI-waiter gap.
 - **Source owner:** Core problem-record and delivery conventions.
 - **State:** open.
 - **Repair link:** [M014](../../MISTAKES.md#M014).
-- **Next action:** make `write-mistake`, `write-debt`, and the callout-repair path commit and push incident
+- **Next action:** make `write-mistake`, `write-debt`, and the self-repair path commit and push incident
   records directly to `main`, while keeping ordinary implementation changes on their normal delivery path.
 - **Resolution condition:** a new incident record is committed directly to `main` without a PR, and both
   host-delivered conventions make that direct-main route explicit for mistake and debt records.
@@ -186,8 +186,7 @@ with a test that `review-prepare` names the skill for such a path.
 - **Cause:** `engineering:session-guidance` ("Record noticed problems") says to record while the observation
   is available, but nothing enforces it. Recording was conflated with repair: being unable to launch a
   repair session was treated as a reason to postpone the record.
-- **Source owner:** core engineering (session guidance, `write-debt`, `write-mistake` and the callout-repair
-  gate).
+- **Source owner:** core engineering (session guidance, `write-debt` and `write-mistake`).
 - **State:** open.
 - **Next action:**
   - state that a record lands in the owning repository's ledger, straight to `main` (D003), at the moment

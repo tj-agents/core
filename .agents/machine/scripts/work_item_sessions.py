@@ -4,6 +4,7 @@
 import argparse
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -277,6 +278,19 @@ def _pid_is_dead(pid, pid_started_at):
     return started != pid_started_at
 
 
+def _finished_elsewhere(row, machine):
+    if row.get("ended_at") is not None:
+        return True
+    if (row.get("machine") or "").casefold() != machine.casefold():
+        return False
+    record = _agent_recovery()._registry(row["session_id"]) or {}
+    started = record.get("pid_started_at")
+    if (record.get("host") in (None, row["host"]) and isinstance(record.get("pid"), int)
+            and isinstance(started, (int, float)) and not isinstance(started, bool) and math.isfinite(started)):
+        return _pid_is_dead(record["pid"], started)
+    return _pid_is_dead(row.get("pid"), row.get("pid_started_at"))
+
+
 def _resume_roots(row):
     host = row["host"]
     subdirectory = "projects" if host == "claude" else "sessions"
@@ -489,6 +503,16 @@ def cmd_item(work_item, status, pr=None, title=None, plan_path=None, cwd=None):
                 connection, key, repo, feature, item, status=status, branch=record_branch, pr=pr,
                 title=title, plan_path=plan_path,
             )
+        if status == "done":
+            keep = [
+                store.session_handle(host, session_id)
+                for host in ("claude", "codex")
+                for session_id in (_current_session_id(host),) if session_id
+            ]
+            machine = socket.gethostname()
+            for row in store.sessions_for_work_item(connection, key):
+                if row["handle"] not in keep and _finished_elsewhere(row, machine):
+                    store.delete_session(connection, row["session_id"])
     finally:
         connection.close()
     return {"work_item": f"{feature}/{item}", "status": status}
