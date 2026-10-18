@@ -9,7 +9,16 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from startup_binding import StartupBindingError, run_session
+try:
+    from startup_binding import StartupBindingError, run_session
+except Exception as _startup_import_error:
+    _startup_unavailable = f"startup binding could not load ({_startup_import_error})"
+
+    class StartupBindingError(Exception):
+        pass
+
+    def run_session(*_arguments: object, **_options: object) -> int:
+        raise StartupBindingError(_startup_unavailable)
 from terminal_command import (
     CLAUDE_NON_SESSION_COMMANDS,
     claude_label,
@@ -34,9 +43,10 @@ def main(argv: list[str] | None = None) -> int:
                 command = ["-n", claude_label(parsed.project)]
             flush_before_cli()
             return run_session("claude", parsed.target, parsed.project, command)
-        except StartupBindingError as error:
-            print(f"standards: Claude refresh failed: {error}", file=sys.stderr)
-            return 1
+        except Exception as error:
+            print(f"standards: Claude refresh failed: {error}; starting Claude without the standards refresh",
+                  file=sys.stderr)
+            return run_target(parsed.target, command)
     if not command:
         command = ["-n", claude_label(parsed.project)]
     flush_before_cli()

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -126,10 +128,21 @@ class TerminalLaunchersTests(unittest.TestCase):
                 self.assertEqual(0, CLAUDE.main(["--project", "/work", "--target", target, "chat"]))
                 session.assert_called_once_with("claude", target, Path("/work"), ["chat"])
 
-    def test_claude_refresh_failure_does_not_run_the_typed_cli(self):
-        with mock.patch.object(CLAUDE, "run_session", side_effect=CLAUDE.StartupBindingError("offline")), \
-                mock.patch.object(CLAUDE, "run_target", return_value=23) as run:
-            self.assertEqual(1, CLAUDE.main(["--project", "/work", "--target", "claude", "chat"]))
+    def test_claude_refresh_failure_falls_back_to_the_typed_cli(self):
+        buffer = io.StringIO()
+        with mock.patch.object(CLAUDE, "run_session", side_effect=CLAUDE.StartupBindingError("offline")) as session, \
+                mock.patch.object(CLAUDE, "run_target", return_value=23) as run, \
+                contextlib.redirect_stderr(buffer):
+            self.assertEqual(23, CLAUDE.main(["--project", "/work", "--target", "claude", "chat"]))
+        session.assert_called_once()
+        run.assert_called_once_with("claude", ["chat"])
+        self.assertIn("starting Claude without the standards refresh", buffer.getvalue())
+
+    def test_claude_successful_session_does_not_run_the_typed_cli_again(self):
+        with mock.patch.object(CLAUDE, "run_session", return_value=0) as session, \
+                mock.patch.object(CLAUDE, "run_target") as run:
+            self.assertEqual(0, CLAUDE.main(["--project", "/work", "--target", "claude", "chat"]))
+        session.assert_called_once()
         run.assert_not_called()
 
     def test_codex_binds_the_typed_shim_and_args_in_the_child_session(self):
@@ -139,17 +152,28 @@ class TerminalLaunchersTests(unittest.TestCase):
             self.assertEqual(23, CODEX.main(["--project", "/work", "--target", "C:/npm/codex.cmd", *special]))
             session.assert_called_once_with("codex", "C:/npm/codex.cmd", Path("/work"), special)
 
-    def test_codex_maintenance_commands_bypass_refresh_but_session_commands_fail_closed(self):
+    def test_codex_maintenance_commands_bypass_refresh_and_session_commands_fall_back(self):
+        buffer = io.StringIO()
         with mock.patch.object(CODEX, "run_session", side_effect=CODEX.StartupBindingError("bad registry")) as session, \
-                mock.patch.object(CODEX, "run_target", return_value=9) as run:
+                mock.patch.object(CODEX, "run_target", return_value=9) as run, \
+                contextlib.redirect_stderr(buffer):
             self.assertEqual(9, CODEX.main(["--project", "/work", "--target", "codex", "plugin", "list"]))
             session.assert_not_called()
             self.assertEqual(9, CODEX.main(["--project", "/work", "--target", "codex", "--", "--version"]))
             self.assertEqual(9, CODEX.main(["--project", "/work", "--target", "codex", "--", "--help"]))
             for command in (["exec"], ["review"], ["exec", "--version"]):
                 with self.subTest(command=command):
-                    self.assertEqual(1, CODEX.main(["--project", "/work", "--target", "codex", *command]))
-            self.assertEqual(run.call_count, 3)
+                    self.assertEqual(9, CODEX.main(["--project", "/work", "--target", "codex", *command]))
+            self.assertEqual(session.call_count, 3)
+            self.assertEqual(run.call_count, 6)
+        self.assertIn("starting Codex without the standards refresh", buffer.getvalue())
+
+    def test_codex_successful_session_does_not_run_the_typed_cli_again(self):
+        with mock.patch.object(CODEX, "run_session", return_value=0) as session, \
+                mock.patch.object(CODEX, "run_target") as run:
+            self.assertEqual(0, CODEX.main(["--project", "/work", "--target", "codex", "exec"]))
+        session.assert_called_once()
+        run.assert_not_called()
 
     def test_codex_launcher_binds_session_commands_and_routes_hook_control(self):
         events = []
@@ -241,7 +265,7 @@ class TerminalLaunchersTests(unittest.TestCase):
         self.assertEqual(json.dumps(arguments, ensure_ascii=False, separators=(",", ":")) + "\n", completed.stdout)
 
     @unittest.skipIf(os.name == "nt", "Bash adapter integration runs on Linux")
-    def test_bash_set_eu_bare_command_and_missing_registry_fails_closed(self):
+    def test_bash_set_eu_bare_command_falls_back_when_the_registry_is_missing(self):
         if shutil.which("bash") is None:
             self.skipTest("Bash is unavailable")
         with tempfile.TemporaryDirectory(prefix="terminal bash ") as directory:
@@ -259,10 +283,11 @@ class TerminalLaunchersTests(unittest.TestCase):
                        CLAUDE_CODE_PLUGIN_CACHE_DIR=str(root / "missing"))
             result = subprocess.run(["bash", "--noprofile", "--norc", "-c", f"set -eu; . '{profile}'; claude"],
                                     env=env, text=True, capture_output=True, check=False)
-        self.assertEqual(125, result.returncode, result.stderr)
-        self.assertEqual("", result.stdout)
-        self.assertFalse(calls.exists())
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("typed:0\n", result.stdout)
+        self.assertEqual("cli\n", calls.read_text(encoding="utf-8"))
         self.assertIn("registry could not be read", result.stderr)
+        self.assertIn("starting Claude without the standards refresh", result.stderr)
 
     def test_bootstrap_warns_for_malformed_registry_shapes(self):
         with tempfile.TemporaryDirectory(prefix="terminal registry ") as directory:
@@ -284,7 +309,7 @@ class TerminalLaunchersTests(unittest.TestCase):
                 self.assertIn("registry is malformed", result.stderr)
 
     @unittest.skipIf(os.name == "nt", "Bash adapter integration runs on Linux")
-    def test_bash_missing_interpreter_fails_closed(self):
+    def test_bash_falls_back_without_a_usable_python(self):
         if shutil.which("bash") is None:
             self.skipTest("Bash is unavailable")
         with tempfile.TemporaryDirectory(prefix="terminal no python ") as directory:
@@ -300,9 +325,10 @@ class TerminalLaunchersTests(unittest.TestCase):
             result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", f". '{profile}'; claude"],
                                     env=dict(os.environ, HOME=str(home), PATH=str(bin_dir)),
                                     text=True, capture_output=True, check=False)
-        self.assertEqual(125, result.returncode, result.stderr)
-        self.assertEqual("", result.stdout)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("fallback\n", result.stdout)
         self.assertIn("no usable Python", result.stderr)
+        self.assertIn("starting Claude without the standards refresh", result.stderr)
 
     @unittest.skipIf(os.name == "nt", "Bash adapter integration runs on Linux")
     def test_bash_preserves_a_real_cli_exit_125_without_a_second_launch(self):

@@ -11,7 +11,16 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from agent_cli import LaunchError
-from startup_binding import StartupBindingError, run_session
+try:
+    from startup_binding import StartupBindingError, run_session
+except Exception as _startup_import_error:
+    _startup_unavailable = f"startup binding could not load ({_startup_import_error})"
+
+    class StartupBindingError(Exception):
+        pass
+
+    def run_session(*_arguments: object, **_options: object) -> int:
+        raise StartupBindingError(_startup_unavailable)
 from terminal_command import command_for_target, flush_before_cli, run_target
 
 
@@ -110,13 +119,14 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.hooks:
         return hook_control(parsed.arguments)
     if not bypasses_refresh(parsed.arguments):
+        command = without_daemon_for_interactive(parsed.arguments, parsed.target)
         try:
-            command = without_daemon_for_interactive(parsed.arguments, parsed.target)
             flush_before_cli()
             return run_session("codex", parsed.target, parsed.project, command)
-        except StartupBindingError as error:
-            print(f"standards: Codex refresh failed: {error}", file=sys.stderr)
-            return 1
+        except Exception as error:
+            print(f"standards: Codex refresh failed: {error}; starting Codex without the standards refresh",
+                  file=sys.stderr)
+            return run_target(parsed.target, command)
     flush_before_cli()
     return run_target(parsed.target, without_daemon_for_interactive(parsed.arguments, parsed.target))
 
