@@ -29,6 +29,8 @@ normalise_remote = _repository_identity.normalise_remote
 SCHEMA_VERSION = 3
 GIT_TIMEOUT = 3
 HOOK_GIT_TIMEOUT = 2
+REGISTRY_REPLACE_ATTEMPTS = 40
+REGISTRY_REPLACE_DELAY_SECONDS = 0.05
 _LOCK_RETRY_DELAY = 0.05
 
 WORK_ITEMS_SCHEMA = """
@@ -84,6 +86,33 @@ def state_directory():
 
 def database_path():
     return state_directory() / "sessions.db"
+
+
+def follow_registered_cwd(host, session_id, cwd):
+    path = state_directory() / "cli-sessions" / f"{session_id}.json"
+    try:
+        entry = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if (not isinstance(entry, dict) or entry.get("session_id") != session_id
+            or entry.get("host") not in (None, host) or entry.get("cwd") == str(cwd)):
+        return None
+    entry.setdefault("launch_cwd", entry.get("cwd"))
+    entry["cwd"] = str(cwd)
+    staging = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        staging.write_text(json.dumps(entry, sort_keys=True) + "\n", encoding="utf-8")
+        for _attempt in range(REGISTRY_REPLACE_ATTEMPTS):
+            try:
+                os.replace(staging, path)
+                return True
+            except PermissionError:
+                time.sleep(REGISTRY_REPLACE_DELAY_SECONDS)
+        return False
+    except OSError:
+        return False
+    finally:
+        staging.unlink(missing_ok=True)
 
 
 def _execute_with_lock_retry(connection, statement):
@@ -208,7 +237,7 @@ def _branch_from_symbolic_ref(value):
 
 def _rev_parse_probe(cwd, timeout):
     output, timed_out = _run_git(
-        cwd, ["rev-parse", "HEAD", "--git-common-dir", "--symbolic-full-name", "HEAD"], timeout,
+        cwd, ["rev-parse", "HEAD", "--git-common-dir", "--symbolic-full-name", "HEAD", "--show-toplevel"], timeout,
     )
     if output:
         lines = output.splitlines()
@@ -216,23 +245,29 @@ def _rev_parse_probe(cwd, timeout):
             head = lines[0].strip() or None
             common_dir = lines[1].strip() or None
             branch = _branch_from_symbolic_ref(lines[2].strip())
-            return head, branch, common_dir
+            toplevel = os.path.normpath(lines[3].strip()) if len(lines) >= 4 and lines[3].strip() else None
+            return head, branch, common_dir, toplevel
     if timed_out:
-        return None, None, None
+        return None, None, None, None
     common_dir = _git(cwd, "rev-parse", "--git-common-dir", timeout=timeout)
     if not common_dir:
-        return None, None, None
+        return None, None, None, None
     symbolic = _git(cwd, "symbolic-ref", "-q", "HEAD", timeout=timeout)
     branch = _branch_from_symbolic_ref(symbolic)
-    return None, branch, common_dir
+    return None, branch, common_dir, None
 
 
-def _collect_repo_branch_head(cwd, timeout=HOOK_GIT_TIMEOUT):
-    head, branch, _common_dir = _rev_parse_probe(cwd, timeout)
+def _collect_checkout(cwd, timeout=HOOK_GIT_TIMEOUT):
+    head, branch, _common_dir, toplevel = _rev_parse_probe(cwd, timeout)
     repo = _repository_identity.repository_identity(
         cwd,
         lambda directory, *arguments: _git(directory, *arguments, timeout=timeout),
     )
+    return toplevel or str(cwd), repo, branch, head
+
+
+def _collect_repo_branch_head(cwd, timeout=HOOK_GIT_TIMEOUT):
+    _checkout, repo, branch, head = _collect_checkout(cwd, timeout)
     return repo, branch, head
 
 
@@ -334,16 +369,18 @@ def record_prompt(connection, handle):
     connection.commit()
 
 
-def record_stop(connection, handle, cwd):
-    repo, branch, head = _collect_repo_branch_head(cwd)
+def record_stop(connection, handle, cwd, follow=None):
+    checkout, repo, branch, head = _collect_checkout(cwd)
+    if follow is not None and follow(checkout) is False:
+        checkout = repo = branch = head = None
     now = time.time()
     connection.execute(
         """
-        UPDATE sessions SET turn_state = 'awaiting_input', last_activity_at = ?, cwd = ?,
+        UPDATE sessions SET turn_state = 'awaiting_input', last_activity_at = ?, cwd = COALESCE(?, cwd),
             repo = COALESCE(?, repo), branch = COALESCE(?, branch), head = COALESCE(?, head)
         WHERE handle = ?
         """,
-        (now, str(cwd), repo, branch, head, handle),
+        (now, checkout, repo, branch, head, handle),
     )
     connection.commit()
     if repo and branch:
@@ -601,7 +638,8 @@ def run_hook(event, host):
             elif event == "prompt":
                 record_prompt(connection, handle)
             elif event == "stop":
-                record_stop(connection, handle, cwd)
+                record_stop(connection, handle, cwd,
+                            follow=lambda checkout: follow_registered_cwd(host, session_id, checkout))
             elif event == "session-end":
                 end_session(connection, handle, "closed")
         finally:
