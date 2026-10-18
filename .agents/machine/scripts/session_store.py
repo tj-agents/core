@@ -393,14 +393,6 @@ def delete_session(connection, session_id):
     connection.commit()
 
 
-def delete_work_item_sessions(connection, key, keep=()):
-    keep = tuple(keep)
-    placeholders = ", ".join("?" for _ in keep)
-    exclusion = f" AND handle NOT IN ({placeholders})" if keep else ""
-    connection.execute(f"DELETE FROM sessions WHERE work_item = ?{exclusion}", (key, *keep))
-    connection.commit()
-
-
 def attach_work_item_if_unique(connection, repo, branch, handle):
     row = connection.execute("SELECT work_item FROM sessions WHERE handle = ?", (handle,)).fetchone()
     if row is None or row["work_item"] is not None:

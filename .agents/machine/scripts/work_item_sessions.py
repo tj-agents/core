@@ -495,7 +495,10 @@ def cmd_item(work_item, status, pr=None, title=None, plan_path=None, cwd=None):
                 for host in ("claude", "codex")
                 for session_id in (_current_session_id(host),) if session_id
             ]
-            store.delete_work_item_sessions(connection, key, keep=keep)
+            for row in store.sessions_for_work_item(connection, key):
+                ended = row["ended_at"] is not None
+                if row["handle"] not in keep and (ended or _pid_is_dead(row["pid"], row["pid_started_at"])):
+                    store.delete_session(connection, row["session_id"])
     finally:
         connection.close()
     return {"work_item": f"{feature}/{item}", "status": status}
