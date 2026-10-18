@@ -324,6 +324,61 @@ class StartupBindingTests(unittest.TestCase):
                     BINDING.ACK_DIRECTORY_ENV, BINDING.ACK_TOKEN_ENV, BINDING.SNAPSHOT_DIRECTORY_ENV):
             self.assertNotIn(key, captured["env"])
 
+    def test_handoff_waits_for_real_codex_session_start_and_rejects_wrong_acknowledgements(self):
+        shutil.copyfile(ROOT / ".agents/plugins/manifests/codex/machine-hooks.json", self.root / "hooks/codex.json")
+        gate = self.project / "gate.py"
+        gate.write_text("print('{}')\n", encoding="utf-8")
+        child = self.project / "native.py"
+        child.write_text(
+            "import json, os, pathlib, subprocess, sys\n"
+            "mode = sys.argv[1]\n"
+            "if mode == 'ack':\n"
+            "    subprocess.run([sys.executable, sys.argv[2], sys.argv[3]], "
+            "input=json.dumps({'hook_event_name': 'SessionStart'}), text=True, check=True)\n"
+            "elif mode == 'wrong':\n"
+            "    directory = pathlib.Path(os.environ['TJ_AGENTS_STARTUP_ACK_DIRECTORY'])\n"
+            "    (directory / 'another-attempt').write_text('wrong', encoding='utf-8')\n"
+            "else:\n"
+            "    raise SystemExit(2)\n"
+            "import time\n"
+            "time.sleep(0.15)\n", encoding="utf-8",
+        )
+        logical = type("Prepared", (), {
+            "host": "codex", "selected_roots": (self.verified,), "launch_args": (), "environment": {},
+        })()
+        class Active:
+            prepared = logical
+            def __enter__(self):
+                return self
+            def __exit__(self, *details):
+                return None
+            def acknowledge_binding(self):
+                return None
+        for mode in ("ack", "wrong", "exit"):
+            with self.subTest(mode=mode):
+                directory = self.project / mode
+                directory.mkdir()
+                binding = type("Binding", (), {
+                    "directory": directory, "prepared": logical, "environment": {},
+                })()
+                runtime = mock.Mock()
+                runtime.prepare_runtime.return_value = binding
+                reported = []
+                command = [sys.executable, str(child), mode, str(ROOT / ".agents/hooks/hook_dispatch.py"), str(gate)]
+                with mock.patch.object(BINDING, "preflight", return_value=Active()), \
+                        mock.patch.object(BINDING, "native_target_for_shim", return_value="native"), \
+                        mock.patch.object(BINDING, "_preflight_arguments", return_value={"project": self.project}), \
+                        mock.patch.object(BINDING, "_module", return_value=runtime), \
+                        mock.patch.object(BINDING, "_preseed_snapshots"), \
+                        mock.patch.object(BINDING, "_converge"), \
+                        mock.patch("rolling_plugins.verify_final"), \
+                        mock.patch.object(BINDING, "command_for_target", return_value=command):
+                    result = BINDING.run_session("codex", "typed", self.project, ["prompt"],
+                                                 require_session_start=True, on_running=reported.append)
+                self.assertEqual(2 if mode == "exit" else 0, result)
+                self.assertEqual(1 if mode == "ack" else 0, len(reported))
+                runtime.cleanup_runtime.assert_called_once()
+
     def test_codex_running_child_retains_runtime_paths_when_liveness_is_uncertain(self):
         events = []
         logical = type("Prepared", (), {

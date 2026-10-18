@@ -75,13 +75,15 @@ class LaunchCodexTests(unittest.TestCase):
     def bound_payload(self):
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertEqual(
-            arguments[:10],
+            arguments[:9],
             [
                 '-I', '-B', str(self.agent_cli.startup_binding_script()), '--host', 'codex',
-                '--project', os.path.abspath(self.directory), '--target', '/bin/codex', '--',
+                '--project', os.path.abspath(self.directory), '--target', '/bin/codex',
             ],
         )
-        return arguments[10:]
+        self.assertEqual(arguments[9], '--status-file')
+        self.assertEqual(arguments[11:13], ['--require-session-start', '--'])
+        return arguments[13:]
 
     # --- validation ---
 
@@ -447,7 +449,8 @@ class LaunchCodexEndToEndTests(unittest.TestCase):
             inner[binding_index:],
             [
                 sys.executable, '-I', '-B', str(self.agent_cli.startup_binding_script()), '--host', 'codex',
-                '--project', directory, '--target', '/bin/codex', '--',
+                '--project', directory, '--target', '/bin/codex',
+                '--status-file', inner[inner.index('--status-file') + 1], '--require-session-start', '--',
                 *(['--no-daemon'] if sys.platform == 'win32' else []), '--cd', directory, '--model',
                 CODEX_LANES['lanes']['L4']['model'], '--config',
                 f"model_reasoning_effort={CODEX_LANES['lanes']['L4']['reasoning_effort']}", expected_prompt_sentence,
