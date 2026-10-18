@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import sys
 
@@ -25,6 +26,7 @@ from terminal_command import (
     flush_before_cli,
     native_target_for_shim,
     run_target,
+    without_binding_state,
 )
 
 
@@ -52,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             print(f"standards: Claude refresh failed: {error}; starting Claude without the standards refresh",
                   file=sys.stderr)
-            return run_target(parsed.target, command)
+            return run_target(parsed.target, command, without_binding_state(os.environ))
     if not command:
         command = ["-n", claude_label(parsed.project)]
     flush_before_cli()

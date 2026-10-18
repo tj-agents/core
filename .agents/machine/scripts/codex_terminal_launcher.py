@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -21,7 +22,7 @@ except Exception as _startup_import_error:
 
     def run_session(*_arguments: object, **_options: object) -> int:
         raise StartupBindingError(_startup_unavailable)
-from terminal_command import command_for_target, flush_before_cli, run_target
+from terminal_command import command_for_target, flush_before_cli, run_target, without_binding_state
 
 
 NON_INTERACTIVE_COMMANDS = frozenset({
@@ -133,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             print(f"standards: Codex refresh failed: {error}; starting Codex without the standards refresh",
                   file=sys.stderr)
-            return run_target(parsed.target, command)
+            return run_target(parsed.target, command, without_binding_state(os.environ))
     flush_before_cli()
     return run_target(parsed.target, without_daemon_for_interactive(parsed.arguments, parsed.target))
 
