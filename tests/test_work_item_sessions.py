@@ -556,7 +556,6 @@ class WorkItemSessionsTests(unittest.TestCase):
             connection.execute("UPDATE sessions SET machine = 'another-host' WHERE handle = ?", (f"claude:{foreign}",))
             connection.commit()
             STORE.end_session(connection, f"claude:{ended}", "closed")
-            STORE.end_session(connection, f"claude:{foreign}", "closed")
         finally:
             connection.close()
         with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": caller, "CLAUDE_CODE_SESSION_ID": ""}):
@@ -567,6 +566,25 @@ class WorkItemSessionsTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(sorted([f"claude:{live}", f"claude:{foreign}", f"codex:{caller}"]), remaining)
+
+    def test_done_item_deletes_an_ended_session_recorded_on_another_machine(self):
+        other = "c4def7e6-d18f-42a9-b7a5-f9dc9b933a97"
+        self._claim_claude(session_id=other, role="bounded: elsewhere")
+        connection = self._connection()
+        try:
+            connection.execute("UPDATE sessions SET machine = 'another-host' WHERE handle = ?", (f"claude:{other}",))
+            connection.commit()
+            STORE.end_session(connection, f"claude:{other}", "closed")
+        finally:
+            connection.close()
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": "", "CLAUDE_CODE_SESSION_ID": ""}):
+            WIS.cmd_item("example-feature/example-item", "done", cwd=self.repo)
+        connection = self._connection()
+        try:
+            remaining = [row["handle"] for row in connection.execute("SELECT handle FROM sessions")]
+        finally:
+            connection.close()
+        self.assertEqual([], remaining)
 
     def test_invalid_work_item_grammar_is_rejected(self):
         with self.assertRaises(ValueError):
