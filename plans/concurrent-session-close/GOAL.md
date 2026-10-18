@@ -27,3 +27,19 @@ Task claimed; current source inspected. Reproduce the overlapping Stop callbacks
 apply the smallest causal correction, run focused close and packaging checks, commit and obtain
 independent review, pass required Windows/Linux CI, merge and verify causal package publication.
 Do not claim a native host exited until an exit observer verifies it.
+
+## Verified repair and validation blocker
+
+The duplicate Stop regression failed for Codex and Claude before repair. The corrected claim order,
+expiry boundary and cancellation/replacement tests pass: 24 focused tests. Native independent review
+and parent workflow fallback found no defects at 970bdc09. The configured workflow review model is
+unsupported by this account; the documented parent fallback was used without repeated dispatch.
+
+Exact-head CI39172700988 passed Linux. Windows stopped before close tests because the public dotnet
+plugin has moved persistence elsewhere, leaving the existing skill-routes example unresolved.
+Update that example to the shipped dotnet:testing and react:testing identities, review the one-line delta and let
+required CI validate the final candidate. No check is weakened or skipped.
+
+The skills runtime lifecycle loader also expects a legacy .agents/skills/bugfix path absent from this
+layout. Canonical bugfix guidance was loaded directly; this unrelated compatibility limitation stays
+recorded here rather than blocking the source repair.
