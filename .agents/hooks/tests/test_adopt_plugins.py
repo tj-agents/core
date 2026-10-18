@@ -52,6 +52,10 @@ class AdoptPluginsTests(unittest.TestCase):
         adopt_plugins.run(self.root, [], ["react"], "write")
         self.assertEqual(["newcomer@tj-agents", "react@tj-agents"], self.plugins())
 
+    def test_efcore_plugin_selects_dotnet_dependency(self):
+        adopt_plugins.run(self.root, [], ["efcore"], "write")
+        self.assertEqual(["dotnet@tj-agents", "efcore@tj-agents"], self.plugins())
+
     def test_schema_two_lock_is_migrated_once_and_discards_its_pin(self):
         legacy = self.root / ".agents" / "plugins.lock.json"
         legacy.parent.mkdir()
