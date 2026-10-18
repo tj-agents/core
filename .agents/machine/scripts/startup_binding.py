@@ -196,7 +196,9 @@ def _preseed_snapshots(roots, snapshot_directory: Path) -> None:
 
 def run_session(host: str, target: str, project: Path, arguments: Sequence[str], *,
                 extra_environment: Mapping[str, str] | None = None,
-                timeout: float = STARTUP_TIMEOUT_SECONDS) -> int:
+                timeout: float = STARTUP_TIMEOUT_SECONDS,
+                on_running: Callable[[], None] | None = None) -> int:
+    running = on_running or (lambda: None)
     project = Path(project).resolve()
     configuration = _configuration_root(host).resolve()
     startup_deadline = time.monotonic() + OPERATION_TIMEOUT_SECONDS
@@ -245,6 +247,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                                 command_for_target(target, _launch_arguments(arguments, binding.prepared.launch_args)),
                                 cwd=project, env=environment, start_new_session=os.name != "nt",
                             )
+                            running()
                             return process.wait()
                         except OSError as error:
                             raise StartupBindingError(f"native {host} could not start: {error}") from error
@@ -262,6 +265,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 if extra_environment:
                     environment.update(extra_environment)
                 try:
+                    running()
                     return subprocess.run(command_for_target(target, arguments), cwd=project, env=environment).returncode
                 except OSError as error:
                     raise StartupBindingError(f"native {host} could not start: {error}") from error
@@ -275,6 +279,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 if extra_environment:
                     environment.update(extra_environment)
                 try:
+                    running()
                     return subprocess.run(command_for_target(target, launch_arguments), cwd=project,
                                           env=environment).returncode
                 except OSError as error:
@@ -306,6 +311,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                     while process.poll() is None and time.monotonic() < deadline:
                         if _acknowledged(directory, token):
                             active.acknowledge_binding()
+                            running()
                             return process.wait()
                         time.sleep(0.05)
                     if process.poll() is not None:
@@ -330,6 +336,23 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
         raise StartupBindingError(f"{host} startup preflight could not complete: {error}") from error
 
 
+def claim_status(path: Path | None) -> bool:
+    if path is None:
+        return True
+    try:
+        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        try:
+            return json.loads(path.read_text(encoding="utf-8")).get("state") != "abandoned"
+        except (OSError, ValueError, AttributeError):
+            return True
+    except OSError:
+        return True
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        json.dump({"state": "preparing", "pid": os.getpid(), "at": time.time()}, handle)
+    return True
+
+
 def write_status(path: Path | None, state: str, **details: object) -> None:
     if path is None:
         return
@@ -351,9 +374,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     parsed = parser.parse_args(argv)
     arguments = parsed.arguments[1:] if parsed.arguments[:1] == ["--"] else parsed.arguments
-    write_status(parsed.status_file, "preparing")
+    if not claim_status(parsed.status_file):
+        print(f"standards: {parsed.host} launch was abandoned by its caller before startup", file=sys.stderr)
+        return 1
     try:
-        returncode = run_session(parsed.host, parsed.target, parsed.project, arguments)
+        returncode = run_session(parsed.host, parsed.target, parsed.project, arguments,
+                                 on_running=lambda: write_status(parsed.status_file, "running"))
     except StartupBindingError as error:
         message = f"standards: {parsed.host} refresh failed: {error}"
         print(message, file=sys.stderr)
