@@ -338,6 +338,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                     if process.poll() is not None:
                         return process.returncode
                     if not require_session_start:
+                        active.acknowledge_binding()
                         running(process.pid)
                         return process.wait()
                     raise StartupBindingError(f"native {host} did not acknowledge SessionStart before the startup deadline")
