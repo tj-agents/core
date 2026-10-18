@@ -15,7 +15,7 @@ START = "# >>> base-agents claude launcher >>>"
 END = "# <<< base-agents claude launcher <<<"
 OPT_OUT_ENV = "BASE_AGENTS_CLAUDE_PROFILE"
 
-BOOTSTRAP = r'''import base64, json, os, subprocess, sys, tempfile
+BOOTSTRAP = r'''import base64, json, os, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 payload = sys.argv[1:2] == ["--payload"]
@@ -250,17 +250,27 @@ def locate():
         raise Missing("the active machine " + kind + " launcher is unavailable", package)
     return package, script
 
+def native_cli():
+    if kind == "codex":
+        return [native_codex(typed_target)]
+    if os.name == "nt" and Path(typed_target).suffix.casefold() == ".ps1":
+        shell = shutil.which("powershell.exe")
+        if shell is None:
+            raise ValueError("Windows PowerShell")
+        return [shell, "-NoProfile", "-File", typed_target]
+    return [typed_target]
+
 def repair(package):
     identity, scope, directory = package
     marketplace = identity.rsplit("@", 1)[1]
     try:
-        executable = typed_target if kind == "claude" else native_codex(typed_target)
+        executable = native_cli()
     except ValueError:
         return False
     if kind == "claude":
-        commands = ([executable, "plugin", "marketplace", "update", marketplace], [executable, "plugin", "update", identity, "--scope", scope])
+        commands = ([*executable, "plugin", "marketplace", "update", marketplace], [*executable, "plugin", "update", identity, "--scope", scope])
     else:
-        commands = ([executable, "plugin", "marketplace", "upgrade", marketplace], [executable, "plugin", "add", identity])
+        commands = ([*executable, "plugin", "marketplace", "upgrade", marketplace], [*executable, "plugin", "add", identity])
     print("standards: reinstalling " + identity + " from its marketplace", file=sys.stderr)
     for command in commands:
         try:

@@ -79,6 +79,13 @@ class TerminalBootstrapRepairTests(unittest.TestCase):
             "machine@base-agents": [{"scope": "user", "installPath": str(package)}],
         }}), encoding="utf-8")
 
+    def powershell_claude(self, repaired: Path) -> Path:
+        self.native_claude(repaired)
+        target = self.root / "claude.ps1"
+        target.write_text(f"& '{sys.executable}' '{self.root / 'native_claude.py'}' @args\r\nexit $LASTEXITCODE\r\n",
+                          encoding="utf-8")
+        return target
+
     def native_claude(self, repaired: Path | None, update_code: int = 0) -> Path:
         body = (
             "import json, os, sys\n"
@@ -189,6 +196,22 @@ class TerminalBootstrapRepairTests(unittest.TestCase):
             "broken",
             "claude plugin marketplace update base-agents",
             "claude plugin update machine@base-agents --scope project",
+            "fixed",
+        ], self.calls_made())
+
+
+    @unittest.skipUnless(os.name == "nt", "PowerShell script shims exist only on Windows; Linux targets run directly")
+    def test_a_powershell_script_shim_is_repaired_through_windows_powershell(self):
+        fixed = self.package("fixed", STARTED_THEN_EXIT.format(label="fixed", code=0))
+        self.install(self.package("broken", READY_THEN_FAIL.format(label="broken")))
+
+        completed = self.run_bootstrap(self.powershell_claude(fixed))
+
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual([
+            "broken",
+            "claude plugin marketplace update base-agents",
+            "claude plugin update machine@base-agents --scope user",
             "fixed",
         ], self.calls_made())
 
