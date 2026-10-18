@@ -540,6 +540,19 @@ class WorkItemSessionsTests(unittest.TestCase):
         self.assertEqual("done", item["status"])
         self.assertEqual("https://github.com/tj-agents/core/pull/1", item["pr"])
 
+    def test_done_item_deletes_its_other_sessions_and_keeps_the_caller(self):
+        self._claim_claude()
+        caller = "01a12aa7-5b58-7312-9400-ef710762147f"
+        self._claim_codex(session_id=caller, role="bounded: review")
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": caller, "CLAUDE_CODE_SESSION_ID": ""}):
+            WIS.cmd_item("example-feature/example-item", "done", cwd=self.repo)
+        connection = self._connection()
+        try:
+            remaining = [row["handle"] for row in connection.execute("SELECT handle FROM sessions")]
+        finally:
+            connection.close()
+        self.assertEqual([f"codex:{caller}"], remaining)
+
     def test_invalid_work_item_grammar_is_rejected(self):
         with self.assertRaises(ValueError):
             WIS._parse_work_item("Not-Valid/Item")

@@ -60,6 +60,20 @@ def _update_own_end(entry, operation, reason):
         pass
 
 
+def delete_own_session(session_id):
+    try:
+        store = register_session._load_session_store()
+        if store is None:
+            return
+        connection = store.connect()
+        try:
+            store.delete_session(connection, session_id)
+        finally:
+            connection.close()
+    except Exception:
+        pass
+
+
 def _record_own_end(entry, reason):
     _update_own_end(entry, "end_session", reason)
 
