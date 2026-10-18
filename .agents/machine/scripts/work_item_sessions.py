@@ -283,6 +283,10 @@ def _resume_roots(row):
     return {host: Path(row["profile"]) / subdirectory}
 
 
+def _unverified_launch(error):
+    return _AGENT_RECOVERY is not None and _AGENT_RECOVERY.unverified_launch(error)
+
+
 def cmd_claim(work_item, host, role=None, predecessor=None, status=None, title=None, plan_path=None, cwd=None):
     store = _session_store()
     cwd = cwd or Path.cwd()
@@ -564,9 +568,12 @@ def main(argv=None):
             )
         else:
             raise ValueError(f"Unknown command: {args.command}")
-    except (ValueError, RuntimeError) as exc:
+    except Exception as exc:
+        unverified = _unverified_launch(exc)
+        if not unverified and not isinstance(exc, (ValueError, RuntimeError)):
+            raise
         print(json.dumps({"error": str(exc)}))
-        return 1
+        return 3 if unverified else 1
     print(json.dumps(result, default=str))
     return 0
 
