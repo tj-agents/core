@@ -47,6 +47,13 @@
   auto-mode classifier as unauthorized persistence. Resolver: Tommy. Resume when he says "merge it" (drive
   CI, review and merge in the foreground) or allows that register command.
 
+- 2026-10-18: Tommy chose "merge it here". Full review at 0280c454 found R1 (staged observer could not load
+  the store, so closeout deleted nothing), R2 (`done` deleted live sessions), R3 (orphaned handoff event);
+  all fixed in 6f70eb39, 244 tests pass. Incremental review and CI for 6f70eb39 in progress.
+- Runtime gap: `continuation_runtime.py` refuses `claim` and `init` once the foreground pushes a new head, so
+  a foreground repair cannot rebind its owner. The b2130b53 owner was preserved under
+  `.agents/continuation/superseded-b2130b53` and a fresh owner initialized at 6f70eb39.
+
 ## Next Steps
 
 Drive PR #295 through exact-head CI, independent review and auto-merge once Tommy picks the route above.
