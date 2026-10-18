@@ -25,7 +25,8 @@ SessionEnd sets `ended_at` and keeps an earlier end reason, else `closed`. Codex
 so a hand-closed Codex tab reads as interrupted. Start and Stop attach an unclaimed session to a work item
 when exactly one non-`done` work item in the same repo records the current branch. `finish.py`/`close.py`
 best-effort record `finished`/`closed` for their own session before closing it; their exit observer
-deletes the row once the host has exited. Marking a work item `done` deletes its sessions except the caller's.
+deletes the row once the host has exited. Marking a work item `done` deletes its other ended or
+dead sessions; live ones and the caller's stay until their own closeout.
 
 ## Read-time status
 
