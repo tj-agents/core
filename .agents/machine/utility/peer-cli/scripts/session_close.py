@@ -340,7 +340,8 @@ def own_host_and_entry(cwd=None):
         raise Refusal("current process is not attached to a recognized registered host")
     matches = []
     for _path, entry in entries():
-        if not valid_entry(entry) or not under_or_equal(cwd, entry["cwd"]):
+        if not valid_entry(entry) or not any(
+                nonempty_string(root) and under_or_equal(cwd, root) for root in (entry["cwd"], entry.get("launch_cwd"))):
             continue
         if (entry["pid"] == nearest.pid
                 and entry["host"] == register_session.stem(nearest.name)

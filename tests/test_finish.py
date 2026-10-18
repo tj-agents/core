@@ -33,6 +33,22 @@ class HostFallbackTests(unittest.TestCase):
             with self.assertRaisesRegex(session_close.Refusal, "do not force-close the host"):
                 session_close.own_host_and_entry(Path.cwd())
 
+    def test_attachment_resolves_under_the_launch_directory_after_the_registry_moved(self):
+        host = session_close.register_session.ProcessInfo(10, 1, "codex.exe", 20.0)
+        launch = Path.cwd().parent
+        entry = {"host": "codex", "session_id": "own", "pid": 10, "pid_started_at": 20.0, "started_at": 30.0,
+                 "cwd": str(launch / "elsewhere"), "launch_cwd": str(launch)}
+        with mock.patch.object(session_close.os, "getppid", return_value=10), \
+                mock.patch.object(session_close, "process_info", return_value=host), \
+                mock.patch.object(session_close, "verified_live", return_value=True), \
+                mock.patch.object(session_close.register_session, "read_host_names", return_value={"codex"}):
+            with mock.patch.object(session_close, "entries", return_value=[("own.json", entry)]):
+                self.assertEqual(entry, session_close.own_host_and_entry(Path.cwd()))
+            moved_only = {key: value for key, value in entry.items() if key != "launch_cwd"}
+            with mock.patch.object(session_close, "entries", return_value=[("own.json", moved_only)]), \
+                    self.assertRaisesRegex(session_close.Refusal, "cannot resolve a verified registry attachment"):
+                session_close.own_host_and_entry(Path.cwd())
+
     def test_terminal_refusal_can_close_verified_host_without_wrapper(self):
         entry = {"pid": 30, "pid_started_at": 3.0}
         for refusal in (

@@ -473,12 +473,27 @@ class HookLifecycleTests(unittest.TestCase):
         self.assertEqual(0, self._invoke("stop", "claude", payload))
         moved = json.loads((registry / "moved-id.json").read_text(encoding="utf-8"))
         self.assertEqual(self.repo.resolve(), Path(moved.pop("cwd")).resolve())
-        self.assertEqual({key: value for key, value in entry.items() if key != "cwd"}, moved)
+        self.assertEqual(dict({key: value for key, value in entry.items() if key != "cwd"}, launch_cwd=str(self.root)), moved)
         self.assertEqual(self.repo.resolve(), Path(self._row("claude:moved-id")["cwd"]).resolve())
         self.assertEqual(0, self._invoke("stop", "claude", {"session_id": "other-id", "cwd": str(self.repo)}))
         self.assertEqual(foreign, json.loads((registry / "other-id.json").read_text(encoding="utf-8")))
         self.assertEqual(0, self._invoke("stop", "claude", {"session_id": "unregistered", "cwd": str(self.repo)}))
         self.assertFalse((registry / "unregistered.json").exists())
+
+    def test_a_locked_registry_keeps_the_store_cwd_so_both_still_agree(self):
+        registry = self.state / "cli-sessions"
+        registry.mkdir(parents=True)
+        entry = {"session_id": "locked-id", "host": "claude", "cwd": str(self.root), "pid": 7, "pid_started_at": 1.5}
+        (registry / "locked-id.json").write_text(json.dumps(entry), encoding="utf-8")
+        self._invoke("session-start", "claude", {"session_id": "locked-id", "cwd": str(self.root)})
+        with mock.patch.object(STORE.os, "replace", side_effect=PermissionError("in use")), \
+                mock.patch.object(STORE, "REGISTRY_REPLACE_DELAY_SECONDS", 0):
+            self.assertEqual(0, self._invoke("stop", "claude", {"session_id": "locked-id", "cwd": str(self.repo)}))
+        self.assertEqual(entry, json.loads((registry / "locked-id.json").read_text(encoding="utf-8")))
+        row = self._row("claude:locked-id")
+        self.assertEqual("awaiting_input", row["turn_state"])
+        self.assertEqual(str(self.root), row["cwd"])
+        self.assertEqual([], [path.name for path in registry.iterdir() if path.name.endswith(".tmp")])
 
     def test_stop_records_the_checkout_root_not_a_subdirectory_or_the_enclosing_checkout(self):
         registry = self.state / "cli-sessions"

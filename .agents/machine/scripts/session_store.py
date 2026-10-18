@@ -29,6 +29,8 @@ normalise_remote = _repository_identity.normalise_remote
 SCHEMA_VERSION = 3
 GIT_TIMEOUT = 3
 HOOK_GIT_TIMEOUT = 2
+REGISTRY_REPLACE_ATTEMPTS = 40
+REGISTRY_REPLACE_DELAY_SECONDS = 0.05
 _LOCK_RETRY_DELAY = 0.05
 
 WORK_ITEMS_SCHEMA = """
@@ -91,15 +93,26 @@ def follow_registered_cwd(host, session_id, cwd):
     try:
         entry = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return False
+        return None
     if (not isinstance(entry, dict) or entry.get("session_id") != session_id
             or entry.get("host") not in (None, host) or entry.get("cwd") == str(cwd)):
-        return False
+        return None
+    entry.setdefault("launch_cwd", entry.get("cwd"))
     entry["cwd"] = str(cwd)
     staging = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    staging.write_text(json.dumps(entry, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(staging, path)
-    return True
+    try:
+        staging.write_text(json.dumps(entry, sort_keys=True) + "\n", encoding="utf-8")
+        for _attempt in range(REGISTRY_REPLACE_ATTEMPTS):
+            try:
+                os.replace(staging, path)
+                return True
+            except PermissionError:
+                time.sleep(REGISTRY_REPLACE_DELAY_SECONDS)
+        return False
+    except OSError:
+        return False
+    finally:
+        staging.unlink(missing_ok=True)
 
 
 def _execute_with_lock_retry(connection, statement):
@@ -356,12 +369,14 @@ def record_prompt(connection, handle):
     connection.commit()
 
 
-def record_stop(connection, handle, cwd):
+def record_stop(connection, handle, cwd, follow=None):
     checkout, repo, branch, head = _collect_checkout(cwd)
+    if follow is not None and follow(checkout) is False:
+        checkout = None
     now = time.time()
     connection.execute(
         """
-        UPDATE sessions SET turn_state = 'awaiting_input', last_activity_at = ?, cwd = ?,
+        UPDATE sessions SET turn_state = 'awaiting_input', last_activity_at = ?, cwd = COALESCE(?, cwd),
             repo = COALESCE(?, repo), branch = COALESCE(?, branch), head = COALESCE(?, head)
         WHERE handle = ?
         """,
@@ -371,7 +386,6 @@ def record_stop(connection, handle, cwd):
     if repo and branch:
         attach_work_item_if_unique(connection, repo, branch, handle)
         connection.commit()
-    return checkout
 
 
 def record_prepared_stop(connection, handle, expected_activity, expected_state):
@@ -624,7 +638,8 @@ def run_hook(event, host):
             elif event == "prompt":
                 record_prompt(connection, handle)
             elif event == "stop":
-                follow_registered_cwd(host, session_id, record_stop(connection, handle, cwd))
+                record_stop(connection, handle, cwd,
+                            follow=lambda checkout: follow_registered_cwd(host, session_id, checkout))
             elif event == "session-end":
                 end_session(connection, handle, "closed")
         finally:
