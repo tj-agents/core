@@ -130,7 +130,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
                 "#!/usr/bin/env python3\n"
                 "import json, sys\n"
                 "if sys.argv[1:] == ['plugin', 'list', '--json']:\n"
-                " print(json.dumps({'installed': [{'pluginId': 'machine@base-agents', 'version': 'test', 'enabled': True, 'marketplaceName': 'base-agents', 'name': 'machine', 'marketplaceSource': {'sourceType': 'git', 'source': 'https://github.com/tj-agents/core.git'}}]}))\n",
+                " print(json.dumps({'installed': [{'pluginId': 'machine@tj-agents', 'version': 'test', 'enabled': True, 'marketplaceName': 'tj-agents', 'name': 'machine', 'marketplaceSource': {'sourceType': 'git', 'source': 'https://github.com/tj-agents/marketplace.git'}}]}))\n",
                 encoding="utf-8",
             )
             native.chmod(native.stat().st_mode | 0o111)
@@ -141,7 +141,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
         source.write_text(
             "using System; class Program { public static int Main(string[] args) { "
             "if (args.Length == 3 && args[0] == \"plugin\" && args[1] == \"list\" && args[2] == \"--json\") "
-            "Console.Write(\"{\\\"installed\\\":[{\\\"pluginId\\\":\\\"machine@base-agents\\\",\\\"version\\\":\\\"test\\\",\\\"enabled\\\":true,\\\"marketplaceName\\\":\\\"base-agents\\\",\\\"name\\\":\\\"machine\\\",\\\"marketplaceSource\\\":{\\\"sourceType\\\":\\\"git\\\",\\\"source\\\":\\\"https://github.com/tj-agents/core.git\\\"}}]}\"); return 0; } }",
+            "Console.Write(\"{\\\"installed\\\":[{\\\"pluginId\\\":\\\"machine@tj-agents\\\",\\\"version\\\":\\\"test\\\",\\\"enabled\\\":true,\\\"marketplaceName\\\":\\\"tj-agents\\\",\\\"name\\\":\\\"machine\\\",\\\"marketplaceSource\\\":{\\\"sourceType\\\":\\\"git\\\",\\\"source\\\":\\\"https://github.com/tj-agents/marketplace.git\\\"}}]}\"); return 0; } }",
             encoding="utf-8",
         )
         compiler = shutil.which("powershell.exe")
@@ -159,7 +159,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
         return native
 
     def claude_package(self, cache: Path, active: Path, version: str) -> Path:
-        package = cache / "base-agents" / "machine" / version
+        package = cache / "tj-agents" / "machine" / version
         package.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(active, package, dirs_exist_ok=True)
         catalog = package / "catalog"
@@ -170,10 +170,10 @@ class TerminalProfileWiringTests(unittest.TestCase):
     def configure_claude_coordinator(self, cache: Path, package: Path) -> None:
         cache.mkdir(exist_ok=True)
         (cache / "known_marketplaces.json").write_text(json.dumps({
-            "base-agents": {"source": "https://github.com/tj-agents/core.git"},
+            "tj-agents": {"source": "https://github.com/tj-agents/marketplace.git"},
         }), encoding="utf-8")
         (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
-            "machine@base-agents": [{"scope": "user", "installPath": str(package)}],
+            "machine@tj-agents": [{"scope": "user", "installPath": str(package)}],
         }}), encoding="utf-8")
 
     def versioned_python(self, name: str, version: tuple[int, int], label: str) -> Path:
@@ -227,10 +227,10 @@ class TerminalProfileWiringTests(unittest.TestCase):
         else:
             native = self.bin / "node_modules" / "@openai" / "codex" / "node_modules" / "@openai" / "codex-test" / "vendor" / "test" / "bin" / "codex"
             native.parent.mkdir(parents=True)
-            native.write_text("#!/bin/sh\nprintf '%s\\n' '{\"installed\":[{\"pluginId\":\"machine@base-agents\",\"version\":\"test\",\"enabled\":true,\"marketplaceName\":\"base-agents\",\"name\":\"machine\",\"marketplaceSource\":{\"sourceType\":\"git\",\"source\":\"https://github.com/tj-agents/core.git\"}}]}'\n", encoding="utf-8")
+            native.write_text("#!/bin/sh\nprintf '%s\\n' '{\"installed\":[{\"pluginId\":\"machine@tj-agents\",\"version\":\"test\",\"enabled\":true,\"marketplaceName\":\"tj-agents\",\"name\":\"machine\",\"marketplaceSource\":{\"sourceType\":\"git\",\"source\":\"https://github.com/tj-agents/marketplace.git\"}}]}'\n", encoding="utf-8")
             native.chmod(native.stat().st_mode | 0o111)
         codex_home = self.root / "codex-interpreter-home"
-        cache = codex_home / "plugins" / "cache" / "base-agents" / "machine" / "test"
+        cache = codex_home / "plugins" / "cache" / "tj-agents" / "machine" / "test"
         cache.parent.mkdir(parents=True)
         shutil.copytree(active, cache)
         return codex_home, active
@@ -361,10 +361,10 @@ class TerminalProfileWiringTests(unittest.TestCase):
         registry = cache / "installed_plugins.json"
         second = cache / "second.json"
         registry.write_text(json.dumps({"plugins": {
-            "machine@base-agents": [{"scope": "user", "installPath": str(first)}],
+            "machine@tj-agents": [{"scope": "user", "installPath": str(first)}],
         }}), encoding="utf-8")
         second.write_text(json.dumps({"plugins": {
-            "machine@base-agents": [{"scope": "user", "installPath": str(second_package)}],
+            "machine@tj-agents": [{"scope": "user", "installPath": str(second_package)}],
         }}), encoding="utf-8")
         self.environment["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(cache)
         self.install_profile(CLAUDE)
@@ -372,7 +372,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
             with self.subTest(shell=shell):
                 self.calls.unlink(missing_ok=True)
                 registry.write_text(json.dumps({"plugins": {
-                    "machine@base-agents": [{"scope": "user", "installPath": str(first)}],
+                    "machine@tj-agents": [{"scope": "user", "installPath": str(first)}],
                 }}), encoding="utf-8")
                 command = (
                     f". '{self.profile_path()}'; claude; "
@@ -392,7 +392,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
         self.environment["CODEX_HOME"] = str(self.root / "codex-home")
         shim = self.executable("codex", "import os, sys\nopen(os.environ['CALLS'], 'a').write('codex ' + ' '.join(sys.argv[1:]) + '\\n')\n")
         self.native_codex(shim)
-        cache = Path(self.environment["CODEX_HOME"]) / "plugins" / "cache" / "base-agents" / "machine" / "test"
+        cache = Path(self.environment["CODEX_HOME"]) / "plugins" / "cache" / "tj-agents" / "machine" / "test"
         cache.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(active, cache, dirs_exist_ok=True)
         self.install_profile(CODEX)
@@ -400,7 +400,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
         completed = run(command)
         self.assertEqual(completed.returncode, expected_code, completed.stderr)
         calls = self.calls.read_text(encoding="utf-8").splitlines()
-        self.assertEqual(sum(line.startswith("refresh ") for line in calls), 2)
+        self.assertEqual(sum(line.startswith("refresh ") for line in calls), 1)
         self.assertEqual(sum(line.startswith("hooks ") for line in calls), 1)
         self.assertEqual(sum(line.startswith("codex ") for line in calls), 0)
 
@@ -411,6 +411,29 @@ class TerminalProfileWiringTests(unittest.TestCase):
         for shell in self.powershells():
             with self.subTest(shell=shell):
                 self.assert_codex_wiring(lambda command: self.run_powershell(shell, command), f". '{self.profile_path()}'; codex plugin list; codex exec; codex-hooks status", 0)
+
+    def assert_codex_plugin_repair_without_coordinator(self, run, source: str):
+        shim = self.executable("codex", "raise SystemExit(88)\n")
+        self.native_codex(shim)
+        self.environment["CODEX_HOME"] = str(self.root / "empty-codex-home")
+        self.install_profile(CODEX)
+        completed = run(source)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertNotIn("coordinator is unavailable", completed.stderr)
+
+    def test_codex_bash_plugin_repair_without_coordinator(self):
+        self.assert_codex_plugin_repair_without_coordinator(
+            self.run_bash,
+            f". {shlex.quote(str(self.home / '.bashrc'))}; codex plugin add machine@tj-agents",
+        )
+
+    def test_codex_powershell_plugin_repair_without_coordinator(self):
+        for shell in self.powershells():
+            with self.subTest(shell=shell):
+                self.assert_codex_plugin_repair_without_coordinator(
+                    lambda command: self.run_powershell(shell, command),
+                    f". '{self.profile_path()}'; codex plugin add machine@tj-agents; exit $LASTEXITCODE",
+                )
 
     def test_powershell_skips_windows_store_aliases_before_usable_python(self):
         active = self.active_argument_spy("claude")
@@ -530,7 +553,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
                 target = self.executable("codex", "raise SystemExit(88)\n")
                 shim = target
                 self.native_codex(shim)
-                cache = Path(self.environment["CODEX_HOME"]) / "plugins" / "cache" / "base-agents" / "machine" / "test"
+                cache = Path(self.environment["CODEX_HOME"]) / "plugins" / "cache" / "tj-agents" / "machine" / "test"
                 cache.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(active, cache, dirs_exist_ok=True)
             self.install_profile(module)
