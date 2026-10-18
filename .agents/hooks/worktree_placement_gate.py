@@ -246,11 +246,11 @@ NATIVE_CREATION_TEXT = re.compile(r"\bgit(?:\.exe)?\b.*\bworktree\b[\s\\`]+add\b
 
 
 def bare_word(value):
-    return re.sub(r"[\"'`]", "", value)
+    return re.sub(r"[\"'`$\\]", "", value)
 
 
 def names_native_creation(text):
-    return bool(NATIVE_CREATION_TEXT.search(bare_word(text)))
+    return bool(NATIVE_CREATION_TEXT.search(re.sub(r"[\"'`$]|\\(?=\w)", "", text)))
 
 
 def tokens_of(segment):
@@ -261,8 +261,9 @@ def tokens_of(segment):
 
 
 def git_executable(value):
-    name = bare_word(value).replace("\\", "/").rsplit("/", 1)[-1].casefold()
-    return name in {"git", "git.exe"}
+    names = {bare_word(value).casefold(),
+             re.sub(r"[\"'`$]", "", value).replace("\\", "/").rsplit("/", 1)[-1].casefold()}
+    return bool(names & {"git", "git.exe"})
 
 
 def path_is_literal_absolute(value):

@@ -445,7 +445,11 @@ class WorktreePlacementGateTests(unittest.TestCase):
         for command in (f"git -c a.b=' ' -C \"{self.repo}\" worktree \"add\" -- \"{sibling}\"",
                         f"git -c a.b=' ' -C \"{self.repo}\" w\"orktree\" add -- \"{sibling}\"",
                         f"git -C \"{self.repo}\" worktree a\"dd\" -- \"{sibling}\"",
-                        f"git -C \"{self.repo}\" w\"orktree\" add -- \"{sibling}\""):
+                        f"git -C \"{self.repo}\" w\"orktree\" add -- \"{sibling}\"",
+                        f"git -C \"{self.repo}\" worktree \\add -- \"{sibling}\"",
+                        f"git -C \"{self.repo}\" w\\orktree add -- \"{sibling}\"",
+                        f"g\\it -C \"{self.repo}\" worktree add -- \"{sibling}\"",
+                        f"git -C \"{self.repo}\" worktree $'add' -- \"{sibling}\""):
             with self.subTest(command=command):
                 result = self.invoke(command)
                 self.assertNotEqual(0, result.returncode)
