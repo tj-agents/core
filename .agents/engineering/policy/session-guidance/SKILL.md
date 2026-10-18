@@ -73,6 +73,10 @@ first; repeated evidence updates that record. Recording stays within the current
 no separate authority to repair, publish, dispatch, or schedule work. Use the addressing workflow only
 when repair is already authorized, and preserve the original task while the record is updated.
 
+Recording requests for features or tasks select `engineering:write-feature` or `engineering:write-task`;
+an untyped recording request selects `engineering:write-issue`. These writers share
+[repository selection and persistence](../../resources/problem-records.md).
+
 ## Keep large changes reviewable
 
 Before implementing or expanding a large refactor or multi-concern change, apply
@@ -115,7 +119,8 @@ release instead.
 ## Maintain the right source owner
 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
-out-of-scope defects with an objective resolution condition in the existing project's debt or plan owner.
+out-of-scope defects with an objective resolution condition through the relevant shared writer. Plans
+link the canonical record under [the shared recording contract](../../resources/problem-records.md).
 A defect in a consumed standards package or its source repository is the exception: a stale or broken
 standard, including the automation that missed it, is a defect to diagnose, never a manual step to hand
 to the user, and so is a standard that caused or failed to prevent a mistake. Diagnose it and follow

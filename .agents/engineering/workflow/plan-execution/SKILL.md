@@ -12,6 +12,10 @@ Own one authoritative plan identity until the requested work completes or reache
 A phase boundary, subordinate return, diagnosable failure, local commit, or resolved next action is not a
 stopping condition.
 
+Read [the shared recording contract](../../resources/problem-records.md) for repository work. Reconcile
+the linked selected item's identity and live state when resolving ownership, and update its progress
+through that contract. Keep design and recovery state in the existing plan and ledger.
+
 Select this workflow by default for authorized long-term or multi-phase execution; the user need not
 name the skill. Before accepting a recorded slice-only boundary, check its source against the current
 request. Preserve explicit user limits and genuine gates, but repair agent-authored stopping points that
@@ -195,6 +199,10 @@ because a phase or commit completed. A massive plan whose substantial design pha
 phased execution plan normally has a separate transfer reason under `engineering:plans`.
 
 ## Terminal result
+
+Before retiring recovery artifacts, update the linked selected item's verified state through the shared
+recording contract. Resolve it only after its own acceptance condition passes; delivery alone does not
+close it. Preserve any unresolved item's owner and next action.
 
 When the canonical goal has a fenced `completion` record, invoke the `persistent-workflow` completion
 contract before reporting the user outcome complete or deleting the goal. A failing completion check keeps

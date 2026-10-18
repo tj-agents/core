@@ -61,6 +61,11 @@ under its implementation-examples contract before drafting code. For plan/ledger
 worktrees, and pull requests for an existing owner. Update the unambiguous existing artifact directly; never
 create a competing plan, reference, or ledger.
 
+Read [the shared recording contract](../../resources/problem-records.md) and reconcile any selected
+canonical item before authoring. Link its identity from the plan and ledger while retaining existing
+roadmap graph keys. The provider owns live item state; planning-only authority does not authorize
+implementation or imply that the item's acceptance has passed.
+
 For a request to choose the next roadmap item, let the
 `engineering:continue-roadmap` compatibility entry resolve the candidate first.
 `engineering:update-roadmap` remains the owner of roadmap reconciliation, not plan design.
