@@ -235,7 +235,7 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertIn("    if: always()\n", jobs["ci-required"])
         required = re.search(r"^    needs: \[(.*?)\]$", jobs["ci-required"], re.MULTILINE)
         self.assertEqual(set(required[1].split(", ")),
-                         {"select", "guard", "verify-windows", "verify-linux"})
+                         {"select", "guard", "guidance-examples", "verify-windows", "verify-linux"})
         self.assertIn("CI_NEEDS: ${{ toJSON(needs) }}", jobs["ci-required"])
         self.assertIn("scripts/ci_selection.py required", jobs["ci-required"])
         self.assertNotRegex(workflow.split("jobs:\n", 1)[0], r"paths(?:-ignore)?:")
@@ -257,6 +257,20 @@ class WorkflowWiringTests(unittest.TestCase):
                 self.assertIn("mode == 'full'", step)
             self.assertIn("sync-generated.ps1 -Check", job)
             self.assertIn("sync_harness_manifests.py --check", job)
+
+    def test_changed_guidance_examples_run_on_pull_requests_and_default_pushes(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:|\Z)",
+                               workflow.split("jobs:\n", 1)[1], re.MULTILINE | re.DOTALL))
+        job = jobs["guidance-examples"]
+        self.assertIn("fetch-depth: 0", job)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", job)
+        self.assertIn("github.event.pull_request.base.sha", job)
+        self.assertIn("github.event.pull_request.head.sha }}\"", job)
+        self.assertIn("github.event.before", job)
+        self.assertIn("github.sha }}\"", job)
+        self.assertIn("github.ref == 'refs/heads/main'", job)
+        self.assertEqual(2, job.count("check_examples.py --root . --base"))
 
 
 if __name__ == "__main__":

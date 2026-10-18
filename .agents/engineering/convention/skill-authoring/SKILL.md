@@ -22,7 +22,13 @@ rather than restating them here:
   [`SOURCE_LAYOUT.md`](https://github.com/tj-agents/core/blob/main/SOURCE_LAYOUT.md) in core,
   `template:check` in a Template-layout repository.
 - **Shipped scripts and resources**: [`PACKAGING.md`](https://github.com/tj-agents/core/blob/main/PACKAGING.md).
-- **One rule, one home** for the prose inside a skill: `engineering:docs`.
+- **One rule, one home** and the required concrete examples for changed skill prose: `engineering:docs`.
+
+```text
+Changed rule: every skill description names its selection trigger
+Construction: description: "Owns query composition. Use when building a reusable query."
+Call site: the agent selects query-building when the task asks to compose a reusable query
+```
 
 ## Extend an owner before creating a skill
 
