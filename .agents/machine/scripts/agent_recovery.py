@@ -484,17 +484,23 @@ def _wrapper_identity(status_path, process_lookup=None):
 
 
 def _launch_ended(previous, process_lookup=None):
-    wrapper = previous.get("wrapper")
-    if not isinstance(wrapper, dict):
-        return None
     try:
         lookup = process_lookup or _load("register_session").build_process_lookup()
     except Exception:
         return None
+    identities = [previous.get("wrapper")]
+    status_file = previous.get("status_file")
+    if status_file and _load("launch_status").read(status_file) is not None:
+        refreshed = _wrapper_identity(status_file, lookup)
+        if refreshed is None:
+            return None
+        identities.append(refreshed)
+    recorded_processes = [process for identity in identities if isinstance(identity, dict)
+                          for process in (identity, identity.get("child")) if isinstance(process, dict)]
+    if not recorded_processes:
+        return None
     ended = True
-    for recorded in (wrapper, wrapper.get("child")):
-        if not isinstance(recorded, dict):
-            continue
+    for recorded in recorded_processes:
         try:
             process = lookup(recorded.get("pid"))
         except Exception:
@@ -543,7 +549,7 @@ def _fingerprint(entry):
     return json.dumps(entry, sort_keys=True, separators=(",", ":"))
 
 
-def _receipt_state(path, host, session_id, profile, state, wrapper=None):
+def _receipt_state(path, host, session_id, profile, state, wrapper=None, status_file=None):
     try:
         previous = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -552,7 +558,8 @@ def _receipt_state(path, host, session_id, profile, state, wrapper=None):
     temporary.write_text(json.dumps({"host": host, "session": session_id, "profile": profile, "state": state,
                                      "created_at": previous.get("created_at", time.time()),
                                      "registry_fingerprint": previous.get("registry_fingerprint"),
-                                     "wrapper": wrapper}) + "\n", encoding="utf-8")
+                                     "wrapper": wrapper,
+                                     "status_file": str(status_file) if status_file else None}) + "\n", encoding="utf-8")
     os.replace(temporary, path)
 
 
@@ -727,7 +734,7 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
             elif isinstance(exc, LaunchUnverified) or (isinstance(timeout_type, type) and isinstance(exc, timeout_type)):
                 try:
                     _receipt_state(receipt, host, session_id, item["profile"], "ambiguous",
-                                   _wrapper_identity(status_path) if status_path else None)
+                                   _wrapper_identity(status_path) if status_path else None, status_path)
                 except OSError:
                     pass
             elif not launched:
