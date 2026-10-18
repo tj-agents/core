@@ -48,6 +48,11 @@ existing selections are kept. With no requested stack or plugin, a new selection
 engineering and machine packages. `preview` lists the changed files, `write` applies them together, and `check`
 exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
 
+`--plugin personal` explicitly selects the personal-project profile plus its base and machine capabilities.
+Use it only for projects the user identifies as personal, then complete that profile's native-instruction
+adoption and verification procedure. Core does not infer personal scope from a directory, an author or a
+technology stack, and selecting a profile does not prove its instructions loaded.
+
 A bare `--plugin <name>` selects from `tj-agents`. Add a foreign plugin with
 `--plugin concertable@agents --marketplace agents=Concertable/agents`. Subsequent adoption preserves
 existing foreign marketplaces and selections. Every selected approved publisher follows `main`.
