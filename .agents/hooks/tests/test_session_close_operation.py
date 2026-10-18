@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor
 import unittest
 from unittest import mock
 
@@ -197,6 +199,86 @@ class CloseOperationTests(unittest.TestCase):
             close.complete()
             self.assertIn('in progress', close.hook(data)['systemMessage'])
         helper.main.assert_called_once_with([])
+
+    def test_overlapping_stop_callbacks_cannot_overwrite_the_reported_ticket(self):
+        for host in ('codex', 'claude'):
+            with self.subTest(host=host):
+                self.entry['host'] = host
+                self.prepare()
+                data = self.transcript_with('Done.', host)
+                first_entered = threading.Event()
+                second_read = threading.Event()
+                release_first = threading.Event()
+                reported = threading.Event()
+                local = threading.local()
+                real_read, real_save = close.read_ticket, close.save_ticket
+
+                def read(session):
+                    ticket = real_read(session)
+                    if getattr(local, 'role', None) == 'second':
+                        second_read.set()
+                    return ticket
+
+                def entry():
+                    if local.role == 'first':
+                        first_entered.set()
+                        if not release_first.wait(5):
+                            raise RuntimeError('first callback was not released')
+                    elif not reported.wait(5):
+                        raise RuntimeError('first callback did not report')
+                    return self.entry
+
+                def save(session, ticket):
+                    real_save(session, ticket)
+                    if ticket.get('status') == 'reported':
+                        reported.set()
+
+                def run(role):
+                    local.role = role
+                    return close.hook(data)
+
+                with mock.patch.object(close, 'runtime', return_value=self.shared), \
+                        mock.patch.object(close, 'read_ticket', side_effect=read), \
+                        mock.patch.object(close, 'save_ticket', side_effect=save), \
+                        mock.patch.object(self.shared, 'own_host_and_entry', side_effect=entry), \
+                        ThreadPoolExecutor(max_workers=2) as pool:
+                    first = pool.submit(run, 'first')
+                    self.assertTrue(first_entered.wait(5))
+                    second = pool.submit(run, 'second')
+                    self.assertTrue(second_read.wait(5))
+                    release_first.set()
+                    results = (first.result(timeout=5), second.result(timeout=5))
+                self.assertEqual('reported', real_read('own')['status'])
+                self.assertEqual(1, sum(result is not None and result.get('decision') == 'block'
+                                        for result in results))
+                self.assertEqual(1, self.store.record_prepared_stop.call_count)
+                self.store.record_prepared_stop.reset_mock()
+                helper = mock.Mock()
+                helper.main.return_value = 0
+                with mock.patch.object(close, 'runtime', return_value=self.shared), \
+                        mock.patch.object(close.importlib, 'import_module', return_value=helper):
+                    close.complete()
+                helper.main.assert_called_once_with([])
+
+    def test_stop_refusal_preserves_cancellation_or_a_replacement_attempt(self):
+        for replacement in (False, True):
+            with self.subTest(replacement=replacement):
+                self.prepare()
+                expected = close.read_ticket('own')
+                expected = {**expected, 'nonce': 'b' * 32} if replacement else None
+
+                def change():
+                    if expected is None:
+                        close.hook({'hook_event_name': 'UserPromptSubmit', 'session_id': 'own'})
+                    else:
+                        close.save_ticket('own', expected)
+                    return self.entry
+
+                with mock.patch.object(close, 'runtime', return_value=self.shared), \
+                        mock.patch.object(self.shared, 'own_host_and_entry', side_effect=change):
+                    result = close.hook(self.transcript_with('Done.'))
+                self.assertIn('cancelled or replaced', result['reason'])
+                self.assertEqual(expected, close.read_ticket('own'))
 
     def test_new_turn_activity_refuses_even_if_the_cancellation_hook_has_not_run(self):
         self.prepare()
