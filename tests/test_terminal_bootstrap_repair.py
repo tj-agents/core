@@ -204,6 +204,8 @@ class TerminalBootstrapRepairTests(unittest.TestCase):
     def test_a_powershell_script_shim_is_repaired_through_windows_powershell(self):
         fixed = self.package("fixed", STARTED_THEN_EXIT.format(label="fixed", code=0))
         self.install(self.package("broken", READY_THEN_FAIL.format(label="broken")))
+        self.environment["PATH"] = os.pathsep.join(
+            entry for entry in self.environment["PATH"].split(os.pathsep) if "windowsapps" not in entry.casefold())
 
         completed = self.run_bootstrap(self.powershell_claude(fixed))
 
