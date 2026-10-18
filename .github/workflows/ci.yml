@@ -36,6 +36,23 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: python3 -B scripts/check_generated_paths.py --base "origin/${BASE_REF}"
 
+  guidance-examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: changed authored guidance has concrete examples (pull request)
+        if: github.event_name == 'pull_request'
+        run: python3 -B .agents/engineering/convention/docs/scripts/check_examples.py --root . --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
+
+      - name: changed authored guidance has concrete examples (default push)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: python3 -B .agents/engineering/convention/docs/scripts/check_examples.py --root . --base "${{ github.event.before }}" --head "${{ github.sha }}"
+
   verify-windows:
     needs: select
     if: needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
@@ -203,7 +220,7 @@ jobs:
 
   ci-required:
     if: always()
-    needs: [select, guard, verify-windows, verify-linux]
+    needs: [select, guard, guidance-examples, verify-windows, verify-linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
