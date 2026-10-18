@@ -37,6 +37,46 @@ class StartupBindingTests(unittest.TestCase):
             "selected_roots": (self.verified,), "launch_args": (), "environment": {},
         })()
 
+    def test_status_file_reports_preparation_failure_and_exit(self):
+        status = self.project / "launch.status.json"
+        seen = []
+
+        def failing(*_args, **_kwargs):
+            seen.append(json.loads(status.read_text(encoding="utf-8"))["state"])
+            raise BINDING.StartupBindingError("unsupported value")
+
+        arguments = ["--host", "codex", "--project", str(self.project), "--target", "codex", "--status-file",
+                     str(status), "--", "resume", "id"]
+        with mock.patch.object(BINDING, "run_session", side_effect=failing), mock.patch("sys.stderr"):
+            self.assertEqual(1, BINDING.main(arguments))
+        self.assertEqual(["preparing"], seen)
+        failed = json.loads(status.read_text(encoding="utf-8"))
+        self.assertEqual("failed", failed["state"])
+        self.assertIn("unsupported value", failed["error"])
+        status.unlink()
+        states = []
+
+        def running(*_args, on_running, **_kwargs):
+            on_running()
+            states.append(json.loads(status.read_text(encoding="utf-8"))["state"])
+            return 0
+
+        with mock.patch.object(BINDING, "run_session", side_effect=running):
+            self.assertEqual(0, BINDING.main(arguments))
+        self.assertEqual(["running"], states)
+        self.assertEqual({"state": "exited", "returncode": 0},
+                         {key: value for key, value in json.loads(status.read_text(encoding="utf-8")).items()
+                          if key in {"state", "returncode"}})
+
+    def test_an_abandoned_launch_never_starts(self):
+        status = self.project / "launch.status.json"
+        status.write_text(json.dumps({"state": "abandoned"}), encoding="utf-8")
+        arguments = ["--host", "codex", "--project", str(self.project), "--target", "codex", "--status-file",
+                     str(status), "--", "resume", "id"]
+        with mock.patch.object(BINDING, "run_session") as run, mock.patch("sys.stderr"):
+            self.assertEqual(1, BINDING.main(arguments))
+        run.assert_not_called()
+
     def test_each_shipped_claude_plugin_acknowledges_session_start_through_its_real_manifest(self):
         token = "a" * 40
         payload = {"hook_event_name": "SessionStart", "session_id": "fixture", "cwd": str(self.project)}
