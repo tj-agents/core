@@ -198,8 +198,8 @@ def _preseed_snapshots(roots, snapshot_directory: Path) -> None:
 def run_session(host: str, target: str, project: Path, arguments: Sequence[str], *,
                 extra_environment: Mapping[str, str] | None = None,
                 timeout: float = STARTUP_TIMEOUT_SECONDS,
-                on_running: Callable[[], None] | None = None) -> int:
-    running = on_running or (lambda: None)
+                on_running: Callable[..., None] | None = None) -> int:
+    running = on_running or (lambda child_pid=None: None)
     project = Path(project).resolve()
     configuration = _configuration_root(host).resolve()
     startup_deadline = time.monotonic() + OPERATION_TIMEOUT_SECONDS
@@ -248,7 +248,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                                 command_for_target(target, _launch_arguments(arguments, binding.prepared.launch_args)),
                                 cwd=project, env=environment, start_new_session=os.name != "nt",
                             )
-                            running()
+                            running(process.pid)
                             return process.wait()
                         except OSError as error:
                             raise StartupBindingError(f"native {host} could not start: {error}") from error
@@ -312,7 +312,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                     while process.poll() is None and time.monotonic() < deadline:
                         if _acknowledged(directory, token):
                             active.acknowledge_binding()
-                            running()
+                            running(process.pid)
                             return process.wait()
                         time.sleep(0.05)
                     if process.poll() is not None:
@@ -367,7 +367,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
     try:
         returncode = run_session(parsed.host, parsed.target, parsed.project, arguments,
-                                 on_running=lambda: report("running", running_at=time.time()))
+                                 on_running=lambda child_pid=None: report("running", running_at=time.time(), child_pid=child_pid))
     except StartupBindingError as error:
         message = f"standards: {parsed.host} refresh failed: {error}"
         print(message, file=sys.stderr)
