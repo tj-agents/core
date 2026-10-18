@@ -119,7 +119,7 @@ class TerminalBootstrapRepairTests(unittest.TestCase):
         self.assertEqual([
             "broken",
             "claude plugin marketplace update base-agents",
-            "claude plugin update machine@base-agents",
+            "claude plugin update machine@base-agents --scope user",
             "fixed",
         ], self.calls_made())
         self.assertIn("reinstalling machine@base-agents", completed.stderr)
@@ -133,7 +133,7 @@ class TerminalBootstrapRepairTests(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertEqual([
             "claude plugin marketplace update base-agents",
-            "claude plugin update machine@base-agents",
+            "claude plugin update machine@base-agents --scope user",
             "fixed",
         ], self.calls_made())
 
@@ -162,7 +162,7 @@ class TerminalBootstrapRepairTests(unittest.TestCase):
         self.assertEqual([
             "broken",
             "claude plugin marketplace update base-agents",
-            "claude plugin update machine@base-agents",
+            "claude plugin update machine@base-agents --scope user",
         ], self.calls_made())
 
     def test_a_repair_that_does_not_fix_the_launcher_is_not_retried_again(self):
@@ -173,7 +173,24 @@ class TerminalBootstrapRepairTests(unittest.TestCase):
 
         self.assertEqual(1, completed.returncode, completed.stderr)
         self.assertEqual(["broken", "claude plugin marketplace update base-agents",
-                          "claude plugin update machine@base-agents", "broken"], self.calls_made())
+                          "claude plugin update machine@base-agents --scope user", "broken"], self.calls_made())
+
+    def test_a_project_scoped_package_is_reinstalled_in_its_own_scope(self):
+        fixed = self.package("fixed", STARTED_THEN_EXIT.format(label="fixed", code=0))
+        broken = self.package("broken", READY_THEN_FAIL.format(label="broken"))
+        (self.cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
+            "machine@base-agents": [{"scope": "project", "projectPath": str(self.root), "installPath": str(broken)}],
+        }}), encoding="utf-8")
+
+        completed = self.run_bootstrap(self.native_claude(fixed))
+
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual([
+            "broken",
+            "claude plugin marketplace update base-agents",
+            "claude plugin update machine@base-agents --scope project",
+            "fixed",
+        ], self.calls_made())
 
 
 class LaunchStateTests(unittest.TestCase):

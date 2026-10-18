@@ -380,6 +380,43 @@ class StartupBindingTests(unittest.TestCase):
 
         runtime.cleanup_runtime.assert_called_once_with(binding, (self.project / "config").resolve())
 
+    def test_codex_native_command_failure_leaves_the_launch_unstarted(self):
+        logical = type("Prepared", (), {
+            "host": "codex", "selected_roots": (self.verified,), "launch_args": (), "environment": {},
+        })()
+        directory = self.project / "runtime"
+        directory.mkdir()
+        runtime_prepared = type("Prepared", (), {
+            "selected_roots": (self.verified,), "launch_args": (), "environment": {},
+        })()
+        binding = type("Binding", (), {
+            "directory": directory, "prepared": runtime_prepared, "environment": {},
+        })()
+
+        class Active:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *details):
+                return None
+
+            def acknowledge_binding(self):
+                return None
+
+        Active.prepared = logical
+        runtime = mock.Mock()
+        runtime.prepare_runtime.return_value = binding
+        state = self.project / "launch-state"
+        state.write_text("ready", encoding="utf-8")
+
+        with mock.patch.object(BINDING, "preflight", return_value=Active()),                 mock.patch.object(BINDING, "native_target_for_shim", return_value="native"),                 mock.patch.object(BINDING, "_preflight_arguments", return_value={"project": self.project}),                 mock.patch.object(BINDING, "_module", side_effect=lambda name, paths: runtime if name == "codex_runtime_binding" else mock.Mock()),                 mock.patch.object(BINDING, "_preseed_snapshots"),                 mock.patch.object(BINDING, "_converge"),                 mock.patch("rolling_plugins.verify_final"),                 mock.patch.object(BINDING, "command_for_target", side_effect=OSError("shim moved")),                 mock.patch.object(BINDING.subprocess, "Popen") as popen,                 mock.patch.dict(os.environ, {"CODEX_HOME": str(self.project / "config"),
+                                             "BASE_AGENTS_LAUNCH_STATE": str(state)}, clear=False):
+            with self.assertRaisesRegex(BINDING.StartupBindingError, "shim moved"):
+                BINDING.run_session("codex", "typed", self.project, ["session"])
+
+        popen.assert_not_called()
+        self.assertEqual("ready", state.read_text(encoding="utf-8"))
+
     def test_preparation_uses_the_operation_budget_not_the_acknowledgement_timeout(self):
         prepared = type("Prepared", (), {
             "selected_roots": (), "launch_args": (), "environment": {},

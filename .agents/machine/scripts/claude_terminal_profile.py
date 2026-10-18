@@ -46,9 +46,9 @@ def unavailable(message):
     sys.exit(1 if probe else 125)
 
 class Missing(Exception):
-    def __init__(self, message, identity=None):
+    def __init__(self, message, package=None):
         super().__init__(message)
-        self.identity = identity
+        self.package = package
 
 def repository(source):
     if isinstance(source, dict):
@@ -175,6 +175,7 @@ def locate():
             if not isinstance(known, dict):
                 raise TypeError("marketplace registry")
             candidates = []
+            scopes = {}
             for identity in ("machine@tj-agents", "machine@base-agents"):
                 marketplace = identity.rsplit("@", 1)[1]
                 expected = "tj-agents/marketplace" if marketplace == "tj-agents" else "tj-agents/core"
@@ -196,10 +197,13 @@ def locate():
                                 if not isinstance(project_path, str) or not inside(project, project_path):
                                     continue
                                 rank = 2
+                                scopes[candidate] = (scope, project_path)
                             else:
                                 rank = 1
+                                scopes[candidate] = ("user", project)
                             candidates.append((identity, rank, candidate))
             identity, root = coordinator(candidates, enabled_identities(config, project))
+            package = (identity, *scopes[root])
         except OSError as error:
             raise Missing("Claude plugin registry could not be read (" + str(error) + ")")
         except (ValueError, TypeError, KeyError):
@@ -238,27 +242,29 @@ def locate():
                 if root is not None and root.parent.name == "machine" and (root / "catalog" / "catalog.json").is_file():
                     candidates.append((item["pluginId"], int(item.get("enabled") is True), root))
             identity, root = coordinator(candidates, {identity for identity, enabled, _root in candidates if enabled})
+            package = (identity, None, project)
         except (OSError, ValueError, TypeError) as error:
             raise Missing("Codex machine coordinator is unavailable (" + str(error) + ")")
     script = root / "resources" / "machine" / "scripts" / f"{kind}_terminal_launcher.py"
     if not script.is_file():
-        raise Missing("the active machine " + kind + " launcher is unavailable", identity)
-    return identity, script
+        raise Missing("the active machine " + kind + " launcher is unavailable", package)
+    return package, script
 
-def repair(identity):
+def repair(package):
+    identity, scope, directory = package
     marketplace = identity.rsplit("@", 1)[1]
     try:
         executable = typed_target if kind == "claude" else native_codex(typed_target)
     except ValueError:
         return False
     if kind == "claude":
-        commands = ([executable, "plugin", "marketplace", "update", marketplace], [executable, "plugin", "update", identity])
+        commands = ([executable, "plugin", "marketplace", "update", marketplace], [executable, "plugin", "update", identity, "--scope", scope])
     else:
         commands = ([executable, "plugin", "marketplace", "upgrade", marketplace], [executable, "plugin", "add", identity])
     print("standards: reinstalling " + identity + " from its marketplace", file=sys.stderr)
     for command in commands:
         try:
-            completed = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            completed = subprocess.run(command, cwd=directory, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                        stderr=subprocess.DEVNULL, timeout=180)
         except (OSError, subprocess.SubprocessError):
             return False
@@ -270,7 +276,7 @@ def resolve():
     try:
         return locate()
     except Missing as missing:
-        if hooks or missing.identity is None or not repair(missing.identity):
+        if hooks or missing.package is None or not repair(missing.package):
             unavailable(str(missing))
     try:
         return locate()
@@ -295,12 +301,12 @@ def launch(script):
             pass
     return code, reached
 
-identity, script = resolve()
+package, script = resolve()
 if probe:
     sys.exit(0)
 code, reached = launch(script)
-if code != 0 and reached == "ready" and not hooks and repair(identity):
-    identity, script = resolve()
+if code != 0 and reached == "ready" and not hooks and repair(package):
+    package, script = resolve()
     code, reached = launch(script)
 sys.exit(code)
 '''

@@ -243,9 +243,10 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                         if extra_environment:
                             environment.update(extra_environment)
                         try:
+                            command = command_for_target(target, _launch_arguments(arguments, binding.prepared.launch_args))
                             launch_state.started()
                             process = subprocess.Popen(
-                                command_for_target(target, _launch_arguments(arguments, binding.prepared.launch_args)),
+                                command,
                                 cwd=project, env=environment, start_new_session=os.name != "nt",
                             )
                             return process.wait()
@@ -265,8 +266,9 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 if extra_environment:
                     environment.update(extra_environment)
                 try:
+                    command = command_for_target(target, arguments)
                     launch_state.started()
-                    return subprocess.run(command_for_target(target, arguments), cwd=project, env=environment).returncode
+                    return subprocess.run(command, cwd=project, env=environment).returncode
                 except OSError as error:
                     raise StartupBindingError(f"native {host} could not start: {error}") from error
             prepared = active.materialize_native(executable)
@@ -279,8 +281,9 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 if extra_environment:
                     environment.update(extra_environment)
                 try:
+                    command = command_for_target(target, launch_arguments)
                     launch_state.started()
-                    return subprocess.run(command_for_target(target, launch_arguments), cwd=project,
+                    return subprocess.run(command, cwd=project,
                                           env=environment).returncode
                 except OSError as error:
                     raise StartupBindingError(f"native {host} could not start: {error}") from error
@@ -300,9 +303,10 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                                                     prepared.environment, extra_environment)
                 process = None
                 try:
+                    command = command_for_target(target, launch_arguments)
                     launch_state.started()
                     process = subprocess.Popen(
-                        command_for_target(target, launch_arguments), cwd=project, env=environment,
+                        command, cwd=project, env=environment,
                         start_new_session=os.name != "nt",
                     )
                 except OSError as error:
