@@ -41,7 +41,7 @@ python -B '<skill-directory>\scripts\adopt_plugins.py' --root C:\path\to\reposit
   --stack dotnet --mode preview
 ```
 
-A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `github-actions`,
+A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `python`, `github-actions`,
 `plugin-repository`) resolves to its plugins through `scripts/plugin_roster.json`, so nobody guesses which
 plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Required plugins are added and
 existing selections are kept. With no requested stack or plugin, a new selection uses the default base,
