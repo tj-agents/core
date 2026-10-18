@@ -357,3 +357,29 @@ Current ownership verification - 2026-10-13: PR212 and PR128 are merged and cont
 **Impact and priority:** P2 process failure; the candidate reached main before Windows validation finished. No failing result or observed product regression followed. **Source owner:** execution of the work-item/session goal, completed through PR257, PR262 and PR263. **State:** resolved by correct execution of the existing delivery gates; no separate repair or continuation workstream.
 
 **Next action:** none for this ordering correction. **Resolution condition:** satisfied: PR263 remained draft until frozen review approved49e49f2130c063fc16a706bff4fafb0ab08e6364 and exact-head Windows/Linux checks succeeded. **Verification evidence:** CI38664798772 Windows completed successfully at2026-10-15T01:30:44Z; Linux completed successfully at01:22:05Z. The existing guarded auto_merge.py accepted that exact head and PR263 merged at01:32:07Z as90d38f0fa6ac285755397ad0c8792c0493d2d39f. The naming/continuation repair cancellation remains unchanged.
+
+## M024 — Auto merge invoked before exact-head CI was terminal
+
+Kind: mistake. Observed: 2026-10-19. Priority: P2; no failed runtime behavior is observed,
+but the merge crossed the required verification boundary. State: in-progress.
+Source owner: Codex personal-projects/standards delivery and Core engineering merge guidance.
+Evidence: Core PR307 head 544cd03911a986ededb06971eb7cb9ad43ed48f9 merged at
+568e6c08f5d6224d330c30c9d5827b0270e35009 while verify-windows in CI39175205937
+was still IN_PROGRESS. Linux had passed. No merge ruleset was returned for this repository.
+Cause confirmed: the agent violated the existing terminal-check prerequisite by assuming
+`gh pr merge --auto` would wait. The consumed merge skill also incorrectly stated that
+`--auto` always enqueues and does not merge, without qualifying repositories lacking a queue.
+Correction: every merge invocation, including --auto, requires the exact PR head's own checks
+to be terminal and green first; determine queue/branch configuration and observe the actual outcome.
+Repair link: https://github.com/tj-agents/core/pull/308, reviewed head
+ec92dbd0e83b57417581f84d486db2576d2cf3dd; canonical personal-projects/GOAL.md in Template.
+Resolution condition: shared wording is corrected and reviewed, source validation and delivery
+pass, the original exact-head CI plus causal main publication reach a verified result, and the
+next owned merge is preceded by an explicit terminal-green check rather than relying on --auto.
+Verification: original exact-head CI39175205937 and merged-main CI39176000363 now pass.
+The next owned merge (React PR20) was explicitly preceded by terminal-green gh pr checks
+for reviewed head5763345f828a36a4d47b481d6e8d1280ca2a14e9, then merged at
+fd4a430d1766cbcbbc3ca4875c0e97180afcf18a. Correction source payload/freshness/docs checks
+and ordinary docs fallback review pass; exact correction CI39176405550 remains monitored.
+Next action: finish correction CI, merge only after a fresh terminal-green check, verify causal
+generation and retain this incident with final verification evidence.
