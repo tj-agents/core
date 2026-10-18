@@ -33,7 +33,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
             "skill_router.py", "tier_gate.py", "git_auth_scope_gate.py",
             "worktree_placement_gate.py",
             "forge_poll_gate.py", "compact_output_gate.py", "delivery_binding_gate.py",
-            "merge_cleanup_gate.py", "callout_repair_gate.py",
+            "merge_cleanup_gate.py",
         ])
 
     def test_every_plugin_uses_host_expanded_plugin_root_and_pretool_adapter(self):

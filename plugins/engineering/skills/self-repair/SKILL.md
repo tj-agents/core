@@ -1,6 +1,6 @@
 ---
 name: self-repair
-description: Route a user callout about an agent mistake caused or not prevented by a consumed Core standard into a verified bounded Core repair handoff. Use when a user identifies an agent mistake and the governing standard, skill, hook, workflow, or host enforcement may have caused or failed to prevent it.
+description: Repair, in the current session, the consumed Core standard that caused or failed to prevent an agent mistake the user called out. Use when a user identifies an agent mistake and the governing standard, skill, hook, workflow, or host enforcement may have caused or failed to prevent it.
 
 kind: workflow
 domain: process
