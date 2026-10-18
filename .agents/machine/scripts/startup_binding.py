@@ -198,7 +198,8 @@ def _preseed_snapshots(roots, snapshot_directory: Path) -> None:
 def run_session(host: str, target: str, project: Path, arguments: Sequence[str], *,
                 extra_environment: Mapping[str, str] | None = None,
                 timeout: float = STARTUP_TIMEOUT_SECONDS,
-                on_running: Callable[..., None] | None = None) -> int:
+                on_running: Callable[..., None] | None = None,
+                require_session_start: bool = False) -> int:
     running = on_running or (lambda child_pid=None: None)
     project = Path(project).resolve()
     configuration = _configuration_root(host).resolve()
@@ -220,6 +221,8 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 logical = getattr(active, "prepared", None)
                 if logical is None:
                     raise StartupBindingError("Codex rolling preflight did not prepare a package set")
+                if require_session_start and not _session_start_dispatcher(logical.selected_roots, host):
+                    raise StartupBindingError("handoff requires a verified SessionStart dispatcher")
                 if logical.selected_roots:
                     runtime = _module("codex_runtime_binding", (HERE / "codex_runtime_binding.py",))
                     binding = runtime.prepare_runtime(
@@ -243,11 +246,24 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                         environment[SNAPSHOT_DIRECTORY_ENV] = str(snapshot_directory)
                         if extra_environment:
                             environment.update(extra_environment)
+                        acknowledgement = binding.directory / "handoff-ack"
+                        token = secrets.token_urlsafe(32)
+                        if require_session_start:
+                            acknowledgement.mkdir()
+                            environment[ACK_DIRECTORY_ENV] = str(acknowledgement)
+                            environment[ACK_TOKEN_ENV] = token
                         try:
                             process = subprocess.Popen(
                                 command_for_target(target, _launch_arguments(arguments, binding.prepared.launch_args)),
                                 cwd=project, env=environment, start_new_session=os.name != "nt",
                             )
+                            if require_session_start:
+                                while process.poll() is None:
+                                    if _acknowledged(acknowledgement, token):
+                                        running(process.pid)
+                                        return process.wait()
+                                    time.sleep(0.05)
+                                return process.returncode
                             running(process.pid)
                             return process.wait()
                         except OSError as error:
@@ -273,6 +289,8 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
             prepared = active.materialize_native(executable)
             _converge(prepared, executable, effective_project)
             launch_arguments = _launch_arguments(arguments, prepared.launch_args)
+            if require_session_start and not _session_start_dispatcher(prepared.selected_roots, host):
+                raise StartupBindingError("handoff requires a verified SessionStart dispatcher")
             if not prepared.selected_roots:
                 active.acknowledge_binding()
                 environment = _without_binding_state(os.environ)
@@ -343,6 +361,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--project", type=Path, required=True)
     parser.add_argument("--target", required=True)
     parser.add_argument("--status-file", type=Path)
+    parser.add_argument("--require-session-start", action="store_true")
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     parsed = parser.parse_args(argv)
     arguments = parsed.arguments[1:] if parsed.arguments[:1] == ["--"] else parsed.arguments
@@ -366,7 +385,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"standards: {parsed.host} launch was abandoned or already claimed before startup", file=sys.stderr)
             return 1
     try:
-        returncode = run_session(parsed.host, parsed.target, parsed.project, arguments,
+        options = {"require_session_start": True} if parsed.require_session_start else {}
+        returncode = run_session(parsed.host, parsed.target, parsed.project, arguments, **options,
                                  on_running=lambda child_pid=None: report("running", running_at=time.time(), child_pid=child_pid))
     except StartupBindingError as error:
         message = f"standards: {parsed.host} refresh failed: {error}"

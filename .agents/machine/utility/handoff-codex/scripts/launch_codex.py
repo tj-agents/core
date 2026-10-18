@@ -145,17 +145,21 @@ def main(argv=None):
         # that was set -- TERM -- is what broke it. On POSIX this clearing has no effect either way:
         # launch_tab never forces or clears TERM there, because the terminal that actually starts the tab
         # sets TERM for that session itself.
+        status_path = agent_cli.handoff_status_path()
         agent_cli.launch_tab(
             working_directory, sys.executable, args.title,
-            arguments=agent_cli.bound_terminal_arguments("codex", working_directory, codex, arguments),
+            arguments=agent_cli.bound_terminal_arguments("codex", working_directory, codex, arguments,
+                                                        status_path, require_session_start=True),
             clear=('TERM',),
         )
+
+        agent_cli.await_handoff_startup(status_path)
 
         selection = f'{tier}{model}' if model else 'the CLI default model'
         if effort:
             selection += f' at {effort}'
         print(f"Launched codex-cli {version['text']} from {codex} on {selection}")
-        print(json.dumps({"event": "agent-handoff-submitted", "worktree": str(working_directory), "prompt_path": str(prompt_path)}))
+        print(json.dumps({"event": "agent-handoff-submitted", "worktree": str(working_directory), "prompt_path": str(prompt_path), "startup": "verified", "status_path": str(status_path)}))
         return 0
     except agent_cli.LaunchError as exc:
         return agent_cli.report_launch_failure(exc)

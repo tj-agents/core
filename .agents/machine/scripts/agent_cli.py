@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = Path(__file__).resolve().parent
 IS_WINDOWS = os.name == 'nt'
@@ -649,13 +650,48 @@ def startup_binding_script():
     return path
 
 
-def bound_terminal_arguments(host, working_directory, target, arguments, status_file=None):
+def handoff_status_path():
+    return Path(tempfile.mkdtemp(prefix="tj-agents-handoff-")) / "status.json"
+
+
+def await_handoff_startup(status_path, timeout=480, wrapper_timeout=45,
+                          clock=time.monotonic, wait=time.sleep):
+    spec = importlib.util.spec_from_file_location("handoff_launch_status", HERE / "launch_status.py")
+    status_file = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(status_file)
+    start = clock()
+    while True:
+        status = status_file.read(status_path) or {}
+        state = status.get("state")
+        if state == "abandoned":
+            raise LaunchError("the launch was abandoned before startup")
+        if state == "failed":
+            raise LaunchError(str(status.get("error") or "native startup failed"))
+        if state == "exited":
+            raise LaunchError(f"native CLI exited with {status.get('returncode')} before handoff confirmation")
+        if state == "running":
+            return
+        elapsed = clock() - start
+        if not status and elapsed >= wrapper_timeout:
+            try:
+                abandoned = status_file.create(status_path, {"state": "abandoned", "at": time.time()})
+            except OSError as error:
+                raise LaunchTimeout(f"launch status could not be recorded: {error}; receipt: {status_path}") from error
+            if abandoned:
+                raise LaunchError("the terminal never started the startup wrapper; the late launch is blocked")
+        if elapsed >= timeout:
+            raise LaunchTimeout(f"native SessionStart was not confirmed; receipt: {status_path}")
+        wait(0.1)
+
+
+def bound_terminal_arguments(host, working_directory, target, arguments, status_file=None, require_session_start=False):
     status = ["--status-file", str(status_file)] if status_file else []
     return ["-I", "-B", str(startup_binding_script()), "--host", host, "--project",
-            str(working_directory), "--target", str(target), *status, "--", *arguments]
+            str(working_directory), "--target", str(target), *status,
+            *(["--require-session-start"] if require_session_start else []), "--", *arguments]
 
 
-def open_claude_tab(working_directory, title, arguments, out=print, status_file=None):
+def open_claude_tab(working_directory, title, arguments, out=print, status_file=None, require_session_start=False):
     """Resolve the native claude executable, sync standards and open the tab.
 
     Shared by open-claude and handoff-claude so executable discovery, pre-launch standards sync and the
@@ -671,5 +707,5 @@ def open_claude_tab(working_directory, title, arguments, out=print, status_file=
     # session on Windows: launch_tab drops any forced TERM on POSIX, because the terminal that actually
     # starts the tab sets TERM for that session itself, and forcing or clearing it here would fight that.
     launch_tab(working_directory, sys.executable, title,
-               arguments=bound_terminal_arguments("claude", working_directory, claude, list(arguments), status_file),
+               arguments=bound_terminal_arguments("claude", working_directory, claude, list(arguments), status_file, require_session_start),
                force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'})
