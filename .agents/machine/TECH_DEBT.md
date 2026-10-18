@@ -175,3 +175,28 @@ one fired, and what caused it, was not identified.
 Resolve when the failing branch is identified from a reproduction (for example, logging both checks under
 two concurrent full suites), its cause is fixed or isolated, and two full suites run concurrently on one
 machine pass.
+
+## A bound launch spends minutes before the native CLI starts
+
+Observed 2026-10-18 on Windows: `startup_binding.py` took about 90 s (Claude) and 165 s (Codex) before
+starting the native CLI. Profiling a Codex launch showed `materialize_native` about 64 s,
+`codex_runtime_binding.prepare_runtime` about 100 s, and Codex hook-trust reads about 22 s. Every terminal,
+handoff and recovery launch pays this, and the tab shows nothing meanwhile. Resolve when a launch with an
+unchanged package set reaches the native CLI in seconds, for example by reusing a verified runtime whose
+revisions match `main`.
+
+## handoff-claude and handoff-codex report a launch they never observed
+
+Recovery now waits for the resumed session to register or write its history, and reports a failed or no-op
+launch with its cause. The handoff launchers still print "Launched" when the terminal accepts the tab, so a
+startup failure inside the tab is invisible to the caller. They start a new session whose id is unknown
+beforehand, so they need the `--status-file` startup state plus a registration that names the new session.
+Resolve when a handoff launch returns only after observed pickup, or fails with the startup cause.
+
+## Prompts do not create or bind a work item
+
+The session store binds a work item only at SessionStart, through `attach_work_item_if_unique` on the
+session's repository and branch, or through an explicit `work_item_sessions.py claim`. No hook creates or binds
+a work item per prompt, so a session working on `main` or an unclaimed branch stays unbound and topic recovery
+can match it only by title, checkout or repository. Resolve when every authorized task's owning session is
+bound to a work item without a manual claim.

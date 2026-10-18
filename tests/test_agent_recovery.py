@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("agent_recovery", ROOT / ".agents/machine/scripts/agent_recovery.py")
 RECOVERY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RECOVERY)
+AWAIT_PICKUP = RECOVERY.await_pickup
 
 
 class RecoveryTests(unittest.TestCase):
@@ -28,6 +29,9 @@ class RecoveryTests(unittest.TestCase):
         self.env = mock.patch.dict("os.environ", {"AGENT_STATE_DIRECTORY": str(self.state)}, clear=False)
         self.env.start()
         self.addCleanup(self.env.stop)
+        self.pickup = mock.patch.object(RECOVERY, "await_pickup", return_value="registered in sessions.db")
+        self.pickup.start()
+        self.addCleanup(self.pickup.stop)
 
     def write_codex(self, session="exact_id", source="cli"):
         path = self.root / "sessions/archive" / f"{session}.jsonl"
@@ -221,12 +225,128 @@ Observed blocker: no send was attempted."""
         cli = mock.Mock()
         cli.resolve_tab_directory.side_effect = lambda value: Path(value)
         seen = []
-        cli.open_claude_tab.side_effect = lambda *args: seen.append(__import__("os").environ.get("CLAUDE_CONFIG_DIR"))
+        cli.open_claude_tab.side_effect = lambda *args, **kwargs: seen.append(__import__("os").environ.get("CLAUDE_CONFIG_DIR"))
         real_load = RECOVERY._load
         with mock.patch.dict("os.environ", {"CLAUDE_CONFIG_DIR": "wrong profile"}, clear=False), \
              mock.patch.object(RECOVERY, "_load", side_effect=lambda name: cli if name == "agent_cli" else real_load(name)):
             RECOVERY.open_session("claude", "claude_id", roots={"claude": projects}, confirm_closed=True)
         self.assertEqual(seen, [RECOVERY._profile("claude", projects)])
+
+    def store_session(self, session="01a1415f-6448", title="Personal workflow policy research", work_title=None,
+                      started_at=1000.0):
+        store = RECOVERY._load("session_store")
+        connection = store.connect()
+        try:
+            if work_title:
+                store.upsert_work_item(connection, "github.com/tj-agents/docs:problem-management/personal-policy",
+                                       "github.com/tj-agents/docs", "problem-management", "personal-policy",
+                                       status="active", title=work_title, plan_path="plans/problem-management/PLAN.md")
+            connection.execute(
+                "INSERT INTO sessions (handle, host, session_id, profile, title, cwd, repo, branch, work_item, "
+                "started_at, last_activity_at) VALUES (?, 'codex', ?, ?, ?, ?, 'github.com/tj-agents/docs', 'main', ?, ?, ?)",
+                (f"codex:{session}", session, str(self.root / "codex profile"), title, str(self.cwd),
+                 "github.com/tj-agents/docs:problem-management/personal-policy" if work_title else None,
+                 started_at, started_at),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def test_topic_search_reads_sqlite_work_items_without_scanning_history(self):
+        self.store_session(work_title="Optional GitHub work-items package and personal adoption")
+        self.store_session("other_id", title="Unrelated session")
+        history = RECOVERY._load("history")
+        with mock.patch.object(history, "history_root", side_effect=AssertionError("native scan")):
+            results = RECOVERY.search(topic="work items GitHub")
+        self.assertEqual(["01a1415f-6448"], [item["id"] for item in results])
+        self.assertEqual("sessions.db", results[0]["source"])
+        self.assertIn("work_item.title", results[0]["matched_by"])
+        self.assertEqual("plans/problem-management/PLAN.md", results[0]["work_item"]["plan_path"])
+
+    def test_sqlite_checkout_filter_and_history_fallback(self):
+        self.store_session(title="Personal workflow policy research")
+        other = self.root / "other checkout"
+        other.mkdir()
+        self.assertEqual(["01a1415f-6448"], [item["id"] for item in RECOVERY.search(checkout=str(self.cwd))])
+        history = RECOVERY._load("history")
+        with mock.patch.object(history, "history_root", return_value=self.root / "missing"):
+            with self.assertRaises(ValueError):
+                RECOVERY.search(("codex",), checkout=str(other))
+        self.write_codex()
+        results = RECOVERY.search(("codex",), topic="launch topic", roots={"codex": self.root / "sessions"})
+        self.assertEqual(("native-history", ["message"]), (results[0]["source"], results[0]["matched_by"]))
+
+    def test_find_uses_the_recorded_session_before_native_history(self):
+        self.store_session()
+        history = RECOVERY._load("history")
+        with mock.patch.object(history, "history_root", side_effect=AssertionError("native scan")):
+            item = RECOVERY.find("codex", "01a1415f-6448")
+        self.assertEqual(str(self.cwd), item["cwd"])
+        self.assertEqual(Path(item["profile"]), (self.root / "codex profile").resolve())
+
+    def run_pickup(self, statuses=(), registered_after=None, history_after=None, timeout=10, wrapper_timeout=3):
+        self.launches = getattr(self, "launches", 0) + 1
+        session = f"pickup_{self.launches}"
+        status = self.root / f"{session}.status.json"
+        history = self.root / f"{session}.jsonl"
+        history.write_text("{}", encoding="utf-8")
+        before = history.stat().st_mtime
+        now = [0.0]
+        states = list(statuses)
+
+        def wait(seconds):
+            now[0] += seconds
+            if states and now[0] >= states[0][0]:
+                status.write_text(json.dumps(states.pop(0)[1]), encoding="utf-8")
+            if registered_after is not None and now[0] >= registered_after:
+                self.store_session(session, started_at=before)
+            if history_after is not None and now[0] >= history_after:
+                os.utime(history, (before + 5, before + 5))
+
+        return AWAIT_PICKUP("codex", session, status, before - 1, history, timeout=timeout,
+                            wrapper_timeout=wrapper_timeout, interval=1, clock=lambda: now[0], wait=wait)
+
+    def test_pickup_is_verified_by_registration_or_history_growth(self):
+        self.assertEqual("registered in sessions.db",
+                         self.run_pickup([(1, {"state": "preparing"})], registered_after=4))
+        self.assertEqual("native history written", self.run_pickup([(1, {"state": "preparing"})], history_after=4))
+
+    def test_pickup_failures_carry_the_cause(self):
+        with self.assertRaisesRegex(RECOVERY.LaunchFailed, "unsupported value"):
+            self.run_pickup([(1, {"state": "preparing"}), (3, {"state": "failed", "error": "unsupported value"})])
+        with self.assertRaisesRegex(RECOVERY.LaunchFailed, "never started"):
+            self.run_pickup()
+        with self.assertRaisesRegex(RECOVERY.LaunchFailed, "exited with 1"):
+            self.run_pickup([(1, {"state": "exited", "returncode": 1})])
+        with self.assertRaises(RECOVERY.LaunchUnverified):
+            self.run_pickup([(1, {"state": "preparing"})])
+
+    def test_failed_launch_releases_its_receipt_and_unverified_keeps_it_ambiguous(self):
+        self.write_codex()
+        cli = RECOVERY._load("agent_cli")
+        roots = {"codex": self.root / "sessions"}
+        for outcome, remaining in ((RECOVERY.LaunchFailed("tab never ran"), None),
+                                   (RECOVERY.LaunchUnverified("not resumed"), "ambiguous")):
+            with self.subTest(outcome=type(outcome).__name__), \
+                    mock.patch.object(RECOVERY, "await_pickup", side_effect=outcome), \
+                    mock.patch.object(RECOVERY, "liveness", return_value="closed"), \
+                    mock.patch.object(RECOVERY, "_verify_codex_resume"), \
+                    mock.patch.object(cli, "resolve_codex_executable", return_value=("native-codex", {})), \
+                    mock.patch.object(cli, "launch_tab"):
+                with self.assertRaises(type(outcome)):
+                    RECOVERY.open_session("codex", "exact_id", roots=roots, cli=cli)
+                receipt = RECOVERY._receipt("codex", "exact_id", RECOVERY._profile("codex", roots["codex"]))
+                state = json.loads(receipt.read_text(encoding="utf-8"))["state"] if receipt.exists() else None
+                self.assertEqual(remaining, state)
+                receipt.unlink(missing_ok=True)
+
+    def test_main_exits_one_for_failed_and_three_for_unverified_launches(self):
+        for error, code in ((RECOVERY.LaunchFailed("native codex exited"), 1), (RECOVERY.LaunchUnverified("x"), 3)):
+            output = io.StringIO()
+            with self.subTest(code=code), mock.patch.object(RECOVERY, "open_session", side_effect=error), \
+                    contextlib.redirect_stderr(output):
+                self.assertEqual(code, RECOVERY.main(["open", "--host", "codex", "--id", "exact_id"]))
+            self.assertIn(str(error), output.getvalue())
 
     def test_packaged_resource_loads_peer_process_helper(self):
         path = ROOT / "plugins/machine/resources/machine/scripts/agent_recovery.py"
@@ -372,8 +492,10 @@ Observed blocker: no send was attempted."""
         self.assertEqual(self.cwd, directory)
         self.assertEqual(sys.executable, executable)
         self.assertEqual("startup_binding.py", Path(arguments[2]).name)
-        self.assertEqual(["--host", "codex", "--project", str(self.cwd), "--target", "native-codex", "--",
-                          "resume", "exact_id", "Continue the requested work."], arguments[3:])
+        self.assertEqual(["--host", "codex", "--project", str(self.cwd), "--target", "native-codex"], arguments[3:9])
+        self.assertEqual("--status-file", arguments[9])
+        self.assertEqual("codex-", Path(arguments[10]).name[:6])
+        self.assertEqual(["--", "resume", "exact_id", "Continue the requested work."], arguments[11:])
         focus.assert_not_called()
 
     def test_reopen_live_session_focuses_its_tab_and_never_launches_a_second_writer(self):
