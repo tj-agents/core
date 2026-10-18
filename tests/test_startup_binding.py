@@ -409,7 +409,16 @@ class StartupBindingTests(unittest.TestCase):
         state = self.project / "launch-state"
         state.write_text("ready", encoding="utf-8")
 
-        with mock.patch.object(BINDING, "preflight", return_value=Active()),                 mock.patch.object(BINDING, "native_target_for_shim", return_value="native"),                 mock.patch.object(BINDING, "_preflight_arguments", return_value={"project": self.project}),                 mock.patch.object(BINDING, "_module", side_effect=lambda name, paths: runtime if name == "codex_runtime_binding" else mock.Mock()),                 mock.patch.object(BINDING, "_preseed_snapshots"),                 mock.patch.object(BINDING, "_converge"),                 mock.patch("rolling_plugins.verify_final"),                 mock.patch.object(BINDING, "command_for_target", side_effect=OSError("shim moved")),                 mock.patch.object(BINDING.subprocess, "Popen") as popen,                 mock.patch.dict(os.environ, {"CODEX_HOME": str(self.project / "config"),
+        with mock.patch.object(BINDING, "preflight", return_value=Active()), \
+                mock.patch.object(BINDING, "native_target_for_shim", return_value="native"), \
+                mock.patch.object(BINDING, "_preflight_arguments", return_value={"project": self.project}), \
+                mock.patch.object(BINDING, "_module", side_effect=lambda name, paths: runtime if name == "codex_runtime_binding" else mock.Mock()), \
+                mock.patch.object(BINDING, "_preseed_snapshots"), \
+                mock.patch.object(BINDING, "_converge"), \
+                mock.patch("rolling_plugins.verify_final"), \
+                mock.patch.object(BINDING, "command_for_target", side_effect=OSError("shim moved")), \
+                mock.patch.object(BINDING.subprocess, "Popen") as popen, \
+                mock.patch.dict(os.environ, {"CODEX_HOME": str(self.project / "config"),
                                              "BASE_AGENTS_LAUNCH_STATE": str(state)}, clear=False):
             with self.assertRaisesRegex(BINDING.StartupBindingError, "shim moved"):
                 BINDING.run_session("codex", "typed", self.project, ["session"])
