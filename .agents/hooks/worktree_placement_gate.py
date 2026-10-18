@@ -242,6 +242,9 @@ def unquote(value):
     return value
 
 
+NATIVE_CREATION_TEXT = re.compile(r"\bgit(?:\.exe)?\b.*\bworktree\b[\s\\`]+add\b", re.I | re.S)
+
+
 def tokens_of(segment):
     try:
         return [unquote(token) for token in shlex.split(segment, posix=False)]
@@ -304,7 +307,7 @@ def branch_name(value):
 def parse_creation(segment):
     tokens = tokens_of(segment)
     if tokens is None:
-        return "invalid", None
+        return ("invalid", None) if NATIVE_CREATION_TEXT.search(segment) else (None, None)
     start = git_start(tokens)
     add_index = worktree_add_index(tokens, start)
     if add_index is None:
@@ -379,7 +382,7 @@ def parse_creation(segment):
 def creation_segments(command, kind):
     segments = shell_segments(command, kind)
     if segments is None:
-        return [("invalid", None)] if re.search(r"\bgit(?:\.exe)?\b.*\bworktree\s+add\b", command, re.I | re.S) else []
+        return [("invalid", None)] if NATIVE_CREATION_TEXT.search(command) else []
     creations = []
     for segment in segments:
         parsed = parse_creation(segment)
