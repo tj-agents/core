@@ -38,12 +38,17 @@ def main(argv: list[str] | None = None) -> int:
     if command[:1] == ["--"]:
         command = command[1:]
     if not command or command[0] not in CLAUDE_NON_SESSION_COMMANDS:
+        started: list[object] = []
         try:
             if not command:
                 command = ["-n", claude_label(parsed.project)]
             flush_before_cli()
-            return run_session("claude", parsed.target, parsed.project, command)
+            return run_session("claude", parsed.target, parsed.project, command,
+                               on_running=lambda child_pid=None: started.append(child_pid))
         except Exception as error:
+            if started:
+                print(f"standards: Claude session ended with a standards error: {error}", file=sys.stderr)
+                return 1
             print(f"standards: Claude refresh failed: {error}; starting Claude without the standards refresh",
                   file=sys.stderr)
             return run_target(parsed.target, command)

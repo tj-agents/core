@@ -120,11 +120,16 @@ def main(argv: list[str] | None = None) -> int:
         return hook_control(parsed.arguments)
     if not bypasses_refresh(parsed.arguments):
         command = parsed.arguments
+        started: list[object] = []
         try:
             command = without_daemon_for_interactive(parsed.arguments, parsed.target)
             flush_before_cli()
-            return run_session("codex", parsed.target, parsed.project, command)
+            return run_session("codex", parsed.target, parsed.project, command,
+                               on_running=lambda child_pid=None: started.append(child_pid))
         except Exception as error:
+            if started:
+                print(f"standards: Codex session ended with a standards error: {error}", file=sys.stderr)
+                return 1
             print(f"standards: Codex refresh failed: {error}; starting Codex without the standards refresh",
                   file=sys.stderr)
             return run_target(parsed.target, command)
