@@ -278,14 +278,14 @@ def _pid_is_dead(pid, pid_started_at):
 
 
 def _finished_elsewhere(row, machine):
-    if (row.get("machine") or "").casefold() != machine.casefold():
-        return False
     if row.get("ended_at") is not None:
         return True
-    liveness = _agent_recovery().liveness({"host": row["host"], "session": row["session_id"]})
-    if liveness == "unknown":
-        return _pid_is_dead(row.get("pid"), row.get("pid_started_at"))
-    return liveness != "live"
+    if (row.get("machine") or "").casefold() != machine.casefold():
+        return False
+    record = _agent_recovery()._registry(row["session_id"]) or {}
+    if isinstance(record.get("pid"), int) and record.get("pid_started_at") is not None:
+        return _pid_is_dead(record["pid"], record["pid_started_at"])
+    return _pid_is_dead(row.get("pid"), row.get("pid_started_at"))
 
 
 def _resume_roots(row):
