@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 from pathlib import Path
 import shutil
@@ -566,6 +567,33 @@ class WorkItemSessionsTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(sorted([f"claude:{live}", f"claude:{foreign}", f"codex:{caller}"]), remaining)
+
+    def test_done_item_judges_a_running_session_by_its_cli_registry_record(self):
+        alive = "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"
+        gone = "b3cde6d5-c07e-4198-a6f4-e8cb8a822986"
+        self._claim_claude(session_id=alive)
+        self._claim_claude(session_id=gone, role="bounded: notes")
+        started = WIS._register_session().build_process_lookup()(os.getpid()).started_at
+        registry = self.state / "cli-sessions"
+        registry.mkdir(parents=True, exist_ok=True)
+        for session_id, pid_started_at in ((alive, started), (gone, started + 1000)):
+            (registry / f"{session_id}.json").write_text(json.dumps({
+                "host": "claude", "session_id": session_id, "pid": os.getpid(), "pid_started_at": pid_started_at,
+            }), encoding="utf-8")
+        connection = self._connection()
+        try:
+            connection.execute("UPDATE sessions SET pid = NULL, pid_started_at = NULL")
+            connection.commit()
+        finally:
+            connection.close()
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": "", "CLAUDE_CODE_SESSION_ID": ""}):
+            WIS.cmd_item("example-feature/example-item", "done", cwd=self.repo)
+        connection = self._connection()
+        try:
+            remaining = [row["handle"] for row in connection.execute("SELECT handle FROM sessions")]
+        finally:
+            connection.close()
+        self.assertEqual([f"claude:{alive}"], remaining)
 
     def test_done_item_deletes_an_ended_session_recorded_on_another_machine(self):
         other = "c4def7e6-d18f-42a9-b7a5-f9dc9b933a97"
