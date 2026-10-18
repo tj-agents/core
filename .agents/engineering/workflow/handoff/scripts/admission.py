@@ -157,6 +157,17 @@ def process_started_at(pid: int) -> float | None:
     return None
 
 
+def within_worktree(cwd: Any, worktree: Any) -> bool:
+    if not isinstance(cwd, str) or not isinstance(worktree, str) or not cwd or not worktree:
+        return False
+    try:
+        inner = Path(os.path.normcase(os.path.abspath(cwd)))
+        outer = Path(os.path.normcase(os.path.abspath(worktree)))
+    except (OSError, ValueError):
+        return False
+    return inner == outer or outer in inner.parents
+
+
 def registry_owner(owner: dict[str, Any]) -> tuple[dict[str, Any] | None, Path | None]:
     matches = []
     for path in registry_root().glob("*.json"):
@@ -166,7 +177,7 @@ def registry_owner(owner: dict[str, Any]) -> tuple[dict[str, Any] | None, Path |
             continue
         if not isinstance(observed, dict) or observed.get("session_id") != owner.get("session_id"):
             continue
-        if observed.get("host") != owner.get("harness") or observed.get("cwd") != owner.get("worktree"):
+        if observed.get("host") != owner.get("harness") or not within_worktree(observed.get("cwd"), owner.get("worktree")):
             continue
         if not isinstance(observed.get("pid"), int) or not isinstance(observed.get("pid_started_at"), (int, float)):
             continue
