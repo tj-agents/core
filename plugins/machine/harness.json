@@ -56,6 +56,13 @@
         ]
       },
       {
+        "path": "resources/machine/scripts/plugin_generation.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
         "path": "resources/machine/scripts/prune_plugin_cache.py",
         "hosts": [
           "claude"

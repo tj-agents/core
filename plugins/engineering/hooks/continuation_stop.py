@@ -1,13 +1,17 @@
+import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 from workflow_route import direct_control, read_receipt
 
 WINDOWS = os.name == "nt"
+BLOCKS = "tj-agents-continuation-stop"
+BLOCK_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
 def workflow_root():
@@ -226,6 +230,45 @@ def outcome(data):
     return None
 
 
+def block_record(session):
+    configured = os.environ.get("AGENT_STATE_DIRECTORY")
+    root = Path(configured) if configured else Path.home() / ".agents-state"
+    return root / BLOCKS / f"{hashlib.sha256(session.encode('utf-8')).hexdigest()}.json"
+
+
+def once_per_stop(data, reason):
+    session = data.get("session_id") or data.get("sessionId")
+    if not isinstance(session, str) or not session:
+        return reason
+    path = block_record(session)
+    if not reason:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return None
+    retry = bool(data.get("stop_hook_active") or data.get("stopHookActive"))
+    if retry and path.is_file():
+        return None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+    except OSError:
+        return None if retry else reason
+    prune_block_records(path)
+    return reason
+
+
+def prune_block_records(current):
+    expiry = time.time() - BLOCK_RETENTION_SECONDS
+    for candidate in current.parent.glob("*.json"):
+        try:
+            if candidate != current and candidate.stat().st_mtime < expiry:
+                candidate.unlink()
+        except OSError:
+            continue
+
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -237,6 +280,7 @@ def main():
         reason = outcome(data)
     except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
         reason = f"Cannot verify continuation ownership; continue the goal: {error}"
+    reason = once_per_stop(data, reason)
     if reason:
         print(json.dumps({"decision": "block", "reason": reason}))
     else:

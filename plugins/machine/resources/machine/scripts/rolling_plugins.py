@@ -22,6 +22,12 @@ import tarfile
 import signal
 from typing import Iterable, Mapping
 
+HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+import generation_record  # noqa: E402
+
 
 GIT_TIMEOUT_SECONDS = 90
 OPERATION_TIMEOUT_SECONDS = 300
@@ -1228,8 +1234,15 @@ def _write_json(path: Path, value: object) -> None:
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     _unlinked_ancestors(path)
     _unlinked_ancestors(temporary)
-    temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+    try:
+        temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+        os.replace(temporary, path)
+    except OSError:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
 
 
 def _codex_inventory_selects(entries: object, identity: str) -> bool:
@@ -1468,6 +1481,30 @@ def verify_final(prepared: Prepared, host: str, target: Path, project: Path, arg
         _clone, revision = _fetch_main(source, cache, prepared.deadline)
         if revision != expected_revision:
             raise RollingPluginError(f"publisher main advanced while materializing {source}")
+    _record_generations(generation_record.generations_path(prepared.plugins_root or target / "plugins", host),
+                        ((root.repository, root.revision) for root in prepared.selected_roots))
+
+
+def _record_generations(record: Path, revisions: Iterable[tuple[str, str]], attempts: int = 5) -> None:
+    revisions = tuple(revisions)
+    try:
+        _unlinked_ancestors(record)
+        record.parent.mkdir(parents=True, exist_ok=True)
+        for attempt in range(attempts):
+            state, entries = generation_record.read_record(record)
+            if state == generation_record.NEWER:
+                raise RollingPluginError("the existing generation record uses a newer schema")
+            try:
+                if state == generation_record.BUSY:
+                    raise PermissionError("the existing generation record could not be read")
+                _write_json(record, generation_record.merged_generations(entries, revisions, time.time()))
+                return
+            except PermissionError:
+                if attempt + 1 == attempts:
+                    raise
+                time.sleep(0.05)
+    except Exception as error:  # noqa: BLE001
+        print(f"tj-agents: verified generations were not recorded in {record}: {error}", file=sys.stderr)
 
 
 def terminate_process_tree(process: subprocess.Popen, timeout: float = 5) -> None:
