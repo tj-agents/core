@@ -1,6 +1,6 @@
 ---
 name: refresh-cli
-description: Refresh Claude's and Codex's installed tj-agents plugins to current main in one command, repair what each host actually loads, and verify it. Use when a skill or hook is missing or out of date after a merge, when /reload-plugins still shows old standards, or when asked to refresh, update or resync the CLI plugins.
+description: Refresh selected tj-agents plugins through native Claude and Codex commands, with optional verification. Use when a skill or hook is missing or out of date after a merge, when /reload-plugins still shows old standards, or when asked to refresh, update or resync the CLI plugins.
 kind: utility
 domain: machine
 route: infer
@@ -8,21 +8,24 @@ route: infer
 
 # Refresh CLI plugins
 
-Run with `python` on Windows or `python3` on Linux/macOS, from the repository whose selection should be
-refreshed:
+Automatic updates run in the background. For an explicit refresh request, use this skill's shipped
+entry point. On Windows:
 
-```sh
-python -B '<skill-directory>/../../resources/machine/scripts/refresh_cli.py' --project '<absolute-checkout>'
+```powershell
+python -B '<skill-directory>/scripts/refresh_cli.py' --project '<absolute-checkout>'
 ```
 
-For each host it updates every registered tj-agents marketplace, runs the same verified rolling refresh a
-bound launch performs, and repairs Claude's plugin registry so the recorded `version` names the refreshed
-install. It then compares every enabled tj-agents package with its repository's `main` and prints a JSON
-report. Exit 0 means both hosts are current; otherwise each entry's `problems` names what is stale.
-Bound Codex launches build each session's packages from `main`, so Codex's `unused_stale_cache` lists
-only cached copies that a launch bypassing the tj-agents launcher would load.
+On Linux/macOS use `python3` with the same arguments and POSIX paths.
 
-Pass `--host claude` or `--host codex` for one host, and `--verify-only` to report without changing
-anything. A refresh takes a few minutes. Afterwards, run `/reload-plugins` in each open Claude session;
-new Codex sessions load the refreshed packages. Each open session reports a superseded generation at its next
-prompt until it adopts the new one.
+The default updates the selected tj-agents marketplaces and plugins through native host commands.
+It prints progress for each operation and does no package generation or rolling startup preflight.
+Claude installs at project scope. Codex's native installer writes a user-level enabled entry; its
+installed cache can subsequently be loaded solely from a trusted project's declaration.
+
+Pass `--host claude` or `--host codex` for one host. `--verify` additionally checks native installation
+inventory and marketplace checkouts against remote main revisions. `--verify-only` runs that slower
+inspection without refreshing. Neither verification mode is the default.
+
+After refreshing, `/reload-plugins` adopts updates in an open Claude session. Start a new Codex session
+to load its updated packages. A successful refresh proves the native commands completed; a fresh
+session is required to prove loading.

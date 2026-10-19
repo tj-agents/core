@@ -31,7 +31,7 @@ python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' 
 ```
 
 A selected open is reported only after the resumed session registers in the store or writes its native history;
-startup refreshes plugins first and can take several minutes. Exit 1 means the launch failed and prints the
+launch starts the native CLI without refreshing plugins. Exit 1 means the launch failed and prints the
 cause; it can be retried after fixing that. Exit 3 means the tab started but the session was not seen to resume;
 check that tab and do not retry.
 
