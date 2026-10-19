@@ -44,7 +44,10 @@ def _terminate(process: subprocess.Popen) -> None:
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
-        process.kill()
+        if os.name == "nt":
+            process.kill()
+        else:
+            os.killpg(process.pid, signal.SIGKILL)
         process.wait(timeout=5)
 
 

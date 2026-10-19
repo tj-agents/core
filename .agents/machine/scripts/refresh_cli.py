@@ -10,14 +10,14 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import agent_cli
-from codex_hook_trust import AppServer
+from codex_hook_trust import AppServer, github_repository
 
 TIMEOUT = 300
-GITHUB = re.compile(r"(?:https://github\.com/|git@github\.com:)([^/]+/[^/]+?)(?:\.git)?/?$")
 
 
 class RefreshError(RuntimeError):
@@ -39,10 +39,8 @@ def configuration_root(host: str) -> Path:
 
 
 def repository(source: object) -> str | None:
-    if not isinstance(source, str):
-        return None
-    match = GITHUB.fullmatch(source)
-    return match[1] if match else None
+    match = github_repository(source)
+    return "/".join(match) if match else None
 
 
 def selection(host: str, executable: str, project: Path) -> tuple[dict, list[str]]:
@@ -56,7 +54,7 @@ def selection(host: str, executable: str, project: Path) -> tuple[dict, list[str
         known = read_json(configuration_root(host) / "plugins/known_marketplaces.json")
         sources = {name: entry.get("source", {}) for name, entry in known.items()}
         sources.update({name: entry.get("source", {}) for name, entry in marketplaces.items()})
-        sources = {name: source.get("repo") if source.get("source") == "github"
+        sources = {name: repository(source.get("repo")) if source.get("source") == "github"
                    else repository(source.get("url")) for name, source in sources.items() if isinstance(source, dict)}
         enabled = [name for name, flag in plugins.items() if flag is True]
     else:
@@ -108,7 +106,42 @@ def package_tree(root: Path) -> dict[str, bytes]:
     return result
 
 
+def source_tree(source: object, location: Path, project: Path, temporary: Path,
+                publishers: dict) -> dict[str, bytes]:
+    if isinstance(source, dict) and source.get("source") == "git-subdir":
+        publisher = repository(source.get("url"))
+        if not publisher or publisher.split("/", 1)[0] != "tj-agents":
+            raise RefreshError("Cannot verify package from an unknown publisher")
+        ref = source.get("sha") or source.get("ref") or "main"
+        if not isinstance(ref, str) or not ref or ref.startswith("-"):
+            raise RefreshError("Invalid package source revision")
+        key = (publisher, ref)
+        if key not in publishers:
+            checkout = temporary / str(len(publishers))
+            run(["git", "init", str(checkout)], project)
+            run(["git", "-C", str(checkout), "fetch", "--depth=1",
+                 f"https://github.com/{publisher}.git", ref], project)
+            run(["git", "-C", str(checkout), "checkout", "--detach", "FETCH_HEAD"], project)
+            publishers[key] = checkout
+        location = publishers[key]
+        source = source.get("path")
+    elif isinstance(source, dict) and source.get("source") == "local":
+        source = source.get("path")
+    if not isinstance(source, str) or not source.startswith("./"):
+        raise RefreshError("Cannot verify catalog package source")
+    root = (location / source).resolve()
+    if not root.is_relative_to(location.resolve()):
+        raise RefreshError("Catalog package escapes its publisher")
+    return package_tree(root)
+
+
 def verify(host: str, executable: str, project: Path, marketplaces: dict, plugins: list[str]) -> dict:
+    with tempfile.TemporaryDirectory(prefix="tj-agents-verify-") as temporary:
+        return verify_packages(host, executable, project, marketplaces, plugins, Path(temporary))
+
+
+def verify_packages(host: str, executable: str, project: Path, marketplaces: dict,
+                    plugins: list[str], temporary: Path) -> dict:
     print(f"Verifying {host} native installations and marketplace revisions...", file=sys.stderr, flush=True)
     inventory = json.loads(run([executable, "plugin", "list", "--json"], project))
     entries = inventory if host == "claude" else inventory.get("installed", [])
@@ -118,6 +151,7 @@ def verify(host: str, executable: str, project: Path, marketplaces: dict, plugin
     installed = {entry.get("id", entry.get("pluginId")) for entry in entries if entry.get("enabled") is True}
     problems = [f"Missing enabled native installation: {identity}" for identity in plugins if identity not in installed]
     revisions = {}
+    publishers = {}
     for name, repo in marketplaces.items():
         print(f"Verifying {name} against {repo} main...", file=sys.stderr, flush=True)
         remote = run(["git", "ls-remote", f"https://github.com/{repo}.git", "refs/heads/main"], project).split()
@@ -145,15 +179,11 @@ def verify(host: str, executable: str, project: Path, marketplaces: dict, plugin
             plugin, marketplace = identity.rsplit("@", 1)
             if marketplace != name:
                 continue
-            source = sources.get(plugin)
-            source = source.get("path") if isinstance(source, dict) and source.get("source") == "local" else source
-            if not isinstance(source, str) or not source.startswith("./"):
-                problems.append(f"Cannot verify non-local catalog package: {identity}")
+            try:
+                expected = source_tree(sources.get(plugin), Path(location), project, temporary, publishers)
+            except RefreshError as error:
+                problems.append(f"{identity}: {error}")
                 continue
-            source_root = (Path(location) / source).resolve()
-            if not source_root.is_relative_to(Path(location).resolve()):
-                raise RefreshError(f"Catalog package escapes its marketplace: {identity}")
-            expected = package_tree(source_root)
             for entry in entries:
                 if entry.get("id", entry.get("pluginId")) != identity:
                     continue

@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 import shutil
+import signal
 import subprocess
 from pathlib import Path
 import sys
@@ -129,6 +130,15 @@ class StartupBindingTests(unittest.TestCase):
         self.assertEqual(0, BINDING.run_session("claude", sys.executable, self.project, [str(script)],
                                                require_session_start=True, on_running=running))
         running.assert_called_once()
+
+    @unittest.skipIf(os.name == "nt", "POSIX process groups")
+    def test_termination_escalates_to_the_entire_process_group(self):
+        process = mock.Mock(pid=4242)
+        process.wait.side_effect = [subprocess.TimeoutExpired("native", 5), 0]
+        with mock.patch.object(BINDING.os, "killpg") as killpg:
+            BINDING._terminate(process)
+        self.assertEqual([mock.call(4242, signal.SIGTERM), mock.call(4242, signal.SIGKILL)], killpg.call_args_list)
+        process.kill.assert_not_called()
 
     def test_missing_acknowledgement_terminates_the_child(self):
         with self.assertRaisesRegex(BINDING.StartupBindingError, "did not acknowledge"):
