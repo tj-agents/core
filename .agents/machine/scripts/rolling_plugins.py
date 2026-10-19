@@ -1491,10 +1491,11 @@ def _record_generations(record: Path, revisions: Iterable[tuple[str, str]], atte
         _unlinked_ancestors(record)
         record.parent.mkdir(parents=True, exist_ok=True)
         for attempt in range(attempts):
-            document = generation_record.merged_generations(
-                generation_record.read_generations(record) or [], revisions, time.time())
+            entries = generation_record.read_generations(record)
             try:
-                _write_json(record, document)
+                if entries is None:
+                    raise PermissionError("the existing generation record could not be read")
+                _write_json(record, generation_record.merged_generations(entries, revisions, time.time()))
                 return
             except PermissionError:
                 if attempt + 1 == attempts:

@@ -80,18 +80,18 @@ class NoticeState:
     def save(self, notified: str | None) -> None:
         if notified == self.notified:
             self.touch()
-        else:
-            temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
+            return
+        temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            temporary.write_text(json.dumps({"notified": notified}) + "\n", encoding="utf-8")
+            os.replace(temporary, self.path)
+        except OSError:
             try:
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                temporary.write_text(json.dumps({"notified": notified}) + "\n", encoding="utf-8")
-                os.replace(temporary, self.path)
+                temporary.unlink(missing_ok=True)
             except OSError:
-                try:
-                    temporary.unlink(missing_ok=True)
-                except OSError:
-                    pass
-                return
+                pass
+            return
         self.sweep()
 
     def touch(self) -> None:
@@ -136,9 +136,12 @@ def claude_install_paths(environ: Mapping[str, str], project: Path | None) -> li
     plugins = registry.get("plugins") if isinstance(registry, dict) else None
     paths = []
     for records in plugins.values() if isinstance(plugins, dict) else ():
-        if isinstance(records, list):
-            paths.extend(record["installPath"] for record in records if isinstance(record, dict)
-                         and isinstance(record.get("installPath"), str) and applies(record, project))
+        if not isinstance(records, list):
+            continue
+        applicable = [record for record in records if isinstance(record, dict)
+                      and isinstance(record.get("installPath"), str) and applies(record, project)]
+        scoped = [record for record in applicable if record.get("scope") in {"project", "local"}]
+        paths.extend(record["installPath"] for record in (scoped or applicable)[-1:])
     return paths
 
 
@@ -226,16 +229,15 @@ def session_bindings(host: str, environ: Mapping[str, str], project: Path | None
     return [binding for binding in bindings if binding is not None], []
 
 
-def installed_generations(environ: Mapping[str, str]) -> dict[str, list[dict[str, object]]] | None:
+def installed_generations(host: str, environ: Mapping[str, str]) -> dict[str, list[dict[str, object]]] | None:
+    entries = read_generations(generations_path(plugins_root(host, environ), host))
+    if entries is None:
+        return None
     by_repository: dict[str, list[dict[str, object]]] = {}
-    for host in HOSTS:
-        entries = read_generations(generations_path(plugins_root(host, environ), host))
-        if entries is None:
-            return None
-        for entry in entries:
-            by_repository.setdefault(entry["repository"], []).append(entry)
-    for entries in by_repository.values():
-        entries.sort(key=lambda entry: entry["verified_at"])
+    for entry in entries:
+        by_repository.setdefault(entry["repository"], []).append(entry)
+    for members in by_repository.values():
+        members.sort(key=lambda entry: entry["verified_at"])
     return by_repository
 
 
@@ -295,18 +297,19 @@ def check(host: str, session_id: str, environ: Mapping[str, str], project: Path 
     bindings, problems = session_bindings(host, environ, project)
     if not bindings and not problems:
         return None
-    installed = installed_generations(environ) if bindings else {}
-    if installed is None:
-        return None
+    installed = installed_generations(host, environ) if bindings else {}
     lines = [f"this session's generation cannot be verified because {problem}." for problem in problems]
-    lines.extend(findings(bindings, installed))
+    lines.extend(findings(bindings, installed or {}))
     state = NoticeState(host, session_id, environ, time.time() if now is None else now)
     if not lines:
-        state.save(None)
+        if installed is not None and all(binding.repository in installed for binding in bindings):
+            state.save(None)
         return None
     report = "plugin generation: " + " ".join(lines)
     output: dict[str, object] = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
                                                         "additionalContext": f"{report} {adoption(host, session_id)}"}}
+    if installed is None:
+        return output
     key = hashlib.sha256(report.encode("utf-8")).hexdigest()
     if state.notified != key:
         output["systemMessage"] = report
