@@ -93,7 +93,10 @@ def install_script(source: Path, directory: Path) -> Path:
 
 def windowless_python() -> str:
     candidate = Path(sys.executable).with_name("pythonw.exe")
-    return str(candidate) if candidate.is_file() else sys.executable
+    if candidate.is_file():
+        return str(candidate)
+    print(f"pythonw.exe was not found beside {sys.executable}; scheduled runs will show a console window")
+    return sys.executable
 
 
 def windows_task_xml(user: str, python: str, script: Path) -> str:

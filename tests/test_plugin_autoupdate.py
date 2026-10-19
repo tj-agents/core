@@ -123,10 +123,31 @@ class LockAndSelfUpdateTests(unittest.TestCase):
             packaged.write_text('new', encoding='utf-8')
 
             with mock.patch.object(UPDATE, 'packaged_copies', return_value=[packaged]):
-                self.assertTrue(UPDATE.self_update(stable))
-                self.assertFalse(UPDATE.self_update(stable))
+                self.assertTrue(UPDATE.self_update(stable, {}))
+                self.assertFalse(UPDATE.self_update(stable, {}))
 
             self.assertEqual('new', stable.read_text(encoding='utf-8'))
+
+
+    def test_only_enabled_installed_machine_packages_are_self_update_sources(self):
+        with tempfile.TemporaryDirectory(prefix='plugin homes ') as temp:
+            claude = Path(temp) / 'claude'
+            (claude / 'plugins').mkdir(parents=True)
+            current = Path(temp) / 'claude-cache' / 'tj-agents' / 'machine' / 'new'
+            legacy = Path(temp) / 'claude-cache' / 'base-agents' / 'machine' / 'old'
+            (claude / 'settings.json').write_text(json.dumps({'enabledPlugins': {
+                'machine@tj-agents': True, 'machine@base-agents': False}}), encoding='utf-8')
+            (claude / 'plugins' / 'installed_plugins.json').write_text(json.dumps({'plugins': {
+                'machine@tj-agents': [{'installPath': str(current)}],
+                'machine@base-agents': [{'installPath': str(legacy)}]}}), encoding='utf-8')
+            codex = Path(temp) / 'codex'
+            config = {'plugins': {'machine@base-agents': {'enabled': True},
+                                  'machine@retired': {'enabled': False}}}
+
+            with mock.patch.dict(os.environ, {'CODEX_HOME': str(codex)}):
+                roots = UPDATE.installed_machine_roots(claude, config)
+
+            self.assertEqual([current, codex / 'plugins' / 'cache' / 'base-agents' / 'machine' / 'local'], roots)
 
 
 class SetupTests(unittest.TestCase):
