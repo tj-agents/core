@@ -333,6 +333,23 @@ Observed blocker: no send was attempted."""
             RECOVERY.open_session("claude", "claude_id", roots={"claude": projects}, confirm_closed=True)
         self.assertEqual(seen, [RECOVERY._profile("claude", projects)])
 
+    def test_default_claude_profile_resumes_without_config_dir(self):
+        home = self.root / "home"
+        projects = home / ".claude" / "projects"
+        self.write_claude(projects)
+        cli = mock.Mock()
+        cli.resolve_tab_directory.side_effect = lambda value: Path(value)
+        seen = []
+        cli.open_claude_tab.side_effect = lambda *args, **kwargs: seen.append(__import__("os").environ.get("CLAUDE_CONFIG_DIR"))
+        real_load = RECOVERY._load
+        with mock.patch.dict("os.environ", {"CLAUDE_CONFIG_DIR": str(home / ".claude")}, clear=False), \
+             mock.patch.object(RECOVERY.Path, "home", return_value=home), \
+             mock.patch.object(RECOVERY, "_load", side_effect=lambda name: cli if name == "agent_cli" else real_load(name)):
+            RECOVERY.open_session("claude", "claude_id", roots={"claude": projects}, confirm_closed=True)
+            restored = __import__("os").environ.get("CLAUDE_CONFIG_DIR")
+        self.assertEqual(seen, [None])
+        self.assertEqual(restored, str(home / ".claude"))
+
     def store_session(self, session="01a1415f-6448", title="Personal workflow policy research", work_title=None,
                       started_at=1000.0, native=True):
         if native:
