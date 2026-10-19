@@ -220,17 +220,36 @@ class ContinuationStopTests(unittest.TestCase):
         with patch.dict(os.environ, {"CONTINUATION_OWNER_ID": "owner", "CONTINUATION_NONCE": "wrong", "CONTINUATION_RESULT_PATH": str(result)}, clear=False):
             self.assertIn("working without", self.call())
 
-    def test_no_receipt_active_binding_blocks_once_and_never_repeats(self):
+    def test_no_receipt_active_binding_and_repeated_stop_still_block(self):
         binding = self.root / ".agents/persistent-workflow-binding.json"
         binding.parent.mkdir(exist_ok=True)
         binding.write_text("{}", encoding="utf-8")
         with patch.object(continuation_stop, "binding_active", return_value=True):
             self.assertIn("Initialize persistent-workflow", self.call({}))
         self.assertIn("continuation owner", self.call())
+        payload = {**self.payload(), "stop_hook_active": True}
+        with patch.object(continuation_stop, "read_receipt", return_value=self.receipt()):
+            self.assertIn("continuation owner", continuation_stop.outcome(payload))
+
+    def test_a_stop_is_blocked_once_and_its_own_retry_is_released(self):
+        session = f"once-{self.id()}"
+        self.addCleanup(lambda: continuation_stop.block_record(session).unlink(missing_ok=True))
+        first = {"session_id": session}
         for flag in ("stop_hook_active", "stopHookActive"):
-            payload = {**self.payload(), flag: True}
-            with self.subTest(flag=flag), patch.object(continuation_stop, "read_receipt", return_value=self.receipt()):
-                self.assertIsNone(continuation_stop.outcome(payload))
+            with self.subTest(flag=flag):
+                self.assertEqual("reason", continuation_stop.once_per_stop(first, "reason"))
+                self.assertIsNone(continuation_stop.once_per_stop({**first, flag: True}, "reason"))
+                self.assertEqual("reason", continuation_stop.once_per_stop(first, "reason"))
+                continuation_stop.once_per_stop(first, None)
+
+    def test_another_gates_block_does_not_release_this_gate(self):
+        session = f"other-{self.id()}"
+        self.addCleanup(lambda: continuation_stop.block_record(session).unlink(missing_ok=True))
+        retry = {"session_id": session, "stop_hook_active": True}
+
+        self.assertEqual("reason", continuation_stop.once_per_stop(retry, "reason"))
+        self.assertIsNone(continuation_stop.once_per_stop(retry, "reason"))
+        self.assertEqual("changed", continuation_stop.once_per_stop(retry, "changed"))
 
     def test_bounded_side_handoff_blocks_stop_until_the_parent_has_an_owner(self):
         scratch = Path(self.temp.name) / "side-handoff-receipt"
