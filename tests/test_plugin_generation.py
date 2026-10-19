@@ -47,7 +47,10 @@ class GenerationHarness(unittest.TestCase):
     def install(self, host, *revisions, now=1000.0):
         plugins = self.claude / 'plugins' if host == 'claude' else self.codex / 'plugins'
         for offset, revision in enumerate(revisions):
-            RECORD.record_generations(RECORD.generations_path(plugins, host), [(CORE, revision)], now + offset)
+            self.verify(RECORD.generations_path(plugins, host), [(CORE, revision)], now + offset)
+
+    def verify(self, record, revisions, now):
+        self.write(record, RECORD.merged_generations(RECORD.read_generations(record), revisions, now))
 
     def codex_root(self, marketplace, plugin, revision, repository=CORE):
         root = self.codex / 'plugins/cache' / marketplace / plugin / 'local'
@@ -195,9 +198,50 @@ class ClaudeGenerationTests(GenerationHarness):
                         for root in stale})
         self.write(self.claude / 'plugins/installed_plugins.json', {'version': 2, 'plugins': plugins}, encoding)
 
-    def start(self, environ):
+    def start(self, environ, source='startup'):
         GENERATION.main(['session-start', '--host', 'claude'], dict(self.environ, **environ),
-                        io.StringIO(json.dumps({'session_id': SESSION, 'cwd': self.temp.name})), io.StringIO())
+                        io.StringIO(json.dumps({'session_id': SESSION, 'cwd': self.temp.name, 'source': source})),
+                        io.StringIO())
+
+    def test_a_resumed_process_takes_a_fresh_snapshot_but_a_compaction_keeps_it(self):
+        other = 'https://github.com/tj-agents/dotnet.git'
+        machine_a = self.claude_root('machine', A)
+        self.registry(machine_a, self.claude_root('dotnet', A, other))
+        self.install('claude', A)
+        self.verify(RECORD.generations_path(self.claude / 'plugins', 'claude'), [(other, A)], 1000.0)
+        environ = {'CLAUDE_PLUGIN_ROOT': str(machine_a)}
+        self.start(environ)
+        self.registry(machine_a, self.claude_root('dotnet', B, other), updated='later')
+        self.verify(RECORD.generations_path(self.claude / 'plugins', 'claude'), [(other, B)], 2000.0)
+
+        self.start(environ, source='compact')
+        self.assertIn(f'runs {A[:12]}, superseded by {B[:12]}', self.context(self.prompt('claude', environ)))
+
+        self.start(environ, source='resume')
+        self.assertIsNone(self.prompt('claude', environ))
+
+    def test_an_install_record_without_a_launch_time_says_so(self):
+        machine_a = self.claude_root('machine', A)
+        self.write(self.claude / 'plugins/installed_plugins.json', {'version': 2, 'plugins': {
+            'machine@tj-agents': [{'scope': 'user', 'installPath': str(machine_a)}],
+            'engineering@tj-agents': [{'scope': 'user', 'installPath': str(self.claude_root('engineering', A))}]}})
+        self.install('claude', A)
+
+        output = self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(machine_a)})
+
+        self.assertIn('no launch time', self.context(output))
+
+    def test_a_failing_snapshot_never_stops_a_session_starting(self):
+        original = GENERATION.claude_records
+
+        def broken(*_arguments):
+            raise OSError('registry on an unavailable drive')
+
+        GENERATION.claude_records = broken
+        try:
+            self.start({'CLAUDE_PLUGIN_ROOT': str(self.claude_root('machine', A))})
+        finally:
+            GENERATION.claude_records = original
 
     def test_every_package_of_the_binding_launch_is_checked_after_a_newer_verification(self):
         machine_a, engineering_a = self.claude_root('machine', A), self.claude_root('engineering', A)
@@ -246,7 +290,7 @@ class ClaudeGenerationTests(GenerationHarness):
 
         self.registry(self.claude_root('machine', B), self.claude_root('engineering', B), updated='later')
         self.install('claude', B, now=2000.0)
-        self.start(environ)
+        self.start(environ, source='compact')
         output = self.prompt('claude', environ)
 
         stored = json.loads((self.state / 'plugin-generation' / f'claude-{SESSION}.json').read_text(encoding='utf-8'))
@@ -321,7 +365,7 @@ class GateContractTests(GenerationHarness):
     def test_the_record_keeps_a_bounded_history_per_repository(self):
         record = RECORD.generations_path(self.codex / 'plugins', 'codex')
         for index in range(RECORD.GENERATION_HISTORY + 5):
-            RECORD.record_generations(record, [(CORE, f'{index:040x}')], index)
+            self.verify(record, [(CORE, f'{index:040x}')], index)
 
         entries = RECORD.read_generations(record)
 
@@ -339,6 +383,26 @@ class GateContractTests(GenerationHarness):
 
         self.assertIn(f'superseded by {B[:12]}', self.context(output))
         self.assertNotIn('systemMessage', output)
+
+    def test_a_supersession_that_returns_after_a_rollback_is_announced_again(self):
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
+        self.install('codex', A, B)
+        self.assertIn('systemMessage', self.prompt('codex', environ))
+        self.install('codex', A, now=3000.0)
+        self.assertIsNone(self.prompt('codex', environ))
+
+        self.install('codex', B, now=4000.0)
+
+        self.assertIn('systemMessage', self.prompt('codex', environ))
+
+    def test_a_vanished_unmanaged_root_does_not_invalidate_the_receipt(self):
+        alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
+        self.install('codex', A, B)
+
+        output = self.prompt('codex', self.receipt(alias, unmanaged=(self.codex / 'plugins/cache/other/gone/1.0',)))
+
+        self.assertIn(f'superseded by {B[:12]}', self.context(output))
+        self.assertNotIn('receipt', self.context(output).split('. Codex cannot')[0])
 
     def test_an_unchanged_live_session_keeps_its_state_alive(self):
         environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))

@@ -548,6 +548,30 @@ class RollingPluginsTests(unittest.TestCase):
         self.assertEqual([(core, 'a' * 40)], [(entry['repository'], entry['revision'])
                                               for entry in ROLLING.generation_record.read_generations(record)])
 
+    def test_a_record_held_open_by_a_reader_is_retried_and_a_lasting_refusal_leaves_no_temporary(self):
+        core = 'https://github.com/tj-agents/core.git'
+        record = ROLLING.generation_record.generations_path(self.root / 'plugins', 'codex')
+        write = ROLLING._write_json
+        attempts = []
+
+        def held_once(path, value):
+            attempts.append(path)
+            if len(attempts) == 1:
+                raise PermissionError('in use')
+            write(path, value)
+
+        with mock.patch.object(ROLLING, '_write_json', side_effect=held_once), \
+                mock.patch.object(ROLLING.time, 'sleep'):
+            ROLLING._record_generations(record, [(core, 'a' * 40)])
+        self.assertEqual(2, len(attempts))
+        self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
+
+        with mock.patch.object(ROLLING, '_write_json', side_effect=PermissionError('in use')), \
+                mock.patch.object(ROLLING.time, 'sleep'):
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+        self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
+        self.assertEqual([record.name], sorted(path.name for path in record.parent.iterdir()))
+
     def test_claude_setting_sources_excludes_unselected_layers(self):
         config = self.root / 'profile'
         project = self.root / 'project'

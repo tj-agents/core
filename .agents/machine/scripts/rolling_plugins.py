@@ -1474,12 +1474,30 @@ def verify_final(prepared: Prepared, host: str, target: Path, project: Path, arg
         _clone, revision = _fetch_main(source, cache, prepared.deadline)
         if revision != expected_revision:
             raise RollingPluginError(f"publisher main advanced while materializing {source}")
-    record = generation_record.generations_path(prepared.plugins_root or target / "plugins", host)
+    _record_generations(generation_record.generations_path(prepared.plugins_root or target / "plugins", host),
+                        ((root.repository, root.revision) for root in prepared.selected_roots))
+
+
+def _record_generations(record: Path, revisions: Iterable[tuple[str, str]], attempts: int = 5) -> None:
+    revisions = tuple(revisions)
     try:
         _unlinked_ancestors(record)
-        generation_record.record_generations(record, ((root.repository, root.revision) for root in prepared.selected_roots))
+        record.parent.mkdir(parents=True, exist_ok=True)
+        for attempt in range(attempts):
+            document = generation_record.merged_generations(
+                generation_record.read_generations(record), revisions, time.time())
+            try:
+                _write_json(record, document)
+                return
+            except PermissionError:
+                if attempt + 1 == attempts:
+                    raise
+                time.sleep(0.05)
     except (OSError, RollingPluginError):
-        pass
+        try:
+            record.with_name(f".{record.name}.{os.getpid()}.tmp").unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def terminate_process_tree(process: subprocess.Popen, timeout: float = 5) -> None:

@@ -76,25 +76,30 @@ class SessionState:
         self.now = now
         stored = read_json(self.path)
         self.value = dict(stored) if isinstance(stored, dict) else {}
+        self.changes: dict[str, object] = {}
 
-    def save(self, **changes: object) -> None:
-        self.value.update(changes)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
-        temporary.write_text(json.dumps(self.value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        os.replace(temporary, self.path)
+    def update(self, **changes: object) -> None:
+        self.changes.update({key: value for key, value in changes.items() if self.value.get(key) != value})
+
+    def flush(self) -> None:
+        try:
+            if not self.changes:
+                os.utime(self.path)
+                return
+            self.value.update(self.changes)
+            self.changes = {}
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
+            temporary.write_text(json.dumps(self.value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            os.replace(temporary, self.path)
+        except OSError:
+            return
         for candidate in self.path.parent.glob("*.json"):
             try:
                 if candidate != self.path and self.now - candidate.stat().st_mtime > STATE_RETENTION_SECONDS:
                     candidate.unlink()
             except OSError:
                 continue
-
-    def keep_alive(self) -> None:
-        try:
-            os.utime(self.path)
-        except OSError:
-            pass
 
 
 def ownership(root: Path) -> Mapping[str, object] | None:
@@ -133,29 +138,31 @@ def claude_records(environ: Mapping[str, str], project: Path | None) -> list[Map
     return chosen
 
 
-def launch_roots(own: str, records: Iterable[Mapping[str, object]]) -> tuple[list[str], bool]:
-    records = list(records)
-    launch = next((record.get("lastUpdated") for record in records
-                   if normalized(record["installPath"]) == normalized(own)), None)
+def launch_roots(own: str, records: list[Mapping[str, object]]) -> tuple[list[str], str | None]:
+    siblings = [record for record in records
+                if normalized(Path(record["installPath"]).parent) != normalized(Path(own).parent)]
+    record = next((record for record in records if normalized(record["installPath"]) == normalized(own)), None)
+    launch = record.get("lastUpdated") if record is not None else None
     if launch is None:
-        return [own], any(ownership(Path(record["installPath"])) is not None for record in records
-                          if normalized(Path(record["installPath"]).parent) != normalized(Path(own).parent))
+        if not any(ownership(Path(sibling["installPath"])) is not None for sibling in siblings):
+            return [own], None
+        if record is None:
+            return [own], "the registry no longer lists its install, so its other tj-agents packages are unknown"
+        return [own], "its install record has no launch time, so its other tj-agents packages are unknown"
     roots = {own}
-    roots.update(record["installPath"] for record in records if record.get("lastUpdated") == launch
-                 and normalized(Path(record["installPath"]).parent) != normalized(Path(own).parent))
-    return sorted(roots), False
+    roots.update(sibling["installPath"] for sibling in siblings if sibling.get("lastUpdated") == launch)
+    return sorted(roots), None
 
 
-def claude_bound_roots(state: SessionState, own: str, records: list[Mapping[str, object]]) -> tuple[list[str], bool]:
+def claude_bound_roots(state: SessionState, own: str, records: list[Mapping[str, object]],
+                       fresh: bool = False) -> tuple[list[str], str | None]:
     stored = state.value.get("roots")
-    if isinstance(stored, list) and normalized(own) in {normalized(root) for root in stored if isinstance(root, str)}:
-        state.keep_alive()
-        return [root for root in stored if isinstance(root, str)], state.value.get("partial") is True
+    if not fresh and isinstance(stored, list) \
+            and normalized(own) in {normalized(root) for root in stored if isinstance(root, str)}:
+        partial = state.value.get("partial")
+        return [root for root in stored if isinstance(root, str)], partial if isinstance(partial, str) else None
     roots, partial = launch_roots(own, records)
-    try:
-        state.save(roots=roots, partial=partial)
-    except OSError:
-        pass
+    state.update(roots=roots, partial=partial)
     return roots, partial
 
 
@@ -213,7 +220,7 @@ def receipt_roots(environ: Mapping[str, str]) -> list[Path]:
         raise ValueError("its Codex runtime receipt names no valid plugin roots")
     resolved = []
     for item, managed in [*((item, True) for item in roots), *((item, False) for item in unmanaged)]:
-        root = Path(item).resolve(strict=True)
+        root = Path(item).resolve(strict=managed)
         parts = root.relative_to(cache).parts
         if len(parts) != 3 or (managed and (not parts[0].startswith(RUNTIME_MARKETPLACE) or parts[2] != "local")) \
                 or (not managed and parts[0].startswith(".")):
@@ -231,8 +238,7 @@ def session_bindings(host: str, state: SessionState, environ: Mapping[str, str],
             return [], []
         records = claude_records(environ, project)
         roots, partial = claude_bound_roots(state, own, records)
-        problems = ["the registry no longer lists its install, so its other tj-agents packages are unknown"] \
-            if partial else []
+        problems = [partial] if partial else []
         bindings = [claude_binding(Path(root), records) for root in roots]
         return [binding for binding in bindings if binding is not None], problems
     if environ.get(RECEIPT_ENV) or environ.get(RECEIPT_SHA256_ENV):
@@ -315,24 +321,21 @@ def check(host: str, session_id: str, environ: Mapping[str, str], project: Path 
           now: float | None = None) -> dict[str, object] | None:
     state = SessionState(host, session_id, environ, time.time() if now is None else now)
     bindings, problems = session_bindings(host, state, environ, project)
-    if not bindings and not problems:
-        return None
     lines = [f"this session's generation cannot be verified because {problem}." for problem in problems]
-    lines.extend(findings(bindings, installed_generations(environ)))
+    if bindings:
+        lines.extend(findings(bindings, installed_generations(environ)))
     if not lines:
+        state.update(notified=None)
+        state.flush()
         return None
     report = "plugin generation: " + " ".join(lines)
     output: dict[str, object] = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
                                                         "additionalContext": f"{report} {adoption(host, session_id)}"}}
     key = hashlib.sha256(report.encode("utf-8")).hexdigest()
-    if state.value.get("notified") == key:
-        state.keep_alive()
-    else:
+    if state.value.get("notified") != key:
         output["systemMessage"] = report
-        try:
-            state.save(notified=key)
-        except OSError:
-            pass
+        state.update(notified=key)
+    state.flush()
     return output
 
 
@@ -361,7 +364,12 @@ def main(argv: list[str] | None = None, environ: Mapping[str, str] | None = None
     if arguments.event == "session-start":
         own = environ.get("CLAUDE_PLUGIN_ROOT")
         if arguments.host == "claude" and own:
-            claude_bound_roots(SessionState("claude", session_id, environ, now), own, claude_records(environ, project))
+            try:
+                state = SessionState("claude", session_id, environ, now)
+                claude_bound_roots(state, own, claude_records(environ, project), fresh=data.get("source") != "compact")
+                state.flush()
+            except Exception:  # noqa: BLE001 - a snapshot failure must never stop a session starting
+                pass
         return 0
     try:
         output = check(arguments.host, session_id, environ, project, now)
