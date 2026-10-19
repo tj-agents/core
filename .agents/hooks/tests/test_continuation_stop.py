@@ -449,21 +449,6 @@ class ContinuationStopTests(unittest.TestCase):
                 self.assertTrue(receipt["execution_suspended"])
                 self.assertIsNone(continuation_stop.outcome(self.payload()))
 
-    def test_both_host_manifests_ship_the_shared_stop_gate(self):
-        for host in ("codex", "claude"):
-            manifest = json.loads((ROOT / f".agents/plugins/manifests/{host}/engineering-hooks.json").read_text(encoding="utf-8"))
-            self.assertIn("continuation_stop.py", json.dumps(manifest["hooks"]["Stop"]))
-        sources = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
-        harness = json.loads((ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8"))
-        self.assertIn(
-            {"plugin": "engineering", "source": ".agents/hooks/continuation_stop.py", "destination": "hooks/continuation_stop.py"},
-            sources["resources"],
-        )
-        self.assertIn(
-            {"path": "hooks/continuation_stop.py", "hosts": ["claude", "codex"]},
-            harness["requires"]["hooks"],
-        )
-
     def test_route_receipt_latches_execution_across_status_and_planning_scope(self):
         scratch = Path(self.temp.name) / "scratch"
         scratch.mkdir()
@@ -545,16 +530,6 @@ class ContinuationStopTests(unittest.TestCase):
                                         capture_output=True, text=True, cwd=self.root, env=environment, timeout=20)
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual("block", json.loads(result.stdout)["decision"])
-        package = ROOT / "plugins/engineering"
-        manifest = json.loads((package / "hooks/claude.json").read_text(encoding="utf-8"))
-        hooks = [hook for group in manifest["hooks"]["Stop"] for hook in group["hooks"]]
-        self.assertEqual(1, len(hooks))
-        args = [value.replace("${CLAUDE_PLUGIN_ROOT}", str(package)) for value in hooks[0]["args"]]
-        result = subprocess.run([sys.executable, *args], input=payload, capture_output=True, text=True,
-                                cwd=self.root, env=environment, timeout=hooks[0]["timeout"])
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual("block", json.loads(result.stdout)["decision"])
-        self.assertIn("persistent-workflow", json.loads(result.stdout)["reason"])
 
     def test_binding_active_reads_the_head_through_real_artifact_normalization(self):
         workflows = continuation_stop.workflow_root()

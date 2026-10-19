@@ -49,8 +49,7 @@ retains that boundary without Base64 or explicit `exec`. These checks do not pro
 who can modify the user's trusted configuration or race files inside the same user's temporary/snapshot
 directories, and source tests do not establish antivirus acceptance.
 
-Use `machine:hook-control` for reversible Codex hook controls. In a terminal with the machine launcher
-loaded, `codex-hooks status`, `codex-hooks off` and `codex-hooks on` operate on the active user profile.
+Use `machine:hook-control` for reversible Codex hook controls on the active user profile.
 Add `--scope project --project <repository>` for a trusted repository's `.codex/config.toml`.
 The utility requires Python 3.11+. `off` writes the native
 [`features.hooks = false` gate](https://learn.chatgpt.com/docs/hooks#turn-hooks-off), which prevents ordinary
@@ -249,9 +248,7 @@ selection independently of freshness.
 A hook repair reaches a machine after it merges and the `regenerate` job commits the published package bytes
 to `main`. Before that publication, the startup preflight verifies the currently published package. On Codex,
 a changed package digest changes the hook definition, so the hook needs trust review again. A running session keeps the hook bytes it loaded on either host and cannot adopt the repair.
-To recover one blocked by a Stop hook, send `stop` or `pause` as the whole prompt so the continuation gate releases
-the turn, then close it and start a new session through the `codex` or `claude` terminal wrapper,
-`handoff-codex` or `handoff-claude`. The startup preflight refreshes and verifies the selected package set;
+Start a new session to load a repair. The startup preflight refreshes and verifies the selected package set;
 if that fails, the CLI remains blocked until the source or selection problem is corrected.
 
 Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.

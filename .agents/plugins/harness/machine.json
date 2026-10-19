@@ -23,13 +23,6 @@
     ],
     "hooks": [
       {
-        "path": ".agents/machine/utility/close/scripts/close_session.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
         "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
         "hosts": [
           "claude",
@@ -41,31 +34,6 @@
         "hosts": [
           "claude",
           "codex"
-        ]
-      },
-      {
-        "path": "resources/machine/scripts/claude_terminal_profile.py",
-        "hosts": [
-          "claude"
-        ]
-      },
-      {
-        "path": "resources/machine/scripts/codex_terminal_profile.py",
-        "hosts": [
-          "codex"
-        ]
-      },
-      {
-        "path": "resources/machine/scripts/plugin_generation.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "resources/machine/scripts/prune_plugin_cache.py",
-        "hosts": [
-          "claude"
         ]
       },
       {

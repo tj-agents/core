@@ -129,9 +129,8 @@ Other hosts use their supported `persistent-workflow` notification or wake mecha
 define a universal listener API or a durable continuation; `persistent-workflow` owns those host-specific
 details.
 
-`.agents/hooks/forge_poll_gate.py` permits the first forge status read for a PR, head, or run, one more after
-a real wake or observed state change, and exactly one shared monitor per identity. It blocks unchanged
-model-turn reads and every legacy watcher shape. Failure-log reads use the compact executable boundary.
+Read forge status for a PR, head, or run once, again only after a real wake or observed state change, and
+keep one shared monitor per identity.
 
 At material checkpoints, ingest the host transcript through `workflow_ops.py telemetry`. The snapshot reports
 model turns, tool calls, wait or poll calls, skill loads, uncached input, cached context replay, output tokens,

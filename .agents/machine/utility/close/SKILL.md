@@ -1,12 +1,15 @@
 ---
 name: close
-description: Close this CLI after all its owned work is done, in any repository. Use when finishing the session, reporting the requested work complete, or asked to close this CLI; not for closing another session.
+description: Unavailable. Post-report self-closure needs the machine Stop hook, which is no longer installed; close the terminal yourself. Not for closing another session.
 kind: utility
 domain: machine
 route: infer
 ---
 
 # Close the completed CLI
+
+Unavailable: the machine plugin no longer installs the Stop hook this procedure depends on. Do not select
+it; the user closes the terminal.
 
 This operation applies in every repository consuming Core. A merge, PR, plan, or completion-check
 record is not a prerequisite. Select it whenever this CLI has finished all its owned work.

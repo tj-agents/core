@@ -18,32 +18,12 @@
           },
           {
             "type": "command",
-            "timeout": 15,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/prune_plugin_cache.py",
-              "--pin",
-              "--notice"
-            ]
-          },
-          {
-            "type": "command",
             "timeout": 10,
             "command": "python",
             "args": [
               "-B",
               "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/reap_orphans.py",
               "--notice"
-            ]
-          },
-          {
-            "type": "command",
-            "timeout": 10,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/claude_terminal_profile.py"
             ]
           }
         ]
@@ -66,13 +46,6 @@
               "hook",
               "prompt",
               "--host",
-              "claude",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-              "hook",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/plugin_generation.py",
-              "--host",
               "claude"
             ]
           }
@@ -91,9 +64,6 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
               "--deadline",
               "55",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-              "hook",
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/session_store.py",
               "hook",

@@ -344,20 +344,8 @@ class CodexHookSnapshotTests(unittest.TestCase):
             self.assertEqual(recovered.returncode, 0, recovered.stderr)
             first_context = json.loads(first.stdout)["hookSpecificOutput"]["additionalContext"]
             recovered_context = json.loads(recovered.stdout)["hookSpecificOutput"]["additionalContext"]
-            self.assertIn("Maintained plan artifacts", first_context)
-            self.assertIn("Maintained plan artifacts", recovered_context)
-
-            pre_tool = manifest["hooks"]["PreToolUse"][0]["hooks"][0][HOST_COMMAND]
-            pre_tool = pre_tool.replace("${PLUGIN_ROOT}", str(payload))
-            routed = subprocess.run(
-                pre_tool, shell=True, cwd=ROOT, env=environment,
-                input=json.dumps({
-                    "tool_name": "exec_command", "cwd": str(ROOT),
-                    "tool_input": {"cmd": "echo read only"},
-                }),
-                capture_output=True, text=True, timeout=30,
-            )
-            self.assertEqual(routed.returncode, 0, routed.stderr)
+            self.assertIn("base:idea-initialization", first_context)
+            self.assertIn("base:idea-initialization", recovered_context)
 
             (snapshot / "hooks" / "hook_runtime.py").write_text("changed", encoding="utf-8")
             rejected = subprocess.run(

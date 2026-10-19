@@ -5,35 +5,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/base/policy/plan-artifacts/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context --hook \"${PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/goal-continuation/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/idea-initialization/scripts/session-context.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/base/policy/plan-artifacts/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context --hook \"${PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/goal-continuation/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/idea-initialization/scripts/session-context.py\"",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context --hook \"${PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/idea-initialization/scripts/session-context.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context --hook \"${PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/idea-initialization/scripts/session-context.py\"",
             "timeout": 10
           }
         ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/skill_router.py\" --harness codex",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/skill_router.py\" --harness codex",
-            "timeout": 15
-          }
-        ],
-        "matcher": "Bash|apply_patch|edit_file|write_file|multi_edit|exec_command|unified_exec|local_shell|shell"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 7 \"${PLUGIN_ROOT}/hooks/tier_gate.py\"",
-            "timeout": 10
-          }
-        ],
-        "matcher": "exec_command|unified_exec|local_shell|shell"
       }
     ]
   }
