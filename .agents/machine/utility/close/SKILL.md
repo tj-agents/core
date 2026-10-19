@@ -11,6 +11,10 @@ route: infer
 Unavailable: the machine plugin no longer installs the Stop hook this procedure depends on. Do not select
 it; the user closes the terminal.
 
+```text
+Done: PR #317 is open for review. This session stays open; close the terminal tab when finished.
+```
+
 This operation applies in every repository consuming Core. A merge, PR, plan, or completion-check
 record is not a prerequisite. Select it whenever this CLI has finished all its owned work.
 

@@ -39,6 +39,12 @@ and children; an unavailable continuation capability does not excuse leaving unb
 Preserve higher-priority restrictions; a source change does not update instructions already loaded in an
 active session.
 
+```text
+Blocked: merging PR #317 needs Tommy's approval.
+Resolver: Tommy. Unblock: approve and merge #317. Resume when: #317 is MERGED.
+Next: start the deny-rules PR from the updated main.
+```
+
 Before a supported wake, checkpoint the next action and release the foreground lease. A later process
 claims the same owner before acting; it is a fresh context unless the host confirms it resumed the
 original session. Keep one active writer per owner so a scheduled wake cannot race foreground work.

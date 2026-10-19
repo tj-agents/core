@@ -28,6 +28,12 @@ snippet, and why. Continue the current task under the existing standard while aw
 accepted, make the refinement in this session under the standing authorization.
 Established standards defects still require immediate repair.
 
+```text
+Standard: engineering:failing-tests. Gap: silent on timeouts under parallel test load.
+Proposed: "Rerun a timed-out test file alone before treating it as a regression."
+Why: three hook test files timed out at 6-way load and passed when run alone.
+```
+
 ## A task has an owning lifecycle — load it before the first edit
 
 Authorized long-term or multi-phase work selects `engineering:plan-execution`, even when the user does
