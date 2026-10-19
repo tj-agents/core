@@ -135,21 +135,33 @@ def load_codex_config() -> dict:
         return {}
 
 
-def packaged_copies() -> list[Path]:
-    relative = ("resources", "machine", "scripts", SCRIPT_NAME)
-    patterns = [
-        (codex_home() / "plugins" / "cache", ("*", "machine", "local", *relative)),
-        (claude_home() / "plugins" / "cache", ("*", "machine", "*", *relative)),
-    ]
-    found = []
-    for root, parts in patterns:
-        if root.is_dir():
-            found.extend(path for path in root.glob("/".join(parts)) if path.is_file())
-    return found
+def installed_machine_roots(claude_config: Path, codex_config: dict) -> list[Path]:
+    roots = []
+    settings = read_json(claude_config / "settings.json").get("enabledPlugins")
+    installed = read_json(claude_config / "plugins" / "installed_plugins.json").get("plugins")
+    if isinstance(settings, dict) and isinstance(installed, dict):
+        for identity, on in settings.items():
+            entries = installed.get(identity)
+            if on is True and identity.startswith("machine@") and isinstance(entries, list):
+                roots.extend(Path(entry["installPath"]) for entry in entries
+                             if isinstance(entry, dict) and isinstance(entry.get("installPath"), str))
+    plugins = codex_config.get("plugins")
+    if isinstance(plugins, dict):
+        for identity, settings in plugins.items():
+            if (identity.startswith("machine@") and isinstance(settings, dict)
+                    and settings.get("enabled") is True):
+                roots.append(codex_home() / "plugins" / "cache" / identity.split("@", 1)[1] / "machine" / "local")
+    return roots
 
 
-def self_update(current: Path) -> bool:
-    candidates = [path for path in packaged_copies() if path.resolve() != current.resolve()]
+def packaged_copies(codex_config: dict) -> list[Path]:
+    relative = Path("resources", "machine", "scripts", SCRIPT_NAME)
+    return [root / relative for root in installed_machine_roots(claude_home(), codex_config)
+            if (root / relative).is_file()]
+
+
+def self_update(current: Path, codex_config: dict) -> bool:
+    candidates = [path for path in packaged_copies(codex_config) if path.resolve() != current.resolve()]
     if not candidates:
         return False
     newest = max(candidates, key=lambda path: path.stat().st_mtime)
@@ -192,12 +204,12 @@ def main(argv: list[str] | None = None) -> int:
         state_file = directory / "plugin-autoupdate.json"
         state = read_json(state_file)
         recorded = state.get("revisions") if isinstance(state.get("revisions"), dict) else {}
+        config = load_codex_config()
         executable = shutil.which("codex")
-        targets = codex_targets(load_codex_config()) if executable else {}
-        outcomes = refresh_codex(executable, targets, recorded) if executable else {}
+        outcomes = refresh_codex(executable, codex_targets(config), recorded) if executable else {}
         write_json(state_file, {"revisions": recorded, "last_run": time.time(), "outcomes": outcomes})
         if not arguments.no_self_update:
-            self_update(Path(__file__))
+            self_update(Path(__file__), config)
     finally:
         lock.unlink(missing_ok=True)
     return 0
