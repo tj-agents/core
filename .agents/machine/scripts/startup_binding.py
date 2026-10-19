@@ -343,7 +343,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 launched()
                 try:
                     phase("waiting-session-start")
-                    deadline = time.monotonic() + _remaining(prepared, timeout)
+                    deadline = time.monotonic() + timeout
                     while process.poll() is None and time.monotonic() < deadline:
                         if _acknowledged(directory, token):
                             active.acknowledge_binding()
