@@ -26,13 +26,6 @@
         ]
       },
       {
-        "path": ".agents/base/policy/goal-continuation/scripts/session-context.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
         "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
         "hosts": [
           "claude",
@@ -40,27 +33,7 @@
         ]
       },
       {
-        "path": ".agents/base/policy/plan-artifacts/scripts/session-context.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
         "path": "hooks/hook_dispatch.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/pre_tool_use_adapter.py",
-        "hosts": [
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/skill_router.py",
         "hosts": [
           "claude",
           "codex"
