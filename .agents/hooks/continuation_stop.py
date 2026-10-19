@@ -247,6 +247,10 @@ def once_per_stop(data, reason):
         return None
     retry = bool(data.get("stop_hook_active") or data.get("stopHookActive"))
     if retry and path.is_file():
+        try:
+            path.unlink()
+        except OSError:
+            pass
         return None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
