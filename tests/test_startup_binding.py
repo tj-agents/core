@@ -440,6 +440,7 @@ class StartupBindingTests(unittest.TestCase):
                 runtime = mock.Mock()
                 runtime.prepare_runtime.return_value = binding
                 reported = []
+                phases = []
                 def start(*args, **kwargs):
                     process = real_popen(*args, **kwargs)
                     if mode == "fast":
@@ -456,7 +457,10 @@ class StartupBindingTests(unittest.TestCase):
                         mock.patch.object(BINDING, "command_for_target", return_value=command), \
                         mock.patch.object(BINDING.subprocess, "Popen", side_effect=start):
                     result = BINDING.run_session("codex", "typed", self.project, ["prompt"],
-                                                 require_session_start=True, on_running=reported.append)
+                                                 require_session_start=True, on_running=reported.append,
+                                                 on_phase=phases.append)
+                self.assertEqual(["reading-selection", "refreshing-plugins", "preparing-runtime",
+                                  "checking-settings", "starting-native", "waiting-session-start"], phases)
                 self.assertEqual(2 if mode == "exit" else 0, result)
                 self.assertEqual(1 if mode in ("ack", "fast") else 0, len(reported))
                 runtime.cleanup_runtime.assert_called_once()

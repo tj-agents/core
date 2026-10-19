@@ -226,6 +226,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                     raise StartupBindingError("handoff requires a verified SessionStart dispatcher")
                 if logical.selected_roots:
                     runtime = _module("codex_runtime_binding", (HERE / "codex_runtime_binding.py",))
+                    phase("preparing-runtime")
                     binding = runtime.prepare_runtime(
                         executable, effective_project, configuration, logical, preflight_arguments, arguments,
                     )
@@ -234,6 +235,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                     try:
                         from rolling_plugins import verify_final
                         verify_final(logical, "codex", configuration, effective_project, preflight_arguments)
+                        phase("checking-settings")
                         _converge(logical, executable, effective_project, trust_runtime=False)
                         snapshot_directory = binding.directory / "hook-snapshots"
                         snapshot_directory.mkdir()
@@ -253,6 +255,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                             acknowledgement.mkdir()
                             environment[ACK_DIRECTORY_ENV] = str(acknowledgement)
                             environment[ACK_TOKEN_ENV] = token
+                        phase("starting-native")
                         try:
                             process = subprocess.Popen(
                                 command_for_target(target, _launch_arguments(arguments, binding.prepared.launch_args)),
@@ -260,6 +263,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                             )
                             launched()
                             if require_session_start:
+                                phase("waiting-session-start")
                                 while process.poll() is None:
                                     if _acknowledged(acknowledgement, token):
                                         running(process.pid)
@@ -285,6 +289,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 environment.update(logical.environment)
                 if extra_environment:
                     environment.update(extra_environment)
+                phase("starting-native")
                 try:
                     running()
                     launched()
@@ -304,6 +309,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 environment.update(prepared.environment)
                 if extra_environment:
                     environment.update(extra_environment)
+                phase("starting-native")
                 try:
                     running()
                     launched()
