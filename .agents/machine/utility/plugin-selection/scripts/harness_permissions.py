@@ -40,6 +40,9 @@ def _has_unbounded_script_arguments(command: str) -> bool:
     if PROJECT_ROOT_TOKEN in command:
         return False
     body = command[len("Bash("):-1]
+    # Exact native command rules keep their fixed arguments and need no wildcard.
+    if not any(character in body for character in "*?[]"):
+        return False
     if body.endswith(":*"):
         prefix = body[:-2]
     elif body.endswith(" *"):
