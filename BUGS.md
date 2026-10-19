@@ -155,3 +155,23 @@ Verification: local check resolves 168 shipped skills across 4 current repositor
 Core PR307 run39175205937 and merged-main run39176000363 pass Windows/Linux.
 Next action: none for this repaired reference defect. Installed host acceptance remains a
 separate personal-project goal criterion.
+
+## B012 — Exact script approvals rejected during project adoption
+
+Kind: bug. Observed: 2026-10-19. Priority: P2; Core cannot adopt its own project settings
+without discarding existing approvals or widening fixed commands to wildcard argument grants.
+Source owner: machine plugin-selection harness_permissions.py. State: in-progress.
+Evidence: adopting personal in Core fails on existing Bash(pwsh .agents/sync-generated.ps1 -Check)
+with script arguments require :*. The native Claude permission documentation supports exact
+command rules: https://code.claude.com/docs/en/permissions.
+Cause confirmed: _has_unbounded_script_arguments classifies fixed arguments after a script
+as unbounded even when the command has no wildcard.
+Repair link: Core Feature/PersonalAdoption, owned by personal-projects/standards; same coupled
+slice preserves the repository's82existing approvals through its supported ownership overlay.
+No verified live owner was found for the same defect in the related older harness worktree.
+Resolution condition: exact command arguments survive generation unchanged, malformed script
+wildcard patterns remain rejected, current Core adoption preserves its approval set, and
+focused Windows/Linux plus reviewed exact-head CI and source publication pass.
+Verification: defect reproduced with committed Core settings; bounded validator and exact/wildcard
+regressions authored. No approval was widened and no installed cache was modified.
+Next action: finish focused checks and publish the coupled Core adoption/validator repair.
