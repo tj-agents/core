@@ -1234,8 +1234,15 @@ def _write_json(path: Path, value: object) -> None:
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     _unlinked_ancestors(path)
     _unlinked_ancestors(temporary)
-    temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+    try:
+        temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+        os.replace(temporary, path)
+    except OSError:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
 
 
 def _codex_inventory_selects(entries: object, identity: str) -> bool:
@@ -1493,11 +1500,8 @@ def _record_generations(record: Path, revisions: Iterable[tuple[str, str]], atte
                 if attempt + 1 == attempts:
                     raise
                 time.sleep(0.05)
-    except (OSError, RollingPluginError):
-        try:
-            record.with_name(f".{record.name}.{os.getpid()}.tmp").unlink(missing_ok=True)
-        except OSError:
-            pass
+    except (OSError, RollingPluginError) as error:
+        print(f"tj-agents: verified generations were not recorded in {record}: {error}", file=sys.stderr)
 
 
 def terminate_process_tree(process: subprocess.Popen, timeout: float = 5) -> None:

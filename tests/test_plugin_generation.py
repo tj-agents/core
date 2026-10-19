@@ -220,6 +220,21 @@ class ClaudeGenerationTests(GenerationHarness):
         self.start(environ, source='resume')
         self.assertIsNone(self.prompt('claude', environ))
 
+    def test_an_in_process_resume_after_the_registry_moved_keeps_the_loaded_snapshot(self):
+        machine_a, engineering_a = self.claude_root('machine', A), self.claude_root('engineering', A)
+        self.registry(machine_a, engineering_a)
+        self.install('claude', A)
+        environ = {'CLAUDE_PLUGIN_ROOT': str(machine_a)}
+        self.start(environ)
+        self.registry(self.claude_root('machine', B), self.claude_root('engineering', B), updated='later')
+        self.install('claude', B, now=2000.0)
+
+        self.start(environ, source='resume')
+        output = self.prompt('claude', environ)
+
+        self.assertIn(f'runs {A[:12]}, superseded by {B[:12]}', self.context(output))
+        self.assertNotIn('unknown', self.context(output))
+
     def test_an_install_record_without_a_launch_time_says_so(self):
         machine_a = self.claude_root('machine', A)
         self.write(self.claude / 'plugins/installed_plugins.json', {'version': 2, 'plugins': {
@@ -394,6 +409,18 @@ class GateContractTests(GenerationHarness):
         self.install('codex', B, now=4000.0)
 
         self.assertIn('systemMessage', self.prompt('codex', environ))
+
+    def test_a_briefly_unreadable_record_does_not_repeat_the_user_notice(self):
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
+        self.install('codex', A, B)
+        self.assertIn('systemMessage', self.prompt('codex', environ))
+        record = RECORD.generations_path(self.codex / 'plugins', 'codex')
+        content = record.read_bytes()
+        record.write_text('{', encoding='utf-8')
+        self.assertIsNone(self.prompt('codex', environ))
+        record.write_bytes(content)
+
+        self.assertNotIn('systemMessage', self.prompt('codex', environ))
 
     def test_a_vanished_unmanaged_root_does_not_invalidate_the_receipt(self):
         alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
