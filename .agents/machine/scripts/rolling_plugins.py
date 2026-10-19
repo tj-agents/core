@@ -1491,9 +1491,11 @@ def _record_generations(record: Path, revisions: Iterable[tuple[str, str]], atte
         _unlinked_ancestors(record)
         record.parent.mkdir(parents=True, exist_ok=True)
         for attempt in range(attempts):
-            entries = generation_record.read_generations(record)
+            state, entries = generation_record.read_record(record)
+            if state == "newer":
+                raise RollingPluginError("the existing generation record uses a newer schema")
             try:
-                if entries is None:
+                if state == "busy":
                     raise PermissionError("the existing generation record could not be read")
                 _write_json(record, generation_record.merged_generations(entries, revisions, time.time()))
                 return
@@ -1501,7 +1503,7 @@ def _record_generations(record: Path, revisions: Iterable[tuple[str, str]], atte
                 if attempt + 1 == attempts:
                     raise
                 time.sleep(0.05)
-    except (OSError, ValueError, RollingPluginError) as error:
+    except (OSError, RollingPluginError) as error:
         print(f"tj-agents: verified generations were not recorded in {record}: {error}", file=sys.stderr)
 
 

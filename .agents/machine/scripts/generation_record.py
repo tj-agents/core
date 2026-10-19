@@ -18,25 +18,33 @@ def generations_path(plugins: Path, host: str) -> Path:
     return plugins / "cache" / ".tj-agents-rolling" / host / GENERATIONS_FILE
 
 
-def read_generations(path: Path) -> list[dict[str, object]] | None:
+def read_record(path: Path) -> tuple[str, list[dict[str, object]]]:
     try:
         raw = path.read_bytes()
     except FileNotFoundError:
-        return []
+        return "readable", []
     except OSError:
-        return None
+        return "busy", []
     try:
         document = json.loads(raw.decode("utf-8-sig"))
     except ValueError:
-        return []
-    if isinstance(document, dict) and document.get("schema_version", SCHEMA_VERSION) != SCHEMA_VERSION:
-        return None
-    entries = document.get("verified") if isinstance(document, dict) else None
+        return "readable", []
+    if not isinstance(document, dict):
+        return "readable", []
+    version = document.get("schema_version")
+    if type(version) is int and version > SCHEMA_VERSION:
+        return "newer", []
+    entries = document.get("verified")
     if not isinstance(entries, list):
-        return []
-    return [entry for entry in entries if isinstance(entry, dict)
+        return "readable", []
+    return "readable", [entry for entry in entries if isinstance(entry, dict)
             and isinstance(entry.get("repository"), str) and isinstance(entry.get("revision"), str)
             and SHA.fullmatch(entry["revision"]) and isinstance(entry.get("verified_at"), (int, float))]
+
+
+def read_generations(path: Path) -> list[dict[str, object]] | None:
+    state, entries = read_record(path)
+    return entries if state == "readable" else None
 
 
 def merged_generations(entries: Iterable[dict[str, object]], revisions: Iterable[tuple[str, str]],

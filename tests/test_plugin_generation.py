@@ -200,7 +200,6 @@ class CodexGenerationTests(GenerationHarness):
     def test_a_busy_or_corrupt_record_skips_history_but_still_reports_binding_problems(self):
         shared = self.codex_root('tj-agents', 'machine', A)
         alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
-        self.install('codex', A, B)
         cases = {
             'busy': lambda: mock.patch.object(GENERATION, 'read_generations', return_value=None),
             'corrupt': lambda: mock.patch.object(GENERATION, 'read_generations',
@@ -208,6 +207,8 @@ class CodexGenerationTests(GenerationHarness):
                                                                            RECORD.read_generations(path))[1]),
         }
         for name, disturbance in cases.items():
+            self.record('codex').unlink(missing_ok=True)
+            self.install('codex', A, B)
             with self.subTest(record=name), disturbance():
                 self.assertIsNone(self.prompt('codex', self.receipt(alias)))
                 problem = self.prompt('codex', {'PLUGIN_ROOT': str(shared)})
@@ -265,7 +266,31 @@ class ClaudeGenerationTests(GenerationHarness):
 
         output = self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(loaded)})
 
-        self.assertIn('this process loaded 1.0.0, but 1.1.0 is installed', self.context(output))
+        self.assertIn('this process loaded 1.0.0, which the registry no longer installs; it installs 1.1.0',
+                      self.context(output))
+
+    def test_every_replacing_non_rolling_install_is_named_once(self):
+        loaded = self.claude / 'plugins/cache/market/machine/1.1.0-RC'
+        loaded.mkdir(parents=True)
+        pinned = self.claude / 'plugins/cache/market/machine/1.0.0'
+        current = self.claude / 'plugins/cache/market/machine/1.2.0'
+        for root in (pinned, current):
+            root.mkdir(parents=True)
+        self.registry((pinned, 'project'), (current, 'user'), (current, 'local'))
+
+        output = self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(loaded)})
+
+        self.assertIn('loaded 1.1.0-RC, which the registry no longer installs; it installs 1.0.0, 1.2.0',
+                      self.context(output))
+
+    def test_a_root_outside_the_plugin_cache_is_never_compared_with_its_siblings(self):
+        loaded = Path(self.temp.name) / 'repos/core/plugins/machine'
+        sibling = Path(self.temp.name) / 'repos/core/plugins/engineering'
+        for root in (loaded, sibling):
+            root.mkdir(parents=True)
+        self.registry((sibling, 'user'))
+
+        self.assertIsNone(self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(loaded)}))
 
     def test_a_non_rolling_root_still_named_by_any_registry_record_is_current(self):
         loaded = self.claude / 'plugins/cache/market/machine/1.0.0'
@@ -311,14 +336,17 @@ class GateContractTests(GenerationHarness):
         record = self.record('codex')
         self.assertEqual([], RECORD.read_generations(record))
         record.parent.mkdir(parents=True, exist_ok=True)
-        for corrupt in (b'{', b'\xff\xfe{', b'"{"', b'{"schema_version": 1, "verified": null}'):
+        for corrupt in (b'{', b'\xff\xfe{', b'"{"', b'{"schema_version": 1, "verified": null}',
+                        b'{"schema_version": null, "verified": []}', b'{"schema_version": "2"}',
+                        b'{"schema_version": true}', b'{"schema_version": 0}'):
             with self.subTest(corrupt=corrupt):
                 record.write_bytes(corrupt)
-                self.assertEqual([], RECORD.read_generations(record))
+                self.assertEqual(('readable', []), RECORD.read_record(record))
         record.write_bytes(b'{"schema_version": 2, "verified": []}')
+        self.assertEqual(('newer', []), RECORD.read_record(record))
         self.assertIsNone(RECORD.read_generations(record))
         with mock.patch.object(Path, 'read_bytes', side_effect=PermissionError('in use')):
-            self.assertIsNone(RECORD.read_generations(record))
+            self.assertEqual(('busy', []), RECORD.read_record(record))
 
     def test_both_hosts_dispatch_the_gate_through_their_prompt_chain(self):
         alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
