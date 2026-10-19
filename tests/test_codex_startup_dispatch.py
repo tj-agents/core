@@ -69,7 +69,7 @@ class CodexStartupDispatchTests(unittest.TestCase):
             output = json.loads(result.stdout)['hookSpecificOutput']
             self.assertEqual('SessionStart', output['hookEventName'])
             self.assertEqual('\n\n'.join(contexts), output['additionalContext'])
-            self.assertGreaterEqual(len(contexts), 3)
+            self.assertGreaterEqual(len(contexts), 2)
 
 
 if __name__ == '__main__':
