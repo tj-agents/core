@@ -186,3 +186,13 @@ Avoids startup_binding.py/terminal launchers (open PR291) and PR306 paths.
   ]
 }
 ```
+
+## Delivery state (2026-10-19)
+
+- PR: https://github.com/tj-agents/core/pull/311, head 62bee29f (candidate ab8dcddc + review fixes).
+- Review: full pass at ab8dcddc recorded (changes-requested, R1-R9 all fixed in 62bee29f); incremental
+  pass ab8dcddc..62bee29f in progress. Work order is Git-private (`review-path`).
+- CI: foreground monitor on PR 311 checks. Durable continuation init is blocked by B021 (classifier
+  refusal; harness declares no continuation-runtime permission) pending Tommy's decision.
+- Next: complete incremental review, green exact-head CI, then merge under recorded auto_merge and verify
+  the post-merge regenerate/publication commit.
