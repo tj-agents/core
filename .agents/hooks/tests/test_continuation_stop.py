@@ -231,6 +231,51 @@ class ContinuationStopTests(unittest.TestCase):
         with patch.object(continuation_stop, "read_receipt", return_value=self.receipt()):
             self.assertIn("continuation owner", continuation_stop.outcome(payload))
 
+    def isolated_state(self):
+        state = tempfile.TemporaryDirectory()
+        self.addCleanup(state.cleanup)
+        patcher = patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state.name})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_a_stop_is_blocked_once_and_its_own_retry_is_released_even_with_new_wording(self):
+        self.isolated_state()
+        first = {"session_id": "once"}
+        for flag in ("stop_hook_active", "stopHookActive"):
+            with self.subTest(flag=flag):
+                self.assertEqual("reason", continuation_stop.once_per_stop(first, "reason"))
+                self.assertIsNone(continuation_stop.once_per_stop({**first, flag: True}, "reworded: error 2"))
+                self.assertEqual("reason", continuation_stop.once_per_stop(first, "reason"))
+                continuation_stop.once_per_stop(first, None)
+
+    def test_another_gates_block_does_not_release_this_gate(self):
+        self.isolated_state()
+        retry = {"session_id": "other", "stop_hook_active": True}
+
+        self.assertEqual("reason", continuation_stop.once_per_stop(retry, "reason"))
+        for _ in range(3):
+            self.assertIsNone(continuation_stop.once_per_stop(retry, "reason"))
+
+    def test_expired_block_records_are_pruned(self):
+        self.isolated_state()
+        stale = continuation_stop.block_record("stale")
+        stale.parent.mkdir(parents=True)
+        stale.write_text("{}", encoding="utf-8")
+        old = continuation_stop.time.time() - continuation_stop.BLOCK_RETENTION_SECONDS - 60
+        os.utime(stale, (old, old))
+
+        continuation_stop.once_per_stop({"session_id": "fresh"}, "reason")
+
+        self.assertFalse(stale.exists())
+        self.assertTrue(continuation_stop.block_record("fresh").exists())
+
+    def test_an_unwritable_block_record_never_loops(self):
+        self.isolated_state()
+        session = {"session_id": "unwritable"}
+        with patch.object(Path, "write_text", side_effect=PermissionError("shared tmp")):
+            self.assertEqual("reason", continuation_stop.once_per_stop(session, "reason"))
+            self.assertIsNone(continuation_stop.once_per_stop({**session, "stop_hook_active": True}, "reason"))
+
     def test_bounded_side_handoff_blocks_stop_until_the_parent_has_an_owner(self):
         scratch = Path(self.temp.name) / "side-handoff-receipt"
         scratch.mkdir()
@@ -491,7 +536,8 @@ class ContinuationStopTests(unittest.TestCase):
         receipt.parent.mkdir(parents=True)
         receipt.write_text(json.dumps(self.receipt()), encoding="utf-8")
         payload = json.dumps(self.payload())
-        environment = dict(os.environ, TEMP=str(scratch), TMP=str(scratch), TMPDIR=str(scratch))
+        environment = dict(os.environ, TEMP=str(scratch), TMP=str(scratch), TMPDIR=str(scratch),
+                           AGENT_STATE_DIRECTORY=str(scratch / "state"))
         scripts = (SCRIPT, ROOT / "plugins/engineering/hooks/continuation_stop.py")
         for script in scripts:
             with self.subTest(script=script):
