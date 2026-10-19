@@ -220,16 +220,17 @@ class ContinuationStopTests(unittest.TestCase):
         with patch.dict(os.environ, {"CONTINUATION_OWNER_ID": "owner", "CONTINUATION_NONCE": "wrong", "CONTINUATION_RESULT_PATH": str(result)}, clear=False):
             self.assertIn("working without", self.call())
 
-    def test_no_receipt_active_binding_and_repeated_stop_still_block(self):
+    def test_no_receipt_active_binding_blocks_once_and_never_repeats(self):
         binding = self.root / ".agents/persistent-workflow-binding.json"
         binding.parent.mkdir(exist_ok=True)
         binding.write_text("{}", encoding="utf-8")
         with patch.object(continuation_stop, "binding_active", return_value=True):
             self.assertIn("Initialize persistent-workflow", self.call({}))
         self.assertIn("continuation owner", self.call())
-        payload = {**self.payload(), "stop_hook_active": True}
-        with patch.object(continuation_stop, "read_receipt", return_value=self.receipt()):
-            self.assertIn("continuation owner", continuation_stop.outcome(payload))
+        for flag in ("stop_hook_active", "stopHookActive"):
+            payload = {**self.payload(), flag: True}
+            with self.subTest(flag=flag), patch.object(continuation_stop, "read_receipt", return_value=self.receipt()):
+                self.assertIsNone(continuation_stop.outcome(payload))
 
     def test_bounded_side_handoff_blocks_stop_until_the_parent_has_an_owner(self):
         scratch = Path(self.temp.name) / "side-handoff-receipt"
