@@ -254,6 +254,8 @@ class ContinuationStopTests(unittest.TestCase):
 
         self.assertEqual("reason", continuation_stop.once_per_stop(retry, "reason"))
         self.assertIsNone(continuation_stop.once_per_stop(retry, "reason"))
+        self.assertFalse(continuation_stop.block_record("other").exists())
+        self.assertEqual("reason", continuation_stop.once_per_stop(retry, "reason"))
 
     def test_an_unwritable_block_record_never_loops(self):
         self.isolated_state()
@@ -522,7 +524,8 @@ class ContinuationStopTests(unittest.TestCase):
         receipt.parent.mkdir(parents=True)
         receipt.write_text(json.dumps(self.receipt()), encoding="utf-8")
         payload = json.dumps(self.payload())
-        environment = dict(os.environ, TEMP=str(scratch), TMP=str(scratch), TMPDIR=str(scratch))
+        environment = dict(os.environ, TEMP=str(scratch), TMP=str(scratch), TMPDIR=str(scratch),
+                           AGENT_STATE_DIRECTORY=str(scratch / "state"))
         scripts = (SCRIPT, ROOT / "plugins/engineering/hooks/continuation_stop.py")
         for script in scripts:
             with self.subTest(script=script):
