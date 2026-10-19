@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import tempfile
 
 from workflow_route import direct_control, read_receipt
 
@@ -230,8 +229,9 @@ def outcome(data):
 
 
 def block_record(session):
-    digest = hashlib.sha256(session.encode("utf-8")).hexdigest()
-    return Path(tempfile.gettempdir()) / BLOCKS / f"{digest}.json"
+    configured = os.environ.get("AGENT_STATE_DIRECTORY")
+    root = Path(configured) if configured else Path.home() / ".agents-state"
+    return root / BLOCKS / f"{hashlib.sha256(session.encode('utf-8')).hexdigest()}.json"
 
 
 def once_per_stop(data, reason):
@@ -245,19 +245,14 @@ def once_per_stop(data, reason):
         except OSError:
             pass
         return None
-    digest = hashlib.sha256(reason.encode("utf-8")).hexdigest()
     retry = bool(data.get("stop_hook_active") or data.get("stopHookActive"))
-    try:
-        blocked = json.loads(path.read_text(encoding="utf-8")).get("reason") == digest
-    except (OSError, ValueError, AttributeError):
-        blocked = False
-    if retry and blocked:
+    if retry and path.is_file():
         return None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"reason": digest}), encoding="utf-8")
+        path.write_text("{}", encoding="utf-8")
     except OSError:
-        pass
+        return None if retry else reason
     return reason
 
 

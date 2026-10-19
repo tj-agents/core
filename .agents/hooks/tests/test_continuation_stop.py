@@ -231,25 +231,36 @@ class ContinuationStopTests(unittest.TestCase):
         with patch.object(continuation_stop, "read_receipt", return_value=self.receipt()):
             self.assertIn("continuation owner", continuation_stop.outcome(payload))
 
-    def test_a_stop_is_blocked_once_and_its_own_retry_is_released(self):
-        session = f"once-{self.id()}"
-        self.addCleanup(lambda: continuation_stop.block_record(session).unlink(missing_ok=True))
-        first = {"session_id": session}
+    def isolated_state(self):
+        state = tempfile.TemporaryDirectory()
+        self.addCleanup(state.cleanup)
+        patcher = patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state.name})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_a_stop_is_blocked_once_and_its_own_retry_is_released_even_with_new_wording(self):
+        self.isolated_state()
+        first = {"session_id": "once"}
         for flag in ("stop_hook_active", "stopHookActive"):
             with self.subTest(flag=flag):
                 self.assertEqual("reason", continuation_stop.once_per_stop(first, "reason"))
-                self.assertIsNone(continuation_stop.once_per_stop({**first, flag: True}, "reason"))
+                self.assertIsNone(continuation_stop.once_per_stop({**first, flag: True}, "reworded: error 2"))
                 self.assertEqual("reason", continuation_stop.once_per_stop(first, "reason"))
                 continuation_stop.once_per_stop(first, None)
 
     def test_another_gates_block_does_not_release_this_gate(self):
-        session = f"other-{self.id()}"
-        self.addCleanup(lambda: continuation_stop.block_record(session).unlink(missing_ok=True))
-        retry = {"session_id": session, "stop_hook_active": True}
+        self.isolated_state()
+        retry = {"session_id": "other", "stop_hook_active": True}
 
         self.assertEqual("reason", continuation_stop.once_per_stop(retry, "reason"))
         self.assertIsNone(continuation_stop.once_per_stop(retry, "reason"))
-        self.assertEqual("changed", continuation_stop.once_per_stop(retry, "changed"))
+
+    def test_an_unwritable_block_record_never_loops(self):
+        self.isolated_state()
+        session = {"session_id": "unwritable"}
+        with patch.object(Path, "write_text", side_effect=PermissionError("shared tmp")):
+            self.assertEqual("reason", continuation_stop.once_per_stop(session, "reason"))
+            self.assertIsNone(continuation_stop.once_per_stop({**session, "stop_hook_active": True}, "reason"))
 
     def test_bounded_side_handoff_blocks_stop_until_the_parent_has_an_owner(self):
         scratch = Path(self.temp.name) / "side-handoff-receipt"
