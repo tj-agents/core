@@ -19,17 +19,20 @@ def generations_path(plugins: Path, host: str) -> Path:
 
 def read_generations(path: Path) -> list[dict[str, object]] | None:
     try:
-        document = json.loads(path.read_text(encoding="utf-8-sig"))
+        text = path.read_text(encoding="utf-8-sig")
     except FileNotFoundError:
         return []
-    except (OSError, ValueError):
+    except OSError:
         return None
+    try:
+        document = json.loads(text)
+    except ValueError:
+        return []
     entries = document.get("verified") if isinstance(document, dict) else None
-    if not isinstance(entries, list):
-        return None
-    return [entry for entry in entries if isinstance(entry, dict)
+    return [entry for entry in entries or () if isinstance(entry, dict)
             and isinstance(entry.get("repository"), str) and isinstance(entry.get("revision"), str)
-            and SHA.fullmatch(entry["revision"]) and isinstance(entry.get("verified_at"), (int, float))]
+            and SHA.fullmatch(entry["revision"]) and isinstance(entry.get("verified_at"), (int, float))] \
+        if isinstance(entries, list) else []
 
 
 def merged_generations(entries: Iterable[dict[str, object]], revisions: Iterable[tuple[str, str]],

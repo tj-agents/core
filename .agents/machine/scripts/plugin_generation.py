@@ -3,7 +3,8 @@
 
 A host binds its plugin roots once, when the process starts. A later refresh installs a newer generation
 for the next process and leaves this one executing the old hooks and skills. This gate runs at each prompt,
-reads only local state, and reports that difference until the session adopts the new generation.
+reads only local state, and states that difference at every prompt until the session adopts the new
+generation.
 """
 
 from __future__ import annotations
@@ -16,7 +17,6 @@ import os
 from pathlib import Path
 import re
 import sys
-import time
 from typing import Iterable, Mapping
 
 HERE = Path(__file__).resolve().parent
@@ -32,8 +32,6 @@ RUNTIME_MARKETPLACE = "tj-run-"
 RECEIPT_ENV = "TJ_AGENTS_CODEX_RUNTIME_RECEIPT"
 RECEIPT_SHA256_ENV = "TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256"
 CODEX_ROOT_VARIABLES = ("PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
-STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
-STATE_RETENTION_SECONDS = 14 * 24 * 60 * 60
 HOSTS = ("claude", "codex")
 
 
@@ -57,56 +55,12 @@ def read_json(path: Path) -> object:
         return None
 
 
-def state_directory(environ: Mapping[str, str]) -> Path:
-    configured = environ.get(STATE_DIRECTORY_ENV)
-    return Path(configured) if configured else Path.home() / ".agents-state"
-
-
 def plugins_root(host: str, environ: Mapping[str, str]) -> Path:
     if host == "claude":
         if environ.get("CLAUDE_CODE_PLUGIN_CACHE_DIR"):
             return Path(environ["CLAUDE_CODE_PLUGIN_CACHE_DIR"])
         return Path(environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude") / "plugins"
     return Path(environ.get("CODEX_HOME") or Path.home() / ".codex") / "plugins"
-
-
-class NoticeState:
-    def __init__(self, host: str, session_id: str, environ: Mapping[str, str], now: float):
-        self.path = state_directory(environ) / "plugin-generation" / f"{host}-{session_id}.json"
-        self.now = now
-        stored = read_json(self.path)
-        self.notified = stored.get("notified") if isinstance(stored, dict) else None
-
-    def save(self, notified: str | None) -> None:
-        if notified == self.notified:
-            self.touch()
-            return
-        temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
-        try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            temporary.write_text(json.dumps({"notified": notified}) + "\n", encoding="utf-8")
-            os.replace(temporary, self.path)
-        except OSError:
-            try:
-                temporary.unlink(missing_ok=True)
-            except OSError:
-                pass
-            return
-        self.sweep()
-
-    def touch(self) -> None:
-        try:
-            os.utime(self.path)
-        except OSError:
-            pass
-
-    def sweep(self) -> None:
-        for candidate in [*self.path.parent.glob("*.json"), *self.path.parent.glob(".*.tmp")]:
-            try:
-                if candidate != self.path and self.now - candidate.stat().st_mtime > STATE_RETENTION_SECONDS:
-                    candidate.unlink()
-            except OSError:
-                continue
 
 
 def ownership(root: Path) -> Mapping[str, object] | None:
@@ -117,41 +71,21 @@ def ownership(root: Path) -> Mapping[str, object] | None:
     return value
 
 
-def applies(record: Mapping[str, object], project: Path | None) -> bool:
-    scope = record.get("scope")
-    if scope in {"user", "managed"}:
-        return True
-    owner = record.get("projectPath")
-    if scope not in {"project", "local"} or not isinstance(owner, str) or project is None:
-        return False
-    try:
-        project.resolve().relative_to(Path(owner).resolve())
-    except (OSError, ValueError):
-        return False
-    return True
-
-
-def claude_install_paths(environ: Mapping[str, str], project: Path | None) -> list[str]:
+def claude_install_paths(environ: Mapping[str, str]) -> list[str]:
     registry = read_json(plugins_root("claude", environ) / "installed_plugins.json")
     plugins = registry.get("plugins") if isinstance(registry, dict) else None
-    paths = []
-    for records in plugins.values() if isinstance(plugins, dict) else ():
-        if not isinstance(records, list):
-            continue
-        applicable = [record for record in records if isinstance(record, dict)
-                      and isinstance(record.get("installPath"), str) and applies(record, project)]
-        scoped = [record for record in applicable if record.get("scope") in {"project", "local"}]
-        paths.extend(record["installPath"] for record in (scoped or applicable)[-1:])
-    return paths
+    return [record["installPath"] for records in (plugins.values() if isinstance(plugins, dict) else ())
+            if isinstance(records, list) for record in records
+            if isinstance(record, dict) and isinstance(record.get("installPath"), str)]
 
 
-def claude_binding(root: Path, environ: Mapping[str, str], project: Path | None) -> Binding | None:
+def claude_binding(root: Path, environ: Mapping[str, str]) -> Binding | None:
     owner = ownership(root)
     if owner is None:
         loaded, plugin = normalized(root), normalized(root.parent)
-        replacement = next((path for path in claude_install_paths(environ, project)
-                            if normalized(Path(path).parent) == plugin and normalized(path) != loaded), None)
-        if replacement is None:
+        paths = [normalized(path) for path in claude_install_paths(environ)]
+        replacement = next((path for path in paths if normalized(Path(path).parent) == plugin), None)
+        if loaded in paths or replacement is None:
             return None
         return Binding(root.parent.name, str(root.parent), None, str(root),
                        f"this process loaded {root.name}, but {Path(replacement).name} is installed")
@@ -209,10 +143,10 @@ def receipt_roots(environ: Mapping[str, str]) -> list[Path]:
     return resolved
 
 
-def session_bindings(host: str, environ: Mapping[str, str], project: Path | None) -> tuple[list[Binding], list[str]]:
+def session_bindings(host: str, environ: Mapping[str, str]) -> tuple[list[Binding], list[str]]:
     if host == "claude":
         own = environ.get("CLAUDE_PLUGIN_ROOT")
-        binding = claude_binding(Path(own), environ, project) if own else None
+        binding = claude_binding(Path(own), environ) if own else None
         return ([binding] if binding is not None else []), []
     if environ.get(RECEIPT_ENV) or environ.get(RECEIPT_SHA256_ENV):
         try:
@@ -292,29 +226,17 @@ def adoption(host: str, session_id: str) -> str:
             "unchanged.")
 
 
-def check(host: str, session_id: str, environ: Mapping[str, str], project: Path | None = None,
-          now: float | None = None) -> dict[str, object] | None:
-    bindings, problems = session_bindings(host, environ, project)
-    if not bindings and not problems:
-        return None
-    installed = installed_generations(host, environ) if bindings else {}
+def check(host: str, session_id: str, environ: Mapping[str, str]) -> dict[str, object] | None:
+    bindings, problems = session_bindings(host, environ)
     lines = [f"this session's generation cannot be verified because {problem}." for problem in problems]
-    lines.extend(findings(bindings, installed or {}))
-    state = NoticeState(host, session_id, environ, time.time() if now is None else now)
+    if bindings:
+        lines.extend(findings(bindings, installed_generations(host, environ) or {}))
     if not lines:
-        if installed is not None and all(binding.repository in installed for binding in bindings):
-            state.save(None)
         return None
     report = "plugin generation: " + " ".join(lines)
-    output: dict[str, object] = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
-                                                        "additionalContext": f"{report} {adoption(host, session_id)}"}}
-    if installed is None:
-        return output
-    key = hashlib.sha256(report.encode("utf-8")).hexdigest()
-    if state.notified != key:
-        output["systemMessage"] = report
-    state.save(key)
-    return output
+    return {"systemMessage": report,
+            "hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
+                                   "additionalContext": f"{report} {adoption(host, session_id)}"}}
 
 
 def payload(stream) -> Mapping[str, object]:
@@ -335,10 +257,8 @@ def main(argv: list[str] | None = None, environ: Mapping[str, str] | None = None
     session_id = data.get("session_id")
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
         return 0
-    cwd = data.get("cwd")
-    project = Path(cwd) if isinstance(cwd, str) and cwd else None
     try:
-        output = check(arguments.host, session_id, environ, project)
+        output = check(arguments.host, session_id, environ)
     except Exception as error:  # noqa: BLE001
         output = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext":
                   f"plugin generation: this session's generation could not be checked ({error})."}}
