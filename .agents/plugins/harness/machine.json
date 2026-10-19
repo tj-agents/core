@@ -128,7 +128,19 @@
         "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
         "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)",
         "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)"
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/refresh-cli/scripts/refresh_cli.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/refresh-cli/scripts/refresh_cli.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/refresh-cli/scripts/refresh_cli.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/refresh-cli/scripts/refresh_cli.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/codex-skills/refresh-cli/scripts/refresh_cli.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/refresh-cli/scripts/refresh_cli.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/refresh-cli/scripts/refresh_cli.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/refresh-cli/scripts/refresh_cli.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/refresh-cli/scripts/refresh_cli.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/refresh-cli/scripts/refresh_cli.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/refresh-cli/scripts/refresh_cli.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/refresh-cli/scripts/refresh_cli.py:*)"
       ],
       "codex_prefix_rules": [
         {
@@ -603,10 +615,13 @@
             "-B",
             [
               "${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py",
-              "${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py"
+              "${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py",
+              "${PLUGIN_ROOT}/skills/refresh-cli/scripts/refresh_cli.py",
+              "${PLUGIN_ROOT}/codex-skills/refresh-cli/scripts/refresh_cli.py",
+              "${PLUGIN_ROOT}/.agents/machine/utility/refresh-cli/scripts/refresh_cli.py"
             ]
           ],
-          "justification": "machine:refresh-cli refreshes the user's own tj-agents plugins from their registered marketplaces through the verified rolling refresh and repairs the host plugin registry.",
+          "justification": "Refresh selected tj-agents plugins through native host commands, with optional remote verification.",
           "match": [
             [
               "python",

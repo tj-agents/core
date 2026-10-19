@@ -4,165 +4,117 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
 
-
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / ".agents" / "machine" / "scripts"
+SCRIPTS = ROOT / ".agents/machine/scripts"
 sys.path.insert(0, str(SCRIPTS))
 SPEC = importlib.util.spec_from_file_location("refresh_cli", SCRIPTS / "refresh_cli.py")
 REFRESH = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = REFRESH
 SPEC.loader.exec_module(REFRESH)
-
-MAIN = "b" * 40
-OLD = "a" * 40
 
 
 class RefreshCliTests(unittest.TestCase):
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory(prefix="refresh cli ")
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
-        self.environ = {"CLAUDE_CONFIG_DIR": str(self.root / "claude"), "CODEX_HOME": str(self.root / "codex")}
-        self.project = self.root / "project"
-        self.project.mkdir()
+    def test_default_uses_native_commands_without_verification_or_bound_launch(self):
+        with mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude"), \
+                mock.patch.object(REFRESH, "selection", return_value=({"tj-agents": "tj-agents/marketplace"}, ["machine@tj-agents"])), \
+                mock.patch.object(REFRESH, "run") as run, mock.patch.object(REFRESH, "verify") as verify, \
+                mock.patch.object(REFRESH, "read_json", return_value={"tj-agents": {}}), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(0, REFRESH.main(["--host", "claude"]))
+        self.assertEqual([call.args[0] for call in run.call_args_list], [
+            ["claude", "plugin", "marketplace", "update", "tj-agents"],
+            ["claude", "plugin", "install", "machine@tj-agents", "--scope", "project"],
+            ["claude", "plugin", "update", "machine@tj-agents", "--scope", "project"],
+        ])
+        verify.assert_not_called()
 
-    def write(self, path: Path, value: object) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(value), encoding="utf-8")
-
-    def install(self, host: str, identity: str, revision: str, directory: str) -> Path:
-        if host == "claude":
-            self.write(self.root / "claude/plugins/known_marketplaces.json", {
-                "tj-agents": {"source": {"source": "github", "repo": "tj-agents/marketplace"}},
-            })
-        name, marketplace = identity.rsplit("@", 1)
-        package = self.root / host / "plugins" / "cache" / marketplace / name
-        (package / directory).mkdir(parents=True)
-        self.write(package / REFRESH.MARKER, {
-            "schema_version": 1, "identity": identity, "repository": "https://github.com/tj-agents/core.git",
-            "revision": revision,
-        })
-        return package / directory
-
-    def test_repository_names_cover_github_sources(self):
-        cases = {
-            "https://github.com/tj-agents/core.git": "tj-agents/core",
-            "git@github.com:tj-agents/marketplace.git": "tj-agents/marketplace",
-            "https://github.com/Concertable/agents": "Concertable/agents",
-            "C:\\local\\catalog": None,
-        }
-        for source, expected in cases.items():
-            with self.subTest(source=source):
-                self.assertEqual(REFRESH.repository_name(source), expected)
-        self.assertEqual(REFRESH.repository_name({"source": "github", "repo": "tj-agents/marketplace"}),
-                         "tj-agents/marketplace")
-
-    def test_only_tj_agents_marketplaces_are_updated(self):
-        self.write(self.root / "claude/plugins/known_marketplaces.json", {
-            "tj-agents": {"source": {"source": "github", "repo": "tj-agents/marketplace"}},
-            "agents": {"source": {"source": "github", "repo": "Concertable/agents"}},
-            "local": {"source": {"source": "directory", "path": "C:/x"}},
-        })
-        self.assertEqual(REFRESH.claude_marketplaces(self.environ), ["tj-agents"])
-        selection = {"effective_marketplace_configuration": {
-            "base-agents": {"source_type": "git", "source": "https://github.com/tj-agents/core.git"},
-            "openai-bundled": {"source_type": "local", "source": "C:/bundled"},
-            "agents": {"source_type": "git", "source": "https://github.com/Concertable/agents.git"},
-        }}
-        self.assertEqual(REFRESH.codex_marketplaces(selection), ["base-agents"])
-        camel = {"effective_marketplace_configuration": {
-            "base-agents": {"sourceType": "git", "source": "https://github.com/tj-agents/core.git"},
-        }}
-        self.assertEqual(REFRESH.codex_marketplaces(camel), ["base-agents"])
-
-    def test_claude_registry_version_must_name_the_refreshed_install(self):
-        current = self.install("claude", "machine@tj-agents", MAIN, MAIN)
-        self.write(self.root / "claude/plugins/installed_plugins.json", {"version": 2, "plugins": {
-            "machine@tj-agents": [{"scope": "user", "installPath": str(current), "version": "61b5b1ee19f7-aee5d9df"}],
-        }})
-        report = REFRESH.verify("claude", {"machine@tj-agents"}, self.project, lambda _repository: MAIN, self.environ)
-        self.assertEqual(len(report["problems"]), 1)
-        self.assertIn("so Claude loads another copy", report["problems"][0])
-
-        self.write(self.root / "claude/plugins/installed_plugins.json", {"version": 2, "plugins": {
-            "machine@tj-agents": [{"scope": "user", "installPath": str(current), "version": MAIN}],
-        }})
-        report = REFRESH.verify("claude", {"machine@tj-agents"}, self.project, lambda _repository: MAIN, self.environ)
-        self.assertEqual(report["problems"], [])
-        self.assertTrue(report["packages"][0]["current"])
-
-    def test_a_project_record_loading_an_older_copy_is_reported(self):
-        current = self.install("claude", "machine@tj-agents", MAIN, MAIN)
-        older = current.parent / OLD
-        older.mkdir()
-        other = self.root / "elsewhere"
-        self.write(self.root / "claude/plugins/installed_plugins.json", {"version": 2, "plugins": {
-            "machine@tj-agents": [
-                {"scope": "user", "installPath": str(current), "version": MAIN},
-                {"scope": "local", "projectPath": str(self.project), "installPath": str(older), "version": OLD},
-                {"scope": "local", "projectPath": str(other), "installPath": str(older), "version": OLD},
-            ],
-        }})
-        report = REFRESH.verify("claude", {"machine@tj-agents"}, self.project, lambda _repository: MAIN,
-                                self.environ)
-        self.assertEqual(report["problems"], [
-            f"machine@tj-agents (local): Claude loads {OLD!r}, but the refreshed install is {MAIN!r}",
+    def test_missing_claude_marketplace_is_registered_before_refresh(self):
+        with mock.patch.object(REFRESH, "read_json", return_value={}), \
+                mock.patch.object(REFRESH, "run") as run:
+            REFRESH.refresh("claude", "claude", ROOT, {"tj-agents": "tj-agents/marketplace"}, [])
+        self.assertEqual([call.args[0] for call in run.call_args_list], [
+            ["claude", "plugin", "marketplace", "add", "tj-agents/marketplace"],
+            ["claude", "plugin", "marketplace", "update", "tj-agents"],
         ])
 
-    def test_stale_enabled_packages_are_reported_and_disabled_ones_ignored(self):
-        self.install("codex", "machine@base-agents", OLD, "local")
-        self.install("codex", "engineering@base-agents", OLD, "local")
-        report = REFRESH.verify("codex", {"machine@base-agents"}, self.project, lambda _repository: MAIN, self.environ)
-        self.assertEqual([package["identity"] for package in report["packages"]], ["machine@base-agents"])
-        self.assertEqual(report["problems"], [f"machine@base-agents is at {OLD}, main is {MAIN}"])
+    def test_packaged_entry_point_resolves_from_each_skill_surface(self):
+        package = ROOT / "plugins/machine"
+        for relative in ("skills/refresh-cli", "codex-skills/refresh-cli",
+                         ".agents/machine/utility/refresh-cli"):
+            with self.subTest(surface=relative):
+                result = subprocess.run([sys.executable, "-I", "-B", str(package / relative / "scripts/refresh_cli.py"),
+                                         "--help"], cwd=ROOT.parent, capture_output=True, text=True,
+                                        encoding="utf-8", timeout=20)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertIn("--verify-only", result.stdout)
 
-    def test_codex_reports_stale_cache_outside_machine_as_unused(self):
-        self.install("codex", "machine@base-agents", MAIN, "local")
-        self.install("codex", "cpp@cpp-agents", OLD, "local")
-        report = REFRESH.verify("codex", {"machine@base-agents", "cpp@cpp-agents"}, self.project, lambda _repository: MAIN,
-                                self.environ)
-        self.assertEqual(report["problems"], [])
-        self.assertEqual(report["unused_stale_cache"], ["cpp@cpp-agents"])
+    def test_project_selection_overrides_user_and_foreign_sources_are_untouched(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = root / "project"
+            for path in (root / "settings.json", project / ".claude/settings.json"):
+                path.parent.mkdir(parents=True, exist_ok=True)
+            (root / "settings.json").write_text(json.dumps({"enabledPlugins": {"base@tj-agents": True}}))
+            (project / ".claude/settings.json").write_text(json.dumps({
+                "enabledPlugins": {"base@tj-agents": False, "machine@tj-agents": True, "other@foreign": True},
+                "extraKnownMarketplaces": {
+                    "tj-agents": {"source": {"source": "github", "repo": "tj-agents/marketplace"}},
+                    "foreign": {"source": {"source": "github", "repo": "elsewhere/plugin"}},
+                }}))
+            with mock.patch.object(REFRESH, "configuration_root", return_value=root):
+                sources, enabled = REFRESH.selection("claude", "unused", project)
+            self.assertEqual({"tj-agents": "tj-agents/marketplace"}, sources)
+            self.assertEqual(["machine@tj-agents"], enabled)
 
-    def test_no_enabled_package_is_a_problem(self):
-        report = REFRESH.verify("codex", set(), self.project, lambda _repository: MAIN, self.environ)
-        self.assertEqual(report["problems"], ["no rolling tj-agents package is installed for codex"])
+    def test_verification_detects_stale_package_bytes_at_a_current_marketplace_revision(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            market = root / "market"
+            source = market / "plugins/base"
+            install = root / "cache/base"
+            for path in (market / ".claude-plugin", source, install, root / "plugins"):
+                path.mkdir(parents=True, exist_ok=True)
+            (source / "payload").write_bytes(b"current")
+            (install / "payload").write_bytes(b"old")
+            (market / ".claude-plugin/marketplace.json").write_text(json.dumps({
+                "plugins": [{"name": "base", "source": "./plugins/base"}]}), encoding="utf-8")
+            (root / "plugins/known_marketplaces.json").write_text(json.dumps({
+                "tj-agents": {"installLocation": str(market)}}), encoding="utf-8")
+            inventory = [{"id": "base@tj-agents", "enabled": True, "scope": "user", "installPath": str(install)}]
+            with mock.patch.object(REFRESH, "configuration_root", return_value=root), \
+                    mock.patch.object(REFRESH, "run", side_effect=[json.dumps(inventory), "a" * 40 + " refs/heads/main", "a" * 40]), \
+                    mock.patch("sys.stderr"):
+                report = REFRESH.verify("claude", "claude", root, {"tj-agents": "tj-agents/marketplace"}, ["base@tj-agents"])
+            self.assertEqual(1, len(report["problems"]))
+            self.assertIn("Native installed bytes differ", report["problems"][0])
 
-    def test_refresh_updates_marketplaces_then_runs_the_bound_refresh(self):
-        self.write(self.root / "claude/plugins/known_marketplaces.json", {
-            "tj-agents": {"source": {"source": "github", "repo": "tj-agents/marketplace"}},
-        })
-        self.write(self.root / "claude/settings.json", {"enabledPlugins": {"machine@tj-agents": True, "x@y": False}})
-        calls = []
-        launch = mock.Mock(return_value=0)
-        with mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude.exe"), \
-                mock.patch.object(REFRESH, "run", side_effect=lambda command, *_args: calls.append(command)):
-            enabled = REFRESH.refresh("claude", self.project, environ=self.environ, launch=launch)
-        self.assertEqual(calls, [["claude.exe", "plugin", "marketplace", "update", "tj-agents"]])
-        launch.assert_called_once_with("claude", "claude.exe", self.project, ["--version"])
-        self.assertEqual(enabled, {"machine@tj-agents"})
+    def test_another_projects_installation_does_not_satisfy_verification(self):
+        inventory = [{"id": "base@tj-agents", "enabled": True, "scope": "project", "projectPath": str(ROOT / "elsewhere")}]
+        with mock.patch.object(REFRESH, "run", return_value=json.dumps(inventory)), mock.patch("sys.stderr"):
+            report = REFRESH.verify("claude", "claude", ROOT, {}, ["base@tj-agents"])
+        self.assertEqual(["Missing enabled native installation: base@tj-agents"], report["problems"])
 
-    def test_verify_only_changes_nothing(self):
-        self.write(self.root / "claude/plugins/known_marketplaces.json", {})
-        launch = mock.Mock()
-        with mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude.exe"), \
-                mock.patch.object(REFRESH, "run") as run:
-            REFRESH.refresh("claude", self.project, verify_only=True, environ=self.environ, launch=launch)
-        run.assert_not_called()
-        launch.assert_not_called()
+    def test_verify_only_does_not_modify_installations(self):
+        with mock.patch.object(REFRESH.agent_cli, "resolve_codex_executable", return_value=("codex", "version")), \
+                mock.patch.object(REFRESH, "selection", return_value=({}, [])), \
+                mock.patch.object(REFRESH, "refresh") as refresh, \
+                mock.patch.object(REFRESH, "verify", return_value={"problems": []}) as verify, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(0, REFRESH.main(["--host", "codex", "--verify-only"]))
+        refresh.assert_not_called()
+        verify.assert_called_once()
 
-    def test_failed_bound_refresh_is_reported(self):
-        self.write(self.root / "claude/plugins/known_marketplaces.json", {})
-        for launch in (mock.Mock(return_value=1),
-                       mock.Mock(side_effect=REFRESH.StartupBindingError("preflight failed"))):
-            with self.subTest(launch=launch), \
-                    mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude.exe"):
-                with self.assertRaises(REFRESH.RefreshError):
-                    REFRESH.refresh("claude", self.project, environ=self.environ, launch=launch)
+    def test_native_failure_is_reported_and_other_host_is_still_attempted(self):
+        with mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude"), \
+                mock.patch.object(REFRESH.agent_cli, "resolve_codex_executable", return_value=("codex", "version")), \
+                mock.patch.object(REFRESH, "selection", side_effect=[REFRESH.RefreshError("failed"), ({}, [])]), \
+                mock.patch.object(REFRESH, "refresh") as refresh, mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main([]))
+        refresh.assert_called_once_with("codex", "codex", Path.cwd().resolve(), {}, [])
 
 
 if __name__ == "__main__":

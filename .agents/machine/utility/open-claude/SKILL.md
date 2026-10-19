@@ -59,7 +59,7 @@ afterwards.
 ## One tab, and never a second
 
 The launcher **exits non-zero** on failure and prints `Launched claude tab '<title>' …` on success.
-`standards:` lines before them report the pre-launch plugin refresh, which never blocks the launch.
+Launch starts the native CLI without refreshing plugins.
 
 Exit code **3 is distinct from every other failure**: it means the terminal control command timed out
 after the tab may already have opened, not that the launch definitely failed. Check the terminal for the
