@@ -503,8 +503,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "branch -d <branch>",
             "proof covers exactly this head, so delete it with",
             "branch -D <branch>",
-            "Step 5 is a blocking post-merge gate",
-            "Only the `finish.py` path may enter Step 6 first",
+            "Report any cleanup you could not complete; never force it",
             "never remove that path",
         ):
             with self.subTest(required=required):
@@ -512,7 +511,7 @@ class ProcessStandardsTests(unittest.TestCase):
 
         self.assertNotIn("worktree remove --force", cleanup)
 
-    def test_merge_retargets_the_host_before_active_worktree_removal(self):
+    def test_merge_leaves_an_attached_worktree_for_pruning_instead_of_closing_the_session(self):
         body = authored_skill("merge").read_text(encoding="utf-8")
         cleanup = body.split(
             "### 5. Return to a clean base and retire any isolated checkout",
@@ -521,31 +520,16 @@ class ProcessStandardsTests(unittest.TestCase):
         flat = " ".join(cleanup.split())
 
         for required in (
-            "Compare the recorded target checkout in the delivery binding with the resolved primary checkout",
-            "When the target is the primary checkout, or the session is already attached to the primary checkout, do not retarget or hand off",
-            "continue cleanup and branch deletion in the current session",
-            "Only when the recorded target is a linked worktree, the host is attached to that target, and the target differs from the primary checkout",
-            "the session closes itself as the delivery's final action, after Step 6",
-            'no arguments and no leading `&`, because the harness allow rule matches only this string',
-            'python3 -B <machine:peer-cli skill-directory>/scripts/finish.py',
-            "detaches a reaper that removes the worktree and branch once this session exits",
-            "closes this session's CLI and tab",
-            "Only when `finish.py` is unavailable or its preflight fails",
-            "shell `cd`, or `git -C` does not retarget Codex or Claude",
-            "invoke `/cd <primary-checkout>` there",
-            "invoke the unqualified `handoff` workflow once with the primary checkout",
-            "The successor is the sole cleanup owner",
-            "requires the physical target path to be absent",
-            "Do not make the user choose between these paths",
+            "When this session is running inside the merged linked worktree, leave that worktree in place",
+            "`engineering:prune-worktrees` removes it later",
+            "Otherwise remove the merged target now",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
 
-        self.assertLess(cleanup.index("finish.py"), cleanup.index("$worktreeHelper"))
-        self.assertLess(
-            cleanup.index("finish.py"),
-            cleanup.index("worktree remove -- <target-worktree>"),
-        )
+        for retired in ("finish.py", "close.py", "machine:close"):
+            with self.subTest(retired=retired):
+                self.assertNotIn(retired, cleanup)
 
     def test_cd_and_handoff_transfer_active_directory_removal_to_the_successor(self):
         cd = " ".join(authored_skill("cd").read_text(encoding="utf-8").split())

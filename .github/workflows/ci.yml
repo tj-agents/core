@@ -143,12 +143,6 @@ jobs:
           ./tests/delivery-continuation.tests.ps1
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/delivery-continuation.tests.ps1
 
-      - name: Codex terminal profile tests
-        if: fromJSON(needs.select.outputs.plan).mode == 'full'
-        shell: pwsh
-        run: |
-          python -B -m unittest discover -s tests -p test_codex_terminal_profile.py
-
       - name: source layout and package tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh

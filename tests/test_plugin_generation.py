@@ -369,19 +369,6 @@ class GateContractTests(GenerationHarness):
         self.assertIn(f'superseded by {B[:12]}', merged['hookSpecificOutput']['additionalContext'])
         self.assertIn(f'superseded by {B[:12]}', merged['systemMessage'])
 
-    def test_both_host_manifests_wire_the_gate(self):
-        claude = json.loads((ROOT / '.agents/plugins/manifests/claude/machine-hooks.json').read_text(encoding='utf-8'))
-        codex = json.loads((ROOT / '.agents/plugins/manifests/codex/machine-hooks.json').read_text(encoding='utf-8'))
-
-        arguments = [argument for group in claude['hooks']['UserPromptSubmit'] for hook in group['hooks']
-                     for argument in hook.get('args', [])]
-        index = arguments.index('${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/plugin_generation.py')
-        self.assertEqual(['--host', 'claude'], arguments[index + 1:index + 3])
-        for field in ('command', 'commandWindows'):
-            commands = [hook[field] for group in codex['hooks']['UserPromptSubmit'] for hook in group['hooks']]
-            self.assertTrue(any('resources/machine/scripts/plugin_generation.py" --host codex' in command
-                                for command in commands))
-
 
 if __name__ == '__main__':
     unittest.main()

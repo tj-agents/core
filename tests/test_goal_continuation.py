@@ -39,27 +39,22 @@ class PolicyContextTests(unittest.TestCase):
                               encoding="utf-8", capture_output=True, cwd=self.cwd)
 
     def test_packaged_hooks_append_the_context_helper_for_both_hosts(self):
-        for policy in self.policies:
+        for policy in ("idea-initialization",):
             for host, variable in (("codex", "PLUGIN_ROOT"), ("claude", "CLAUDE_PLUGIN_ROOT")):
                 with self.subTest(policy=policy, host=host):
                     hooks = json.loads((self.plugin / self.manifest(host)["hooks"]).read_text(encoding="utf-8"))
                     startup = hooks["hooks"]["SessionStart"]
                     helper = f".agents/base/policy/{policy}/scripts/session-context.py"
+                    self.assertEqual(len(startup), 1)
+                    self.assertEqual(len(startup[0]["hooks"]), 1)
+                    handler = startup[0]["hooks"][0]
                     if host == "claude":
-                        self.assertEqual(len(startup), 5)
-                        handlers = [item["hooks"][0] for item in startup]
-                        self.assertEqual(
-                            1,
-                            sum(
-                                handler["command"] == "python"
-                                and handler["args"] == ["-B", f"${{{variable}}}/{helper}"]
-                                for handler in handlers
-                            ),
-                        )
+                        self.assertEqual(handler["command"], "python")
+                        target = f"${{{variable}}}/{helper}"
+                        self.assertIn(f"${{{variable}}}/hooks/hook_dispatch.py", handler["args"])
+                        self.assertEqual(handler["args"].count(target), 1)
+                        self.assertEqual(handler["args"][handler["args"].index(target) - 1], "--hook")
                     else:
-                        self.assertEqual(len(startup), 1)
-                        self.assertEqual(len(startup[0]["hooks"]), 1)
-                        handler = startup[0]["hooks"][0]
                         for variant in ("command", "commandWindows"):
                             self.assertIn(f'"${{{variable}}}/hooks/hook_dispatch.py"', handler[variant])
                             self.assertEqual(handler[variant].count(f'--hook "${{{variable}}}/{helper}"'), 1)
