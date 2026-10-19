@@ -528,20 +528,25 @@ class RollingPluginsTests(unittest.TestCase):
         root = ROLLING.VerifiedRoot('base@core', self.root / 'root', 'a' * 40, core)
         prepared = ROLLING.Prepared('claude', (), (root,), self.root / 'catalog', {},
                                     source_revisions=((core, 'a' * 40),), plugins_root=plugins)
-        record = ROLLING.plugin_generation.generations_path(plugins, 'claude')
+        record = ROLLING.generation_record.generations_path(plugins, 'claude')
 
-        def verify(main):
-            with mock.patch.object(ROLLING, '_selection_state', return_value=([], set())),                     mock.patch.object(ROLLING, '_cache_root', return_value=self.root / 'cache'),                     mock.patch.object(ROLLING, '_fetch_main', return_value=(self.root, main)):
+        def verify(main, linked=False):
+            refuse = ROLLING.RollingPluginError('linked') if linked else None
+            with mock.patch.object(ROLLING, '_selection_state', return_value=([], set())), \
+                    mock.patch.object(ROLLING, '_cache_root', return_value=self.root / 'cache'), \
+                    mock.patch.object(ROLLING, '_fetch_main', return_value=(self.root, main)), \
+                    mock.patch.object(ROLLING, '_unlinked_ancestors', side_effect=refuse):
                 ROLLING.verify_final(prepared, 'claude', self.root, self.root, {})
 
         with self.assertRaisesRegex(ROLLING.RollingPluginError, 'main advanced'):
             verify('b' * 40)
+        verify('a' * 40, linked=True)
         self.assertFalse(record.exists())
 
         verify('a' * 40)
 
         self.assertEqual([(core, 'a' * 40)], [(entry['repository'], entry['revision'])
-                                              for entry in ROLLING.plugin_generation.read_generations(record)])
+                                              for entry in ROLLING.generation_record.read_generations(record)])
 
     def test_claude_setting_sources_excludes_unselected_layers(self):
         config = self.root / 'profile'
