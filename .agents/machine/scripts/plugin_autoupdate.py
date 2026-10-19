@@ -1,0 +1,207 @@
+#!/usr/bin/env python3
+"""Refresh Codex plugin marketplaces only when their source revision changed (Python 3.11+)."""
+
+from __future__ import annotations
+
+import argparse
+from concurrent.futures import ThreadPoolExecutor
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+GIT_TIMEOUT_SECONDS = 30
+CLI_TIMEOUT_SECONDS = 300
+LOCK_STALE_SECONDS = 3600
+SCRIPT_NAME = "plugin_autoupdate.py"
+
+
+def state_directory() -> Path:
+    return Path(os.environ.get("AGENT_STATE_DIRECTORY") or Path.home() / ".agents-state")
+
+
+def codex_home() -> Path:
+    return Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+
+
+def claude_home() -> Path:
+    return Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
+
+
+def read_json(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def write_json(path: Path, value: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+            json.dump(value, stream, indent=2, ensure_ascii=False)
+            stream.write("\n")
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def codex_targets(config: dict) -> dict[str, dict]:
+    marketplaces = config.get("marketplaces")
+    plugins = config.get("plugins")
+    if not isinstance(marketplaces, dict) or not isinstance(plugins, dict):
+        return {}
+    targets: dict[str, dict] = {}
+    for identity, settings in sorted(plugins.items()):
+        if not isinstance(settings, dict) or settings.get("enabled") is not True or "@" not in identity:
+            continue
+        marketplace = identity.rsplit("@", 1)[1]
+        source = marketplaces.get(marketplace)
+        if (not isinstance(source, dict) or source.get("source_type") != "git"
+                or not isinstance(source.get("source"), str) or not source["source"]):
+            continue
+        target = targets.setdefault(marketplace, {"source": source["source"], "ref": source.get("ref"),
+                                                  "plugins": []})
+        target["plugins"].append(identity)
+    return targets
+
+
+def remote_revision(source: str, ref: object = None) -> str | None:
+    reference = ref if isinstance(ref, str) and ref else "HEAD"
+    try:
+        result = subprocess.run(["git", "ls-remote", source, reference], capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT_SECONDS, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode:
+        return None
+    for line in result.stdout.splitlines():
+        revision = line.split("\t", 1)[0].strip()
+        if len(revision) == 40:
+            return revision
+    return None
+
+
+def run_cli(command: list[str]) -> bool:
+    try:
+        result = subprocess.run(command, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", timeout=CLI_TIMEOUT_SECONDS, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, revision=remote_revision,
+                  run=run_cli) -> dict[str, str]:
+    outcomes: dict[str, str] = {}
+    names = sorted(targets)
+    with ThreadPoolExecutor(max_workers=max(1, len(names))) as pool:
+        heads = dict(zip(names, pool.map(lambda name: revision(targets[name]["source"],
+                                                               targets[name].get("ref")), names)))
+    for marketplace in names:
+        target = targets[marketplace]
+        key = "codex:" + marketplace
+        head = heads[marketplace]
+        if head is None:
+            outcomes[marketplace] = "unreachable"
+            continue
+        if recorded.get(key) == head:
+            outcomes[marketplace] = "current"
+            continue
+        refreshed = run([executable, "plugin", "marketplace", "upgrade", marketplace]) and all(
+            run([executable, "plugin", "add", plugin]) for plugin in target["plugins"])
+        if refreshed:
+            recorded[key] = head
+            outcomes[marketplace] = "updated"
+        else:
+            outcomes[marketplace] = "failed"
+    return outcomes
+
+
+def load_codex_config() -> dict:
+    import tomllib
+
+    try:
+        with (codex_home() / "config.toml").open("rb") as stream:
+            return tomllib.load(stream)
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+
+
+def packaged_copies() -> list[Path]:
+    relative = ("resources", "machine", "scripts", SCRIPT_NAME)
+    patterns = [
+        (codex_home() / "plugins" / "cache", ("*", "machine", "local", *relative)),
+        (claude_home() / "plugins" / "cache", ("*", "machine", "*", *relative)),
+    ]
+    found = []
+    for root, parts in patterns:
+        if root.is_dir():
+            found.extend(path for path in root.glob("/".join(parts)) if path.is_file())
+    return found
+
+
+def self_update(current: Path) -> bool:
+    candidates = [path for path in packaged_copies() if path.resolve() != current.resolve()]
+    if not candidates:
+        return False
+    newest = max(candidates, key=lambda path: path.stat().st_mtime)
+    try:
+        if newest.read_bytes() == current.read_bytes():
+            return False
+        shutil.copyfile(newest, current.with_name(current.name + ".next"))
+        os.replace(current.with_name(current.name + ".next"), current)
+    except OSError:
+        return False
+    return True
+
+
+def acquire_lock(path: Path) -> bool:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if time.time() - path.stat().st_mtime > LOCK_STALE_SECONDS:
+            path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    try:
+        os.close(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+    except FileExistsError:
+        return False
+    return True
+
+
+def main(argv: list[str] | None = None) -> int:
+    if sys.version_info < (3, 11):
+        print("plugin_autoupdate requires Python 3.11 or newer", file=sys.stderr)
+        return 2
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--no-self-update", action="store_true")
+    arguments = parser.parse_args(argv)
+    directory = state_directory()
+    lock = directory / "plugin-autoupdate.lock"
+    if not acquire_lock(lock):
+        return 0
+    try:
+        state_file = directory / "plugin-autoupdate.json"
+        state = read_json(state_file)
+        recorded = state.get("revisions") if isinstance(state.get("revisions"), dict) else {}
+        executable = shutil.which("codex")
+        targets = codex_targets(load_codex_config()) if executable else {}
+        outcomes = refresh_codex(executable, targets, recorded) if executable else {}
+        write_json(state_file, {"revisions": recorded, "last_run": time.time(), "outcomes": outcomes})
+        if not arguments.no_self_update:
+            self_update(Path(__file__))
+    finally:
+        lock.unlink(missing_ok=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
