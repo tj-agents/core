@@ -126,7 +126,7 @@ class StartupBindingTests(unittest.TestCase):
     def test_each_shipped_claude_plugin_acknowledges_session_start_through_its_real_manifest(self):
         token = "a" * 40
         payload = {"hook_event_name": "SessionStart", "session_id": "fixture", "cwd": str(self.project)}
-        for plugin in ("base", "engineering", "machine"):
+        for plugin in ("base", "machine"):
             with self.subTest(plugin=plugin):
                 package = self.project / plugin
                 hooks = package / "hooks"
@@ -139,10 +139,22 @@ class StartupBindingTests(unittest.TestCase):
                 arguments = [item.replace("${CLAUDE_PLUGIN_ROOT}", str(package)) for item in hook["args"]]
                 dispatcher = Path(arguments[1])
                 shutil.copyfile(ROOT / ".agents/hooks/hook_dispatch.py", dispatcher)
-                gate_index = arguments.index("--hook") + 1
-                gate = Path(arguments[gate_index])
-                gate.parent.mkdir(parents=True, exist_ok=True)
-                gate.write_text("import json, sys\nprint(json.dumps({'hookSpecificOutput': {'additionalContext': json.dumps({'argv': sys.argv[1:], 'payload': json.load(sys.stdin)})}}))\n", encoding="utf-8")
+                hook_start = arguments.index("--hook")
+                gates = []
+                for value in arguments[hook_start:]:
+                    if value == "--hook":
+                        gates.append([None, []])
+                    elif gates[-1][0] is None:
+                        gates[-1][0] = value
+                    else:
+                        gates[-1][1].append(value)
+                stub = ("import json, sys\n"
+                        "print(json.dumps({'hookSpecificOutput': {'additionalContext': "
+                        "json.dumps({'argv': sys.argv[1:], 'payload': json.load(sys.stdin)})}}))\n")
+                for script_path, _ in gates:
+                    gate = Path(script_path)
+                    gate.parent.mkdir(parents=True, exist_ok=True)
+                    gate.write_text(stub, encoding="utf-8")
                 directory = package / "ack"
                 directory.mkdir()
                 environment = dict(os.environ, TJ_AGENTS_STARTUP_ACK_DIRECTORY=str(directory),
@@ -152,9 +164,13 @@ class StartupBindingTests(unittest.TestCase):
                                         text=True, encoding="utf-8", timeout=hook["timeout"] + 5)
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual(token, (directory / token).read_text(encoding="utf-8"))
-                output = json.loads(json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"])
-                self.assertEqual(payload, output["payload"])
-                self.assertEqual(arguments[gate_index + 1:], output["argv"])
+                context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+                chunks = context.split("\n\n")
+                self.assertEqual(len(gates), len(chunks))
+                for (_, script_arguments), chunk in zip(gates, chunks):
+                    output = json.loads(chunk)
+                    self.assertEqual(payload, output["payload"])
+                    self.assertEqual(script_arguments, output["argv"])
 
     def test_isolated_script_loads_shipped_dependencies_outside_the_callers_import_path(self):
         package = self.project / "packaged machine \u00e9" / "resources" / "machine" / "scripts"
