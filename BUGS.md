@@ -197,3 +197,18 @@ registrations and running package generations converged at the entry point users
 repair its cause, and verify an actual fresh Windows/Linux session and installed generations.
 **Resume condition:** a fresh normal launcher completes current publisher/package convergence and
 loads the mandatory rule; version output or a continued session after refresh failure is insufficient.
+
+## B014 — Project-selection guidance omitted exact Codex repository trust
+
+Kind: bug. Observed: 2026-10-19. Priority: P2. State: resolved.
+Source owner: machine:plugin-selection guidance; no launcher implementation change.
+The guide claimed a fresh clone installed its declared plugins without machine settings. Actual normal
+Concertable session01a15605 loaded its mandatory native policy but lacked personal in the skill catalog.
+Native config/read explicitly disabled the project layer until its exact Git root was trusted, despite
+existing trusted parent folders; native plugin inventory independently lacked the personal selection.
+Correction: the guide distinguishes source settings from native admission, installation and session
+loading, states the exact-root trust prerequisite and limits installation changes to existing authority.
+Verification: authorized exact-project trust for personal and Concertable source roots through the native
+configuration API preserved every unrelated setting and existing project entry. Fresh config/read then
+reported enabled personal selection and no disabled project layer for both roots. Declaration checks
+alone are expressly insufficient; actual host/catalog acceptance remains tracked in the personal goal.
