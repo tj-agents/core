@@ -77,3 +77,15 @@ Current next action: freeze/review this diagnostics candidate, run required remo
   ]
 }
 ```
+
+## Deadline starvation reproduced and corrected
+
+A real-child regression reproduces a healthy native startup being terminated when plugin preparation leaves only 0.01 seconds on its deadline. The child writes the exact acknowledgement after 0.15 seconds. Before the correction it fails with the same missing-SessionStart error as the original launches. The correction gives native acknowledgement its own existing 20-second budget after launch; preparation remains bounded at 300 seconds and outer handoff observation remains 480 seconds. No hook or trust check is bypassed and no configured timeout value is increased.
+
+Focused verification after the correction: 221 tests in 14.396 seconds, 24 platform/environment skips, all others pass. Evidence: .git/agent-workflow/runs/handoff-startup-reliability/artifacts/deadline-fix-tests.log. Native normal-tools diagnostic session 00b29f92-3654-48b3-ac3f-a802d6eda8e1 acknowledged 7.44 seconds after launch and its native transcript contains the actual response NORMAL_TOOLS_DIAGNOSTIC. Its exact child was cleaned. This establishes a concrete failure mechanism and a successful normal-tools path; original receipts lack phase timing, so attribution of both historical failures remains unproven.
+
+The first frozen review completed with one verified Codex phase finding. Its correction reports the true runtime/acknowledgement phase and passes the focused suite. Native review evidence is retained privately. The configured workflow reviewer model was unavailable; parent fallback completed that bounded frozen check. Incremental review must cover both the phase correction and deadline correction against 828a85cc4a6ea4c46a5f19a12c07c935819101f9.
+
+The prior incremental preparation was cancelled but its Python child survived the shell cancellation; its exact command, PID and creation time were verified before stopping only that child. The following preparation failed because the cancelled helper had left a bundle without an authoritative descriptor. No native task owner was duplicated. Do not confuse shell cancellation with verified child termination. Current next action: finish incremental review, remote validation and a single verified real goal pickup. Broad capability/hook cleanup remains deferred.
+
+PR: not opened
