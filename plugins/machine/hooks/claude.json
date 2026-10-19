@@ -69,7 +69,11 @@
               "claude",
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-              "hook"
+              "hook",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/plugin_generation.py",
+              "--host",
+              "claude"
             ]
           }
         ]

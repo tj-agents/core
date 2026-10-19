@@ -24,4 +24,5 @@ only cached copies that a launch bypassing the tj-agents launcher would load.
 
 Pass `--host claude` or `--host codex` for one host, and `--verify-only` to report without changing
 anything. A refresh takes a few minutes. Afterwards, run `/reload-plugins` in each open Claude session;
-new Codex sessions load the refreshed packages.
+new Codex sessions load the refreshed packages. Each open session reports a superseded generation at its next
+prompt until it adopts the new one.
