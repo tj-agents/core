@@ -361,7 +361,7 @@ Current ownership verification - 2026-10-13: PR212 and PR128 are merged and cont
 ## M024 — Auto merge invoked before exact-head CI was terminal
 
 Kind: mistake. Observed: 2026-10-19. Priority: P2; no failed runtime behavior is observed,
-but the merge crossed the required verification boundary. State: in-progress.
+but the merge crossed the required verification boundary. State: resolved.
 Source owner: Codex personal-projects/standards delivery and Core engineering merge guidance.
 Evidence: Core PR307 head 544cd03911a986ededb06971eb7cb9ad43ed48f9 merged at
 568e6c08f5d6224d330c30c9d5827b0270e35009 while verify-windows in CI 39175205937
@@ -383,4 +383,7 @@ fd4a430d1766cbcbbc3ca4875c0e97180afcf18a. Correction source payload/freshness/do
 and ordinary docs fallback review pass. Correction CI 39176405550 passed Windows/Linux;
 PR308 merged at 1c87146b1e56aa93178c78f6bbbfa57d1c63b036 after fresh terminal-green
 checks. Causal merged-main verification and generated-package confirmation remain owned.
-Next action: verify that causal main run and generation, then retain final resolution evidence.
+Final verification: causal merged-main CI 39177848564 passed Windows/Linux. The generated
+engineering package on current main contains the corrected --auto guidance. The original
+exact-head/main checks and the subsequent explicit terminal-green React merge also passed.
+Next action: none for this incident; retain the history and its pre-merge failure chronology.
