@@ -147,9 +147,16 @@ class HarnessPermissionValidationTests(unittest.TestCase):
             with self.subTest(command=command):
                 harness_permissions.validate_requires(self.requires(command), "test")
 
-    def test_script_arguments_require_a_terminal_matcher_after_a_literal_prefix(self):
+    def test_exact_script_rules_preserve_fixed_arguments(self):
         for command in (
             "Bash(python -B ${PLUGIN_ROOT}/script.py --clear)",
+            'Bash(python -B "${PLUGIN_ROOT}/policy runner.py" --name café)',
+        ):
+            with self.subTest(command=command):
+                harness_permissions.validate_requires(self.requires(command), "test")
+
+    def test_wildcard_arguments_require_a_terminal_matcher_after_a_literal_prefix(self):
+        for command in (
             "Bash(python -B ${PLUGIN_ROOT}/script.py --clear*)",
             "Bash(python -B ${PLUGIN_ROOT}/script.py --clear:* more)",
             "Bash(python* -B ${PLUGIN_ROOT}/script.py --clear:*)",
