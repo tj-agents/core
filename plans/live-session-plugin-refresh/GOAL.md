@@ -210,3 +210,10 @@ state untouched. Native Claude acceptance was rerun on this shape and still pass
 
 Pass 6 follow-up: each session compares only with its own host's verified record, so it is never told to
 adopt a revision only the other host verified, and one host's bad record cannot disable the other's gate.
+
+Pass 7 follow-up: the per-session notice deduplication state kept producing edge cases against missing,
+busy and corrupt records and rollbacks, so it was removed. Following this repository's precedent for the
+superseded-session notice (stated every time, unthrottled), the gate states a stale binding at every
+prompt until adoption. A busy record skips history for that prompt; a corrupt record reads as empty and
+is repaired by the next verified launch. A non-rolling Claude root is reported only when no registry
+record names it at all. Native Claude acceptance was rerun on this shape.
