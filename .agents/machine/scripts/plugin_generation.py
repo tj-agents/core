@@ -19,18 +19,18 @@ import sys
 import time
 from typing import Iterable, Mapping
 
-HERE = Path(__file__).resolve().parent
-if str(HERE) not in sys.path:
-    sys.path.insert(0, str(HERE))
-
-from rolling_plugins import SHA, generations_path, read_generations  # noqa: E402
-
+SHA = re.compile(r"^[0-9a-f]{40}$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+SESSION_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+GENERATIONS_FILE = "generations.json"
+GENERATION_HISTORY = 64
 MARKER = ".tj-agents-rolling.json"
 RUNTIME_MARKETPLACE = "tj-run-"
 RECEIPT_ENV = "TJ_AGENTS_CODEX_RUNTIME_RECEIPT"
 RECEIPT_SHA256_ENV = "TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256"
+CODEX_ROOT_VARIABLES = ("PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
-SESSION_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+STATE_RETENTION_SECONDS = 14 * 24 * 60 * 60
 HOSTS = ("claude", "codex")
 
 
@@ -41,6 +41,54 @@ class Binding:
     revision: str | None
     root: str
     problem: str | None = None
+
+
+def normalized(path: str | Path) -> str:
+    return os.path.normcase(str(Path(path).resolve()))
+
+
+def read_json(path: Path) -> object:
+    try:
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return None
+
+
+def write_json(path: Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def generations_path(plugins: Path, host: str) -> Path:
+    return plugins / "cache" / ".tj-agents-rolling" / host / GENERATIONS_FILE
+
+
+def read_generations(path: Path) -> list[dict[str, object]]:
+    document = read_json(path)
+    entries = document.get("verified") if isinstance(document, dict) else None
+    return [entry for entry in entries or () if isinstance(entry, dict)
+            and isinstance(entry.get("repository"), str) and isinstance(entry.get("revision"), str)
+            and SHA.fullmatch(entry["revision"]) and isinstance(entry.get("verified_at"), (int, float))]
+
+
+def record_generations(plugins: Path, host: str, revisions: Iterable[tuple[str, str]],
+                       now: float | None = None) -> None:
+    """Record each repository revision just verified as its publisher's main and installed for new sessions."""
+    path = generations_path(plugins, host)
+    current = {(repository, revision) for repository, revision in revisions if SHA.fullmatch(revision)}
+    entries = [entry for entry in read_generations(path)
+               if (entry["repository"], entry["revision"]) not in current]
+    moment = time.time() if now is None else now
+    entries.extend({"repository": repository, "revision": revision, "verified_at": moment}
+                   for repository, revision in sorted(current))
+    kept = []
+    for repository in sorted({entry["repository"] for entry in entries}):
+        members = sorted((entry for entry in entries if entry["repository"] == repository),
+                         key=lambda entry: entry["verified_at"])
+        kept.extend(members[-GENERATION_HISTORY:])
+    write_json(path, {"schema_version": 1, "verified": kept})
 
 
 def state_directory(environ: Mapping[str, str]) -> Path:
@@ -60,18 +108,14 @@ def session_path(host: str, session_id: str, environ: Mapping[str, str]) -> Path
     return state_directory(environ) / "plugin-generation" / f"{host}-{session_id}.json"
 
 
-def read_json(path: Path) -> object:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-
-
-def write_json(path: Path, value: object) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(json.dumps(value, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+def write_session(path: Path, value: Mapping[str, object], now: float) -> None:
+    write_json(path, value)
+    for candidate in path.parent.glob("*.json"):
+        try:
+            if candidate != path and now - candidate.stat().st_mtime > STATE_RETENTION_SECONDS:
+                candidate.unlink()
+        except OSError:
+            continue
 
 
 def ownership(root: Path) -> Mapping[str, object] | None:
@@ -80,29 +124,6 @@ def ownership(root: Path) -> Mapping[str, object] | None:
             or not isinstance(value.get("repository"), str):
         return None
     return value
-
-
-def claude_binding(root: Path) -> Binding | None:
-    owner = ownership(root)
-    if owner is None:
-        return None
-    revision = root.name if SHA.fullmatch(root.name) else None
-    problem = None if revision else "its install directory does not name a verified revision"
-    return Binding(owner["identity"], owner["repository"], revision, str(root), problem)
-
-
-def codex_binding(root: Path) -> Binding | None:
-    owner = ownership(root)
-    if owner is None:
-        return None
-    marketplace = root.parent.parent.name
-    if not marketplace.startswith(RUNTIME_MARKETPLACE):
-        return Binding(owner["identity"], owner["repository"], None, str(root),
-                       "it was not launched through the tj-agents launcher, so its shared install can change under it")
-    revision = owner.get("revision")
-    if not isinstance(revision, str) or not SHA.fullmatch(revision):
-        return Binding(owner["identity"], owner["repository"], None, str(root), "its binding marker names no revision")
-    return Binding(owner["identity"], owner["repository"], revision, str(root))
 
 
 def applies(record: Mapping[str, object], project: Path | None) -> bool:
@@ -119,65 +140,124 @@ def applies(record: Mapping[str, object], project: Path | None) -> bool:
     return True
 
 
-def claude_registry_roots(environ: Mapping[str, str], project: Path | None) -> list[str]:
+def claude_records(environ: Mapping[str, str], project: Path | None) -> list[Mapping[str, object]]:
     registry = read_json(plugins_root("claude", environ) / "installed_plugins.json")
     plugins = registry.get("plugins") if isinstance(registry, dict) else None
-    roots = []
+    chosen = []
     for records in plugins.values() if isinstance(plugins, dict) else ():
+        if not isinstance(records, list):
+            continue
         applicable = [record for record in records if isinstance(record, dict)
-                      and isinstance(record.get("installPath"), str) and applies(record, project)]             if isinstance(records, list) else []
-        project_scoped = [record for record in applicable if record.get("scope") in {"project", "local"}]
-        chosen = (project_scoped or applicable)[-1:]
-        roots.extend(record["installPath"] for record in chosen)
-    return roots
+                      and isinstance(record.get("installPath"), str) and applies(record, project)]
+        scoped = [record for record in applicable if record.get("scope") in {"project", "local"}]
+        chosen.extend((scoped or applicable)[-1:])
+    return chosen
 
 
 def claude_session_roots(environ: Mapping[str, str], project: Path | None) -> list[str]:
     own = environ.get("CLAUDE_PLUGIN_ROOT")
-    roots = [root for root in claude_registry_roots(environ, project)
-             if not own or Path(root).parent != Path(own).parent]
-    if own:
-        roots.append(own)
-    return sorted(set(roots))
+    if not own:
+        return []
+    records = claude_records(environ, project)
+    launch = next((record.get("lastUpdated") for record in records
+                   if normalized(record["installPath"]) == normalized(own)), None)
+    roots = {own}
+    if launch is not None:
+        roots.update(record["installPath"] for record in records if record.get("lastUpdated") == launch
+                     and normalized(Path(record["installPath"]).parent) != normalized(Path(own).parent))
+    return sorted(roots)
 
 
-def record_claude_session(session_id: str, environ: Mapping[str, str], project: Path | None) -> None:
-    path = session_path("claude", session_id, environ)
-    stored = read_json(path)
-    stored = stored if isinstance(stored, dict) else {}
-    write_json(path, {**stored, "roots": claude_session_roots(environ, project)})
+def claude_binding(root: Path, records: Iterable[Mapping[str, object]]) -> Binding | None:
+    owner = ownership(root)
+    if owner is None:
+        replacement = next((record["installPath"] for record in records
+                            if normalized(Path(record["installPath"]).parent) == normalized(root.parent)
+                            and normalized(record["installPath"]) != normalized(root)), None)
+        if replacement is None:
+            return None
+        return Binding(f"{root.parent.name}", str(root.parent), None, str(root),
+                       f"this process loaded {root.name}, but {Path(replacement).name} is installed")
+    revision = root.name if SHA.fullmatch(root.name) else None
+    problem = None if revision else "its install directory does not name a verified revision"
+    return Binding(owner["identity"], owner["repository"], revision, str(root), problem)
 
 
-def session_bindings(host: str, session_id: str, environ: Mapping[str, str],
-                     project: Path | None = None) -> tuple[list[Binding], list[str]]:
+def codex_binding(root: Path) -> Binding | None:
+    owner = ownership(root)
+    if owner is None:
+        return None
+    if not root.parent.parent.name.startswith(RUNTIME_MARKETPLACE):
+        return Binding(owner["identity"], owner["repository"], None, str(root),
+                       "it was not launched through the tj-agents launcher, so its shared install can change under it")
+    revision = owner.get("revision")
+    if not isinstance(revision, str) or not SHA.fullmatch(revision):
+        return Binding(owner["identity"], owner["repository"], None, str(root), "its binding marker names no revision")
+    return Binding(owner["identity"], owner["repository"], revision, str(root))
+
+
+def receipt_roots(environ: Mapping[str, str]) -> list[Path]:
+    digest = environ.get(RECEIPT_SHA256_ENV)
+    if not digest or not SHA256.fullmatch(digest):
+        raise ValueError("its Codex runtime receipt digest is missing")
+    receipt = Path(environ[RECEIPT_ENV]).resolve(strict=True)
+    content = receipt.read_bytes()
+    if hashlib.sha256(content).hexdigest() != digest:
+        raise ValueError("its Codex runtime receipt failed its integrity check")
+    value = json.loads(content)
+    if not isinstance(value, dict) or value.get("schema_version") != 1:
+        raise ValueError("its Codex runtime receipt has an unsupported schema")
+    home = Path(environ.get("CODEX_HOME") or Path.home() / ".codex").resolve()
+    if not isinstance(value.get("codex_home"), str) or Path(value["codex_home"]).resolve() != home:
+        raise ValueError("its Codex runtime receipt names another Codex home")
+    cache = (home / "plugins" / "cache").resolve()
+    receipt.parent.relative_to(cache / ".tj-agents-rolling" / "codex" / "sessions")
+    roots = value.get("roots")
+    unmanaged = value.get("unmanaged_roots", [])
+    if not isinstance(roots, list) or not roots or not isinstance(unmanaged, list) \
+            or not all(isinstance(item, str) for item in [*roots, *unmanaged]):
+        raise ValueError("its Codex runtime receipt names no valid plugin roots")
+    resolved = []
+    for item, managed in [*((item, True) for item in roots), *((item, False) for item in unmanaged)]:
+        parts = Path(item).resolve().relative_to(cache).parts
+        if len(parts) != 3 or (managed and (not parts[0].startswith(RUNTIME_MARKETPLACE) or parts[2] != "local")) \
+                or (not managed and parts[0].startswith(".")):
+            raise ValueError("its Codex runtime receipt names a root outside the runtime cache layout")
+        resolved.append(cache.joinpath(*parts))
+    return resolved
+
+
+def session_bindings(host: str, session_id: str, environ: Mapping[str, str], project: Path | None,
+                     now: float) -> tuple[list[Binding], list[str]]:
     if host == "claude":
-        stored = read_json(session_path("claude", session_id, environ))
-        roots = stored.get("roots") if isinstance(stored, dict) else None
         own = environ.get("CLAUDE_PLUGIN_ROOT")
-        if isinstance(roots, list) and own and Path(own) not in {Path(root) for root in roots if isinstance(root, str)}:
-            record_claude_session(session_id, environ, project)
+        if not own:
+            return [], []
+        path = session_path("claude", session_id, environ)
+        stored = read_json(path)
+        stored = stored if isinstance(stored, dict) else {}
+        roots = stored.get("roots") if isinstance(stored.get("roots"), list) else None
+        if roots is None or normalized(own) not in {normalized(root) for root in roots if isinstance(root, str)}:
             roots = claude_session_roots(environ, project)
-        if not isinstance(roots, list):
-            roots = [own] if own else []
-        bindings = [claude_binding(Path(root)) for root in roots if isinstance(root, str)]
+            try:
+                write_session(path, {**stored, "roots": roots}, now)
+            except OSError:
+                pass
+        records = claude_records(environ, project)
+        bindings = [claude_binding(Path(root), records) for root in roots if isinstance(root, str)]
         return [binding for binding in bindings if binding is not None], []
-    receipt = environ.get(RECEIPT_ENV)
-    if receipt:
+    if environ.get(RECEIPT_ENV) or environ.get(RECEIPT_SHA256_ENV):
         try:
-            encoded = Path(receipt).read_bytes()
-        except OSError as error:
-            return [], [f"its Codex runtime receipt could not be read ({error})"]
-        if hashlib.sha256(encoded).hexdigest() != environ.get(RECEIPT_SHA256_ENV):
-            return [], ["its Codex runtime receipt failed its integrity check"]
-        try:
-            roots = json.loads(encoded.decode("utf-8")).get("roots")
-        except (ValueError, AttributeError):
-            roots = None
-        if not isinstance(roots, list):
-            return [], ["its Codex runtime receipt names no plugin roots"]
+            roots = receipt_roots(environ)
+        except (KeyError, OSError, ValueError, TypeError) as error:
+            reason = str(error) if str(error).startswith("its ") else f"its Codex runtime receipt is invalid ({error})"
+            return [], [reason]
     else:
-        roots = [environ["PLUGIN_ROOT"]] if environ.get("PLUGIN_ROOT") else []
-    bindings = [codex_binding(Path(root)) for root in roots if isinstance(root, str)]
+        root = next((environ[name] for name in CODEX_ROOT_VARIABLES if environ.get(name)), None)
+        if root is None:
+            return [], ["neither a Codex runtime receipt nor a plugin root is available"]
+        roots = [Path(root)]
+    bindings = [codex_binding(root) for root in roots]
     return [binding for binding in bindings if binding is not None], []
 
 
@@ -187,7 +267,7 @@ def installed_generations(environ: Mapping[str, str]) -> dict[str, list[dict[str
         for entry in read_generations(generations_path(plugins_root(host, environ), host)):
             by_repository.setdefault(entry["repository"], []).append({**entry, "host": host})
     for entries in by_repository.values():
-        entries.sort(key=lambda entry: entry["installed_at"])
+        entries.sort(key=lambda entry: entry["verified_at"])
     return by_repository
 
 
@@ -225,7 +305,8 @@ def findings(bindings: Iterable[Binding], installed: Mapping[str, list[dict[str,
                 continue
             if revision in known:
                 lines.append(f"{name}: this session runs {short(revision)}, superseded by {short(newest['revision'])}, "
-                             f"installed {stamp(newest['installed_at'])} for new {newest['host']} sessions.")
+                             f"verified as published main and installed for new {newest['host']} sessions "
+                             f"{stamp(newest['verified_at'])}.")
             else:
                 lines.append(f"{name}: this session runs {short(revision)}, which no verified install recorded; "
                              f"the newest verified install is {short(newest['revision'])}.")
@@ -246,25 +327,27 @@ def adoption(host: str, session_id: str) -> str:
             "unchanged.")
 
 
-def check(host: str, session_id: str, environ: Mapping[str, str],
-          project: Path | None = None) -> dict[str, object] | None:
-    bindings, problems = session_bindings(host, session_id, environ, project)
+def check(host: str, session_id: str, environ: Mapping[str, str], project: Path | None = None,
+          now: float | None = None) -> dict[str, object] | None:
+    moment = time.time() if now is None else now
+    bindings, problems = session_bindings(host, session_id, environ, project, moment)
+    if not bindings and not problems:
+        return None
     lines = [f"this session's generation cannot be verified because {problem}." for problem in problems]
     lines.extend(findings(bindings, installed_generations(environ)))
     if not lines:
         return None
     report = "plugin generation: " + " ".join(lines)
-    context = f"{report} {adoption(host, session_id)}"
     output: dict[str, object] = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
-                                                        "additionalContext": context}}
-    state_path = session_path(host, session_id, environ)
-    state = read_json(state_path)
+                                                        "additionalContext": f"{report} {adoption(host, session_id)}"}}
+    path = session_path(host, session_id, environ)
+    state = read_json(path)
     state = state if isinstance(state, dict) else {}
     key = hashlib.sha256(report.encode("utf-8")).hexdigest()
     if state.get("notified") != key:
         output["systemMessage"] = report
         try:
-            write_json(state_path, {**state, "notified": key})
+            write_session(path, {**state, "notified": key}, moment)
         except OSError:
             pass
     return output
@@ -291,15 +374,19 @@ def main(argv: list[str] | None = None, environ: Mapping[str, str] | None = None
         return 0
     cwd = data.get("cwd")
     project = Path(cwd) if isinstance(cwd, str) and cwd else None
+    now = time.time()
     if arguments.event == "session-start":
         if arguments.host == "claude":
             try:
-                record_claude_session(session_id, environ, project)
+                path = session_path("claude", session_id, environ)
+                stored = read_json(path)
+                write_session(path, {**(stored if isinstance(stored, dict) else {}),
+                                     "roots": claude_session_roots(environ, project)}, now)
             except OSError:
                 pass
         return 0
     try:
-        output = check(arguments.host, session_id, environ, project)
+        output = check(arguments.host, session_id, environ, project, now)
     except Exception as error:  # noqa: BLE001 - an unverifiable session must say so, never pass silently
         output = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext":
                   f"plugin generation: this session's generation could not be checked ({error})."}}
