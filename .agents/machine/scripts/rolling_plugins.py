@@ -22,6 +22,12 @@ import tarfile
 import signal
 from typing import Iterable, Mapping
 
+HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+import plugin_generation  # noqa: E402
+
 
 GIT_TIMEOUT_SECONDS = 90
 OPERATION_TIMEOUT_SECONDS = 300
@@ -29,8 +35,6 @@ LOCK_WAIT_SECONDS = 180
 LOCK_STALE_SECONDS = 900
 SHA = re.compile(r"^[0-9a-f]{40}$")
 GENERATED_MARKER = ".tj-agents-generated"
-GENERATIONS_FILE = "generations.json"
-GENERATION_HISTORY = 64
 
 
 class RollingPluginError(RuntimeError):
@@ -1449,42 +1453,8 @@ def materialize_native(prepared: Prepared, host: str, target: Path, project: Pat
                 raise
         else:
             raise RollingPluginError(f"unsupported host: {host}")
-    try:
-        record_generations(plugins, host, roots)
-    except (OSError, RollingPluginError):
-        pass
     return Prepared(prepared.host, prepared.launch_args, tuple(roots), prepared.catalog_root, prepared.environment,
                     prepared.selections, prepared.source_revisions, prepared.plugins_root, deadline, prepared.disabled)
-
-
-def generations_path(plugins: Path, host: str) -> Path:
-    return plugins / "cache" / ".tj-agents-rolling" / host / GENERATIONS_FILE
-
-
-def read_generations(path: Path) -> list[dict[str, object]]:
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
-    entries = document.get("installed") if isinstance(document, dict) else None
-    return [entry for entry in entries or () if isinstance(entry, dict)
-            and isinstance(entry.get("repository"), str) and isinstance(entry.get("revision"), str)
-            and SHA.fullmatch(entry["revision"]) and isinstance(entry.get("installed_at"), (int, float))]
-
-
-def record_generations(plugins: Path, host: str, roots: Iterable[VerifiedRoot], now: float | None = None) -> None:
-    path = generations_path(plugins, host)
-    entries = read_generations(path)
-    known = {(entry["repository"], entry["revision"]) for entry in entries}
-    moment = time.time() if now is None else now
-    for repository, revision in sorted({(root.repository, root.revision) for root in roots}):
-        if (repository, revision) not in known and SHA.fullmatch(revision):
-            entries.append({"repository": repository, "revision": revision, "installed_at": moment})
-    kept = []
-    for repository in sorted({entry["repository"] for entry in entries}):
-        kept.extend([entry for entry in entries if entry["repository"] == repository][-GENERATION_HISTORY:])
-    path.parent.mkdir(parents=True, exist_ok=True)
-    _write_json(path, {"schema_version": 1, "installed": kept})
 
 
 def hook_trust_arguments(prepared: Prepared) -> tuple[str, ...]:
@@ -1504,6 +1474,11 @@ def verify_final(prepared: Prepared, host: str, target: Path, project: Path, arg
         _clone, revision = _fetch_main(source, cache, prepared.deadline)
         if revision != expected_revision:
             raise RollingPluginError(f"publisher main advanced while materializing {source}")
+    try:
+        plugin_generation.record_generations(prepared.plugins_root or target / "plugins", host,
+                                             ((root.repository, root.revision) for root in prepared.selected_roots))
+    except OSError:
+        pass
 
 
 def terminate_process_tree(process: subprocess.Popen, timeout: float = 5) -> None:
