@@ -227,6 +227,34 @@ class StartupBindingTests(unittest.TestCase):
         self.assertEqual(["materialize", "start", "ack", "exit"], events)
         self.assertEqual([4242], reported)
 
+    def test_slow_preparation_does_not_shorten_native_acknowledgement_budget(self):
+        prepared = self.prepared
+        prepared.deadline = mock.Mock()
+        prepared.deadline.remaining.return_value = 0.01
+        active = mock.MagicMock()
+        active.__enter__.return_value = active
+        active.materialize_native.return_value = prepared
+        child = self.project / "delayed_ack.py"
+        child.write_text(
+            "import os, pathlib, time\n"
+            "time.sleep(0.15)\n"
+            "directory = pathlib.Path(os.environ['TJ_AGENTS_STARTUP_ACK_DIRECTORY'])\n"
+            "token = os.environ['TJ_AGENTS_STARTUP_ACK_TOKEN']\n"
+            "(directory / token).write_text(token, encoding='utf-8')\n"
+            "time.sleep(0.15)\n", encoding="utf-8",
+        )
+        reported = []
+        with mock.patch.object(BINDING, "preflight", return_value=active), \
+                mock.patch.object(BINDING, "native_target_for_shim", return_value="native"), \
+                mock.patch.object(BINDING, "_preflight_arguments", return_value={}), \
+                mock.patch.object(BINDING, "_converge"), \
+                mock.patch.object(BINDING, "command_for_target", return_value=[sys.executable, str(child)]):
+            result = BINDING.run_session("claude", "typed", self.project, ["session"],
+                                         timeout=10, require_session_start=True, on_running=reported.append)
+        self.assertEqual(0, result)
+        self.assertEqual(1, len(reported))
+        active.acknowledge_binding.assert_called_once()
+
     def test_missing_session_start_acknowledgement_preserves_the_failure_when_cleanup_fails(self):
         prepared = self.prepared
 
@@ -255,7 +283,7 @@ class StartupBindingTests(unittest.TestCase):
                 BINDING.StartupBindingError,
                 "did not acknowledge SessionStart.*cleanup also failed: cleanup unavailable",
             ):
-                BINDING.run_session("claude", "typed", self.project, ["session"])
+                BINDING.run_session("claude", "typed", self.project, ["session"], timeout=0)
         terminate.assert_called_once_with(process)
 
     def test_typed_session_without_acknowledgement_keeps_running(self):
@@ -279,7 +307,7 @@ class StartupBindingTests(unittest.TestCase):
         with mock.patch.object(BINDING, "preflight", return_value=Active()),                 mock.patch.object(BINDING, "native_target_for_shim", return_value="native"),                 mock.patch.object(BINDING, "_preflight_arguments", return_value={}),                 mock.patch.object(BINDING, "_converge"),                 mock.patch.object(BINDING, "_remaining", return_value=0),                 mock.patch.object(BINDING, "command_for_target", return_value=["native"]),                 mock.patch.object(BINDING.subprocess, "Popen", return_value=process) as popen,                 mock.patch.object(BINDING, "terminate_process_tree") as terminate,                 mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.project / "config")}, clear=False):
             launched = mock.Mock()
             self.assertEqual(7, BINDING.run_session("claude", "typed", self.project, ["session"],
-                                                    on_launch=launched, keep_unacknowledged_session=True))
+                                                    on_launch=launched, keep_unacknowledged_session=True, timeout=0))
         popen.assert_called_once()
         launched.assert_called_once_with()
         terminate.assert_not_called()
