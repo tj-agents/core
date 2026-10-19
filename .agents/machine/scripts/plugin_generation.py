@@ -83,12 +83,12 @@ def claude_binding(root: Path, environ: Mapping[str, str]) -> Binding | None:
     owner = ownership(root)
     if owner is None:
         loaded, plugin = normalized(root), normalized(root.parent)
-        paths = [normalized(path) for path in claude_install_paths(environ)]
-        replacement = next((path for path in paths if normalized(Path(path).parent) == plugin), None)
-        if loaded in paths or replacement is None:
+        paths = {normalized(path) for path in claude_install_paths(environ)}
+        replacements = sorted({Path(path).name for path in paths if os.path.dirname(path) == plugin})
+        if loaded in paths or not replacements:
             return None
         return Binding(root.parent.name, str(root.parent), None, str(root),
-                       f"this process loaded {root.name}, but {Path(replacement).name} is installed")
+                       f"this process loaded {root.name}, but {', '.join(replacements)} is installed")
     revision = root.name if SHA.fullmatch(root.name) else None
     problem = None if revision else "its install directory does not name a verified revision"
     return Binding(owner["identity"], owner["repository"], revision, str(root), problem)

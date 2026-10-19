@@ -577,9 +577,11 @@ class RollingPluginsTests(unittest.TestCase):
             ROLLING._record_generations(record, [(core, 'b' * 40)])
         self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
 
-        record.write_text('{', encoding='utf-8')
-        ROLLING._record_generations(record, [(core, 'b' * 40)])
-        self.assertEqual(['b' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
+        for corrupt in (b'{', b'\xff\xfe{'):
+            record.write_bytes(corrupt)
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+            self.assertEqual(['b' * 40],
+                             [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
 
     def test_claude_setting_sources_excludes_unselected_layers(self):
         config = self.root / 'profile'
