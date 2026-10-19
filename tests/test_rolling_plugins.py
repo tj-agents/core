@@ -333,7 +333,6 @@ class RollingPluginsTests(unittest.TestCase):
                             ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
                         self.assertEqual(installs, ['base@one'])
                         self.assertEqual(json.loads(registry_path.read_text()), before)
-                        self.assertFalse(ROLLING.generations_path(config / 'plugins', 'claude').exists())
                     else:
                         result = ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
                         self.assertEqual(installs, ['base@one', 'base@two'])
@@ -344,9 +343,6 @@ class RollingPluginsTests(unittest.TestCase):
                             self.assertEqual(record['installPath'], str(root.root))
                             self.assertEqual(record['version'], root.root.name)
                             self.assertEqual(record['gitCommitSha'], root.revision)
-                        recorded = ROLLING.read_generations(ROLLING.generations_path(config / 'plugins', 'claude'))
-                        self.assertEqual({(entry['repository'], entry['revision']) for entry in recorded},
-                                         {(root.repository, root.revision) for root in roots})
                         installs.clear()
                         ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
                         self.assertEqual(installs, [])
@@ -525,6 +521,27 @@ class RollingPluginsTests(unittest.TestCase):
         self.write(config / 'settings.json', {'enabledPlugins': {'engineering@core': True, 'base@core': False}})
         with self.assertRaisesRegex(ROLLING.RollingPluginError, 'disablement changed'):
             ROLLING.verify_final(prepared, 'claude', config, project, arguments)
+
+    def test_only_a_final_verification_still_on_main_records_its_generation(self):
+        core = 'https://github.com/tj-agents/core.git'
+        plugins = self.root / 'plugins'
+        root = ROLLING.VerifiedRoot('base@core', self.root / 'root', 'a' * 40, core)
+        prepared = ROLLING.Prepared('claude', (), (root,), self.root / 'catalog', {},
+                                    source_revisions=((core, 'a' * 40),), plugins_root=plugins)
+        record = ROLLING.plugin_generation.generations_path(plugins, 'claude')
+
+        def verify(main):
+            with mock.patch.object(ROLLING, '_selection_state', return_value=([], set())),                     mock.patch.object(ROLLING, '_cache_root', return_value=self.root / 'cache'),                     mock.patch.object(ROLLING, '_fetch_main', return_value=(self.root, main)):
+                ROLLING.verify_final(prepared, 'claude', self.root, self.root, {})
+
+        with self.assertRaisesRegex(ROLLING.RollingPluginError, 'main advanced'):
+            verify('b' * 40)
+        self.assertFalse(record.exists())
+
+        verify('a' * 40)
+
+        self.assertEqual([(core, 'a' * 40)], [(entry['repository'], entry['revision'])
+                                              for entry in ROLLING.plugin_generation.read_generations(record)])
 
     def test_claude_setting_sources_excludes_unselected_layers(self):
         config = self.root / 'profile'

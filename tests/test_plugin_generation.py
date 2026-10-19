@@ -8,15 +8,15 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / '.agents/machine/scripts'
-SPEC = importlib.util.spec_from_file_location('plugin_generation', SCRIPTS / 'plugin_generation.py')
+SPEC = importlib.util.spec_from_file_location('plugin_generation_under_test', SCRIPTS / 'plugin_generation.py')
 GENERATION = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = GENERATION
 SPEC.loader.exec_module(GENERATION)
-ROLLING = sys.modules['rolling_plugins']
 
 CORE = 'https://github.com/tj-agents/core.git'
 A = 'a' * 40
@@ -31,22 +31,22 @@ class GenerationHarness(unittest.TestCase):
         base = Path(self.temp.name)
         self.claude = base / '.claude'
         self.codex = base / '.codex'
+        self.state = base / 'state'
         self.environ = {
             'CLAUDE_CONFIG_DIR': str(self.claude),
             'CODEX_HOME': str(self.codex),
-            'AGENT_STATE_DIRECTORY': str(base / 'state'),
+            'AGENT_STATE_DIRECTORY': str(self.state),
         }
 
-    def write(self, path, value):
+    def write(self, path, value, encoding='utf-8'):
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(value), encoding='utf-8')
+        path.write_text(json.dumps(value), encoding=encoding)
         return path
 
     def install(self, host, *revisions, now=1000.0):
         plugins = self.claude / 'plugins' if host == 'claude' else self.codex / 'plugins'
         for offset, revision in enumerate(revisions):
-            ROLLING.record_generations(
-                plugins, host, [ROLLING.VerifiedRoot('machine@tj-agents', Path('unused'), revision, CORE)], now + offset)
+            GENERATION.record_generations(plugins, host, [(CORE, revision)], now + offset)
 
     def codex_root(self, marketplace, plugin, revision, repository=CORE):
         root = self.codex / 'plugins/cache' / marketplace / plugin / 'local'
@@ -63,8 +63,10 @@ class GenerationHarness(unittest.TestCase):
             'schema_version': 1, 'identity': f'{plugin}@tj-agents', 'repository': repository, 'revision': revision})
         return root
 
-    def receipt(self, *roots, tamper=False):
-        encoded = (json.dumps({'schema_version': 1, 'roots': [str(root) for root in roots]}) + '\n').encode('utf-8')
+    def receipt(self, *roots, tamper=False, home=None, unmanaged=()):
+        payload = {'schema_version': 1, 'codex_home': str(home or self.codex), 'roots': [str(root) for root in roots],
+                   'unmanaged_roots': [str(root) for root in unmanaged]}
+        encoded = (json.dumps(payload) + '\n').encode('utf-8')
         path = self.codex / 'plugins/cache/.tj-agents-rolling/codex/sessions/nonce/runtime-receipt.json'
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(encoded)
@@ -82,9 +84,8 @@ class GenerationHarness(unittest.TestCase):
 
 
 class CodexGenerationTests(GenerationHarness):
-    def test_a_newer_install_is_reported_at_the_next_prompt_and_not_before(self):
-        alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
-        environ = self.receipt(alias)
+    def test_a_newer_verified_generation_is_reported_at_the_next_prompt_and_not_before(self):
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
         self.install('codex', A)
 
         self.assertIsNone(self.prompt('codex', environ))
@@ -100,101 +101,125 @@ class CodexGenerationTests(GenerationHarness):
         self.assertIn(f'superseded by {B[:12]}', self.context(second))
         self.assertNotIn('systemMessage', second)
 
-    def test_a_newer_install_by_the_other_host_also_supersedes(self):
-        alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
+    def test_a_newer_verification_by_the_other_host_also_supersedes(self):
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
         self.install('codex', A)
         self.install('claude', B, now=3000.0)
 
-        output = self.prompt('codex', self.receipt(alias))
+        self.assertIn('new claude sessions', self.context(self.prompt('codex', environ)))
 
-        self.assertIn('for new claude sessions', self.context(output))
+    def test_the_most_recent_verification_decides_the_newest_generation(self):
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', B))
+        self.install('codex', A, B)
+        self.install('claude', A, now=5000.0)
+
+        self.assertIn(f'runs {B[:12]}, superseded by {A[:12]}', self.context(self.prompt('codex', environ)))
 
     def test_duplicate_aliases_at_two_revisions_are_reported_as_mixed(self):
-        base = self.codex_root(f'tj-run-{SESSION}-base-agents', 'base', A)
-        tj = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'base', B)
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-base-agents', 'base', A),
+                               self.codex_root(f'tj-run-{SESSION}-tj-agents', 'base', B))
         self.install('codex', A, B)
 
-        output = self.prompt('codex', self.receipt(base, tj))
+        output = self.prompt('codex', environ)
 
         self.assertIn('several generations at once', self.context(output))
         self.assertIn(f'base@tj-run-{SESSION}-base-agents {A[:12]}', self.context(output))
 
     def test_duplicate_aliases_at_the_newest_revision_are_silent(self):
-        base = self.codex_root(f'tj-run-{SESSION}-base-agents', 'base', B)
-        tj = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'base', B)
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-base-agents', 'base', B),
+                               self.codex_root(f'tj-run-{SESSION}-tj-agents', 'base', B))
         self.install('codex', A, B)
 
-        self.assertIsNone(self.prompt('codex', self.receipt(base, tj)))
+        self.assertIsNone(self.prompt('codex', environ))
 
-    def test_a_tampered_receipt_is_unverifiable_rather_than_current(self):
+    def test_an_invalid_receipt_is_unverifiable_rather_than_current(self):
         alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', B)
+        shared = self.codex_root('tj-agents', 'machine', B)
+        self.install('codex', B)
+        cases = {
+            'failed its integrity check': lambda: self.receipt(alias, tamper=True),
+            'names another Codex home': lambda: self.receipt(alias, home=Path(self.temp.name) / 'elsewhere'),
+            'outside the runtime cache layout': lambda: self.receipt(shared),
+        }
+        for message, receipt in cases.items():
+            with self.subTest(message=message):
+                self.assertIn(message, self.context(self.prompt('codex', receipt())))
+
+    def test_an_unmanaged_tj_agents_root_in_the_receipt_is_unverifiable(self):
+        alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', B)
+        shared = self.codex_root('tj-agents', 'dotnet', B)
         self.install('codex', B)
 
-        output = self.prompt('codex', self.receipt(alias, tamper=True))
+        output = self.prompt('codex', self.receipt(alias, unmanaged=(shared,)))
 
-        self.assertIn('failed its integrity check', self.context(output))
+        self.assertIn('dotnet@tj-agents has no verifiable generation', self.context(output))
 
-    def test_an_unmanaged_shared_root_is_unverifiable_rather_than_current(self):
+    def test_a_session_without_the_launcher_is_unverifiable_rather_than_current(self):
         shared = self.codex_root('tj-agents', 'machine', B)
         self.install('codex', B)
 
-        output = self.prompt('codex', {'PLUGIN_ROOT': str(shared)})
-
-        self.assertIn('not launched through the tj-agents launcher', self.context(output))
+        for variable in GENERATION.CODEX_ROOT_VARIABLES:
+            with self.subTest(variable=variable):
+                output = self.prompt('codex', {variable: str(shared)})
+                self.assertIn('not launched through the tj-agents launcher', self.context(output))
+        self.assertIn('neither a Codex runtime receipt nor a plugin root', self.context(self.prompt('codex', {})))
 
     def test_an_unrecorded_revision_is_never_called_current(self):
-        alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', 'c' * 40)
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', 'c' * 40))
         self.install('codex', B)
 
-        output = self.prompt('codex', self.receipt(alias))
-
-        self.assertIn('which no verified install recorded', self.context(output))
-
-    def test_a_failed_refresh_records_nothing_so_the_session_is_not_told_of_it(self):
-        alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
-        self.install('codex', A)
-        record = ROLLING.generations_path(self.codex / 'plugins', 'codex')
-        before = record.read_bytes()
-
-        self.assertIsNone(self.prompt('codex', self.receipt(alias)))
-        self.assertEqual(before, record.read_bytes())
+        self.assertIn('which no verified install recorded', self.context(self.prompt('codex', environ)))
 
     def test_malformed_records_cannot_become_the_newest_generation(self):
-        alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
         self.install('codex', A)
-        record = ROLLING.generations_path(self.codex / 'plugins', 'codex')
+        record = GENERATION.generations_path(self.codex / 'plugins', 'codex')
         document = json.loads(record.read_text(encoding='utf-8'))
-        document['installed'].append({'repository': CORE, 'revision': 'not-a-sha', 'installed_at': 9999})
-        document['installed'].append({'repository': CORE, 'revision': B})
+        document['verified'].append({'repository': CORE, 'revision': 'not-a-sha', 'verified_at': 9999})
+        document['verified'].append({'repository': CORE, 'revision': B})
         record.write_text(json.dumps(document), encoding='utf-8')
 
-        self.assertIsNone(self.prompt('codex', self.receipt(alias)))
+        self.assertIsNone(self.prompt('codex', environ))
 
 
 class ClaudeGenerationTests(GenerationHarness):
-    def registry(self, *roots):
-        plugins = {f'{root.parent.name}@tj-agents': [{'scope': 'user', 'installPath': str(root)}] for root in roots}
-        self.write(self.claude / 'plugins/installed_plugins.json', {'version': 2, 'plugins': plugins})
+    def registry(self, *roots, updated='2026-10-19T00:00:00Z', stale=(), encoding='utf-8'):
+        plugins = {f'{root.parent.name}@tj-agents': [{'scope': 'user', 'installPath': str(root), 'lastUpdated': updated}]
+                   for root in roots}
+        plugins.update({f'{root.parent.name}@tj-agents': [{'scope': 'user', 'installPath': str(root),
+                                                           'lastUpdated': '2026-01-01T00:00:00Z'}]
+                        for root in stale})
+        self.write(self.claude / 'plugins/installed_plugins.json', {'version': 2, 'plugins': plugins}, encoding)
 
     def start(self, environ):
         GENERATION.main(['session-start', '--host', 'claude'], dict(self.environ, **environ),
                         io.StringIO(json.dumps({'session_id': SESSION, 'cwd': self.temp.name})), io.StringIO())
 
-    def test_every_loaded_package_is_checked_after_the_registry_moves_on(self):
+    def test_every_package_of_the_binding_launch_is_checked_after_a_newer_verification(self):
         machine_a, engineering_a = self.claude_root('machine', A), self.claude_root('engineering', A)
-        self.registry(machine_a, engineering_a)
+        self.registry(machine_a, engineering_a, encoding='utf-8-sig')
         self.install('claude', A)
         environ = {'CLAUDE_PLUGIN_ROOT': str(machine_a)}
         self.start(environ)
         self.assertIsNone(self.prompt('claude', environ))
 
-        self.registry(self.claude_root('machine', B), self.claude_root('engineering', B))
+        self.registry(self.claude_root('machine', B), self.claude_root('engineering', B), updated='later')
         self.install('claude', B, now=2000.0)
         output = self.prompt('claude', environ)
 
         self.assertIn(f'runs {A[:12]}, superseded by {B[:12]}', self.context(output))
         self.assertIn('/reload-plugins', self.context(output))
         self.assertIn(f'claude --resume {SESSION}', self.context(output))
+
+    def test_a_package_left_behind_by_an_earlier_launch_is_not_counted_as_loaded(self):
+        machine_b = self.claude_root('machine', B)
+        self.registry(machine_b, stale=(self.claude_root('engineering', A),))
+        self.install('claude', A, B)
+        environ = {'CLAUDE_PLUGIN_ROOT': str(machine_b)}
+
+        self.start(environ)
+
+        self.assertIsNone(self.prompt('claude', environ))
 
     def test_the_loaded_root_outranks_a_registry_that_moved_before_session_start(self):
         machine_a = self.claude_root('machine', A)
@@ -208,21 +233,35 @@ class ClaudeGenerationTests(GenerationHarness):
         self.assertIn(f'runs {A[:12]}, superseded by {B[:12]}', self.context(output))
         self.assertNotIn('several generations', self.context(output))
 
-    def test_a_reload_that_rebinds_every_package_silences_the_report(self):
+    def test_a_reload_that_rebinds_the_session_silences_the_report(self):
         machine_a, engineering_a = self.claude_root('machine', A), self.claude_root('engineering', A)
         self.registry(machine_a, engineering_a)
         self.install('claude', A)
         self.start({'CLAUDE_PLUGIN_ROOT': str(machine_a)})
         machine_b, engineering_b = self.claude_root('machine', B), self.claude_root('engineering', B)
-        self.registry(machine_b, engineering_b)
+        self.registry(machine_b, engineering_b, updated='later')
         self.install('claude', B, now=2000.0)
         self.assertIsNotNone(self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(machine_a)}))
 
         self.assertIsNone(self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(machine_b)}))
 
-    def test_a_non_rolling_install_is_ignored(self):
+    def test_a_superseded_non_rolling_install_is_still_reported(self):
+        loaded = self.claude / 'plugins/cache/market/machine/1.0.0'
+        installed = self.claude / 'plugins/cache/market/machine/1.1.0'
+        loaded.mkdir(parents=True)
+        installed.mkdir(parents=True)
+        self.write(self.claude / 'plugins/installed_plugins.json', {'version': 2, 'plugins': {
+            'machine@market': [{'scope': 'user', 'installPath': str(installed)}]}})
+
+        output = self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(loaded)})
+
+        self.assertIn('this process loaded 1.0.0, but 1.1.0 is installed', self.context(output))
+
+    def test_a_current_non_rolling_install_is_ignored(self):
         root = self.claude / 'plugins/cache/other/plugin/1.0.0'
         root.mkdir(parents=True)
+        self.write(self.claude / 'plugins/installed_plugins.json', {'version': 2, 'plugins': {
+            'plugin@other': [{'scope': 'user', 'installPath': str(root)}]}})
         self.install('claude', A, B)
 
         self.assertIsNone(self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(root)}))
@@ -230,10 +269,10 @@ class ClaudeGenerationTests(GenerationHarness):
 
 class GateContractTests(GenerationHarness):
     def test_an_invalid_session_identity_produces_nothing(self):
-        alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
         self.install('codex', A, B)
 
-        self.assertIsNone(self.prompt('codex', self.receipt(alias), session='../escape'))
+        self.assertIsNone(self.prompt('codex', environ, session='../escape'))
 
     def test_an_internal_failure_reports_an_unverified_generation(self):
         original = GENERATION.check
@@ -251,16 +290,26 @@ class GateContractTests(GenerationHarness):
 
     def test_the_record_keeps_a_bounded_history_per_repository(self):
         plugins = self.codex / 'plugins'
-        for index in range(ROLLING.GENERATION_HISTORY + 5):
-            ROLLING.record_generations(
-                plugins, 'codex', [ROLLING.VerifiedRoot('machine@tj-agents', Path('unused'), f'{index:040x}', CORE)], index)
-        ROLLING.record_generations(
-            plugins, 'codex', [ROLLING.VerifiedRoot('machine@tj-agents', Path('unused'), f'{10:040x}', CORE)], 9999)
+        for index in range(GENERATION.GENERATION_HISTORY + 5):
+            GENERATION.record_generations(plugins, 'codex', [(CORE, f'{index:040x}')], index)
 
-        entries = ROLLING.read_generations(ROLLING.generations_path(plugins, 'codex'))
+        entries = GENERATION.read_generations(GENERATION.generations_path(plugins, 'codex'))
 
-        self.assertEqual(ROLLING.GENERATION_HISTORY, len(entries))
-        self.assertEqual(f'{ROLLING.GENERATION_HISTORY + 4:040x}', entries[-1]['revision'])
+        self.assertEqual(GENERATION.GENERATION_HISTORY, len(entries))
+        self.assertEqual(f'{GENERATION.GENERATION_HISTORY + 4:040x}', entries[-1]['revision'])
+
+    def test_session_state_expires_after_its_retention(self):
+        stale = self.state / 'plugin-generation' / 'codex-stale.json'
+        self.write(stale, {'notified': 'old'})
+        old = time.time() - GENERATION.STATE_RETENTION_SECONDS - 60
+        os.utime(stale, (old, old))
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
+        self.install('codex', A, B)
+
+        self.prompt('codex', environ)
+
+        self.assertFalse(stale.exists())
+        self.assertTrue((self.state / 'plugin-generation' / f'codex-{SESSION}.json').exists())
 
     def test_both_hosts_dispatch_the_gate_through_their_prompt_chain(self):
         alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
@@ -279,12 +328,11 @@ class GateContractTests(GenerationHarness):
         self.assertIn(f'superseded by {B[:12]}', merged['systemMessage'])
 
     def test_both_host_manifests_wire_the_gate(self):
-        claude = (ROOT / '.agents/plugins/manifests/claude/machine-hooks.json').read_text(encoding='utf-8')
+        claude = json.loads((ROOT / '.agents/plugins/manifests/claude/machine-hooks.json').read_text(encoding='utf-8'))
         codex = json.loads((ROOT / '.agents/plugins/manifests/codex/machine-hooks.json').read_text(encoding='utf-8'))
-        claude_hooks = json.loads(claude)['hooks']
 
         for event, mode in (('SessionStart', 'session-start'), ('UserPromptSubmit', 'prompt')):
-            arguments = [argument for group in claude_hooks[event] for hook in group['hooks']
+            arguments = [argument for group in claude['hooks'][event] for hook in group['hooks']
                          for argument in hook.get('args', [])]
             index = arguments.index('${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/plugin_generation.py')
             self.assertEqual([mode, '--host', 'claude'], arguments[index + 1:index + 4])
