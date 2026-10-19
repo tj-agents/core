@@ -163,7 +163,7 @@ def main(argv=None):
         print(json.dumps({"worktree": str(working_directory), "prompt_path": str(prompt_path), "startup": "verified", "status_path": str(status_path)}))
         return 0
     except agent_cli.LaunchError as exc:
-        if status_path is not None and isinstance(exc, agent_cli.LaunchTimeout):
+        if status_path is not None:
             print(f"Handoff startup receipt: {status_path}", file=sys.stderr)
         return agent_cli.report_launch_failure(exc)
 

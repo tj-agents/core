@@ -195,7 +195,9 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 on_running: Callable[..., None] | None = None,
                 require_session_start: bool = False,
                 on_launch: Callable[[], None] | None = None,
-                keep_unacknowledged_session: bool = False) -> int:
+                keep_unacknowledged_session: bool = False,
+                on_phase: Callable[[str], None] | None = None) -> int:
+    phase = on_phase or (lambda _name: None)
     running = on_running or (lambda child_pid=None: None)
     launched = on_launch or (lambda: None)
     project = Path(project).resolve()
@@ -203,6 +205,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
     startup_deadline = time.monotonic() + OPERATION_TIMEOUT_SECONDS
     try:
         executable = native_target_for_shim(target)
+        phase("reading-selection")
         preflight_arguments = _preflight_arguments(
             host, executable, project, arguments,
             lambda: _startup_remaining(startup_deadline),
@@ -213,6 +216,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
             if not isinstance(selected_project, Path):
                 raise StartupBindingError("Codex effective configuration did not report a project directory")
             effective_project = selected_project
+        phase("refreshing-plugins")
         with preflight(host, configuration, effective_project, preflight_arguments) as active:
             if host == "codex":
                 logical = getattr(active, "prepared", None)
@@ -287,7 +291,9 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                     return subprocess.run(command_for_target(target, arguments), cwd=project, env=environment).returncode
                 except OSError as error:
                     raise StartupBindingError(f"native {host} could not start: {error}") from error
+            phase("installing-plugins")
             prepared = active.materialize_native(executable)
+            phase("checking-settings")
             _converge(prepared, executable, effective_project)
             launch_arguments = _launch_arguments(arguments, prepared.launch_args)
             if require_session_start and not _session_start_dispatcher(prepared.selected_roots, host):
@@ -320,6 +326,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 environment = _binding_environment(directory, token, snapshot_directory,
                                                     prepared.environment, extra_environment)
                 process = None
+                phase("starting-native")
                 try:
                     process = subprocess.Popen(
                         command_for_target(target, launch_arguments), cwd=project, env=environment,
@@ -329,6 +336,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                     raise StartupBindingError(f"native {host} could not start: {error}") from error
                 launched()
                 try:
+                    phase("waiting-session-start")
                     deadline = time.monotonic() + _remaining(prepared, timeout)
                     while process.poll() is None and time.monotonic() < deadline:
                         if _acknowledged(directory, token):
@@ -375,6 +383,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parsed = parser.parse_args(argv)
     arguments = parsed.arguments[1:] if parsed.arguments[:1] == ["--"] else parsed.arguments
     status: dict[str, object] = {"pid": os.getpid()}
+    if parsed.host == "claude" and parsed.require_session_start and parsed.status_file is not None:
+        if not any(value == "--debug-file" or value.startswith("--debug-file=") for value in arguments):
+            debug_log = parsed.status_file.resolve().parent / "native-debug.log"
+            arguments = ["--debug-file", str(debug_log), *arguments]
+            status["debug_log"] = str(debug_log)
 
     def report(state: str, **details: object) -> None:
         status.update(details, state=state, at=time.time())
@@ -393,8 +406,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not claimed:
             print(f"standards: {parsed.host} launch was abandoned or already claimed before startup", file=sys.stderr)
             return 1
+
+    def phase(name: str) -> None:
+        if parsed.status_file is not None:
+            report("preparing", phase=name)
+            print(f"standards: {parsed.host} startup: {name}", flush=True)
+
     try:
         options = {"require_session_start": True} if parsed.require_session_start else {}
+        if parsed.status_file is not None:
+            options["on_phase"] = phase
         returncode = run_session(parsed.host, parsed.target, parsed.project, arguments, **options,
                                  on_running=lambda child_pid=None: report("running", running_at=time.time(), child_pid=child_pid))
     except StartupBindingError as error:
