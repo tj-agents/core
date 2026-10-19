@@ -92,6 +92,49 @@ class RefreshCliTests(unittest.TestCase):
             self.assertEqual(1, len(report["problems"]))
             self.assertIn("Native installed bytes differ", report["problems"][0])
 
+    def test_supported_github_sources_are_normalized_before_selection(self):
+        for source in ("ssh://git@github.com/TJ-Agents/core.git", "git@github.com:tj-agents/core.git",
+                       "https://github.com/TJ-AGENTS/Core.git", "tj-agents/core"):
+            with self.subTest(source=source):
+                self.assertEqual("tj-agents/core", REFRESH.repository(source))
+                config = {"marketplaces": {"core": {"source_type": "git", "source": source}},
+                          "plugins": {"base@core": {"enabled": True}}}
+                with mock.patch.object(REFRESH, "AppServer") as server:
+                    server.return_value.__enter__.return_value.request.return_value = {"config": config}
+                    self.assertEqual(({"core": "tj-agents/core"}, ["base@core"]),
+                                     REFRESH.selection("codex", "codex", ROOT))
+
+    def test_external_publisher_packages_are_verified_at_the_declared_revision(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            publisher = root / "publisher"
+            publisher.mkdir()
+            subprocess.run(["git", "init", str(publisher)], check=True, capture_output=True)
+            package = publisher / "plugins/base"
+            package.mkdir(parents=True)
+            (package / "payload").write_bytes(b"published")
+            subprocess.run(["git", "-C", str(publisher), "add", "."], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(publisher), "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                            "commit", "-m", "package"], check=True, capture_output=True)
+            revision = subprocess.check_output(["git", "-C", str(publisher), "rev-parse", "HEAD"], text=True).strip()
+            run_native = REFRESH.run
+
+            def run(command, project):
+                arguments = [str(publisher) if value == "https://github.com/tj-agents/core.git" else value for value in command]
+                return run_native(arguments, project)
+
+            clones = {}
+            source = {"source": "git-subdir", "url": "ssh://git@github.com/TJ-Agents/core.git",
+                      "path": "./plugins/base", "sha": revision}
+            with mock.patch.object(REFRESH, "run", side_effect=run) as commands, mock.patch("sys.stderr"):
+                expected = REFRESH.source_tree(source, root, root, root / "scratch", clones)
+                self.assertEqual({"payload": b"published"}, expected)
+                self.assertEqual(expected, REFRESH.source_tree(source, root, root, root / "scratch", clones))
+                self.assertEqual(1, sum("fetch" in call.args[0] for call in commands.call_args_list))
+                source["path"] = "./../../escape"
+                with self.assertRaisesRegex(REFRESH.RefreshError, "escapes"):
+                    REFRESH.source_tree(source, root, root, root / "scratch", clones)
+
     def test_another_projects_installation_does_not_satisfy_verification(self):
         inventory = [{"id": "base@tj-agents", "enabled": True, "scope": "project", "projectPath": str(ROOT / "elsewhere")}]
         with mock.patch.object(REFRESH, "run", return_value=json.dumps(inventory)), mock.patch("sys.stderr"):
