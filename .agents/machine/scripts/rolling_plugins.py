@@ -26,7 +26,7 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-import plugin_generation  # noqa: E402
+import generation_record  # noqa: E402
 
 
 GIT_TIMEOUT_SECONDS = 90
@@ -1474,10 +1474,11 @@ def verify_final(prepared: Prepared, host: str, target: Path, project: Path, arg
         _clone, revision = _fetch_main(source, cache, prepared.deadline)
         if revision != expected_revision:
             raise RollingPluginError(f"publisher main advanced while materializing {source}")
+    record = generation_record.generations_path(prepared.plugins_root or target / "plugins", host)
     try:
-        plugin_generation.record_generations(prepared.plugins_root or target / "plugins", host,
-                                             ((root.repository, root.revision) for root in prepared.selected_roots))
-    except OSError:
+        _unlinked_ancestors(record)
+        generation_record.record_generations(record, ((root.repository, root.revision) for root in prepared.selected_roots))
+    except (OSError, RollingPluginError):
         pass
 
 
