@@ -81,18 +81,21 @@ class SessionState:
     def update(self, **changes: object) -> None:
         self.changes.update({key: value for key, value in changes.items() if self.value.get(key) != value})
 
-    def flush(self) -> None:
+    def flush(self, sweep: bool = False) -> None:
         try:
-            if not self.changes:
+            if self.changes:
+                self.value.update(self.changes)
+                self.changes = {}
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
+                temporary.write_text(json.dumps(self.value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+                os.replace(temporary, self.path)
+                sweep = True
+            else:
                 os.utime(self.path)
-                return
-            self.value.update(self.changes)
-            self.changes = {}
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
-            temporary.write_text(json.dumps(self.value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            os.replace(temporary, self.path)
         except OSError:
+            return
+        if not sweep:
             return
         for candidate in self.path.parent.glob("*.json"):
             try:
@@ -139,9 +142,9 @@ def claude_records(environ: Mapping[str, str], project: Path | None) -> list[Map
 
 
 def launch_roots(own: str, records: list[Mapping[str, object]]) -> tuple[list[str], str | None]:
-    siblings = [record for record in records
-                if normalized(Path(record["installPath"]).parent) != normalized(Path(own).parent)]
-    record = next((record for record in records if normalized(record["installPath"]) == normalized(own)), None)
+    own_path, own_plugin = normalized(own), normalized(Path(own).parent)
+    siblings = [record for record in records if normalized(Path(record["installPath"]).parent) != own_plugin]
+    record = next((record for record in records if normalized(record["installPath"]) == own_path), None)
     launch = record.get("lastUpdated") if record is not None else None
     if launch is None:
         if not any(ownership(Path(sibling["installPath"])) is not None for sibling in siblings):
@@ -157,8 +160,10 @@ def launch_roots(own: str, records: list[Mapping[str, object]]) -> tuple[list[st
 def claude_bound_roots(state: SessionState, own: str, records: list[Mapping[str, object]],
                        fresh: bool = False) -> tuple[list[str], str | None]:
     stored = state.value.get("roots")
-    if not fresh and isinstance(stored, list) \
-            and normalized(own) in {normalized(root) for root in stored if isinstance(root, str)}:
+    own_path = normalized(own)
+    holds_own = isinstance(stored, list) and own_path in {normalized(root) for root in stored if isinstance(root, str)}
+    listed = any(normalized(record["installPath"]) == own_path for record in records)
+    if holds_own and (not fresh or not listed):
         partial = state.value.get("partial")
         return [root for root in stored if isinstance(root, str)], partial if isinstance(partial, str) else None
     roots, partial = launch_roots(own, records)
@@ -322,10 +327,11 @@ def check(host: str, session_id: str, environ: Mapping[str, str], project: Path 
     state = SessionState(host, session_id, environ, time.time() if now is None else now)
     bindings, problems = session_bindings(host, state, environ, project)
     lines = [f"this session's generation cannot be verified because {problem}." for problem in problems]
-    if bindings:
-        lines.extend(findings(bindings, installed_generations(environ)))
+    installed = installed_generations(environ) if bindings else {}
+    lines.extend(findings(bindings, installed))
     if not lines:
-        state.update(notified=None)
+        if installed:
+            state.update(notified=None)
         state.flush()
         return None
     report = "plugin generation: " + " ".join(lines)
@@ -367,13 +373,13 @@ def main(argv: list[str] | None = None, environ: Mapping[str, str] | None = None
             try:
                 state = SessionState("claude", session_id, environ, now)
                 claude_bound_roots(state, own, claude_records(environ, project), fresh=data.get("source") != "compact")
-                state.flush()
-            except Exception:  # noqa: BLE001 - a snapshot failure must never stop a session starting
+                state.flush(sweep=True)
+            except Exception:  # noqa: BLE001
                 pass
         return 0
     try:
         output = check(arguments.host, session_id, environ, project, now)
-    except Exception as error:  # noqa: BLE001 - an unverifiable session must say so, never pass silently
+    except Exception as error:  # noqa: BLE001
         output = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext":
                   f"plugin generation: this session's generation could not be checked ({error})."}}
     if output:
