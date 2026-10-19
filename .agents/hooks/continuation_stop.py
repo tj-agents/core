@@ -5,11 +5,13 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 from workflow_route import direct_control, read_receipt
 
 WINDOWS = os.name == "nt"
 BLOCKS = "tj-agents-continuation-stop"
+BLOCK_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
 def workflow_root():
@@ -247,17 +249,24 @@ def once_per_stop(data, reason):
         return None
     retry = bool(data.get("stop_hook_active") or data.get("stopHookActive"))
     if retry and path.is_file():
-        try:
-            path.unlink()
-        except OSError:
-            pass
         return None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{}", encoding="utf-8")
     except OSError:
         return None if retry else reason
+    prune_block_records(path)
     return reason
+
+
+def prune_block_records(current):
+    expiry = time.time() - BLOCK_RETENTION_SECONDS
+    for candidate in current.parent.glob("*.json"):
+        try:
+            if candidate != current and candidate.stat().st_mtime < expiry:
+                candidate.unlink()
+        except OSError:
+            continue
 
 
 def main():

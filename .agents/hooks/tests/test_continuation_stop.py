@@ -253,9 +253,21 @@ class ContinuationStopTests(unittest.TestCase):
         retry = {"session_id": "other", "stop_hook_active": True}
 
         self.assertEqual("reason", continuation_stop.once_per_stop(retry, "reason"))
-        self.assertIsNone(continuation_stop.once_per_stop(retry, "reason"))
-        self.assertFalse(continuation_stop.block_record("other").exists())
-        self.assertEqual("reason", continuation_stop.once_per_stop(retry, "reason"))
+        for _ in range(3):
+            self.assertIsNone(continuation_stop.once_per_stop(retry, "reason"))
+
+    def test_expired_block_records_are_pruned(self):
+        self.isolated_state()
+        stale = continuation_stop.block_record("stale")
+        stale.parent.mkdir(parents=True)
+        stale.write_text("{}", encoding="utf-8")
+        old = continuation_stop.time.time() - continuation_stop.BLOCK_RETENTION_SECONDS - 60
+        os.utime(stale, (old, old))
+
+        continuation_stop.once_per_stop({"session_id": "fresh"}, "reason")
+
+        self.assertFalse(stale.exists())
+        self.assertTrue(continuation_stop.block_record("fresh").exists())
 
     def test_an_unwritable_block_record_never_loops(self):
         self.isolated_state()
