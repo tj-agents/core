@@ -572,10 +572,19 @@ class RollingPluginsTests(unittest.TestCase):
         self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
         self.assertEqual([record.name], sorted(path.name for path in record.parent.iterdir()))
 
-        with mock.patch.object(ROLLING.generation_record, 'read_generations', return_value=None), \
-                mock.patch.object(ROLLING.time, 'sleep'):
+        with mock.patch.object(ROLLING.generation_record, 'read_record', return_value=('busy', [])), \
+                mock.patch.object(ROLLING.time, 'sleep') as sleep:
             ROLLING._record_generations(record, [(core, 'b' * 40)])
+        self.assertEqual(4, sleep.call_count)
         self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
+
+        newer = record.read_bytes()
+        record.write_bytes(b'{"schema_version": 2, "verified": []}')
+        with mock.patch.object(ROLLING.time, 'sleep') as sleep:
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+        sleep.assert_not_called()
+        self.assertEqual(b'{"schema_version": 2, "verified": []}', record.read_bytes())
+        record.write_bytes(newer)
 
         for corrupt in (b'{', b'\xff\xfe{'):
             record.write_bytes(corrupt)
