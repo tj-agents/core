@@ -15,6 +15,12 @@ someone ask for it.
 The loop is yours end to end: **run → diagnose → fix → re-run until green.** Find the root cause and fix it in
 code, wherever the real bug lives — service, handler, page object, step definition, fixture, configuration.
 
+```text
+python -m pytest tests/test_repository_permissions.py -q
+FAILED test_every_ci_verify_command_is_allowed_for_both_shells: 18 != 17
+Cause: a CI verify step was removed. Fix: update the expected count to 17, then re-run until green.
+```
+
 **Route by tier.** Each tier has its own procedure, and entering it *is* the next action; picking through the
 failure by hand is how a tier's known traps get rediscovered one at a time.
 
