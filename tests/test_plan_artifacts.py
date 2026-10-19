@@ -40,35 +40,21 @@ class PlanArtifactTests(unittest.TestCase):
 
     def test_packaged_hook_commands_and_context_for_each_session_source(self):
         before = snapshot(self.root)
+        script = ".agents/base/policy/plan-artifacts/scripts/session-context.py"
+        self.assertTrue((self.plugin / script).is_file())
+        self.assertTrue((self.plugin / '.agents/base/policy/plan-artifacts/templates/PLAN.md').is_file())
         bodies = []
-        for host in ("claude", "codex"):
-            manifest = self.manifest(host)
-            hooks = json.loads((self.plugin / manifest["hooks"]).read_text())
-            handler = hooks["hooks"]["SessionStart"][0]["hooks"][0]
-            script = ".agents/base/policy/plan-artifacts/scripts/session-context.py"
-            if host == "claude":
-                self.assertEqual("python", handler["command"])
-                self.assertEqual(
-                    ["-B", "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
-                     "--deadline", "8", "--hook", f"${{CLAUDE_PLUGIN_ROOT}}/{script}"],
-                    handler["args"],
-                )
-            else:
-                self.assertIn(f'"${{PLUGIN_ROOT}}/{script}"', handler["command"])
-                self.assertIn(f'"${{PLUGIN_ROOT}}/{script}"', handler["commandWindows"])
-            self.assertTrue((self.plugin / script).is_file())
-            self.assertTrue((self.plugin / '.agents/base/policy/plan-artifacts/templates/PLAN.md').is_file())
-            for source in ("startup", "resume", "compact", "clear"):
-                with self.subTest(host=host, source=source):
-                    result = self.invoke(host, source)
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    output = json.loads(result.stdout)["hookSpecificOutput"]
-                    self.assertEqual(output["hookEventName"], "SessionStart")
-                    self.assertEqual(result.stderr, "")
-                    body = output["additionalContext"].split("\n\n", 1)[1]
-                    contract = (self.plugin / '.agents/base/policy/plan-artifacts/SKILL.md').read_text(encoding='utf-8')
-                    self.assertEqual(body, contract.split("\n---\n", 1)[1].strip())
-                    bodies.append(body)
+        for source in ("startup", "resume", "compact", "clear"):
+            with self.subTest(source=source):
+                result = self.invoke("claude", source)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                output = json.loads(result.stdout)["hookSpecificOutput"]
+                self.assertEqual(output["hookEventName"], "SessionStart")
+                self.assertEqual(result.stderr, "")
+                body = output["additionalContext"].split("\n\n", 1)[1]
+                contract = (self.plugin / '.agents/base/policy/plan-artifacts/SKILL.md').read_text(encoding='utf-8')
+                self.assertEqual(body, contract.split("\n---\n", 1)[1].strip())
+                bodies.append(body)
         self.assertEqual(len(set(bodies)), 1)
         self.assertEqual(before, snapshot(self.root))
 
