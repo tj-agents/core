@@ -1,13 +1,16 @@
+import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 from workflow_route import direct_control, read_receipt
 
 WINDOWS = os.name == "nt"
+BLOCKS = "tj-agents-continuation-stop"
 
 
 def workflow_root():
@@ -158,8 +161,6 @@ def foreground_owns_current_process(owner, runtime):
 def outcome(data):
     if (data.get("hook_event_name") or data.get("hookEventName")) != "Stop":
         return None
-    if data.get("stop_hook_active") or data.get("stopHookActive"):
-        return None
     cwd = data.get("cwd")
     session = data.get("session_id") or data.get("sessionId")
     if not isinstance(cwd, str) or not isinstance(session, str) or not cwd or not session:
@@ -228,6 +229,38 @@ def outcome(data):
     return None
 
 
+def block_record(session):
+    digest = hashlib.sha256(session.encode("utf-8")).hexdigest()
+    return Path(tempfile.gettempdir()) / BLOCKS / f"{digest}.json"
+
+
+def once_per_stop(data, reason):
+    session = data.get("session_id") or data.get("sessionId")
+    if not isinstance(session, str) or not session:
+        return reason
+    path = block_record(session)
+    if not reason:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return None
+    digest = hashlib.sha256(reason.encode("utf-8")).hexdigest()
+    retry = bool(data.get("stop_hook_active") or data.get("stopHookActive"))
+    try:
+        blocked = json.loads(path.read_text(encoding="utf-8")).get("reason") == digest
+    except (OSError, ValueError, AttributeError):
+        blocked = False
+    if retry and blocked:
+        return None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"reason": digest}), encoding="utf-8")
+    except OSError:
+        pass
+    return reason
+
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -239,6 +272,7 @@ def main():
         reason = outcome(data)
     except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
         reason = f"Cannot verify continuation ownership; continue the goal: {error}"
+    reason = once_per_stop(data, reason)
     if reason:
         print(json.dumps({"decision": "block", "reason": reason}))
     else:
