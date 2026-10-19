@@ -17,13 +17,17 @@ def generations_path(plugins: Path, host: str) -> Path:
     return plugins / "cache" / ".tj-agents-rolling" / host / GENERATIONS_FILE
 
 
-def read_generations(path: Path) -> list[dict[str, object]]:
+def read_generations(path: Path) -> list[dict[str, object]] | None:
     try:
         document = json.loads(path.read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError):
+    except FileNotFoundError:
         return []
+    except (OSError, ValueError):
+        return None
     entries = document.get("verified") if isinstance(document, dict) else None
-    return [entry for entry in entries or () if isinstance(entry, dict)
+    if not isinstance(entries, list):
+        return None
+    return [entry for entry in entries if isinstance(entry, dict)
             and isinstance(entry.get("repository"), str) and isinstance(entry.get("revision"), str)
             and SHA.fullmatch(entry["revision"]) and isinstance(entry.get("verified_at"), (int, float))]
 

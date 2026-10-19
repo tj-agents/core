@@ -1492,7 +1492,7 @@ def _record_generations(record: Path, revisions: Iterable[tuple[str, str]], atte
         record.parent.mkdir(parents=True, exist_ok=True)
         for attempt in range(attempts):
             document = generation_record.merged_generations(
-                generation_record.read_generations(record), revisions, time.time())
+                generation_record.read_generations(record) or [], revisions, time.time())
             try:
                 _write_json(record, document)
                 return

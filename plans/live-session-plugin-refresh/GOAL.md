@@ -161,7 +161,7 @@ Avoids startup_binding.py/terminal launchers (open PR291) and PR306 paths.
       "host": "claude",
       "behavior": "UserPromptSubmit reports superseded, mixed or unverifiable tj-agents generations and the /reload-plugins or resume adoption path",
       "source": ".agents/plugins/manifests/claude/machine-hooks.json",
-      "mapping": "machine SessionStart session-start snapshot and UserPromptSubmit prompt gate through hook_dispatch",
+      "mapping": "machine UserPromptSubmit gate through hook_dispatch, observing its own CLAUDE_PLUGIN_ROOT",
       "verification": {
         "level": "installed",
         "result": "passed",
@@ -196,3 +196,14 @@ Avoids startup_binding.py/terminal launchers (open PR291) and PR306 paths.
   refusal; harness declares no continuation-runtime permission) pending Tommy's decision.
 - Next: complete incremental review, green exact-head CI, then merge under recorded auto_merge and verify
   the post-merge regenerate/publication commit.
+
+## Review-driven scope correction (2026-10-19)
+
+Five review passes (R1-R33 plus pass 5) repeatedly found corner cases in the Claude cross-package
+snapshot: Claude does not expose another plugin's loaded roots to the machine hook, nor process identity
+across in-process `/resume` or `/clear`, so the snapshot could misstate which packages a process loaded.
+The Claude gate now checks only the root it can observe, the machine plugin's own `CLAUDE_PLUGIN_ROOT`,
+which carries Core's generation (plus the registry comparison for non-rolling installs). Staleness of other
+Claude packages is a recorded host limitation; Codex keeps full per-process coverage from its validated
+runtime receipt. An unreadable generation record now reports nothing for that prompt and leaves notice
+state untouched. Native Claude acceptance was rerun on this shape and still passes.
