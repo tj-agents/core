@@ -69,6 +69,51 @@ class StartupBindingTests(unittest.TestCase):
                          {key: value for key, value in json.loads(status.read_text(encoding="utf-8")).items()
                           if key in {"state", "returncode"}})
 
+    def test_handoff_failure_retains_native_debug_destination_and_last_phase(self):
+        status = self.project / "handoff.json"
+        captured = []
+        phases = []
+
+        def failing(host, target, project, arguments, *, on_phase=None, **kwargs):
+            captured.extend(arguments)
+            if on_phase is not None:
+                on_phase("refreshing-plugins")
+                phases.append(json.loads(status.read_text(encoding="utf-8"))["phase"])
+            raise BINDING.StartupBindingError("fixture startup failed")
+
+        arguments = ["--host", "claude", "--project", str(self.project), "--target", "claude",
+                     "--status-file", str(status), "--require-session-start", "--", "fixture prompt"]
+        with mock.patch.object(BINDING, "run_session", side_effect=failing), \
+                mock.patch("sys.stdout") as output, mock.patch("sys.stderr"):
+            self.assertEqual(1, BINDING.main(arguments))
+        self.assertEqual(["refreshing-plugins"], phases)
+        failed = json.loads(status.read_text(encoding="utf-8"))
+        self.assertEqual("failed", failed["state"])
+        self.assertEqual("refreshing-plugins", failed["phase"])
+        debug_log = self.project.resolve() / "native-debug.log"
+        self.assertEqual(str(debug_log), failed["debug_log"])
+        self.assertEqual(["--debug-file", str(debug_log), "fixture prompt"], captured)
+        output.write.assert_any_call("standards: claude startup: refreshing-plugins")
+
+    def test_handoff_keeps_an_explicit_debug_file_and_leaves_ordinary_launches_alone(self):
+        for flags in (("--require-session-start",), ()):
+            with self.subTest(flags=flags):
+                status = self.project / "explicit.json"
+                status.unlink(missing_ok=True)
+                captured = []
+
+                def run(host, target, project, arguments, **kwargs):
+                    captured.extend(arguments)
+                    return 0
+
+                arguments = ["--host", "claude", "--project", str(self.project), "--target", "claude",
+                             "--status-file", str(status), *flags, "--", "--debug-file", "explicit.log",
+                             "fixture prompt"]
+                with mock.patch.object(BINDING, "run_session", side_effect=run):
+                    self.assertEqual(0, BINDING.main(arguments))
+                self.assertEqual(["--debug-file", "explicit.log", "fixture prompt"], captured)
+                self.assertNotIn("debug_log", json.loads(status.read_text(encoding="utf-8")))
+
     def test_an_abandoned_launch_never_starts(self):
         status = self.project / "launch.status.json"
         status.write_text(json.dumps({"state": "abandoned"}), encoding="utf-8")
@@ -173,8 +218,11 @@ class StartupBindingTests(unittest.TestCase):
                 mock.patch.object(BINDING.subprocess, "Popen", Process), \
                 mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.project / "config")}, clear=False):
             reported = []
+            phases = []
             self.assertEqual(0, BINDING.run_session("claude", "typed", self.project, ["session"],
-                                                    on_running=reported.append))
+                                                    on_running=reported.append, on_phase=phases.append))
+        self.assertEqual(["reading-selection", "refreshing-plugins", "installing-plugins",
+                          "checking-settings", "starting-native", "waiting-session-start"], phases)
 
         self.assertEqual(["materialize", "start", "ack", "exit"], events)
         self.assertEqual([4242], reported)
