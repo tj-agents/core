@@ -158,6 +158,8 @@ def foreground_owns_current_process(owner, runtime):
 def outcome(data):
     if (data.get("hook_event_name") or data.get("hookEventName")) != "Stop":
         return None
+    if data.get("stop_hook_active") or data.get("stopHookActive"):
+        return None
     cwd = data.get("cwd")
     session = data.get("session_id") or data.get("sessionId")
     if not isinstance(cwd, str) or not isinstance(session, str) or not cwd or not session:
