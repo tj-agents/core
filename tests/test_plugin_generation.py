@@ -106,17 +106,18 @@ class CodexGenerationTests(GenerationHarness):
         self.assertIn(f'superseded by {B[:12]}', self.context(second))
         self.assertNotIn('systemMessage', second)
 
-    def test_a_newer_verification_by_the_other_host_also_supersedes(self):
+    def test_only_this_hosts_verified_installs_supersede_its_sessions(self):
         environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
         self.install('codex', A)
         self.install('claude', B, now=3000.0)
+        self.write(RECORD.generations_path(self.claude / 'plugins', 'claude'), '{')
 
-        self.assertIn(f'superseded by {B[:12]}', self.context(self.prompt('codex', environ)))
+        self.assertIsNone(self.prompt('codex', environ))
 
     def test_the_most_recent_verification_decides_the_newest_generation(self):
         environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', B))
         self.install('codex', A, B)
-        self.install('claude', A, now=5000.0)
+        self.install('codex', A, now=5000.0)
 
         self.assertIn(f'runs {B[:12]}, superseded by {A[:12]}', self.context(self.prompt('codex', environ)))
 
@@ -247,6 +248,17 @@ class ClaudeGenerationTests(GenerationHarness):
 
         self.assertIn('this process loaded 1.0.0, but 1.1.0 is installed', self.context(output))
 
+    def test_a_project_scoped_install_outranks_a_newer_user_install(self):
+        loaded = self.claude / 'plugins/cache/market/machine/1.0.0'
+        loaded.mkdir(parents=True)
+        newer = self.claude / 'plugins/cache/market/machine/1.1.0'
+        newer.mkdir(parents=True)
+        self.write(self.claude / 'plugins/installed_plugins.json', {'version': 2, 'plugins': {'machine@market': [
+            {'scope': 'user', 'installPath': str(newer)},
+            {'scope': 'project', 'projectPath': self.temp.name, 'installPath': str(loaded)}]}})
+
+        self.assertIsNone(self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(loaded)}))
+
     def test_a_current_non_rolling_install_is_ignored(self):
         root = self.claude / 'plugins/cache/other/plugin/1.0.0'
         root.mkdir(parents=True)
@@ -297,19 +309,29 @@ class GateContractTests(GenerationHarness):
         self.assertIn(f'superseded by {B[:12]}', self.context(output))
         self.assertNotIn('systemMessage', output)
 
-    def test_an_unreadable_record_reports_nothing_and_keeps_the_notice_state(self):
+    def test_an_unreadable_or_missing_record_keeps_the_notice_state(self):
         environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
         self.install('codex', A, B)
-        self.install('claude', B, now=3000.0)
         self.assertIn('systemMessage', self.prompt('codex', environ))
-        record = RECORD.generations_path(self.claude / 'plugins', 'claude')
+        record = RECORD.generations_path(self.codex / 'plugins', 'codex')
         content = record.read_bytes()
-        record.write_text('{', encoding='utf-8')
 
-        self.assertIsNone(self.prompt('codex', environ))
+        for disturbance in (lambda: record.write_text('{', encoding='utf-8'), record.unlink):
+            with self.subTest(disturbance=disturbance):
+                disturbance()
+                self.assertIsNone(self.prompt('codex', environ))
+                record.write_bytes(content)
+                self.assertNotIn('systemMessage', self.prompt('codex', environ))
 
-        record.write_bytes(content)
-        self.assertNotIn('systemMessage', self.prompt('codex', environ))
+    def test_an_unreadable_record_still_reports_binding_problems_without_a_notice(self):
+        shared = self.codex_root('tj-agents', 'machine', B)
+        self.install('codex', B)
+        RECORD.generations_path(self.codex / 'plugins', 'codex').write_text('{', encoding='utf-8')
+
+        output = self.prompt('codex', {'PLUGIN_ROOT': str(shared)})
+
+        self.assertIn('not launched through the tj-agents launcher', self.context(output))
+        self.assertNotIn('systemMessage', output)
 
     def test_a_supersession_that_returns_after_a_rollback_is_announced_again(self):
         environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))

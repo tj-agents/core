@@ -159,7 +159,7 @@ Avoids startup_binding.py/terminal launchers (open PR291) and PR306 paths.
   "hosts": [
     {
       "host": "claude",
-      "behavior": "UserPromptSubmit reports superseded, mixed or unverifiable tj-agents generations and the /reload-plugins or resume adoption path",
+      "behavior": "UserPromptSubmit reports when the machine plugin root it loaded, Core's generation, is superseded by a Claude-verified install or unverifiable, and the /reload-plugins or resume adoption path",
       "source": ".agents/plugins/manifests/claude/machine-hooks.json",
       "mapping": "machine UserPromptSubmit gate through hook_dispatch, observing its own CLAUDE_PLUGIN_ROOT",
       "verification": {
@@ -207,3 +207,6 @@ which carries Core's generation (plus the registry comparison for non-rolling in
 Claude packages is a recorded host limitation; Codex keeps full per-process coverage from its validated
 runtime receipt. An unreadable generation record now reports nothing for that prompt and leaves notice
 state untouched. Native Claude acceptance was rerun on this shape and still passes.
+
+Pass 6 follow-up: each session compares only with its own host's verified record, so it is never told to
+adopt a revision only the other host verified, and one host's bad record cannot disable the other's gate.
