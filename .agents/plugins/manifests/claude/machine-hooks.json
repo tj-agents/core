@@ -13,8 +13,15 @@
               "--deadline",
               "8",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py",
-              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py"
+            ]
+          },
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "python",
+            "args": [
+              "-B",
               "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/plugin_generation.py",
               "session-start",
               "--host",
