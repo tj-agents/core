@@ -9,6 +9,7 @@ import re
 from typing import Iterable
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
+SCHEMA_VERSION = 1
 GENERATIONS_FILE = "generations.json"
 GENERATION_HISTORY = 64
 
@@ -19,20 +20,23 @@ def generations_path(plugins: Path, host: str) -> Path:
 
 def read_generations(path: Path) -> list[dict[str, object]] | None:
     try:
-        text = path.read_text(encoding="utf-8-sig")
+        raw = path.read_bytes()
     except FileNotFoundError:
         return []
     except OSError:
         return None
     try:
-        document = json.loads(text)
+        document = json.loads(raw.decode("utf-8-sig"))
     except ValueError:
         return []
+    if isinstance(document, dict) and document.get("schema_version", SCHEMA_VERSION) != SCHEMA_VERSION:
+        return None
     entries = document.get("verified") if isinstance(document, dict) else None
-    return [entry for entry in entries or () if isinstance(entry, dict)
+    if not isinstance(entries, list):
+        return []
+    return [entry for entry in entries if isinstance(entry, dict)
             and isinstance(entry.get("repository"), str) and isinstance(entry.get("revision"), str)
-            and SHA.fullmatch(entry["revision"]) and isinstance(entry.get("verified_at"), (int, float))] \
-        if isinstance(entries, list) else []
+            and SHA.fullmatch(entry["revision"]) and isinstance(entry.get("verified_at"), (int, float))]
 
 
 def merged_generations(entries: Iterable[dict[str, object]], revisions: Iterable[tuple[str, str]],
@@ -46,4 +50,4 @@ def merged_generations(entries: Iterable[dict[str, object]], revisions: Iterable
         members = sorted((entry for entry in kept if entry["repository"] == repository),
                          key=lambda entry: entry["verified_at"])
         bounded.extend(members[-GENERATION_HISTORY:])
-    return {"schema_version": 1, "verified": bounded}
+    return {"schema_version": SCHEMA_VERSION, "verified": bounded}

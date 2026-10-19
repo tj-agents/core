@@ -1501,7 +1501,7 @@ def _record_generations(record: Path, revisions: Iterable[tuple[str, str]], atte
                 if attempt + 1 == attempts:
                     raise
                 time.sleep(0.05)
-    except (OSError, RollingPluginError) as error:
+    except (OSError, ValueError, RollingPluginError) as error:
         print(f"tj-agents: verified generations were not recorded in {record}: {error}", file=sys.stderr)
 
 
