@@ -387,3 +387,15 @@ Final verification: causal merged-main CI 39177848564 passed Windows/Linux. The 
 engineering package on current main contains the corrected --auto guidance. The original
 exact-head/main checks and the subsequent explicit terminal-green React merge also passed.
 Next action: none for this incident; retain the history and its pre-merge failure chronology.
+
+## M025 - Handoff laned as specified implementation while design decisions were still open
+
+**Kind:** mistake. **Observed/reported:** 2026-10-19. A cris-authz session launched the AB#28116 build handoff with `--lane L4` because the plan listed build steps. The delegated work still contained open design decisions, and it resolved to the workhorse model. Tommy called it out and the handoff was relaunched. **Cause:** ambiguous rule. `lanes` and both handoff launchers chose from "the hardest judgement inside the delegated work" but never defined when work counts as specified, so a detailed plan read as a specification.
+
+**Impact and priority:** P2; one handoff was redone, and no code had been written.
+
+**Source owner:** `engineering:lanes` and `machine:handoff-claude`/`handoff-codex`. **State:** repair in review. **Repair links:** branch `Fix-LaneOpenDecisions`. **Next action:** merge the wording change.
+
+**Resolution condition:** the lane rules state that work is specified only when every decision in it is recorded, and that a decision the successor must still make is open design however detailed the plan.
+
+**Verification evidence:** `tests/test_handoff_startup.py` and `.agents/hooks/tests/test_lane_tables.py` pass on the branch.

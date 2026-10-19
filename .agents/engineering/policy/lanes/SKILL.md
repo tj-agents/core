@@ -58,7 +58,9 @@ implementation that still needs code-level judgement, and L5 for small already-d
    design is L3; small local choices inside a specified, testable fix are L4.
 2. **Stakes.** For work that designs nothing: how costly, and how hard to undo, is a wrong call? A
    diagnosis or review with a lot riding on it — production, security, stored data — is L2.
-3. **Ambiguity.** Is the answer known and this is typing, or is the problem open? Open is never below L3;
+3. **Ambiguity.** Is the answer known and this is typing, or is the problem open? Work is specified only
+   when every decision in it is already recorded; one the worker must still make is open, however
+   detailed the plan around it. Open is never below L3;
    specified implementation that still needs code-level judgement is L4; small already-decided file
    deletion or move, config or docs cleanup is L5. File count, a handoff, or a merge does not raise it.
 4. **Verifiability.** What catches the mistake — a compiler, a test suite, or only human judgement? Use

@@ -64,9 +64,10 @@ non-Haiku model.
 
 **The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
 lane from the prompt would quietly decide the cost of every handoff. Choose the cheapest suitable rung by
-design, stakes, ambiguity and verifiability, from the hardest judgement inside the delegated work — never
-by how hard the work feels, file count, a handoff, or a merge, push or publish at its end, which the
-delivery gates govern:
+design, stakes, ambiguity and verifiability, from the hardest judgement inside the delegated work. A
+decision the successor must still make is open design, not specified implementation, however detailed
+the plan around it. Never choose by how hard the work feels, file count, a handoff, or a merge, push or
+publish at its end, which the delivery gates govern:
 
 | Lane | For |
 |---|---|
