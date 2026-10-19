@@ -104,12 +104,6 @@ when delivery is authorized. Bind remote monitoring to the exact repository, hea
 pending CI is owned without an active monitor. A failed test selects `engineering:failing-tests` and its
 diagnose, repair and focused verification loop. Do not weaken a check merely to produce a pass.
 
-When all owned work is done, select `machine:close` and prepare its post-report operation before
-delivering the final completion report. `base:goal-continuation` owns this requirement for ordinary
-tasks as well as goals and deliveries. The close operation owns verified host closure and its keep-open,
-active-dialogue and unsupported-host handling. A handoff predecessor follows `engineering:handoff`'s
-release instead.
-
 ## Maintain the right source owner
 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material

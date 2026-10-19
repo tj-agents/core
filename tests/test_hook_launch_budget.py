@@ -155,18 +155,7 @@ class HookBudgetUnderLoad(unittest.TestCase):
     def setUp(self):
         self.session = str(uuid.uuid4())
 
-    def test_prompt_route_does_no_scans_or_subprocesses_under_load(self):
-        runs = self.run_registered("engineering", "UserPromptSubmit", {"prompt": self.prompt})
-        self.assertEqual(1, len(runs))
-        self.assert_bounded(runs)
-        hook, result, _, events = runs[0]
-        self.assertIn("engineering:plan-execution automatically selected", result.stdout)
-        self.assertEqual([], [event for event in events if event[0] == "subprocess.Popen"])
-        watched = (str(self.home).lower(), str(self.cwd).lower())
-        self.assertEqual([], [path for _, path in events if path.lower().startswith(watched)])
-
-    def test_tool_hooks_stay_within_budget_and_recover_a_lost_route(self):
-        recovered = []
+    def test_tool_hooks_stay_within_budget(self):
         for plugin in PLUGINS:
             for event, payload in (
                 ("PreToolUse", {"tool_name": "Bash", "tool_input": {"command": "git status"}}),
@@ -177,9 +166,6 @@ class HookBudgetUnderLoad(unittest.TestCase):
             ):
                 runs = self.run_registered(plugin, event, payload)
                 self.assert_bounded(runs)
-                recovered.extend(result.stdout for _, result, _, _ in runs
-                                 if "did not deliver this prompt's route" in result.stdout)
-        self.assertEqual(1, len(recovered))
 
 
 if __name__ == "__main__":

@@ -139,7 +139,6 @@ Run from the implementation checkout:
 pwsh -NoProfile -File .agents/sync-generated.ps1 -Check
 python -B -m unittest discover -s tests -p test_plan_artifacts.py -v
 pwsh -NoProfile -File tests/skill-packaging.tests.ps1
-python3 -B -m unittest discover -s tests -p 'test_terminal_profile*.py' -v
 claude plugin validate --strict ./plugins/base
 ```
 

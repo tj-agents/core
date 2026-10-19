@@ -8,8 +8,8 @@ domain: process
 
 # Building a repo's skill-route table
 
-`.agents/skill-routes.json` maps a path to the skills that must be loaded before that path is written.
-`skill_router.py` reads it at write time and at review time; that mechanism, and how it is delivered, is
+`.agents/skill-routes.json` maps a path to the skills that apply when that path is written.
+`skill_router.py` reads it at review time and on request; that mechanism, and how it is delivered, is
 the `agents` README, not this doc. This doc owns the other half: **how a repo's table is built**,
 and why every carved service repo derives its own rather than copying one.
 

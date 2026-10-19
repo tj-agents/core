@@ -109,10 +109,8 @@ That command writes the binding to `.agents/persistent-workflow-binding.json` at
 owner/name, PR number and URL, branch, absolute worktree, full head SHA, the exact check and run IDs, and
 the completion condition. It is per-worktree runtime state, gitignored, and is the discoverable form of the
 binding a hook can read. Update it on every rebind to a new head, and delete it on any terminal (merge,
-closure, supersession, external head replacement, a human gate). `.agents/hooks/persistent_workflow_merge_gate.py`
-refuses `gh pr merge … --auto` on a PR whose checks or merge queue have not settled unless this file exists
-and its PR, head, and worktree match the enqueue — so an unattended auto-merge cannot be armed without a
-continuation that owns the wait.
+closure, supersession, external head replacement, a human gate). Do not arm an unattended auto-merge without
+a continuation that owns the wait.
 
 ## Route every wake through the shared decision contract
 
@@ -180,11 +178,9 @@ Persistent delivery may implement, test, commit, push, diagnose exact-head CI, a
 It must not merge, enable auto-merge, approve, deploy, delete, or widen scope without the recorded authority.
 A merge authorization never covers publishing: releasing to a package feed stays an explicit human call
 whatever the standing instruction says about merging.
-The merge hook and the ordinary review/merge skills remain authoritative. `.agents/hooks/forge_poll_gate.py`
-also enforces the single-monitor / one-read-per-wake rule from this contract. Launch
+The ordinary review/merge skills remain authoritative. Keep one monitor and one read per wake. Launch
 `.agents/workflows/workflow_ops.py monitor` for the exact binding; it persists state across disconnects and
-wakes the owner only for a material transition or terminal result. A repeated model-turn status read of
-unchanged state is blocked.
+wakes the owner only for a material transition or terminal result.
 
 Stop and remove the slice's host task when the bound PR merges, closes, is superseded, or reaches a genuine human,
 authorization, external-head, model-availability, or product-capability decision. A closed continuation is
