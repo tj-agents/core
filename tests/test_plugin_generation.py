@@ -8,8 +8,8 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / '.agents/machine/scripts'
@@ -32,21 +32,18 @@ class GenerationHarness(unittest.TestCase):
         base = Path(self.temp.name)
         self.claude = base / '.claude'
         self.codex = base / '.codex'
-        self.state = base / 'state'
-        self.environ = {
-            'CLAUDE_CONFIG_DIR': str(self.claude),
-            'CODEX_HOME': str(self.codex),
-            'AGENT_STATE_DIRECTORY': str(self.state),
-        }
+        self.environ = {'CLAUDE_CONFIG_DIR': str(self.claude), 'CODEX_HOME': str(self.codex)}
 
     def write(self, path, value, encoding='utf-8'):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(value), encoding=encoding)
         return path
 
+    def record(self, host):
+        return RECORD.generations_path((self.claude if host == 'claude' else self.codex) / 'plugins', host)
+
     def install(self, host, *revisions, now=1000.0):
-        plugins = self.claude / 'plugins' if host == 'claude' else self.codex / 'plugins'
-        record = RECORD.generations_path(plugins, host)
+        record = self.record(host)
         for offset, revision in enumerate(revisions):
             self.write(record, RECORD.merged_generations(RECORD.read_generations(record) or [], [(CORE, revision)],
                                                          now + offset))
@@ -81,7 +78,7 @@ class GenerationHarness(unittest.TestCase):
     def prompt(self, host, environ, session=SESSION):
         stream = io.StringIO()
         GENERATION.main(['--host', host], dict(self.environ, **environ),
-                        io.StringIO(json.dumps({'session_id': session, 'cwd': self.temp.name})), stream)
+                        io.StringIO(json.dumps({'session_id': session})), stream)
         return json.loads(stream.getvalue()) if stream.getvalue().strip() else None
 
     def context(self, output):
@@ -89,30 +86,33 @@ class GenerationHarness(unittest.TestCase):
 
 
 class CodexGenerationTests(GenerationHarness):
-    def test_a_newer_verified_generation_is_reported_at_the_next_prompt_and_not_before(self):
+    def test_a_newer_verified_generation_is_stated_at_every_prompt_after_it_lands(self):
         environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
         self.install('codex', A)
 
         self.assertIsNone(self.prompt('codex', environ))
 
         self.install('codex', B, now=2000.0)
-        first = self.prompt('codex', environ)
-        second = self.prompt('codex', environ)
-
-        self.assertIn(f'runs {A[:12]}, superseded by {B[:12]}', self.context(first))
-        self.assertIn(f'codex resume {SESSION}', self.context(first))
-        self.assertIn('task and ownership are unchanged', self.context(first))
-        self.assertIn('systemMessage', first)
-        self.assertIn(f'superseded by {B[:12]}', self.context(second))
-        self.assertNotIn('systemMessage', second)
+        for _ in range(2):
+            output = self.prompt('codex', environ)
+            self.assertIn(f'runs {A[:12]}, superseded by {B[:12]}', self.context(output))
+            self.assertIn(f'superseded by {B[:12]}', output['systemMessage'])
+        self.assertIn(f'codex resume {SESSION}', self.context(output))
+        self.assertIn('task and ownership are unchanged', self.context(output))
 
     def test_only_this_hosts_verified_installs_supersede_its_sessions(self):
         environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
         self.install('codex', A)
         self.install('claude', B, now=3000.0)
-        self.write(RECORD.generations_path(self.claude / 'plugins', 'claude'), '{')
 
         self.assertIsNone(self.prompt('codex', environ))
+
+    def test_the_other_hosts_bad_record_does_not_disable_this_hosts_gate(self):
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
+        self.install('codex', A, B)
+        self.write(self.record('claude'), '{')
+
+        self.assertIn(f'superseded by {B[:12]}', self.context(self.prompt('codex', environ)))
 
     def test_the_most_recent_verification_decides_the_newest_generation(self):
         environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', B))
@@ -189,19 +189,37 @@ class CodexGenerationTests(GenerationHarness):
     def test_malformed_records_cannot_become_the_newest_generation(self):
         environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
         self.install('codex', A)
-        record = RECORD.generations_path(self.codex / 'plugins', 'codex')
-        document = json.loads(record.read_text(encoding='utf-8'))
+        document = json.loads(self.record('codex').read_text(encoding='utf-8'))
         document['verified'].append({'repository': CORE, 'revision': 'not-a-sha', 'verified_at': 9999})
         document['verified'].append({'repository': CORE, 'revision': B})
-        record.write_text(json.dumps(document), encoding='utf-8')
+        self.write(self.record('codex'), document)
 
         self.assertIsNone(self.prompt('codex', environ))
 
+    def test_a_busy_or_corrupt_record_skips_history_but_still_reports_binding_problems(self):
+        shared = self.codex_root('tj-agents', 'machine', A)
+        alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
+        self.install('codex', A, B)
+        cases = {
+            'busy': lambda: mock.patch.object(GENERATION, 'read_generations', return_value=None),
+            'corrupt': lambda: mock.patch.object(GENERATION, 'read_generations',
+                                                 side_effect=lambda path: RECORD.read_generations(
+                                                     self.write(path, '{'))),
+        }
+        for name, disturbance in cases.items():
+            with self.subTest(record=name), disturbance():
+                self.assertIsNone(self.prompt('codex', self.receipt(alias)))
+                problem = self.prompt('codex', {'PLUGIN_ROOT': str(shared)})
+                self.assertIn('not launched through the tj-agents launcher', self.context(problem))
+                self.assertIn('not launched through the tj-agents launcher', problem['systemMessage'])
+
 
 class ClaudeGenerationTests(GenerationHarness):
-    def registry(self, *roots):
-        plugins = {f'{root.parent.name}@{root.parent.parent.name}': [{'scope': 'user', 'installPath': str(root)}]
-                   for root in roots}
+    def registry(self, *records):
+        plugins = {}
+        for root, scope in records:
+            plugins.setdefault(f'{root.parent.name}@{root.parent.parent.name}', []).append(
+                {'scope': scope, 'installPath': str(root)})
         self.write(self.claude / 'plugins/installed_plugins.json', {'version': 2, 'plugins': plugins},
                    encoding='utf-8-sig')
 
@@ -211,7 +229,7 @@ class ClaudeGenerationTests(GenerationHarness):
         environ = {'CLAUDE_PLUGIN_ROOT': str(machine_a)}
         self.assertIsNone(self.prompt('claude', environ))
 
-        self.registry(self.claude_root('machine', B))
+        self.registry((self.claude_root('machine', B), 'user'))
         self.install('claude', B, now=2000.0)
         output = self.prompt('claude', environ)
 
@@ -242,27 +260,26 @@ class ClaudeGenerationTests(GenerationHarness):
         loaded.mkdir(parents=True)
         installed = self.claude / 'plugins/cache/market/machine/1.1.0'
         installed.mkdir(parents=True)
-        self.registry(installed)
+        self.registry((installed, 'user'))
 
         output = self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(loaded)})
 
         self.assertIn('this process loaded 1.0.0, but 1.1.0 is installed', self.context(output))
 
-    def test_a_project_scoped_install_outranks_a_newer_user_install(self):
+    def test_a_non_rolling_root_still_named_by_any_registry_record_is_current(self):
         loaded = self.claude / 'plugins/cache/market/machine/1.0.0'
         loaded.mkdir(parents=True)
         newer = self.claude / 'plugins/cache/market/machine/1.1.0'
         newer.mkdir(parents=True)
-        self.write(self.claude / 'plugins/installed_plugins.json', {'version': 2, 'plugins': {'machine@market': [
-            {'scope': 'user', 'installPath': str(newer)},
-            {'scope': 'project', 'projectPath': self.temp.name, 'installPath': str(loaded)}]}})
-
-        self.assertIsNone(self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(loaded)}))
+        for scope in ('project', 'local', 'managed'):
+            with self.subTest(scope=scope):
+                self.registry((newer, 'user'), (loaded, scope))
+                self.assertIsNone(self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(loaded)}))
 
     def test_a_current_non_rolling_install_is_ignored(self):
         root = self.claude / 'plugins/cache/other/plugin/1.0.0'
         root.mkdir(parents=True)
-        self.registry(root)
+        self.registry((root, 'user'))
         self.install('claude', A, B)
 
         self.assertIsNone(self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(root)}))
@@ -276,16 +293,8 @@ class GateContractTests(GenerationHarness):
         self.assertIsNone(self.prompt('codex', environ, session='../escape'))
 
     def test_an_internal_failure_reports_an_unverified_generation(self):
-        original = GENERATION.check
-
-        def broken(*_arguments):
-            raise RuntimeError('synthetic failure')
-
-        GENERATION.check = broken
-        try:
+        with mock.patch.object(GENERATION, 'check', side_effect=RuntimeError('synthetic failure')):
             output = self.prompt('codex', {})
-        finally:
-            GENERATION.check = original
 
         self.assertIn('could not be checked (synthetic failure)', self.context(output))
 
@@ -297,70 +306,13 @@ class GateContractTests(GenerationHarness):
         self.assertEqual(RECORD.GENERATION_HISTORY, len(entries))
         self.assertEqual(f'{RECORD.GENERATION_HISTORY + 4:040x}', entries[-1]['revision'])
 
-    def test_reverifying_the_newest_revision_does_not_repeat_the_user_notice(self):
-        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
-        self.install('codex', A, B)
-        self.assertIn('systemMessage', self.prompt('codex', environ))
-
-        self.install('claude', B, now=9000.0)
-        self.install('codex', B, now=9500.0)
-        output = self.prompt('codex', environ)
-
-        self.assertIn(f'superseded by {B[:12]}', self.context(output))
-        self.assertNotIn('systemMessage', output)
-
-    def test_an_unreadable_or_missing_record_keeps_the_notice_state(self):
-        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
-        self.install('codex', A, B)
-        self.assertIn('systemMessage', self.prompt('codex', environ))
-        record = RECORD.generations_path(self.codex / 'plugins', 'codex')
-        content = record.read_bytes()
-
-        for disturbance in (lambda: record.write_text('{', encoding='utf-8'), record.unlink):
-            with self.subTest(disturbance=disturbance):
-                disturbance()
-                self.assertIsNone(self.prompt('codex', environ))
-                record.write_bytes(content)
-                self.assertNotIn('systemMessage', self.prompt('codex', environ))
-
-    def test_an_unreadable_record_still_reports_binding_problems_without_a_notice(self):
-        shared = self.codex_root('tj-agents', 'machine', B)
-        self.install('codex', B)
-        RECORD.generations_path(self.codex / 'plugins', 'codex').write_text('{', encoding='utf-8')
-
-        output = self.prompt('codex', {'PLUGIN_ROOT': str(shared)})
-
-        self.assertIn('not launched through the tj-agents launcher', self.context(output))
-        self.assertNotIn('systemMessage', output)
-
-    def test_a_supersession_that_returns_after_a_rollback_is_announced_again(self):
-        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
-        self.install('codex', A, B)
-        self.assertIn('systemMessage', self.prompt('codex', environ))
-        self.install('codex', A, now=3000.0)
-        self.assertIsNone(self.prompt('codex', environ))
-
-        self.install('codex', B, now=4000.0)
-
-        self.assertIn('systemMessage', self.prompt('codex', environ))
-
-    def test_notice_state_is_kept_alive_and_expired_state_is_swept(self):
-        stale = self.write(self.state / 'plugin-generation' / 'codex-stale.json', {'notified': 'old'})
-        leftover = self.write(self.state / 'plugin-generation' / '.codex-stale.json.1.tmp', {})
-        old = time.time() - GENERATION.STATE_RETENTION_SECONDS - 60
-        for path in (stale, leftover):
-            os.utime(path, (old, old))
-        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
-        self.install('codex', A, B)
-        self.prompt('codex', environ)
-        state = self.state / 'plugin-generation' / f'codex-{SESSION}.json'
-        os.utime(state, (old, old))
-
-        self.prompt('codex', environ)
-
-        self.assertFalse(stale.exists())
-        self.assertFalse(leftover.exists())
-        self.assertLess(time.time() - state.stat().st_mtime, 60)
+    def test_a_record_reads_missing_and_corrupt_as_empty_and_unreadable_as_unknown(self):
+        record = self.record('codex')
+        self.assertEqual([], RECORD.read_generations(record))
+        self.write(record, '{')
+        self.assertEqual([], RECORD.read_generations(record))
+        with mock.patch.object(Path, 'read_text', side_effect=PermissionError('in use')):
+            self.assertIsNone(RECORD.read_generations(record))
 
     def test_both_hosts_dispatch_the_gate_through_their_prompt_chain(self):
         alias = self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A)
