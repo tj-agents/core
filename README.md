@@ -205,8 +205,33 @@ needs trust review again. A running session keeps the hook bytes it loaded; star
 
 Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.
 
-Use `machine:plugin-selection` to give a repository its own plugin selection.
+## Repository plugin selection
 
-Codex does not load agent definitions directly from plugins. When engineering is selected, the startup
-preflight updates its shared agents in the active Codex profile. The installer preserves unowned filename
-collisions and locally changed owned files; Claude loads the package's `agents/` payload directly.
+Use `machine:plugin-selection` to commit `.agents/plugins.json`, `.claude/settings.json` and
+`.codex/config.toml`. Claude declares `extraKnownMarketplaces` with `autoUpdate: true` and
+`enabledPlugins`. Codex declares `[marketplaces]` and `[plugins]` in trusted project configuration.
+Native admission, installation, credentials and caches remain host responsibilities.
+
+Handoff, open and recovery launchers start the native CLI without refreshing plugins, generating
+packages or rewriting host configuration. They retain handoff startup acknowledgement and recovery
+pickup verification. Running sessions retain the instructions they already loaded.
+
+On Codex 0.163.0-alpha.1, declarations make a plugin discoverable but do not install it in an empty
+profile. `codex plugin add <plugin>@<marketplace>` installs the native cache and writes a user enabled
+entry. An installed cache can subsequently load solely from trusted project declarations. Generated
+settings alone do not prove fresh-machine installation. See the current
+[cutover acceptance record](plans/repo-declared-config/CUTOVER.md).
+
+Automatic updates belong to Claude's native updater and the background updater introduced by core
+PR #320. That PR's `setup.ps1` installs the one-time machine setup. Its Codex updater currently reads
+user configuration; repository-only background discovery must be verified before user declarations
+can be retired. Nothing updates packages in the launch path.
+
+For an explicit native refresh use `machine:refresh-cli`. Its default performs native marketplace
+and plugin updates; remote revision verification is opt-in and prints progress. `/reload-plugins`
+adopts updates in an open Claude session; start a new Codex session to load updated packages.
+
+Codex does not load agent definitions directly from plugins. Its engineering package supplies
+`scripts/install-codex-agents.ps1` for explicit profile delivery; launcher startup no longer copies
+agents or records hook trust. Native hook trust review still applies. Claude loads the package's
+`agents/` payload directly.

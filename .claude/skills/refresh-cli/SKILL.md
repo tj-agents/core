@@ -1,6 +1,6 @@
 ---
 name: refresh-cli
-description: Refresh Claude's and Codex's installed tj-agents plugins to current main in one command, repair what each host actually loads, and verify it. Use when a skill or hook is missing or out of date after a merge, when /reload-plugins still shows old standards, or when asked to refresh, update or resync the CLI plugins.
+description: Refresh selected tj-agents plugins through native Claude and Codex commands, with optional verification. Use when a skill or hook is missing or out of date after a merge, when /reload-plugins still shows old standards, or when asked to refresh, update or resync the CLI plugins.
 kind: utility
 domain: machine
 route: infer
