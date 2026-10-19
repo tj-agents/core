@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Refresh Codex plugin marketplaces only when their source revision changed (Python 3.11+)."""
+"""Keep this machine's agent plugins current and its merged worktrees removed (Python 3.11+).
+
+Codex marketplaces refresh only when their source revision changed. The worktree sweep runs from the
+installed engineering package, so it always matches the current standards.
+"""
 
 from __future__ import annotations
 
@@ -16,6 +20,7 @@ import time
 
 GIT_TIMEOUT_SECONDS = 30
 CLI_TIMEOUT_SECONDS = 300
+SWEEP_TIMEOUT_SECONDS = 1800
 LOCK_STALE_SECONDS = 3600
 SCRIPT_NAME = "plugin_autoupdate.py"
 
@@ -135,28 +140,48 @@ def load_codex_config() -> dict:
         return {}
 
 
-def installed_machine_roots(claude_config: Path, codex_config: dict) -> list[Path]:
+def installed_plugin_roots(plugin: str, claude_config: Path, codex_config: dict) -> list[Path]:
     roots = []
+    prefix = plugin + "@"
     settings = read_json(claude_config / "settings.json").get("enabledPlugins")
     installed = read_json(claude_config / "plugins" / "installed_plugins.json").get("plugins")
     if isinstance(settings, dict) and isinstance(installed, dict):
         for identity, on in settings.items():
             entries = installed.get(identity)
-            if on is True and identity.startswith("machine@") and isinstance(entries, list):
+            if on is True and identity.startswith(prefix) and isinstance(entries, list):
                 roots.extend(Path(entry["installPath"]) for entry in entries
                              if isinstance(entry, dict) and isinstance(entry.get("installPath"), str))
     plugins = codex_config.get("plugins")
     if isinstance(plugins, dict):
         for identity, settings in plugins.items():
-            if (identity.startswith("machine@") and isinstance(settings, dict)
-                    and settings.get("enabled") is True):
-                roots.append(codex_home() / "plugins" / "cache" / identity.split("@", 1)[1] / "machine" / "local")
+            if identity.startswith(prefix) and isinstance(settings, dict) and settings.get("enabled") is True:
+                roots.append(codex_home() / "plugins" / "cache" / identity.split("@", 1)[1] / plugin / "local")
     return roots
+
+
+def newest_existing(paths: list[Path]) -> Path | None:
+    existing = [path for path in paths if path.is_file()]
+    return max(existing, key=lambda path: path.stat().st_mtime) if existing else None
+
+
+def sweep_worktrees(codex_config: dict) -> str:
+    relative = Path(".agents", "engineering", "workflow", "merge", "scripts", "worktree_sweep.py")
+    script = newest_existing([root / relative for root in installed_plugin_roots("engineering", claude_home(),
+                                                                                   codex_config)])
+    if script is None:
+        return "engineering package not installed"
+    try:
+        result = subprocess.run([sys.executable, "-B", str(script)], stdin=subprocess.DEVNULL, capture_output=True,
+                                text=True, encoding="utf-8", errors="replace", timeout=SWEEP_TIMEOUT_SECONDS,
+                                check=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return f"failed: {error}"
+    return "ran" if result.returncode == 0 else f"failed with exit code {result.returncode}"
 
 
 def packaged_copies(codex_config: dict) -> list[Path]:
     relative = Path("resources", "machine", "scripts", SCRIPT_NAME)
-    return [root / relative for root in installed_machine_roots(claude_home(), codex_config)
+    return [root / relative for root in installed_plugin_roots("machine", claude_home(), codex_config)
             if (root / relative).is_file()]
 
 
@@ -195,6 +220,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-self-update", action="store_true")
+    parser.add_argument("--no-sweep", action="store_true")
     arguments = parser.parse_args(argv)
     directory = state_directory()
     lock = directory / "plugin-autoupdate.lock"
@@ -207,7 +233,9 @@ def main(argv: list[str] | None = None) -> int:
         config = load_codex_config()
         executable = shutil.which("codex")
         outcomes = refresh_codex(executable, codex_targets(config), recorded) if executable else {}
-        write_json(state_file, {"revisions": recorded, "last_run": time.time(), "outcomes": outcomes})
+        sweep = "skipped" if arguments.no_sweep else sweep_worktrees(config)
+        write_json(state_file, {"revisions": recorded, "last_run": time.time(), "outcomes": outcomes,
+                                "worktree_sweep": sweep})
         if not arguments.no_self_update:
             self_update(Path(__file__), config)
     finally:
