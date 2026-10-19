@@ -110,7 +110,8 @@ class CodexGenerationTests(GenerationHarness):
     def test_the_other_hosts_bad_record_does_not_disable_this_hosts_gate(self):
         environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-tj-agents', 'machine', A))
         self.install('codex', A, B)
-        self.write(self.record('claude'), '{')
+        self.record('claude').parent.mkdir(parents=True, exist_ok=True)
+        self.record('claude').write_bytes(b'\xff{')
 
         self.assertIn(f'superseded by {B[:12]}', self.context(self.prompt('codex', environ)))
 
@@ -203,8 +204,8 @@ class CodexGenerationTests(GenerationHarness):
         cases = {
             'busy': lambda: mock.patch.object(GENERATION, 'read_generations', return_value=None),
             'corrupt': lambda: mock.patch.object(GENERATION, 'read_generations',
-                                                 side_effect=lambda path: RECORD.read_generations(
-                                                     self.write(path, '{'))),
+                                                 side_effect=lambda path: (path.write_text('{', encoding='utf-8'),
+                                                                           RECORD.read_generations(path))[1]),
         }
         for name, disturbance in cases.items():
             with self.subTest(record=name), disturbance():
@@ -309,9 +310,14 @@ class GateContractTests(GenerationHarness):
     def test_a_record_reads_missing_and_corrupt_as_empty_and_unreadable_as_unknown(self):
         record = self.record('codex')
         self.assertEqual([], RECORD.read_generations(record))
-        self.write(record, '{')
-        self.assertEqual([], RECORD.read_generations(record))
-        with mock.patch.object(Path, 'read_text', side_effect=PermissionError('in use')):
+        record.parent.mkdir(parents=True, exist_ok=True)
+        for corrupt in (b'{', b'\xff\xfe{', b'"{"', b'{"schema_version": 1, "verified": null}'):
+            with self.subTest(corrupt=corrupt):
+                record.write_bytes(corrupt)
+                self.assertEqual([], RECORD.read_generations(record))
+        record.write_bytes(b'{"schema_version": 2, "verified": []}')
+        self.assertIsNone(RECORD.read_generations(record))
+        with mock.patch.object(Path, 'read_bytes', side_effect=PermissionError('in use')):
             self.assertIsNone(RECORD.read_generations(record))
 
     def test_both_hosts_dispatch_the_gate_through_their_prompt_chain(self):
