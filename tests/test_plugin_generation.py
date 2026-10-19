@@ -336,15 +336,20 @@ class GateContractTests(GenerationHarness):
         record = self.record('codex')
         self.assertEqual([], RECORD.read_generations(record))
         record.parent.mkdir(parents=True, exist_ok=True)
-        for corrupt in (b'{', b'\xff\xfe{', b'"{"', b'{"schema_version": 1, "verified": null}',
+        for corrupt in (b'{', b'\xff\xfe{', b'[' * 100000, b'"{"', b'{"schema_version": 1, "verified": null}',
                         b'{"schema_version": null, "verified": []}', b'{"schema_version": "2"}',
                         b'{"schema_version": true}', b'{"schema_version": 0}'):
             with self.subTest(corrupt=corrupt):
                 record.write_bytes(corrupt)
                 self.assertEqual(('readable', []), RECORD.read_record(record))
-        record.write_bytes(b'{"schema_version": 2, "verified": []}')
-        self.assertEqual(('newer', []), RECORD.read_record(record))
-        self.assertIsNone(RECORD.read_generations(record))
+        for newer in (b'{"schema_version": 2, "verified": []}', b'{"schema_version": 2.5}'):
+            record.write_bytes(newer)
+            self.assertEqual(('newer', []), RECORD.read_record(record))
+            self.assertIsNone(RECORD.read_generations(record))
+        record.write_bytes(json.dumps({'schema_version': 1, 'verified': [
+            {'repository': CORE, 'revision': A, 'verified_at': value} for value in (True, 'NaN')]}).encode('utf-8')
+                           .replace(b'"NaN"', b'NaN'))
+        self.assertEqual(('readable', []), RECORD.read_record(record))
         with mock.patch.object(Path, 'read_bytes', side_effect=PermissionError('in use')):
             self.assertEqual(('busy', []), RECORD.read_record(record))
 

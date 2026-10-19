@@ -82,15 +82,16 @@ def claude_install_paths(environ: Mapping[str, str]) -> list[str]:
 def claude_binding(root: Path, environ: Mapping[str, str]) -> Binding | None:
     owner = ownership(root)
     if owner is None:
+        loaded, plugin = normalized(root), normalized(root.parent)
+        cache = normalized(plugins_root("claude", environ) / "cache")
         try:
-            cached = len(Path(normalized(root)).relative_to(normalized(plugins_root("claude", environ) / "cache")).parts) == 3
+            cached = len(Path(loaded).relative_to(cache).parts) == 3
         except ValueError:
             cached = False
         if not cached:
             return None
-        loaded, plugin = normalized(root), normalized(root.parent)
         installed = [(normalized(path), Path(path).name) for path in claude_install_paths(environ)]
-        replacements = list(dict.fromkeys(name for path, name in installed if os.path.dirname(path) == plugin))
+        replacements = sorted({name for path, name in installed if os.path.dirname(path) == plugin})
         if any(path == loaded for path, _name in installed) or not replacements:
             return None
         return Binding(root.parent.name, str(root.parent), None, str(root),

@@ -578,15 +578,18 @@ class RollingPluginsTests(unittest.TestCase):
         self.assertEqual(4, sleep.call_count)
         self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
 
-        newer = record.read_bytes()
-        record.write_bytes(b'{"schema_version": 2, "verified": []}')
-        with mock.patch.object(ROLLING.time, 'sleep') as sleep:
-            ROLLING._record_generations(record, [(core, 'b' * 40)])
-        sleep.assert_not_called()
-        self.assertEqual(b'{"schema_version": 2, "verified": []}', record.read_bytes())
-        record.write_bytes(newer)
+        self.addCleanup(record.write_bytes, record.read_bytes())
+        for newer in (b'{"schema_version": 2, "verified": []}', b'{"schema_version": 2.0}'):
+            record.write_bytes(newer)
+            with mock.patch.object(ROLLING.time, 'sleep') as sleep:
+                ROLLING._record_generations(record, [(core, 'b' * 40)])
+            sleep.assert_not_called()
+            self.assertEqual(newer, record.read_bytes())
 
-        for corrupt in (b'{', b'\xff\xfe{'):
+        with mock.patch.object(ROLLING.generation_record, 'merged_generations', side_effect=RuntimeError('bug')):
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+
+        for corrupt in (b'{', b'\xff\xfe{', b'[' * 100000):
             record.write_bytes(corrupt)
             ROLLING._record_generations(record, [(core, 'b' * 40)])
             self.assertEqual(['b' * 40],
