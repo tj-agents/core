@@ -522,6 +522,79 @@ class RollingPluginsTests(unittest.TestCase):
         with self.assertRaisesRegex(ROLLING.RollingPluginError, 'disablement changed'):
             ROLLING.verify_final(prepared, 'claude', config, project, arguments)
 
+    def test_only_a_final_verification_still_on_main_records_its_generation(self):
+        core = 'https://github.com/tj-agents/core.git'
+        plugins = self.root / 'plugins'
+        root = ROLLING.VerifiedRoot('base@core', self.root / 'root', 'a' * 40, core)
+        prepared = ROLLING.Prepared('claude', (), (root,), self.root / 'catalog', {},
+                                    source_revisions=((core, 'a' * 40),), plugins_root=plugins)
+        record = ROLLING.generation_record.generations_path(plugins, 'claude')
+
+        def verify(main, linked=False):
+            refuse = ROLLING.RollingPluginError('linked') if linked else None
+            with mock.patch.object(ROLLING, '_selection_state', return_value=([], set())), \
+                    mock.patch.object(ROLLING, '_cache_root', return_value=self.root / 'cache'), \
+                    mock.patch.object(ROLLING, '_fetch_main', return_value=(self.root, main)), \
+                    mock.patch.object(ROLLING, '_unlinked_ancestors', side_effect=refuse):
+                ROLLING.verify_final(prepared, 'claude', self.root, self.root, {})
+
+        with self.assertRaisesRegex(ROLLING.RollingPluginError, 'main advanced'):
+            verify('b' * 40)
+        verify('a' * 40, linked=True)
+        self.assertFalse(record.exists())
+
+        verify('a' * 40)
+
+        self.assertEqual([(core, 'a' * 40)], [(entry['repository'], entry['revision'])
+                                              for entry in ROLLING.generation_record.read_generations(record)])
+
+    def test_a_record_held_open_by_a_reader_is_retried_and_a_lasting_refusal_leaves_no_temporary(self):
+        core = 'https://github.com/tj-agents/core.git'
+        record = ROLLING.generation_record.generations_path(self.root / 'plugins', 'codex')
+        write = ROLLING._write_json
+        attempts = []
+
+        def held_once(path, value):
+            attempts.append(path)
+            if len(attempts) == 1:
+                raise PermissionError('in use')
+            write(path, value)
+
+        with mock.patch.object(ROLLING, '_write_json', side_effect=held_once), \
+                mock.patch.object(ROLLING.time, 'sleep'):
+            ROLLING._record_generations(record, [(core, 'a' * 40)])
+        self.assertEqual(2, len(attempts))
+        self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
+
+        with mock.patch.object(ROLLING, '_write_json', side_effect=PermissionError('in use')), \
+                mock.patch.object(ROLLING.time, 'sleep'):
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+        self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
+        self.assertEqual([record.name], sorted(path.name for path in record.parent.iterdir()))
+
+        with mock.patch.object(ROLLING.generation_record, 'read_record', return_value=('busy', [])), \
+                mock.patch.object(ROLLING.time, 'sleep') as sleep:
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+        self.assertEqual(4, sleep.call_count)
+        self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
+
+        self.addCleanup(record.write_bytes, record.read_bytes())
+        for newer in (b'{"schema_version": 2, "verified": []}', b'{"schema_version": 2.0}'):
+            record.write_bytes(newer)
+            with mock.patch.object(ROLLING.time, 'sleep') as sleep:
+                ROLLING._record_generations(record, [(core, 'b' * 40)])
+            sleep.assert_not_called()
+            self.assertEqual(newer, record.read_bytes())
+
+        with mock.patch.object(ROLLING.generation_record, 'merged_generations', side_effect=RuntimeError('bug')):
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+
+        for corrupt in (b'{', b'\xff\xfe{', b'[' * 100000):
+            record.write_bytes(corrupt)
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+            self.assertEqual(['b' * 40],
+                             [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
+
     def test_claude_setting_sources_excludes_unselected_layers(self):
         config = self.root / 'profile'
         project = self.root / 'project'
