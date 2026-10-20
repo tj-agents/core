@@ -131,19 +131,6 @@ one-shot `wl-copy`/`xclip` invocation that exits once the data is handed off. Wh
 written here), default mode copies both flavours from one call and this entry is deleted, with a test
 proving a `text/plain` read-back succeeds right after a default-mode copy.
 
-## Rolling plugin preflight still needs real-host acceptance
-
-The handoff and recovery launchers use a bounded preflight that refreshes and verifies the selected
-tj-agents package closure from publisher `main` and blocks launch on any fetch, install, trust,
-verification or deadline failure; an installed fallback must never start after a failed refresh there.
-A typed `codex`/`claude` command instead falls back to the native CLI with a warning when that same
-preflight fails, so a standards outage never blocks the user's own command.
-
-This source contract still needs integrated real-host acceptance on Claude and Codex, including proof
-that the process deadline terminates the full updater tree and that handoff/recovery startup remains
-blocked after each failure class. Do not treat source tests or native disposable-profile experiments as
-that acceptance.
-
 ## A shared parent shell can keep the worktree locked after finish
 
 `finish.py` stops a parent shell only when it is this session's dedicated wrapper. When the CLI was started
@@ -177,15 +164,6 @@ one fired, and what caused it, was not identified.
 Resolve when the failing branch is identified from a reproduction (for example, logging both checks under
 two concurrent full suites), its cause is fixed or isolated, and two full suites run concurrently on one
 machine pass.
-
-## A bound launch spends minutes before the native CLI starts
-
-Observed 2026-10-18 on Windows: `startup_binding.py` took about 90 s (Claude) and 165 s (Codex) before
-starting the native CLI. Profiling a Codex launch showed `materialize_native` about 64 s,
-`codex_runtime_binding.prepare_runtime` about 100 s, and Codex hook-trust reads about 22 s. Every terminal,
-handoff and recovery launch pays this, and the tab shows nothing meanwhile. Resolve when a launch with an
-unchanged package set reaches the native CLI in seconds, for example by reusing a verified runtime whose
-revisions match `main`.
 
 ## handoff-claude and handoff-codex report a launch they never observed
 
