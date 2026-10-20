@@ -173,10 +173,14 @@ def console_python() -> str:
     return str(console) if executable.name.lower() == "pythonw.exe" and console.is_file() else sys.executable
 
 
-def sweep_worktrees(codex_config: dict) -> str:
+def sweep_script(codex_config: dict) -> Path | None:
     relative = Path(".agents", "engineering", "workflow", "merge", "scripts", "worktree_sweep.py")
-    script = newest_existing([root / relative for root in installed_plugin_roots("engineering", claude_home(),
-                                                                                   codex_config)])
+    return newest_existing([root / relative for root in installed_plugin_roots("engineering", claude_home(),
+                                                                                codex_config)])
+
+
+def sweep_worktrees(codex_config: dict) -> str:
+    script = sweep_script(codex_config)
     if script is None:
         return "engineering package not installed"
     try:
