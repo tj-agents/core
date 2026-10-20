@@ -156,6 +156,25 @@ class LockAndSelfUpdateTests(unittest.TestCase):
                 self.assertEqual('engineering package not installed', UPDATE.sweep_worktrees({}))
 
 
+    def test_every_child_process_starts_without_a_console_window(self):
+        source = (SCRIPTS / 'plugin_autoupdate.py').read_text(encoding='utf-8')
+        launches = source.count('subprocess.run(') + source.count('subprocess.Popen(')
+
+        self.assertEqual(launches, source.count('creationflags=NO_WINDOW'))
+        if os.name == 'nt':
+            self.assertEqual(UPDATE.subprocess.CREATE_NO_WINDOW, UPDATE.NO_WINDOW)
+
+    def test_the_sweep_runs_under_a_console_interpreter_when_scheduled_windowless(self):
+        with tempfile.TemporaryDirectory(prefix='python dir ') as temp:
+            pythonw = Path(temp) / 'pythonw.exe'
+            console = Path(temp) / 'python.exe'
+            pythonw.write_text('', encoding='utf-8')
+            console.write_text('', encoding='utf-8')
+
+            with mock.patch.object(UPDATE.sys, 'executable', str(pythonw)):
+                self.assertEqual(str(console), UPDATE.console_python())
+
+
 class SetupTests(unittest.TestCase):
     def test_claude_auto_update_is_enabled_only_for_marketplaces_of_enabled_plugins(self):
         with tempfile.TemporaryDirectory(prefix='claude config ') as temp:
