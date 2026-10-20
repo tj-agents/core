@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import agent_cli
 from codex_hook_trust import AppServer, github_repository
+import plugin_autoupdate
 
 TIMEOUT = 300
 
@@ -88,19 +89,26 @@ def refresh(host: str, executable: str, project: Path, marketplaces: dict, plugi
         run([executable, "plugin", "marketplace", "update" if host == "claude" else "upgrade", name], project)
     installations = (json.loads(run([executable, "plugin", "list", "--json"], project))
                      if host == "claude" and plugins else [])
+    user_config = configuration_root(host) / "config.toml"
+    user_enabled = plugin_autoupdate.enabled_identities(plugin_autoupdate.load_toml(user_config))
     for identity in plugins:
         if host == "claude":
-            scopes = {"project"}
+            declared = {scope for scope, name in (("project", "settings.json"), ("local", "settings.local.json"))
+                        if read_json(project / ".claude" / name).get("enabledPlugins", {}).get(identity) is True}
+            scopes = set(declared) or {"user"}
             for entry in installations:
                 owner = entry.get("projectPath")
                 if (entry.get("id") == identity and entry.get("scope") == "local" and owner
                         and project.resolve().is_relative_to(Path(owner).resolve())):
                     scopes.add("local")
-            run([executable, "plugin", "install", identity, "--scope", "project"], project)
+            for scope in sorted(declared):
+                run([executable, "plugin", "install", identity, "--scope", scope], project)
             for scope in sorted(scopes):
                 run([executable, "plugin", "update", identity, "--scope", scope], project)
         else:
             run([executable, "plugin", "add", identity], project)
+    if host == "codex":
+        plugin_autoupdate.remove_user_plugins(user_config, set(plugins) - user_enabled)
 
 
 def package_tree(root: Path) -> dict[str, bytes]:
