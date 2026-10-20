@@ -24,11 +24,10 @@ owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
 Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
-The [shared recording contract](.agents/engineering/resources/problem-records.md) uses an explicitly
-selected provider for future bugs, mistakes, debt, features and tasks. Without selection, existing
-repository owners and file defaults apply, including root `BUGS.md`/`MISTAKES.md` and area `TECH_DEBT.md`.
-`engineering:write-issue` classifies a recording request and delegates to the corresponding specific
-writer. The problem address workflows reuse the existing repair lifecycle.
+The [shared recording contract](.agents/engineering/resources/problem-records.md) routes future bugs,
+mistakes, debt, features and tasks to Work Items. `work-items:write-issue` classifies a recording request
+and delegates to the corresponding specific writer; failure does not fall back to root problem-register
+files. The problem address workflows reuse the existing repair lifecycle.
 Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.9+
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
 current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or
