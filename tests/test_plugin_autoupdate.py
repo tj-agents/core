@@ -267,9 +267,15 @@ class LockAndSelfUpdateTests(unittest.TestCase):
                                   'machine@retired': {'enabled': False}}}
 
             with mock.patch.dict(os.environ, {'CODEX_HOME': str(codex)}):
-                roots = UPDATE.installed_machine_roots(claude, config)
+                roots = UPDATE.installed_plugin_roots('machine', claude, config)
 
             self.assertEqual([current, codex / 'plugins' / 'cache' / 'base-agents' / 'machine' / 'local'], roots)
+
+
+    def test_the_sweep_is_skipped_when_no_engineering_package_is_installed(self):
+        with tempfile.TemporaryDirectory(prefix='plugin homes ') as temp:
+            with mock.patch.dict(os.environ, {'CLAUDE_CONFIG_DIR': temp, 'CODEX_HOME': temp}):
+                self.assertEqual('engineering package not installed', UPDATE.sweep_worktrees({}))
 
 
 class SetupTests(unittest.TestCase):
