@@ -33,8 +33,11 @@ def primary_checkout(directory):
         )
     except (OSError, subprocess.SubprocessError) as error:
         raise RecordError("source primary checkout could not be resolved") from error
-    entries = [Path(field[9:]).resolve() for field in listed.stdout.split("\0")
-               if field.startswith("worktree ") and field[9:]]
+    entries = []
+    for block in listed.stdout.split("\0\0"):
+        fields = block.strip("\0").split("\0")
+        if fields[0].startswith("worktree ") and fields[0][9:] and "bare" not in fields[1:]:
+            entries.append(Path(fields[0][9:]).resolve())
     if listed.returncode or not entries or worktree not in entries or not entries[0].is_dir():
         raise RecordError("source primary checkout could not be resolved")
     return entries[0]

@@ -464,15 +464,45 @@ class WorkItemStatusTests(ListWorkHarness):
         self.assertEqual(2, result.returncode)
         self.assertIn('list-work capability failure', result.stderr)
 
-    def test_selected_queue_is_never_reported_as_file_plans(self):
-        self.repo_plan('plans/STALE_BACKLOG.md')
-        (self.here / '.problem-records.json').write_text(
-            json.dumps({'schema_version': 1, 'provider': 'fixture:manage'}), encoding='utf-8')
-        result = self.capability_result(SCRIPT)
-        self.assertEqual(2, result.returncode)
-        self.assertIn('fixture:manage', result.stderr)
-        self.assertIn('list/read', result.stderr)
-        self.assertNotIn('STALE_BACKLOG', result.stdout)
+    def select(self, repo, text=None):
+        (repo / '.problem-records.json').write_text(
+            text or json.dumps({'schema_version': 1, 'provider': 'fixture:manage'}), encoding='utf-8')
+
+    def test_selected_repository_lists_plans_as_supporting_context(self):
+        self.repo_plan('plans/STALE_BACKLOG.md', '# backlog\n\n- [x] done\n- [ ] open\n')
+        self.plan('demo/LOCAL_NOTES.md')
+        self.select(self.here)
+        output = self.board()
+        self.assertEqual({'STALE_BACKLOG.md', 'LOCAL_NOTES.md'}, rows(output))
+        backlog = next(line for line in ROW.findall(output) if line.endswith('STALE_BACKLOG.md'))
+        self.assertIn('supporting', backlog)
+        self.assertNotIn('live', backlog)
+        self.assertIn('selected provider: fixture:manage', output)
+        self.assertIn('list/read', output)
+
+    def test_sibling_selection_failures_are_skipped_without_aborting(self):
+        application = self.repo('group', 'app')
+        documentation = self.repo('group', 'docs')
+        selected = self.repo('group', 'tracker')
+        stale = self.repos / 'group' / 'stale'
+        stale.mkdir()
+        (stale / '.git').write_text('gitdir: %s\n' % (self.home / 'missing-gitdir'), encoding='utf-8')
+        self.repo_plan('plans/payments/APP_PLAN.md', '# app\n\n- [ ] open\n', repo=application)
+        self.repo_plan('plans/payments/DOCS_PLAN.md', repo=documentation)
+        self.repo_plan('plans/payments/TRACKER_PLAN.md', '# tracker\n\n- [ ] open\n', repo=selected)
+        self.select(documentation, '{')
+        self.select(selected)
+        output = self.board(cwd=application)
+        self.assertEqual({'APP_PLAN.md', 'TRACKER_PLAN.md'}, rows(output))
+        application_row = next(line for line in ROW.findall(output) if line.endswith('APP_PLAN.md'))
+        self.assertIn('live 0/1', application_row)
+        tracker_row = next(line for line in ROW.findall(output) if line.endswith('TRACKER_PLAN.md'))
+        self.assertIn('supporting', tracker_row)
+        skipped = [line for line in output.splitlines() if line.startswith('skipped: ')]
+        self.assertEqual(2, len(skipped))
+        self.assertTrue(any('docs' in line for line in skipped))
+        self.assertTrue(any('stale' in line for line in skipped))
+        self.assertIn('selected provider: fixture:manage', output)
 
     def test_invalid_selection_never_falls_back_to_plans(self):
         self.repo_plan('plans/STALE_BACKLOG.md')

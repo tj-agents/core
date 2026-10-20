@@ -358,7 +358,7 @@
                   "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
                 ]
               ],
-              "justification": "Reads unselected file-backed plans and local execution status; selected or invalid tracker declarations stop the scan and direct the caller to the canonical provider without writing state",
+              "justification": "Reads plans and local execution status, labels a selected repository's plans as supporting context and names its provider; an invalid current-repository selection stops the scan. It writes no repository or session state",
               "match": [
                 [
                   "python3",

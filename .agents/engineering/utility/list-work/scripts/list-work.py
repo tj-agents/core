@@ -86,33 +86,35 @@ def work_item_reader():
     return runtime, contract
 
 
-def require_file_backlog(directory):
-    if not any((path / ".git").exists() for path in (directory, *directory.parents)):
-        return
-    hooks = workflow_root().parent / "hooks"
-    sys.path.insert(0, str(hooks))
+def record_selection_reader():
+    sys.path.insert(0, str(workflow_root().parent / "hooks"))
     try:
-        from problem_records import RecordError, declaration, primary_checkout
+        import problem_records
     except ImportError as error:
         raise RuntimeError("list-work capability failure: own record-selection helper is unavailable") from error
+    return problem_records
+
+
+def record_selection(directory):
+    if not any((path / ".git").exists() for path in (directory, *directory.parents)):
+        return None
     try:
-        primary = primary_checkout(directory)
-        selected = declaration(primary)
-    except RecordError as error:
-        raise RuntimeError("list-work record selection failed: " + str(error)) from error
-    if selected:
-        raise RuntimeError(
-            "list-work selected provider: " + selected["provider"] + "; load that skill and use its "
-            "list/read commands for " + str(primary) + ". The file scanner cannot list its live queue."
-        )
+        primary = records.primary_checkout(directory)
+        selected = records.declaration(primary)
+    except records.RecordError as error:
+        raise RuntimeError("list-work record selection failed for %s: %s" % (directory, error)) from error
+    return (primary, selected["provider"]) if selected else None
 
 
 try:
     runtime, contract = work_item_reader()
-    require_file_backlog(here)
+    records = record_selection_reader()
+    asked = record_selection(here)
 except RuntimeError as error:
     print(error, file=sys.stderr)
     raise SystemExit(2)
+selected_repositories = dict([asked]) if asked else {}
+skipped = []
 
 
 def group_of(project):
@@ -158,12 +160,18 @@ def repo_plans():
         return
     members = [home] if is_repo(home) else [
         child for child in home.iterdir() if child.is_dir() and is_repo(child)]
+    current = here.resolve()
     for member in members:
-        try:
-            require_file_backlog(member)
-        except RuntimeError as error:
-            print(error, file=sys.stderr)
-            raise SystemExit(2)
+        if member.resolve() == current or member.resolve() in current.parents:
+            selection = asked
+        else:
+            try:
+                selection = record_selection(member)
+            except RuntimeError as error:
+                skipped.append(str(error))
+                continue
+        if selection:
+            selected_repositories[selection[0]] = selection[1]
         for relative in PLAN_DIRS:
             first = member.joinpath(*relative.split("/"))
             if not first.is_dir():
@@ -178,7 +186,7 @@ def repo_plans():
                     continue
                 topic = parts[-2] if len(parts) > 1 else ""
                 label = topic or member.name
-                yield path, member.name + ("/" + topic if topic else ""), label, mine, member, item
+                yield path, member.name + ("/" + topic if topic else ""), label, mine, member, item, selection
 
 
 def plan_entries():
@@ -198,7 +206,7 @@ named_seen = False
 providers = {}
 for entry in plan_entries():
     path, folder, label, group = entry[:4]
-    member, item = entry[4:] if len(entry) > 4 else (None, None)
+    member, item, selection = entry[4:] if len(entry) > 4 else (None, None, None)
     work_item_key = "%s/%s" % item.groups() if item is not None else ""
     if scope != "all" and mine and group and group != mine:
         if about(folder) or about(path.stem) or (work_item_key and about(work_item_key)):
@@ -239,12 +247,14 @@ for entry in plan_entries():
             status_reason = str(error)
     else:
         opens, dones = len(OPEN_BOX.findall(text)), len(DONE_BOX.findall(text))
-        if opens:
-            state = "live %d/%d" % (dones, dones + opens)
-        elif DONE.search(text) or dones:
+        if not opens and (DONE.search(text) or dones):
             if is_named:
                 hidden += 1
             continue
+        if selection:
+            state = "supporting"
+        elif opens:
+            state = "live %d/%d" % (dones, dones + opens)
         else:
             state = ""
     hit = NEXT.search(text) or RESOLVES.search(text) or OPEN_ITEM.search(text)
@@ -278,3 +288,8 @@ if needle:
               " roadmap kept inside a repo is never searched." % subject)
 for group, count in sorted(elsewhere.items(), key=lambda value: -value[1]):
     print("out of scope: %d in %s - rerun with the scope argument all to include." % (count, group))
+for primary, provider in sorted(selected_repositories.items()):
+    print("selected provider: %s owns live work items for %s; use its list/read commands."
+          " Its plans above are supporting context." % (provider, primary))
+for reason in skipped:
+    print("skipped: %s" % reason)

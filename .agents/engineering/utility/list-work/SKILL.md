@@ -8,13 +8,13 @@ domain: process
 
 # List work
 
-Read [the shared recording contract](../../resources/problem-records.md) first. When a provider is
-selected, load its qualified skill and use its list/read commands scoped by the requested filter,
-limit, kind and state. Include tracker-only items with no local plan; source plans supply supporting
-design and recovery context. The provider owns live item state.
+Read [repository selection](../../resources/problem-records.md#repository-selection) first. When a
+provider is selected, load its qualified skill and use its list/read commands scoped by the requested
+filter, limit, kind and state. Include tracker-only items with no local plan. The provider owns live item
+state.
 
-Without a selected provider, run the shipped script from the skill directory. The optional arguments are filter, limit, and scope;
-`all` includes other repository groups.
+Run the shipped script from the skill directory for plans. The optional arguments are filter, limit, and
+scope; `all` includes other repository groups.
 
 On Windows:
 
@@ -28,5 +28,8 @@ On Linux or macOS:
 python3 -B "<skill-directory>/scripts/list-work.py" "<filter>" [limit] [scope]
 ```
 
-For script output, report the rows as printed, newest first. Keep out-of-scope and text-only matches as counts unless the
-caller selected `all`. Blank state means the plan has no explicit checkbox or completion state.
+Report the rows as printed, newest first. Keep out-of-scope and text-only matches as counts unless the
+caller selected `all`. Blank state means the plan has no explicit checkbox or completion state. A selected
+repository's plans show `supporting`: they are design and recovery context, never its live queue. Report
+`skipped` repositories whose selection could not be read; an invalid selection in the current repository
+stops the script.
