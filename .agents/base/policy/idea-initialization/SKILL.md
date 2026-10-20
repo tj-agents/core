@@ -19,6 +19,10 @@ outcome; choose the smallest suitable approach.
 Solve deterministic work with deterministic code: a script, fixture or dummy process, never a model
 session.
 
+```text
+Test the session-close watcher against `python -c "import time; time.sleep(600)"`, not a Claude session.
+```
+
 Record that the assessment is complete, its useful references, limitations, and rationale in the
 existing task context or goal/decision artifact. Distinguish observed behavior from source inspection
 and documentation claims. Small ideas need no new plan, configuration, database, or command just to
