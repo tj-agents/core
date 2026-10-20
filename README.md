@@ -182,18 +182,38 @@ resources remain covered.
 
 ## Machine setup and updates
 
-Run once per machine, and again whenever you like; it changes nothing that is already set:
+Run once per machine. Rerunning setup converges on the same channel and service configuration:
 
 ```text
 ./setup.ps1          # Windows (PowerShell)
-./setup.sh           # Linux and macOS (bash and python3)
+./setup.sh           # Linux (bash and python3)
 ```
 
-It turns on Claude's own auto-update for every marketplace an enabled plugin comes from, removes the
-retired `claude`/`codex` profile launcher, and schedules `plugin_autoupdate.py` hidden at logon and hourly
-(Task Scheduler on Windows, crontab on Linux). Each run checks every Codex git marketplace that an enabled
-plugin comes from with one `git ls-remote`, and upgrades the marketplace and re-adds its enabled plugins only
-when the revision changed. Nothing runs when `claude` or `codex` starts.
+It enables Claude's native auto-update, removes the retired CLI launchers and installs one hidden
+machine event listener in `~/.agents-state/bin`. Windows uses a logon-only Task Scheduler task with
+failure restart and no execution limit. Linux uses a systemd user service with failure restart; systemd
+is required. Setup removes the former hourly plugin-autoupdate and merge-gates tasks or cron entries.
+Rerunning setup reuses the shared channel, replaces the runtime and restarts the same listener.
+
+The listener holds a blocking HTTPS JSON subscription to ntfy.sh. Main-branch callers use the shared
+`tj-agents/github-actions/.github/actions/machine-events` publisher. Setup reuses or creates the
+unguessable `MACHINE_EVENTS_TOPIC` Actions variable on core, configures the same variable for active
+repositories in tj-agents, Concertable and tomjseery, and saves it in `~/.agents-state/machine-events.json`.
+The same value is stored as an Actions secret for callers, so public run logs mask it.
+The topic is an untrusted public hint channel; it contains only repository names and change categories.
+No administrative GitHub credential is stored in Actions.
+
+The listener re-reads GitHub and invokes the installed github-actions plugin's `merge-policy reconcile`
+for committed policy changes as Tommy's saved `gh` account. Install that plugin before setup. It invokes
+`plugin_autoupdate.py` for marketplace changes, and the existing sweep for main-branch changes. It
+catches up once on startup and after an offline gap, coalesces duplicates and retries failures a
+bounded number of times. There are no periodic GitHub checks. Native process-exit notifications resume
+plugin refreshes deferred while Codex sessions are alive. Nothing runs at CLI startup.
+
+Runtime logs rotate at `~/.agents-state/machine-events.log`. Package regeneration jobs publish a second
+hint after pushing generated packages because GitHub's own token cannot trigger another push workflow.
+Existing repositories need the prepared uniform caller merged; service scaffolding emits it for new
+repositories. GitHub Free's repository ruleset limitations still apply to private repositories.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
 loaded; new sessions pick up the update. `install.ps1` still wires the Windows `shell/` profile.
@@ -206,8 +226,34 @@ needs trust review again. A running session keeps the hook bytes it loaded; star
 
 Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.
 
-Use `machine:plugin-selection` to give a repository its own plugin selection.
+## Repository plugin selection
 
-Codex does not load agent definitions directly from plugins. When engineering is selected, the startup
-preflight updates its shared agents in the active Codex profile. The installer preserves unowned filename
-collisions and locally changed owned files; Claude loads the package's `agents/` payload directly.
+Use `machine:plugin-selection` to commit `.agents/plugins.json`, `.claude/settings.json` and
+`.codex/config.toml`. Claude declares `extraKnownMarketplaces` with `autoUpdate: true` and
+`enabledPlugins`. Codex declares `[marketplaces]` and `[plugins]` in trusted project configuration.
+Native admission, installation, credentials and caches remain host responsibilities.
+
+Handoff, open and recovery launchers start the native CLI without refreshing plugins, generating
+packages or rewriting host configuration. They retain handoff startup acknowledgement and recovery
+pickup verification. Running sessions retain the instructions they already loaded.
+
+On Codex 0.163.0-alpha.1, declarations make a plugin discoverable but do not install it in an empty
+profile. `codex plugin add <plugin>@<marketplace>` installs the native cache and writes a user enabled
+entry. An installed cache can subsequently load solely from trusted project declarations. Generated
+settings alone do not prove fresh-machine installation. See the current
+[cutover acceptance record](plans/repo-declared-config/CUTOVER.md).
+
+Automatic updates belong to Claude's native updater and the background updater installed by `setup.ps1`.
+The scheduled Codex updater also installs missing declared plugins after a repository has native trust.
+Its native `plugin add` commands maintain the host's required user installation entries automatically;
+repository settings remain the authored selection. Codex currently provides no cache-only install scope.
+Nothing updates packages in the launch path.
+
+For an explicit native refresh use `machine:reload-plugins`. Its default performs native marketplace
+and plugin updates; remote revision verification is opt-in and prints progress. `/reload-plugins`
+adopts updates in an open Claude session; start a new Codex session to load updated packages.
+
+Codex does not load agent definitions directly from plugins. Its engineering package supplies
+`scripts/install-codex-agents.ps1` for explicit profile delivery; launcher startup no longer copies
+agents or records hook trust. Native hook trust review still applies. Claude loads the package's
+`agents/` payload directly.
