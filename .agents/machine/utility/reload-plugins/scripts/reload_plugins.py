@@ -6,9 +6,9 @@ import runpy
 
 HERE = Path(__file__).resolve()
 TARGET = next(path for path in (
-    HERE.parents[3] / "scripts" / "refresh_cli.py",
-    HERE.parents[3] / "resources" / "machine" / "scripts" / "refresh_cli.py",
-    HERE.parents[5] / "resources" / "machine" / "scripts" / "refresh_cli.py",
+    HERE.parents[3] / "scripts" / "reload_plugins.py",
+    HERE.parents[3] / "resources" / "machine" / "scripts" / "reload_plugins.py",
+    HERE.parents[5] / "resources" / "machine" / "scripts" / "reload_plugins.py",
 ) if path.is_file())
 
 if __name__ == "__main__":

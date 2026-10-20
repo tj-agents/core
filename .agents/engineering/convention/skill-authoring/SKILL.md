@@ -64,6 +64,19 @@ different name for an exact match or a near miss. Where a bare name is already s
 publisher, write the qualified `plugin:name` in every reference to it, because a bare name may select the
 other plugin's skill.
 
+## Mirror a host's native command
+
+When a host already provides a capability natively, name the skill exactly after that command and make it
+one skill on both hosts with extended host adapters (`extended_host_adapters` in
+`.agents/plugins/sources.json`). Each host's entry point uses its native mechanism; the shared definition
+supplies an implementation only for a host that lacks one. Never give the same capability different names
+or different update paths per host.
+
+```text
+Claude Code has /reload-plugins; Codex has none.
+Skill `reload-plugins`: Claude's entry point asks for /reload-plugins; Codex's runs the shared script.
+```
+
 ## Write the description as the selection trigger
 
 The description is the only text an agent sees before choosing. State what the skill owns, then a
