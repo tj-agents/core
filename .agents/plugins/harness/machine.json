@@ -120,15 +120,7 @@
         "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
         "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
         "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-        "Bash(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)"
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)"
       ],
       "codex_prefix_rules": [
         {
@@ -529,7 +521,7 @@
             ],
             "arm"
           ],
-          "justification": "Prepare or complete only this verified CLI closure after all owned work and Stop gates are satisfied; removal remains receipt-guarded",
+          "justification": "Arm a watcher that closes only this verified CLI after its final reply",
           "match": [
             [
               "python",
@@ -550,47 +542,6 @@
               "-B",
               "${PLUGIN_ROOT}/other.py",
               "arm"
-            ]
-          ]
-        },
-        {
-          "pattern": [
-            [
-              "python",
-              "python3"
-            ],
-            "-B",
-            [
-              "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-              "${PLUGIN_ROOT}/skills/close/scripts/close_session.py",
-              "${PLUGIN_ROOT}/codex-skills/close/scripts/close_session.py"
-            ],
-            "complete",
-            "--stop-gates-accepted"
-          ],
-          "justification": "Prepare or complete only this verified CLI closure after all owned work and Stop gates are satisfied; removal remains receipt-guarded",
-          "match": [
-            [
-              "python",
-              "-B",
-              "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-              "complete",
-              "--stop-gates-accepted"
-            ]
-          ],
-          "not_match": [
-            [
-              "python",
-              "-B",
-              "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-              "hook"
-            ],
-            [
-              "python",
-              "-B",
-              "${PLUGIN_ROOT}/other.py",
-              "complete",
-              "--stop-gates-accepted"
             ]
           ]
         },
