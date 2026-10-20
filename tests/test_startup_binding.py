@@ -131,6 +131,16 @@ class StartupBindingTests(unittest.TestCase):
                                                require_session_start=True, on_running=running))
         running.assert_called_once()
 
+    @unittest.skipUnless(os.name == "nt", "Windows taskkill fallback")
+    def test_taskkill_failure_falls_back_to_direct_termination(self):
+        for error in (OSError("unavailable"), subprocess.TimeoutExpired("taskkill", 10)):
+            with self.subTest(error=error):
+                process = mock.Mock(pid=4242)
+                with mock.patch.object(BINDING.subprocess, "run", side_effect=error):
+                    BINDING._terminate(process)
+                process.kill.assert_called_once()
+                process.wait.assert_called_once_with(timeout=5)
+
     @unittest.skipIf(os.name == "nt", "POSIX process groups")
     def test_termination_escalates_to_the_entire_process_group(self):
         process = mock.Mock(pid=4242)
