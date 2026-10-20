@@ -1,24 +1,13 @@
-"""Prepare and execute verified post-report closure of this completed CLI."""
+"""Arm a detached watcher that closes this CLI once its final reply is delivered (Python 3.9+)."""
 
 import argparse
-import hashlib
 import importlib
+import importlib.util
 import json
-import math
 import os
 from pathlib import Path
-import re
 import sys
-import tempfile
 import time
-import uuid
-
-
-MAX_TAIL = 1 << 20
-MAX_AGE = 3600
-IDENTITY = ('host', 'session_id', 'pid', 'pid_started_at')
-DONE = re.compile(r"^\s*(?:\*\*)?(?:done|all done|all complete|work complete|completed)(?:\*\*)?[.!:]?(?:\s|$)", re.I)
-KEEP_OPEN = re.compile(r"\b(?:keep|leave)\b[^.!?\n]{0,50}\bopen\b|\b(?:do not|don't|never)\s+close\b", re.I)
 
 
 def peer_scripts():
@@ -45,34 +34,28 @@ def verified_entry(shared):
     return entry
 
 
-def ticket_path(session):
-    root = Path(os.environ.get('AGENT_STATE_DIRECTORY') or Path.home() / '.agents-state')
-    digest = hashlib.sha256(session.encode('utf-8')).hexdigest()
-    return root / 'session-close' / (digest + '.json')
-
-
-def read_ticket(session):
-    try:
-        value = json.loads(ticket_path(session).read_text(encoding='utf-8'))
-    except (OSError, ValueError):
+def primary_checkout(shared):
+    code, common, _error = shared.git(Path.cwd(), 'rev-parse', '--path-format=absolute', '--git-common-dir')
+    if code:
         return None
-    return value if isinstance(value, dict) else None
+    common = Path(common)
+    return common.parent if common.name == '.git' else None
 
 
-def save_ticket(session, value):
-    path = ticket_path(session)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=path.name)
+def sweep_script(shared):
+    store = shared.register_session.session_store_path()
+    if store is None or not store.with_name('plugin_autoupdate.py').is_file():
+        return None
     try:
-        with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:
-            json.dump(value, stream)
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+        spec = importlib.util.spec_from_file_location('close_plugin_autoupdate', store.with_name('plugin_autoupdate.py'))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.sweep_script(module.load_codex_config())
+    except Exception:
+        return None
 
 
-def arm(remove_worktree=False):
+def arm():
     shared = runtime()
     entry = verified_entry(shared)
     store = shared.register_session._load_session_store()
@@ -84,193 +67,20 @@ def arm(remove_worktree=False):
     finally:
         connection.close()
     if (not isinstance(activity, dict) or activity.get('ended_at') is not None
-            or activity.get('turn_state') not in ('working', 'awaiting_input')
-            or not shared.finite_positive(activity.get('last_activity_at'))):
-        raise shared.Refusal('this session has no active verified turn')
-    if remove_worktree:
-        shared.fresh_removable_receipt(shared.worktree_from_cwd())
-    value = {'entry': entry, 'armed_at': time.time(), 'remove_worktree': remove_worktree,
-             'status': 'armed', 'cwd': str(Path.cwd().resolve()), 'nonce': uuid.uuid4().hex,
-             'activity': activity['last_activity_at'], 'turn_state': activity['turn_state']}
-    save_ticket(entry['session_id'], value)
-    return {'operation': 'session-close', 'status': 'armed', 'session_id': entry['session_id'],
-            'checkout': 'remove-after-verified-exit' if remove_worktree else 'retain'}
-
-
-def turn_messages(data):
-    """Read only the current turn's final answer, never quoted tool output or old turns."""
-    path = data.get('transcript_path') or data.get('transcriptPath')
-    if not isinstance(path, str):
-        return '', ''
-    try:
-        with Path(path).open('rb') as stream:
-            stream.seek(0, 2)
-            stream.seek(max(0, stream.tell() - MAX_TAIL))
-            lines = stream.read().splitlines()
-    except OSError:
-        return '', ''
-    prompt, answer = '', ''
-    for line in lines:
-        try:
-            record = json.loads(line)
-        except (ValueError, UnicodeError):
-            continue
-        if not isinstance(record, dict) or record.get('isSidechain') or record.get('isMeta'):
-            continue
-        value = record.get('payload') if record.get('type') == 'response_item' else record.get('message', record)
-        if not isinstance(value, dict):
-            continue
-        role = value.get('role') or record.get('type')
-        if role == 'user':
-            content = value.get('content')
-            if isinstance(content, str) or (isinstance(content, list) and any(
-                    isinstance(item, dict) and item.get('type') in ('text', 'input_text') for item in content)):
-                answer = ''
-                prompt = content if isinstance(content, str) else '\n'.join(
-                    item['text'] for item in content if isinstance(item, dict)
-                    and item.get('type') in ('text', 'input_text') and isinstance(item.get('text'), str))
-        if role != 'assistant' or value.get('channel') in ('analysis', 'commentary'):
-            continue
-        content = value.get('content')
-        if isinstance(content, str):
-            answer = content
-        elif isinstance(content, list):
-            text = '\n'.join(item['text'] for item in content if isinstance(item, dict)
-                             and item.get('type') in ('text', 'output_text') and isinstance(item.get('text'), str))
-            if text:
-                answer = text
-    return prompt.strip(), answer.strip()
-
-
-def blocked(reason):
-    return {'decision': 'block', 'reason': 'SESSION CLOSE: ' + reason}
-
-
-def complete():
-    """Explicit foreground operation after the host returns every Stop-gate verdict."""
-    shared = runtime()
-    entry = verified_entry(shared)
-    session = entry['session_id']
-    ticket = read_ticket(session)
-    if not ticket or ticket.get('status') != 'reported':
-        raise shared.Refusal('no prepared completion report has passed through Stop')
-    armed = ticket.get('armed_at')
-    if (not isinstance(armed, (int, float)) or isinstance(armed, bool)
-            or not math.isfinite(armed) or not 0 <= time.time() - armed <= MAX_AGE
-            or not isinstance(ticket.get('nonce'), str)
-            or re.fullmatch('[0-9a-f]{32}', ticket['nonce']) is None):
-        raise shared.Refusal('reported closure expired or has an invalid identity')
-    expected = ticket.get('entry')
-    if (not isinstance(expected, dict) or any(entry.get(key) != expected.get(key) for key in IDENTITY)
-            or shared.path_key(Path.cwd()) != shared.path_key(ticket['cwd'])):
-        raise shared.Refusal('reported host identity or attachment changed')
-    shared.awaiting_input_activity(entry)
-    claim = ticket_path(session).with_suffix('.' + ticket['nonce'] + '.close-claim')
-    try:
-        descriptor = os.open(claim, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError:
-        raise shared.Refusal('this close attempt has already been claimed')
-    os.close(descriptor)
-    if read_ticket(session) != ticket:
-        raise shared.Refusal('reported closure was cancelled or replaced')
-    ticket['status'] = 'closing'
-    save_ticket(session, ticket)
-    try:
-        module = importlib.import_module('finish' if ticket.get('remove_worktree') else 'close')
-        result = module.main([])
-        if result:
-            raise shared.Refusal('verified close helper failed')
-    except Exception as error:
-        ticket.update(status='refused', error=str(error))
-        save_ticket(session, ticket)
-        raise
-    return None
-
-
-def stop(data, session):
-    ticket = read_ticket(session)
-    prompt, answer = turn_messages(data)
-    retry = data.get('stop_hook_active') or data.get('stopHookActive')
-    if KEEP_OPEN.search(prompt):
-        ticket_path(session).unlink(missing_ok=True)
-        return None
-    if ticket is None:
-        if DONE.match(answer) and not retry:
-            return blocked('You reported completion without preparing session closure. Load machine:close, '
-                           'verify all owned work is done, and arm its post-report close operation. '
-                           'If work remains or the user requested keep-open, explain that actual state instead.')
-        return None
-    if ticket.get('status') != 'armed':
-        if ticket.get('status') == 'reported':
-            return {'systemMessage': 'SESSION CLOSE: the report is delivered. Resolve every other Stop-gate blocker, '
-                    'then run machine:close complete --stop-gates-accepted. The Stop hook never terminates the host.'}
-        if ticket.get('status') == 'closing':
-            return {'systemMessage': 'SESSION CLOSE: the prepared attempt is in progress; do not start a second close or claim verified exit.'}
-        return {'systemMessage': 'SESSION CLOSE: closure was not verified: ' + str(ticket.get('error', 'unknown refusal'))}
-    if not answer:
-        return None
-    shared = runtime()
-    try:
-        nonce = ticket.get('nonce')
-        if not isinstance(nonce, str) or re.fullmatch('[0-9a-f]{32}', nonce) is None:
-            raise shared.Refusal('prepared closure identity is invalid')
-        claim = ticket_path(session).with_suffix('.' + nonce + '.claim')
-        try:
-            descriptor = os.open(claim, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        except FileExistsError:
-            return None
-        os.close(descriptor)
-        armed = ticket.get('armed_at')
-        if (not isinstance(armed, (int, float)) or isinstance(armed, bool)
-                or not math.isfinite(armed) or not 0 <= time.time() - armed <= MAX_AGE):
-            raise shared.Refusal('prepared closure expired')
-        entry = verified_entry(shared)
-        expected = ticket.get('entry')
-        if not isinstance(expected, dict) or any(entry.get(key) != expected.get(key)
-                for key in IDENTITY) or entry['session_id'] != session:
-            raise shared.Refusal('prepared host identity or attachment changed')
-        if shared.path_key(Path.cwd()) != shared.path_key(ticket['cwd']):
-            raise shared.Refusal('prepared working directory changed')
-        if read_ticket(session) != ticket:
-            raise shared.Refusal('prepared closure was cancelled or replaced')
-        store = shared.register_session._load_session_store()
-        if store is None:
-            raise shared.Refusal('session turn store is unavailable')
-        connection = store.connect()
-        try:
-            handle = store.session_handle(entry['host'], entry['session_id'])
-            unchanged = store.record_prepared_stop(connection, handle, ticket['activity'], ticket['turn_state'])
-        finally:
-            connection.close()
-        if not unchanged:
-            raise shared.Refusal('prepared turn activity changed; preserve the active dialogue')
-        ticket['status'] = 'reported'
-        save_ticket(session, ticket)
-        # Do not signal a process inside a Stop hook: other plugins may still return block.
-        return blocked('The completion report is delivered. Inspect every Stop-gate verdict and resolve '
-                       'all other blockers before invoking machine:close with '
-                       '`close_session.py complete --stop-gates-accepted`. '
-                       'No host was closed by this hook. No new user answer is needed for this operation.')
-    except Exception as error:
-        if read_ticket(session) == ticket:
-            ticket.update(status='refused', error=str(error))
-            save_ticket(session, ticket)
-        return blocked('Verified close refused: ' + str(error) + '. Preserve this session and report the limitation; '
-                       'do not force-close or claim closure succeeded.')
-    return None
-
-
-def hook(data):
-    session = data.get('session_id') or data.get('sessionId')
-    if not isinstance(session, str) or not session:
-        return None
-    event = data.get('hook_event_name') or data.get('hookEventName')
-    if event == 'UserPromptSubmit':
-        ticket_path(session).unlink(missing_ok=True)
-        return None
-    if event == 'Stop':
-        return stop(data, session)
-    return None
+            or activity.get('turn_state') != 'working'):
+        raise shared.Refusal('this session has no active turn to close after')
+    arguments = ['--host', entry['host'], '--session-id', entry['session_id'], '--pid', str(entry['pid']),
+                 '--pid-started-at', repr(entry['pid_started_at']), '--armed-at', repr(time.time()),
+                 '--state-directory', str(shared.state_directory()),
+                 '--host-names', os.environ.get('AGENT_CLI_HOST_NAMES', '')]
+    primary, sweep = primary_checkout(shared), sweep_script(shared)
+    if primary and sweep:
+        arguments += ['--repo', str(primary), '--sweep', str(sweep)]
+    here = Path(__file__).resolve()
+    scripts = peer_scripts()
+    shared.start_detached(here.with_name('close_watcher.py'), arguments,
+                          [scripts / 'close.py', scripts / 'close_tab.py', scripts / 'windows_terminal_uia.ps1'])
+    return {'operation': 'session-close', 'status': 'armed', 'session_id': entry['session_id']}
 
 
 def main(argv=None):
@@ -279,22 +89,9 @@ def main(argv=None):
         return 2
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
-    prepare = commands.add_parser('arm')
-    prepare.add_argument('--remove-worktree', action='store_true')
-    finish = commands.add_parser('complete')
-    finish.add_argument('--stop-gates-accepted', action='store_true', required=True,
-                        help='confirm every other Stop gate accepted completion before closing')
-    commands.add_parser('hook')
-    arguments = parser.parse_args(argv)
-    if arguments.command == 'arm':
-        output = arm(arguments.remove_worktree)
-    elif arguments.command == 'complete':
-        output = complete()
-    else:
-        data = json.load(sys.stdin)
-        output = hook(data) if isinstance(data, dict) else None
-    if output:
-        print(json.dumps(output))
+    commands.add_parser('arm')
+    parser.parse_args(argv)
+    print(json.dumps(arm()))
     return 0
 
 
