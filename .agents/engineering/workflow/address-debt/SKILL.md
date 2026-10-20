@@ -97,3 +97,12 @@ Each delivery slice keeps its branch, selected checkout, commits and PR through 
 work needs multiple PRs, resolve and validate Workflow v2 repository state, promote it through
 `engineering:plans`, and checkpoint under `engineering:plan-checkpoint`. Deliver the remaining slices
 under `engineering:git-branching`, resuming from the entry and ledger rather than this session.
+
+## Example
+
+```text
+The selected provider lists debt WI-320, "remove the duplicate parser branch", as the first unblocked
+high-value item in api/. It has no branch or worktree owner. Select its api checkout, repair the duplicate
+branch, run the parser unit tests, commit the focused change, and update WI-320 with the test evidence
+before closing it through the provider.
+```
