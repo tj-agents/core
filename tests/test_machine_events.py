@@ -105,11 +105,12 @@ class IdentityTests(unittest.TestCase):
     def test_tokens_and_agent_git_overrides_never_reach_policy_subprocess(self):
         run = mock.Mock(return_value=mock.Mock(returncode=0))
         environment = {"TJ_AGENT": "1", "GH_TOKEN": "bot", "GITHUB_TOKEN": "bot",
-                       "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_VALUE_0": "helper", "KEEP_ME": "yes"}
+                       "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_VALUE_0": "helper", "GH_HOST": "other.example", "KEEP_ME": "yes"}
         with mock.patch.dict(os.environ, environment), mock.patch.object(events, "policy_script", return_value=Path("/installed/merge_policy.py")):
             events.reconcile_policy("tj-agents/core", run=run)
         saved = run.call_args.kwargs["env"]
         self.assertEqual("yes", saved["KEEP_ME"])
+        self.assertEqual("github.com", saved["GH_HOST"])
         self.assertFalse(any(key.startswith("GIT_CONFIG_") or key in {"TJ_AGENT", "GH_TOKEN", "GITHUB_TOKEN"} for key in saved))
         self.assertEqual(["reconcile", "--repo", "tj-agents/core"], run.call_args.args[0][-3:])
         self.assertEqual(events.plugins.NO_WINDOW, run.call_args.kwargs["creationflags"])
@@ -170,6 +171,11 @@ class SetupTests(unittest.TestCase):
         run = mock.Mock(return_value=mock.Mock(returncode=0, stdout="0 5 * * * backup\n"))
         setup.remove_retired_cron(run=run)
         self.assertEqual(1, run.call_count)
+
+    def test_linux_without_crontab_can_still_install_the_listener(self):
+        run = mock.Mock(side_effect=FileNotFoundError("crontab"))
+        setup.remove_retired_cron(run=run)
+        run.assert_called_once()
 
     def test_shared_topic_is_reused_without_writing_github_on_rerun(self):
         with tempfile.TemporaryDirectory() as directory:
