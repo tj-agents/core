@@ -42,7 +42,7 @@ Promotion changes persistence, not the requested outcome.
 ## Execute the lifecycle
 
 Read [the shared recording contract](../../resources/problem-records.md). When a provider is selected,
-reconcile the canonical item through `engineering:write-feature` or `engineering:write-task`, preserving
+reconcile the canonical item through `work-items:write-feature` or `work-items:write-task`, preserving
 its requirements and acceptance criteria. Update its progress and verified acceptance through that
 contract before reporting it resolved; a delivered PR alone does not close the item.
 

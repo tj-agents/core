@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:f5477a5e0f208bf36e6e44fe9da78b419f2c0c3619f53311bea9a17e23061283",
+      "digest": "sha256:025e61b645ae69641ecee7434e52c976cb49494a823105e1f73592b3be6174f4",
       "harness": {
         "marketplaces": [
           {
@@ -151,18 +151,23 @@
         "sync-checkout",
         "unmerged",
         "update-roadmap",
-        "worktree",
-        "write-bug",
-        "write-debt",
-        "write-feature",
-        "write-issue",
-        "write-mistake",
-        "write-task"
+        "worktree"
       ],
       "dependencies": {
         "required": [
           "base-agents/base",
-          "base-agents/machine"
+          "base-agents/machine",
+          "work-items-agents/work-items"
+        ],
+        "optional": []
+      },
+      "external_dependencies": {
+        "required": [
+          {
+            "id": "work-items-agents/work-items",
+            "marketplace": "work-items-agents",
+            "repository": "tj-agents/work-items"
+          }
         ],
         "optional": []
       },
@@ -177,18 +182,23 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:7709e91efeeb33416972c65ba21e0c24db24627b6b27708156426e780aa045d8",
+      "digest": "sha256:1c38a6d9976a792294dccf57105717bb5aca2cfae49ce7d4c785cafa4f741902",
       "harness": {
         "marketplaces": [
           {
             "id": "base-agents",
             "repository": "tj-agents/core"
+          },
+          {
+            "id": "work-items-agents",
+            "repository": "tj-agents/work-items"
           }
         ],
         "plugins": [
           "base-agents/base",
           "base-agents/engineering",
-          "base-agents/machine"
+          "base-agents/machine",
+          "work-items-agents/work-items"
         ],
         "hooks": [
           {
@@ -471,7 +481,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:e01a584f673c2895fc3e1ff96045a2481f572a09a9e3d6effd8f6f86359930e3",
+      "digest": "sha256:597d62538853a26c24c47575a163eeddf4ce33b69c2addcb9eb81afedbf18f25",
       "digest_excludes": [
         "catalog/catalog.json"
       ],

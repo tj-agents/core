@@ -376,6 +376,17 @@
       "base"
     ]
   },
+  "external_prerequisites": {
+    "base": [],
+    "engineering": [
+      {
+        "id": "work-items-agents/work-items",
+        "marketplace": "work-items-agents",
+        "repository": "tj-agents/work-items"
+      }
+    ],
+    "machine": []
+  },
   "extended_host_adapters": [
     "persistent-workflow",
     "review"
