@@ -12,8 +12,9 @@ Read [the shared problem-record contract](../../resources/problem-records.md). T
 incident's history while returning the correction to its existing owner; it does not create another repair
 engine.
 
-1. Use the selected Work Items provider's read/list/update/close commands. Reconcile the named incident,
-   or select one actionable high-value record quickly. Do not deep-rank
+1. Use the selected Work Items provider's read/list/update/close commands, or the unselected
+   repository's register, under the shared contract. Reconcile the named incident, or select one
+   actionable high-value record quickly. Do not deep-rank
    every record. Prefer an unblocked `P0` or `P1`, then the first useful `P2` or `P3`; priority does not
    pause unrelated work except for `engineering:self-repair`'s shared agent-lifecycle exception.
 2. Reconcile the existing goal, session, branch, PR, or writer before writing or dispatching. If a repair
