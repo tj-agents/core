@@ -1,4 +1,5 @@
 from contextlib import ExitStack
+import io
 import json
 import os
 from pathlib import Path
@@ -30,6 +31,22 @@ class HostFallbackTests(unittest.TestCase):
                 mock.patch.object(session_close.register_session, "read_host_names", return_value={"codex"}), \
                 mock.patch.object(session_close, "entries", return_value=[]):
             with self.assertRaisesRegex(session_close.Refusal, "do not force-close the host"):
+                session_close.own_host_and_entry(Path.cwd())
+
+    def test_attachment_resolves_under_the_launch_directory_after_the_registry_moved(self):
+        host = session_close.register_session.ProcessInfo(10, 1, "codex.exe", 20.0)
+        launch = Path.cwd().parent
+        entry = {"host": "codex", "session_id": "own", "pid": 10, "pid_started_at": 20.0, "started_at": 30.0,
+                 "cwd": str(launch / "elsewhere"), "launch_cwd": str(launch)}
+        with mock.patch.object(session_close.os, "getppid", return_value=10), \
+                mock.patch.object(session_close, "process_info", return_value=host), \
+                mock.patch.object(session_close, "verified_live", return_value=True), \
+                mock.patch.object(session_close.register_session, "read_host_names", return_value={"codex"}):
+            with mock.patch.object(session_close, "entries", return_value=[("own.json", entry)]):
+                self.assertEqual(entry, session_close.own_host_and_entry(Path.cwd()))
+            moved_only = {key: value for key, value in entry.items() if key != "launch_cwd"}
+            with mock.patch.object(session_close, "entries", return_value=[("own.json", moved_only)]), \
+                    self.assertRaisesRegex(session_close.Refusal, "cannot resolve a verified registry attachment"):
                 session_close.own_host_and_entry(Path.cwd())
 
     def test_terminal_refusal_can_close_verified_host_without_wrapper(self):
@@ -1106,6 +1123,36 @@ class SelfCloseActivityGuardTests(unittest.TestCase):
                 end_record.assert_not_called()
                 closer.assert_not_called()
                 cancel.assert_called_once()
+
+    def test_a_session_that_moved_checkout_still_matches_its_attachment_after_stop(self):
+        moved = Path(self.temp.name) / "moved worktree"
+        moved.mkdir()
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state)}), \
+                mock.patch.object(session_close, "verified_live", return_value=True):
+            store = session_close.register_session._load_session_store()
+            for host in ("codex", "claude"):
+                with self.subTest(host=host):
+                    entry = {
+                        "host": host, "session_id": host + "-moved", "pid": 10,
+                        "pid_started_at": 20.0, "started_at": 30.0, "cwd": str(self.cwd),
+                    }
+                    registry = self.state / "cli-sessions" / f"{entry['session_id']}.json"
+                    registry.parent.mkdir(parents=True, exist_ok=True)
+                    registry.write_text(json.dumps(entry), encoding="utf-8")
+                    connection = store.connect()
+                    try:
+                        store.start_session(connection, host, entry["session_id"], self.cwd,
+                                            pid=entry["pid"], pid_started_at=entry["pid_started_at"])
+                    finally:
+                        connection.close()
+                    payload = json.dumps({"session_id": entry["session_id"], "cwd": str(moved)})
+                    with mock.patch.object(sys, "stdin", io.StringIO(payload)):
+                        store.main(["hook", "stop", "--host", host])
+                    refreshed = json.loads(registry.read_text(encoding="utf-8"))
+                    self.assertEqual(str(moved), refreshed["cwd"])
+                    with self.assertRaisesRegex(session_close.Refusal, "does not match"):
+                        session_close.awaiting_input_activity(entry)
+                    self.assertIsInstance(session_close.awaiting_input_activity(refreshed), float)
 
     def test_real_store_turn_transitions_require_the_current_idle_token_for_both_hosts(self):
         with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state)}), \

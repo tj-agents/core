@@ -895,7 +895,7 @@ class ReviewTests(RepositoryFixture):
 
     def test_review_prepare_keeps_plugin_owned_routes_and_deny_hits(self):
         (self.root / ".agents" / "skill-routes.json").write_text(json.dumps({"routes": [{
-            "path": "^src/", "skills": ["dotnet:persistence"],
+            "path": "^src/", "skills": ["efcore:persistence"],
             "deny": [{"pattern": "candidate", "reason": "no candidate text"}],
         }]}), encoding="utf-8")
         self.git("add", ".agents/skill-routes.json")
@@ -904,7 +904,7 @@ class ReviewTests(RepositoryFixture):
         result = ops.review_prepare(self.root, "plugin-routed", "origin/main", "HEAD", False)
 
         self.assertEqual([], result["rules"])
-        self.assertEqual(["dotnet:persistence"], result["routed_skills"])
+        self.assertEqual(["efcore:persistence"], result["routed_skills"])
         self.assertEqual([["src/mapping.txt", "no candidate text"]], result["route_violations"])
 
     def test_review_prepare_uses_employer_from_original_repository(self):

@@ -169,7 +169,11 @@ def required_results(value, needs, event):
         raise ValueError("invalid CI job results")
     if event != "pull_request" and value["mode"] != "full":
         raise ValueError("non-PR validation requires full coverage")
-    expected = {"select": "success", "guard": "success" if event == "pull_request" else "skipped"}
+    expected = {
+        "select": "success",
+        "guard": "success" if event == "pull_request" else "skipped",
+        "guidance-examples": "success",
+    }
     expected.update({name: "skipped" if value["mode"] == "docs" else "success"
                      for name in ("verify-windows", "verify-linux")})
     for name, result in expected.items():

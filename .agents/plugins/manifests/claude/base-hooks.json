@@ -13,87 +13,15 @@
               "--deadline",
               "8",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/plan-artifacts/scripts/session-context.py"
-            ]
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 10,
-            "command": "python",
-            "args": [
-              "-B",
               "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
-              "--session-context"
-            ]
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 10,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py"
-            ]
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 10,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/goal-continuation/scripts/session-context.py"
-            ]
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 10,
-            "command": "python",
-            "args": [
-              "-B",
+              "--session-context",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py",
+              "--hook",
               "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/idea-initialization/scripts/session-context.py"
             ]
           }
         ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 25,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
-              "--deadline",
-              "20",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py",
-              "--harness",
-              "claude",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py"
-            ]
-          }
-        ],
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell|Skill"
       }
     ]
   }

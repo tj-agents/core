@@ -69,6 +69,51 @@ class StartupBindingTests(unittest.TestCase):
                          {key: value for key, value in json.loads(status.read_text(encoding="utf-8")).items()
                           if key in {"state", "returncode"}})
 
+    def test_handoff_failure_retains_native_debug_destination_and_last_phase(self):
+        status = self.project / "handoff.json"
+        captured = []
+        phases = []
+
+        def failing(host, target, project, arguments, *, on_phase=None, **kwargs):
+            captured.extend(arguments)
+            if on_phase is not None:
+                on_phase("refreshing-plugins")
+                phases.append(json.loads(status.read_text(encoding="utf-8"))["phase"])
+            raise BINDING.StartupBindingError("fixture startup failed")
+
+        arguments = ["--host", "claude", "--project", str(self.project), "--target", "claude",
+                     "--status-file", str(status), "--require-session-start", "--", "fixture prompt"]
+        with mock.patch.object(BINDING, "run_session", side_effect=failing), \
+                mock.patch("sys.stdout") as output, mock.patch("sys.stderr"):
+            self.assertEqual(1, BINDING.main(arguments))
+        self.assertEqual(["refreshing-plugins"], phases)
+        failed = json.loads(status.read_text(encoding="utf-8"))
+        self.assertEqual("failed", failed["state"])
+        self.assertEqual("refreshing-plugins", failed["phase"])
+        debug_log = self.project.resolve() / "native-debug.log"
+        self.assertEqual(str(debug_log), failed["debug_log"])
+        self.assertEqual(["--debug-file", str(debug_log), "fixture prompt"], captured)
+        output.write.assert_any_call("standards: claude startup: refreshing-plugins")
+
+    def test_handoff_keeps_an_explicit_debug_file_and_leaves_ordinary_launches_alone(self):
+        for flags in (("--require-session-start",), ()):
+            with self.subTest(flags=flags):
+                status = self.project / "explicit.json"
+                status.unlink(missing_ok=True)
+                captured = []
+
+                def run(host, target, project, arguments, **kwargs):
+                    captured.extend(arguments)
+                    return 0
+
+                arguments = ["--host", "claude", "--project", str(self.project), "--target", "claude",
+                             "--status-file", str(status), *flags, "--", "--debug-file", "explicit.log",
+                             "fixture prompt"]
+                with mock.patch.object(BINDING, "run_session", side_effect=run):
+                    self.assertEqual(0, BINDING.main(arguments))
+                self.assertEqual(["--debug-file", "explicit.log", "fixture prompt"], captured)
+                self.assertNotIn("debug_log", json.loads(status.read_text(encoding="utf-8")))
+
     def test_an_abandoned_launch_never_starts(self):
         status = self.project / "launch.status.json"
         status.write_text(json.dumps({"state": "abandoned"}), encoding="utf-8")
@@ -81,7 +126,7 @@ class StartupBindingTests(unittest.TestCase):
     def test_each_shipped_claude_plugin_acknowledges_session_start_through_its_real_manifest(self):
         token = "a" * 40
         payload = {"hook_event_name": "SessionStart", "session_id": "fixture", "cwd": str(self.project)}
-        for plugin in ("base", "engineering", "machine"):
+        for plugin in ("base", "machine"):
             with self.subTest(plugin=plugin):
                 package = self.project / plugin
                 hooks = package / "hooks"
@@ -94,10 +139,22 @@ class StartupBindingTests(unittest.TestCase):
                 arguments = [item.replace("${CLAUDE_PLUGIN_ROOT}", str(package)) for item in hook["args"]]
                 dispatcher = Path(arguments[1])
                 shutil.copyfile(ROOT / ".agents/hooks/hook_dispatch.py", dispatcher)
-                gate_index = arguments.index("--hook") + 1
-                gate = Path(arguments[gate_index])
-                gate.parent.mkdir(parents=True, exist_ok=True)
-                gate.write_text("import json, sys\nprint(json.dumps({'hookSpecificOutput': {'additionalContext': json.dumps({'argv': sys.argv[1:], 'payload': json.load(sys.stdin)})}}))\n", encoding="utf-8")
+                hook_start = arguments.index("--hook")
+                gates = []
+                for value in arguments[hook_start:]:
+                    if value == "--hook":
+                        gates.append([None, []])
+                    elif gates[-1][0] is None:
+                        gates[-1][0] = value
+                    else:
+                        gates[-1][1].append(value)
+                stub = ("import json, sys\n"
+                        "print(json.dumps({'hookSpecificOutput': {'additionalContext': "
+                        "json.dumps({'argv': sys.argv[1:], 'payload': json.load(sys.stdin)})}}))\n")
+                for script_path, _ in gates:
+                    gate = Path(script_path)
+                    gate.parent.mkdir(parents=True, exist_ok=True)
+                    gate.write_text(stub, encoding="utf-8")
                 directory = package / "ack"
                 directory.mkdir()
                 environment = dict(os.environ, TJ_AGENTS_STARTUP_ACK_DIRECTORY=str(directory),
@@ -107,9 +164,13 @@ class StartupBindingTests(unittest.TestCase):
                                         text=True, encoding="utf-8", timeout=hook["timeout"] + 5)
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual(token, (directory / token).read_text(encoding="utf-8"))
-                output = json.loads(json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"])
-                self.assertEqual(payload, output["payload"])
-                self.assertEqual(arguments[gate_index + 1:], output["argv"])
+                context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+                chunks = context.split("\n\n")
+                self.assertEqual(len(gates), len(chunks))
+                for (_, script_arguments), chunk in zip(gates, chunks):
+                    output = json.loads(chunk)
+                    self.assertEqual(payload, output["payload"])
+                    self.assertEqual(script_arguments, output["argv"])
 
     def test_isolated_script_loads_shipped_dependencies_outside_the_callers_import_path(self):
         package = self.project / "packaged machine \u00e9" / "resources" / "machine" / "scripts"
@@ -173,11 +234,42 @@ class StartupBindingTests(unittest.TestCase):
                 mock.patch.object(BINDING.subprocess, "Popen", Process), \
                 mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.project / "config")}, clear=False):
             reported = []
+            phases = []
             self.assertEqual(0, BINDING.run_session("claude", "typed", self.project, ["session"],
-                                                    on_running=reported.append))
+                                                    on_running=reported.append, on_phase=phases.append))
+        self.assertEqual(["reading-selection", "refreshing-plugins", "installing-plugins",
+                          "checking-settings", "starting-native", "waiting-session-start"], phases)
 
         self.assertEqual(["materialize", "start", "ack", "exit"], events)
         self.assertEqual([4242], reported)
+
+    def test_slow_preparation_does_not_shorten_native_acknowledgement_budget(self):
+        prepared = self.prepared
+        prepared.deadline = mock.Mock()
+        prepared.deadline.remaining.return_value = 0.01
+        active = mock.MagicMock()
+        active.__enter__.return_value = active
+        active.materialize_native.return_value = prepared
+        child = self.project / "delayed_ack.py"
+        child.write_text(
+            "import os, pathlib, time\n"
+            "time.sleep(0.15)\n"
+            "directory = pathlib.Path(os.environ['TJ_AGENTS_STARTUP_ACK_DIRECTORY'])\n"
+            "token = os.environ['TJ_AGENTS_STARTUP_ACK_TOKEN']\n"
+            "(directory / token).write_text(token, encoding='utf-8')\n"
+            "time.sleep(0.15)\n", encoding="utf-8",
+        )
+        reported = []
+        with mock.patch.object(BINDING, "preflight", return_value=active), \
+                mock.patch.object(BINDING, "native_target_for_shim", return_value="native"), \
+                mock.patch.object(BINDING, "_preflight_arguments", return_value={}), \
+                mock.patch.object(BINDING, "_converge"), \
+                mock.patch.object(BINDING, "command_for_target", return_value=[sys.executable, str(child)]):
+            result = BINDING.run_session("claude", "typed", self.project, ["session"],
+                                         timeout=10, require_session_start=True, on_running=reported.append)
+        self.assertEqual(0, result)
+        self.assertEqual(1, len(reported))
+        active.acknowledge_binding.assert_called_once()
 
     def test_missing_session_start_acknowledgement_preserves_the_failure_when_cleanup_fails(self):
         prepared = self.prepared
@@ -207,8 +299,35 @@ class StartupBindingTests(unittest.TestCase):
                 BINDING.StartupBindingError,
                 "did not acknowledge SessionStart.*cleanup also failed: cleanup unavailable",
             ):
-                BINDING.run_session("claude", "typed", self.project, ["session"])
+                BINDING.run_session("claude", "typed", self.project, ["session"], timeout=0)
         terminate.assert_called_once_with(process)
+
+    def test_typed_session_without_acknowledgement_keeps_running(self):
+        prepared = self.prepared
+
+        class Active:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *details):
+                return None
+
+            def materialize_native(self, executable):
+                return prepared
+
+            acknowledge_binding = mock.Mock()
+
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.wait.return_value = 7
+        with mock.patch.object(BINDING, "preflight", return_value=Active()),                 mock.patch.object(BINDING, "native_target_for_shim", return_value="native"),                 mock.patch.object(BINDING, "_preflight_arguments", return_value={}),                 mock.patch.object(BINDING, "_converge"),                 mock.patch.object(BINDING, "_remaining", return_value=0),                 mock.patch.object(BINDING, "command_for_target", return_value=["native"]),                 mock.patch.object(BINDING.subprocess, "Popen", return_value=process) as popen,                 mock.patch.object(BINDING, "terminate_process_tree") as terminate,                 mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.project / "config")}, clear=False):
+            launched = mock.Mock()
+            self.assertEqual(7, BINDING.run_session("claude", "typed", self.project, ["session"],
+                                                    on_launch=launched, keep_unacknowledged_session=True, timeout=0))
+        popen.assert_called_once()
+        launched.assert_called_once_with()
+        terminate.assert_not_called()
+        Active.acknowledge_binding.assert_called_once()
 
     def test_selected_packages_without_session_start_dispatcher_fail_before_native_start(self):
         (self.root / "hooks" / "claude.json").write_text('{"hooks":{"SessionStart":[]}}', encoding="utf-8")
@@ -365,6 +484,7 @@ class StartupBindingTests(unittest.TestCase):
                 runtime = mock.Mock()
                 runtime.prepare_runtime.return_value = binding
                 reported = []
+                phases = []
                 def start(*args, **kwargs):
                     process = real_popen(*args, **kwargs)
                     if mode == "fast":
@@ -381,7 +501,10 @@ class StartupBindingTests(unittest.TestCase):
                         mock.patch.object(BINDING, "command_for_target", return_value=command), \
                         mock.patch.object(BINDING.subprocess, "Popen", side_effect=start):
                     result = BINDING.run_session("codex", "typed", self.project, ["prompt"],
-                                                 require_session_start=True, on_running=reported.append)
+                                                 require_session_start=True, on_running=reported.append,
+                                                 on_phase=phases.append)
+                self.assertEqual(["reading-selection", "refreshing-plugins", "preparing-runtime",
+                                  "checking-settings", "starting-native", "waiting-session-start"], phases)
                 self.assertEqual(2 if mode == "exit" else 0, result)
                 self.assertEqual(1 if mode in ("ack", "fast") else 0, len(reported))
                 runtime.cleanup_runtime.assert_called_once()

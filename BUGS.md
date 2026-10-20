@@ -12,7 +12,7 @@
 
 **Verification evidence:** independent security review reproduced preference=True with uppercase Windows settings, unmatched stop/security paths and scoped authorization acceptance. Parent independently confirmed both classifiers miss alternate casing while matching the canonical path. Repair artifacts now pass runtime 36, guarded auto-merge 10 and settings security patterns 10 tests; the fixed expressions and actual guarded-consumer rejection were inspected.
 
-**Final delivery evidence:** Final reviewed head0f98144fceff5040f6050413e036d26f1cf98ea8 passed guard and Windows/Linux CI38187755625 and independent incremental review. PR208 merged normally at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d; causal main ci38189303890 and regeneration114618404712 succeeded and published exact-parent bot commitcbe97265fcd8267493c24d18f74a5a0a26b872c9. Parent verified canonical/published engineering and both-host machine payload byte parity.
+**Final delivery evidence:** Final reviewed head0f98144fceff5040f6050413e036d26f1cf98ea8 passed guard and Windows/Linux CI 38187755625 and independent incremental review. PR208 merged normally at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d; causal main ci38189303890 and regeneration114618404712 succeeded and published exact-parent bot commitcbe97265fcd8267493c24d18f74a5a0a26b872c9. Parent verified canonical/published engineering and both-host machine payload byte parity.
 
 
 ## B002 - Deep JSON leaves stale conditional machine permissions
@@ -27,7 +27,7 @@
 
 **Verification evidence:** security review seeded both hosts' disposable owned grants, replaced settings with a 20,000-level opaque JSON array, observed main return zero with profiles unchanged. Parent independently reproduced the escaped RecursionError and inspected the machine ValueError boundary. Repair artifacts now pass reader 12 tests (2 privilege skips) and machine synchronization 28; parent inspected the strengthened active-grants-before/deep-invalid-settings-after assertions for both Claude and Codex.
 
-**Final delivery evidence:** Final reviewed head0f98144fceff5040f6050413e036d26f1cf98ea8 passed guard and Windows/Linux CI38187755625 and independent incremental review. PR208 merged normally at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d; causal main ci38189303890 and regeneration114618404712 succeeded and published exact-parent bot commitcbe97265fcd8267493c24d18f74a5a0a26b872c9. Parent verified canonical/published engineering and both-host machine payload byte parity.
+**Final delivery evidence:** Final reviewed head0f98144fceff5040f6050413e036d26f1cf98ea8 passed guard and Windows/Linux CI 38187755625 and independent incremental review. PR208 merged normally at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d; causal main ci38189303890 and regeneration114618404712 succeeded and published exact-parent bot commitcbe97265fcd8267493c24d18f74a5a0a26b872c9. Parent verified canonical/published engineering and both-host machine payload byte parity.
 
 
 ## B003 - Invalid settings escape the no-legacy consumer error boundary
@@ -42,7 +42,7 @@
 
 **Verification evidence:** fresh security lens compared immutable531 and178ba; both malformed no-policy cases escape DeliveryContractViolation and invoke zero merge commands. Parent independently called the actual standing_authorization in disposable repositories: absent legacy yields DeliveryContractViolation/public_workflow_error=False, valid legacy yields WorkflowOperationError/public_workflow_error=True. The new regression failed before with exactly two absent-policy errors and the final artifact passed11 tests, including malformed/deep inputs with both policy states, controlled settings diagnostic and zero merge commands. Delivery-binding38 and harness14 tests plus declaration consistency also passed; parent read the actual terminal artifacts.
 
-**Final delivery evidence:** Final reviewed head0f98144fceff5040f6050413e036d26f1cf98ea8 passed guard and Windows/Linux CI38187755625 and independent incremental review. PR208 merged normally at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d; causal main ci38189303890 and regeneration114618404712 succeeded and published exact-parent bot commitcbe97265fcd8267493c24d18f74a5a0a26b872c9. Parent verified canonical/published engineering and both-host machine payload byte parity.
+**Final delivery evidence:** Final reviewed head0f98144fceff5040f6050413e036d26f1cf98ea8 passed guard and Windows/Linux CI 38187755625 and independent incremental review. PR208 merged normally at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d; causal main ci38189303890 and regeneration114618404712 succeeded and published exact-parent bot commitcbe97265fcd8267493c24d18f74a5a0a26b872c9. Parent verified canonical/published engineering and both-host machine payload byte parity.
 
 ## B004 - Verified self-host remains alive after Windows Terminal discovery refuses
 
@@ -99,7 +99,7 @@
 
 **Resolution condition:** supported Claude/Codex shell events reject sibling, nested and ambiguous allocation; verified internal creation works from linked checkouts; executable regressions, packaging, independent review and exact-head CI pass; source merges and causal generated distribution is verified.
 
-**Verification evidence:** PR220 merged reviewed head 40ff30d9e006f37f87201fd38ae1c36de9268dd4 as 441a09ab3894ee0e076f6ff8e97d9c61d4a7aca2. Final review found no remaining defects; exact-head CI38286569828 passed Windows, Linux and guard. Twenty-two local placement tests completed with two Windows symlink-capability skips. Causal run38288409546 attempt1 passed Windows, Linux and regeneration; generated commit3b41211db4b6349ca74036e0df3a6d8bc91784f2 carries matching hook and dependency bytes and both host mappings. No external feed or version-sync producer exists. Installed native-host trust and adoption remain unverified.
+**Verification evidence:** PR220 merged reviewed head 40ff30d9e006f37f87201fd38ae1c36de9268dd4 as 441a09ab3894ee0e076f6ff8e97d9c61d4a7aca2. Final review found no remaining defects; exact-head CI 38286569828 passed Windows, Linux and guard. Twenty-two local placement tests completed with two Windows symlink-capability skips. Causal run38288409546 attempt1 passed Windows, Linux and regeneration; generated commit3b41211db4b6349ca74036e0df3a6d8bc91784f2 carries matching hook and dependency bytes and both host mappings. No external feed or version-sync producer exists. Installed native-host trust and adoption remain unverified.
 ## B008 - Claude normal-profile sync accepts incomplete or misidentified packages
 - Kind: bug. Observed/reported: 2026-10-12; profile repair found 208 cached files against 331 source files, including 61 missing skill definitions. Cause: confirmed Claude normal-profile synchronization omits torn-package checks and alias migration; installation discards `installPath` and `gitCommitSha`, and external groups ignores a different ref when `sourceURL` matches.
 - Impact and priority: P2; synchronization can accept incomplete packages, discard source identity and pin information, and retain obsolete aliases.
@@ -138,3 +138,77 @@
 
 **Record identity:** transferred from branch-local B009 on Fix/InertCloseoutCadence; main B009 already names a different defect, so B010 is this defect's canonical main ID. The earlier branch references remain historical aliases.
 
+## B011 — Stale persistence skill reference after the EF Core cutover
+
+Kind: bug. Observed: 2026-10-18. Priority: P2; public-corpus validation failed for a valid
+personal-roster integration because shared routing guidance named a no-longer-shipped skill.
+Source owner: tj-agents/core engineering skill-routes guidance. State: resolved.
+Evidence: Windows CI 39173332372 rejected `.agents/engineering/convention/skill-routes/SKILL.md`
+for missing dotnet:persistence after persistence moved to efcore:persistence.
+Cause confirmed: the shared example was not migrated with the skill identity cutover.
+Existing repair link: upstream commit ade368b3 (Use shipped skills in the routing example),
+retained unchanged when reconciling https://github.com/tj-agents/core/pull/307. The final
+example uses shipped dotnet:testing and react:testing identities; no parallel repair remains.
+Resolution condition: current public-corpus skill references resolve and Windows/Linux
+validation passes with the upstream repair present.
+Verification: local check resolves 168 shipped skills across 4 current repositories; exact
+Core PR307 run39175205937 and merged-main run39176000363 pass Windows/Linux.
+Next action: none for this repaired reference defect. Installed host acceptance remains a
+separate personal-project goal criterion.
+
+## B012 — Exact script approvals rejected during project adoption
+
+Kind: bug. Observed: 2026-10-19. Priority: P2; Core cannot adopt its own project settings
+without discarding existing approvals or widening fixed commands to wildcard argument grants.
+Source owner: machine plugin-selection harness_permissions.py. State: resolved.
+Evidence: adopting personal in Core fails on existing Bash(pwsh .agents/sync-generated.ps1 -Check)
+with script arguments require :*. The native Claude permission documentation supports exact
+command rules: https://code.claude.com/docs/en/permissions.
+Cause confirmed: _has_unbounded_script_arguments classifies fixed arguments after a script
+as unbounded even when the command has no wildcard.
+Repair link: Core Feature/PersonalAdoption, owned by personal-projects/standards; same coupled
+slice preserves the repository's82existing approvals through its supported ownership overlay.
+No verified live owner was found for the same defect in the related older harness worktree.
+Resolution condition: exact command arguments survive generation unchanged, malformed script
+wildcard patterns remain rejected, current Core adoption preserves its approval set, and
+focused Windows/Linux plus reviewed exact-head CI and source publication pass.
+Verification: Core PR313 merged 6b3719505a10690b63e56785777361f7eb949ec9 after corrected exact-head
+CI 39308737267 passed Windows/Linux; causal main 39311721736 and policy 39311721852 passed.
+39 project-config tests and 20harness-manifest tests passed on Windows/native Linux (three existing
+Linux PowerShell-schema skips);13 adoption and 6selection tests passed. Current main canonical and
+both packaged helper copies match. Existing82approvals and deny rules were preserved exactly.
+Next action: none for this repaired validator defect. Live refresh B013 remains separately owned.
+
+## B013 — Fresh Codex entry starts after rolling refresh exceeds its deadline
+
+**Kind:** bug. **Observed:** 2026-10-19. **State:** blocked.
+**Source owner:** Core rolling-plugin launcher; the originating Concertable launch-repair owner
+retains implementation authority under the explicit personal-projects handoff. No second repair writer.
+**Observation:** A fresh actual Windows Codex invocation through the installed normal launcher emitted
+`rolling plugin refresh exceeded its deadline; starting Codex without the standards refresh`.
+Thread `01a155a8-d50f-7cf1-b5a0-719e65856188` then quoted the mandatory native personal rule successfully.
+Native instruction loading passed; installed plugin refresh convergence did not. Earlier shallow-lock
+failure is separate evidence, not a confirmed cause of this deadline.
+**Impact and priority:** P2; source/main and native-rule verification cannot establish that installed
+registrations and running package generations converged at the entry point users invoke.
+**blocked_by:** existing repair ownership and unverified launcher refresh.
+**Resolver:** originating Concertable launch-repair owner; Tommy can resume that owner if needed.
+**Concrete unblock:** diagnose the normal-launch refresh deadline in that existing repair scope,
+repair its cause, and verify an actual fresh Windows/Linux session and installed generations.
+**Resume condition:** a fresh normal launcher completes current publisher/package convergence and
+loads the mandatory rule; version output or a continued session after refresh failure is insufficient.
+
+## B014 — Project-selection guidance omitted exact Codex repository trust
+
+Kind: bug. Observed: 2026-10-19. Priority: P2. State: resolved.
+Source owner: machine:plugin-selection guidance; no launcher implementation change.
+The guide claimed a fresh clone installed its declared plugins without machine settings. Actual normal
+Concertable session01a15605 loaded its mandatory native policy but lacked personal in the skill catalog.
+Native config/read explicitly disabled the project layer until its exact Git root was trusted, despite
+existing trusted parent folders; native plugin inventory independently lacked the personal selection.
+Correction: the guide distinguishes source settings from native admission, installation and session
+loading, states the exact-root trust prerequisite and limits installation changes to existing authority.
+Verification: authorized exact-project trust for personal and Concertable source roots through the native
+configuration API preserved every unrelated setting and existing project entry. Fresh config/read then
+reported enabled personal selection and no disabled project layer for both roots. Declaration checks
+alone are expressly insufficient; actual host/catalog acceptance remains tracked in the personal goal.

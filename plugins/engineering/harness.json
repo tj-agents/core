@@ -12,7 +12,8 @@
     ".agents/machine/scripts/repository_identity.py",
     ".agents/workflows",
     ".agents/workflows/repository_configuration.py",
-    ".agents/workflows/review_evidence.py"
+    ".agents/workflows/review_evidence.py",
+    ".agents/workflows/workflow_runtime.py"
   ],
   "requires": {
     "marketplaces": [
@@ -28,47 +29,6 @@
     ],
     "hooks": [
       {
-        "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/compact_output_gate.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/continuation_stop.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/delivery_binding_gate.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/denial_prompt.py",
-        "hosts": [
-          "claude"
-        ]
-      },
-      {
-        "path": "hooks/forge_poll_gate.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
         "path": "hooks/git_auth_scope_gate.py",
         "hosts": [
           "claude",
@@ -76,33 +36,7 @@
         ]
       },
       {
-        "path": "hooks/harness_grant.py",
-        "hosts": [
-          "claude"
-        ]
-      },
-      {
         "path": "hooks/hook_dispatch.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/merge_cleanup_gate.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/merge_review_gate.py",
-        "hosts": [
-          "claude"
-        ]
-      },
-      {
-        "path": "hooks/persistent_workflow_merge_gate.py",
         "hosts": [
           "claude"
         ]
@@ -110,33 +44,6 @@
       {
         "path": "hooks/pre_tool_use_adapter.py",
         "hosts": [
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/red_run_gate.py",
-        "hosts": [
-          "claude"
-        ]
-      },
-      {
-        "path": "hooks/workflow_route.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/worktree_cleanup_gate.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/worktree_placement_gate.py",
-        "hosts": [
-          "claude",
           "codex"
         ]
       }

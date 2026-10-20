@@ -910,7 +910,7 @@ class OpenClaudeTabBindingTests(unittest.TestCase):
         self.launch_tab.assert_called_once_with(
             missing, sys.executable, 'Tab',
             arguments=CLI.bound_terminal_arguments('claude', missing, '/bin/claude', []),
-            force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
+            clear=(), force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
         )
 
     def test_resolves_and_binds_the_typed_target_in_order(self):
@@ -924,7 +924,16 @@ class OpenClaudeTabBindingTests(unittest.TestCase):
         self.launch_tab.assert_called_once_with(
             self.directory, sys.executable, 'Tab',
             arguments=CLI.bound_terminal_arguments('claude', self.directory, '/bin/claude', ['--flag']),
-            force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
+            clear=(), force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
+        )
+
+    def test_forwards_profile_environment_to_the_tab(self):
+        CLI.open_claude_tab(self.directory, 'Tab', [], clear=('CLAUDE_CONFIG_DIR',), force={'EXTRA': '1'})
+
+        self.launch_tab.assert_called_once_with(
+            self.directory, sys.executable, 'Tab',
+            arguments=CLI.bound_terminal_arguments('claude', self.directory, '/bin/claude', []),
+            clear=('CLAUDE_CONFIG_DIR',), force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color', 'EXTRA': '1'},
         )
 
 
