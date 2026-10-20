@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
+import queue
+import threading
 import json
 import os
 from pathlib import Path
@@ -116,7 +118,59 @@ def project_directories(config: dict) -> list[Path]:
                    and (Path(path) / ".codex/config.toml").is_file()})
 
 
+def effective_config(executable: str, project: Path) -> dict:
+    process = subprocess.Popen([executable, "app-server"], cwd=project, stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               text=True, encoding="utf-8", bufsize=1,
+                               creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+    messages = queue.Queue()
+
+    def receive():
+        try:
+            for line in process.stdout:
+                messages.put(json.loads(line))
+        except (OSError, ValueError) as error:
+            messages.put(error)
+        finally:
+            messages.put(None)
+
+    threading.Thread(target=receive, daemon=True).start()
+
+    def request(identity, method, params):
+        process.stdin.write(json.dumps({"id": identity, "method": method, "params": params}) + "\n")
+        process.stdin.flush()
+        deadline = time.monotonic() + CLI_TIMEOUT_SECONDS
+        while True:
+            message = messages.get(timeout=max(0, deadline - time.monotonic()))
+            if message is None or isinstance(message, Exception):
+                raise ValueError(f"Codex stopped during {method}")
+            if message.get("id") == identity:
+                if "error" in message:
+                    raise ValueError(f"Codex {method} failed: {message['error']}")
+                return message["result"]
+
+    try:
+        request(1, "initialize", {"clientInfo": {"name": "tj_agents_autoupdate", "version": "1.0.0"},
+                                   "capabilities": {"experimentalApi": True}})
+        process.stdin.write(json.dumps({"method": "initialized"}) + "\n")
+        process.stdin.flush()
+        return request(2, "config/read", {"cwd": str(project), "includeLayers": False})["config"]
+    except queue.Empty as error:
+        raise ValueError("Codex configuration read timed out") from error
+    finally:
+        if process.poll() is None:
+            process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        process.stdin.close()
+        process.stdout.close()
+
+
 def project_targets(executable: str, project: Path) -> dict[str, dict]:
+    targets = codex_targets(effective_config(executable, project))
     command = [executable, "plugin", "list", "--available", "--json"]
     options = {"cwd": project, "stdin": subprocess.DEVNULL, "capture_output": True, "text": True,
                "encoding": "utf-8", "errors": "replace", "timeout": CLI_TIMEOUT_SECONDS, "check": True}
@@ -127,20 +181,10 @@ def project_targets(executable: str, project: Path) -> dict[str, dict]:
             raise
         result = subprocess.run(command, **options)
     listing = json.loads(result.stdout)
-    config = {"marketplaces": {}, "plugins": {}}
-    for entry in listing.get("installed", []) + listing.get("available", []):
-        identity = entry.get("pluginId")
-        source = entry.get("marketplaceSource", {})
-        if (entry.get("enabled") is True and isinstance(identity, str) and "@" in identity
-                and isinstance(source, dict) and source.get("sourceType") == "git"):
-            name = identity.rsplit("@", 1)[1]
-            config["marketplaces"][name] = {"source_type": "git", "source": source.get("source"),
-                                            "ref": source.get("ref")}
-            config["plugins"][identity] = {"enabled": True}
-    targets = codex_targets(config)
-    missing = {entry.get("pluginId") for entry in listing.get("available", []) if entry.get("installed") is not True}
+    installed = {entry.get("pluginId") for entry in listing.get("installed", [])
+                 if entry.get("installed") is True}
     for target in targets.values():
-        target["missing"] = sorted(set(target["plugins"]) & missing)
+        target["missing"] = sorted(set(target["plugins"]) - installed)
         publishers = {}
         for entry in listing.get("installed", []) + listing.get("available", []):
             source = entry.get("source", {})
@@ -168,10 +212,10 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
         published = [heads[(source["source"], source.get("ref") or "HEAD")] for source in sources]
         head = (hashlib.sha256(json.dumps(published).encode("utf-8")).hexdigest()
                 if len(published) > 1 else published[0])
-        if any(value is None for value in published):
+        if published[0] is None:
             outcomes[marketplace] = "unreachable"
             continue
-        if recorded.get(key) == head and not target.get("missing"):
+        if all(value is not None for value in published) and recorded.get(key) == head and not target.get("missing"):
             outcomes[marketplace] = "current"
             continue
         def invoke(command):
@@ -180,7 +224,8 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
         refreshed = invoke([executable, "plugin", "marketplace", "upgrade", marketplace]) and all(
             invoke([executable, "plugin", "add", plugin]) for plugin in target["plugins"])
         if refreshed:
-            recorded[key] = head
+            if all(value is not None for value in published):
+                recorded[key] = head
             outcomes[marketplace] = "updated"
         else:
             outcomes[marketplace] = "failed"

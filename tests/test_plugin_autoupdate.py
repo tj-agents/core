@@ -104,7 +104,10 @@ class ProjectUpdateTests(unittest.TestCase):
             {"pluginId": "disabled@tj-agents", "enabled": False,
              "marketplaceSource": {"sourceType": "git", "source": CORE}},
         ]}
-        with mock.patch.object(UPDATE.subprocess, "run", return_value=mock.Mock(stdout=json.dumps(listing))) as run:
+        config = {"marketplaces": {"tj-agents": {"source_type": "git", "source": CORE}},
+                  "plugins": {"base@tj-agents": {"enabled": True}, "disabled@tj-agents": {"enabled": False}}}
+        with mock.patch.object(UPDATE, "effective_config", return_value=config), \
+                mock.patch.object(UPDATE.subprocess, "run", return_value=mock.Mock(stdout=json.dumps(listing))) as run:
             targets = UPDATE.project_targets("codex", ROOT)
         self.assertEqual(["base@tj-agents"], targets["tj-agents"]["plugins"])
         self.assertEqual(ROOT, run.call_args.kwargs["cwd"])
@@ -114,11 +117,36 @@ class ProjectUpdateTests(unittest.TestCase):
         import subprocess
 
         missing = subprocess.CalledProcessError(1, "codex", stderr="no snapshot")
-        with mock.patch.object(UPDATE.subprocess, "run", side_effect=[missing, mock.Mock(stdout='{"installed": [], "available": []}')]) as run, \
+        with mock.patch.object(UPDATE, "effective_config", return_value={}), \
+                mock.patch.object(UPDATE.subprocess, "run", side_effect=[missing, mock.Mock(stdout='{"installed": [], "available": []}')]) as run, \
                 mock.patch.object(UPDATE, "run_cli", return_value=True) as bootstrap:
             self.assertEqual({}, UPDATE.project_targets("codex", ROOT))
         bootstrap.assert_called_once_with(["codex", "plugin", "marketplace", "upgrade"], cwd=ROOT)
         self.assertEqual(2, run.call_count)
+
+    def test_selected_plugin_absent_from_snapshot_still_refreshes_its_marketplace(self):
+        config = {"marketplaces": {"tj-agents": {"source_type": "git", "source": CORE}},
+                  "plugins": {"new@tj-agents": {"enabled": True}}}
+        with mock.patch.object(UPDATE, "effective_config", return_value=config), \
+                mock.patch.object(UPDATE.subprocess, "run", return_value=mock.Mock(stdout='{"installed": [], "available": []}')):
+            targets = UPDATE.project_targets("codex", ROOT)
+        run = mock.Mock(return_value=True)
+        self.assertEqual(["new@tj-agents"], targets["tj-agents"]["missing"])
+        self.assertEqual({"tj-agents": "updated"}, UPDATE.refresh_codex(
+            "codex", targets, {}, revision=lambda *_: NEW, run=run, project=ROOT))
+        self.assertIn(mock.call(["codex", "plugin", "add", "new@tj-agents"], cwd=ROOT), run.call_args_list)
+
+    def test_retired_publisher_does_not_block_reachable_marketplace_refresh(self):
+        targets = UPDATE.codex_targets(codex_config())
+        retired = "https://github.com/tj-agents/retired.git"
+        targets["base-agents"]["publishers"] = [{"source": retired, "ref": "removed"}]
+        recorded = {}
+        run = mock.Mock(return_value=True)
+        self.assertEqual({"base-agents": "updated"}, UPDATE.refresh_codex(
+            "codex", targets, recorded,
+            revision=lambda source, ref: None if source == retired else NEW, run=run))
+        self.assertEqual(["codex", "plugin", "marketplace", "upgrade", "base-agents"], run.call_args_list[0].args[0])
+        self.assertEqual({}, recorded)
 
     def test_project_discovery_requires_exact_saved_trust_and_project_configuration(self):
         with tempfile.TemporaryDirectory() as temporary:
