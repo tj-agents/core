@@ -203,13 +203,38 @@ class SetupTests(unittest.TestCase):
             self.assertEqual("a" * 48, setup.configure_topic(Path(directory), api=api))
             self.assertEqual(1, api.call_count)
 
-    def test_publisher_configuration_writes_only_a_missing_or_different_variable(self):
+    def test_publisher_configuration_keeps_the_topic_masked_and_skips_current_settings(self):
         rows = [current("tj-agents/current"), current("tj-agents/new")]
         api = mock.Mock(side_effect=[{"variables": [{"name": "MACHINE_EVENTS_TOPIC", "value": "a" * 48}]},
-                                    {"variables": []}, None])
-        self.assertEqual(1, setup.configure_publishers("a" * 48, rows, api=api))
+                                    {"secrets": [{"name": "MACHINE_EVENTS_TOPIC"}]},
+                                    {"variables": []}, {"secrets": []}, None])
+        secret = mock.Mock()
+        self.assertEqual(1, setup.configure_publishers("a" * 48, rows, api=api, secret=secret))
+        secret.assert_called_once_with("tj-agents/new", "a" * 48)
         self.assertEqual("POST", api.call_args.args[0][1])
         self.assertEqual("repos/tj-agents/new/actions/variables", api.call_args.args[0][2])
+
+    def test_existing_variable_is_migrated_to_a_topic_secret(self):
+        api = mock.Mock(side_effect=[{"variables": [{"name": "MACHINE_EVENTS_TOPIC", "value": "a" * 48}]},
+                                    {"secrets": []}])
+        secret = mock.Mock()
+        self.assertEqual(1, setup.configure_publishers("a" * 48, [current()], api=api, secret=secret))
+        secret.assert_called_once_with("tj-agents/core", "a" * 48)
+        self.assertEqual(2, api.call_count)
+
+    def test_rotated_canonical_variable_refreshes_the_masked_secret(self):
+        api = mock.Mock(side_effect=[{"variables": [{"name": "MACHINE_EVENTS_TOPIC", "value": "a" * 48,
+                                                     "updated_at": "2026-10-20T12:00:00Z"}]},
+                                    {"secrets": [{"name": "MACHINE_EVENTS_TOPIC", "updated_at": "2026-10-19T12:00:00Z"}]}])
+        secret = mock.Mock()
+        self.assertEqual(1, setup.configure_publishers("a" * 48, [current()], api=api, secret=secret))
+        secret.assert_called_once()
+
+    def test_topic_secret_goes_through_stdin_and_not_command_arguments(self):
+        with mock.patch.object(events, "github_cli") as cli:
+            setup.set_topic_secret("tj-agents/core", "a" * 48)
+        self.assertEqual("a" * 48, cli.call_args.kwargs["input"])
+        self.assertNotIn("a" * 48, cli.call_args.args[0])
 
     def test_installation_copies_the_complete_standalone_runtime(self):
         with tempfile.TemporaryDirectory(prefix="runtime ü ") as directory:
