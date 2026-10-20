@@ -128,9 +128,8 @@ Use one status vocabulary:
 - `[x]` resolved; and
 - `[wontfix]` a conscious final disposition whose reason and any required debt entry are recorded.
 
-Do not introduce a second deferred status. Any postponed work is `[wontfix]` here and must be recorded in
-the same stroke through `work-items:write-debt`, linking its canonical record and objective resolution
-condition. Keep review evidence in the work order; ordinary findings do not each require a tracker record.
+Do not introduce a second deferred status. Any postponed work is `[wontfix]` here and must be transferred in
+the same stroke to the owning tech-debt file or issue with an objective resolution condition.
 
 Use one severity vocabulary. `CRITICAL` is an immediately exploitable security, data-loss, or catastrophic
 availability defect; `HIGH` is a likely correctness, security, or boundary failure with material impact;

@@ -1,6 +1,6 @@
 ---
 name: list-work
-description: List selected work items and supporting plans in the current repository group, including their state and next action. Use when Tommy asks what work is open, which plans remain, what is active, or to list work about a subject.
+description: List plans in the current repository group, including their state and next action. Use when Tommy asks what work is open, which plans remain, what is active, or to list work about a subject.
 
 kind: utility
 domain: process
