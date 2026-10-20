@@ -133,6 +133,18 @@ class SweepTests(unittest.TestCase):
         self.assertTrue(fresh.is_dir())
         self.assertIn('removed empty leftover folder', outcomes.values())
 
+    def test_a_dry_run_reports_empty_leftovers_without_removing_them(self):
+        empty = self.primary / '.worktrees' / 'Fix-Gone'
+        empty.mkdir()
+        old = empty.stat().st_mtime - SWEEP.ORPHAN_AGE_SECONDS - 60
+        os.utime(empty, (old, old))
+
+        outcomes = SWEEP.sweep_repository(self.primary, [], removable=lambda primary, worktree: (False, 'no'),
+                                          based=lambda primary, branch: False, dry_run=True)
+
+        self.assertTrue(empty.is_dir())
+        self.assertIn('would remove empty leftover folder', outcomes.values())
+
     def test_an_unreadable_session_registry_stops_the_run(self):
         database = Path(self.temp.name) / 'sessions.db'
         database.write_bytes(b'not a sqlite database at all' * 100)
