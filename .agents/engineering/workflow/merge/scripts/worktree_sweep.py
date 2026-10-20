@@ -140,8 +140,12 @@ def bases_an_open_pull_request(primary: Path, branch: str) -> bool:
 
 
 def proven_removable(primary: Path, worktree: dict, archive: bool = True) -> tuple[bool, str]:
+    try:
+        default = cleanup_proof.default_branch(primary)
+    except cleanup_proof.Preserve as error:
+        return False, error.reason
     arguments = argparse.Namespace(worktree=worktree["path"], branch=worktree["branch"], head=worktree["head"],
-                                   pr=None, default=None, repo=None)
+                                   pr=None, default=default, repo=None)
     output = io.StringIO()
     previous = Path.cwd()
     try:
@@ -195,13 +199,34 @@ def remove(primary: Path, worktree: dict) -> tuple[bool, str]:
     target = Path(worktree["path"])
     unlink_links(target)
     result = git(primary, "worktree", "remove", "--", str(target))
-    if result.returncode:
+    registered = result.returncode != 0 and any(
+        Path(entry["path"]).resolve() == target.resolve()
+        for entry in parse_worktrees(git(primary, "worktree", "list", "--porcelain").stdout))
+    if registered:
         return False, "removal failed, retried next run: " + (result.stderr.strip().splitlines() or ["?"])[-1]
     default = cleanup_proof.default_branch(primary)
     contained = git(primary, "merge-base", "--is-ancestor", "refs/heads/" + worktree["branch"],
                     "origin/" + default).returncode == 0
     git(primary, "branch", "-d" if contained else "-D", worktree["branch"])
+    if target.exists():
+        return True, "removed; its empty folder stays until the process using it exits"
     return True, "removed"
+
+
+def remove_empty_orphans(primary: Path, registered: list[dict]) -> list[str]:
+    root = primary / ".worktrees"
+    if not root.is_dir():
+        return []
+    known = {Path(entry["path"]).resolve() for entry in registered if entry.get("path")}
+    removed = []
+    for child in root.iterdir():
+        if child.is_dir() and not is_link(child) and child.resolve() not in known and not any(child.iterdir()):
+            try:
+                child.rmdir()
+                removed.append(str(child))
+            except OSError:
+                pass
+    return removed
 
 
 def sweep_repository(primary: Path, live: list[str], removable=proven_removable, based=bases_an_open_pull_request,
@@ -209,8 +234,10 @@ def sweep_repository(primary: Path, live: list[str], removable=proven_removable,
     listing = git(primary, "worktree", "list", "--porcelain")
     if listing.returncode:
         return {}
-    outcomes: dict[str, str] = {}
-    for worktree in parse_worktrees(listing.stdout)[1:]:
+    worktrees = parse_worktrees(listing.stdout)
+    outcomes: dict[str, str] = {path: "removed empty leftover folder"
+                                for path in remove_empty_orphans(primary, worktrees)}
+    for worktree in worktrees[1:]:
         path = worktree.get("path")
         if not path or not Path(path).is_dir():
             continue
