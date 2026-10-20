@@ -1,5 +1,6 @@
 """Synthetic configuration and command doubles only; no network, CLI or scheduler is touched."""
 
+import ast
 import importlib.util
 import json
 import os
@@ -136,6 +137,98 @@ class ProjectUpdateTests(unittest.TestCase):
             "codex", targets, {}, revision=lambda *_: NEW, run=run, project=ROOT))
         self.assertIn(mock.call(["codex", "plugin", "add", "new@tj-agents"], cwd=ROOT), run.call_args_list)
 
+    def test_a_plugin_the_marketplace_no_longer_publishes_is_skipped_without_failing(self):
+        targets = UPDATE.codex_targets(codex_config())
+        targets["base-agents"]["plugins"] = ["base@base-agents", "kit@base-agents"]
+
+        def run(command, cwd=None):
+            return UPDATE.RETIRED if command[-1] == "kit@base-agents" else True
+
+        outcome = UPDATE.refresh_codex("codex", targets, {}, revision=lambda *_: NEW, run=run)["base-agents"]
+
+        self.assertTrue(outcome.startswith("updated"))
+        self.assertIn("kit@base-agents", outcome)
+
+    def test_a_known_retired_plugin_does_not_force_a_refresh_every_run(self):
+        targets = UPDATE.codex_targets(codex_config())
+        targets["base-agents"]["plugins"] = ["base@base-agents", "kit@base-agents"]
+        targets["base-agents"]["missing"] = ["kit@base-agents"]
+        recorded = {}
+
+        def run(command, cwd=None):
+            return UPDATE.RETIRED if command[-1] == "kit@base-agents" else True
+
+        UPDATE.refresh_codex("codex", targets, recorded, revision=lambda *_: NEW, run=run)
+        again = mock.Mock(return_value=True)
+        outcome = UPDATE.refresh_codex("codex", targets, recorded, revision=lambda *_: NEW, run=again)
+
+        self.assertEqual({"base-agents": "current"}, outcome)
+        again.assert_not_called()
+
+    def test_unchanged_project_configuration_reuses_its_resolved_targets(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = root / "repo"
+            (project / ".codex").mkdir(parents=True)
+            (project / ".codex" / "config.toml").write_text("", encoding="utf-8")
+            config = {"projects": {str(project): {"trust_level": "trusted"}}}
+            resolved = UPDATE.codex_targets(codex_config())
+            recorded = {}
+            with mock.patch.dict(os.environ, {"CODEX_HOME": temporary}), \
+                    mock.patch.object(UPDATE, "project_directories", return_value=[project]), \
+                    mock.patch.object(UPDATE, "project_targets", return_value=resolved) as probe:
+                for _ in range(2):
+                    UPDATE.refresh_projects("codex", {}, recorded, run=mock.Mock(return_value=True))
+
+        self.assertEqual(1, probe.call_count)
+
+    def test_a_failed_refresh_waits_a_day_before_retrying(self):
+        targets = UPDATE.codex_targets(codex_config())
+        recorded = {}
+        failing = mock.Mock(return_value=False)
+
+        self.assertEqual("failed", UPDATE.refresh_codex(
+            "codex", targets, recorded, revision=lambda *_: NEW, run=failing, now=1000.0)["base-agents"])
+        retry = mock.Mock(return_value=True)
+        soon = UPDATE.refresh_codex("codex", targets, recorded, revision=lambda *_: NEW, run=retry, now=2000.0)
+        later = UPDATE.refresh_codex("codex", targets, recorded, revision=lambda *_: NEW, run=retry,
+                                     now=1000.0 + UPDATE.FAILURE_BACKOFF_SECONDS + 1)
+
+        self.assertIn("retried after 24 hours", soon["base-agents"])
+        self.assertEqual("updated", later["base-agents"])
+        self.assertNotIn(True, [key.startswith("failed:") for key in recorded])
+
+    def test_projects_inside_the_temporary_directory_are_ignored(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name in ("kept", "scratch"):
+                (root / name / ".codex").mkdir(parents=True)
+                (root / name / ".codex" / "config.toml").write_text("", encoding="utf-8")
+            config = {"projects": {str(root / "kept"): {"trust_level": "trusted"},
+                                   str(root / "scratch"): {"trust_level": "trusted"}}}
+
+            found = UPDATE.project_directories(config, temporary=root / "scratch")
+
+        self.assertEqual([(root / "kept").resolve()], found)
+
+    def test_every_child_process_starts_without_a_console_window(self):
+        tree = ast.parse((SCRIPTS / "plugin_autoupdate.py").read_text(encoding="utf-8"))
+        option_sets = {node.targets[0].id for node in ast.walk(tree)
+                       if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict)
+                       and isinstance(node.targets[0], ast.Name)
+                       and "creationflags" in [key.value for key in node.value.keys if isinstance(key, ast.Constant)]}
+        launches = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute) and node.func.attr in ("run", "Popen")
+                    and isinstance(node.func.value, ast.Name) and node.func.value.id == "subprocess"]
+
+        self.assertTrue(launches)
+        for call in launches:
+            with self.subTest(line=call.lineno):
+                named = any(keyword.arg == "creationflags" for keyword in call.keywords)
+                spread = any(keyword.arg is None and isinstance(keyword.value, ast.Name)
+                             and keyword.value.id in option_sets for keyword in call.keywords)
+                self.assertTrue(named or spread)
+
     def test_retired_publisher_does_not_block_reachable_marketplace_refresh(self):
         targets = UPDATE.codex_targets(codex_config())
         retired = "https://github.com/tj-agents/retired.git"
@@ -157,7 +250,7 @@ class ProjectUpdateTests(unittest.TestCase):
             config = {"projects": {str(root / "trusted"): {"trust_level": "trusted"},
                                    str(root / "untrusted"): {"trust_level": "untrusted"},
                                    str(root / "parent"): {"trust_level": "trusted"}}}
-            self.assertEqual([(root / "trusted").resolve()], UPDATE.project_directories(config))
+            self.assertEqual([(root / "trusted").resolve()], UPDATE.project_directories(config, temporary=Path('/nonexistent-temp')))
 
     def test_project_runs_use_the_native_cwd_and_share_remote_revision_checks(self):
         target = UPDATE.codex_targets(codex_config())

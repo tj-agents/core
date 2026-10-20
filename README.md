@@ -230,7 +230,7 @@ Its native `plugin add` commands maintain the host's required user installation 
 repository settings remain the authored selection. Codex currently provides no cache-only install scope.
 Nothing updates packages in the launch path.
 
-For an explicit native refresh use `machine:refresh-cli`. Its default performs native marketplace
+For an explicit native refresh use `machine:reload-plugins`. Its default performs native marketplace
 and plugin updates; remote revision verification is opt-in and prints progress. `/reload-plugins`
 adopts updates in an open Claude session; start a new Codex session to load updated packages.
 
