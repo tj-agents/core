@@ -56,8 +56,8 @@ the work.
 ## Example
 
 ```text
-An upstream API removes `v1` on 2027-03-01. The default-branch roadmap owns the dependency ordering, one
-active branch owns its migration plan, and another plan has no semantic dependency on the API. Update the
-roadmap and active plan with the replacement API and verification gate, record the unrelated plan as `none`,
-run the graph check in each owning worktree, and leave product code unchanged.
+An upstream API removes `v1` on 2027-03-01. Roadmap key `payments/api-v2` links Work Items feature
+WI-701, which the provider shows in progress under PR #88. Record the new deadline and dependency on
+WI-701 through the provider, update the roadmap's design notes and status summary from that state, keep
+the `payments/api-v2` key, and leave product code unchanged.
 ```
