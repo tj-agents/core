@@ -183,9 +183,9 @@ resources remain covered.
 
 Run once per machine, and again whenever you like; it changes nothing that is already set:
 
-```powershell
-./setup.ps1          # Windows (pwsh or Windows PowerShell)
-pwsh ./setup.ps1     # Linux
+```text
+./setup.ps1          # Windows (PowerShell)
+./setup.sh           # Linux and macOS (bash and python3)
 ```
 
 It turns on Claude's own auto-update for every marketplace an enabled plugin comes from, removes the

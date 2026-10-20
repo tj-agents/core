@@ -482,7 +482,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "do not create a second branch solely to change the type prefix to `Docs`", flat
         )
 
-    def test_merge_requires_safe_cleanup_when_the_repository_helper_is_absent(self):
+    def test_merge_cleanup_runs_the_proving_worktree_sweep(self):
         body = authored_skill("merge").read_text(encoding="utf-8")
         cleanup = body.split(
             "### 5. Return to a clean base and retire any isolated checkout",
@@ -491,43 +491,19 @@ class ProcessStandardsTests(unittest.TestCase):
         flat = " ".join(cleanup.split())
 
         for required in (
-            "Join-Path <primary-checkout> 'scripts/worktrees.ps1'",
-            "Test-Path -LiteralPath $worktreeHelper -PathType Leaf",
-            "If that exact primary-checkout helper path is absent, do not skip cleanup",
-            "cleanup_proof.py",
-            "a dirty tree",
-            "a merge commit absent from `origin/<default>`",
-            "a still-open PR for the head",
-            "`preserve:` stops cleanup",
-            "worktree remove -- <target-worktree>",
-            "branch -d <branch>",
-            "proof covers exactly this head, so delete it with",
-            "branch -D <branch>",
-            "Report any cleanup you could not complete; never force it",
             "never remove that path",
+            "scripts/worktree_sweep.py --repo <primary-checkout>",
+            "`cleanup_proof.py` proves its PR merged at exactly its head",
+            "archiving any leftovers under `<state>/merge-cleanup/set-aside/` first",
+            "while a registered session still works inside it",
+            "while an open PR is based on its branch",
+            "removed by the machine's hourly job after the session ends",
+            "never force a removal",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
 
-        self.assertNotIn("worktree remove --force", cleanup)
-
-    def test_merge_leaves_an_attached_worktree_for_pruning_instead_of_closing_the_session(self):
-        body = authored_skill("merge").read_text(encoding="utf-8")
-        cleanup = body.split(
-            "### 5. Return to a clean base and retire any isolated checkout",
-            maxsplit=1,
-        )[1].split("### 6. Follow the publish", maxsplit=1)[0]
-        flat = " ".join(cleanup.split())
-
-        for required in (
-            "When this session is running inside the merged linked worktree, leave that worktree in place",
-            "`engineering:prune-worktrees` removes it later",
-            "Otherwise remove the merged target now",
-        ):
-            with self.subTest(required=required):
-                self.assertIn(required, flat)
-
-        for retired in ("finish.py", "close.py", "machine:close"):
+        for retired in ("finish.py", "close.py", "machine:close", "worktrees.ps1", "worktree remove --force"):
             with self.subTest(retired=retired):
                 self.assertNotIn(retired, cleanup)
 
