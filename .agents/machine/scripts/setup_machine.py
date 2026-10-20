@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Set this machine up for automatic plugin updates; safe to run again at any time (Python 3.11+)."""
+"""Install the supervised machine event listener (Python 3.11+)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import argparse
 import codecs
 import os
 from pathlib import Path
+import secrets
 import shutil
 import subprocess
 import sys
@@ -14,9 +15,11 @@ import tempfile
 from xml.sax.saxutils import escape
 
 import plugin_autoupdate
+import machine_events
 
-TASK_NAME = "tj-agents plugin autoupdate"
-CRON_MARKER = "# tj-agents-plugin-autoupdate"
+TASK_NAME = machine_events.SERVICE_NAME
+RETIRED_TASKS = ("tj-agents plugin autoupdate", "tj-agents merge gates")
+RETIRED_CRON_MARKERS = ("# tj-agents-plugin-autoupdate", "# tj-agents-merge-gates")
 COMMAND_TIMEOUT_SECONDS = 60
 RETIRED_BLOCKS = (
     ("# >>> base-agents claude launcher >>>", "# <<< base-agents claude launcher <<<"),
@@ -84,19 +87,11 @@ def remove_retired_launchers(paths: list[Path]) -> list[Path]:
     return cleaned
 
 
-def install_script(source: Path, directory: Path) -> Path:
-    directory.mkdir(parents=True, exist_ok=True)
-    target = directory / plugin_autoupdate.SCRIPT_NAME
-    shutil.copyfile(source, target)
-    return target
-
-
 def windowless_python() -> str:
     candidate = Path(sys.executable).with_name("pythonw.exe")
     if candidate.is_file():
         return str(candidate)
-    print(f"pythonw.exe was not found beside {sys.executable}; scheduled runs will show a console window")
-    return sys.executable
+    raise RuntimeError(f"pythonw.exe is required beside {sys.executable} for the hidden listener")
 
 
 def windows_task_xml(user: str, python: str, script: Path) -> str:
@@ -104,10 +99,6 @@ def windows_task_xml(user: str, python: str, script: Path) -> str:
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <Triggers>
     <LogonTrigger><Enabled>true</Enabled><UserId>{escape(user)}</UserId></LogonTrigger>
-    <TimeTrigger>
-      <Repetition><Interval>PT1H</Interval><StopAtDurationEnd>false</StopAtDurationEnd></Repetition>
-      <StartBoundary>2026-01-01T00:00:00</StartBoundary><Enabled>true</Enabled>
-    </TimeTrigger>
   </Triggers>
   <Principals>
     <Principal id="Author"><UserId>{escape(user)}</UserId><LogonType>InteractiveToken</LogonType>
@@ -118,13 +109,13 @@ def windows_task_xml(user: str, python: str, script: Path) -> str:
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
     <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
     <StartWhenAvailable>true</StartWhenAvailable>
-    <RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable>
+    <RestartOnFailure><Interval>PT1M</Interval><Count>999</Count></RestartOnFailure>
     <Hidden>true</Hidden>
-    <ExecutionTimeLimit>PT30M</ExecutionTimeLimit>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
     <Enabled>true</Enabled>
   </Settings>
   <Actions Context="Author">
-    <Exec><Command>{escape(python)}</Command><Arguments>-B "{escape(str(script))}"</Arguments></Exec>
+    <Exec><Command>{escape(python)}</Command><Arguments>-B "{escape(str(script))}" --state-directory "{escape(str(script.parent.parent))}"</Arguments></Exec>
   </Actions>
 </Task>
 """
@@ -143,19 +134,107 @@ def schedule_windows(script: Path, run=subprocess.run) -> None:
         Path(path).unlink(missing_ok=True)
 
 
-def cron_lines(python: str, script: Path) -> list[str]:
-    command = f'"{python}" -B "{script}"'
-    return [f"@reboot {command} {CRON_MARKER}", f"17 * * * * {command} {CRON_MARKER}"]
-
-
-def schedule_cron(script: Path, run=subprocess.run) -> None:
-    current = run(["crontab", "-l"], capture_output=True, text=True, encoding="utf-8", errors="replace",
-                  timeout=COMMAND_TIMEOUT_SECONDS, check=False)
-    lines = [line for line in (current.stdout if current.returncode == 0 else "").splitlines()
-             if CRON_MARKER not in line]
-    lines.extend(cron_lines(sys.executable, script))
+def remove_retired_cron(run=subprocess.run) -> None:
+    try:
+        current = run(["crontab", "-l"], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                      timeout=COMMAND_TIMEOUT_SECONDS, check=False)
+    except FileNotFoundError:
+        return
+    if current.returncode and "no crontab" not in current.stderr.lower():
+        raise RuntimeError("Cannot inspect crontab: " + current.stderr)
+    original = (current.stdout if current.returncode == 0 else "").splitlines()
+    lines = [line for line in original if not any(marker in line for marker in RETIRED_CRON_MARKERS)]
+    if lines == original:
+        return
     run(["crontab", "-"], input="\n".join(lines) + "\n", capture_output=True, text=True, encoding="utf-8",
         errors="replace", timeout=COMMAND_TIMEOUT_SECONDS, check=True)
+
+
+def systemd_unit(python: str, script: Path) -> str:
+    def quoted(value):
+        return '"' + str(value).replace("%", "%%").replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+    return ("[Unit]\nDescription=tj-agents machine events\nAfter=network.target\n\n[Service]\n"
+            f"ExecStart={quoted(python)} -B {quoted(script)} --state-directory {quoted(script.parent.parent)}\nRestart=always\nRestartSec=5\n"
+            "\n[Install]\nWantedBy=default.target\n")
+
+
+def schedule_systemd(script: Path, home: Path, run=subprocess.run) -> None:
+    unit = home / ".config/systemd/user/tj-agents-machine-events.service"
+    unit.parent.mkdir(parents=True, exist_ok=True)
+    unit.write_text(systemd_unit(sys.executable, script), encoding="utf-8", newline="\n")
+    for command in (["systemctl", "--user", "daemon-reload"],
+                    ["systemctl", "--user", "enable", "tj-agents-machine-events.service"],
+                    ["systemctl", "--user", "restart", "tj-agents-machine-events.service"]):
+        run(command, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=COMMAND_TIMEOUT_SECONDS, check=True)
+
+
+def remove_retired_windows(run=subprocess.run) -> None:
+    for name in RETIRED_TASKS:
+        existing = run(["schtasks.exe", "/query", "/tn", name], capture_output=True, text=True,
+                       timeout=COMMAND_TIMEOUT_SECONDS, check=False, creationflags=plugin_autoupdate.NO_WINDOW)
+        if existing.returncode == 0:
+            run(["schtasks.exe", "/end", "/tn", name], capture_output=True, text=True,
+                timeout=COMMAND_TIMEOUT_SECONDS, check=False, creationflags=plugin_autoupdate.NO_WINDOW)
+            run(["schtasks.exe", "/delete", "/tn", name, "/f"], capture_output=True, text=True,
+                timeout=COMMAND_TIMEOUT_SECONDS, check=True, creationflags=plugin_autoupdate.NO_WINDOW)
+
+
+def configure_topic(directory: Path, api=machine_events.gh) -> str:
+    endpoint = "repos/tj-agents/core/actions/variables"
+    values = api([endpoint + "?per_page=100"])
+    remote = next((item["value"] for item in values["variables"]
+                   if item["name"] == machine_events.TOPIC_VARIABLE), None)
+    saved = plugin_autoupdate.read_json(directory / "machine-events.json").get("topic")
+    topic = machine_events.topic_value(remote or saved or secrets.token_hex(24))
+    if not remote:
+        api(["--method", "POST", endpoint, "--input", "-"],
+            {"name": machine_events.TOPIC_VARIABLE, "value": topic})
+    plugin_autoupdate.write_json(directory / "machine-events.json", {"topic": topic})
+    return topic
+
+
+def set_topic_secret(repository: str, topic: str) -> None:
+    machine_events.github_cli(["secret", "set", machine_events.TOPIC_VARIABLE, "--repo", repository], input=topic)
+
+
+def configure_publishers(topic: str, repositories, api=machine_events.gh, secret=set_topic_secret) -> int:
+    changed = 0
+    for repository in repositories:
+        if repository.get("isArchived") or repository.get("isFork"):
+            continue
+        name = repository["nameWithOwner"]
+        if not machine_events.valid_repository(name):
+            raise ValueError("Unsupported publisher repository")
+        endpoint = f"repos/{name}/actions/variables"
+        values = api([endpoint + "?per_page=100"])
+        existing = next((item for item in values["variables"]
+                         if item["name"] == machine_events.TOPIC_VARIABLE), None)
+        different = existing is None or existing["value"] != topic
+        secrets = api([f"repos/{name}/actions/secrets?per_page=100"])
+        saved = next((item for item in secrets["secrets"]
+                      if item["name"] == machine_events.TOPIC_VARIABLE), None)
+        stale = bool(existing and saved and existing.get("updated_at", "") > saved.get("updated_at", ""))
+        if different:
+            if existing:
+                endpoint += "/" + machine_events.TOPIC_VARIABLE
+            api(["--method", "PATCH" if existing else "POST", endpoint, "--input", "-"],
+                {"name": machine_events.TOPIC_VARIABLE, "value": topic})
+        if different or saved is None or stale:
+            secret(name, topic)
+            changed += 1
+    return changed
+
+
+def install_listener(directory: Path) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    for name in ("plugin_autoupdate.py", "machine_events.py"):
+        target = directory / name
+        temporary = target.with_suffix(".next")
+        shutil.copyfile(Path(__file__).with_name(name), temporary)
+        os.replace(temporary, target)
+    return directory / "machine_events.py"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -163,24 +242,30 @@ def main(argv: list[str] | None = None) -> int:
         print("setup_machine requires Python 3.11 or newer", file=sys.stderr)
         return 2
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--no-schedule", action="store_true")
-    arguments = parser.parse_args(argv)
+    parser.parse_args(argv)
     home = Path.home()
+    machine_events.require_tommy()
+    directory = plugin_autoupdate.state_directory()
+    topic = configure_topic(directory)
+    repositories = list(machine_events.catch_up_states())
+    configured = configure_publishers(topic, repositories)
+    print(f"Channel configured for {configured} repository publishers")
     for name in enable_claude_autoupdate(plugin_autoupdate.claude_home()):
         print(f"Claude marketplace now auto-updates: {name}")
     for path in remove_retired_launchers(profile_paths(home)):
         print(f"Removed the retired launcher from {path}")
-    script = install_script(Path(__file__).with_name(plugin_autoupdate.SCRIPT_NAME),
-                            plugin_autoupdate.state_directory() / "bin")
-    if not arguments.no_schedule:
-        if os.name == "nt":
-            schedule_windows(script)
-            print(f"Scheduled '{TASK_NAME}' at logon and hourly")
-        else:
-            schedule_cron(script)
-            print("Scheduled the plugin refresh at boot and hourly in crontab")
-    plugin_autoupdate.main(["--no-self-update"])
-    print("Plugins are up to date")
+    script = install_listener(directory / "bin")
+    if os.name == "nt":
+        schedule_windows(script)
+        remove_retired_windows()
+        subprocess.run(["schtasks.exe", "/end", "/tn", TASK_NAME], capture_output=True,
+                       timeout=COMMAND_TIMEOUT_SECONDS, check=False, creationflags=plugin_autoupdate.NO_WINDOW)
+        subprocess.run(["schtasks.exe", "/run", "/tn", TASK_NAME], capture_output=True,
+                       timeout=COMMAND_TIMEOUT_SECONDS, check=True, creationflags=plugin_autoupdate.NO_WINDOW)
+    else:
+        remove_retired_cron()
+        schedule_systemd(script, home)
+    print("Machine event listener installed and started; it catches up on startup")
     return 0
 
 
