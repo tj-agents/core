@@ -342,10 +342,11 @@ class RepoIdentityTests(unittest.TestCase):
             return original_run(*args, **kwargs)
 
         with mock.patch.object(STORE.subprocess, "run", side_effect=counting_run):
-            head, branch, common_dir = STORE._rev_parse_probe(repo, STORE.GIT_TIMEOUT)
+            head, branch, common_dir, toplevel = STORE._rev_parse_probe(repo, STORE.GIT_TIMEOUT)
         self.assertEqual(1, len(calls))
         self.assertIsNotNone(head)
         self.assertIsNotNone(common_dir)
+        self.assertEqual(Path(repo).resolve(), Path(toplevel).resolve())
 
     def test_rev_parse_probe_falls_back_on_unborn_head_within_three_calls(self):
         directory = self.root / "unborn-fallback-repo"
@@ -361,7 +362,7 @@ class RepoIdentityTests(unittest.TestCase):
             return original_run(*args, **kwargs)
 
         with mock.patch.object(STORE.subprocess, "run", side_effect=counting_run):
-            head, branch, common_dir = STORE._rev_parse_probe(directory, STORE.GIT_TIMEOUT)
+            head, branch, common_dir, toplevel = STORE._rev_parse_probe(directory, STORE.GIT_TIMEOUT)
         self.assertLessEqual(len(calls), 3)
         self.assertIsNone(head)
         self.assertIsNotNone(common_dir)
@@ -377,7 +378,7 @@ class RepoIdentityTests(unittest.TestCase):
             return original_run(*args, **kwargs)
 
         with mock.patch.object(STORE.subprocess, "run", side_effect=counting_run):
-            head, branch, common_dir = STORE._rev_parse_probe(directory, STORE.GIT_TIMEOUT)
+            head, branch, common_dir, toplevel = STORE._rev_parse_probe(directory, STORE.GIT_TIMEOUT)
         self.assertIsNone(head)
         self.assertIsNone(common_dir)
         self.assertFalse(any("symbolic-ref" in call for call in calls))
@@ -391,7 +392,7 @@ class RepoIdentityTests(unittest.TestCase):
             raise subprocess.TimeoutExpired(cmd=args[0], timeout=kwargs.get("timeout", 0))
 
         with mock.patch.object(STORE.subprocess, "run", side_effect=timeout_run):
-            head, branch, common_dir = STORE._rev_parse_probe(repo, STORE.GIT_TIMEOUT)
+            head, branch, common_dir, toplevel = STORE._rev_parse_probe(repo, STORE.GIT_TIMEOUT)
         self.assertEqual(1, len(calls))
         self.assertIsNone(head)
         self.assertIsNone(branch)
@@ -458,6 +459,59 @@ class HookLifecycleTests(unittest.TestCase):
         row = self._row(handle)
         self.assertIsNotNone(row["ended_at"])
         self.assertEqual("closed", row["end_reason"])
+
+    def test_stop_moves_the_registered_cwd_to_where_the_session_now_runs(self):
+        registry = self.state / "cli-sessions"
+        registry.mkdir(parents=True)
+        entry = {"session_id": "moved-id", "host": "claude", "cwd": str(self.root), "pid": 7,
+                 "pid_started_at": 1.5, "terminal": {"kind": "windows-terminal", "session": "tab"}}
+        (registry / "moved-id.json").write_text(json.dumps(entry), encoding="utf-8")
+        foreign = dict(entry, session_id="other-id", host="codex")
+        (registry / "other-id.json").write_text(json.dumps(foreign), encoding="utf-8")
+        payload = {"session_id": "moved-id", "cwd": str(self.repo)}
+        self._invoke("session-start", "claude", payload)
+        self.assertEqual(0, self._invoke("stop", "claude", payload))
+        moved = json.loads((registry / "moved-id.json").read_text(encoding="utf-8"))
+        self.assertEqual(self.repo.resolve(), Path(moved.pop("cwd")).resolve())
+        self.assertEqual(dict({key: value for key, value in entry.items() if key != "cwd"}, launch_cwd=str(self.root)), moved)
+        self.assertEqual(self.repo.resolve(), Path(self._row("claude:moved-id")["cwd"]).resolve())
+        self.assertEqual(0, self._invoke("stop", "claude", {"session_id": "other-id", "cwd": str(self.repo)}))
+        self.assertEqual(foreign, json.loads((registry / "other-id.json").read_text(encoding="utf-8")))
+        self.assertEqual(0, self._invoke("stop", "claude", {"session_id": "unregistered", "cwd": str(self.repo)}))
+        self.assertFalse((registry / "unregistered.json").exists())
+
+    def test_a_locked_registry_keeps_the_store_cwd_so_both_still_agree(self):
+        registry = self.state / "cli-sessions"
+        registry.mkdir(parents=True)
+        entry = {"session_id": "locked-id", "host": "claude", "cwd": str(self.root), "pid": 7, "pid_started_at": 1.5}
+        (registry / "locked-id.json").write_text(json.dumps(entry), encoding="utf-8")
+        self._invoke("session-start", "claude", {"session_id": "locked-id", "cwd": str(self.root)})
+        with mock.patch.object(STORE.os, "replace", side_effect=PermissionError("in use")), \
+                mock.patch.object(STORE, "REGISTRY_REPLACE_DELAY_SECONDS", 0):
+            self.assertEqual(0, self._invoke("stop", "claude", {"session_id": "locked-id", "cwd": str(self.repo)}))
+        self.assertEqual(entry, json.loads((registry / "locked-id.json").read_text(encoding="utf-8")))
+        row = self._row("claude:locked-id")
+        self.assertEqual("awaiting_input", row["turn_state"])
+        self.assertEqual((str(self.root), None, None, None, None),
+                         (row["cwd"], row["repo"], row["branch"], row["head"], row["work_item"]))
+        self.assertEqual([], [path.name for path in registry.iterdir() if path.name.endswith(".tmp")])
+
+    def test_stop_records_the_checkout_root_not_a_subdirectory_or_the_enclosing_checkout(self):
+        registry = self.state / "cli-sessions"
+        registry.mkdir(parents=True)
+        (self.repo / "tests").mkdir()
+        nested = self.repo / ".worktrees" / "feature"
+        _run_git(self.repo, "worktree", "add", "-q", "-b", "feature", str(nested))
+        entry = {"session_id": "rooted-id", "host": "codex", "cwd": str(self.root), "pid": 7, "pid_started_at": 1.5}
+        (registry / "rooted-id.json").write_text(json.dumps(entry), encoding="utf-8")
+        for directory, expected in ((self.repo / "tests", self.repo), (nested, nested)):
+            with self.subTest(directory=directory.name):
+                payload = {"session_id": "rooted-id", "cwd": str(directory)}
+                self._invoke("session-start", "codex", payload)
+                self.assertEqual(0, self._invoke("stop", "codex", payload))
+                registered = json.loads((registry / "rooted-id.json").read_text(encoding="utf-8"))
+                self.assertEqual(expected.resolve(), Path(registered["cwd"]).resolve())
+                self.assertEqual(expected.resolve(), Path(self._row("codex:rooted-id")["cwd"]).resolve())
 
     def test_resume_start_clears_ended_at_and_end_reason(self):
         payload = {"session_id": "exact-id", "cwd": str(self.repo)}

@@ -36,6 +36,30 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: python3 -B scripts/check_generated_paths.py --base "origin/${BASE_REF}"
 
+  guidance-examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/checkout@v4
+        with:
+          repository: tj-agents/template
+          ref: main
+          path: .template
+          persist-credentials: false
+
+      - name: changed authored guidance has concrete examples (pull request)
+        if: github.event_name == 'pull_request'
+        run: python3 -B .template/.agents/template/utility/check/scripts/check_examples.py --root . --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}" --merge-base
+
+      - name: changed authored guidance has concrete examples (default push)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: python3 -B .template/.agents/template/utility/check/scripts/check_examples.py --root . --base "${{ github.event.before }}" --head "${{ github.sha }}"
+
   verify-windows:
     needs: select
     if: needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
@@ -119,12 +143,6 @@ jobs:
           ./tests/delivery-continuation.tests.ps1
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/delivery-continuation.tests.ps1
 
-      - name: Codex terminal profile tests
-        if: fromJSON(needs.select.outputs.plan).mode == 'full'
-        shell: pwsh
-        run: |
-          python -B -m unittest discover -s tests -p test_codex_terminal_profile.py
-
       - name: source layout and package tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
@@ -203,7 +221,7 @@ jobs:
 
   ci-required:
     if: always()
-    needs: [select, guard, verify-windows, verify-linux]
+    needs: [select, guard, guidance-examples, verify-windows, verify-linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

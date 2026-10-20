@@ -27,9 +27,11 @@ procedure that goes stale in the repo that renames one.
 - **A green PR is not proof the required end-to-end suites passed.** Suites gated on `merge_group` report
   **`skipping`** on the PR itself — expected, not a failure. They run *after* you enqueue, inside the merge
   group. Only the queue proves them.
-- **`--auto` enqueues; it does not merge.** It returns immediately and the merge lands later, so observe the
-  outcome through persistent-workflow when it must outlive this turn, or the foreground listener procedure below; never assume it landed. A full end-to-end merge
-  is tens of minutes, and waiting for it must not keep the model running.
+- **Resolve the repository's merge configuration before using `--auto`.** With a merge queue it enqueues;
+  without a queue or required branch checks it can merge immediately. Before every merge invocation,
+  including `--auto`, require the exact PR head's own checks to be terminal and green under step 3.
+  The flag is not a check-waiting gate. Observe the actual queued or merged outcome through
+  persistent-workflow or the foreground listener; waiting must not keep the model running.
 - **`--admin` is an escape hatch, not the default.** It force-merges immediately and **bypasses the queue,
   which means the required suites do not run at all.** Use it only when the user explicitly asks to skip the
   queue — a meta-only diff with zero runtime impact (`engineering:merge-docs` is that case as its own
@@ -71,16 +73,9 @@ product, package or test-selection path makes it a code PR and requires
 too large for one pass. Commits added after the review require
 `engineering:incremental-review`. **Do not proceed while findings remain open.**
 
-**The gate is hook-enforced, and every harness names the checkout in the merge command.**
-`.agents/hooks/merge_review_gate.py` (PreToolUse) blocks the agent's merge command until the branch's review
-file is current and clean. Codex does not expose an `exec_command` workdir override to hooks, so the merge
-procedure never asks the hook to infer one from shell text. Record the worktree's absolute path and use the
-single cross-shell envelope shown in Step 4: `pushd "<absolute-worktree>" && gh pr merge <n> ...`. It works
-under Bash, cmd and PowerShell, pins the checkout before `gh` runs, and gives Codex one deliberately narrow
-target-proof contract. Claude also resolves the checkout from that envelope, retaining its legacy
-`cd`/payload-cwd behavior only for compatibility when the envelope is absent. A Codex merge outside
-that exact envelope fails closed; simplify the command instead of adding another shell spelling or
-asking the user to bypass the hook.
+**Name the checkout in the merge command.** Record the worktree's absolute path and use the single
+cross-shell envelope shown in Step 4: `pushd "<absolute-worktree>" && gh pr merge <n> ...`. It works under
+Bash, cmd and PowerShell and pins the checkout before `gh` runs.
 
 ### 1. Find the PR for the current branch
 
@@ -234,70 +229,8 @@ git -C <primary-checkout> checkout <default>
 git -C <primary-checkout> pull --ff-only origin <default>
 ```
 
-Compare the recorded target checkout in the delivery binding with the resolved primary checkout and the
-current host attachment before invoking either cleanup path below. Read `machine:close`'s self-session
-execution requirements first. When the target is the primary checkout,
-or the session is already attached to the primary checkout, do not retarget or hand off; continue cleanup
-and branch deletion in the current session.
-
-When the session remains attached to the primary checkout or another retained checkout, finish Step 6
-and any plan close-out, then select `machine:close` and arm its retained-checkout operation before the
-final report. After the report and all other Stop gates, its `complete` operation runs this underlying
-argument-free command:
-
-```
-python3 -B <machine:peer-cli skill-directory>/scripts/close.py  # Linux/macOS
-python -B <machine:peer-cli skill-directory>\scripts\close.py  # Windows
-```
-
-It verifies this session's registered host and attachment, closes only its own CLI or uniquely identified
-tab, and records verified session exit while preserving checkout files and Git state. A retained checkout
-or deleted branch does not prove that the CLI exited. If verification fails, preserve the session and
-resolve its registry or attachment evidence before retrying.
-
-Only when the recorded target is a linked worktree, the host is attached to that target, and the target
-differs from the primary checkout, the session closes itself as the delivery's final action, after Step 6,
-any plan close-out and the report. Run gate 1 below, then select `machine:close` and arm it with
-`--remove-worktree` before the final report. After all other Stop gates, its `complete` operation runs
-the underlying helper below with
-no arguments and no leading `&`, because the harness allow rule matches only this string, written with
-forward slashes since the Bash tool strips backslashes:
-
-```
-python3 -B <machine:peer-cli skill-directory>/scripts/finish.py  # Linux/macOS
-python -B <machine:peer-cli skill-directory>\scripts\finish.py  # Windows
-```
-
-It verifies the receipt, detaches a reaper that removes the worktree and branch once this session exits, and
-closes this session's CLI and tab. The reaper's result and the cleanup reminder surface any failure to the
-next session. A per-command `workdir`, shell `cd`, or `git -C` does not retarget Codex or Claude and is not
-evidence that the old directory can be deleted.
-
-Run neither underlying command before the completion report is delivered; the close skill's `arm`
-operation runs before the report and its Stop hook routes the post-report `complete` operation.
-Honor an explicit keep-open or continue
-instruction and an active dialogue. Both commands require a live, exact session-store attachment that is
-still `awaiting_input`; they recheck the same idle activity token immediately before recording end or
-signalling. That guard is not proof that the report was delivered. If no supported post-report execution
-path remains, preserve the session and worktree with the existing `merge_cleanup_gate --clear` deliberate-
-retention escape.
-
-- Only when `finish.py` is unavailable or its preflight fails, including an unresolved verified registry attachment: if the harness exposes its native host
-  command interface, invoke `/cd <primary-checkout>` there and continue only after the host confirms that
-  the session is attached to the primary checkout.
-- Only when `finish.py` is unavailable or its preflight fails: if that interface is unavailable, invoke
-  the unqualified `handoff` workflow once with the primary checkout. Checkpoint the exact repository, merged
-  PR, branch, remote head, target worktree, primary checkout, and remote default. Put the remaining Step 5
-  cleanup and final inventory in the successor's `## Next Steps`. After verified launcher submission the
-  predecessor stops repository-scoped work; it cannot end its own host session, so the successor's
-  `## Next Steps` gates on the recorded release marker and then closes the predecessor's CLI and tab through
-  `handoff`'s `machine:peer-cli` release procedure, and the predecessor does not run either cleanup path. The
-  successor is the sole cleanup owner: after closing the predecessor, it selects the helper or native-Git
-  path below, requires the physical target path to be absent, and then continues this delivery.
-
-Do not make the user choose between these paths or teach them this lifecycle detail. Only the final manual
-`/cd` pause already defined by `base:cd` applies when the automatic handoff capability is genuinely
-unavailable or its diagnosed launcher fails.
+When this session is running inside the merged linked worktree, leave that worktree in place and say so in
+the report; `engineering:prune-worktrees` removes it later. Otherwise remove the merged target now:
 
 Resolve the repository's own worktree command under the primary checkout and prefer it for a
 worktree-developed branch. It refuses every unsafe state and handles the platform details — junctions, long
@@ -326,7 +259,7 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
    `--force`, then delete the local branch with `git -C <primary-checkout> branch -d <branch>`. For a branch
    developed in the primary checkout, the checkout-and-fast-forward above replaces the removal step; delete
    the old local branch with the same lowercase `-d` only after it is no longer checked out. Double-quote each
-   path and run each command on its own; that exact form is what the plugin's harness grant approves; when
+   path and run each command on its own; when
    `-d` refuses a squash- or rebase-merged branch, the proof covers exactly this head, so delete it with
    `git -C <primary-checkout> branch -D <branch>`.
 3. Re-run `git worktree list --porcelain`, the local branch inventory, and primary-checkout status. The
@@ -334,11 +267,7 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
    current on it, and pre-existing user files must remain. Treat any removal error or residual target path
    as incomplete cleanup; never replace the failed command with a forced removal or raw recursive deletion.
 
-**Step 5 is a blocking post-merge gate. Do not report terminal delivery or leave the cleanup for a later
-session until `finish.py` has run or host retargeting plus the helper or native-Git path has produced the
-final inventory above. Only the `finish.py` path may enter Step 6 first.** The
-worktree-cleanup audit gate and the merge-cleanup gate are backstops that make a missed cleanup visible, not
-a substitute for doing it immediately.
+Report any cleanup you could not complete; never force it.
 
 If plan work remains, reconcile and continue an existing successor stack layer, including its base,
 head, review evidence and delivery binding. When no successor exists, start the next branch from the
@@ -435,7 +364,4 @@ needed.
 
 Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
 follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
-select `machine:close` and arm its post-report operation before the final report. Select removal only
-for the verified removable merged worktree; otherwise retain the checkout. After the report and all
-other Stop gates, its `complete` operation invokes `finish.py` or `close.py`. This is required even when Tommy merged
-the PR manually. No preamble.
+report. This applies even when Tommy merged the PR manually. No preamble.

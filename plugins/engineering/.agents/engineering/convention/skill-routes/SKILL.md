@@ -8,8 +8,8 @@ domain: process
 
 # Building a repo's skill-route table
 
-`.agents/skill-routes.json` maps a path to the skills that must be loaded before that path is written.
-`skill_router.py` reads it at write time and at review time; that mechanism, and how it is delivered, is
+`.agents/skill-routes.json` maps a path to the skills that apply when that path is written.
+`skill_router.py` reads it at review time and on request; that mechanism, and how it is delivered, is
 the `agents` README, not this doc. This doc owns the other half: **how a repo's table is built**,
 and why every carved service repo derives its own rather than copying one.
 
@@ -75,8 +75,8 @@ stack's rows. Kinds:
 ## The row fields
 
 - `path` — a regex matched against the repo-relative POSIX path.
-- `skills` — invoked before writing the file. Use `plugin:skill` where a generic standard and this
-  system's roster share a name (`dotnet:persistence` and `concertable:persistence`): both load and the
+- `skills` — invoked before writing the file. Use `plugin:skill` when skills share a name
+  (`dotnet:testing` and `react:testing`): both load and the
   plugin says which is which. A name with one home stays bare.
 - `content_requires` — an optional regex over the content being written; the row fires only when it also
   matches (a `.csproj` routes to the testing skills only when it declares `<IsTestProject>true`).

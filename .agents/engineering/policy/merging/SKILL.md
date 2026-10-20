@@ -31,10 +31,8 @@ continuation mechanism. That owner classifies a real failure by test tier, dispa
 skill in a fresh context, rebinds after a push, obtains the required review, and reaches merge under the
 goal-scoped authorization above. The shared monitor is the only foreground or persistent forge-wait mechanism.
 
-This is hook-enforced. `.agents/hooks/persistent_workflow_merge_gate.py` refuses `gh pr merge … --auto` on
-a PR whose checks or merge queue have not settled unless a persistent-workflow binding
-(`.agents/persistent-workflow-binding.json`) exists in the checkout and matches the PR and head — so bind
-the continuation first, or wait for the checks to finish and merge without `--auto`.
+Do not arm `gh pr merge … --auto` on a PR whose checks or merge queue have not settled unless a continuation
+owns the wait; otherwise wait for the checks to finish and merge without `--auto`.
 ## Synchronize once before final review
 
 Immediately before final review, resolve the actual PR base to its fetched remote-tracking ref:
@@ -66,10 +64,8 @@ suspension. It queries no more than once a minute and emits only a changed tuple
 error, or bounded timeout. When it wakes, perform one direct GitHub read before acting. The monitor never
 retries or toggles a failed check.
 
-This is hook-enforced. `.agents/hooks/forge_poll_gate.py` allows the first `gh` status read plus one
-authoritative read after a real wake or observed transition. It blocks repeated unchanged reads, direct
-`gh run watch`, and ad hoc sleeping forge loops. `.agents/hooks/compact_output_gate.py` routes
-`gh run view --log*` through compact artifact capture.
+Read forge status once, then again only after a real wake or observed transition; avoid repeated unchanged
+reads and ad hoc sleeping loops.
 
 1. **Merged** — report the landing sha and stop.
 2. **A check failed** — report the failing job, point at the run log, and **stop. Do not retry**; re-running a

@@ -384,6 +384,80 @@ class RollingPluginsTests(unittest.TestCase):
         package = ROLLING.resolve([ROLLING.Selection('base@core', str(self.remote), 'core')], self.root / 'cache')[0]
         self.assertTrue(package.root.joinpath('payload.txt').stat().st_mode & 0o111)
 
+    def add_generators(self, exit_code=0):
+        digests = "import sys\nsys.exit(0)\n"
+        sync = (
+            "import argparse, pathlib, sys\n"
+            "parser = argparse.ArgumentParser(); parser.add_argument('--root'); parser.add_argument('--check', action='store_true')\n"
+            "arguments = parser.parse_args(); built = pathlib.Path(arguments.root) / 'plugins/base/generated.txt'\n"
+            f"if {exit_code}: sys.exit({exit_code})\n"
+            "if arguments.check: sys.exit(0 if built.read_text() == 'built' else 1)\n"
+            "built.write_text('built')\n"
+        )
+        (self.author / 'scripts').mkdir(exist_ok=True)
+        (self.author / 'scripts/update_catalog_digests.py').write_text(digests, encoding='utf-8')
+        (self.author / 'scripts/sync_plugin_packages.py').write_text(sync, encoding='utf-8')
+        git(self.author, 'add', '-A')
+        git(self.author, 'commit', '-m', 'merged source awaiting regeneration')
+        git(self.author, 'push', 'origin', 'HEAD:main')
+
+    def test_unpublished_core_main_is_generated_locally_for_startup(self):
+        self.add_generators()
+        cache = self.root / 'cache'
+        clone, tip = ROLLING._fetch_main(str(self.remote), cache)
+        core = 'https://github.com/tj-agents/core.git'
+        catalog_cache, published = {}, set()
+        with mock.patch.object(ROLLING, 'canonical_source', return_value=core),                 mock.patch.object(ROLLING, '_fetch_main', return_value=(clone, tip)),                 mock.patch.object(ROLLING, '_publication_gate', side_effect=ROLLING.RollingPluginError('Catalog digest drift')):
+            source, generated, revision, catalog = ROLLING._state(core, cache, catalog_cache, published, ROLLING.Deadline(60))
+        self.assertEqual((core, tip), (source, revision))
+        self.assertEqual(cache / 'generated' / tip, generated)
+        self.assertEqual(['base', 'engineering'], [entry['name'] for entry in catalog['plugins']])
+        files = ROLLING._tree_files(generated, tip, 'plugins/base')
+        self.assertEqual(b'built', files['generated.txt'][0])
+        self.assertEqual(b'one', files['payload.txt'][0])
+        self.assertNotIn(ROLLING.GENERATED_MARKER, files)
+        with mock.patch.object(ROLLING, '_extract_repository', side_effect=AssertionError('rebuilt')):
+            self.assertEqual(generated, ROLLING._generated_publication(clone, tip, cache, ROLLING.Deadline(60)))
+
+    def test_a_core_main_that_cannot_be_generated_still_fails_startup_with_both_causes(self):
+        self.add_generators(exit_code=3)
+        cache = self.root / 'cache'
+        clone, tip = ROLLING._fetch_main(str(self.remote), cache)
+        core = 'https://github.com/tj-agents/core.git'
+        with mock.patch.object(ROLLING, 'canonical_source', return_value=core), \
+                mock.patch.object(ROLLING, '_fetch_main', return_value=(clone, tip)), \
+                mock.patch.object(ROLLING, '_publication_gate', side_effect=ROLLING.RollingPluginError('Catalog digest drift')), \
+                self.assertRaisesRegex(ROLLING.RollingPluginError, 'could not be generated for startup.*Catalog digest drift'):
+            ROLLING._state(core, cache, {}, set(), ROLLING.Deadline(60))
+        self.assertFalse((cache / 'generated' / tip).exists())
+        self.assertEqual([], list((cache / 'generated').iterdir()))
+
+    def test_a_newer_generated_main_replaces_older_builds_and_write_failures_are_refresh_errors(self):
+        self.add_generators()
+        cache = self.root / 'cache'
+        stale = cache / 'generated' / ('0' * 40)
+        stale.mkdir(parents=True)
+        (stale / ROLLING.GENERATED_MARKER).write_text('old', encoding='utf-8')
+        clone, tip = ROLLING._fetch_main(str(self.remote), cache)
+        locked = cache / 'generated' / ('1' * 40)
+        locked.mkdir()
+        real_remove = ROLLING._remove_cache_tree
+
+        def remove(path, root):
+            if path == locked:
+                raise PermissionError('in use')
+            return real_remove(path, root)
+
+        with mock.patch.object(ROLLING, '_remove_cache_tree', side_effect=remove):
+            generated = ROLLING._generated_publication(clone, tip, cache, ROLLING.Deadline(60))
+        self.assertEqual(sorted([generated, locked]), sorted((cache / 'generated').iterdir()))
+        shutil.rmtree(locked)
+        shutil.rmtree(generated)
+        with mock.patch.object(ROLLING.os, 'replace', side_effect=PermissionError('in use')), \
+                self.assertRaisesRegex(ROLLING.RollingPluginError, 'generated tree could not be written'):
+            ROLLING._generated_publication(clone, tip, cache, ROLLING.Deadline(60))
+        self.assertEqual([], list((cache / 'generated').iterdir()))
+
     def test_publication_gate_runs_the_fetched_generator_in_a_bounded_subprocess(self):
         clone = self.root / 'clone'
         clone.mkdir()
@@ -447,6 +521,79 @@ class RollingPluginsTests(unittest.TestCase):
         self.write(config / 'settings.json', {'enabledPlugins': {'engineering@core': True, 'base@core': False}})
         with self.assertRaisesRegex(ROLLING.RollingPluginError, 'disablement changed'):
             ROLLING.verify_final(prepared, 'claude', config, project, arguments)
+
+    def test_only_a_final_verification_still_on_main_records_its_generation(self):
+        core = 'https://github.com/tj-agents/core.git'
+        plugins = self.root / 'plugins'
+        root = ROLLING.VerifiedRoot('base@core', self.root / 'root', 'a' * 40, core)
+        prepared = ROLLING.Prepared('claude', (), (root,), self.root / 'catalog', {},
+                                    source_revisions=((core, 'a' * 40),), plugins_root=plugins)
+        record = ROLLING.generation_record.generations_path(plugins, 'claude')
+
+        def verify(main, linked=False):
+            refuse = ROLLING.RollingPluginError('linked') if linked else None
+            with mock.patch.object(ROLLING, '_selection_state', return_value=([], set())), \
+                    mock.patch.object(ROLLING, '_cache_root', return_value=self.root / 'cache'), \
+                    mock.patch.object(ROLLING, '_fetch_main', return_value=(self.root, main)), \
+                    mock.patch.object(ROLLING, '_unlinked_ancestors', side_effect=refuse):
+                ROLLING.verify_final(prepared, 'claude', self.root, self.root, {})
+
+        with self.assertRaisesRegex(ROLLING.RollingPluginError, 'main advanced'):
+            verify('b' * 40)
+        verify('a' * 40, linked=True)
+        self.assertFalse(record.exists())
+
+        verify('a' * 40)
+
+        self.assertEqual([(core, 'a' * 40)], [(entry['repository'], entry['revision'])
+                                              for entry in ROLLING.generation_record.read_generations(record)])
+
+    def test_a_record_held_open_by_a_reader_is_retried_and_a_lasting_refusal_leaves_no_temporary(self):
+        core = 'https://github.com/tj-agents/core.git'
+        record = ROLLING.generation_record.generations_path(self.root / 'plugins', 'codex')
+        write = ROLLING._write_json
+        attempts = []
+
+        def held_once(path, value):
+            attempts.append(path)
+            if len(attempts) == 1:
+                raise PermissionError('in use')
+            write(path, value)
+
+        with mock.patch.object(ROLLING, '_write_json', side_effect=held_once), \
+                mock.patch.object(ROLLING.time, 'sleep'):
+            ROLLING._record_generations(record, [(core, 'a' * 40)])
+        self.assertEqual(2, len(attempts))
+        self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
+
+        with mock.patch.object(ROLLING, '_write_json', side_effect=PermissionError('in use')), \
+                mock.patch.object(ROLLING.time, 'sleep'):
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+        self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
+        self.assertEqual([record.name], sorted(path.name for path in record.parent.iterdir()))
+
+        with mock.patch.object(ROLLING.generation_record, 'read_record', return_value=('busy', [])), \
+                mock.patch.object(ROLLING.time, 'sleep') as sleep:
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+        self.assertEqual(4, sleep.call_count)
+        self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
+
+        self.addCleanup(record.write_bytes, record.read_bytes())
+        for newer in (b'{"schema_version": 2, "verified": []}', b'{"schema_version": 2.0}'):
+            record.write_bytes(newer)
+            with mock.patch.object(ROLLING.time, 'sleep') as sleep:
+                ROLLING._record_generations(record, [(core, 'b' * 40)])
+            sleep.assert_not_called()
+            self.assertEqual(newer, record.read_bytes())
+
+        with mock.patch.object(ROLLING.generation_record, 'merged_generations', side_effect=RuntimeError('bug')):
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+
+        for corrupt in (b'{', b'\xff\xfe{', b'[' * 100000):
+            record.write_bytes(corrupt)
+            ROLLING._record_generations(record, [(core, 'b' * 40)])
+            self.assertEqual(['b' * 40],
+                             [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
 
     def test_claude_setting_sources_excludes_unselected_layers(self):
         config = self.root / 'profile'

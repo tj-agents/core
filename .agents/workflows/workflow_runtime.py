@@ -655,7 +655,7 @@ class ReadOnlyWorkItemStore:
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA query_only = ON")
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version not in {2, 3}:
+            if version not in {2, 3, 4}:
                 raise ContractViolation(f"work-item session store has unsupported schema version {version}")
             tables = {
                 row[0]
@@ -669,6 +669,8 @@ class ReadOnlyWorkItemStore:
                 "work_items": {"key", "status", "pr"},
                 "sessions": {"handle", "repo", "branch", "cwd", "work_item", "role", "ended_at"},
             }
+            if version == 4:
+                required["work_item_references"] = {"provider", "scope", "native_id", "work_item"}
             for table, columns in required.items():
                 available = {
                     row[1]

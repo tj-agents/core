@@ -102,9 +102,35 @@ session resume, or machine suspension; it reconnects to the same identity and ob
 while disconnected. It emits compact JSON only for a material transition, terminal result, query error, or
 bounded timeout. Direct `gh run watch`, ad hoc sleeping forge loops, and model-turn polling are blocked.
 
-`.agents/hooks/forge_poll_gate.py` permits the first forge status read for a PR, head, or run, one more after
-a real wake or observed state change, and exactly one shared monitor per identity. It blocks unchanged
-model-turn reads and every legacy watcher shape. Failure-log reads use the compact executable boundary.
+### Notify before parking a listener
+
+Before the model parks on a silent process, wire its completion notification. **Do not spend later model turns
+polling a listener handle with `write_stdin`, `functions.wait`, status, or tail calls.** A background relay may
+read one already-bound monitor session and notify only for nonempty output or a terminal result; an empty,
+still-running read does not wake the model.
+
+When a host documents `functions.exec`, start its documented background cell only after binding the monitor
+session. Replace `12345` with the `session_id` returned for that existing bound monitor; cells do not share
+local variables. Inside the cell, use the documented `tools.write_stdin` and `notify` globals directly. This
+body does not start a second monitor or invent a durable continuation API:
+
+```js
+const sessionId = 12345; // Existing bound monitor session_id.
+for (;;) {
+  const update = await tools.write_stdin({session_id: sessionId, chars: "", yield_time_ms: 30_000});
+  const terminal = update.exit_code !== undefined;
+  const hasOutput = typeof update.output === "string" && update.output.trim() !== "";
+  if (hasOutput || terminal) notify(JSON.stringify({output: update.output, terminal}));
+  if (terminal) break;
+}
+```
+
+Other hosts use their supported `persistent-workflow` notification or wake mechanism. This policy does not
+define a universal listener API or a durable continuation; `persistent-workflow` owns those host-specific
+details.
+
+Read forge status for a PR, head, or run once, again only after a real wake or observed state change, and
+keep one shared monitor per identity.
 
 At material checkpoints, ingest the host transcript through `workflow_ops.py telemetry`. The snapshot reports
 model turns, tool calls, wait or poll calls, skill loads, uncached input, cached context replay, output tokens,

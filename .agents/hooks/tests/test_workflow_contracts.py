@@ -2027,12 +2027,107 @@ class RepositoryProviderTests(unittest.TestCase):
         self.assertEqual(before, malformed.read_bytes())
 
         connection = sqlite3.connect(database)
-        connection.execute("PRAGMA user_version = 4")
+        connection.execute("PRAGMA user_version = 5")
         connection.commit()
         connection.close()
         before = database.read_bytes()
-        with self.assertRaisesRegex(ContractViolation, "unsupported schema version 4"):
+        with self.assertRaisesRegex(ContractViolation, "unsupported schema version 5"):
             ReadOnlyWorkItemStore(database).work_item(key)
+        self.assertEqual(before, database.read_bytes())
+
+    def test_read_only_work_item_store_accepts_v4_references_and_execution_keys_without_writes(self):
+        state = self.root / "v4-reader-state"
+        state.mkdir()
+        database = state / "sessions.db"
+        execution_key = "execution:1d7b92d5-23a4-4dd4-b5f4-7ba249d4d5be"
+        legacy_key = "github.com/example/runtime:runtime-bridge/readme-reader"
+        connection = sqlite3.connect(database)
+        connection.executescript(
+            "CREATE TABLE work_items ("
+            "key TEXT PRIMARY KEY, repo TEXT NOT NULL, feature TEXT, item TEXT, status TEXT NOT NULL, "
+            "branch TEXT, pr TEXT, title TEXT, plan_path TEXT, updated_at REAL);"
+            "CREATE TABLE work_item_references ("
+            "provider TEXT NOT NULL, scope TEXT NOT NULL, native_id TEXT NOT NULL, "
+            "work_item TEXT NOT NULL REFERENCES work_items(key), "
+            "PRIMARY KEY (provider, scope, native_id));"
+            "CREATE TABLE sessions ("
+            "handle TEXT PRIMARY KEY, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);"
+            "PRAGMA user_version = 4;"
+        )
+        connection.execute(
+            "INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                execution_key,
+                "github.com/example/runtime",
+                None,
+                None,
+                "active",
+                "Feature/provider-fixture",
+                None,
+                "Native execution",
+                None,
+                0,
+            ),
+        )
+        connection.execute(
+            "INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                legacy_key,
+                "github.com/example/runtime",
+                "runtime-bridge",
+                "readme-reader",
+                "active",
+                "Feature/provider-fixture",
+                None,
+                "Legacy local work item",
+                "plans/features/runtime-bridge/work-items/readme-reader/README.md",
+                0,
+            ),
+        )
+        connection.execute(
+            "INSERT INTO work_item_references VALUES (?, ?, ?, ?)",
+            ("github", "github.com/example/runtime", "42", execution_key),
+        )
+        connection.execute(
+            "INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                "codex:owner",
+                "github.com/example/runtime",
+                "Feature/provider-fixture",
+                str(self.root),
+                execution_key,
+                "owner",
+                None,
+            ),
+        )
+        connection.commit()
+        connection.close()
+
+        before = database.read_bytes()
+        store = ReadOnlyWorkItemStore(database)
+        self.assertEqual("active", store.work_item(execution_key)["status"])
+        self.assertEqual("active", store.work_item(legacy_key)["status"])
+        self.assertEqual("codex:owner", store.owner(execution_key)["handle"])
+        self.assertEqual(before, database.read_bytes())
+
+    def test_read_only_work_item_store_rejects_incomplete_v4_reference_table_without_writes(self):
+        state = self.root / "invalid-v4-reader-state"
+        state.mkdir()
+        database = state / "sessions.db"
+        connection = sqlite3.connect(database)
+        connection.executescript(
+            "CREATE TABLE work_items (key TEXT, status TEXT, pr TEXT);"
+            "CREATE TABLE work_item_references (provider TEXT, scope TEXT, work_item TEXT);"
+            "CREATE TABLE sessions ("
+            "handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);"
+            "PRAGMA user_version = 4;"
+        )
+        connection.commit()
+        connection.close()
+
+        before = database.read_bytes()
+        with self.assertRaisesRegex(ContractViolation, "missing required columns.*native_id"):
+            ReadOnlyWorkItemStore(database).work_item("execution:missing-reference-column")
         self.assertEqual(before, database.read_bytes())
 
     def test_work_item_readme_preserves_a_registered_null_pull_request(self):

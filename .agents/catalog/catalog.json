@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:843718b7109637150d7701876f9997e54363f7a4978935e1f7e9ca906b173403",
+      "digest": "sha256:f5477a5e0f208bf36e6e44fe9da78b419f2c0c3619f53311bea9a17e23061283",
       "harness": {
         "marketplaces": [
           {
@@ -52,13 +52,6 @@
             ]
           },
           {
-            "path": ".agents/base/policy/goal-continuation/scripts/session-context.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
             "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
             "hosts": [
               "claude",
@@ -66,27 +59,7 @@
             ]
           },
           {
-            "path": ".agents/base/policy/plan-artifacts/scripts/session-context.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
             "path": "hooks/hook_dispatch.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/pre_tool_use_adapter.py",
-            "hosts": [
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/skill_router.py",
             "hosts": [
               "claude",
               "codex"
@@ -204,7 +177,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:afa89b78733bbd52251a37332981a123c6a543dde0438b0987d9572f5924294f",
+      "digest": "sha256:7709e91efeeb33416972c65ba21e0c24db24627b6b27708156426e780aa045d8",
       "harness": {
         "marketplaces": [
           {
@@ -219,47 +192,6 @@
         ],
         "hooks": [
           {
-            "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/compact_output_gate.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/continuation_stop.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/delivery_binding_gate.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/denial_prompt.py",
-            "hosts": [
-              "claude"
-            ]
-          },
-          {
-            "path": "hooks/forge_poll_gate.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
             "path": "hooks/git_auth_scope_gate.py",
             "hosts": [
               "claude",
@@ -267,33 +199,7 @@
             ]
           },
           {
-            "path": "hooks/harness_grant.py",
-            "hosts": [
-              "claude"
-            ]
-          },
-          {
             "path": "hooks/hook_dispatch.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/merge_cleanup_gate.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/merge_review_gate.py",
-            "hosts": [
-              "claude"
-            ]
-          },
-          {
-            "path": "hooks/persistent_workflow_merge_gate.py",
             "hosts": [
               "claude"
             ]
@@ -301,33 +207,6 @@
           {
             "path": "hooks/pre_tool_use_adapter.py",
             "hosts": [
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/red_run_gate.py",
-            "hosts": [
-              "claude"
-            ]
-          },
-          {
-            "path": "hooks/workflow_route.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/worktree_cleanup_gate.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/worktree_placement_gate.py",
-            "hosts": [
-              "claude",
               "codex"
             ]
           }
@@ -592,7 +471,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:6ade6fac76397d2278fb86b0e654b9f95084bf4caaad05e034bca10c500382ad",
+      "digest": "sha256:e01a584f673c2895fc3e1ff96045a2481f572a09a9e3d6effd8f6f86359930e3",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -609,13 +488,6 @@
         ],
         "hooks": [
           {
-            "path": ".agents/machine/utility/close/scripts/close_session.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
             "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
             "hosts": [
               "claude",
@@ -627,24 +499,6 @@
             "hosts": [
               "claude",
               "codex"
-            ]
-          },
-          {
-            "path": "resources/machine/scripts/claude_terminal_profile.py",
-            "hosts": [
-              "claude"
-            ]
-          },
-          {
-            "path": "resources/machine/scripts/codex_terminal_profile.py",
-            "hosts": [
-              "codex"
-            ]
-          },
-          {
-            "path": "resources/machine/scripts/prune_plugin_cache.py",
-            "hosts": [
-              "claude"
             ]
           },
           {

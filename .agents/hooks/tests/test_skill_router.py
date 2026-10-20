@@ -327,40 +327,6 @@ class SkillRouterTests(unittest.TestCase):
             self.assertEqual(2, result.returncode, result.stdout + result.stderr)
             self.assertIn("--harness requires claude or codex", result.stderr)
 
-    def test_claude_manifest_dispatch_passes_explicit_host_to_router(self):
-        manifest = json.loads((HOOKS.parent / "plugins" / "manifests" / "claude" / "base-hooks.json").read_text(
-            encoding="utf-8"
-        ))
-        group = manifest["hooks"]["PreToolUse"][0]
-        self.assertEqual("Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell|Skill", group["matcher"])
-        arguments = group["hooks"][0]["args"]
-        self.assertEqual([
-            "--hook", "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py", "--harness", "claude",
-            "--hook", "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
-        ], arguments[4:])
-        local_arguments = [str(self.router) if value.endswith("/skill_router.py") else
-                           str(HOOKS / Path(value).name) if value.startswith("${CLAUDE_PLUGIN_ROOT}/hooks/") else value
-                           for value in arguments]
-        result = subprocess.run(
-            [sys.executable, *local_arguments], cwd=self.repo,
-            input=json.dumps(self.bash_payload(turn_id=str(uuid.uuid4()))), capture_output=True,
-            text=True, encoding="utf-8", env=self.environment(), timeout=30,
-        )
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        verdict = json.loads(result.stdout)["hookSpecificOutput"]
-        self.assertEqual("deny", verdict["permissionDecision"])
-        self.assertIn("Invoke the skill(s)", verdict["permissionDecisionReason"])
-        self.assertNotIn("READ THIS WHOLE FILE", verdict["permissionDecisionReason"])
-
-    def test_codex_manifest_pins_host_in_unix_and_windows_commands(self):
-        manifest = json.loads((HOOKS.parent / "plugins" / "manifests" / "codex" / "base-hooks.json").read_text(
-            encoding="utf-8"
-        ))
-        router = manifest["hooks"]["PreToolUse"][0]["hooks"][0]
-        self.assertTrue(router["command"].endswith('"${PLUGIN_ROOT}/hooks/skill_router.py" --harness codex'))
-        self.assertTrue(router["commandWindows"].endswith('"${PLUGIN_ROOT}/hooks/skill_router.py" --harness codex'))
-        self.assertIn("--timeout 12", router["commandWindows"])
-
     def run_router(self, arguments=(), payload=None):
         return subprocess.run(
             [sys.executable, "-B", str(self.router), *arguments],

@@ -59,9 +59,10 @@ class HandoffStartupTests(unittest.TestCase):
     def test_failed_refresh_never_emits_success_for_either_host(self):
         for host in ('codex', 'claude'):
             with self.subTest(host=host):
-                result, output, error, _ = self.run_launch(host, {'state': 'failed', 'error': 'marketplace unavailable'})
+                result, output, error, receipt = self.run_launch(host, {'state': 'failed', 'error': 'marketplace unavailable'})
                 self.assertEqual(1, result)
                 self.assertIn('marketplace unavailable', error)
+                self.assertIn(str(receipt), error)
                 self.assertNotIn('Launched', output)
                 self.assertNotIn('"startup": "verified"', output)
 

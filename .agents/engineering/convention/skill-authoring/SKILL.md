@@ -13,8 +13,9 @@ every session's listing. A skill therefore costs discovery before it delivers an
 scan, one more selection to get right or wrong. Author a skill so that an agent doing the work it governs
 selects it, and an agent doing anything else passes it by.
 
-This convention owns how a skill is shaped and named. Other owners supply the rest; follow their links
-rather than restating them here:
+This convention owns whether a skill needs to exist, its selection trigger, name, and size. `template:check`
+owns required skill content and layout validation. Other owners supply the rest; follow their links rather
+than restating them here:
 
 - **Kind**: [`SKILL_KINDS.md`](https://github.com/tj-agents/core/blob/main/SKILL_KINDS.md).
 - **Lane**, and whether the skill may declare one: `engineering:lanes`.
@@ -22,7 +23,14 @@ rather than restating them here:
   [`SOURCE_LAYOUT.md`](https://github.com/tj-agents/core/blob/main/SOURCE_LAYOUT.md) in core,
   `template:check` in a Template-layout repository.
 - **Shipped scripts and resources**: [`PACKAGING.md`](https://github.com/tj-agents/core/blob/main/PACKAGING.md).
-- **One rule, one home** for the prose inside a skill: `engineering:docs`.
+- **One rule, one home** and concrete examples for changed guidance: `engineering:docs`; validate the
+  required skill content and layout with `template:check`.
+
+```text
+Changed rule: every skill description names its selection trigger
+Construction: description: "Owns query composition. Use when building a reusable query."
+Call site: the agent selects query-building when the task asks to compose a reusable query
+```
 
 ## Extend an owner before creating a skill
 
