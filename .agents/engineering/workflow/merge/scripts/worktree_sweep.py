@@ -20,6 +20,7 @@ import sqlite3
 import stat
 import subprocess
 import sys
+import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -28,6 +29,12 @@ import cleanup_proof
 GIT_TIMEOUT_SECONDS = 60
 GH_TIMEOUT_SECONDS = 60
 STILL_ACTIVE = 259
+RECENT_EDIT_SECONDS = 30 * 60
+ORPHAN_AGE_SECONDS = 10 * 60
+
+
+class UnreadableSessions(Exception):
+    pass
 
 
 def state_directory() -> Path:
@@ -35,8 +42,12 @@ def state_directory() -> Path:
 
 
 def git(cwd: Path, *arguments: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", str(cwd), *arguments], capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT_SECONDS, check=False)
+    command = ["git", "-C", str(cwd), *arguments]
+    try:
+        return subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              timeout=GIT_TIMEOUT_SECONDS, check=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return subprocess.CompletedProcess(command, 1, "", str(error))
 
 
 def process_alive(pid: object) -> bool:
@@ -64,17 +75,17 @@ def process_alive(pid: object) -> bool:
 
 
 def session_rows(database: Path) -> list[sqlite3.Row]:
-    if not database.is_file():
+    if not database.exists():
         return []
     try:
         connection = sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True, timeout=5)
-    except sqlite3.Error:
-        return []
+    except sqlite3.Error as error:
+        raise UnreadableSessions(f"cannot open {database}: {error}") from error
     try:
         connection.row_factory = sqlite3.Row
         return list(connection.execute("SELECT cwd, pid, ended_at FROM sessions"))
-    except sqlite3.Error:
-        return []
+    except sqlite3.Error as error:
+        raise UnreadableSessions(f"cannot read {database}: {error}") from error
     finally:
         connection.close()
 
@@ -128,9 +139,12 @@ def discover_repositories(rows: list[sqlite3.Row]) -> list[Path]:
 
 
 def bases_an_open_pull_request(primary: Path, branch: str) -> bool:
-    result = subprocess.run(["gh", "pr", "list", "--state", "open", "--base", branch, "--json", "number"],
-                            cwd=primary, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                            timeout=GH_TIMEOUT_SECONDS, check=False)
+    try:
+        result = subprocess.run(["gh", "pr", "list", "--state", "open", "--base", branch, "--json", "number"],
+                                cwd=primary, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                                timeout=GH_TIMEOUT_SECONDS, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return True
     if result.returncode:
         return True
     try:
@@ -154,6 +168,8 @@ def proven_removable(primary: Path, worktree: dict, archive: bool = True) -> tup
             code = cleanup_proof.run(arguments)
     except cleanup_proof.Preserve as error:
         return False, error.reason
+    except (OSError, subprocess.SubprocessError) as error:
+        return False, f"proof error: {error}"
     finally:
         os.chdir(previous)
     lines = output.getvalue().splitlines()
@@ -163,6 +179,21 @@ def proven_removable(primary: Path, worktree: dict, archive: bool = True) -> tup
     if not archive and reason.endswith("has uncommitted or untracked changes"):
         return True, "merged, leftovers would be archived"
     return False, reason
+
+
+def recently_edited(worktree: Path, now: float | None = None) -> bool:
+    status = git(worktree, "status", "--porcelain=v1", "--untracked-files=all", "-z")
+    if status.returncode:
+        return True
+    limit = (now if now is not None else time.time()) - RECENT_EDIT_SECONDS
+    for record in status.stdout.split("\0"):
+        if len(record) > 3:
+            try:
+                if (worktree / record[3:]).stat().st_mtime >= limit:
+                    return True
+            except OSError:
+                continue
+    return False
 
 
 def is_link(path: Path) -> bool:
@@ -185,11 +216,13 @@ def unlink_links(root: Path) -> list[Path]:
         for entry in entries:
             path = Path(entry.path)
             if is_link(path):
-                try:
-                    os.rmdir(path) if os.name == "nt" and entry.is_dir() else os.unlink(path)
-                    removed.append(path)
-                except OSError:
-                    pass
+                for unlink in ((os.rmdir, os.unlink) if os.name == "nt" else (os.unlink,)):
+                    try:
+                        unlink(path)
+                        removed.append(path)
+                        break
+                    except OSError:
+                        continue
             elif entry.is_dir(follow_symlinks=False):
                 pending.append(path)
     return removed
@@ -204,7 +237,13 @@ def remove(primary: Path, worktree: dict) -> tuple[bool, str]:
         for entry in parse_worktrees(git(primary, "worktree", "list", "--porcelain").stdout))
     if registered:
         return False, "removal failed, retried next run: " + (result.stderr.strip().splitlines() or ["?"])[-1]
-    default = cleanup_proof.default_branch(primary)
+    tip = git(primary, "rev-parse", "--verify", "refs/heads/" + worktree["branch"]).stdout.strip()
+    if tip != worktree["head"]:
+        return True, "removed; branch kept because it moved past the proven commit"
+    try:
+        default = cleanup_proof.default_branch(primary)
+    except cleanup_proof.Preserve:
+        return True, "removed; branch kept because the default branch is unknown"
     contained = git(primary, "merge-base", "--is-ancestor", "refs/heads/" + worktree["branch"],
                     "origin/" + default).returncode == 0
     git(primary, "branch", "-d" if contained else "-D", worktree["branch"])
@@ -213,14 +252,16 @@ def remove(primary: Path, worktree: dict) -> tuple[bool, str]:
     return True, "removed"
 
 
-def remove_empty_orphans(primary: Path, registered: list[dict]) -> list[str]:
+def remove_empty_orphans(primary: Path, registered: list[dict], now: float | None = None) -> list[str]:
     root = primary / ".worktrees"
     if not root.is_dir():
         return []
     known = {Path(entry["path"]).resolve() for entry in registered if entry.get("path")}
     removed = []
+    limit = (now if now is not None else time.time()) - ORPHAN_AGE_SECONDS
     for child in root.iterdir():
-        if child.is_dir() and not is_link(child) and child.resolve() not in known and not any(child.iterdir()):
+        if (child.is_dir() and not is_link(child) and child.resolve() not in known
+                and child.stat().st_mtime < limit and not any(child.iterdir())):
             try:
                 child.rmdir()
                 removed.append(str(child))
@@ -230,7 +271,7 @@ def remove_empty_orphans(primary: Path, registered: list[dict]) -> list[str]:
 
 
 def sweep_repository(primary: Path, live: list[str], removable=proven_removable, based=bases_an_open_pull_request,
-                     delete=remove) -> dict[str, str]:
+                     delete=remove, edited=recently_edited) -> dict[str, str]:
     listing = git(primary, "worktree", "list", "--porcelain")
     if listing.returncode:
         return {}
@@ -247,6 +288,9 @@ def sweep_repository(primary: Path, live: list[str], removable=proven_removable,
         if any(inside(directory, Path(path)) for directory in live):
             outcomes[path] = "kept: a session is working in it"
             continue
+        if edited(Path(path)):
+            outcomes[path] = "kept: changed files were edited in the last 30 minutes"
+            continue
         if based(primary, worktree["branch"]):
             outcomes[path] = "kept: an open pull request is based on its branch"
             continue
@@ -254,7 +298,10 @@ def sweep_repository(primary: Path, live: list[str], removable=proven_removable,
         if not ok:
             outcomes[path] = "kept: " + reason
             continue
-        _done, result = delete(primary, worktree)
+        try:
+            _done, result = delete(primary, worktree)
+        except (OSError, subprocess.SubprocessError) as error:
+            result = f"kept: removal error, retried next run: {error}"
         outcomes[path] = result
     return outcomes
 
@@ -265,7 +312,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="primary checkout to sweep; default: every repository a recorded session used")
     parser.add_argument("--dry-run", action="store_true", help="report what would be removed without removing it")
     arguments = parser.parse_args(argv)
-    rows = session_rows(state_directory() / "sessions.db")
+    try:
+        rows = session_rows(state_directory() / "sessions.db")
+    except UnreadableSessions as error:
+        print(json.dumps({"error": f"nothing removed: {error}"}))
+        return 1
     live = live_session_directories(rows)
     repositories = [primary for primary in (primary_checkout(Path(value)) for value in arguments.repo) if primary]
     if not arguments.repo:

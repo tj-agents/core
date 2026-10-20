@@ -121,12 +121,49 @@ class SweepTests(unittest.TestCase):
         kept = self.primary / '.worktrees' / 'Fix-HasFiles'
         kept.mkdir()
         (kept / 'notes.md').write_text('x', encoding='utf-8')
+        fresh = self.primary / '.worktrees' / 'Fix-BeingCreated'
+        fresh.mkdir()
+        old = empty.stat().st_mtime - SWEEP.ORPHAN_AGE_SECONDS - 60
+        os.utime(empty, (old, old))
 
         outcomes = self.sweep()
 
         self.assertFalse(empty.exists())
         self.assertTrue((kept / 'notes.md').is_file())
+        self.assertTrue(fresh.is_dir())
         self.assertIn('removed empty leftover folder', outcomes.values())
+
+    def test_an_unreadable_session_registry_stops_the_run(self):
+        database = Path(self.temp.name) / 'sessions.db'
+        database.write_bytes(b'not a sqlite database at all' * 100)
+
+        with self.assertRaises(SWEEP.UnreadableSessions):
+            SWEEP.session_rows(database)
+
+    def test_recent_edits_keep_a_worktree_and_old_ones_do_not(self):
+        worktree = self.worktrees['Feature/Merged']
+        notes = worktree / 'notes.md'
+        notes.write_text('thinking', encoding='utf-8')
+
+        self.assertTrue(SWEEP.recently_edited(worktree))
+        old = notes.stat().st_mtime - SWEEP.RECENT_EDIT_SECONDS - 60
+        os.utime(notes, (old, old))
+        self.assertFalse(SWEEP.recently_edited(worktree))
+
+    def test_a_branch_that_moved_past_the_proven_commit_is_kept(self):
+        worktree = self.worktrees['Feature/Merged']
+        proven = subprocess.run(['git', '-C', str(worktree), 'rev-parse', 'HEAD'], capture_output=True,
+                                text=True, check=True).stdout.strip()
+        git(worktree, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'late')
+
+        done, result = SWEEP.remove(self.primary, {'path': str(worktree), 'branch': 'Feature/Merged',
+                                                   'head': proven})
+
+        self.assertTrue(done)
+        self.assertIn('branch kept', result)
+        branches = subprocess.run(['git', '-C', str(self.primary), 'branch', '--list', 'Feature/Merged'],
+                                  capture_output=True, text=True, check=True).stdout
+        self.assertIn('Feature/Merged', branches)
 
     def test_worktree_listing_parses_branches_and_detached_heads(self):
         porcelain = ('worktree C:/r\nHEAD aaa\nbranch refs/heads/main\n\n'
