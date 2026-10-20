@@ -61,3 +61,6 @@ Generated from canonical `.agents/` definitions.
 - `unmerged` — utility — `.agents/engineering/utility/unmerged/SKILL.md`
 - `update-roadmap` — workflow — `.agents/engineering/workflow/update-roadmap/SKILL.md`
 - `worktree` — utility — `.agents/engineering/utility/worktree/SKILL.md`
+- `write-bug` — convention — `.agents/engineering/convention/write-bug/SKILL.md`
+- `write-debt` — convention — `.agents/engineering/convention/write-debt/SKILL.md`
+- `write-mistake` — convention — `.agents/engineering/convention/write-mistake/SKILL.md`

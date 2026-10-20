@@ -52,10 +52,6 @@ metadata lines; actionable work must be completed before that ending.
 
 ## Keep one current snapshot
 
-Follow [the shared recording contract](../../resources/problem-records.md) for a linked selected item.
-Keep its canonical identity alongside existing roadmap keys; the provider owns live item status while
-the ledger keeps execution recovery evidence and the link.
-
 Reconcile only the sections affected by the material transition:
 
 - worktree, branch, PR, ownership, and dependency or package gates;

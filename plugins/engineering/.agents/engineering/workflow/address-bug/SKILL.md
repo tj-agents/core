@@ -12,8 +12,8 @@ Read [the shared problem-record contract](../../resources/problem-records.md). T
 tracks repair; it does not replace `engineering:bugfix`, `engineering:failing-tests`, or an existing plan
 owner.
 
-1. Use the selected Work Items provider's read/list/update/close commands. Reconcile the named record,
-   or select one actionable high-value record quickly. Do not deep-rank every
+1. Read the shared contract's explicit provider selection and use its read/list/update/close commands
+   when selected. Without selection, use the declared register. Reconcile the named record, or select one actionable high-value record quickly. Do not deep-rank every
    record. Prefer an unblocked `P0` or `P1`, then the first useful `P2` or `P3`; priority does not pause
    unrelated work except for `engineering:self-repair`'s shared agent-lifecycle exception.
 2. Reconcile an existing goal, session, branch, PR, or writer before writing or dispatching. If another
@@ -30,12 +30,3 @@ owner.
 
 Answer a user's direct question before entering this workflow. Recording or selecting a record does not
 grant repair or publication authority beyond the active task.
-
-## Example
-
-```text
-Work Items bug WI-241 reports that an export without a title returns HTTP 500. PR #91 already contains
-the causal repair and its regression test. Link WI-241 to PR #91 and keep its existing owner; do not open
-a second branch. After the regression test passes against the repaired export, record that evidence and
-set WI-241 to resolved.
-```
