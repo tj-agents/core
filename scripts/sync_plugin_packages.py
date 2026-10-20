@@ -22,29 +22,30 @@ def load(path: Path):
     return json.loads(read(path))
 
 
-def external_prerequisites(config: dict, plugin: str) -> list[dict[str, str]]:
-    entries = config["external_prerequisites"][plugin]
+EMPTY_EXTERNAL_DEPENDENCIES = {"required": [], "optional": []}
+
+
+def external_dependencies(owner: str, entries) -> list[dict[str, str]]:
     if not isinstance(entries, list):
-        raise ValueError(f"External prerequisites for {plugin} must be a list")
+        raise ValueError(f"External dependencies for {owner} must be a list")
     seen: set[str] = set()
     for entry in entries:
-        if not isinstance(entry, dict) or set(entry) != {"id", "marketplace", "repository"}:
-            raise ValueError(f"Invalid external prerequisite for {plugin}: {entry!r}")
-        identifier = entry["id"]
-        marketplace = entry["marketplace"]
-        repository = entry["repository"]
         if (
-            not isinstance(identifier, str)
-            or not isinstance(marketplace, str)
-            or not isinstance(repository, str)
-            or identifier != f"{marketplace}/{identifier.rsplit('/', 1)[-1]}"
-            or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", marketplace)
-            or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository)
-            or identifier in seen
+            not isinstance(entry, dict)
+            or set(entry) != {"id", "marketplace", "repository"}
+            or not all(isinstance(value, str) for value in entry.values())
+            or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", entry["marketplace"])
+            or not re.fullmatch(rf"{re.escape(entry['marketplace'])}/[a-z0-9][a-z0-9-]*", entry["id"])
+            or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", entry["repository"])
+            or entry["id"] in seen
         ):
-            raise ValueError(f"Invalid external prerequisite for {plugin}: {entry!r}")
-        seen.add(identifier)
+            raise ValueError(f"Invalid external dependency for {owner}: {entry!r}")
+        seen.add(entry["id"])
     return entries
+
+
+def external_prerequisites(config: dict, plugin: str) -> list[dict[str, str]]:
+    return external_dependencies(plugin, config["external_prerequisites"][plugin])
 
 
 def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[str]) -> None:
@@ -139,6 +140,24 @@ def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[s
                                     raise ValueError(f"{hook_path}: {field} script target is missing: {script}")
 
 
+def catalog_marketplaces(packages: dict[str, dict]) -> dict[str, dict[str, str]]:
+    marketplaces: dict[str, dict[str, str]] = {}
+
+    def claim(marketplace: str, owner_repository: str, source: str) -> None:
+        owner = {"owner_repository": owner_repository, "source": source}
+        if marketplaces.setdefault(marketplace, owner) != owner:
+            raise ValueError(f"Catalog marketplace has inconsistent ownership: {marketplace}")
+
+    for package in packages.values():
+        claim(package["marketplace"], package["owner_repository"], package["source"])
+        declared = package.get("external_dependencies", EMPTY_EXTERNAL_DEPENDENCIES)
+        for kind in ("required", "optional"):
+            for dependency in declared[kind]:
+                repository = dependency["repository"]
+                claim(dependency["marketplace"], repository, f"https://github.com/{repository}.git")
+    return marketplaces
+
+
 def catalog_index(catalog: dict) -> dict[str, dict]:
     if catalog.get("schema_version") != 1 or catalog.get("digest_format") != "sha256-tree-v1":
         raise ValueError("Unsupported capability catalog schema or digest format")
@@ -156,31 +175,26 @@ def catalog_index(catalog: dict) -> dict[str, dict]:
         plugins[plugin_id] = plugin
     if not plugins:
         raise ValueError("Capability catalog has no packages")
-    external: dict[str, dict] = {}
     for plugin_id, plugin in plugins.items():
-        external_dependencies = plugin.get("external_dependencies", {"required": [], "optional": []})
-        if set(external_dependencies) != {"required", "optional"}:
+        declared = plugin.get("external_dependencies", EMPTY_EXTERNAL_DEPENDENCIES)
+        if not isinstance(declared, dict) or set(declared) != {"required", "optional"}:
             raise ValueError(f"Invalid external dependency declaration: {plugin_id}")
-        for kind in ("required", "optional"):
-            for dependency in external_dependencies[kind]:
-                if not isinstance(dependency, dict) or set(dependency) != {"id", "marketplace", "repository"}:
-                    raise ValueError(f"Invalid external dependency declaration: {plugin_id}")
-                dependency_id = dependency["id"]
-                if (
-                    not isinstance(dependency_id, str)
-                    or dependency_id != f"{dependency['marketplace']}/{dependency_id.rsplit('/', 1)[-1]}"
-                    or not isinstance(dependency["repository"], str)
-                ):
-                    raise ValueError(f"Invalid external dependency declaration: {plugin_id}")
-                previous = external.setdefault(dependency_id, dependency)
-                if previous != dependency:
-                    raise ValueError(f"External dependency ownership disagrees: {dependency_id}")
-    for plugin_id, plugin in plugins.items():
         dependencies = plugin.get("dependencies", {})
+        owned: dict[str, str] = {}
+        for kind in ("required", "optional"):
+            for dependency in external_dependencies(plugin_id, declared[kind]):
+                if (
+                    dependency["id"] in plugins
+                    or dependency["id"] in owned
+                    or dependency["id"] not in dependencies.get(kind, [])
+                ):
+                    raise ValueError(f"Invalid external dependency for {plugin_id}: {dependency!r}")
+                owned[dependency["id"]] = kind
         for kind in ("required", "optional"):
             for dependency in dependencies.get(kind, []):
-                if dependency not in plugins and dependency not in external:
+                if dependency not in plugins and owned.get(dependency) != kind:
                     raise ValueError(f"{plugin_id} names unknown dependency {dependency}")
+    catalog_marketplaces(plugins)
     visiting: set[str] = set()
     visited: set[str] = set()
 
