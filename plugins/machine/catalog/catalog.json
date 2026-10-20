@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:f5477a5e0f208bf36e6e44fe9da78b419f2c0c3619f53311bea9a17e23061283",
+      "digest": "sha256:8bc6a761b829113b0a4738357f7d035e853f48f3bf667de0bd743da2e489b5ee",
       "harness": {
         "marketplaces": [
           {
@@ -512,7 +512,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:59a05cc7a883fe2d50f068737075c6f46dae75d40b906ed8f5c41bd6352a5cb6",
+      "digest": "sha256:be749783cfc42f5829c20f7d7db460cad8e9b618827099a1d9cdada72f495314",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -626,15 +626,7 @@
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
             "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)"
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)"
           ],
           "codex_prefix_rules": [
             {
@@ -1035,7 +1027,7 @@
                 ],
                 "arm"
               ],
-              "justification": "Prepare or complete only this verified CLI closure after all owned work and Stop gates are satisfied; removal remains receipt-guarded",
+              "justification": "Arm a watcher that closes only this verified CLI after its final reply",
               "match": [
                 [
                   "python",
@@ -1056,47 +1048,6 @@
                   "-B",
                   "${PLUGIN_ROOT}/other.py",
                   "arm"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-                  "${PLUGIN_ROOT}/skills/close/scripts/close_session.py",
-                  "${PLUGIN_ROOT}/codex-skills/close/scripts/close_session.py"
-                ],
-                "complete",
-                "--stop-gates-accepted"
-              ],
-              "justification": "Prepare or complete only this verified CLI closure after all owned work and Stop gates are satisfied; removal remains receipt-guarded",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-                  "complete",
-                  "--stop-gates-accepted"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-                  "hook"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/other.py",
-                  "complete",
-                  "--stop-gates-accepted"
                 ]
               ]
             },

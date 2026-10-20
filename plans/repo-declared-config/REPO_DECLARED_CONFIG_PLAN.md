@@ -34,3 +34,42 @@ condition. Generated settings and passing unit tests alone do not establish inst
 
 Progress and dependencies: [REPO_DECLARED_CONFIG_PROGRESS.md](REPO_DECLARED_CONFIG_PROGRESS.md).
 Native evidence: [CUTOVER.md](CUTOVER.md).
+
+```agent-host-coverage
+{
+  "schema_version": 1,
+  "shared_source": ".agents/machine/scripts/startup_binding.py, plugin_autoupdate.py and refresh_cli.py",
+  "hosts": [
+    {
+      "host": "claude",
+      "behavior": "Committed repository selection with native autoUpdate and native launcher; explicit fast refresh",
+      "source": ".agents/machine/scripts/startup_binding.py and refresh_cli.py",
+      "mapping": ".claude/settings.json and machine host adapter through .agents/plugins/sources.json",
+      "verification": {
+        "level": "installed",
+        "result": "limited",
+        "evidence": "Real normal-profile Windows Claude handoff returned verified SessionStart receipt; source tests pass on Windows and Linux."
+      },
+      "exception": {
+        "constraint_evidence": "Isolated authenticated repository-only acceptance requires explicitly authorized memory-only OAuth use; automatic approval review rejected credential access.",
+        "supported_other_host_outcome": "Fresh Windows native Codex profile loaded all five base skills from repository-only declarations after native installation."
+      }
+    },
+    {
+      "host": "codex",
+      "behavior": "Trusted effective repository selection drives automatic native installation/update; launch waits for native SessionStart receipt",
+      "source": ".agents/machine/scripts/plugin_autoupdate.py and startup_binding.py",
+      "mapping": ".codex/config.toml and machine package resources through .agents/plugins/sources.json",
+      "verification": {
+        "level": "installed",
+        "result": "limited",
+        "evidence": "Real fresh Windows profile installed and loaded base skills, passed verify-only source/cache checks and reported current on second update. Final remediation CI passed on Windows and Linux at 19bb7b20."
+      },
+      "exception": {
+        "constraint_evidence": "Changed installed native hook definitions remain modified, so actual handoff lacked SessionStart ACK. Linux native host session acceptance is unverified.",
+        "supported_other_host_outcome": "Normal authenticated Windows Claude handoff returned verified SessionStart ACK without rolling refresh."
+      }
+    }
+  ]
+}
+```

@@ -31,6 +31,7 @@ GH_TIMEOUT_SECONDS = 60
 STILL_ACTIVE = 259
 RECENT_EDIT_SECONDS = 30 * 60
 ORPHAN_AGE_SECONDS = 10 * 60
+MERGED_PR_LIMIT = 1000
 
 
 class UnreadableSessions(Exception):
@@ -136,6 +137,21 @@ def discover_repositories(rows: list[sqlite3.Row]) -> list[Path]:
         if primary is not None:
             seen.setdefault(str(primary).casefold(), primary)
     return list(seen.values())
+
+
+def merged_heads(primary: Path) -> set[tuple[str, str]] | None:
+    try:
+        result = subprocess.run(["gh", "pr", "list", "--state", "merged", "--limit", str(MERGED_PR_LIMIT),
+                                 "--json", "headRefName,headRefOid"], cwd=primary, capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", timeout=GH_TIMEOUT_SECONDS, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode:
+        return None
+    try:
+        return {(entry["headRefName"], entry["headRefOid"]) for entry in json.loads(result.stdout or "[]")}
+    except (ValueError, KeyError, TypeError):
+        return None
 
 
 def bases_an_open_pull_request(primary: Path, branch: str) -> bool:
@@ -275,19 +291,26 @@ def remove_empty_orphans(primary: Path, registered: list[dict], now: float | Non
 
 
 def sweep_repository(primary: Path, live: list[str], removable=proven_removable, based=bases_an_open_pull_request,
-                     delete=remove, edited=recently_edited, dry_run: bool = False) -> dict[str, str]:
+                     delete=remove, edited=recently_edited, dry_run: bool = False,
+                     merged=merged_heads) -> dict[str, str]:
     listing = git(primary, "worktree", "list", "--porcelain")
     if listing.returncode:
         return {}
     worktrees = parse_worktrees(listing.stdout)
     orphan = "would remove empty leftover folder" if dry_run else "removed empty leftover folder"
     outcomes: dict[str, str] = {path: orphan for path in remove_empty_orphans(primary, worktrees, dry_run=dry_run)}
+    candidates = merged(primary) if len(worktrees) > 1 else set()
+    if candidates is None:
+        return outcomes
     for worktree in worktrees[1:]:
         path = worktree.get("path")
         if not path or not Path(path).is_dir():
             continue
         if "branch" not in worktree or "head" not in worktree:
             outcomes[path] = "kept: detached"
+            continue
+        if (worktree["branch"], worktree["head"]) not in candidates:
+            outcomes[path] = "kept: no merged pull request at this commit"
             continue
         if any(inside(directory, Path(path)) for directory in live):
             outcomes[path] = "kept: a session is working in it"

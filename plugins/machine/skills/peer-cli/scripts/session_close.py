@@ -548,15 +548,21 @@ def current_windows_user(kwargs, timeout):
 
 
 def start_observer(arguments):
+    return start_detached(Path(__file__).with_name("finish_reaper.py"), arguments)
+
+
+def start_detached(script, arguments, extra=()):
+    """Run a staged script outside the host's process tree, so it outlives the host closing."""
     staging = state_directory() / "merge-cleanup" / "observers" / uuid.uuid4().hex
     staging.mkdir(parents=True, exist_ok=False)
-    for name in ("finish_reaper.py", "session_close.py", "register_session.py"):
-        shutil.copy2(Path(__file__).with_name(name), staging / name)
+    here = Path(__file__)
+    for path in (Path(script), here, here.with_name("register_session.py"), *map(Path, extra)):
+        shutil.copy2(path, staging / path.name)
     store = register_session.session_store_path()
     if store is not None:
         for name in ("session_store.py", "repository_identity.py"):
             shutil.copy2(store.with_name(name), staging / name)
-    command = [sys.executable, str(staging / "finish_reaper.py"), *arguments]
+    command = [sys.executable, str(staging / Path(script).name), *arguments]
     kwargs = {"cwd": str(state_directory()), "stdin": subprocess.DEVNULL,
               "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
     timeout = bounded_timeout("AGENT_FINISH_SPAWN_TIMEOUT_SECONDS")
