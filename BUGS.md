@@ -212,3 +212,12 @@ Verification: authorized exact-project trust for personal and Concertable source
 configuration API preserved every unrelated setting and existing project entry. Fresh config/read then
 reported enabled personal selection and no disabled project layer for both roots. Declaration checks
 alone are expressly insufficient; actual host/catalog acceptance remains tracked in the personal goal.
+
+
+## B015 - Terminal-close refusal kills the CLI and is reported as a closed tab
+
+Kind: bug. Observed/reported: 2026-10-20. Priority: P1; a live usable session is destroyed while its terminal remains. State: in-progress. Source owner: machine `close.py`, `finish.py` and `close_watcher.py`. Repair owner: session `01a15a14-d110-7b71-b7b7-9b2436ddb4db`, branch `Fix/CloseTabAndCalloutRepair`.
+
+Cause confirmed in source: both close helpers catch `TerminalRefusal` and send SIGTERM to the verified host and optional wrapper. The watcher then writes `closed`; its host-exit deadline also returns success without confirming exit. Existing fallback tests require this process-only behavior. The user observed a dead tab; the receipt says `closed`. The exact swallowed terminal-refusal diagnostic was not retained, so its original trigger is unknown. This corrects a consequence of historical B004; its original observation and delivery history remain intact.
+
+Correction: terminal refusal propagates, preserving the host and wrapper; closure requires the existing adapter's exact-tab disappearance check plus confirmed host exit. Remove the process-only environment bypass. Next action: run dummy-process/refusal/receipt regressions on Windows and Linux, review and deliver the bounded source fix. Resolution condition: ambiguous, missing or unsupported terminal identity never signals a process, never triggers cleanup and never yields a closed receipt; successful exact-tab closure still works. Verification evidence: source path and existing tests establish the mechanism; current focused watcher unit regressions pass, process fixtures and delivery are pending.
