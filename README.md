@@ -190,11 +190,12 @@ Run once per machine, and again whenever you like; it changes nothing that is al
 
 It turns on Claude's own auto-update for every marketplace an enabled plugin comes from, removes the
 retired `claude`/`codex` profile launcher, and schedules `plugin_autoupdate.py` hidden at logon and hourly
-(Task Scheduler on Windows, crontab on Linux). It discovers Codex selections from user configuration and
-native plugin inventories in repositories with exact saved trust and `.codex/config.toml`. Each run checks
-a source with `git ls-remote` and upgrades its marketplace and selected plugins when the revision or
-selection changes, or a native installation is missing. An untrusted repository remains subject to Codex's
-native admission. Nothing runs when `claude` or `codex` starts.
+(Task Scheduler on Windows, crontab on Linux). It reads Codex selections from the user configuration and
+the `.codex/config.toml` of each repository with exact saved trust, one declaration per marketplace (user
+first, then an unpinned one). Each run checks every source once with `git ls-remote` and upgrades a
+marketplace and its selected plugins only when a revision changed or a plugin cache is missing, and never
+while a registered Codex session is running. An untrusted repository remains subject to Codex's native
+admission. Nothing runs when `claude` or `codex` starts.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
 loaded; new sessions pick up the update. `install.ps1` still wires the Windows `shell/` profile.

@@ -10,24 +10,23 @@ from __future__ import annotations
 import argparse
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
-import queue
-import threading
 import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import time
 
 GIT_TIMEOUT_SECONDS = 30
-CLI_TIMEOUT_SECONDS = 300
 SWEEP_TIMEOUT_SECONDS = 1800
 LOCK_STALE_SECONDS = 3600
 SCRIPT_NAME = "plugin_autoupdate.py"
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-PROJECT_CLI_TIMEOUT_SECONDS = 60
+CLI_TIMEOUT_SECONDS = 60
+STILL_ACTIVE = 259
 FAILURE_BACKOFF_SECONDS = 24 * 60 * 60
 RETIRED = "retired"
 
@@ -65,29 +64,152 @@ def write_json(path: Path, value: dict) -> None:
             os.unlink(temporary)
 
 
-def codex_targets(config: dict) -> dict[str, dict]:
-    marketplaces = config.get("marketplaces")
-    plugins = config.get("plugins")
-    if not isinstance(marketplaces, dict) or not isinstance(plugins, dict):
+def is_pinned(ref: object) -> bool:
+    return isinstance(ref, str) and len(ref) == 40 and all(character in "0123456789abcdefABCDEF"
+                                                            for character in ref)
+
+
+def load_toml(path: Path) -> dict:
+    import tomllib
+
+    try:
+        with path.open("rb") as stream:
+            return tomllib.load(stream)
+    except (OSError, tomllib.TOMLDecodeError):
         return {}
-    targets: dict[str, dict] = {}
-    for identity, settings in sorted(plugins.items()):
-        if not isinstance(settings, dict) or settings.get("enabled") is not True or "@" not in identity:
+
+
+def git_marketplace(source: object) -> dict | None:
+    if (not isinstance(source, dict) or source.get("source_type") != "git"
+            or not isinstance(source.get("source"), str) or not source["source"]):
+        return None
+    ref = source.get("ref")
+    return {"source": source["source"], "ref": ref if isinstance(ref, str) and ref else None}
+
+
+def project_directories(config: dict, temporary: Path | None = None) -> list[Path]:
+    projects = config.get("projects", {})
+    if not isinstance(projects, dict):
+        return []
+    temporary = (temporary or Path(tempfile.gettempdir())).resolve()
+    return sorted({Path(path).resolve() for path, settings in projects.items()
+                   if isinstance(settings, dict) and settings.get("trust_level") == "trusted"
+                   and (Path(path) / ".codex/config.toml").is_file()
+                   and not Path(path).resolve().is_relative_to(temporary)})
+
+
+def declarations(config: dict) -> list[tuple[Path, dict]]:
+    found = [(Path.home(), config)]
+    user_file = (codex_home() / "config.toml").resolve()
+    for project in project_directories(config):
+        path = project / ".codex" / "config.toml"
+        if path.resolve() != user_file:
+            found.append((project, load_toml(path)))
+    return found
+
+
+def section(config: dict, name: str) -> dict:
+    value = config.get(name)
+    return value if isinstance(value, dict) else {}
+
+
+def declared_targets(config: dict) -> tuple[dict[str, dict], list[str]]:
+    user = section(config, "marketplaces")
+    candidates: dict[str, dict[tuple, dict]] = {}
+    for rank, (directory, declared) in enumerate(declarations(config)):
+        marketplaces = section(declared, "marketplaces")
+        for identity, settings in sorted(section(declared, "plugins").items()):
+            if not isinstance(settings, dict) or settings.get("enabled") is not True or "@" not in identity:
+                continue
+            name = identity.rsplit("@", 1)[1]
+            source = git_marketplace(marketplaces[name] if name in marketplaces else user.get(name))
+            if source is None:
+                continue
+            option = candidates.setdefault(name, {}).setdefault(
+                (source["source"], source["ref"]), {**source, "project": directory, "rank": rank, "plugins": set()})
+            option["plugins"].add(identity)
+    targets, ignored = {}, []
+    for name, options in sorted(candidates.items()):
+        chosen = min(options.values(), key=lambda option: (option["rank"] > 0, is_pinned(option["ref"]),
+                                                            option["rank"]))
+        targets[name] = {"source": chosen["source"], "ref": chosen["ref"], "project": chosen["project"],
+                         "plugins": sorted(chosen["plugins"])}
+        ignored.extend(f"{name} at {option['ref'] or 'HEAD'} declared by {option['project']}"
+                       for option in options.values() if option is not chosen)
+    return targets, ignored
+
+
+def marketplace_manifest(name: str) -> dict:
+    root = codex_home() / ".tmp" / "marketplaces" / name
+    for relative in (Path(".agents", "plugins", "marketplace.json"), Path(".claude-plugin", "marketplace.json")):
+        manifest = read_json(root / relative)
+        if manifest:
+            return manifest
+    return {}
+
+
+def inspect_installation(name: str, target: dict) -> None:
+    cache = codex_home() / "plugins" / "cache" / name
+    selected = {identity.rsplit("@", 1)[0] for identity in target["plugins"]}
+    target["missing"] = [identity for identity in target["plugins"]
+                         if not (cache / identity.rsplit("@", 1)[0]).is_dir()]
+    publishers = {}
+    entries = marketplace_manifest(name).get("plugins")
+    for entry in entries if isinstance(entries, list) else []:
+        if not isinstance(entry, dict) or entry.get("name") not in selected:
             continue
-        marketplace = identity.rsplit("@", 1)[1]
-        source = marketplaces.get(marketplace)
-        if (not isinstance(source, dict) or source.get("source_type") != "git"
-                or not isinstance(source.get("source"), str) or not source["source"]):
-            continue
-        target = targets.setdefault(marketplace, {"source": source["source"], "ref": source.get("ref"),
-                                                  "plugins": []})
-        target["plugins"].append(identity)
-    return targets
+        source = entry.get("source")
+        if isinstance(source, dict) and source.get("source") == "git-subdir" and isinstance(source.get("url"), str):
+            ref = source.get("sha") or source.get("ref") or "HEAD"
+            if isinstance(ref, str):
+                publishers[(source["url"], ref)] = {"source": source["url"], "ref": ref}
+    target["publishers"] = [publishers[key] for key in sorted(publishers)]
+
+
+def process_alive(pid: object) -> bool:
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            return bool(kernel32.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def codex_session_running(alive=process_alive) -> bool:
+    database = state_directory() / "sessions.db"
+    if not database.exists():
+        return False
+    try:
+        connection = sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True, timeout=5)
+        try:
+            rows = connection.execute("SELECT profile, pid FROM sessions WHERE ended_at IS NULL").fetchall()
+        finally:
+            connection.close()
+    except sqlite3.Error:
+        return True
+    home = os.path.normcase(str(codex_home().resolve()))
+    return any(isinstance(profile, str) and os.path.normcase(str(Path(profile).resolve())) == home and alive(pid)
+               for profile, pid in rows)
 
 
 def remote_revision(source: str, ref: object = None) -> str | None:
     reference = ref if isinstance(ref, str) and ref else "HEAD"
-    if len(reference) == 40 and all(character in "0123456789abcdefABCDEF" for character in reference):
+    if is_pinned(reference):
         return reference.lower()
     try:
         result = subprocess.run(["git", "ls-remote", source, reference], capture_output=True, text=True,
@@ -104,11 +226,10 @@ def remote_revision(source: str, ref: object = None) -> str | None:
     return None
 
 
-def run_cli(command: list[str], *, cwd: Path | None = None) -> bool | str:
-    timeout = PROJECT_CLI_TIMEOUT_SECONDS if cwd is not None else CLI_TIMEOUT_SECONDS
+def run_cli(command: list[str], *, cwd: Path) -> bool | str:
     try:
         result = subprocess.run(command, cwd=cwd, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                                encoding="utf-8", errors="replace", timeout=timeout, check=False,
+                                encoding="utf-8", errors="replace", timeout=CLI_TIMEOUT_SECONDS, check=False,
                                 creationflags=NO_WINDOW)
     except (OSError, subprocess.TimeoutExpired):
         return False
@@ -117,137 +238,42 @@ def run_cli(command: list[str], *, cwd: Path | None = None) -> bool | str:
     return result.returncode == 0
 
 
-def target_key(name: str, target: dict) -> str:
-    value = json.dumps({key: target.get(key) for key in ("source", "ref", "plugins", "publishers")},
-                       sort_keys=True, separators=(",", ":"))
-    return "codex:" + name + ":" + hashlib.sha256(value.encode("utf-8")).hexdigest()
-
-
-def project_directories(config: dict, temporary: Path | None = None) -> list[Path]:
-    projects = config.get("projects", {})
-    if not isinstance(projects, dict):
-        return []
-    temporary = (temporary or Path(tempfile.gettempdir())).resolve()
-    return sorted({Path(path).resolve() for path, settings in projects.items()
-                   if isinstance(settings, dict) and settings.get("trust_level") == "trusted"
-                   and (Path(path) / ".codex/config.toml").is_file()
-                   and not Path(path).resolve().is_relative_to(temporary)})
-
-
-def effective_config(executable: str, project: Path) -> dict:
-    process = subprocess.Popen([executable, "app-server"], cwd=project, stdin=subprocess.PIPE,
-                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                               text=True, encoding="utf-8", bufsize=1,
-                               creationflags=NO_WINDOW)
-    messages = queue.Queue()
-
-    def receive():
-        try:
-            for line in process.stdout:
-                messages.put(json.loads(line))
-        except (OSError, ValueError) as error:
-            messages.put(error)
-        finally:
-            messages.put(None)
-
-    threading.Thread(target=receive, daemon=True).start()
-
-    def request(identity, method, params):
-        process.stdin.write(json.dumps({"id": identity, "method": method, "params": params}) + "\n")
-        process.stdin.flush()
-        deadline = time.monotonic() + CLI_TIMEOUT_SECONDS
-        while True:
-            message = messages.get(timeout=max(0, deadline - time.monotonic()))
-            if message is None or isinstance(message, Exception):
-                raise ValueError(f"Codex stopped during {method}")
-            if message.get("id") == identity:
-                if "error" in message:
-                    raise ValueError(f"Codex {method} failed: {message['error']}")
-                return message["result"]
-
-    try:
-        request(1, "initialize", {"clientInfo": {"name": "tj_agents_autoupdate", "version": "1.0.0"},
-                                   "capabilities": {"experimentalApi": True}})
-        process.stdin.write(json.dumps({"method": "initialized"}) + "\n")
-        process.stdin.flush()
-        return request(2, "config/read", {"cwd": str(project), "includeLayers": False})["config"]
-    except queue.Empty as error:
-        raise ValueError("Codex configuration read timed out") from error
-    finally:
-        if process.poll() is None:
-            process.terminate()
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
-        process.stdin.close()
-        process.stdout.close()
-
-
-def project_targets(executable: str, project: Path) -> dict[str, dict]:
-    targets = codex_targets(effective_config(executable, project))
-    command = [executable, "plugin", "list", "--available", "--json"]
-    options = {"cwd": project, "stdin": subprocess.DEVNULL, "capture_output": True, "text": True,
-               "encoding": "utf-8", "errors": "replace", "timeout": PROJECT_CLI_TIMEOUT_SECONDS, "check": True,
-               "creationflags": NO_WINDOW}
-    try:
-        result = subprocess.run(command, **options)
-    except subprocess.CalledProcessError:
-        if not run_cli([executable, "plugin", "marketplace", "upgrade"], cwd=project):
-            raise
-        result = subprocess.run(command, **options)
-    listing = json.loads(result.stdout)
-    installed = {entry.get("pluginId") for entry in listing.get("installed", [])
-                 if entry.get("installed") is True}
-    for target in targets.values():
-        target["missing"] = sorted(set(target["plugins"]) - installed)
-        publishers = {}
-        for entry in listing.get("installed", []) + listing.get("available", []):
-            source = entry.get("source", {})
-            if (entry.get("pluginId") in target["plugins"] and isinstance(source, dict)
-                    and source.get("source") == "git-subdir" and isinstance(source.get("url"), str)):
-                ref = source.get("sha") or source.get("ref") or "HEAD"
-                if isinstance(ref, str):
-                    publishers[(source["url"], ref)] = {"source": source["url"], "ref": ref}
-        target["publishers"] = list(publishers.values())
-    return targets
-
-
 def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, revision=remote_revision,
-                  run=run_cli, project: Path | None = None, now: float | None = None) -> dict[str, str]:
+                  run=run_cli, now: float | None = None, busy=codex_session_running) -> dict[str, str]:
     now = time.time() if now is None else now
     outcomes: dict[str, str] = {}
-    names = sorted(targets)
     references = sorted({(source["source"], source.get("ref") or "HEAD")
                          for target in targets.values() for source in [target, *target.get("publishers", [])]})
     with ThreadPoolExecutor(max_workers=max(1, min(8, len(references)))) as pool:
         heads = dict(zip(references, pool.map(lambda source: revision(*source), references)))
-    for marketplace in names:
+    running = None
+    for marketplace in sorted(targets):
         target = targets[marketplace]
-        key = target_key(marketplace, target)
-        sources = [target, *target.get("publishers", [])]
-        published = [heads[(source["source"], source.get("ref") or "HEAD")] for source in sources]
-        head = (hashlib.sha256(json.dumps(published).encode("utf-8")).hexdigest()
-                if len(published) > 1 else published[0])
+        key = "codex:" + marketplace
+        published = [heads[(source["source"], source.get("ref") or "HEAD")]
+                     for source in [target, *target.get("publishers", [])]]
         if published[0] is None:
             outcomes[marketplace] = "unreachable"
             continue
+        head = (hashlib.sha256(json.dumps(published).encode("utf-8")).hexdigest()
+                if len(published) > 1 else published[0])
         missing = set(target.get("missing", [])) - set(recorded.get("retired:" + key, []))
-        if all(value is not None for value in published) and recorded.get(key) == head and not missing:
+        if None not in published and recorded.get(key) == head and not missing:
             outcomes[marketplace] = "current"
             continue
         failed_at = recorded.get("failed:" + key)
         if isinstance(failed_at, (int, float)) and now - failed_at < FAILURE_BACKOFF_SECONDS:
             outcomes[marketplace] = "failed recently; retried after 24 hours"
             continue
-        def invoke(command):
-            return run(command, cwd=project) if project is not None else run(command)
-
-        refreshed = invoke([executable, "plugin", "marketplace", "upgrade", marketplace]) is True
+        running = busy() if running is None else running
+        if running:
+            outcomes[marketplace] = "deferred while a Codex session is running"
+            continue
+        refreshed = run([executable, "plugin", "marketplace", "upgrade", marketplace],
+                        cwd=target["project"]) is True
         retired = []
         for plugin in target["plugins"] if refreshed else []:
-            added = invoke([executable, "plugin", "add", plugin])
+            added = run([executable, "plugin", "add", plugin], cwd=target["project"])
             if added == RETIRED:
                 retired.append(plugin)
             elif added is not True:
@@ -257,7 +283,7 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
             recorded["retired:" + key] = sorted(retired)
         retired = f" (no longer published, not installed: {', '.join(retired)})" if retired else ""
         if refreshed:
-            if all(value is not None for value in published):
+            if None not in published:
                 recorded[key] = head
             recorded.pop("failed:" + key, None)
             outcomes[marketplace] = "updated" + retired
@@ -267,68 +293,19 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
     return outcomes
 
 
-
-def refresh_projects(executable: str, config: dict, recorded: dict, run=run_cli) -> dict[str, dict]:
-    revisions = {}
-
-    def revision(source, ref):
-        key = (source, ref)
-        if key not in revisions:
-            revisions[key] = remote_revision(source, ref)
-        return revisions[key]
-
-    def targets_for(project: Path, label: str) -> dict[str, dict]:
-        stamp = [configuration_stamp(codex_home() / "config.toml"),
-                 configuration_stamp(project / ".codex" / "config.toml")]
-        cached = recorded.get("targets:" + label)
-        if isinstance(cached, dict) and cached.get("stamp") == stamp and isinstance(cached.get("targets"), dict):
-            return cached["targets"]
-        targets = project_targets(executable, project)
-        recorded["targets:" + label] = {"stamp": stamp, "targets": targets}
-        return targets
-
-    def settle(label: str, targets: dict[str, dict], results: dict[str, str]) -> None:
-        cached = recorded.get("targets:" + label)
-        if isinstance(cached, dict):
-            for name, result in results.items():
-                if result.startswith(("updated", "current")) and name in cached.get("targets", {}):
-                    cached["targets"][name]["missing"] = []
-
-    outcomes = {"user": {}}
-    if codex_targets(config):
-        try:
-            targets = targets_for(Path.home(), "user")
-            outcomes["user"] = refresh_codex(executable, targets, recorded, revision=revision, run=run,
-                                              project=Path.home())
-            settle("user", targets, outcomes["user"])
-        except (OSError, ValueError, TypeError, AttributeError, subprocess.SubprocessError) as error:
-            outcomes["user"] = {"error": str(error)}
-    for project in project_directories(config):
-        try:
-            targets = targets_for(project, str(project))
-            outcomes[str(project)] = refresh_codex(executable, targets, recorded, revision=revision, run=run,
-                                                   project=project)
-            settle(str(project), targets, outcomes[str(project)])
-        except (OSError, ValueError, TypeError, AttributeError, subprocess.SubprocessError) as error:
-            outcomes[str(project)] = {"error": str(error)}
-    return outcomes
-
-
-def configuration_stamp(path: Path) -> float | None:
-    try:
-        return path.stat().st_mtime
-    except OSError:
-        return None
+def refresh_declared(executable: str, config: dict, recorded: dict, **options) -> dict:
+    targets, ignored = declared_targets(config)
+    for name, target in targets.items():
+        inspect_installation(name, target)
+    outcomes = refresh_codex(executable, targets, recorded, **options)
+    kept = {prefix + "codex:" + name for name in targets for prefix in ("", "retired:", "failed:")}
+    for key in [key for key in recorded if key not in kept]:
+        del recorded[key]
+    return {"marketplaces": outcomes, "ignored": ignored}
 
 
 def load_codex_config() -> dict:
-    import tomllib
-
-    try:
-        with (codex_home() / "config.toml").open("rb") as stream:
-            return tomllib.load(stream)
-    except (OSError, tomllib.TOMLDecodeError):
-        return {}
+    return load_toml(codex_home() / "config.toml")
 
 
 def installed_plugin_roots(plugin: str, claude_config: Path, codex_config: dict) -> list[Path]:
@@ -429,7 +406,7 @@ def main(argv: list[str] | None = None) -> int:
         recorded = state.get("revisions") if isinstance(state.get("revisions"), dict) else {}
         config = load_codex_config()
         executable = shutil.which("codex")
-        outcomes = refresh_projects(executable, config, recorded) if executable else {}
+        outcomes = refresh_declared(executable, config, recorded) if executable else {}
         sweep = "skipped" if arguments.no_sweep else sweep_worktrees(config)
         write_json(state_file, {"revisions": recorded, "last_run": time.time(), "outcomes": outcomes,
                                 "worktree_sweep": sweep})
