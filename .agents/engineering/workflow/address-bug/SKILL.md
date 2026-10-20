@@ -30,3 +30,12 @@ owner.
 
 Answer a user's direct question before entering this workflow. Recording or selecting a record does not
 grant repair or publication authority beyond the active task.
+
+## Example
+
+```text
+Work Items bug WI-241 reports that an export without a title returns HTTP 500. PR #91 already contains
+the causal repair and its regression test. Link WI-241 to PR #91 and keep its existing owner; do not open
+a second branch. After the regression test passes against the repaired export, record that evidence and
+set WI-241 to resolved.
+```

@@ -112,3 +112,12 @@ default branch, naming their validation, review, PR, and merge commit, plus whet
 was present. Otherwise return one typed human, dependency, or delivery gate with its owner, required action,
 evidence, and observable resume condition. Do not implement under planning-only authority or expose internal
 agent transcripts.
+
+## Example
+
+```text
+Roadmap key AUTH-34 and Work Items feature WI-610 require passkey sign-in. The plan separates credential
+storage, browser enrollment, and sign-in verification into independently green phases, records the required
+migration and test gates, and links WI-610 from its ledger. Run the plan graph and documentation review,
+then merge the plan artifact; do not implement passkeys under planning-only authority.
+```

@@ -63,3 +63,12 @@ check gates; it never authorizes taking over an unrelated pending delivery.
 The callout response is complete when the standard is repaired, tested and committed, or its blocker is
 recorded, and the original task has resumed. A source change does not alter instructions already loaded in
 the originating session.
+
+## Example
+
+```text
+The user reports that an agent created a second bug record after a repair already had an owner. Inspect the
+governing recording guidance, reconcile the existing Work Items record, and repair the source rule that
+failed to require that reconciliation. Test the guidance change in Core, record the evidence on the selected
+mistake item, and resume the user's original task without taking over an unrelated pending PR.
+```

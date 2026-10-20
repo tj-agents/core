@@ -67,3 +67,12 @@ preflight and report its exact next action.
 
 Report fixed findings, any final dispositions and their durable owner, fixing commits, validation, canonical
 work order, and current watermark. Do not re-litigate a completed pass judgment.
+
+## Example
+
+```text
+The canonical work order has a complete pass at commit a1b2c3d and open finding F-07: request validation
+does not reject an empty account ID. Mark F-07 `[~]`, make and test the focused validation change, commit
+it, append the test evidence, and mark F-07 `[x]`. Then run incremental review from a1b2c3d to the fixing
+commit; the original completed pass judgment remains unchanged.
+```

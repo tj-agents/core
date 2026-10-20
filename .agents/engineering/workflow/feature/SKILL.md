@@ -87,3 +87,11 @@ Return one completed repository outcome naming the implemented behavior, validat
 delivery state; a commit is not terminal while authorized delivery remains. Otherwise return one typed human
 gate with its owner, required action, evidence, and observable resume condition. Do not expose internal agent
 transcripts, model choices, routine continuation prompts, or a phase boundary as a stopping condition.
+
+## Example
+
+```text
+Work Items feature WI-605 requires CSV export to include the account owner column. An analogous JSON export
+already defines that column, so add the matching CSV mapping and a focused export test. After the test and
+review pass, update WI-605 with the verified acceptance evidence; an open PR alone does not resolve it.
+```
