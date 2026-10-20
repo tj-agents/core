@@ -351,6 +351,32 @@ class DeclaredRefreshTests(unittest.TestCase):
         self.assertEqual({'current'}, set(second['marketplaces'].values()))
         again.assert_not_called()
 
+    def test_a_plugin_declared_only_by_projects_is_removed_from_user_scope_after_codex_enables_it(self):
+        machine = Machine(self)
+        work = machine.project('work', tj_agents(None, 'infonetica'))
+        machine.installed('tj-agents', 'infonetica')
+        machine.installed('base-agents', 'base', 'machine')
+        user = machine.home / 'config.toml'
+        user.write_text('[plugins."base@base-agents"]\nenabled = true\n', encoding='utf-8')
+
+        def run(command, cwd):
+            if command[2] == 'add':
+                user.write_text(user.read_text(encoding='utf-8') + f'\n[plugins."{command[-1]}"]\nenabled = true\n',
+                                encoding='utf-8')
+            return True
+
+        first = UPDATE.refresh_declared('codex', user_config([work]), {}, run=run, busy=idle, revision=lambda *_: NEW)
+        leaked = user_config([work])
+        leaked['plugins']['infonetica@tj-agents'] = {'enabled': True}
+        second = UPDATE.refresh_declared('codex', leaked, {}, first['project_only'], run=run, busy=idle,
+                                         revision=lambda *_: NEW)
+
+        text = user.read_text(encoding='utf-8')
+        self.assertEqual(['infonetica@tj-agents'], first['project_only'])
+        self.assertEqual(['infonetica@tj-agents'], second['project_only'])
+        self.assertNotIn('infonetica@tj-agents', text)
+        self.assertIn('[plugins."base@base-agents"]\nenabled = true', text)
+
 
 class SessionDetectionTests(unittest.TestCase):
     def sessions(self, machine, rows):

@@ -92,12 +92,14 @@ def selection_document(root: Path, requested: set[str], foreign: set[str], decla
     return document
 
 
-def plan(root: Path, stacks: list[str], plugins: list[str], scope: str, marketplaces: list[str] = ()) -> tuple[dict[Path, str | None], Path]:
+def plan(root: Path, stacks: list[str], plugins: list[str], scope: str | None, marketplaces: list[str] = ()) -> tuple[dict[Path, str | None], Path]:
     root = root.expanduser().resolve()
     if root.exists() and not root.is_dir():
         raise lock_io.LockError(f"Repository root is not a directory: {root}")
     roster = load_roster()
     names, foreign = requested_plugins(stacks, plugins, roster)
+    if root.is_dir() and repo_config.owned(root):
+        names.add("personal")
     declared = {}
     for value in marketplaces:
         name, source = parse_marketplace(value)
@@ -114,7 +116,7 @@ def plan(root: Path, stacks: list[str], plugins: list[str], scope: str, marketpl
     return targets, root
 
 
-def run(root: Path, stacks: list[str], plugins: list[str], mode: str, scope: str = "project", marketplaces: list[str] = ()) -> list[str]:
+def run(root: Path, stacks: list[str], plugins: list[str], mode: str, scope: str | None = None, marketplaces: list[str] = ()) -> list[str]:
     targets, root = plan(root, stacks, plugins, scope, marketplaces)
     changed = {path: value for path, value in targets.items() if repo_config.text_at(path) != value}
     drift = [path.relative_to(root).as_posix() for path in changed]
@@ -129,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--marketplace", action="append", default=[], metavar="NAME=OWNER/REPO")
     parser.add_argument("--stack", action="append", default=[])
     parser.add_argument("--plugin", action="append", default=[])
-    parser.add_argument("--scope", choices=("project", "local"), default="project")
+    parser.add_argument("--scope", choices=("project", "local"))
     parser.add_argument("--mode", required=True, choices=("preview", "check", "write"))
     arguments = parser.parse_args(argv)
     try:

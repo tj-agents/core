@@ -28,8 +28,7 @@ class RefreshCliTests(unittest.TestCase):
         self.assertEqual([call.args[0] for call in run.call_args_list], [
             ["claude", "plugin", "marketplace", "update", "tj-agents"],
             ["claude", "plugin", "list", "--json"],
-            ["claude", "plugin", "install", "machine@tj-agents", "--scope", "project"],
-            ["claude", "plugin", "update", "machine@tj-agents", "--scope", "project"],
+            ["claude", "plugin", "update", "machine@tj-agents", "--scope", "user"],
         ])
         verify.assert_not_called()
 
@@ -41,10 +40,39 @@ class RefreshCliTests(unittest.TestCase):
             REFRESH.refresh("claude", "claude", ROOT, {}, ["machine@tj-agents"])
         self.assertEqual([call.args[0] for call in run.call_args_list], [
             ["claude", "plugin", "list", "--json"],
-            ["claude", "plugin", "install", "machine@tj-agents", "--scope", "project"],
             ["claude", "plugin", "update", "machine@tj-agents", "--scope", "local"],
-            ["claude", "plugin", "update", "machine@tj-agents", "--scope", "project"],
+            ["claude", "plugin", "update", "machine@tj-agents", "--scope", "user"],
         ])
+
+    def test_claude_installs_only_at_the_scope_the_repository_declares(self):
+        for declared, scope in (("settings.local.json", "local"), ("settings.json", "project")):
+            def settings(path, declared=declared):
+                return {"enabledPlugins": {"infonetica@tj-agents": True}} if path.name == declared else {}
+            with self.subTest(declared=declared), mock.patch.object(REFRESH, "read_json", side_effect=settings), \
+                    mock.patch.object(REFRESH, "run", return_value="[]") as run:
+                REFRESH.refresh("claude", "claude", ROOT, {}, ["infonetica@tj-agents"])
+            self.assertEqual([call.args[0] for call in run.call_args_list], [
+                ["claude", "plugin", "list", "--json"],
+                ["claude", "plugin", "install", "infonetica@tj-agents", "--scope", scope],
+                ["claude", "plugin", "update", "infonetica@tj-agents", "--scope", scope],
+            ])
+
+    def test_codex_refresh_removes_project_only_plugins_from_user_scope(self):
+        with tempfile.TemporaryDirectory() as home:
+            config = Path(home) / "config.toml"
+            config.write_text('[plugins."base@tj-agents"]\nenabled = true\n', encoding="utf-8")
+
+            def add(command, project):
+                identity = command[-1]
+                if command[2] == "add":
+                    config.write_text(config.read_text(encoding="utf-8")
+                                      + f'\n[plugins."{identity}"]\nenabled = true\n', encoding="utf-8")
+                return ""
+            with mock.patch.dict("os.environ", {"CODEX_HOME": home}), mock.patch.object(REFRESH, "run", side_effect=add):
+                REFRESH.refresh("codex", "codex", ROOT, {}, ["base@tj-agents", "infonetica@tj-agents"])
+            text = config.read_text(encoding="utf-8")
+        self.assertIn('[plugins."base@tj-agents"]\nenabled = true', text)
+        self.assertNotIn('infonetica@tj-agents', text)
 
     def test_missing_claude_marketplace_is_registered_before_refresh(self):
         with mock.patch.object(REFRESH, "read_json", return_value={}), \

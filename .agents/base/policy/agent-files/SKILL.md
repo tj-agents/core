@@ -21,3 +21,7 @@ replacing it with the pointer.
 Before delivery, check both directions across the changed repository: every `AGENTS.md` has its sibling
 `CLAUDE.md`, and every `CLAUDE.md` has its sibling `AGENTS.md` with the exact pointer content. Do not rely
 on a machine-local profile file to supply this repository rule.
+
+This applies only to repositories whose GitHub owner is listed in `repo-owners.json`. Any other
+repository keeps its own agent-file layout. Edit its agent files only when the work itself requires it, and
+never add personal conventions or settings to them.
