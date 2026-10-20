@@ -150,10 +150,65 @@ class StartupBindingTests(unittest.TestCase):
         self.assertEqual([mock.call(4242, signal.SIGTERM), mock.call(4242, signal.SIGKILL)], killpg.call_args_list)
         process.kill.assert_not_called()
 
-    def test_missing_acknowledgement_terminates_the_child(self):
-        with self.assertRaisesRegex(BINDING.StartupBindingError, "did not acknowledge"):
-            BINDING.run_session("codex", sys.executable, self.project, ["-c", "import time; time.sleep(30)"],
-                                require_session_start=True, timeout=0.1)
+    def test_missing_acknowledgement_preserves_the_child_and_its_exit_code(self):
+        survived = self.project / "survived.json"
+        script = self.project / "unacknowledged child \u00fc.py"
+        script.write_text(
+            "import sys,time\nfrom pathlib import Path\n"
+            "time.sleep(0.3)\nPath(sys.argv[1]).write_text('survived')\nsys.exit(7)\n",
+            encoding="utf-8",
+        )
+        for host in ("codex", "claude"):
+            with self.subTest(host=host), mock.patch("sys.stderr"):
+                survived.unlink(missing_ok=True)
+                running, unconfirmed = mock.Mock(), mock.Mock()
+                self.assertEqual(7, BINDING.run_session(
+                    host, sys.executable, self.project, [str(script), str(survived)],
+                    require_session_start=True, timeout=0, on_running=running,
+                    on_unconfirmed=unconfirmed,
+                ))
+                self.assertEqual("survived", survived.read_text(encoding="utf-8"))
+                running.assert_not_called()
+                unconfirmed.assert_called_once()
+                self.assertIsInstance(unconfirmed.call_args.args[0], int)
+
+    def test_late_acknowledgement_confirms_the_original_child(self):
+        script = self.project / "late acknowledgement.py"
+        script.write_text(
+            "import os,time\nfrom pathlib import Path\n"
+            "time.sleep(0.2)\n"
+            "token=os.environ['TJ_AGENTS_STARTUP_ACK_TOKEN']\n"
+            "(Path(os.environ['TJ_AGENTS_STARTUP_ACK_DIRECTORY'])/token).write_text(token)\n"
+            "time.sleep(0.1)\n", encoding="utf-8",
+        )
+        events = mock.Mock()
+        with mock.patch("sys.stderr"):
+            self.assertEqual(0, BINDING.run_session(
+                "codex", sys.executable, self.project, [str(script)], require_session_start=True,
+                timeout=0, on_running=events.running, on_unconfirmed=events.unconfirmed,
+            ))
+        self.assertEqual(["unconfirmed", "running"], [call[0] for call in events.mock_calls])
+        self.assertEqual(events.unconfirmed.call_args, events.running.call_args)
+
+    def test_missing_acknowledgement_receipt_never_claims_verified_startup(self):
+        status = self.project / "unconfirmed.json"
+        observed = []
+
+        def run(*_args, on_unconfirmed, **_kwargs):
+            on_unconfirmed(4242)
+            observed.append(json.loads(status.read_text(encoding="utf-8")))
+            return 0
+
+        arguments = ["--host", "codex", "--project", str(self.project), "--target", "codex",
+                     "--status-file", str(status), "--require-session-start", "--"]
+        with mock.patch.object(BINDING, "run_session", side_effect=run):
+            self.assertEqual(0, BINDING.main(arguments))
+        self.assertEqual("unconfirmed", observed[0]["state"])
+        self.assertEqual(4242, observed[0]["child_pid"])
+        self.assertNotIn("running_at", observed[0])
+        final = json.loads(status.read_text(encoding="utf-8"))
+        self.assertEqual("exited", final["state"])
+        self.assertNotIn("running_at", final)
 
 
 if __name__ == "__main__":
