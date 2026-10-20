@@ -16,7 +16,7 @@ Generated from canonical `.agents/` definitions.
 - `peer-cli` — utility — `.agents/machine/utility/peer-cli/SKILL.md`
 - `plugin-selection` — utility — `.agents/machine/utility/plugin-selection/SKILL.md`
 - `recover-agents` — utility — `.agents/machine/utility/recover-agents/SKILL.md`
-- `refresh-cli` — utility — `.agents/machine/utility/refresh-cli/SKILL.md`
+- `reload-plugins` — utility — `.agents/machine/utility/reload-plugins/SKILL.md`
 - `search` — utility — `.agents/machine/utility/search/SKILL.md`
 - `search-claude` — utility — `.agents/machine/utility/search-claude/SKILL.md`
 - `search-codex` — utility — `.agents/machine/utility/search-codex/SKILL.md`

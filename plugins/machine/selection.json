@@ -21,7 +21,7 @@
     "peer-cli",
     "plugin-selection",
     "recover-agents",
-    "refresh-cli",
+    "reload-plugins",
     "search",
     "search-claude",
     "search-codex"
