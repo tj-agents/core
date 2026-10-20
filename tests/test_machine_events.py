@@ -71,6 +71,13 @@ class ReconcileTests(unittest.TestCase):
         self.reconciler.repository(current(revision="b", policy="new-policy", marketplace=False))
         self.assertEqual(2, self.policy.call_count)
 
+    def test_standalone_plugin_changes_refresh_without_a_marketplace_manifest(self):
+        state = current(policy=None, marketplace=False)
+        state["plugin"] = {"oid": "plugin-manifest"}
+        self.reconciler.repository(state)
+        self.refresh.assert_called_once_with()
+        self.policy.assert_not_called()
+
     def test_catch_up_refreshes_once_for_many_marketplaces(self):
         self.reconciler.catch_up([current(f"tj-agents/repo{i}") for i in range(50)])
         self.refresh.assert_called_once_with()

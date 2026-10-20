@@ -31,12 +31,14 @@ FIELDS = """nameWithOwner isArchived isFork
 defaultBranchRef { name target { oid } }
 policy: object(expression: "HEAD:.github/merge-policy.json") { oid }
 marketplace: object(expression: "HEAD:.claude-plugin/marketplace.json") { oid }
-catalog: object(expression: "HEAD:.agents/plugins/marketplace.json") { oid }"""
+catalog: object(expression: "HEAD:.agents/plugins/marketplace.json") { oid }
+plugin: object(expression: "HEAD:.claude-plugin/plugin.json") { oid }
+codexPlugin: object(expression: "HEAD:.codex-plugin/plugin.json") { oid }"""
 
 
 def tommy_environment():
     environment = {key: value for key, value in os.environ.items()
-            if key not in {"TJ_AGENT", "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"}
+                   if key not in {"TJ_AGENT", "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"}
                    and not key.startswith("GIT_CONFIG_")}
     environment["GH_HOST"] = "github.com"
     return environment
@@ -154,7 +156,7 @@ class Reconciler:
         revision = current["defaultBranchRef"]["target"]["oid"]
         old = self.state.get(repository, {})
         policy = (current.get("policy") or {}).get("oid")
-        marketplace = bool(current.get("marketplace") or current.get("catalog"))
+        marketplace = any(current.get(name) for name in ("marketplace", "catalog", "plugin", "codexPlugin"))
         if old.get("revision") == revision:
             return
         if policy and policy != old.get("policy"):
