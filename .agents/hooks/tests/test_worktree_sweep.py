@@ -34,6 +34,7 @@ class SweepTests(unittest.TestCase):
             path = self.primary / '.worktrees' / branch.replace('/', '-')
             git(self.primary, 'worktree', 'add', '-q', '-b', branch, str(path))
             self.worktrees[branch] = path
+        self.heads = {branch: self.head(path) for branch, path in self.worktrees.items()}
         self.removed = []
 
     def tearDown(self):
@@ -48,8 +49,16 @@ class SweepTests(unittest.TestCase):
             self.removed.append(worktree['branch'])
             return True, 'removed'
 
+        def merged(primary):
+            return set(self.heads.items())
+
         return SWEEP.sweep_repository(self.primary, list(live), removable=removable,
-                                      based=lambda primary, branch: branch == 'Feature/Base', delete=delete)
+                                      based=lambda primary, branch: branch == 'Feature/Base', delete=delete,
+                                      merged=merged)
+
+    def head(self, path):
+        return subprocess.run(['git', '-C', str(path), 'rev-parse', 'HEAD'], capture_output=True, text=True,
+                              check=True).stdout.strip()
 
     def outcome(self, outcomes, branch):
         return next(value for key, value in outcomes.items()
@@ -140,10 +149,35 @@ class SweepTests(unittest.TestCase):
         os.utime(empty, (old, old))
 
         outcomes = SWEEP.sweep_repository(self.primary, [], removable=lambda primary, worktree: (False, 'no'),
-                                          based=lambda primary, branch: False, dry_run=True)
+                                          based=lambda primary, branch: False, dry_run=True,
+                                          merged=lambda primary: set())
 
         self.assertTrue(empty.is_dir())
         self.assertIn('would remove empty leftover folder', outcomes.values())
+
+    def test_only_worktrees_at_a_merged_pr_head_reach_the_proof(self):
+        proved = []
+
+        def removable(primary, worktree):
+            proved.append(worktree['branch'])
+            return True, 'merged'
+
+        merged = {('Feature/Merged', self.head(self.worktrees['Feature/Merged']))}
+        outcomes = SWEEP.sweep_repository(self.primary, [], removable=removable,
+                                          based=lambda primary, branch: False,
+                                          delete=lambda primary, worktree: (True, 'removed'),
+                                          merged=lambda primary: merged)
+
+        self.assertEqual(['Feature/Merged'], proved)
+        self.assertEqual(3, list(outcomes.values()).count('kept: no merged pull request at this commit'))
+
+    def test_an_unreadable_merged_pr_list_removes_nothing(self):
+        outcomes = SWEEP.sweep_repository(self.primary, [], removable=lambda primary, worktree: (True, 'merged'),
+                                          based=lambda primary, branch: False,
+                                          delete=lambda primary, worktree: (True, 'removed'),
+                                          merged=lambda primary: None)
+
+        self.assertNotIn('removed', outcomes.values())
 
     def test_an_unreadable_session_registry_stops_the_run(self):
         database = Path(self.temp.name) / 'sessions.db'
