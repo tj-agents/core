@@ -127,7 +127,7 @@ def source_tree(source: object, location: Path, project: Path, temporary: Path,
         source = source.get("path")
     elif isinstance(source, dict) and source.get("source") == "local":
         source = source.get("path")
-    if not isinstance(source, str) or not source.startswith("./"):
+    if not isinstance(source, str) or not source or Path(source).is_absolute():
         raise RefreshError("Cannot verify catalog package source")
     root = (location / source).resolve()
     if not root.is_relative_to(location.resolve()):

@@ -125,7 +125,7 @@ class RefreshCliTests(unittest.TestCase):
 
             clones = {}
             source = {"source": "git-subdir", "url": "ssh://git@github.com/TJ-Agents/core.git",
-                      "path": "./plugins/base", "sha": revision}
+                      "path": "plugins/base", "sha": revision}
             with mock.patch.object(REFRESH, "run", side_effect=run) as commands, mock.patch("sys.stderr"):
                 expected = REFRESH.source_tree(source, root, root, root / "scratch", clones)
                 self.assertEqual({"payload": b"published"}, expected)

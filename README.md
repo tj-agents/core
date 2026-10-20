@@ -190,9 +190,11 @@ pwsh ./setup.ps1     # Linux
 
 It turns on Claude's own auto-update for every marketplace an enabled plugin comes from, removes the
 retired `claude`/`codex` profile launcher, and schedules `plugin_autoupdate.py` hidden at logon and hourly
-(Task Scheduler on Windows, crontab on Linux). Each run checks every Codex git marketplace that an enabled
-plugin comes from with one `git ls-remote`, and upgrades the marketplace and re-adds its enabled plugins only
-when the revision changed. Nothing runs when `claude` or `codex` starts.
+(Task Scheduler on Windows, crontab on Linux). It discovers Codex selections from user configuration and
+native plugin inventories in repositories with exact saved trust and `.codex/config.toml`. Each run checks
+a source with `git ls-remote` and upgrades its marketplace and selected plugins when the revision or
+selection changes, or a native installation is missing. An untrusted repository remains subject to Codex's
+native admission. Nothing runs when `claude` or `codex` starts.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
 loaded; new sessions pick up the update. `install.ps1` still wires the Windows `shell/` profile.
@@ -222,10 +224,11 @@ entry. An installed cache can subsequently load solely from trusted project decl
 settings alone do not prove fresh-machine installation. See the current
 [cutover acceptance record](plans/repo-declared-config/CUTOVER.md).
 
-Automatic updates belong to Claude's native updater and the background updater introduced by core
-PR #320. That PR's `setup.ps1` installs the one-time machine setup. Its Codex updater currently reads
-user configuration; repository-only background discovery must be verified before user declarations
-can be retired. Nothing updates packages in the launch path.
+Automatic updates belong to Claude's native updater and the background updater installed by `setup.ps1`.
+The scheduled Codex updater also installs missing declared plugins after a repository has native trust.
+Its native `plugin add` commands maintain the host's required user installation entries automatically;
+repository settings remain the authored selection. Codex currently provides no cache-only install scope.
+Nothing updates packages in the launch path.
 
 For an explicit native refresh use `machine:refresh-cli`. Its default performs native marketplace
 and plugin updates; remote revision verification is opt-in and prints progress. `/reload-plugins`
