@@ -428,21 +428,39 @@ class ConsoleTests(unittest.TestCase):
 
 
 class LockAndSelfUpdateTests(unittest.TestCase):
-    def test_a_second_run_cannot_take_a_held_lock(self):
+    def test_a_second_run_cannot_take_a_held_lock_even_after_an_hour(self):
         with tempfile.TemporaryDirectory(prefix='autoupdate lock ') as temp:
-            lock = Path(temp) / 'plugin-autoupdate.lock'
+            path = Path(temp) / 'plugin-autoupdate.lock'
+            held = UPDATE.acquire_lock(path)
+            self.assertIsNotNone(held)
+            try:
+                old = path.stat().st_mtime - 7200
+                os.utime(path, (old, old))
+                self.assertIsNone(UPDATE.acquire_lock(path))
+            finally:
+                held.close()
 
-            self.assertTrue(UPDATE.acquire_lock(lock))
-            self.assertFalse(UPDATE.acquire_lock(lock))
-
-    def test_a_stale_lock_is_reclaimed(self):
+    def test_an_orphan_lockfile_from_the_retired_task_does_not_block_refresh(self):
         with tempfile.TemporaryDirectory(prefix='autoupdate lock ') as temp:
-            lock = Path(temp) / 'plugin-autoupdate.lock'
-            lock.write_text('', encoding='utf-8')
-            old = lock.stat().st_mtime - UPDATE.LOCK_STALE_SECONDS - 60
-            os.utime(lock, (old, old))
+            path = Path(temp) / 'plugin-autoupdate.lock'
+            path.write_text('', encoding='utf-8')
+            held = UPDATE.acquire_lock(path)
+            self.assertIsNotNone(held)
+            held.close()
 
-            self.assertTrue(UPDATE.acquire_lock(lock))
+    def test_an_old_cache_without_the_listener_cannot_replace_the_installed_runtime(self):
+        with tempfile.TemporaryDirectory(prefix='autoupdate cutover ') as temp:
+            stable = Path(temp) / 'bin' / UPDATE.SCRIPT_NAME
+            stable.parent.mkdir()
+            stable.write_text('current updater', encoding='utf-8')
+            stable.with_name('machine_events.py').write_text('current listener', encoding='utf-8')
+            old = Path(temp) / 'old-package' / UPDATE.SCRIPT_NAME
+            old.parent.mkdir()
+            old.write_text('old updater', encoding='utf-8')
+            with mock.patch.object(UPDATE, 'packaged_copies', return_value=[old]):
+                self.assertFalse(UPDATE.self_update(stable, {}))
+            self.assertEqual('current updater', stable.read_text(encoding='utf-8'))
+            self.assertEqual('current listener', stable.with_name('machine_events.py').read_text(encoding='utf-8'))
 
     def test_the_stable_copy_adopts_the_newest_packaged_script(self):
         with tempfile.TemporaryDirectory(prefix='autoupdate self ') as temp:
