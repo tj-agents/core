@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 PLUGIN_ROOT_VARIABLES = ("PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
-TRUST_FILE = "harness-trust.json"
+OWNERS_FILE = "repo-owners.json"
 _GITHUB_OWNER_RE = re.compile(
     r"\A(?:https://(?:[^@/\s]+@)?github\.com/|ssh://git@github\.com/|git@github\.com:)"
     r"(?P<owner>[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)/[^/\s]+?(?:\.git)?/?\Z"
@@ -253,17 +253,17 @@ def own_payload_root(hook_file):
     return Path(hook_file).resolve().parent.parent
 
 
-def trusted_owners(hook_file):
+def repo_owners(hook_file):
     """GitHub owners whose repositories receive the plugin's harness grants.
 
     The list ships beside the hooks, never in the repository being worked on, so a checkout cannot
     grant itself permissions. A missing or malformed list grants nothing.
     """
     try:
-        parsed = json.loads((Path(hook_file).resolve().parent / TRUST_FILE).read_text(encoding="utf-8"))
+        parsed = json.loads((Path(hook_file).resolve().parent / OWNERS_FILE).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return frozenset()
-    owners = parsed.get("trusted_owners") if isinstance(parsed, dict) else None
+    owners = parsed.get("owners") if isinstance(parsed, dict) else None
     if not isinstance(owners, list):
         return frozenset()
     return frozenset(owner.casefold() for owner in owners if isinstance(owner, str) and owner)
@@ -287,7 +287,7 @@ def origin_owner(checkout):
 
 def is_trusted_checkout(hook_file, checkout):
     owner = origin_owner(checkout)
-    return owner is not None and owner in trusted_owners(hook_file)
+    return owner is not None and owner in repo_owners(hook_file)
 
 
 def grant(reason):

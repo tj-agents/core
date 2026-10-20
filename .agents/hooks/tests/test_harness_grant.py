@@ -48,7 +48,7 @@ class TrustTests(unittest.TestCase):
         self.assertIsNone(hook_runtime.origin_owner(self.root))
 
     def test_the_shipped_list_trusts_personal_owners_only(self):
-        owners = hook_runtime.trusted_owners(HOOK)
+        owners = hook_runtime.repo_owners(HOOK)
 
         self.assertIn("tj-agents", owners)
         self.assertIn("concertable", owners)
@@ -56,11 +56,11 @@ class TrustTests(unittest.TestCase):
 
     def test_a_missing_or_malformed_list_trusts_nothing(self):
         stray = self.root / "hook.py"
-        self.assertEqual(frozenset(), hook_runtime.trusted_owners(stray))
-        (self.root / hook_runtime.TRUST_FILE).write_text("{not json", encoding="utf-8")
-        self.assertEqual(frozenset(), hook_runtime.trusted_owners(stray))
-        (self.root / hook_runtime.TRUST_FILE).write_text('{"trusted_owners": "x"}', encoding="utf-8")
-        self.assertEqual(frozenset(), hook_runtime.trusted_owners(stray))
+        self.assertEqual(frozenset(), hook_runtime.repo_owners(stray))
+        (self.root / hook_runtime.OWNERS_FILE).write_text("{not json", encoding="utf-8")
+        self.assertEqual(frozenset(), hook_runtime.repo_owners(stray))
+        (self.root / hook_runtime.OWNERS_FILE).write_text('{"owners": "x"}', encoding="utf-8")
+        self.assertEqual(frozenset(), hook_runtime.repo_owners(stray))
 
 
 class HarnessGrantTests(unittest.TestCase):

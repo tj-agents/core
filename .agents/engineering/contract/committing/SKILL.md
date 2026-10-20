@@ -32,6 +32,11 @@ commit it *there* — never a reason to leave it in the working tree.
 I commit this?"* or *"I've left it uncommitted for your review"*, **that sentence is the trigger** — don't
 send it, commit.
 
+## Never stage what Git ignores
+
+Never `git add -f`, or otherwise stage, a path covered by `.gitignore` or `.git/info/exclude`. An exclusion
+is the owner's decision, not an obstacle. If an ignored file genuinely belongs in a commit, ask first.
+
 ## Commit cadence and push cadence are different
 
 Commit completed reversible work locally at every natural boundary. Push only a **stable executable
