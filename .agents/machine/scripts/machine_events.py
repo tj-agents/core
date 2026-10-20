@@ -331,29 +331,6 @@ def subscribe(topic, pending, cursor_file, opener=urllib.request.urlopen):
             delay = min(delay * 2, 60)
 
 
-def acquire_listener_lock(path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    stream = path.open("a+b")
-    try:
-        if os.name == "nt":
-            import msvcrt
-
-            stream.seek(0)
-            if not stream.read(1):
-                stream.write(b"0")
-                stream.flush()
-            stream.seek(0)
-            msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-
-            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        stream.close()
-        return None
-    return stream
-
-
 def main(argv=None):
     if sys.version_info < (3, 11):
         raise RuntimeError("machine_events requires Python 3.11 or newer")
@@ -370,7 +347,7 @@ def main(argv=None):
                                   encoding="utf-8")
     LOG.addHandler(handler)
     LOG.setLevel(logging.INFO)
-    lock = acquire_listener_lock(directory / "machine-events.lock")
+    lock = plugins.acquire_lock(directory / "machine-events.lock")
     if lock is None:
         return 0
     try:
