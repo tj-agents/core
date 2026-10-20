@@ -22,11 +22,6 @@ reference" is rot that misleads the next reader into thinking the work is still 
 
 ## Roadmap → plan → progress
 
-Read [the shared recording contract](../../resources/problem-records.md). In a selected repository, the
-provider owns the live queue and item status. Keep substantive design files and the file graph below,
-including its stable keys, and link the canonical selected item from its plan and ledger. Roadmap status
-summaries follow that item; plans and roadmaps do not create a second live backlog.
-
 - A **roadmap** (`<EPIC>_ROADMAP.md`) is an epic's living tracker: no ledger, never deleted, alive until the
   epic ships. Each of its items spins off its own plan and keeps the tick when that plan is deleted. Each
   checklist item contains its stable `<epic>/<slug>` key as an inline backticked token; the spun-off ledger
@@ -406,10 +401,6 @@ It prepares the exact `handoff-format` pointer and invokes one selected launcher
 does not transfer ownership. Do not select a handoff as routine phase-ending ceremony.
 
 ## Finishing, superseding, abandoning
-
-Before retiring recovery artifacts, reconcile and update the linked selected item through the shared
-recording contract. Resolve it only after its own acceptance condition is verified; a delivered PR or
-retired plan alone does not close it. Preserve unresolved item ownership and next action.
 
 - **Finished** → delete the plan and its ledger, once the whole lifecycle is terminal — not merely once the
   final local phase is committed.

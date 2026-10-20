@@ -30,7 +30,7 @@ launches; repair and preservation actions may continue.
 2. Respect explicit user limits. Do not create a repair for an explicitly rejected change, and do not
    silently widen the repair into product work, profile installation, destructive cleanup, or unrelated
    standards redesign.
-3. Select `work-items:write-bug`, `work-items:write-mistake`, or `work-items:write-debt` for the
+3. Select `engineering:write-bug`, `engineering:write-mistake`, or `engineering:write-debt` for the
    observed problem and update its canonical record. If the same source repair has a live canonical owner,
    reconcile that owner and contribute the new evidence without creating a duplicate writer.
 
@@ -63,12 +63,3 @@ check gates; it never authorizes taking over an unrelated pending delivery.
 The callout response is complete when the standard is repaired, tested and committed, or its blocker is
 recorded, and the original task has resumed. A source change does not alter instructions already loaded in
 the originating session.
-
-## Example
-
-```text
-The user reports that an agent created a second bug record after a repair already had an owner. Inspect the
-governing recording guidance, reconcile the existing Work Items record, and repair the source rule that
-failed to require that reconciliation. Test the guidance change in Core, record the evidence on the selected
-mistake item, and resume the user's original task without taking over an unrelated pending PR.
-```

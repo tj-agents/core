@@ -86,30 +86,8 @@ def work_item_reader():
     return runtime, contract
 
 
-def require_file_backlog(directory):
-    if not any((path / ".git").exists() for path in (directory, *directory.parents)):
-        return
-    hooks = workflow_root().parent / "hooks"
-    sys.path.insert(0, str(hooks))
-    try:
-        from problem_records import RecordError, declaration, primary_checkout
-    except ImportError as error:
-        raise RuntimeError("list-work capability failure: own record-selection helper is unavailable") from error
-    try:
-        primary = primary_checkout(directory)
-        selected = declaration(primary)
-    except RecordError as error:
-        raise RuntimeError("list-work record selection failed: " + str(error)) from error
-    if selected:
-        raise RuntimeError(
-            "list-work selected provider: " + selected["provider"] + "; load that skill and use its "
-            "list/read commands for " + str(primary) + ". The file scanner cannot list its live queue."
-        )
-
-
 try:
     runtime, contract = work_item_reader()
-    require_file_backlog(here)
 except RuntimeError as error:
     print(error, file=sys.stderr)
     raise SystemExit(2)
@@ -159,11 +137,6 @@ def repo_plans():
     members = [home] if is_repo(home) else [
         child for child in home.iterdir() if child.is_dir() and is_repo(child)]
     for member in members:
-        try:
-            require_file_backlog(member)
-        except RuntimeError as error:
-            print(error, file=sys.stderr)
-            raise SystemExit(2)
         for relative in PLAN_DIRS:
             first = member.joinpath(*relative.split("/"))
             if not first.is_dir():

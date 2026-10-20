@@ -61,11 +61,6 @@ under its implementation-examples contract before drafting code. For plan/ledger
 worktrees, and pull requests for an existing owner. Update the unambiguous existing artifact directly; never
 create a competing plan, reference, or ledger.
 
-Read [the shared recording contract](../../resources/problem-records.md) and reconcile any selected
-canonical item before authoring. Link its identity from the plan and ledger while retaining existing
-roadmap graph keys. The provider owns live item state; planning-only authority does not authorize
-implementation or imply that the item's acceptance has passed.
-
 For a request to choose the next roadmap item, let the
 `engineering:continue-roadmap` compatibility entry resolve the candidate first.
 `engineering:update-roadmap` remains the owner of roadmap reconciliation, not plan design.
@@ -112,12 +107,3 @@ default branch, naming their validation, review, PR, and merge commit, plus whet
 was present. Otherwise return one typed human, dependency, or delivery gate with its owner, required action,
 evidence, and observable resume condition. Do not implement under planning-only authority or expose internal
 agent transcripts.
-
-## Example
-
-```text
-Roadmap key AUTH-34 and Work Items feature WI-610 require passkey sign-in. The plan separates credential
-storage, browser enrollment, and sign-in verification into independently green phases, records the required
-migration and test gates, and links WI-610 from its ledger. Run the plan graph and documentation review,
-then merge the plan artifact; do not implement passkeys under planning-only authority.
-```

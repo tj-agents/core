@@ -40,10 +40,6 @@ diagnoses the cause, and chooses the repair.
 
 ## Execute the repair lifecycle
 
-Read [the shared recording contract](../../resources/problem-records.md) and use `work-items:write-bug`
-to reconcile the canonical defect record as evidence becomes available. Update that record through the
-same contract after verifying its resolution condition; a delivered PR alone does not resolve it.
-
 1. Reproduce or anchor the defect in direct evidence. Separate symptoms from the first incorrect state or
    transition.
 2. Choose the smallest repair that corrects the causal mechanism without suppressing errors, weakening
@@ -92,12 +88,3 @@ validation, review state, and delivery state; a commit is not terminal while aut
 Otherwise return one typed human gate with its owner, required action, evidence, and observable resume
 condition. Do not expose internal agent transcripts, model choices, competing-hypothesis chatter, or a
 routine continuation prompt.
-
-## Example
-
-```text
-`GET /reports/42` returns 404 after a report is archived and restored. Reproduce the request, trace the
-lookup to the stale archive filter, and add a regression test that fails before removing that filter. Run
-the focused test after the repair, record its command and result on the linked Work Items bug, then create
-the reviewable commit before entering review.
-```

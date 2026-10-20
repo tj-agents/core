@@ -1,6 +1,6 @@
 ---
 name: address-debt
-description: Take one Work Items debt item all the way to a focused PR in its selected checkout — survey the selected provider, pick one high-value item, fix it, verify resolution under its retention rules, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
+description: Take one tech-debt item all the way to a focused PR in its selected checkout — survey every TECH_DEBT.md, pick one high-value item, fix it with the long-term scalable solution, verify, delete the resolved entry, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
 
 kind: workflow
 domain: process
@@ -8,14 +8,16 @@ domain: process
 
 # Working one tech-debt item — or a small bundle — to a PR
 
-Take a Work Items debt item all the way to a focused PR in its selected checkout, so nothing touches
-in-flight branches. This is the *resolution* workflow; `work-items:write-debt` owns the record's facts,
-retention, and verified closure. A single item is the default shape; bundling more than one into the same PR is the exception
+Take a tech-debt item all the way to a focused PR in its selected checkout, so nothing touches in-flight branches.
+This is the *resolution* workflow; where a debt entry lives and when it is deleted is the `write-debt`
+standard. A single item is the default shape; bundling more than one into the same PR is the exception
 below, not a second workflow.
 
 Read [the shared problem-record contract](../../resources/problem-records.md) first. In each repository,
-use the selected Work Items provider to list, read, update and close debt. Provider failure blocks that
-repository's record operation; retain unsent facts under the shared guidance.
+use its explicitly selected provider to list, read, update and close debt. Selection failures block that
+repository rather than falling back to Markdown. Where the steps below mention a `TECH_DEBT.md` survey,
+use the selected provider's debt list; where they delete a resolved entry, perform the provider's verified
+closure and retention operation. The file survey and deletion rule apply only without selection.
 
 ## Steps
 
@@ -31,14 +33,14 @@ repository's record operation; retain unsent facts under the shared guidance.
      remote default. Select or reuse an available checkout under `engineering:git-branching`; use
      `open-worktree` when concurrent work or necessary isolation requires another checkout. Each active
      writer has one owning branch and checkout.
-   - **Polyrepo-root mode:** run Step 2's survey across every child repository's selected debt items as one
+   - **Polyrepo-root mode:** run Step 2's survey across every child repo's `TECH_DEBT.md` set as one
      combined list. Once the primary item is selected, its child repo owns this run. Select the branch
      and checkout there under the same `git-branching` and `open-worktree` rules as single-repo mode. A second item may join the bundle only if it also lives in that same child
      repo, on top of passing the Step 2 bundling test below — a PR belongs to one repo, so cross-repo
      bundling doesn't exist. Every other child repo stays untouched; picking from more than one of them is a
      future run, not this one.
-2. **Pick the item(s) fast.** List titles and severity across the selected debt items in one pass (in
-   polyrepo-root mode, across every child repository's set, combined); do not read each entry in full or
+2. **Pick the item(s) fast.** Skim titles and severity across every `TECH_DEBT.md` in one pass (in
+   polyrepo-root mode, across every child repo's set, combined); do not read each entry in full or
    deep-dive candidates before choosing. Rule an item out only for a fact one command settles: already in
    flight (`git branch -a` or `git worktree list` naming that area, run within whichever repo the candidate
    belongs to), or needing a decision only the repository owner can make. Take the first remaining item
@@ -69,14 +71,16 @@ repository's record operation; retain unsent facts under the shared guidance.
 3. **Investigate.** Read the surrounding code and understand the real root cause before touching anything,
    for each item in the bundle.
 4. **Fix it properly.** Always the long-term, scalable solution, never the hacky shortcut — the shortcut
-   rule and its one exception are the `work-items:write-debt` standard. It can span multiple PRs; if it genuinely
+   rule and its one exception are the `write-debt` standard. It can span multiple PRs; if it genuinely
    needs splitting, say so in one line, drop it from any bundle, and start with the first PR on its own
    branch.
 5. **Verify.** Build the affected projects to zero errors and run the affected unit/integration tests. Do
    not run local E2E for PR-bound work; the merge queue owns that gate per the repository's plan floor.
 6. **Close the loop.** Give each item its own commit — never squash a bundle into one — so the PR reads as
-   N independent, individually-revertable changes. Update each canonical item with progress and close it
-   only through its provider after its resolution condition is verified. Then push and open one PR covering the whole bundle following the `open-pr` standard, with a body section per
+   N independent, individually-revertable changes. In the commit for a given item, delete that item's
+   resolved entry from its `TECH_DEBT.md` — or, for a multi-PR cut-over, the final PR deletes it while
+   earlier PRs record progress in the entry (the deletion rule is the `write-debt` standard). Then push
+   and open one PR covering the whole bundle following the `open-pr` standard, with a body section per
    item. Do not set an E2E label while opening the PR; the merge procedure's tier selection normalizes it
    mechanically at merge time.
 
@@ -86,7 +90,7 @@ the item(s) you picked before starting, and flag anything irreversible.
 ## Bounded dispatch, and the state that outlives a stage
 
 The Step 2 survey and Step 3 investigation may use independent read-only Workflow v2 roles —
-`evidence-explorer` over the selected debt items and surrounding code, `test-impact-analyst` for the
+`evidence-explorer` over the `TECH_DEBT.md` set and the surrounding code, `test-impact-analyst` for the
 affected projects and their commands — through the semantic envelopes in `.agents/workflows/contract/v2`, or
 the packaged `../../workflows/contract/v2` bundle. Picking, bundling, the split call, and the fix stay with
 the parent. A bundled item whose transformation is disjoint from every other may go to a `mechanical-worker`
@@ -97,12 +101,3 @@ Each delivery slice keeps its branch, selected checkout, commits and PR through 
 work needs multiple PRs, resolve and validate Workflow v2 repository state, promote it through
 `engineering:plans`, and checkpoint under `engineering:plan-checkpoint`. Deliver the remaining slices
 under `engineering:git-branching`, resuming from the entry and ledger rather than this session.
-
-## Example
-
-```text
-The selected provider lists debt WI-320, "remove the duplicate parser branch", as the first unblocked
-high-value item in api/. It has no branch or worktree owner. Select its api checkout, repair the duplicate
-branch, run the parser unit tests, commit the focused change, and update WI-320 with the test evidence
-before closing it through the provider.
-```

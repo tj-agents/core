@@ -2,9 +2,8 @@
   "schema_version": 1,
   "plugins": {
     "base": [],
-    "engineering": ["base", "work-items"],
+    "engineering": ["base"],
     "machine": ["base"],
-    "work-items": ["base"],
     "cpp": [],
     "gpp": ["cpp"],
     "msvc": ["cpp"],

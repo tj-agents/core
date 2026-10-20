@@ -18,28 +18,6 @@ class RecordError(ValueError):
     pass
 
 
-def primary_checkout(directory):
-    try:
-        root = subprocess.run(
-            ["git", "-C", str(directory), "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, encoding="utf-8", timeout=5, check=False,
-        )
-        if root.returncode:
-            raise RecordError("source repository root could not be resolved")
-        worktree = Path(root.stdout.strip()).resolve()
-        listed = subprocess.run(
-            ["git", "-C", str(worktree), "worktree", "list", "--porcelain", "-z"],
-            capture_output=True, text=True, encoding="utf-8", timeout=5, check=False,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
-        raise RecordError("source primary checkout could not be resolved") from error
-    entries = [Path(field[9:]).resolve() for field in listed.stdout.split("\0")
-               if field.startswith("worktree ") and field[9:]]
-    if listed.returncode or not entries or worktree not in entries or not entries[0].is_dir():
-        raise RecordError("source primary checkout could not be resolved")
-    return entries[0]
-
-
 def declaration(root):
     path = Path(root) / CONFIG
     if path.is_symlink():
