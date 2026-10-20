@@ -91,9 +91,10 @@ says which entry points do which, and what generation checks.
 
 ## A skill folder holds only what ships
 
-Generation copies every file beside a canonical `SKILL.md` into each package that contains the skill.
-Keep plans, reviews, working notes and debt records out of a skill folder. Record a skill's debt through
-`work-items:write-debt`; its unselected file destination stays outside every skill folder.
+Generation copies every file beside a canonical `SKILL.md` into each package that contains the skill. Keep
+plans, reviews, working notes and debt records out of a skill folder. Record a skill's debt under [the
+shared recording contract](../../resources/problem-records.md); an unselected repository's register stays
+outside every skill folder.
 
 ## Replace names cleanly
 
