@@ -512,7 +512,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:179c74796e118021eb79c6967f1333db6dfcdc6a6b5222bd502939aaf58ae76c",
+      "digest": "sha256:2809faa12dfa084a960523ed68b8011dbb7d2bb170000ad7e308ca091633490a",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
