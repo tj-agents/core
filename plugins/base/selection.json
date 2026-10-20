@@ -4,6 +4,7 @@
     "behavior"
   ],
   "prerequisites": [],
+  "external_prerequisites": [],
   "skills": [
     "agent-files",
     "cd",

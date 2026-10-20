@@ -229,45 +229,21 @@ git -C <primary-checkout> checkout <default>
 git -C <primary-checkout> pull --ff-only origin <default>
 ```
 
-When this session is running inside the merged linked worktree, leave that worktree in place and say so in
-the report; `engineering:prune-worktrees` removes it later. Otherwise remove the merged target now:
+Then run the worktree sweep for this repository:
 
-Resolve the repository's own worktree command under the primary checkout and prefer it for a
-worktree-developed branch. It refuses every unsafe state and handles the platform details — junctions, long
-paths, Git administration, branch deletion — and the repository's own docs own that list, so trust the
-refusal instead of second-guessing it:
-
-```powershell
-$worktreeHelper = Join-Path <primary-checkout> 'scripts/worktrees.ps1'
-if (Test-Path -LiteralPath $worktreeHelper -PathType Leaf) {
-    & $worktreeHelper close -Worktree <path> -PullRequest <n> [-PlanManaged]
-}
+```text
+python -B <skill-directory>/scripts/worktree_sweep.py --repo <primary-checkout>    # Windows
+python3 -B <skill-directory>/scripts/worktree_sweep.py --repo <primary-checkout>   # Linux/macOS
 ```
 
-Add `-PlanManaged` when a plan owns the work. If that exact primary-checkout helper path is absent, do not
-skip cleanup. Apply the same gates with native Git from the primary checkout:
-
-1. From inside the target worktree run exactly `python -B <skill-directory>/scripts/cleanup_proof.py` on
-   Windows or `python3 -B <skill-directory>/scripts/cleanup_proof.py` on Linux/macOS; from
-   elsewhere add `--worktree <target> --branch <branch> --head <remote-head> --pr <n>`. It refuses the
-   primary checkout, a detached or mismatched target,
-   a PR that is not `MERGED` at exactly that head, a merge commit absent from `origin/<default>` (the
-   squash/rebase-safe containment proof), and a still-open PR for the head. Run from inside a proven
-   merged target, it sets uncommitted leftovers aside under `<state>/merge-cleanup/set-aside/` and cleans
-   the tree; from elsewhere a dirty tree still preserves. `preserve:` stops cleanup.
-2. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
-   `--force`, then delete the local branch with `git -C <primary-checkout> branch -d <branch>`. For a branch
-   developed in the primary checkout, the checkout-and-fast-forward above replaces the removal step; delete
-   the old local branch with the same lowercase `-d` only after it is no longer checked out. Double-quote each
-   path and run each command on its own; when
-   `-d` refuses a squash- or rebase-merged branch, the proof covers exactly this head, so delete it with
-   `git -C <primary-checkout> branch -D <branch>`.
-3. Re-run `git worktree list --porcelain`, the local branch inventory, and primary-checkout status. The
-   target must be absent, the local merged branch must be gone, a primary checkout moved to the default must be
-   current on it, and pre-existing user files must remain. Treat any removal error or residual target path
-   as incomplete cleanup; never replace the failed command with a forced removal or raw recursive deletion.
-
-Report any cleanup you could not complete; never force it.
+It removes each merged linked worktree once `cleanup_proof.py` proves its PR merged at exactly its head
+with the merge commit on `origin/<default>`, archiving any leftovers under `<state>/merge-cleanup/set-aside/`
+first. It keeps a worktree while a registered session still works inside it, while an open PR is based on
+its branch, or when the proof refuses, and prints why. A worktree kept because this session is inside it
+is removed by the machine's hourly job after the session ends. For a branch developed in the primary
+checkout, the checkout-and-fast-forward above replaces removal; delete the old local branch with
+`git -C <primary-checkout> branch -d <branch>`, or `-D` once the proof covers a squash merge. Report what
+the sweep kept and why; never force a removal.
 
 If plan work remains, reconcile and continue an existing successor stack layer, including its base,
 head, review evidence and delivery binding. When no successor exists, start the next branch from the
@@ -324,8 +300,11 @@ merge caused, and a causally linked red one is never left behind. The mechanics:
 - **Close plan-managed delivery from a checkout selected under `engineering:git-branching`.** Before
   deleting the goal, run the fresh completion check above. A missing, invalid, or failing record leaves the
   plan and its owned actions in place. Once
-  publication and sync are terminal, record the final transition, delete the plan and ledger, and tick
-  the owning roadmap item in one docs-only
+  publication and sync are terminal, reconcile the linked selected item through
+  [the shared recording contract](../../resources/problem-records.md) before deleting recovery artifacts.
+  Resolve it only after its own acceptance is verified; a delivered PR alone does not close it. Record
+  the final transition, delete the plan and ledger, and update the curated roadmap summary from the
+  selected item's state, or tick the unselected owning roadmap item, in one docs-only
   closeout commit. Review it per `engineering:docs-review` — skipped for a pure close-out — and
   land it through `engineering:merge-docs`.
 

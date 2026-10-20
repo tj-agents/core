@@ -13,6 +13,11 @@ This public name owns only the special selection stage before
 
 ## Resolve one item
 
+Read [the shared recording contract](../../resources/problem-records.md). When a provider is selected,
+list/read its candidates scoped to the requested epic and use their canonical identities and live states.
+The curated roadmap supplies design and dependency context; retain its existing graph keys and link the
+selected item rather than creating another live queue.
+
 1. Read the repository instructions, `engineering:plans`, the roadmap,
    and any named preference.
 2. Classify every outstanding item against real ledgers, branches, worktrees, pull requests, dependencies,
@@ -36,3 +41,12 @@ reconciliation remains with `engineering:update-roadmap`.
 
 Return the completed planning outcome or one typed selection/dependency gate. Do not implement directly,
 duplicate an in-flight plan, or stop between selection and authorized plan authoring.
+
+## Example
+
+```text
+The Payments epic has ITEM-17 in flight on PR #88, ITEM-18 blocked on an upstream API, and ITEM-19 ready
+and unowned. When the user asks what to plan next, report the existing owner and blocker, recommend ITEM-19,
+and obtain the product choice. After ITEM-19 is selected, enter `plan-authoring` with its Work Items identity
+and roadmap evidence; do not begin implementation.
+```

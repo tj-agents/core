@@ -41,6 +41,11 @@ Promotion changes persistence, not the requested outcome.
 
 ## Execute the lifecycle
 
+Read [the shared recording contract](../../resources/problem-records.md). When a provider is selected,
+reconcile the canonical item through `work-items:write-feature` or `work-items:write-task`, preserving
+its requirements and acceptance criteria. Update its progress and verified acceptance through that
+contract before reporting it resolved; a delivered PR alone does not close the item.
+
 1. Discover repository ownership, applicable standards, analogous implementations, dependencies, and test
    impact. Parallelize only independent bounded reads.
 2. Keep requirement interpretation, architecture, public contracts, data/security/migration implications,
@@ -82,3 +87,11 @@ Return one completed repository outcome naming the implemented behavior, validat
 delivery state; a commit is not terminal while authorized delivery remains. Otherwise return one typed human
 gate with its owner, required action, evidence, and observable resume condition. Do not expose internal agent
 transcripts, model choices, routine continuation prompts, or a phase boundary as a stopping condition.
+
+## Example
+
+```text
+Work Items feature WI-605 requires CSV export to include the account owner column. An analogous JSON export
+already defines that column, so add the matching CSV mapping and a focused export test. After the test and
+review pass, update WI-605 with the verified acceptance evidence; an open PR alone does not resolve it.
+```

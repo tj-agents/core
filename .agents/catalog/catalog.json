@@ -161,16 +161,6 @@
         ],
         "optional": []
       },
-      "external_dependencies": {
-        "required": [
-          {
-            "id": "work-items-agents/work-items",
-            "marketplace": "work-items-agents",
-            "repository": "tj-agents/work-items"
-          }
-        ],
-        "optional": []
-      },
       "external_prerequisites": {
         "required": [
           "exe:git",
@@ -182,7 +172,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:02829237f98126cd254c71edd5162e6f80bdb97ca76142bd736e240b90bd631d",
+      "digest": "sha256:acd5aade173bacad0770ce638bacb4b5ff26f76eecb96bcd9d8be562c6055912",
       "harness": {
         "marketplaces": [
           {
@@ -240,7 +230,15 @@
             "Bash(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
             "PowerShell(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)"
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)"
           ],
           "codex_prefix_rules": [
             {
@@ -385,6 +383,42 @@
                   "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/other.py"
                 ]
               ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py",
+                  "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
+                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/worktree_sweep.py"
+                ],
+                "--repo"
+              ],
+              "justification": "engineering:merge Step 5 removes proven-merged worktrees for one repository; it never forces, keeps worktrees in use, and archives leftovers first",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
+                  "--repo",
+                  "C:/repo"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/skills/merge/scripts/other.py",
+                  "--repo",
+                  "C:/repo"
+                ]
+              ]
             }
           ],
           "auto_merge": {
@@ -428,6 +462,16 @@
             ]
           }
         }
+      },
+      "external_dependencies": {
+        "required": [
+          {
+            "id": "work-items-agents/work-items",
+            "marketplace": "work-items-agents",
+            "repository": "tj-agents/work-items"
+          }
+        ],
+        "optional": []
       }
     },
     {
@@ -481,7 +525,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:597d62538853a26c24c47575a163eeddf4ce33b69c2addcb9eb81afedbf18f25",
+      "digest": "sha256:e9fc9921e36b7d28346c7a23aafc166cf8b1744069f8556667fa813b2e7df968",
       "digest_excludes": [
         "catalog/catalog.json"
       ],

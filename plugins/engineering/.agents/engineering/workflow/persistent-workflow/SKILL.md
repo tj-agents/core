@@ -15,6 +15,11 @@ action. The runtime refreshes every recorded PR and rejects a complete receipt u
 recorded, merged at its full head, has no unchecked tasks, and the outcome evidence is present. A rejection
 keeps the current owner and leaves the returned actions open.
 
+Before retiring recovery artifacts, reconcile and update any linked selected item through
+[the shared recording contract](../../resources/problem-records.md). Resolve it only after its own
+acceptance is verified; the PR completion check alone does not close it. Preserve unresolved item
+ownership and next action.
+
 Run the same read-only check before a foreground terminal report:
 
 Run the Python helpers with `python` on Windows or `python3` on Linux/macOS:

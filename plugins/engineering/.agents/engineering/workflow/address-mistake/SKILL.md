@@ -12,8 +12,8 @@ Read [the shared problem-record contract](../../resources/problem-records.md). T
 incident's history while returning the correction to its existing owner; it does not create another repair
 engine.
 
-1. Read the shared contract's explicit provider selection and use its read/list/update/close commands
-   when selected. Without selection, use the declared register. Reconcile the named incident, or select one actionable high-value record quickly. Do not deep-rank
+1. Use the selected Work Items provider's read/list/update/close commands. Reconcile the named incident,
+   or select one actionable high-value record quickly. Do not deep-rank
    every record. Prefer an unblocked `P0` or `P1`, then the first useful `P2` or `P3`; priority does not
    pause unrelated work except for `engineering:self-repair`'s shared agent-lifecycle exception.
 2. Reconcile the existing goal, session, branch, PR, or writer before writing or dispatching. If a repair
@@ -34,3 +34,12 @@ engine.
 
 Answer a user's direct question before entering this workflow. Recording or selecting an incident does
 not grant repair or publication authority beyond the active task.
+
+## Example
+
+```text
+Mistake WI-412 records that a release checklist omitted a migration verification step. The linked plan
+already owns the checklist correction. Append the observed evidence to WI-412 and link that plan rather
+than starting another repair. Once the plan's verification proves the new checklist step works, record the
+evidence and resolve WI-412 while retaining its incident history.
+```

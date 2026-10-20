@@ -7,6 +7,13 @@
     "base",
     "machine"
   ],
+  "external_prerequisites": [
+    {
+      "id": "work-items-agents/work-items",
+      "marketplace": "work-items-agents",
+      "repository": "tj-agents/work-items"
+    }
+  ],
   "skills": [
     "address-bug",
     "address-debt",
@@ -66,9 +73,6 @@
     "sync-checkout",
     "unmerged",
     "update-roadmap",
-    "worktree",
-    "write-bug",
-    "write-debt",
-    "write-mistake"
+    "worktree"
   ]
 }
