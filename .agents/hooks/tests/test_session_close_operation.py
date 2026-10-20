@@ -176,6 +176,45 @@ class WatcherTests(unittest.TestCase):
             watcher.close_session(self.args, 1005)
         reopen.assert_called_once_with(entry, 'closed')
 
+    def test_unconfirmed_host_exit_is_refused_reopened_and_never_swept(self):
+        entry = {'host': 'claude', 'session_id': 'own', 'pid': 123, 'pid_started_at': 100.5}
+        with mock.patch.object(watcher, 'wait_for_idle', return_value=1005), \
+                mock.patch.object(watcher, 'registered_entry', return_value=entry), \
+                mock.patch.object(watcher.session_close, 'awaiting_input_activity'), \
+                mock.patch.object(watcher.session_close, 'qualified_windows_wrapper', return_value=None), \
+                mock.patch.object(watcher.session_close, '_record_own_end'), \
+                mock.patch.object(watcher.session_close, '_reopen_own_end') as reopen, \
+                mock.patch.object(watcher.close, 'close_host'), \
+                mock.patch.object(watcher.session_close, 'verified_exited', return_value=False), \
+                mock.patch.object(watcher, 'EXIT_WAIT_SECONDS', 0), \
+                mock.patch.object(watcher, 'sweep') as sweep:
+            self.assertEqual(2, watcher.main(['--host', 'claude', '--session-id', 'own', '--pid', '123',
+                                              '--pid-started-at', '100.5', '--armed-at', '1000']))
+        reopen.assert_called_once_with(entry, 'closed')
+        sweep.assert_not_called()
+        self.assertIn('host exit was not confirmed',
+                      watcher.session_close.read_json(watcher.outcome_path('own'))['status'])
+
+    def test_tab_refusal_reaches_the_receipt_without_signalling_or_sweeping(self):
+        entry = {'host': 'claude', 'session_id': 'own', 'pid': 123, 'pid_started_at': 100.5}
+        with mock.patch.object(watcher, 'wait_for_idle', return_value=1005), \
+                mock.patch.object(watcher, 'registered_entry', return_value=entry), \
+                mock.patch.object(watcher.session_close, 'awaiting_input_activity'), \
+                mock.patch.object(watcher.session_close, 'qualified_windows_wrapper', return_value=None), \
+                mock.patch.object(watcher.session_close, '_record_own_end'), \
+                mock.patch.object(watcher.session_close, '_reopen_own_end') as reopen, \
+                mock.patch.object(watcher.close.close_tab, 'close_entry',
+                                  side_effect=watcher.close.close_tab.TerminalRefusal('tab ambiguous')), \
+                mock.patch.object(watcher.close.os, 'kill') as killer, \
+                mock.patch.object(watcher, 'sweep') as sweep:
+            self.assertEqual(2, watcher.main(['--host', 'claude', '--session-id', 'own', '--pid', '123',
+                                              '--pid-started-at', '100.5', '--armed-at', '1000']))
+        reopen.assert_called_once_with(entry, 'closed')
+        killer.assert_not_called()
+        sweep.assert_not_called()
+        self.assertEqual('refused: tab ambiguous',
+                         watcher.session_close.read_json(watcher.outcome_path('own'))['status'])
+
 
 if __name__ == '__main__':
     unittest.main()
