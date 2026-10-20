@@ -23,6 +23,7 @@ CLI_TIMEOUT_SECONDS = 300
 SWEEP_TIMEOUT_SECONDS = 1800
 LOCK_STALE_SECONDS = 3600
 SCRIPT_NAME = "plugin_autoupdate.py"
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
 def state_directory() -> Path:
@@ -82,7 +83,8 @@ def remote_revision(source: str, ref: object = None) -> str | None:
     reference = ref if isinstance(ref, str) and ref else "HEAD"
     try:
         result = subprocess.run(["git", "ls-remote", source, reference], capture_output=True, text=True,
-                                encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT_SECONDS, check=False)
+                                encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT_SECONDS, check=False,
+                                creationflags=NO_WINDOW)
     except (OSError, subprocess.TimeoutExpired):
         return None
     if result.returncode:
@@ -97,7 +99,8 @@ def remote_revision(source: str, ref: object = None) -> str | None:
 def run_cli(command: list[str]) -> bool:
     try:
         result = subprocess.run(command, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                                encoding="utf-8", errors="replace", timeout=CLI_TIMEOUT_SECONDS, check=False)
+                                encoding="utf-8", errors="replace", timeout=CLI_TIMEOUT_SECONDS, check=False,
+                                creationflags=NO_WINDOW)
     except (OSError, subprocess.TimeoutExpired):
         return False
     return result.returncode == 0
@@ -164,6 +167,12 @@ def newest_existing(paths: list[Path]) -> Path | None:
     return max(existing, key=lambda path: path.stat().st_mtime) if existing else None
 
 
+def console_python() -> str:
+    executable = Path(sys.executable)
+    console = executable.with_name("python.exe")
+    return str(console) if executable.name.lower() == "pythonw.exe" and console.is_file() else sys.executable
+
+
 def sweep_script(codex_config: dict) -> Path | None:
     relative = Path(".agents", "engineering", "workflow", "merge", "scripts", "worktree_sweep.py")
     return newest_existing([root / relative for root in installed_plugin_roots("engineering", claude_home(),
@@ -175,9 +184,9 @@ def sweep_worktrees(codex_config: dict) -> str:
     if script is None:
         return "engineering package not installed"
     try:
-        result = subprocess.run([sys.executable, "-B", str(script)], stdin=subprocess.DEVNULL, capture_output=True,
-                                text=True, encoding="utf-8", errors="replace", timeout=SWEEP_TIMEOUT_SECONDS,
-                                check=False)
+        result = subprocess.run([console_python(), "-B", str(script)], stdin=subprocess.DEVNULL,
+                                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                                timeout=SWEEP_TIMEOUT_SECONDS, check=False, creationflags=NO_WINDOW)
     except (OSError, subprocess.TimeoutExpired) as error:
         return f"failed: {error}"
     return "ran" if result.returncode == 0 else f"failed with exit code {result.returncode}"
