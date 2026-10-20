@@ -59,6 +59,19 @@ def validate_requires(root: Path, config: dict, catalog: dict, plugin: str, requ
         marketplace = catalog_marketplaces.setdefault(package["marketplace"], package)
         if marketplace["owner_repository"] != package["owner_repository"] or marketplace["source"] != package["source"]:
             raise ValueError(f"Catalog marketplace has inconsistent ownership: {package['marketplace']}")
+        for dependency in package.get("external_dependencies", {}).get("required", []):
+            marketplace = catalog_marketplaces.setdefault(
+                dependency["marketplace"],
+                {
+                    "owner_repository": dependency["repository"],
+                    "source": f"https://github.com/{dependency['repository']}.git",
+                },
+            )
+            if (
+                marketplace["owner_repository"] != dependency["repository"]
+                or marketplace["source"] != f"https://github.com/{dependency['repository']}.git"
+            ):
+                raise ValueError(f"Catalog marketplace has inconsistent ownership: {dependency['marketplace']}")
     for marketplace in required_marketplaces:
         if set(marketplace) != {"id", "repository"}:
             raise ValueError(f"{plugin}: invalid marketplace declaration")

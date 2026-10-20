@@ -42,8 +42,8 @@ unblocked, then age. A dependency is reconsidered on a supported foreground acti
 continuation after its observed fingerprint changes; no record or skill creates a scheduler or dispatches
 work by itself.
 
-When work cannot run, use `engineering:write-bug`, `engineering:write-mistake`, or
-`engineering:write-debt` to update its canonical record with its resolver and resume condition.
+When work cannot run, use `work-items:write-bug`, `work-items:write-mistake`, or
+`work-items:write-debt` to update its canonical record with its resolver and resume condition.
 
 ## Full context transfer
 

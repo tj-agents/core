@@ -80,7 +80,7 @@ says which entry points do which, and what generation checks.
 
 Generation copies every file beside a canonical `SKILL.md` into each package that contains the skill.
 Keep plans, reviews, working notes and debt records out of a skill folder. Record a skill's debt through
-`engineering:write-debt`; its unselected file destination stays outside every skill folder.
+`work-items:write-debt`; its unselected file destination stays outside every skill folder.
 
 ## Replace names cleanly
 

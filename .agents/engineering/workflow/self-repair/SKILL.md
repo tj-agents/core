@@ -30,7 +30,7 @@ launches; repair and preservation actions may continue.
 2. Respect explicit user limits. Do not create a repair for an explicitly rejected change, and do not
    silently widen the repair into product work, profile installation, destructive cleanup, or unrelated
    standards redesign.
-3. Select `engineering:write-bug`, `engineering:write-mistake`, or `engineering:write-debt` for the
+3. Select `work-items:write-bug`, `work-items:write-mistake`, or `work-items:write-debt` for the
    observed problem and update its canonical record. If the same source repair has a live canonical owner,
    reconcile that owner and contribute the new evidence without creating a duplicate writer.
 

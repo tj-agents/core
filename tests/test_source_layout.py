@@ -56,7 +56,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(88, len(skills))
+        self.assertEqual(82, len(skills))
         self.assertEqual("machine", skills["hook-control"]["plugin"])
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
@@ -85,11 +85,9 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertIn("plugins/base/.agents/base/policy/goal-continuation/SKILL.md", output)
         self.assertIn("plugins/base/.agents/base/policy/idea-initialization/SKILL.md", output)
 
-    def test_problem_record_skills_and_shared_contract_ship_for_both_hosts(self):
+    def test_problem_record_consumers_and_shared_contract_ship_for_both_hosts(self):
         _, output, skills, _ = SYNC.build(self.root)
         canonical = {
-            "write-bug": "convention/write-bug",
-            "write-mistake": "convention/write-mistake",
             "address-bug": "workflow/address-bug",
             "address-mistake": "workflow/address-mistake",
         }
@@ -107,6 +105,26 @@ class SourceLayoutTests(unittest.TestCase):
                 self.assertIn(f"]({link})", canonical_body)
                 resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
                 self.assertEqual(resource, resolved)
+
+    def test_engineering_declares_the_work_items_provider(self):
+        _, output, _, _ = SYNC.build(self.root)
+        catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
+        engineering = next(package for package in catalog["packages"] if package["id"] == "base-agents/engineering")
+        dependency = {
+            "id": "work-items-agents/work-items",
+            "marketplace": "work-items-agents",
+            "repository": "tj-agents/work-items",
+        }
+        self.assertIn(dependency["id"], engineering["dependencies"]["required"])
+        self.assertEqual([dependency], engineering["external_dependencies"]["required"])
+        harness = json.loads(output["plugins/engineering/harness.json"].decode("utf-8"))
+        self.assertIn(
+            {"id": dependency["marketplace"], "repository": dependency["repository"]},
+            harness["requires"]["marketplaces"],
+        )
+        self.assertIn(dependency["id"], harness["requires"]["plugins"])
+        selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
+        self.assertEqual([dependency], selection["external_prerequisites"])
 
     def test_task_recovery_contract_ships_for_both_hosts(self):
         _, output, skills, _ = SYNC.build(self.root)

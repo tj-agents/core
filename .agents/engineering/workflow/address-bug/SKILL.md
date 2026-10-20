@@ -12,8 +12,8 @@ Read [the shared problem-record contract](../../resources/problem-records.md). T
 tracks repair; it does not replace `engineering:bugfix`, `engineering:failing-tests`, or an existing plan
 owner.
 
-1. Read the shared contract's explicit provider selection and use its read/list/update/close commands
-   when selected. Without selection, use the declared register. Reconcile the named record, or select one actionable high-value record quickly. Do not deep-rank every
+1. Use the selected Work Items provider's read/list/update/close commands. Reconcile the named record,
+   or select one actionable high-value record quickly. Do not deep-rank every
    record. Prefer an unblocked `P0` or `P1`, then the first useful `P2` or `P3`; priority does not pause
    unrelated work except for `engineering:self-repair`'s shared agent-lifecycle exception.
 2. Reconcile an existing goal, session, branch, PR, or writer before writing or dispatching. If another

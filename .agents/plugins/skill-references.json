@@ -1,0 +1,10 @@
+{
+  "external_skills": {
+    "work-items:write-issue": "Work Items owns classification and recording of untyped requests.",
+    "work-items:write-bug": "Work Items owns canonical bug records.",
+    "work-items:write-mistake": "Work Items owns canonical mistake records.",
+    "work-items:write-debt": "Work Items owns canonical debt records.",
+    "work-items:write-feature": "Work Items owns canonical feature records.",
+    "work-items:write-task": "Work Items owns canonical task records."
+  }
+}
