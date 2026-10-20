@@ -366,7 +366,7 @@ class SessionDetectionTests(unittest.TestCase):
         machine = Machine(self)
         codex = str(machine.home)
         claude = str(machine.root / 'claude')
-        self.sessions(machine, [(codex, 10, 5.0), (claude, 11, None), (codex.upper(), 12, None)])
+        self.sessions(machine, [(codex, 10, 5.0), (claude, 11, None), (codex.upper() if os.name == 'nt' else codex, 12, None)])
 
         self.assertTrue(UPDATE.codex_session_running(alive=lambda pid: pid == 12))
         self.assertFalse(UPDATE.codex_session_running(alive=lambda pid: pid in (10, 11)))
