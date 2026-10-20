@@ -13,8 +13,8 @@ names a session, topic or directory; use this skill only to reopen an exact id y
 
 Search first, then reopen only the chosen exact native id. Verify its recorded cwd and profile before opening;
 use `machine:search-codex` against the selected profile when that evidence needs reconciliation. The launcher
-verifies native resume support, preserves the recorded cwd, refreshes supported Codex startup standards and
-uses the native executable directly.
+verifies native resume support, preserves the recorded cwd and uses the native executable directly without
+refreshing plugins.
 Run the helper with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh

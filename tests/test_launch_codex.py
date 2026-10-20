@@ -1,5 +1,5 @@
 """launch_codex.py: option validation, argument assembly and real lane resolution, with
-resolve_codex_executable/sync_codex_standards/launch_tab stubbed but everything else (the directory
+resolve_codex_executable/launch_tab stubbed but everything else (the directory
 check, the prompt file check, resolve_lane_model and the precedence rules) left real."""
 import contextlib
 import importlib.util
@@ -10,7 +10,6 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-import types
 import unittest
 from unittest import mock
 
@@ -29,19 +28,6 @@ sys.modules[SPEC.name] = LAUNCH_CODEX
 SPEC.loader.exec_module(LAUNCH_CODEX)
 
 
-def fake_sync_module():
-    """A stand-in for codex_marketplace_sync.py: a SyncError type and a sync_codex_standards Mock, so no
-    test here ever runs a real marketplace, plugin or hook-trust call."""
-    module = types.SimpleNamespace()
-
-    class SyncError(Exception):
-        pass
-
-    module.SyncError = SyncError
-    module.sync_codex_standards = mock.Mock()
-    return module
-
-
 class LaunchCodexTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix='launch codex ')
@@ -54,15 +40,9 @@ class LaunchCodexTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-        self.sync = fake_sync_module()
-        sync_patcher = mock.patch.object(LAUNCH_CODEX, '_load_codex_marketplace_sync', return_value=self.sync)
-        sync_patcher.start()
-        self.addCleanup(sync_patcher.stop)
-
         # For the call-order assertion: attached to the same mocks the fixtures installed.
         self.call_order = mock.Mock()
         self.call_order.attach_mock(self.agent_cli.resolve_codex_executable, 'resolve_codex_executable')
-        self.call_order.attach_mock(self.sync.sync_codex_standards, 'sync_codex_standards')
         self.call_order.attach_mock(self.agent_cli.launch_tab, 'launch_tab')
 
     def run_main(self, *args):
@@ -133,7 +113,6 @@ class LaunchCodexTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn('--lane L7 is for in-session clerical work and cannot open a handoff', err)
         self.agent_cli.launch_tab.assert_not_called()
-        self.sync.sync_codex_standards.assert_not_called()
 
     def test_lane_l7_is_rejected_even_with_an_explicit_model(self):
         # The lane itself is what a handoff can never open, not merely the model it would have paired
@@ -259,7 +238,7 @@ class LaunchCodexTests(unittest.TestCase):
         self.assertEqual(arguments[arguments.index('--config') + 1], 'model_reasoning_effort=xhigh')
         self.assertNotIn(CODEX_LANES['lanes']['L4']['model'], arguments)
 
-    # --- forced environment, sync-before-launch ---
+    # --- forced environment, launch order ---
 
     def test_term_is_cleared_not_forced(self):
         self.run_main()
@@ -280,14 +259,6 @@ class LaunchCodexTests(unittest.TestCase):
         if sys.platform == 'win32':
             self.assertEqual(arguments.pop(0), '--no-daemon')
         self.assertEqual(arguments[:2], ['--cd', os.path.abspath(self.directory)])
-
-    def test_parent_does_not_run_legacy_sync_before_opening_bound_session(self):
-        self.sync.sync_codex_standards.side_effect = self.sync.SyncError('marketplace upgrade failed')
-        code, out, err = self.run_main()
-        self.assertEqual((code, err), (0, ''))
-        self.sync.sync_codex_standards.assert_not_called()
-        self.agent_cli.launch_tab.assert_called_once()
-        self.assertIn('Launched', out)
 
     def test_minimum_version_is_threaded_to_executable_resolution(self):
         self.run_main('--minimum-version', '0.160.0')
@@ -342,7 +313,6 @@ class LaunchCodexTests(unittest.TestCase):
         self.assertIn('no native codex found', err)
         self.assertEqual(out, '')
         self.agent_cli.launch_tab.assert_not_called()
-        self.sync.sync_codex_standards.assert_not_called()
 
     # --- a LaunchTimeout is distinct from a definite failure ---
 
@@ -374,8 +344,8 @@ class LaunchCodexTests(unittest.TestCase):
 
 
 class LaunchCodexEndToEndTests(unittest.TestCase):
-    """main() through the REAL agent_cli.launch_tab (H7-equivalent) -- only resolve_codex_executable and
-    the standards sync are mocked. Exercises the real tmux handler, the real environment scrub and the
+    """main() through the REAL agent_cli.launch_tab (H7-equivalent) -- only resolve_codex_executable is
+    mocked. Exercises the real tmux handler, the real environment scrub and the
     real argument assembly, with only `subprocess.run` faked."""
 
     def setUp(self):
@@ -400,11 +370,6 @@ class LaunchCodexEndToEndTests(unittest.TestCase):
         load_patcher = mock.patch.object(LAUNCH_CODEX, '_load_agent_cli', return_value=self.agent_cli)
         load_patcher.start()
         self.addCleanup(load_patcher.stop)
-
-        self.sync = fake_sync_module()
-        sync_patcher = mock.patch.object(LAUNCH_CODEX, '_load_codex_marketplace_sync', return_value=self.sync)
-        sync_patcher.start()
-        self.addCleanup(sync_patcher.stop)
 
         # Only TMUX is set, so the real detection order picks the tmux handler and nothing else.
         environ_patcher = mock.patch.dict(os.environ, {'TMUX': 'session'}, clear=True)
@@ -463,12 +428,11 @@ class LaunchCodexEndToEndTests(unittest.TestCase):
 
 
 class InstalledLayoutTests(unittest.TestCase):
-    """Every layout the package ships launch_codex.py in must find the shared agent_cli.py and
-    codex_marketplace_sync.py beside it."""
+    """Every layout the package ships launch_codex.py in must find the shared agent_cli.py."""
 
     LAYOUTS = ('.agents/machine/utility', 'codex-skills', 'skills')
 
-    def test_the_authored_and_every_packaged_copy_loads_agent_cli_and_the_sync_script(self):
+    def test_the_authored_and_every_packaged_copy_loads_agent_cli(self):
         copies = [SCRIPT] + [ROOT / 'plugins/machine' / layout / 'handoff-codex/scripts/launch_codex.py'
                              for layout in self.LAYOUTS]
         for copy in copies:
@@ -479,7 +443,6 @@ class InstalledLayoutTests(unittest.TestCase):
                 spec.loader.exec_module(module)
                 agent_cli = module._load_agent_cli()
                 self.assertTrue(callable(agent_cli.launch_tab))
-                self.assertTrue(callable(module._load_codex_marketplace_sync(agent_cli).sync_codex_standards))
 
 
 if __name__ == '__main__':
