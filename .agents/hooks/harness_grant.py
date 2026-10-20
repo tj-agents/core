@@ -1,7 +1,7 @@
 r"""PreToolUse hook: approve the harness's own base sync and merged-branch cleanup.
 
 Approves exactly the commands the merge procedures prescribe, and only in a repository whose
-origin is a trusted GitHub owner (`harness-trust.json` beside this file):
+origin is a trusted GitHub owner (`repo-owners.json` beside this file):
 
 - `git -C "<checkout>" merge --no-edit origin/<default>` from a branch other than the default;
 - `git -C "<checkout>" worktree remove -- "<worktree>"` for a linked worktree whose head is
