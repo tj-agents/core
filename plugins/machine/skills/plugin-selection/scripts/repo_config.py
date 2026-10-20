@@ -22,6 +22,48 @@ MANAGED_START = "# BEGIN repo-declared agent capabilities"
 MANAGED_END = "# END repo-declared agent capabilities"
 TABLE = re.compile(r"^\s*\[\s*(marketplaces|plugins)(?:\.|\])")
 HEADER = re.compile(r"^\s*\[")
+OWNERS_FILE = "repo-owners.json"
+GITHUB_OWNER = re.compile(r"github\.com[:/]+([^/]+)/", re.IGNORECASE)
+
+
+def repo_owners() -> frozenset[str]:
+    for parent in Path(__file__).resolve().parents:
+        for candidate in (parent / "hooks" / OWNERS_FILE, parent / ".agents" / "hooks" / OWNERS_FILE):
+            if candidate.is_file():
+                owners = lock_io.load_json(candidate).get("owners", [])
+                return frozenset(owner.casefold() for owner in owners if isinstance(owner, str) and owner)
+    return frozenset()
+
+
+def remote_owners(root: Path, run=subprocess.run) -> set[str]:
+    owners = set()
+    for name in lock_io.git(run, ["remote"], root).split():
+        for url in lock_io.git(run, ["remote", "get-url", "--all", name], root).splitlines():
+            match = GITHUB_OWNER.search(url)
+            owners.add(match.group(1).casefold() if match else url)
+    return owners
+
+
+def owned(root: Path, run=subprocess.run) -> bool:
+    if not (root / ".git").exists():
+        return False
+    owners = remote_owners(root, run)
+    return bool(owners) and not owners - repo_owners()
+
+
+def resolve_scope(root: Path, scope: str | None, run=subprocess.run) -> str:
+    if scope not in {None, "project", "local"}:
+        raise lock_io.LockError(f"Unknown repository scope: {scope}")
+    if not (root / ".git").exists():
+        return scope or "project"
+    foreign = sorted(remote_owners(root, run) - repo_owners())
+    if not foreign:
+        return scope or "project"
+    if scope == "project":
+        raise lock_io.LockError(
+            f"{root} belongs to {', '.join(foreign)}: agent settings there are local and git-excluded only; use --scope local"
+        )
+    return "local"
 
 
 def declarations(lock_path: Path, lock: dict) -> tuple[dict[str, dict], dict[str, bool], list[str], list[dict]]:
@@ -332,15 +374,14 @@ def plan(
     lock_path: Path,
     *,
     root: Path | None = None,
-    scope: str = "project",
+    scope: str | None = None,
     prospective_paths: list[Path] = (),
     lock_document: dict | None = None,
     read_paths: list[Path] = (),
     execute=subprocess.run,
 ) -> dict[Path, str | None]:
-    if scope not in {"project", "local"}:
-        raise lock_io.LockError(f"Unknown repository scope: {scope}")
     root = (root or lock_path.resolve().parent.parent).expanduser().resolve()
+    scope = resolve_scope(root, scope, execute)
     claude = root / ".claude" / ("settings.local.json" if scope == "local" else "settings.json")
     codex = root / ".codex/config.toml"
     rules_path = root / ".codex/rules/agent-harness.rules"
@@ -363,7 +404,8 @@ def plan(
         updated = {"schema_version": 1, "claude": claude_owned, "codex": codex_owned, "rules": expected_rules}
         targets = {claude: claude_text, codex: codex_text, rules_path: expected_rules, state_path: json.dumps(updated, indent=2, ensure_ascii=False) + "\n"}
         if exclude is not None:
-            targets[exclude] = exclusion_text(exclude, root, [*paths, *[contained(root, path) for path in prospective_paths]])
+            selection = [lock_path] if lock_path.resolve().is_relative_to(root) else []
+            targets[exclude] = exclusion_text(exclude, root, [*paths, *[contained(root, path) for path in [*prospective_paths, *selection]]])
     else:
         targets = {claude: claude_settings(claude, sources, identities, allow), codex: codex_settings(codex, sources, identities), rules_path: expected_rules}
         reject_machine_paths(root, targets)
@@ -414,7 +456,7 @@ def write_batch(targets: dict[Path, str | None]) -> None:
         raise
 
 
-def run(lock_path: Path, mode: str, *, root: Path | None = None, scope: str = "project") -> list[str]:
+def run(lock_path: Path, mode: str, *, root: Path | None = None, scope: str | None = None) -> list[str]:
     if mode not in {"write", "check", "preview"}:
         raise lock_io.LockError(f"Unknown repository mode: {mode}")
     root = (root or lock_path.resolve().parent.parent).expanduser().resolve()
@@ -431,7 +473,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lock", type=Path)
     parser.add_argument("--mode", required=True, choices=("write", "check", "preview"))
     parser.add_argument("--root", type=Path)
-    parser.add_argument("--scope", choices=("project", "local"), default="project")
+    parser.add_argument("--scope", choices=("project", "local"))
     args = parser.parse_args(argv)
     try:
         lock = args.lock or plugin_selection.resolve((args.root or Path.cwd()).expanduser().resolve())
