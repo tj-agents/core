@@ -208,6 +208,7 @@ def process_pending(pending, reconciler, state_file):
         repository = pending.get()
         for attempt in range(3):
             try:
+                require_tommy()
                 if repository is None:
                     for failed in reconciler.catch_up(catch_up_states()):
                         pending.put(failed)
@@ -373,10 +374,10 @@ def main(argv=None):
     if lock is None:
         return 0
     try:
-        require_tommy()
         state_file = directory / "machine-events-state.json"
         reconciler = Reconciler(plugins.read_json(state_file))
         if arguments.once:
+            require_tommy()
             failures = []
             if arguments.repo:
                 if not valid_repository(arguments.repo):

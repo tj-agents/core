@@ -204,7 +204,7 @@ No administrative GitHub credential is stored in Actions.
 The listener re-reads GitHub and invokes the installed github-actions plugin's `merge-policy reconcile`
 for committed policy changes as Tommy's saved `gh` account. Install that plugin before setup. It invokes
 `plugin_autoupdate.py` for marketplace changes, and the existing sweep for main-branch changes. It
-catches up once after connection and after an offline gap, coalesces duplicates and retries failures a
+catches up once on startup and after an offline gap, coalesces duplicates and retries failures a
 bounded number of times. There are no periodic GitHub checks. Native process-exit notifications resume
 plugin refreshes deferred while Codex sessions are alive. Nothing runs at CLI startup.
 

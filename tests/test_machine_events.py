@@ -133,6 +133,16 @@ class IdentityTests(unittest.TestCase):
                 child.terminate()
                 child.wait(timeout=5)
 
+    def test_worker_rechecks_saved_identity_before_each_reconciliation(self):
+        pending = mock.Mock()
+        pending.get.side_effect = ["tj-agents/core", KeyboardInterrupt]
+        reconciler = mock.Mock()
+        with mock.patch.object(events, "require_tommy", side_effect=RuntimeError("saved account changed")) as identity, mock.patch.object(events, "repository_state") as read, mock.patch.object(events.time, "sleep"), self.assertLogs(events.LOG, level="ERROR"), self.assertRaises(KeyboardInterrupt):
+            events.process_pending(pending, reconciler, Path("unused-state.json"))
+        self.assertEqual(3, identity.call_count)
+        read.assert_not_called()
+        reconciler.repository.assert_not_called()
+
     def test_listener_lock_has_no_age_expiry_and_releases_with_handle(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "lock"
