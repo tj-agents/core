@@ -21,16 +21,30 @@ class RefreshCliTests(unittest.TestCase):
     def test_default_uses_native_commands_without_verification_or_bound_launch(self):
         with mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude"), \
                 mock.patch.object(REFRESH, "selection", return_value=({"tj-agents": "tj-agents/marketplace"}, ["machine@tj-agents"])), \
-                mock.patch.object(REFRESH, "run") as run, mock.patch.object(REFRESH, "verify") as verify, \
+                mock.patch.object(REFRESH, "run", return_value="[]") as run, mock.patch.object(REFRESH, "verify") as verify, \
                 mock.patch.object(REFRESH, "read_json", return_value={"tj-agents": {}}), \
                 mock.patch("sys.stdout"), mock.patch("sys.stderr"):
             self.assertEqual(0, REFRESH.main(["--host", "claude"]))
         self.assertEqual([call.args[0] for call in run.call_args_list], [
             ["claude", "plugin", "marketplace", "update", "tj-agents"],
+            ["claude", "plugin", "list", "--json"],
             ["claude", "plugin", "install", "machine@tj-agents", "--scope", "project"],
             ["claude", "plugin", "update", "machine@tj-agents", "--scope", "project"],
         ])
         verify.assert_not_called()
+
+    def test_refresh_updates_applicable_claude_local_installations(self):
+        inventory = [{"id": "machine@tj-agents", "scope": "local", "projectPath": str(ROOT)},
+                     {"id": "machine@tj-agents", "scope": "local", "projectPath": str(ROOT / "other")}]
+        with mock.patch.object(REFRESH, "read_json", return_value={}), \
+                mock.patch.object(REFRESH, "run", return_value=json.dumps(inventory)) as run:
+            REFRESH.refresh("claude", "claude", ROOT, {}, ["machine@tj-agents"])
+        self.assertEqual([call.args[0] for call in run.call_args_list], [
+            ["claude", "plugin", "list", "--json"],
+            ["claude", "plugin", "install", "machine@tj-agents", "--scope", "project"],
+            ["claude", "plugin", "update", "machine@tj-agents", "--scope", "local"],
+            ["claude", "plugin", "update", "machine@tj-agents", "--scope", "project"],
+        ])
 
     def test_missing_claude_marketplace_is_registered_before_refresh(self):
         with mock.patch.object(REFRESH, "read_json", return_value={}), \

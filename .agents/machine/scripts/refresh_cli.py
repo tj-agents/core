@@ -86,10 +86,19 @@ def refresh(host: str, executable: str, project: Path, marketplaces: dict, plugi
         if host == "claude" and name not in known:
             run([executable, "plugin", "marketplace", "add", marketplaces[name]], project)
         run([executable, "plugin", "marketplace", "update" if host == "claude" else "upgrade", name], project)
+    installations = (json.loads(run([executable, "plugin", "list", "--json"], project))
+                     if host == "claude" and plugins else [])
     for identity in plugins:
         if host == "claude":
+            scopes = {"project"}
+            for entry in installations:
+                owner = entry.get("projectPath")
+                if (entry.get("id") == identity and entry.get("scope") == "local" and owner
+                        and project.resolve().is_relative_to(Path(owner).resolve())):
+                    scopes.add("local")
             run([executable, "plugin", "install", identity, "--scope", "project"], project)
-            run([executable, "plugin", "update", identity, "--scope", "project"], project)
+            for scope in sorted(scopes):
+                run([executable, "plugin", "update", identity, "--scope", scope], project)
         else:
             run([executable, "plugin", "add", identity], project)
 
