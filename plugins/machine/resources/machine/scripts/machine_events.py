@@ -146,11 +146,10 @@ def refresh_plugins():
 
 
 class Reconciler:
-    def __init__(self, state=None, refresh=None, policy=reconcile_policy, sweep=None):
+    def __init__(self, state=None, refresh=None, policy=reconcile_policy):
         self.state = state if state is not None else {}
         self.refresh = refresh or refresh_plugins
         self.policy = policy
-        self.sweep = sweep or (lambda: plugins.sweep_worktrees(plugins.load_codex_config()))
 
     def repository(self, current, refresh_plugins=True):
         if not current or current.get("isArchived") or current.get("isFork"):
@@ -170,7 +169,6 @@ class Reconciler:
             if self.refresh() != 0:
                 raise RuntimeError("plugin refresh failed")
         self.state[repository] = {"revision": revision, "policy": policy}
-        return True
 
     def catch_up(self, states):
         if self.refresh() != 0:
@@ -182,7 +180,6 @@ class Reconciler:
             except Exception:
                 LOG.exception("Catch-up failed for %s", current.get("nameWithOwner"))
                 failures.append(current["nameWithOwner"])
-        self.sweep()
         return failures
 
 
@@ -218,8 +215,7 @@ def process_pending(pending, reconciler, state_file):
                     for failed in reconciler.catch_up(catch_up_states()):
                         pending.put(failed)
                 else:
-                    if reconciler.repository(repository_state(repository)):
-                        reconciler.sweep()
+                    reconciler.repository(repository_state(repository))
                 plugins.write_json(state_file, reconciler.state)
                 if runtime_digest() != running_bytes:
                     os._exit(75)
