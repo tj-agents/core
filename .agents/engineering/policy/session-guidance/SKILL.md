@@ -70,16 +70,17 @@ continuation preserves its relevant instructions. Read again only for changed in
 
 ## Record noticed problems
 
-When a bug, mistake, or deliberate debt is noticed or reported, record it under the relevant shared
-problem-record convention while the observation is available: `work-items:write-bug`,
-`work-items:write-mistake`, or `work-items:write-debt`. Reconcile an existing record and repair owner
-first; repeated evidence updates that record. Recording stays within the current authorization and grants
-no separate authority to repair, publish, dispatch, or schedule work. Use the addressing workflow only
-when repair is already authorized, and preserve the original task while the record is updated.
+When a bug, mistake, or deliberate debt is noticed or reported, record it while the observation is available
+under [the shared recording contract](../../resources/problem-records.md): `work-items:write-bug`,
+`work-items:write-mistake` or `work-items:write-debt` when selected, otherwise the repository's register.
+Reconcile an existing record and repair owner first; repeated evidence updates that record. Recording stays
+within the current authorization and grants no separate authority to repair, publish, dispatch, or schedule
+work. Use the addressing workflow only when repair is already authorized, and preserve the original task
+while the record is updated.
 
 Recording requests for features or tasks select `work-items:write-feature` or `work-items:write-task`;
 an untyped recording request selects `work-items:write-issue`. These writers share
-[repository selection and persistence](../../resources/problem-records.md).
+[repository selection](../../resources/problem-records.md#repository-selection).
 
 ## Keep large changes reviewable
 
@@ -127,5 +128,5 @@ current task resumes. That workflow owns the repair authorization and delivery p
 limits still hold.
 Before committing or returning a terminal result, check the work against the standards that governed
 it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt
-entry. `work-items:write-debt` defines the selected repository convention. Do not create a second
+entry. The shared recording contract defines that destination. Do not create a second
 ledger for a standalone goal just to satisfy a repository-oriented procedure.

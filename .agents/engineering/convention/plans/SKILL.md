@@ -22,10 +22,10 @@ reference" is rot that misleads the next reader into thinking the work is still 
 
 ## Roadmap → plan → progress
 
-Read [the shared recording contract](../../resources/problem-records.md). In a selected repository, the
-provider owns the live queue and item status. Keep substantive design files and the file graph below,
-including its stable keys, and link the canonical selected item from its plan and ledger. Roadmap status
-summaries follow that item; plans and roadmaps do not create a second live backlog.
+Read [repository selection](../../resources/problem-records.md#repository-selection). In a selected
+repository, the provider owns the live queue and item status. Keep substantive design files and the file
+graph below, including its stable keys, and link the canonical selected item from its plan and ledger.
+Roadmap status summaries follow that item; plans and roadmaps do not create a second live backlog.
 
 - A **roadmap** (`<EPIC>_ROADMAP.md`) is an epic's living tracker: no ledger, never deleted, alive until the
   epic ships. Each of its items spins off its own plan and keeps the tick when that plan is deleted. Each

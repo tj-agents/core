@@ -1,6 +1,6 @@
 ---
 name: address-debt
-description: Take one Work Items debt item all the way to a focused PR in its selected checkout — survey the selected provider, pick one high-value item, fix it, verify resolution under its retention rules, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
+description: Take one tech-debt item all the way to a focused PR in its selected checkout — survey the selected Work Items provider or the unselected repository's debt registers, pick one high-value item, fix it, verify resolution under its retention rules, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
 kind: workflow
 domain: process
 ---

@@ -1,6 +1,6 @@
 # Mistakes
 
-This is core's incident record. Entries describe the observed mistake, its cause where known, and the intended correction. They are proposals for later repair, not additional operating instructions. `engineering:write-mistake` records incidents and `engineering:address-mistake` reconciles an authorized correction while retaining this learning history.
+This is core's incident record. Entries describe the observed mistake, its cause where known, and the intended correction. They are proposals for later repair, not additional operating instructions. New incidents follow [the shared recording contract](.agents/engineering/resources/problem-records.md) and `engineering:address-mistake` reconciles an authorized correction while retaining this learning history.
 
 Each entry has a stable ID and an open or addressed status. Address entries individually and retain the verification evidence when their status changes. Governing behavior remains owned by canonical `.agents/` definitions and the relevant `.codex/` or `.claude/` adapter.
 
