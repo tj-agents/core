@@ -72,8 +72,8 @@ work order, and current watermark. Do not re-litigate a completed pass judgment.
 ## Example
 
 ```text
-The canonical work order has a complete pass at commit a1b2c3d and open finding F-07: request validation
-does not reject an empty account ID. Mark F-07 `[~]`, make and test the focused validation change, commit
-it, append the test evidence, and mark F-07 `[x]`. Then run incremental review from a1b2c3d to the fixing
-commit; the original completed pass judgment remains unchanged.
+Finding F-07 asks for paging beyond 1,000 records, but the provider endpoint has no continuation support
+yet. Mark F-07 `[wontfix]` with that reason and, in the same stroke, record the deferred paging as debt
+under the shared recording contract. Append the debt's identity and exit condition, every record fetched
+and verified in a queue above 1,000, to F-07; do not introduce a separate deferred status.
 ```

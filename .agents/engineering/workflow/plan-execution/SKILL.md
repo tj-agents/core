@@ -217,8 +217,8 @@ transcript or routine continuation prompt.
 ## Example
 
 ```text
-The resolved ledger names phase 2 on branch feature/passkeys-storage and says the next action is to add the
-credential repository. Git confirms the same branch and the only dirty files are the repository files named
-by that phase. Continue the slice, run its focused tests, commit the green candidate, update the ledger at
-the material phase transition, and then start review rather than creating another plan.
+The ledger links Work Items task WI-512 and names phase 2 as next. The provider shows WI-512 open with no
+other owner, so continue phase 2 and add a progress note to WI-512 after its focused tests pass. When the
+final PR merges, verify WI-512's acceptance condition before setting it resolved and deleting the plan;
+the merge alone does not close it.
 ```
