@@ -29,6 +29,11 @@ deciding to create, split, merge, rename or retire a skill, including while plan
 A utility skill must not depend on a manually assembled, machine-local file the plugin does not ship.
 See [`PACKAGING.md`](PACKAGING.md).
 
+For machine setup, event handling or repository adoption, read the
+[refresh and repository boundaries](README.md#refresh-and-repository-boundaries) before changing them.
+Preserve the separation with the [machine event fixtures](tests/test_machine_events.py); repository
+adoption and local exclusions follow [machine:plugin-selection](.agents/machine/utility/plugin-selection/SKILL.md).
+
 This repository owns common agent behavior, selected engineering process and machine utilities.
 `plan-artifacts` supplies maintained plans without requiring an engineering lifecycle. Stack standards,
 product profiles and product-specific enforcement remain with their scope owners. Shared runtime recovery
