@@ -42,8 +42,8 @@ unblocked, then age. A dependency is reconsidered on a supported foreground acti
 continuation after its observed fingerprint changes; no record or skill creates a scheduler or dispatches
 work by itself.
 
-When work cannot run, update its canonical record under [the shared recording
-contract](../../resources/problem-records.md) with its resolver and resume condition.
+When work cannot run, update its canonical record under
+[the shared recording contract](../../resources/problem-records.md) with its resolver and resume condition.
 
 ## Full context transfer
 
