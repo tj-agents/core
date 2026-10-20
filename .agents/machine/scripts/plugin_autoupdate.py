@@ -26,6 +26,10 @@ CLI_TIMEOUT_SECONDS = 300
 SWEEP_TIMEOUT_SECONDS = 1800
 LOCK_STALE_SECONDS = 3600
 SCRIPT_NAME = "plugin_autoupdate.py"
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+PROJECT_CLI_TIMEOUT_SECONDS = 60
+FAILURE_BACKOFF_SECONDS = 24 * 60 * 60
+RETIRED = "retired"
 
 
 def state_directory() -> Path:
@@ -87,7 +91,8 @@ def remote_revision(source: str, ref: object = None) -> str | None:
         return reference.lower()
     try:
         result = subprocess.run(["git", "ls-remote", source, reference], capture_output=True, text=True,
-                                encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT_SECONDS, check=False)
+                                encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT_SECONDS, check=False,
+                                creationflags=NO_WINDOW)
     except (OSError, subprocess.TimeoutExpired):
         return None
     if result.returncode:
@@ -99,12 +104,16 @@ def remote_revision(source: str, ref: object = None) -> str | None:
     return None
 
 
-def run_cli(command: list[str], *, cwd: Path | None = None) -> bool:
+def run_cli(command: list[str], *, cwd: Path | None = None) -> bool | str:
+    timeout = PROJECT_CLI_TIMEOUT_SECONDS if cwd is not None else CLI_TIMEOUT_SECONDS
     try:
         result = subprocess.run(command, cwd=cwd, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                                encoding="utf-8", errors="replace", timeout=CLI_TIMEOUT_SECONDS, check=False)
+                                encoding="utf-8", errors="replace", timeout=timeout, check=False,
+                                creationflags=NO_WINDOW)
     except (OSError, subprocess.TimeoutExpired):
         return False
+    if result.returncode and "was not found in marketplace" in (result.stderr + result.stdout):
+        return RETIRED
     return result.returncode == 0
 
 
@@ -114,20 +123,22 @@ def target_key(name: str, target: dict) -> str:
     return "codex:" + name + ":" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def project_directories(config: dict) -> list[Path]:
+def project_directories(config: dict, temporary: Path | None = None) -> list[Path]:
     projects = config.get("projects", {})
     if not isinstance(projects, dict):
         return []
+    temporary = (temporary or Path(tempfile.gettempdir())).resolve()
     return sorted({Path(path).resolve() for path, settings in projects.items()
                    if isinstance(settings, dict) and settings.get("trust_level") == "trusted"
-                   and (Path(path) / ".codex/config.toml").is_file()})
+                   and (Path(path) / ".codex/config.toml").is_file()
+                   and not Path(path).resolve().is_relative_to(temporary)})
 
 
 def effective_config(executable: str, project: Path) -> dict:
     process = subprocess.Popen([executable, "app-server"], cwd=project, stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                text=True, encoding="utf-8", bufsize=1,
-                               creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+                               creationflags=NO_WINDOW)
     messages = queue.Queue()
 
     def receive():
@@ -178,7 +189,8 @@ def project_targets(executable: str, project: Path) -> dict[str, dict]:
     targets = codex_targets(effective_config(executable, project))
     command = [executable, "plugin", "list", "--available", "--json"]
     options = {"cwd": project, "stdin": subprocess.DEVNULL, "capture_output": True, "text": True,
-               "encoding": "utf-8", "errors": "replace", "timeout": CLI_TIMEOUT_SECONDS, "check": True}
+               "encoding": "utf-8", "errors": "replace", "timeout": PROJECT_CLI_TIMEOUT_SECONDS, "check": True,
+               "creationflags": NO_WINDOW}
     try:
         result = subprocess.run(command, **options)
     except subprocess.CalledProcessError:
@@ -203,7 +215,8 @@ def project_targets(executable: str, project: Path) -> dict[str, dict]:
 
 
 def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, revision=remote_revision,
-                  run=run_cli, project: Path | None = None) -> dict[str, str]:
+                  run=run_cli, project: Path | None = None, now: float | None = None) -> dict[str, str]:
+    now = time.time() if now is None else now
     outcomes: dict[str, str] = {}
     names = sorted(targets)
     references = sorted({(source["source"], source.get("ref") or "HEAD")
@@ -220,20 +233,37 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
         if published[0] is None:
             outcomes[marketplace] = "unreachable"
             continue
-        if all(value is not None for value in published) and recorded.get(key) == head and not target.get("missing"):
+        missing = set(target.get("missing", [])) - set(recorded.get("retired:" + key, []))
+        if all(value is not None for value in published) and recorded.get(key) == head and not missing:
             outcomes[marketplace] = "current"
+            continue
+        failed_at = recorded.get("failed:" + key)
+        if isinstance(failed_at, (int, float)) and now - failed_at < FAILURE_BACKOFF_SECONDS:
+            outcomes[marketplace] = "failed recently; retried after 24 hours"
             continue
         def invoke(command):
             return run(command, cwd=project) if project is not None else run(command)
 
-        refreshed = invoke([executable, "plugin", "marketplace", "upgrade", marketplace]) and all(
-            invoke([executable, "plugin", "add", plugin]) for plugin in target["plugins"])
+        refreshed = invoke([executable, "plugin", "marketplace", "upgrade", marketplace]) is True
+        retired = []
+        for plugin in target["plugins"] if refreshed else []:
+            added = invoke([executable, "plugin", "add", plugin])
+            if added == RETIRED:
+                retired.append(plugin)
+            elif added is not True:
+                refreshed = False
+                break
+        if retired:
+            recorded["retired:" + key] = sorted(retired)
+        retired = f" (no longer published, not installed: {', '.join(retired)})" if retired else ""
         if refreshed:
             if all(value is not None for value in published):
                 recorded[key] = head
-            outcomes[marketplace] = "updated"
+            recorded.pop("failed:" + key, None)
+            outcomes[marketplace] = "updated" + retired
         else:
-            outcomes[marketplace] = "failed"
+            recorded["failed:" + key] = now
+            outcomes[marketplace] = "failed" + retired
     return outcomes
 
 
@@ -247,21 +277,48 @@ def refresh_projects(executable: str, config: dict, recorded: dict, run=run_cli)
             revisions[key] = remote_revision(source, ref)
         return revisions[key]
 
+    def targets_for(project: Path, label: str) -> dict[str, dict]:
+        stamp = [configuration_stamp(codex_home() / "config.toml"),
+                 configuration_stamp(project / ".codex" / "config.toml")]
+        cached = recorded.get("targets:" + label)
+        if isinstance(cached, dict) and cached.get("stamp") == stamp and isinstance(cached.get("targets"), dict):
+            return cached["targets"]
+        targets = project_targets(executable, project)
+        recorded["targets:" + label] = {"stamp": stamp, "targets": targets}
+        return targets
+
+    def settle(label: str, targets: dict[str, dict], results: dict[str, str]) -> None:
+        cached = recorded.get("targets:" + label)
+        if isinstance(cached, dict):
+            for name, result in results.items():
+                if result.startswith(("updated", "current")) and name in cached.get("targets", {}):
+                    cached["targets"][name]["missing"] = []
+
     outcomes = {"user": {}}
     if codex_targets(config):
         try:
-            outcomes["user"] = refresh_codex(executable, project_targets(executable, Path.home()), recorded,
-                                              revision=revision, run=run, project=Path.home())
+            targets = targets_for(Path.home(), "user")
+            outcomes["user"] = refresh_codex(executable, targets, recorded, revision=revision, run=run,
+                                              project=Path.home())
+            settle("user", targets, outcomes["user"])
         except (OSError, ValueError, TypeError, AttributeError, subprocess.SubprocessError) as error:
             outcomes["user"] = {"error": str(error)}
     for project in project_directories(config):
         try:
-            targets = project_targets(executable, project)
+            targets = targets_for(project, str(project))
             outcomes[str(project)] = refresh_codex(executable, targets, recorded, revision=revision, run=run,
                                                    project=project)
+            settle(str(project), targets, outcomes[str(project)])
         except (OSError, ValueError, TypeError, AttributeError, subprocess.SubprocessError) as error:
             outcomes[str(project)] = {"error": str(error)}
     return outcomes
+
+
+def configuration_stamp(path: Path) -> float | None:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return None
 
 
 def load_codex_config() -> dict:
@@ -298,6 +355,12 @@ def newest_existing(paths: list[Path]) -> Path | None:
     return max(existing, key=lambda path: path.stat().st_mtime) if existing else None
 
 
+def console_python() -> str:
+    executable = Path(sys.executable)
+    console = executable.with_name("python.exe")
+    return str(console) if executable.name.lower() == "pythonw.exe" and console.is_file() else sys.executable
+
+
 def sweep_worktrees(codex_config: dict) -> str:
     relative = Path(".agents", "engineering", "workflow", "merge", "scripts", "worktree_sweep.py")
     script = newest_existing([root / relative for root in installed_plugin_roots("engineering", claude_home(),
@@ -305,9 +368,9 @@ def sweep_worktrees(codex_config: dict) -> str:
     if script is None:
         return "engineering package not installed"
     try:
-        result = subprocess.run([sys.executable, "-B", str(script)], stdin=subprocess.DEVNULL, capture_output=True,
-                                text=True, encoding="utf-8", errors="replace", timeout=SWEEP_TIMEOUT_SECONDS,
-                                check=False)
+        result = subprocess.run([console_python(), "-B", str(script)], stdin=subprocess.DEVNULL,
+                                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                                timeout=SWEEP_TIMEOUT_SECONDS, check=False, creationflags=NO_WINDOW)
     except (OSError, subprocess.TimeoutExpired) as error:
         return f"failed: {error}"
     return "ran" if result.returncode == 0 else f"failed with exit code {result.returncode}"

@@ -12,7 +12,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / ".agents/machine/scripts"
 sys.path.insert(0, str(SCRIPTS))
-SPEC = importlib.util.spec_from_file_location("refresh_cli", SCRIPTS / "refresh_cli.py")
+SPEC = importlib.util.spec_from_file_location("reload_plugins", SCRIPTS / "reload_plugins.py")
 REFRESH = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(REFRESH)
 
@@ -57,10 +57,10 @@ class RefreshCliTests(unittest.TestCase):
 
     def test_packaged_entry_point_resolves_from_each_skill_surface(self):
         package = ROOT / "plugins/machine"
-        for relative in ("skills/refresh-cli", "codex-skills/refresh-cli",
-                         ".agents/machine/utility/refresh-cli"):
+        for relative in ("skills/reload-plugins", "codex-skills/reload-plugins",
+                         ".agents/machine/utility/reload-plugins"):
             with self.subTest(surface=relative):
-                result = subprocess.run([sys.executable, "-I", "-B", str(package / relative / "scripts/refresh_cli.py"),
+                result = subprocess.run([sys.executable, "-I", "-B", str(package / relative / "scripts/reload_plugins.py"),
                                          "--help"], cwd=ROOT.parent, capture_output=True, text=True,
                                         encoding="utf-8", timeout=20)
                 self.assertEqual(0, result.returncode, result.stderr)
