@@ -35,7 +35,7 @@ probe is required before claiming enforcement. The host coverage limit is tracke
 `.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents a generated native-instruction
 fallback.
 Codex hook commands use a per-session temporary snapshot preseeded for the running session's hooks.
-This lets those hooks keep running after a startup refresh replaces an inactive package cache entry.
+This lets those hooks keep running after a plugin update replaces an inactive package cache entry.
 New sessions create a fresh snapshot from the verified package; snapshots outside the plugin cache are
 left in place. A changed hook definition still requires Codex trust review before it runs.
 
