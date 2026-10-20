@@ -28,6 +28,12 @@ snippet, and why. Continue the current task under the existing standard while aw
 accepted, make the refinement in this session under the standing authorization.
 Established standards defects still require immediate repair.
 
+```text
+Standard: engineering:failing-tests. Gap: silent on timeouts under parallel test load.
+Proposed: "Rerun a timed-out test file alone before treating it as a regression."
+Why: three hook test files timed out at 6-way load and passed when run alone.
+```
+
 ## A task has an owning lifecycle — load it before the first edit
 
 Authorized long-term or multi-phase work selects `engineering:plan-execution`, even when the user does
@@ -107,12 +113,6 @@ Follow `engineering:committing` for local checkpoints and the repository's selec
 when delivery is authorized. Bind remote monitoring to the exact repository, head and run; never imply
 pending CI is owned without an active monitor. A failed test selects `engineering:failing-tests` and its
 diagnose, repair and focused verification loop. Do not weaken a check merely to produce a pass.
-
-When all owned work is done, select `machine:close` and prepare its post-report operation before
-delivering the final completion report. `base:goal-continuation` owns this requirement for ordinary
-tasks as well as goals and deliveries. The close operation owns verified host closure and its keep-open,
-active-dialogue and unsupported-host handling. A handoff predecessor follows `engineering:handoff`'s
-release instead.
 
 ## Maintain the right source owner
 

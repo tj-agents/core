@@ -33,7 +33,7 @@ def refresh_attachment(entry, worktree):
             or refreshed["pid"] != entry["pid"]
             or refreshed["pid_started_at"] != entry["pid_started_at"]
             or session_close.path_key(worktree) != session_close.path_key(session_close.worktree_from_cwd())
-            or not session_close.under_or_equal(os.getcwd(), refreshed["cwd"])):
+            or not session_close.attached_to(os.getcwd(), refreshed)):
         raise session_close.Refusal("session attachment changed while observer started")
 
 
@@ -50,7 +50,7 @@ def main(argv=None):
 
 def close_session(entry):
     worktree = session_close.worktree_from_cwd()
-    if not session_close.under_or_equal(os.getcwd(), entry["cwd"]):
+    if not session_close.attached_to(os.getcwd(), entry):
         raise session_close.Refusal("current directory is not this session's registered attachment")
     activity = session_close.awaiting_input_activity(entry)
     result = session_close.results_path()

@@ -12,9 +12,17 @@ route: infer
 The commands below show Windows paths and use `python` in Windows PowerShell. On Linux/macOS, use
 `python3` with POSIX paths and the same script arguments.
 
-A repository commits `.agents/plugins.json`, `.claude/settings.json` and `.codex/config.toml`. A fresh
-clone then installs exactly the plugins it selects from its declared marketplaces on `main`, without
-depending on any machine's user settings.
+A repository commits `.agents/plugins.json`, `.claude/settings.json` and `.codex/config.toml`, carrying
+its selection from the declared marketplaces on `main`. Complete the native host's project admission
+and installation before claiming those plugins loaded.
+
+Codex ignores project-local configuration until the exact repository is trusted; a trusted parent
+folder does not admit a nested Git repository. Inspect native `config/read` for the actual cwd and its
+project layer's `disabledReason`, then verify the selected plugins through `plugin list --json` and a
+fresh session. Within authorized installation scope, use the native project-trust flow or configuration
+API for that exact repository; preserve other settings and never trust a broader parent on its behalf.
+Without that authority, keep native activation pending. A passing declaration check proves source
+settings are current, not that native trust, installation or session loading succeeded.
 
 ## The selection
 
@@ -41,12 +49,17 @@ python -B '<skill-directory>\scripts\adopt_plugins.py' --root C:\path\to\reposit
   --stack dotnet --mode preview
 ```
 
-A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `github-actions`,
+A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `python`, `github-actions`,
 `plugin-repository`) resolves to its plugins through `scripts/plugin_roster.json`, so nobody guesses which
 plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Required plugins are added and
 existing selections are kept. With no requested stack or plugin, a new selection uses the default base,
 engineering and machine packages. `preview` lists the changed files, `write` applies them together, and `check`
 exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
+
+`--plugin personal` explicitly selects the personal-project profile plus its base and machine capabilities.
+Use it only for projects the user identifies as personal, then complete that profile's native-instruction
+adoption and verification procedure. Core does not infer personal scope from a directory, an author or a
+technology stack, and selecting a profile does not prove its instructions loaded.
 
 A bare `--plugin <name>` selects from `tj-agents`. Add a foreign plugin with
 `--plugin concertable@agents --marketplace agents=Concertable/agents`. Subsequent adoption preserves

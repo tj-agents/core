@@ -1,10 +1,16 @@
 # core
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
-The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core); the marketplace ID remains `base-agents`.
+The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core).
+Select `base@tj-agents`, `engineering@tj-agents` and `machine@tj-agents` from
+[`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
 The repository publishes a minimal `base` package and optional `engineering` and `machine` packages.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
+
+`engineering:skill-authoring` owns skill selection triggers, names, and sizing; the
+[`template:check` validator](https://github.com/tj-agents/template) owns required skill content and layout
+validation. `engineering:docs` owns the generic guidance-writing convention.
 
 Global architecture and cross-repository designs live in [`tj-agents/docs`](https://github.com/tj-agents/docs)
 (private; organization access required). Core-specific implementation plans and operational documentation
@@ -45,8 +51,7 @@ retains that boundary without Base64 or explicit `exec`. These checks do not pro
 who can modify the user's trusted configuration or race files inside the same user's temporary/snapshot
 directories, and source tests do not establish antivirus acceptance.
 
-Use `machine:hook-control` for reversible Codex hook controls. In a terminal with the machine launcher
-loaded, `codex-hooks status`, `codex-hooks off` and `codex-hooks on` operate on the active user profile.
+Use `machine:hook-control` for reversible Codex hook controls on the active user profile.
 Add `--scope project --project <repository>` for a trusted repository's `.codex/config.toml`.
 The utility requires Python 3.11+. `off` writes the native
 [`features.hooks = false` gate](https://learn.chatgpt.com/docs/hooks#turn-hooks-off), which prevents ordinary
@@ -56,12 +61,9 @@ skills remain enabled. A higher-priority project, profile, command-line or manag
 the selected layer; status describes saved settings, and reopening Codex is required to rely on the change.
 Internal host cleanup hooks and the separate legacy `notify` command are outside this gate.
 
-The packages have no release line or compatibility promise: each supported Claude and Codex launcher
-refreshes and verifies the currently selected packages and their required dependencies from their
-publishers' `main` branches before the native CLI starts. Selection stays an independent user and
-repository setting; adding a marketplace does not select its full roster. An explicitly selected package
-that has been removed from the current publisher roster blocks startup with an error until selection is
-corrected. Initial native installation is bootstrap only; ongoing freshness requires a supported launcher.
+The packages have no release line or compatibility promise: machines follow each publisher's `main`
+through automatic updates (see [Machine setup and updates](#machine-setup-and-updates)). Selection stays an
+independent user and repository setting; adding a marketplace does not select its full roster.
 
 ## Repository auto-merge
 
@@ -125,15 +127,16 @@ establish installed-host trust or acceptance.
 
 ### Windows CLI hook windows
 
-On Windows, interactive Codex launches through the installed machine profile and Codex handoff tabs
-use `--no-daemon` to avoid the shared daemon's visible hook child consoles. The option is applied to
-interactive starts, resumes, and forks; Codex's batch and maintenance commands keep their normal
-arguments. Reopen a terminal after updating the machine plugin so its profile launcher is current.
-The launcher checks that the installed Codex advertises this option and leaves `--remote` sessions alone;
-older CLIs need an update to receive this Windows workaround.
-For an existing installation that cannot yet refresh the machine plugin, run
-`pwsh shell/install-codex-no-daemon.ps1` to add the workaround to both PowerShell profiles;
-`-VerifyOnly` checks that local installation.
+Pass `--no-daemon` to an interactive Codex launch on Windows to avoid the shared daemon's visible hook
+child consoles.
+
+If coordinator discovery fails, Codex plugin maintenance remains available through the normal command
+on Windows and Linux. Install the current coordinator with:
+
+```text
+codex plugin marketplace add https://github.com/tj-agents/marketplace.git
+codex plugin add machine@tj-agents
+```
 
 Claude Code can open a visible Git Bash window for each hook. On Windows, run
 `pwsh shell/install-hidden-bash.ps1` once from this checkout. The installer builds the included
@@ -178,70 +181,29 @@ the sorted package paths, lengths and bytes. The machine package excludes only i
 `catalog/catalog.json` from its own digest to avoid a self-reference; its schemas, bootstrap and all other
 resources remain covered.
 
-## Install
+## Machine setup and updates
+
+Run once per machine, and again whenever you like; it changes nothing that is already set:
 
 ```powershell
-.\install.ps1
+./setup.ps1          # Windows (pwsh or Windows PowerShell)
+pwsh ./setup.ps1     # Linux
 ```
 
-Use `-WhatIf` to inspect and `-VerifyOnly` to verify without changing the machine. Session-recovery runtime
-data, transcripts, credentials, and identifiers remain outside the repository.
+It turns on Claude's own auto-update for every marketplace an enabled plugin comes from, removes the
+retired `claude`/`codex` profile launcher, and schedules `plugin_autoupdate.py` hidden at logon and hourly
+(Task Scheduler on Windows, crontab on Linux). Each run checks every Codex git marketplace that an enabled
+plugin comes from with one `git ls-remote`, and upgrades the marketplace and re-adds its enabled plugins only
+when the revision changed. Nothing runs when `claude` or `codex` starts.
 
-## Install / update the default plugins
-
-Each supported Claude and Codex terminal, handoff, and recovery launcher runs a bounded startup preflight
-before starting the native CLI. It follows the selected tj-agents packages and their required dependencies
-to the publishers' current `main` commits, installs and verifies the exact package files and bytes, and
-blocks startup if fetching, installation, trust, verification, or the overall deadline fails. A successful
-native install alone does not establish freshness. Published package bytes become available after the
-post-merge `regenerate` job commits generated packages to `main`; the updater follows what is currently
-published there. Running sessions retain their already-loaded instructions.
-
-Codex gives each launch temporary native marketplace names, catalogs and package paths while keeping
-its normal user profile and logical plugin selections. Verified preparation releases the refresh lock
-before starting the CLI, so an idle terminal can wait for its first prompt while another CLI refreshes.
-Hook trust and copied plugin policy are supplied only to that child. Its temporary paths remain until
-the child is confirmed exited; uncertain child liveness preserves them.
-
-The updater accepts only the configured tj-agents source closure. Claude permissions are synchronized
-only from the current verified selected-package closure. Codex hook trust follows that same verified
-closure. Startup uses disposable native install settings so selection does not leak into global settings.
-Codex's automatically installed shared agents update from the selected engineering package while
-preserving unowned or locally changed filename collisions. See [PACKAGING.md](PACKAGING.md) for package
-content rules.
-
-Native installation is a one-time bootstrap for packages already selected by repository or user settings.
-Use Claude's plugin UI or Codex's plugin commands to install only those selected packages. Registering a
-marketplace or bootstrapping one package does not select the publisher's full roster. After bootstrap,
-ongoing freshness requires a supported launcher preflight. Typing `claude` in Bash on Linux or
-PowerShell on Windows/Linux, `open-claude`, `handoff-claude` and session recovery run the startup preflight
-first, so a session started through them loads the verified current `main` content for the selected
-packages and dependencies. The machine plugin's SessionStart hook
-adds one marked block to the supported terminal profiles that resolves its own `claude` wrapper, so the wrapper
-updates with the plugin and no checkout is pulled; set `BASE_AGENTS_CLAUDE_PROFILE=off` to opt out.
-The startup preflight refreshes selected packages and dependencies and blocks launch on failure. Claude
-permissions are updated only from that current verified package closure.
-
-Typing `codex` in Bash on Linux or PowerShell on Windows/Linux and using `handoff-codex` runs the startup
-preflight for selected tj-agents packages and dependencies before Codex loads them. The launcher then
-records native Codex hook trust only for the current verified package closure. Other publishers and
-user/project hooks retain normal trust review.
-Set `BASE_AGENTS_CODEX_HOOK_TRUST=off` to keep manual review for all hooks. The machine plugin's SessionStart hook adds a marked block
-to the supported terminal profiles. That block resolves the active installed machine package at invocation time, so later
-terminals load its `codex` wrapper without pulling this checkout. The first session after installing
-the package wires the profiles; open a new terminal to use the wrapper. Set
-`BASE_AGENTS_CODEX_PROFILE=off` to leave profiles alone. Repository and user settings determine package
-selection independently of freshness.
+Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
+loaded; new sessions pick up the update. `install.ps1` still wires the Windows `shell/` profile.
 
 ### Recover from a faulty installed hook
 
-A hook repair reaches a machine after it merges and the `regenerate` job commits the published package bytes
-to `main`. Before that publication, the startup preflight verifies the currently published package. On Codex,
-a changed package digest changes the hook definition, so the hook needs trust review again. A running session keeps the hook bytes it loaded on either host and cannot adopt the repair.
-To recover one blocked by a Stop hook, send `stop` or `pause` as the whole prompt so the continuation gate releases
-the turn, then close it and start a new session through the `codex` or `claude` terminal wrapper,
-`handoff-codex` or `handoff-claude`. The startup preflight refreshes and verifies the selected package set;
-if that fails, the CLI remains blocked until the source or selection problem is corrected.
+A hook repair reaches a machine after it merges, the `regenerate` job publishes it to `main`, and the next
+automatic update installs it. On Codex, a changed package digest changes the hook definition, so the hook
+needs trust review again. A running session keeps the hook bytes it loaded; start a new session.
 
 Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.
 

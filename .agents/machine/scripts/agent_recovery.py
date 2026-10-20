@@ -101,6 +101,10 @@ def _profile(host, root):
     return os.path.normcase(str(Path(root).parent.resolve()))
 
 
+def _is_default_claude_profile(profile):
+    return os.path.normcase(str(Path(profile).resolve())) == os.path.normcase(str((Path.home() / ".claude").resolve()))
+
+
 def _normalise(item, root):
     preview = item.get("preview") or next((re.sub(r"\s+", " ", text)[:160] for _, role, text in item.get("messages", ())
                                              if role == "user" and not text.lstrip().startswith("<")), "(no user preview)")
@@ -688,21 +692,18 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
         label = title or f"{host.title()} {session_id[:8]}"
         instruction = cli.prompt_file_argument(prompt_path)[0] if prompt_path else prompt
         if host == "claude":
-            old_profile = os.environ.get("CLAUDE_CONFIG_DIR")
-            os.environ["CLAUDE_CONFIG_DIR"] = item["profile"]
-            try:
-                arguments = ["--resume", session_id]
-                if dangerously_skip_permissions:
-                    arguments.append("--dangerously-skip-permissions")
-                if model:
-                    arguments += ["--model", model]
-                arguments.append(instruction)
-                cli.open_claude_tab(directory, label, arguments, status_file=status_path)
-            finally:
-                if old_profile is None:
-                    os.environ.pop("CLAUDE_CONFIG_DIR", None)
-                else:
-                    os.environ["CLAUDE_CONFIG_DIR"] = old_profile
+            # Claude reads ~/.claude.json only without CLAUDE_CONFIG_DIR; set to ~/.claude it starts first-run onboarding.
+            if _is_default_claude_profile(item["profile"]):
+                profile_environment = {"clear": ("CLAUDE_CONFIG_DIR",)}
+            else:
+                profile_environment = {"force": {"CLAUDE_CONFIG_DIR": item["profile"]}}
+            arguments = ["--resume", session_id]
+            if dangerously_skip_permissions:
+                arguments.append("--dangerously-skip-permissions")
+            if model:
+                arguments += ["--model", model]
+            arguments.append(instruction)
+            cli.open_claude_tab(directory, label, arguments, status_file=status_path, **profile_environment)
         else:
             executable, _ = cli.resolve_codex_executable()
             _verify_codex_resume(executable)

@@ -40,17 +40,17 @@ class HookContractTests(unittest.TestCase):
 
     def test_missing_hook_script_target_is_rejected(self) -> None:
         output = copy.deepcopy(self.output)
-        del output["plugins/base/hooks/skill_router.py"]
+        del output["plugins/engineering/hooks/git_auth_scope_gate.py"]
         with self.assertRaisesRegex(ValueError, "script target is missing"):
             self.validate(output)
 
     def test_missing_second_windows_hook_script_target_is_rejected(self) -> None:
         output = copy.deepcopy(self.output)
-        path = "plugins/base/hooks/codex.json"
+        path = "plugins/engineering/hooks/codex.json"
         payload = json.loads(output[path])
         command = payload["hooks"]["PreToolUse"][0]["hooks"][0]["commandWindows"]
         payload["hooks"]["PreToolUse"][0]["hooks"][0]["commandWindows"] = command.replace(
-            "hooks/skill_router.py", "hooks/does-not-exist.py"
+            "hooks/git_auth_scope_gate.py", "hooks/does-not-exist.py"
         )
         output[path] = json.dumps(payload).encode()
         with self.assertRaisesRegex(ValueError, "script target is missing"):
@@ -67,10 +67,10 @@ class HookContractTests(unittest.TestCase):
 
     def test_codex_windows_host_root_expansion_is_enforced(self) -> None:
         output = copy.deepcopy(self.output)
-        path = "plugins/base/hooks/codex.json"
+        path = "plugins/engineering/hooks/codex.json"
         payload = json.loads(output[path])
         payload["hooks"]["PreToolUse"][0]["hooks"][0]["commandWindows"] = (
-            'python -B "%PLUGIN_ROOT%/hooks/skill_router.py"'
+            'python -B "%PLUGIN_ROOT%/hooks/git_auth_scope_gate.py"'
         )
         output[path] = json.dumps(payload).encode()
         with self.assertRaisesRegex(ValueError, "wrong plugin root"):
@@ -78,7 +78,7 @@ class HookContractTests(unittest.TestCase):
 
     def test_claude_shell_form_and_packed_arguments_are_rejected(self) -> None:
         path = "plugins/engineering/hooks/claude.json"
-        packed = '-B "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py"'
+        packed = '-B "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py"'
         for hook in (
             {"type": "command", "command": f"python {packed}"},
             {"type": "command", "command": "python", "args": [packed]},
@@ -86,20 +86,20 @@ class HookContractTests(unittest.TestCase):
             with self.subTest(hook=hook):
                 output = copy.deepcopy(self.output)
                 payload = json.loads(output[path])
-                payload["hooks"]["UserPromptSubmit"][0]["hooks"][0] = hook
+                payload["hooks"]["PreToolUse"][0]["hooks"][0] = hook
                 output[path] = json.dumps(payload).encode()
                 with self.assertRaisesRegex(ValueError, "exec form"):
                     self.validate(output)
 
     def test_missing_dispatched_gate_target_is_rejected(self) -> None:
         output = copy.deepcopy(self.output)
-        del output["plugins/engineering/hooks/harness_grant.py"]
-        with self.assertRaisesRegex(ValueError, "script target is missing: hooks/harness_grant.py"):
+        del output["plugins/base/hooks/tier_gate.py"]
+        with self.assertRaisesRegex(ValueError, "script target is missing: hooks/tier_gate.py"):
             self.validate(output)
 
     def test_codex_windows_command_is_required(self) -> None:
         output = copy.deepcopy(self.output)
-        path = "plugins/base/hooks/codex.json"
+        path = "plugins/engineering/hooks/codex.json"
         payload = json.loads(output[path])
         payload["hooks"]["PreToolUse"][0]["hooks"][0].pop("commandWindows")
         output[path] = json.dumps(payload).encode()

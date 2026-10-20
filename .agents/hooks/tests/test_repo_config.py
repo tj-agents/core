@@ -92,20 +92,38 @@ class RepoConfigTests(unittest.TestCase):
         repo_config.run(self.lock, "write")
         self.assertFalse(path.exists())
 
-    def test_claude_script_arguments_require_wildcard(self):
-        for allow in (
-            ["Bash(python -B .agents/workflows/workflow_ops.py)"],
-            ["Bash(python -B .agents/workflows/workflow_ops.py:*)"],
+    def test_exact_script_approvals_keep_their_argument_scope(self):
+        commands = [
+            "Bash(python -B .agents/workflows/workflow_ops.py --check)",
+            "Bash(pwsh .agents/sync-generated.ps1 -Check)",
+            'Bash(python -B "tools/policy runner.py" --name café)',
+        ]
+        self.overlay(commands)
+        repo_config.run(self.lock, "write")
+        self.assertEqual([], repo_config.run(self.lock, "check"))
+        settings = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
+        self.assertEqual(set(commands), set(settings["permissions"]["allow"]))
+        self.assertTrue(all(":*" not in command for command in settings["permissions"]["allow"]))
+
+    def test_wildcard_script_arguments_keep_the_stable_prefix_guard(self):
+        for command in (
+            "Bash(python -B .agents/workflows/workflow_ops.py)",
+            "Bash(python -B .agents/workflows/workflow_ops.py:*)",
+            "Bash(python -B .agents/workflows/workflow_ops.py --mode *)",
         ):
-            with self.subTest(allow=allow):
-                overlay = self.overlay(allow)
+            with self.subTest(command=command):
+                overlay = self.overlay([command])
                 requires = json.loads(overlay.read_text(encoding="utf-8"))["requires"]
                 repo_config.harness_permissions.validate_requires(requires, "fixture")
-
-        overlay = self.overlay(["Bash(python -B .agents/workflows/workflow_ops.py --check)"])
-        requires = json.loads(overlay.read_text(encoding="utf-8"))["requires"]
-        with self.assertRaisesRegex(repo_config.lock_io.LockError, r"script arguments require :\*"):
-            repo_config.harness_permissions.validate_requires(requires, "fixture")
+        for command in (
+            "Bash(python -B .agents/workflows/workflow_ops.py --mode * --check)",
+            "Bash(python -B .agents/*/workflow_ops.py --check)",
+        ):
+            with self.subTest(command=command):
+                overlay = self.overlay([command])
+                requires = json.loads(overlay.read_text(encoding="utf-8"))["requires"]
+                with self.assertRaisesRegex(repo_config.lock_io.LockError, r"script arguments require :\*"):
+                    repo_config.harness_permissions.validate_requires(requires, "fixture")
 
     def test_hand_written_allow_rule_blocks_check_and_write_without_mutation(self):
         settings = self.root / ".claude" / "settings.json"

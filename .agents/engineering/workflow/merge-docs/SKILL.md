@@ -118,8 +118,3 @@ it against the repo's own publish path filter rather than assuming, then report 
 One short report: PR number and merge commit, that it bypassed the end-to-end gate because the diff was
 meta-only, and that the base is clean. If the diff turned out not to be meta-only, report that you stopped
 and routed to `engineering:merge`.
-
-Select `machine:close` and arm its operation before delivering that report. After the report and the
-complete host Stop-gate feedback, perform its post-report `complete` operation when the gates permit
-closure. The skill owns verified session exit, retained-checkout defaults, removable-worktree proof,
-keep-open instructions and unsupported-host handling. Branch deletion alone does not prove CLI exit.
