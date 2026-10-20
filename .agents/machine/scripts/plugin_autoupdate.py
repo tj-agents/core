@@ -23,7 +23,6 @@ import time
 
 GIT_TIMEOUT_SECONDS = 30
 SWEEP_TIMEOUT_SECONDS = 1800
-LOCK_STALE_SECONDS = 3600
 SCRIPT_NAME = "plugin_autoupdate.py"
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 CLI_TIMEOUT_SECONDS = 60
@@ -392,7 +391,8 @@ def packaged_copies(codex_config: dict) -> list[Path]:
 
 
 def self_update(current: Path, codex_config: dict) -> bool:
-    candidates = [path for path in packaged_copies(codex_config) if path.resolve() != current.resolve()]
+    candidates = [path for path in packaged_copies(codex_config)
+                  if path.resolve() != current.resolve() and path.with_name("machine_events.py").is_file()]
     if not candidates:
         return False
     newest = max(candidates, key=lambda path: path.stat().st_mtime)
@@ -409,18 +409,27 @@ def self_update(current: Path, codex_config: dict) -> bool:
     return changed
 
 
-def acquire_lock(path: Path) -> bool:
+def acquire_lock(path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
+    stream = path.open("a+b")
     try:
-        if time.time() - path.stat().st_mtime > LOCK_STALE_SECONDS:
-            path.unlink(missing_ok=True)
+        if os.name == "nt":
+            import msvcrt
+
+            stream.seek(0)
+            if not stream.read(1):
+                stream.write(b"0")
+                stream.flush()
+            stream.seek(0)
+            msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
-        pass
-    try:
-        os.close(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
-    except FileExistsError:
-        return False
-    return True
+        stream.close()
+        return None
+    return stream
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -433,8 +442,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--retry-failures", action="store_true")
     arguments = parser.parse_args(argv)
     directory = state_directory()
-    lock = directory / "plugin-autoupdate.lock"
-    if not acquire_lock(lock):
+    lock = acquire_lock(directory / "plugin-autoupdate.lock")
+    if lock is None:
         return 0
     try:
         state_file = directory / "plugin-autoupdate.json"
@@ -452,7 +461,7 @@ def main(argv: list[str] | None = None) -> int:
         if not arguments.no_self_update:
             self_update(Path(__file__), load_codex_config())
     finally:
-        lock.unlink(missing_ok=True)
+        lock.close()
     results = outcomes.get("marketplaces", {})
     return int(any(str(value).startswith(("failed", "unreachable")) for value in results.values()))
 

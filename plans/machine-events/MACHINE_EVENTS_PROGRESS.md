@@ -10,7 +10,7 @@ Status: final identity/offline fix
 
 Publisher/reconcile and personal scheduler-removal commits exist. Core listener, setup migration and fixtures are implemented. All 62 callers are prepared under core/.worktrees/machine-event-callers; runtime inventory is kept outside public source. No production topic, publisher variable, service, task or ruleset has been changed.
 
-Verification: core 21 listener/setup and 35 updater fixtures pass; packaging and catalog digest checks pass. github-actions 8 publisher/reconcile fixtures, 13 existing policy fixtures and 102 scaffold tests pass (14 platform-specific skips). Personal's 7 identity fixtures pass. One bounded ntfy-to-GitHub check passed for tj-agents/core without a ruleset write or agent session. Linux installed acceptance remains unverified.
+Verification: core 21 listener/setup and 36 updater fixtures pass; packaging and catalog digest checks pass. github-actions 8 publisher/reconcile fixtures, 13 existing policy fixtures and 102 scaffold tests pass (14 platform-specific skips). Personal's 7 identity fixtures pass. One bounded ntfy-to-GitHub check passed for tj-agents/core without a ruleset write or agent session. Linux installed acceptance remains unverified.
 
 ## Next Steps
 
@@ -26,3 +26,5 @@ Done when: the full requested event channel is shipped and setup owns its lifecy
 The configured review-lens model is unsupported in this account. The review workflow explicitly routes role/model unavailability to the parent over the same immutable candidate; use that fallback for the native-general and security checks. Parent inspection found and fixed Linux setup failing when crontab is absent, and pins administrative gh requests to github.com. Final frozen-candidate review is pending. The legacy workflow helper's skill lookup is incompatible with the canonical layout; use the workflow's native-tool fallback.
 
 Final source review used the permitted parent fallback and recorded exact-head private receipts. Publisher #16 merged at 683b05f955e2df735cebe67e8ed252326876d630. A final fixture now verifies identity before every worker action; startup does not require GitHub connectivity. Current PR checks must validate that final core head. Unrelated review-cache housekeeping was deferred while all current-candidate validations were retained.
+
+Cutover regression fixtures pass: old caches without the listener cannot overwrite the installed runtime; OS-held updater locks recover an orphan file from a stopped legacy task and never expire beneath a live process. Final listener/updater fixtures: 21 + 36.

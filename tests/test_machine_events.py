@@ -146,13 +146,13 @@ class IdentityTests(unittest.TestCase):
     def test_listener_lock_has_no_age_expiry_and_releases_with_handle(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "lock"
-            first = events.acquire_listener_lock(path)
+            first = events.plugins.acquire_lock(path)
             self.assertIsNotNone(first)
             try:
-                self.assertIsNone(events.acquire_listener_lock(path))
+                self.assertIsNone(events.plugins.acquire_lock(path))
             finally:
                 first.close()
-            again = events.acquire_listener_lock(path)
+            again = events.plugins.acquire_lock(path)
             self.assertIsNotNone(again)
             again.close()
 
