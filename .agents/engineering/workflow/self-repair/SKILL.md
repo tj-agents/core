@@ -30,10 +30,10 @@ launches; repair and preservation actions may continue.
 2. Respect explicit user limits. Do not create a repair for an explicitly rejected change, and do not
    silently widen the repair into product work, profile installation, destructive cleanup, or unrelated
    standards redesign.
-3. Record the observed bug, mistake or debt under [the shared recording
-   contract](../../resources/problem-records.md) and update its canonical record. If the same source repair
-   has a live canonical owner, reconcile that owner and contribute the new evidence without creating a
-   duplicate writer.
+3. Record the observed bug, mistake or debt under
+   [the shared recording contract](../../resources/problem-records.md) and update its canonical record. If
+   the same source repair has a live canonical owner, reconcile that owner and contribute the new evidence
+   without creating a duplicate writer.
 
 ## Repair it here
 
