@@ -16,6 +16,9 @@ sources, and inspect relevant implementations when behavior matters. Compare ado
 selective reuse, custom implementation, and keeping the current solution against the intended
 outcome; choose the smallest suitable approach.
 
+Solve deterministic work with deterministic code: a script, fixture or dummy process, never a model
+session.
+
 Record that the assessment is complete, its useful references, limitations, and rationale in the
 existing task context or goal/decision artifact. Distinguish observed behavior from source inspection
 and documentation claims. Small ideas need no new plan, configuration, database, or command just to
