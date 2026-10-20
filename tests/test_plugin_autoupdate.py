@@ -54,7 +54,7 @@ class CodexTargetTests(unittest.TestCase):
 
     def test_an_unchanged_revision_runs_no_cli_command(self):
         run = mock.Mock(return_value=True)
-        recorded = {'codex:base-agents': OLD}
+        recorded = {UPDATE.target_key('base-agents', UPDATE.codex_targets(codex_config())['base-agents']): OLD}
 
         outcomes = UPDATE.refresh_codex('codex', UPDATE.codex_targets(codex_config()), recorded,
                                         revision=lambda source, ref: OLD, run=run)
@@ -64,13 +64,13 @@ class CodexTargetTests(unittest.TestCase):
 
     def test_a_changed_revision_upgrades_then_re_adds_each_enabled_plugin(self):
         run = mock.Mock(return_value=True)
-        recorded = {'codex:base-agents': OLD}
+        recorded = {UPDATE.target_key('base-agents', UPDATE.codex_targets(codex_config())['base-agents']): OLD}
 
         outcomes = UPDATE.refresh_codex('codex', UPDATE.codex_targets(codex_config()), recorded,
                                         revision=lambda source, ref: NEW, run=run)
 
         self.assertEqual({'base-agents': 'updated'}, outcomes)
-        self.assertEqual(NEW, recorded['codex:base-agents'])
+        self.assertEqual(NEW, recorded[UPDATE.target_key('base-agents', UPDATE.codex_targets(codex_config())['base-agents'])])
         self.assertEqual([
             mock.call(['codex', 'plugin', 'marketplace', 'upgrade', 'base-agents']),
             mock.call(['codex', 'plugin', 'add', 'base@base-agents']),
@@ -78,13 +78,13 @@ class CodexTargetTests(unittest.TestCase):
         ], run.call_args_list)
 
     def test_a_failed_refresh_keeps_the_old_revision_so_the_next_run_retries(self):
-        recorded = {'codex:base-agents': OLD}
+        recorded = {UPDATE.target_key('base-agents', UPDATE.codex_targets(codex_config())['base-agents']): OLD}
 
         outcomes = UPDATE.refresh_codex('codex', UPDATE.codex_targets(codex_config()), recorded,
                                         revision=lambda source, ref: NEW, run=lambda command: False)
 
         self.assertEqual({'base-agents': 'failed'}, outcomes)
-        self.assertEqual(OLD, recorded['codex:base-agents'])
+        self.assertEqual(OLD, recorded[UPDATE.target_key('base-agents', UPDATE.codex_targets(codex_config())['base-agents'])])
 
     def test_an_unreachable_source_changes_nothing(self):
         run = mock.Mock(return_value=True)
@@ -94,6 +94,100 @@ class CodexTargetTests(unittest.TestCase):
 
         self.assertEqual({'base-agents': 'unreachable'}, outcomes)
         run.assert_not_called()
+
+
+class ProjectUpdateTests(unittest.TestCase):
+    def test_native_project_inventory_drives_initial_installation_without_user_selection(self):
+        listing = {"installed": [], "available": [
+            {"pluginId": "base@tj-agents", "enabled": True,
+             "marketplaceSource": {"sourceType": "git", "source": CORE}},
+            {"pluginId": "disabled@tj-agents", "enabled": False,
+             "marketplaceSource": {"sourceType": "git", "source": CORE}},
+        ]}
+        with mock.patch.object(UPDATE.subprocess, "run", return_value=mock.Mock(stdout=json.dumps(listing))) as run:
+            targets = UPDATE.project_targets("codex", ROOT)
+        self.assertEqual(["base@tj-agents"], targets["tj-agents"]["plugins"])
+        self.assertEqual(ROOT, run.call_args.kwargs["cwd"])
+        self.assertIn("--available", run.call_args.args[0])
+
+    def test_absent_native_marketplace_snapshots_are_bootstrapped_before_discovery(self):
+        import subprocess
+
+        missing = subprocess.CalledProcessError(1, "codex", stderr="no snapshot")
+        with mock.patch.object(UPDATE.subprocess, "run", side_effect=[missing, mock.Mock(stdout='{"installed": [], "available": []}')]) as run, \
+                mock.patch.object(UPDATE, "run_cli", return_value=True) as bootstrap:
+            self.assertEqual({}, UPDATE.project_targets("codex", ROOT))
+        bootstrap.assert_called_once_with(["codex", "plugin", "marketplace", "upgrade"], cwd=ROOT)
+        self.assertEqual(2, run.call_count)
+
+    def test_project_discovery_requires_exact_saved_trust_and_project_configuration(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name in ("trusted", "untrusted", "parent/nested"):
+                (root / name / ".codex").mkdir(parents=True)
+                (root / name / ".codex/config.toml").write_text("", encoding="utf-8")
+            config = {"projects": {str(root / "trusted"): {"trust_level": "trusted"},
+                                   str(root / "untrusted"): {"trust_level": "untrusted"},
+                                   str(root / "parent"): {"trust_level": "trusted"}}}
+            self.assertEqual([(root / "trusted").resolve()], UPDATE.project_directories(config))
+
+    def test_project_runs_use_the_native_cwd_and_share_remote_revision_checks(self):
+        target = UPDATE.codex_targets(codex_config())
+        recorded = {}
+        run = mock.Mock(return_value=True)
+        with mock.patch.object(UPDATE, "project_directories", return_value=[ROOT, ROOT.parent]), \
+                mock.patch.object(UPDATE, "project_targets", return_value=target), \
+                mock.patch.object(UPDATE, "remote_revision", return_value=NEW) as revision, \
+                mock.patch.object(UPDATE, "refresh_codex", wraps=UPDATE.refresh_codex) as refresh:
+            outcomes = UPDATE.refresh_projects("codex", {}, recorded, run=run)
+        revision.assert_called_once_with(CORE, "HEAD")
+        self.assertEqual("updated", outcomes[str(ROOT)]["base-agents"])
+        self.assertEqual("current", outcomes[str(ROOT.parent)]["base-agents"])
+        self.assertTrue(all(call.kwargs.get("cwd") == ROOT for call in run.call_args_list))
+
+    def test_a_new_selection_at_the_same_source_revision_is_installed(self):
+        targets = UPDATE.codex_targets(codex_config())
+        recorded = {UPDATE.target_key("base-agents", targets["base-agents"]): OLD}
+        targets["base-agents"]["plugins"].append("engineering@base-agents")
+        run = mock.Mock(return_value=True)
+        self.assertEqual({"base-agents": "updated"}, UPDATE.refresh_codex(
+            "codex", targets, recorded, revision=lambda *_: OLD, run=run))
+        self.assertIn(mock.call(["codex", "plugin", "add", "engineering@base-agents"]), run.call_args_list)
+
+    def test_missing_native_installation_is_retried_at_an_unchanged_revision(self):
+        targets = UPDATE.codex_targets(codex_config())
+        recorded = {UPDATE.target_key("base-agents", targets["base-agents"]): OLD}
+        targets["base-agents"]["missing"] = ["base@base-agents"]
+        run = mock.Mock(return_value=True)
+        self.assertEqual({"base-agents": "updated"}, UPDATE.refresh_codex(
+            "codex", targets, recorded, revision=lambda *_: OLD, run=run))
+        self.assertTrue(run.called)
+
+    def test_publisher_changes_refresh_an_unchanged_umbrella_marketplace(self):
+        targets = UPDATE.codex_targets(codex_config())
+        publisher = "https://github.com/tj-agents/python.git"
+        targets["base-agents"]["publishers"] = [{"source": publisher, "ref": "main"}]
+        recorded = {}
+        run = mock.Mock(return_value=True)
+        revision = lambda source, ref: OLD
+        UPDATE.refresh_codex("codex", targets, recorded, revision=revision, run=run)
+        run.reset_mock()
+        self.assertEqual({"base-agents": "current"}, UPDATE.refresh_codex(
+            "codex", targets, recorded, revision=revision, run=run))
+        run.assert_not_called()
+        revision = lambda source, ref: NEW if source == publisher else OLD
+        self.assertEqual({"base-agents": "updated"}, UPDATE.refresh_codex(
+            "codex", targets, recorded, revision=revision, run=run))
+        self.assertTrue(run.called)
+
+    def test_a_broken_project_does_not_prevent_another_project_from_updating(self):
+        with mock.patch.object(UPDATE, "project_directories", return_value=[ROOT, ROOT.parent]), \
+                mock.patch.object(UPDATE, "project_targets", side_effect=[ValueError("bad native output"), {}]), \
+                mock.patch.object(UPDATE, "refresh_codex", return_value={}) as refresh:
+            outcomes = UPDATE.refresh_projects("codex", {}, {})
+        self.assertIn("error", outcomes[str(ROOT)])
+        self.assertEqual({}, outcomes[str(ROOT.parent)])
+        self.assertEqual(1, refresh.call_count)
 
 
 class LockAndSelfUpdateTests(unittest.TestCase):
