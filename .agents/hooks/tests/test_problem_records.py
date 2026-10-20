@@ -105,6 +105,23 @@ class PrimaryCheckoutTests(unittest.TestCase):
                     self.assertEqual(root, primary_checkout(directory))
                     self.assertEqual(selected, declaration(primary_checkout(directory)))
 
+    def test_bare_repository_entry_is_never_the_primary_checkout(self):
+        with tempfile.TemporaryDirectory(prefix="bare tracker ") as raw:
+            source = Path(raw).resolve() / "source"
+            bare = Path(raw).resolve() / "bare.git"
+            checkout = Path(raw).resolve() / "checkout"
+            subprocess.run(["git", "init", "-q", str(source)], check=True)
+            subprocess.run(["git", "-C", str(source), "-c", "user.name=Fixture", "-c",
+                            "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"], check=True)
+            subprocess.run(["git", "clone", "-q", "--bare", str(source), str(bare)], check=True)
+            subprocess.run(["git", "-C", str(bare), "worktree", "add", "-q", "-b", "work", str(checkout)], check=True)
+            selected = {"schema_version": 1, "provider": "fixture:manage"}
+            (checkout / ".problem-records.json").write_text(json.dumps(selected), encoding="utf-8")
+            nested = checkout / "nested"
+            nested.mkdir()
+            self.assertEqual(checkout, primary_checkout(nested))
+            self.assertEqual(selected, declaration(primary_checkout(nested)))
+
     def test_non_repository_and_unavailable_git_fail_visibly(self):
         with tempfile.TemporaryDirectory() as directory, self.assertRaises(RecordError):
             primary_checkout(directory)
