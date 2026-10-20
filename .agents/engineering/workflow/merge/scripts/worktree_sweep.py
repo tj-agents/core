@@ -252,7 +252,8 @@ def remove(primary: Path, worktree: dict) -> tuple[bool, str]:
     return True, "removed"
 
 
-def remove_empty_orphans(primary: Path, registered: list[dict], now: float | None = None) -> list[str]:
+def remove_empty_orphans(primary: Path, registered: list[dict], now: float | None = None,
+                         dry_run: bool = False) -> list[str]:
     root = primary / ".worktrees"
     if not root.is_dir():
         return []
@@ -262,6 +263,9 @@ def remove_empty_orphans(primary: Path, registered: list[dict], now: float | Non
     for child in root.iterdir():
         if (child.is_dir() and not is_link(child) and child.resolve() not in known
                 and child.stat().st_mtime < limit and not any(child.iterdir())):
+            if dry_run:
+                removed.append(str(child))
+                continue
             try:
                 child.rmdir()
                 removed.append(str(child))
@@ -271,13 +275,13 @@ def remove_empty_orphans(primary: Path, registered: list[dict], now: float | Non
 
 
 def sweep_repository(primary: Path, live: list[str], removable=proven_removable, based=bases_an_open_pull_request,
-                     delete=remove, edited=recently_edited) -> dict[str, str]:
+                     delete=remove, edited=recently_edited, dry_run: bool = False) -> dict[str, str]:
     listing = git(primary, "worktree", "list", "--porcelain")
     if listing.returncode:
         return {}
     worktrees = parse_worktrees(listing.stdout)
-    outcomes: dict[str, str] = {path: "removed empty leftover folder"
-                                for path in remove_empty_orphans(primary, worktrees)}
+    orphan = "would remove empty leftover folder" if dry_run else "removed empty leftover folder"
+    outcomes: dict[str, str] = {path: orphan for path in remove_empty_orphans(primary, worktrees, dry_run=dry_run)}
     for worktree in worktrees[1:]:
         path = worktree.get("path")
         if not path or not Path(path).is_dir():
@@ -324,7 +328,7 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.dry_run:
         report = {str(primary): sweep_repository(
             primary, live, removable=lambda root, worktree: proven_removable(root, worktree, archive=False),
-            delete=lambda root, worktree: (True, "would remove")) for primary in repositories}
+            delete=lambda root, worktree: (True, "would remove"), dry_run=True) for primary in repositories}
     else:
         report = {str(primary): sweep_repository(primary, live) for primary in repositories}
     print(json.dumps(report, indent=2))
