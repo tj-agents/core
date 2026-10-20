@@ -185,17 +185,33 @@ Run once per machine, and again whenever you like; it changes nothing that is al
 
 ```text
 ./setup.ps1          # Windows (PowerShell)
-./setup.sh           # Linux and macOS (bash and python3)
+./setup.sh           # Linux (bash and python3)
 ```
 
-It turns on Claude's own auto-update for every marketplace an enabled plugin comes from, removes the
-retired `claude`/`codex` profile launcher, and schedules `plugin_autoupdate.py` hidden at logon and hourly
-(Task Scheduler on Windows, crontab on Linux). It reads Codex selections from the user configuration and
-the `.codex/config.toml` of each repository with exact saved trust, one declaration per marketplace (user
-first, then an unpinned one). Each run checks every source once with `git ls-remote` and upgrades a
-marketplace and its selected plugins only when a revision changed or a plugin cache is missing, and never
-while a registered Codex session is running. An untrusted repository remains subject to Codex's native
-admission. Nothing runs when `claude` or `codex` starts.
+It enables Claude's native auto-update, removes the retired CLI launchers and installs one hidden
+machine event listener in `~/.agents-state/bin`. Windows uses a logon-only Task Scheduler task with
+failure restart and no execution limit. Linux uses a systemd user service with failure restart; systemd
+is required. Setup removes the former hourly plugin-autoupdate and merge-gates tasks or cron entries.
+Rerunning setup reuses the shared channel, replaces the runtime and restarts the same listener.
+
+The listener holds a blocking HTTPS JSON subscription to ntfy.sh. Main-branch callers use the shared
+`tj-agents/github-actions/.github/actions/machine-events` publisher. Setup reuses or creates the
+unguessable `MACHINE_EVENTS_TOPIC` Actions variable on core, configures the same variable for active
+repositories in tj-agents, Concertable and tomjseery, and saves it in `~/.agents-state/machine-events.json`.
+The topic is an untrusted public hint channel; it contains only repository names and change categories.
+No administrative GitHub credential is stored in Actions.
+
+The listener re-reads GitHub and invokes the installed github-actions plugin's `merge-policy reconcile`
+for committed policy changes as Tommy's saved `gh` account. Install that plugin before setup. It invokes
+`plugin_autoupdate.py` for marketplace changes, and the existing sweep for main-branch changes. It
+catches up once after connection and after an offline gap, coalesces duplicates and retries failures a
+bounded number of times. There are no periodic GitHub checks. Native process-exit notifications resume
+plugin refreshes deferred while Codex sessions are alive. Nothing runs at CLI startup.
+
+Runtime logs rotate at `~/.agents-state/machine-events.log`. Package regeneration jobs publish a second
+hint after pushing generated packages because GitHub's own token cannot trigger another push workflow.
+Existing repositories need the prepared uniform caller merged; service scaffolding emits it for new
+repositories. GitHub Free's repository ruleset limitations still apply to private repositories.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
 loaded; new sessions pick up the update. `install.ps1` still wires the Windows `shell/` profile.

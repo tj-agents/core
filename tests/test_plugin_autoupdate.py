@@ -426,12 +426,15 @@ class LockAndSelfUpdateTests(unittest.TestCase):
             packaged = Path(temp) / 'package' / UPDATE.SCRIPT_NAME
             packaged.parent.mkdir()
             packaged.write_text('new', encoding='utf-8')
+            packaged.with_name('machine_events.py').write_text('new listener', encoding='utf-8')
+            stable.with_name('machine_events.py').write_text('old listener', encoding='utf-8')
 
             with mock.patch.object(UPDATE, 'packaged_copies', return_value=[packaged]):
                 self.assertTrue(UPDATE.self_update(stable, {}))
                 self.assertFalse(UPDATE.self_update(stable, {}))
 
             self.assertEqual('new', stable.read_text(encoding='utf-8'))
+            self.assertEqual('new listener', stable.with_name('machine_events.py').read_text(encoding='utf-8'))
 
 
     def test_only_enabled_installed_machine_packages_are_self_update_sources(self):
@@ -521,32 +524,6 @@ class SetupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='profile ') as temp:
             self.assertEqual([], SETUP.remove_retired_launchers([Path(temp) / 'absent.ps1']))
 
-    def test_cron_entries_replace_earlier_ones_and_keep_other_jobs(self):
-        calls = []
-
-        def run(command, **kwargs):
-            calls.append((command, kwargs.get('input')))
-            existing = f'0 5 * * * backup\n@reboot old {SETUP.CRON_MARKER}\n'
-            return mock.Mock(returncode=0, stdout=existing)
-
-        SETUP.schedule_cron(Path('/home/t/.agents-state/bin/plugin_autoupdate.py'), run=run)
-
-        written = calls[-1][1].splitlines()
-        self.assertEqual(['crontab', '-'], calls[-1][0])
-        self.assertEqual('0 5 * * * backup', written[0])
-        self.assertEqual(2, sum(SETUP.CRON_MARKER in line for line in written))
-        self.assertTrue(any(line.startswith('@reboot ') and 'plugin_autoupdate.py' in line for line in written))
-        self.assertTrue(any(line.startswith('17 * * * * ') for line in written))
-
-    def test_windows_task_runs_hidden_at_logon_and_hourly(self):
-        script = Path('C:/state dir/a.py')
-        xml = SETUP.windows_task_xml('PC\\Tommy & Co', 'C:/Python/pythonw.exe', script)
-
-        self.assertIn('<LogonTrigger>', xml)
-        self.assertIn('<Interval>PT1H</Interval>', xml)
-        self.assertIn('<Hidden>true</Hidden>', xml)
-        self.assertIn('PC\\Tommy &amp; Co', xml)
-        self.assertIn(f'-B "{script}"', xml)
 
 
 if __name__ == '__main__':
