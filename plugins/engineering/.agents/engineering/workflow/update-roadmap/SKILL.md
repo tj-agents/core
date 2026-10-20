@@ -12,6 +12,11 @@ Update the complete live ROADMAP → PLAN → PROGRESS graph from one authoritat
 requirement, dependency, package release, or upstream API change. Planning docs only; do not implement
 the change.
 
+Read [the shared recording contract](../../resources/problem-records.md). When a provider is selected,
+reconcile the affected canonical items and use it for live status and ownership updates. Keep substantive
+roadmap design, plans and existing graph keys, linking their canonical items; file summaries follow the
+provider's state rather than becoming another live queue. Planning-only authority still controls the work.
+
 ## Workflow
 
 1. Resolve the target roadmap and the change set or source. Ask only when more than one roadmap plausibly
@@ -46,3 +51,12 @@ the change.
    rides that branch's next substantive commit; do not push a metadata-only synchronization commit.
 8. Report the source evidence, changed artifacts, justified `none` classifications, validation, and
    commits. Follow the `handoff` standard for each explicitly targeted actionable or blocked ledger.
+
+## Example
+
+```text
+An upstream API removes `v1` on 2027-03-01. The default-branch roadmap owns the dependency ordering, one
+active branch owns its migration plan, and another plan has no semantic dependency on the API. Update the
+roadmap and active plan with the replacement API and verification gate, record the unrelated plan as `none`,
+run the graph check in each owning worktree, and leave product code unchanged.
+```
