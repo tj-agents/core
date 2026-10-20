@@ -193,6 +193,28 @@ class RepoConfigTests(unittest.TestCase):
     def git(self, *arguments, root=None):
         return subprocess.run(["git", "-c", "core.hooksPath=none", "-c", "commit.gpgsign=false", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "-C", str(root or self.root), *arguments], check=True, capture_output=True, encoding="utf-8").stdout.strip()
 
+    def test_foreign_owned_repository_refuses_project_scope_and_defaults_to_excluded_local(self):
+        self.git("init", "-q")
+        self.git("remote", "add", "origin", "https://github.com/Infonetica/cris-auth.git")
+        with self.assertRaisesRegex(repo_config.lock_io.LockError, "infonetica"):
+            repo_config.plan(self.lock, root=self.root, scope="project")
+        repo_config.run(self.lock, "write", root=self.root)
+        self.assertFalse((self.root / ".claude/settings.json").exists())
+        self.assertTrue((self.root / ".claude/settings.local.json").is_file())
+        self.assertEqual("", self.git("status", "--porcelain", "--untracked-files=all"))
+
+    def test_non_github_remote_is_foreign(self):
+        self.git("init", "-q")
+        self.git("remote", "add", "origin", "https://dev.azure.com/Org/Project/_git/repo")
+        with self.assertRaises(repo_config.lock_io.LockError):
+            repo_config.plan(self.lock, root=self.root, scope="project")
+
+    def test_personal_repository_defaults_to_project_scope(self):
+        self.git("init", "-q")
+        self.git("remote", "add", "origin", "git@github.com:tomjseery/Concertable.git")
+        self.git("remote", "add", "agents", "https://github.com/tj-agents/core.git")
+        self.assertIn(self.root / ".claude/settings.json", repo_config.plan(self.lock, root=self.root))
+
     def overlay(self, allow):
         path = self.lock.parent / "repository-harness.json"
         path.write_text(json.dumps({"schema_version": 1, "requires": {"marketplaces": [], "plugins": [], "hooks": [], "permissions": {"claude_allow": allow, "codex_prefix_rules": []}}}), encoding="utf-8")

@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -51,17 +52,20 @@ def read_json(path: Path) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def write_json(path: Path, value: dict) -> None:
+def write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".")
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
-            json.dump(value, stream, indent=2, ensure_ascii=False)
-            stream.write("\n")
+            stream.write(text)
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def write_json(path: Path, value: dict) -> None:
+    write_text(path, json.dumps(value, indent=2, ensure_ascii=False) + "\n")
 
 
 def is_pinned(ref: object) -> bool:
@@ -293,15 +297,39 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
     return outcomes
 
 
-def refresh_declared(executable: str, config: dict, recorded: dict, **options) -> dict:
+def enabled_identities(config: dict) -> set[str]:
+    return {identity for identity, settings in section(config, "plugins").items()
+            if isinstance(settings, dict) and settings.get("enabled") is True}
+
+
+def remove_user_plugins(path: Path, identities: set[str]) -> None:
+    if not path.is_file():
+        return
+    original = path.read_text(encoding="utf-8")
+    headers = {f"[plugins.{json.dumps(identity)}]" for identity in identities}
+    kept, skipping = [], False
+    for line in original.splitlines(keepends=True):
+        if line.lstrip().startswith("["):
+            skipping = line.strip() in headers
+        if not skipping:
+            kept.append(line)
+    text = re.sub(r"\n{3,}", "\n\n", "".join(kept))
+    if text != original:
+        write_text(path, text)
+
+
+def refresh_declared(executable: str, config: dict, recorded: dict, previous: list[str] = (), **options) -> dict:
     targets, ignored = declared_targets(config)
     for name, target in targets.items():
         inspect_installation(name, target)
+    declared = set().union(*(enabled_identities(layer) for _, layer in declarations(config)[1:]))
+    project_only = declared - (enabled_identities(config) - set(previous))
     outcomes = refresh_codex(executable, targets, recorded, **options)
+    remove_user_plugins(codex_home() / "config.toml", project_only)
     kept = {prefix + "codex:" + name for name in targets for prefix in ("", "retired:", "failed:")}
     for key in [key for key in recorded if key not in kept]:
         del recorded[key]
-    return {"marketplaces": outcomes, "ignored": ignored}
+    return {"marketplaces": outcomes, "ignored": ignored, "project_only": sorted(project_only)}
 
 
 def load_codex_config() -> dict:
@@ -414,12 +442,13 @@ def main(argv: list[str] | None = None) -> int:
         recorded = state.get("revisions") if isinstance(state.get("revisions"), dict) else {}
         if arguments.retry_failures:
             recorded = {key: value for key, value in recorded.items() if not key.startswith("failed:")}
+        previous = state.get("project_only") if isinstance(state.get("project_only"), list) else []
         config = load_codex_config()
         executable = shutil.which("codex")
-        outcomes = refresh_declared(executable, config, recorded) if executable else {}
+        outcomes = refresh_declared(executable, config, recorded, previous) if executable else {}
         sweep = "skipped" if arguments.no_sweep else sweep_worktrees(config)
-        write_json(state_file, {"revisions": recorded, "last_run": time.time(), "outcomes": outcomes,
-                                "worktree_sweep": sweep})
+        write_json(state_file, {"revisions": recorded, "project_only": outcomes.get("project_only", previous),
+                                "last_run": time.time(), "outcomes": outcomes, "worktree_sweep": sweep})
         if not arguments.no_self_update:
             self_update(Path(__file__), load_codex_config())
     finally:
