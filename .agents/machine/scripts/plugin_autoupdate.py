@@ -369,13 +369,16 @@ def self_update(current: Path, codex_config: dict) -> bool:
         return False
     newest = max(candidates, key=lambda path: path.stat().st_mtime)
     try:
-        if newest.read_bytes() == current.read_bytes():
-            return False
-        shutil.copyfile(newest, current.with_name(current.name + ".next"))
-        os.replace(current.with_name(current.name + ".next"), current)
+        changed = False
+        for source, target in ((newest, current), (newest.with_name("machine_events.py"), current.with_name("machine_events.py"))):
+            if not source.is_file() or (target.is_file() and source.read_bytes() == target.read_bytes()):
+                continue
+            shutil.copyfile(source, target.with_name(target.name + ".next"))
+            os.replace(target.with_name(target.name + ".next"), target)
+            changed = True
     except OSError:
         return False
-    return True
+    return changed
 
 
 def acquire_lock(path: Path) -> bool:
@@ -399,6 +402,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-self-update", action="store_true")
     parser.add_argument("--no-sweep", action="store_true")
+    parser.add_argument("--retry-failures", action="store_true")
     arguments = parser.parse_args(argv)
     directory = state_directory()
     lock = directory / "plugin-autoupdate.lock"
@@ -408,6 +412,8 @@ def main(argv: list[str] | None = None) -> int:
         state_file = directory / "plugin-autoupdate.json"
         state = read_json(state_file)
         recorded = state.get("revisions") if isinstance(state.get("revisions"), dict) else {}
+        if arguments.retry_failures:
+            recorded = {key: value for key, value in recorded.items() if not key.startswith("failed:")}
         config = load_codex_config()
         executable = shutil.which("codex")
         outcomes = refresh_declared(executable, config, recorded) if executable else {}
@@ -418,7 +424,8 @@ def main(argv: list[str] | None = None) -> int:
             self_update(Path(__file__), load_codex_config())
     finally:
         lock.unlink(missing_ok=True)
-    return 0
+    results = outcomes.get("marketplaces", {})
+    return int(any(str(value).startswith(("failed", "unreachable")) for value in results.values()))
 
 
 if __name__ == "__main__":
