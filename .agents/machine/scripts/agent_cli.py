@@ -242,31 +242,6 @@ def claude_config_dir():
     return Path(configured) if configured else Path.home() / '.claude'
 
 
-def standards_sync_script():
-    """The synchronizer shipped beside this launcher."""
-    path = HERE / 'claude_standards_sync.py'
-    return path if path.is_file() else None
-
-
-def sync_claude_standards(working_directory, claude=None, out=print):
-    """Refresh the registered standards before a Claude session opens."""
-    script = standards_sync_script()
-    if script is None:
-        raise LaunchError(f'Claude standards sync script was not found beside {HERE}.')
-    arguments = [sys.executable, '-I', '-B', str(script), '--project', str(working_directory)]
-    if claude:
-        arguments += ['--claude', str(claude)]
-    try:
-        result = subprocess.run(arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 encoding='utf-8', errors='replace')
-    except OSError as exc:
-        raise LaunchError(f'Claude standards refresh could not start: {exc}') from exc
-    for line in result.stdout.splitlines():
-        out(line)
-    if result.returncode != 0:
-        raise LaunchError(f'Claude standards refresh failed with exit {result.returncode}.')
-
-
 def prompt_file_argument(path):
     """(sentence, resolved_path) for a prepared prompt file: the 'Read the file at ...' sentence and the
     same resolved Path, so a caller never re-resolves it for its own messages.
@@ -667,6 +642,9 @@ def await_handoff_startup(status_path, timeout=480, wrapper_timeout=45,
             raise LaunchError("the launch was abandoned before startup")
         if state == "failed":
             raise LaunchError(str(status.get("error") or "native startup failed"))
+        if state == "unconfirmed":
+            raise LaunchTimeout(f"native CLI is still running, but SessionStart was not acknowledged; "
+                                f"leave the tab open and do not relaunch; receipt: {status_path}")
         if state == "running" or (state == "exited" and status.get("running_at") and status.get("returncode") == 0):
             return
         if state == "exited":
@@ -693,12 +671,6 @@ def bound_terminal_arguments(host, working_directory, target, arguments, status_
 
 def open_claude_tab(working_directory, title, arguments, out=print, status_file=None, require_session_start=False,
                     clear=(), force=None):
-    """Resolve the native claude executable, sync standards and open the tab.
-
-    Shared by open-claude and handoff-claude so executable discovery, pre-launch standards sync and the
-    forced colour environment have one owner. `working_directory` must already be resolved: both
-    launchers call resolve_tab_directory first, and launch_tab checks it once more for its direct callers.
-    """
     claude = resolve_claude_executable()
 
     # Forced, not merely un-cleared: an automation-spawned terminal tab is not the interactive shell a

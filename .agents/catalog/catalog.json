@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:f5477a5e0f208bf36e6e44fe9da78b419f2c0c3619f53311bea9a17e23061283",
+      "digest": "sha256:3fa5ae476dfc9a311f3319b941d30a79cb670d14823a9e0de84f1353159fd0aa",
       "harness": {
         "marketplaces": [
           {
@@ -172,7 +172,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:afd6cd6eb3d65d73590529a2aff44744d58e69094c009ce51270f9dba1abc855",
+      "digest": "sha256:1ff306a8dc5f167a245ab33cdfb11d3c88e2181c793eaafaf5fb8af75fa33b3b",
       "harness": {
         "marketplaces": [
           {
@@ -502,7 +502,7 @@
         "peer-cli",
         "plugin-selection",
         "recover-agents",
-        "refresh-cli",
+        "reload-plugins",
         "search",
         "search-claude",
         "search-codex"
@@ -525,7 +525,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:59a05cc7a883fe2d50f068737075c6f46dae75d40b906ed8f5c41bd6352a5cb6",
+      "digest": "sha256:cb22079a489d984e2a2e59843929238649b3918634f8d3f1c5c69069b2f87bc0",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -600,14 +600,14 @@
             "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
@@ -640,14 +640,18 @@
             "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py complete --stop-gates-accepted:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py complete --stop-gates-accepted:*)"
+            "Bash(python -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)"
           ],
           "codex_prefix_rules": [
             {
@@ -1048,7 +1052,7 @@
                 ],
                 "arm"
               ],
-              "justification": "Prepare or complete only this verified CLI closure after all owned work and Stop gates are satisfied; removal remains receipt-guarded",
+              "justification": "Arm a watcher that closes only this verified CLI after its final reply",
               "match": [
                 [
                   "python",
@@ -1080,64 +1084,26 @@
                 ],
                 "-B",
                 [
-                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-                  "${PLUGIN_ROOT}/skills/close/scripts/close_session.py",
-                  "${PLUGIN_ROOT}/codex-skills/close/scripts/close_session.py"
-                ],
-                "complete",
-                "--stop-gates-accepted"
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py",
+                  "${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py",
+                  "${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py"
+                ]
               ],
-              "justification": "Prepare or complete only this verified CLI closure after all owned work and Stop gates are satisfied; removal remains receipt-guarded",
+              "justification": "Refresh selected tj-agents plugins through native host commands, with optional remote verification.",
               "match": [
                 [
                   "python",
                   "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-                  "complete",
-                  "--stop-gates-accepted"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-                  "hook"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/other.py",
-                  "complete",
-                  "--stop-gates-accepted"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py"
-                ]
-              ],
-              "justification": "machine:refresh-cli refreshes the user's own tj-agents plugins from their registered marketplaces through the verified rolling refresh and repairs the host plugin registry.",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py",
                   "--project",
                   "C:/repo"
                 ],
                 [
                   "python3",
                   "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py",
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py",
                   "--verify-only"
                 ]
               ],

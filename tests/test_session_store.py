@@ -401,23 +401,6 @@ class RepoIdentityTests(unittest.TestCase):
 
 @unittest.skipUnless(GIT, "git is required for hook lifecycle tests")
 class HookLifecycleTests(unittest.TestCase):
-    def test_prepared_stop_cannot_overwrite_a_new_prompt_or_ended_session(self):
-        payload = {'session_id': 'prepared-close', 'cwd': str(self.repo)}
-        self._invoke('session-start', 'claude', payload)
-        connection = STORE.connect()
-        self.addCleanup(connection.close)
-        handle = 'claude:prepared-close'
-        prepared = STORE.get_session(connection, handle)
-        STORE.record_prompt(connection, handle)
-        self.assertFalse(STORE.record_prepared_stop(connection, handle, prepared['last_activity_at'], prepared['turn_state']))
-        fresh = STORE.get_session(connection, handle)
-        self.assertEqual('working', fresh['turn_state'])
-        self.assertTrue(STORE.record_prepared_stop(connection, handle, fresh['last_activity_at'], fresh['turn_state']))
-        stopped = STORE.get_session(connection, handle)
-        self.assertEqual('awaiting_input', stopped['turn_state'])
-        STORE.end_session(connection, handle, 'closed')
-        self.assertFalse(STORE.record_prepared_stop(connection, handle, stopped['last_activity_at'], stopped['turn_state']))
-
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="session store hooks é ")
         self.addCleanup(self.temp.cleanup)

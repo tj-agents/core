@@ -12,9 +12,12 @@ route: infer
 The commands below show Windows paths and use `python` in Windows PowerShell. On Linux/macOS, use
 `python3` with POSIX paths and the same script arguments.
 
-A repository commits `.agents/plugins.json`, `.claude/settings.json` and `.codex/config.toml`, carrying
-its selection from the declared marketplaces on `main`. Complete the native host's project admission
-and installation before claiming those plugins loaded.
+A repository whose GitHub owner is listed in `repo-owners.json` commits `.agents/plugins.json`,
+`.claude/settings.json` and `.codex/config.toml`, carrying its selection from the declared marketplaces on
+`main`. Any other repository, such as an employer's, gets local scope only. Its files are written per clone
+and git-excluded, and never committed, branched or opened as a PR. The scripts default to local scope there
+and refuse `--scope project`. Complete the native host's project admission and installation before claiming
+those plugins loaded.
 
 Codex ignores project-local configuration until the exact repository is trusted; a trusted parent
 folder does not admit a nested Git repository. Inspect native `config/read` for the actual cwd and its
@@ -56,10 +59,9 @@ existing selections are kept. With no requested stack or plugin, a new selection
 engineering and machine packages. `preview` lists the changed files, `write` applies them together, and `check`
 exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
 
-`--plugin personal` explicitly selects the personal-project profile plus its base and machine capabilities.
-Use it only for projects the user identifies as personal, then complete that profile's native-instruction
-adoption and verification procedure. Core does not infer personal scope from a directory, an author or a
-technology stack, and selecting a profile does not prove its instructions loaded.
+A Git repository whose remotes all belong to `repo-owners.json` owners always selects the personal-project
+profile (`personal`, with its base and machine capabilities). Any other repository never does.
+`--plugin personal` also selects it explicitly. Selecting a profile does not prove its instructions loaded.
 
 A bare `--plugin <name>` selects from `tj-agents`. Add a foreign plugin with
 `--plugin concertable@agents --marketplace agents=Concertable/agents`. Subsequent adoption preserves
@@ -80,10 +82,11 @@ anywhere in the committed `.claude/settings.json`, `.codex/config.toml` or `.cod
 reporting `file:line`. Replace such a path with a repository-relative one, or move the setting to an
 uncommitted local file. `machine_paths.py --root <checkout>` runs that scan alone.
 
-For per-clone adoption pass `--scope local` to either command, which writes `.claude/settings.local.json`, `.codex/config.toml`,
-optional `.codex/rules/agent-harness.rules` and `.agents/repo-capabilities.local.json` ownership state, keeps
-exact Git exclusions, preserves unrelated selections and approvals, and refuses tracked targets, changed
-owned settings and links that escape the root. Local settings need Python 3.11 or newer.
+Both commands pick the scope from repository ownership, and `--scope local` forces per-clone adoption. Local
+scope writes `.claude/settings.local.json`, `.codex/config.toml`, optional `.codex/rules/agent-harness.rules`
+and `.agents/repo-capabilities.local.json` ownership state. It git-excludes all of them and the selection,
+preserves unrelated selections and approvals, and refuses tracked targets, changed owned settings and links
+that escape the root. Local settings need Python 3.11 or newer.
 
 ## Audit a machine
 

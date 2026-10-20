@@ -18,7 +18,9 @@
     "python": [],
     "github-actions": [],
     "template": [],
-    "personal": ["base", "machine"]
+    "personal": ["base", "machine"],
+    "work": ["base"],
+    "infonetica": ["work"]
   },
   "stacks": {
     "dotnet": ["dotnet"],

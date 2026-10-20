@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -55,6 +56,17 @@ class AdoptPluginsTests(unittest.TestCase):
         claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
         self.assertTrue(claude["enabledPlugins"]["personal@tj-agents"])
         self.assertIn('[plugins."personal@tj-agents"]', (self.root / ".codex/config.toml").read_text(encoding="utf-8"))
+
+    def test_owned_repositories_always_select_personal_and_foreign_ones_never_do(self):
+        for remote, personal in (("git@github.com:tomjseery/Concertable.git", True),
+                                 ("https://github.com/Infonetica/cris-erm.git", False)):
+            with self.subTest(remote=remote), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp).resolve()
+                subprocess.run(["git", "init", "-q", str(root)], check=True)
+                subprocess.run(["git", "-C", str(root), "remote", "add", "origin", remote], check=True)
+                adopt_plugins.run(root, [], ["machine"], "write")
+                selected = json.loads((root / ".agents/plugins.json").read_text(encoding="utf-8"))["plugins"]
+                self.assertEqual(personal, "personal@tj-agents" in selected)
 
     def test_existing_selection_is_extended_and_unknown_packages_are_kept(self):
         self.selection.parent.mkdir()

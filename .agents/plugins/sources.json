@@ -161,6 +161,11 @@
       "destination": "plugins/harness.schema.json"
     },
     {
+      "plugin": "machine",
+      "source": ".agents/hooks/repo-owners.json",
+      "destination": "hooks/repo-owners.json"
+    },
+    {
       "plugin": "engineering",
       "source": ".agents/workflows",
       "destination": "workflows"
@@ -237,8 +242,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/harness-trust.json",
-      "destination": "hooks/harness-trust.json"
+      "source": ".agents/hooks/repo-owners.json",
+      "destination": "hooks/repo-owners.json"
     },
     {
       "plugin": "engineering",
@@ -389,6 +394,7 @@
   },
   "extended_host_adapters": [
     "persistent-workflow",
+    "reload-plugins",
     "review"
   ],
   "host_only_terms": {

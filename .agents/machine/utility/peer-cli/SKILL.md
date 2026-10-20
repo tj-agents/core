@@ -94,28 +94,7 @@ Its two refusals both exist because they were broken first:
   a kill or cleanup. Force can select an explicit stale terminal target, but never bypasses pid/start-time
   verification for a process signal.
 
-Closing *this* session is `machine:close`'s job, for ordinary tasks as well as PR deliveries.
-Select that skill and prepare its post-report operation before the final completion report.
-The `close.py` and `finish.py` helpers beside these scripts remain its verified runtime; they are
-not a substitute for invoking the close operation.
-
-For a completed session whose checkout must remain, `machine:close`'s post-report `complete` operation
-invokes the underlying runtime command
-`python3 -B <skill-directory>/scripts/close.py` on Linux/macOS or
-`python -B <skill-directory>\scripts\close.py` on Windows, with no
-arguments after the completion report and the other Stop-gate feedback. Select `machine:close` rather
-than invoking this helper as a replacement for that operation. It requires this host's verified registry entry and attachment,
-an active unended `awaiting_input` turn with an unchanged activity token immediately before close, then
-closes only its own host or uniquely identified tab and records session exit without changing files, branches
-or worktree registration. Idle state does not prove report delivery. Honor keep-open, continue and active
-dialogue; when no supported post-report execution path exists, preserve the session and checkout through
-the existing `merge_cleanup_gate --clear` deliberate-retention escape. `finish.py` retains ownership of
-removable linked-worktree cleanup.
-
-Run self-session close and finish with visibility of the registered native host. When a command sandbox
-isolates the process tree, use the harness's supported host-side execution path, subject to its permission
-review. A sandbox wrapper is not the registered CLI; keep the PID/start-time checks. If registration is
-missing, repair the machine plugin's installation and session attachment before attempting closure.
+Closing *this* session is `machine:close`'s job. Its watcher reuses `close.py`'s verified host close.
 
 ## Closing a peer
 
