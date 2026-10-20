@@ -195,7 +195,11 @@ def configure_topic(directory: Path, api=machine_events.gh) -> str:
     return topic
 
 
-def configure_publishers(topic: str, repositories, api=machine_events.gh) -> int:
+def set_topic_secret(repository: str, topic: str) -> None:
+    machine_events.github_cli(["secret", "set", machine_events.TOPIC_VARIABLE, "--repo", repository], input=topic)
+
+
+def configure_publishers(topic: str, repositories, api=machine_events.gh, secret=set_topic_secret) -> int:
     changed = 0
     for repository in repositories:
         if repository.get("isArchived") or repository.get("isFork"):
@@ -207,13 +211,19 @@ def configure_publishers(topic: str, repositories, api=machine_events.gh) -> int
         values = api([endpoint + "?per_page=100"])
         existing = next((item for item in values["variables"]
                          if item["name"] == machine_events.TOPIC_VARIABLE), None)
-        if existing and existing["value"] == topic:
-            continue
-        if existing:
-            endpoint += "/" + machine_events.TOPIC_VARIABLE
-        api(["--method", "PATCH" if existing else "POST", endpoint, "--input", "-"],
-            {"name": machine_events.TOPIC_VARIABLE, "value": topic})
-        changed += 1
+        different = existing is None or existing["value"] != topic
+        secrets = api([f"repos/{name}/actions/secrets?per_page=100"])
+        saved = next((item for item in secrets["secrets"]
+                      if item["name"] == machine_events.TOPIC_VARIABLE), None)
+        stale = bool(existing and saved and existing.get("updated_at", "") > saved.get("updated_at", ""))
+        if different:
+            if existing:
+                endpoint += "/" + machine_events.TOPIC_VARIABLE
+            api(["--method", "PATCH" if existing else "POST", endpoint, "--input", "-"],
+                {"name": machine_events.TOPIC_VARIABLE, "value": topic})
+        if different or saved is None or stale:
+            secret(name, topic)
+            changed += 1
     return changed
 
 

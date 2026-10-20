@@ -10,7 +10,7 @@ Status: final identity/offline fix
 
 Publisher/reconcile and personal scheduler-removal commits exist. Core listener, setup migration and fixtures are implemented. All 62 callers are prepared under core/.worktrees/machine-event-callers; runtime inventory is kept outside public source. No production topic, publisher variable, service, task or ruleset has been changed.
 
-Verification: core 21 listener/setup and 36 updater fixtures pass; packaging and catalog digest checks pass. github-actions 8 publisher/reconcile fixtures, 13 existing policy fixtures and 102 scaffold tests pass (14 platform-specific skips). Personal's 7 identity fixtures pass. One bounded ntfy-to-GitHub check passed for tj-agents/core without a ruleset write or agent session. Linux installed acceptance remains unverified.
+Verification: core 24 listener/setup and 36 updater fixtures pass; packaging and catalog digest checks pass. github-actions 8 publisher/reconcile fixtures, 13 existing policy fixtures and 102 scaffold tests pass (14 platform-specific skips). Personal's 7 identity fixtures pass. One bounded ntfy-to-GitHub check passed for tj-agents/core without a ruleset write or agent session. Linux installed acceptance remains unverified.
 
 ## Next Steps
 
@@ -28,3 +28,5 @@ The configured review-lens model is unsupported in this account. The review work
 Final source review used the permitted parent fallback and recorded exact-head private receipts. Publisher #16 merged at 683b05f955e2df735cebe67e8ed252326876d630. A final fixture now verifies identity before every worker action; startup does not require GitHub connectivity. Current PR checks must validate that final core head. Unrelated review-cache housekeeping was deferred while all current-candidate validations were retained.
 
 Cutover regression fixtures pass: old caches without the listener cannot overwrite the installed runtime; OS-held updater locks recover an orphan file from a stopped legacy task and never expire beneath a live process. Final listener/updater fixtures: 21 + 36.
+
+Public-log masking is part of the final cutover: setup owns the topic secret and canonical variable, fixtures cover existing-variable migration and topic rotation, and all uniform callers consume only that permitted secret. Companion masked-caller follow-ups are being prepared on Fix/MaskedMachineEventTopic in github-actions and personal. No production topic or scheduler was changed.

@@ -181,7 +181,7 @@ resources remain covered.
 
 ## Machine setup and updates
 
-Run once per machine, and again whenever you like; it changes nothing that is already set:
+Run once per machine. Rerunning setup converges on the same channel and service configuration:
 
 ```text
 ./setup.ps1          # Windows (PowerShell)
@@ -198,6 +198,7 @@ The listener holds a blocking HTTPS JSON subscription to ntfy.sh. Main-branch ca
 `tj-agents/github-actions/.github/actions/machine-events` publisher. Setup reuses or creates the
 unguessable `MACHINE_EVENTS_TOPIC` Actions variable on core, configures the same variable for active
 repositories in tj-agents, Concertable and tomjseery, and saves it in `~/.agents-state/machine-events.json`.
+The same value is stored as an Actions secret for callers, so public run logs mask it.
 The topic is an untrusted public hint channel; it contains only repository names and change categories.
 No administrative GitHub credential is stored in Actions.
 

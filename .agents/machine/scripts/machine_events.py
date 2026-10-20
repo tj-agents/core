@@ -44,7 +44,7 @@ def tommy_environment():
     return environment
 
 
-def gh(arguments, payload=None, run=subprocess.run):
+def github_cli(arguments, input=None, run=subprocess.run):
     environment = tommy_environment()
     shim = os.path.normcase(str(Path.home() / ".agents-state/bin/bot-identity"))
     path = os.pathsep.join(entry for entry in environment.get("PATH", "").split(os.pathsep)
@@ -52,12 +52,17 @@ def gh(arguments, payload=None, run=subprocess.run):
     executable = plugins.shutil.which("gh", path=path)
     if not executable:
         raise RuntimeError("GitHub CLI must be installed and signed in as tomjseery")
-    result = run([executable, "api", *arguments], input=None if payload is None else json.dumps(payload),
+    result = run([executable, *arguments], input=input,
                  env=environment, capture_output=True, text=True, encoding="utf-8", errors="replace",
                  timeout=60, check=False, creationflags=plugins.NO_WINDOW)
     if result.returncode:
         raise RuntimeError(result.stderr.strip() or "GitHub API failed")
-    return json.loads(result.stdout) if result.stdout.strip() else None
+    return result.stdout
+
+
+def gh(arguments, payload=None, run=subprocess.run):
+    output = github_cli(["api", *arguments], input=None if payload is None else json.dumps(payload), run=run)
+    return json.loads(output) if output.strip() else None
 
 
 def require_tommy(api=gh):
