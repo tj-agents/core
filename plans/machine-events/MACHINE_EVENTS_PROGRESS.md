@@ -10,7 +10,7 @@ Status: review candidate
 
 Publisher/reconcile and personal scheduler-removal commits exist. Core listener, setup migration and fixtures are implemented. All 62 callers are prepared under core/.worktrees/machine-event-callers; runtime inventory is kept outside public source. No production topic, publisher variable, service, task or ruleset has been changed.
 
-Verification: core 19 listener/setup and 34 updater fixtures pass; packaging and catalog digest checks pass. github-actions 8 publisher/reconcile fixtures, 13 existing policy fixtures and 102 scaffold tests pass (14 platform-specific skips). Personal's 7 identity fixtures pass. One bounded ntfy-to-GitHub check passed for tj-agents/core without a ruleset write or agent session. Linux installed acceptance remains unverified.
+Verification: core 20 listener/setup and 34 updater fixtures pass; packaging and catalog digest checks pass. github-actions 8 publisher/reconcile fixtures, 13 existing policy fixtures and 102 scaffold tests pass (14 platform-specific skips). Personal's 7 identity fixtures pass. One bounded ntfy-to-GitHub check passed for tj-agents/core without a ruleset write or agent session. Linux installed acceptance remains unverified.
 
 ## Next Steps
 
