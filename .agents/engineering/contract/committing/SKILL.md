@@ -37,6 +37,13 @@ send it, commit.
 Never `git add -f`, or otherwise stage, a path covered by `.gitignore` or `.git/info/exclude`. An exclusion
 is the owner's decision, not an obstacle. If an ignored file genuinely belongs in a commit, ask first.
 
+```text
+$ git check-ignore -v .claude/settings.local.json
+.git/info/exclude:16:/.claude/settings.local.json	.claude/settings.local.json
+```
+
+That output means the file stays unstaged.
+
 ## Commit cadence and push cadence are different
 
 Commit completed reversible work locally at every natural boundary. Push only a **stable executable
