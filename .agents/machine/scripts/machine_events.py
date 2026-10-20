@@ -35,9 +35,11 @@ catalog: object(expression: "HEAD:.agents/plugins/marketplace.json") { oid }"""
 
 
 def tommy_environment():
-    return {key: value for key, value in os.environ.items()
+    environment = {key: value for key, value in os.environ.items()
             if key not in {"TJ_AGENT", "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"}
-            and not key.startswith("GIT_CONFIG_")}
+                   and not key.startswith("GIT_CONFIG_")}
+    environment["GH_HOST"] = "github.com"
+    return environment
 
 
 def gh(arguments, payload=None, run=subprocess.run):

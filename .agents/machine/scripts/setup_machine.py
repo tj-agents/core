@@ -135,8 +135,11 @@ def schedule_windows(script: Path, run=subprocess.run) -> None:
 
 
 def remove_retired_cron(run=subprocess.run) -> None:
-    current = run(["crontab", "-l"], capture_output=True, text=True, encoding="utf-8", errors="replace",
-                  timeout=COMMAND_TIMEOUT_SECONDS, check=False)
+    try:
+        current = run(["crontab", "-l"], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                      timeout=COMMAND_TIMEOUT_SECONDS, check=False)
+    except FileNotFoundError:
+        return
     if current.returncode and "no crontab" not in current.stderr.lower():
         raise RuntimeError("Cannot inspect crontab: " + current.stderr)
     original = (current.stdout if current.returncode == 0 else "").splitlines()
@@ -252,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         remove_retired_cron()
         schedule_systemd(script, home)
-    print("Machine event listener installed and started; it catches up after connecting")
+    print("Machine event listener installed and started; it catches up on startup")
     return 0
 
 
