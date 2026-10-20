@@ -267,6 +267,7 @@ jobs:
           python -B scripts/sync_harness_manifests.py --check
 
       - name: commit and push the regeneration
+        id: publish-packages
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -279,6 +280,14 @@ jobs:
             git commit -m "Regenerate packages for $env:GITHUB_SHA"
             python -B scripts/update_catalog_digests.py --check
             git push origin HEAD:main
+            "changed=true" >> $env:GITHUB_OUTPUT
           } else {
             "Generated output already current."
           }
+
+      - name: Publish the generated package hint
+        if: steps.publish-packages.outputs.changed == 'true' && vars.MACHINE_EVENTS_TOPIC != ''
+        uses: tj-agents/github-actions/.github/actions/machine-events@d45d8a70dc1309ca02d304c8e3c58e493c263f89
+        with:
+          topic: ${{ secrets.MACHINE_EVENTS_TOPIC }}
+          published: 'true'
