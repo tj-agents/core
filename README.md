@@ -190,9 +190,12 @@ Run once per machine, and again whenever you like; it changes nothing that is al
 
 It turns on Claude's own auto-update for every marketplace an enabled plugin comes from, removes the
 retired `claude`/`codex` profile launcher, and schedules `plugin_autoupdate.py` hidden at logon and hourly
-(Task Scheduler on Windows, crontab on Linux). Each run checks every Codex git marketplace that an enabled
-plugin comes from with one `git ls-remote`, and upgrades the marketplace and re-adds its enabled plugins only
-when the revision changed. Nothing runs when `claude` or `codex` starts.
+(Task Scheduler on Windows, crontab on Linux). It reads Codex selections from the user configuration and
+the `.codex/config.toml` of each repository with exact saved trust, one declaration per marketplace (user
+first, then an unpinned one). Each run checks every source once with `git ls-remote` and upgrades a
+marketplace and its selected plugins only when a revision changed or a plugin cache is missing, and never
+while a registered Codex session is running. An untrusted repository remains subject to Codex's native
+admission. Nothing runs when `claude` or `codex` starts.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
 loaded; new sessions pick up the update. `install.ps1` still wires the Windows `shell/` profile.
@@ -205,8 +208,34 @@ needs trust review again. A running session keeps the hook bytes it loaded; star
 
 Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.
 
-Use `machine:plugin-selection` to give a repository its own plugin selection.
+## Repository plugin selection
 
-Codex does not load agent definitions directly from plugins. When engineering is selected, the startup
-preflight updates its shared agents in the active Codex profile. The installer preserves unowned filename
-collisions and locally changed owned files; Claude loads the package's `agents/` payload directly.
+Use `machine:plugin-selection` to commit `.agents/plugins.json`, `.claude/settings.json` and
+`.codex/config.toml`. Claude declares `extraKnownMarketplaces` with `autoUpdate: true` and
+`enabledPlugins`. Codex declares `[marketplaces]` and `[plugins]` in trusted project configuration.
+Native admission, installation, credentials and caches remain host responsibilities.
+
+Handoff, open and recovery launchers start the native CLI without refreshing plugins, generating
+packages or rewriting host configuration. They retain handoff startup acknowledgement and recovery
+pickup verification. Running sessions retain the instructions they already loaded.
+
+On Codex 0.163.0-alpha.1, declarations make a plugin discoverable but do not install it in an empty
+profile. `codex plugin add <plugin>@<marketplace>` installs the native cache and writes a user enabled
+entry. An installed cache can subsequently load solely from trusted project declarations. Generated
+settings alone do not prove fresh-machine installation. See the current
+[cutover acceptance record](plans/repo-declared-config/CUTOVER.md).
+
+Automatic updates belong to Claude's native updater and the background updater installed by `setup.ps1`.
+The scheduled Codex updater also installs missing declared plugins after a repository has native trust.
+Its native `plugin add` commands maintain the host's required user installation entries automatically;
+repository settings remain the authored selection. Codex currently provides no cache-only install scope.
+Nothing updates packages in the launch path.
+
+For an explicit native refresh use `machine:reload-plugins`. Its default performs native marketplace
+and plugin updates; remote revision verification is opt-in and prints progress. `/reload-plugins`
+adopts updates in an open Claude session; start a new Codex session to load updated packages.
+
+Codex does not load agent definitions directly from plugins. Its engineering package supplies
+`scripts/install-codex-agents.ps1` for explicit profile delivery; launcher startup no longer copies
+agents or records hook trust. Native hook trust review still applies. Claude loads the package's
+`agents/` payload directly.

@@ -81,14 +81,14 @@
         "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
         "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
         "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
-        "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
         "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
         "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
         "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
@@ -120,7 +120,19 @@
         "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
         "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
         "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)"
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)"
       ],
       "codex_prefix_rules": [
         {
@@ -553,23 +565,26 @@
             ],
             "-B",
             [
-              "${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py",
-              "${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py"
+              "${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py",
+              "${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py",
+              "${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py",
+              "${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py",
+              "${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py"
             ]
           ],
-          "justification": "machine:refresh-cli refreshes the user's own tj-agents plugins from their registered marketplaces through the verified rolling refresh and repairs the host plugin registry.",
+          "justification": "Refresh selected tj-agents plugins through native host commands, with optional remote verification.",
           "match": [
             [
               "python",
               "-B",
-              "${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py",
+              "${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py",
               "--project",
               "C:/repo"
             ],
             [
               "python3",
               "-B",
-              "${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py",
+              "${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py",
               "--verify-only"
             ]
           ],
