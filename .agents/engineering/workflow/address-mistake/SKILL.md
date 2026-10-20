@@ -34,3 +34,12 @@ engine.
 
 Answer a user's direct question before entering this workflow. Recording or selecting an incident does
 not grant repair or publication authority beyond the active task.
+
+## Example
+
+```text
+Mistake WI-412 records that a release checklist omitted a migration verification step. The linked plan
+already owns the checklist correction. Append the observed evidence to WI-412 and link that plan rather
+than starting another repair. Once the plan's verification proves the new checklist step works, record the
+evidence and resolve WI-412 while retaining its incident history.
+```

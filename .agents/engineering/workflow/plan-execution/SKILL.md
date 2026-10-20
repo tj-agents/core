@@ -213,3 +213,12 @@ implementation, review, validation, delivery, and remaining durable state; neith
 nor open PR is terminal while authorized delivery remains, including a planning-only slice. Otherwise return
 one typed human, dependency, delivery, destructive, or context-transfer gate. Never expose an internal
 transcript or routine continuation prompt.
+
+## Example
+
+```text
+The resolved ledger names phase 2 on branch feature/passkeys-storage and says the next action is to add the
+credential repository. Git confirms the same branch and the only dirty files are the repository files named
+by that phase. Continue the slice, run its focused tests, commit the green candidate, update the ledger at
+the material phase transition, and then start review rather than creating another plan.
+```

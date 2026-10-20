@@ -41,3 +41,12 @@ reconciliation remains with `engineering:update-roadmap`.
 
 Return the completed planning outcome or one typed selection/dependency gate. Do not implement directly,
 duplicate an in-flight plan, or stop between selection and authorized plan authoring.
+
+## Example
+
+```text
+The Payments epic has ITEM-17 in flight on PR #88, ITEM-18 blocked on an upstream API, and ITEM-19 ready
+and unowned. When the user asks what to plan next, report the existing owner and blocker, recommend ITEM-19,
+and obtain the product choice. After ITEM-19 is selected, enter `plan-authoring` with its Work Items identity
+and roadmap evidence; do not begin implementation.
+```

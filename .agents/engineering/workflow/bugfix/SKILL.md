@@ -92,3 +92,12 @@ validation, review state, and delivery state; a commit is not terminal while aut
 Otherwise return one typed human gate with its owner, required action, evidence, and observable resume
 condition. Do not expose internal agent transcripts, model choices, competing-hypothesis chatter, or a
 routine continuation prompt.
+
+## Example
+
+```text
+`GET /reports/42` returns 404 after a report is archived and restored. Reproduce the request, trace the
+lookup to the stale archive filter, and add a regression test that fails before removing that filter. Run
+the focused test after the repair, record its command and result on the linked Work Items bug, then create
+the reviewable commit before entering review.
+```
