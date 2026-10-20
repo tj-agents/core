@@ -28,8 +28,8 @@ rather than a new window.
 ## One tab, and never a second
 
 The launcher prints its successful handoff event only after this attempt's native SessionStart is
-confirmed through the startup wrapper. A terminal accepting the command is insufficient. Plugin refresh
-failures and a CLI that exits before confirmation return nonzero without a successful handoff event.
+confirmed through the startup wrapper. A terminal accepting the command is insufficient. A CLI that exits
+before confirmation returns nonzero without a successful handoff event. Launch performs no plugin refresh.
 This confirms startup; reading the goal and accepting ownership remain separate pickup evidence.
 
 Exit code **3** means startup or terminal submission remains uncertain. The error retains the attempt's
