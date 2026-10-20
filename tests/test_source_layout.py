@@ -126,6 +126,48 @@ class SourceLayoutTests(unittest.TestCase):
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertEqual([dependency], selection["external_prerequisites"])
 
+    def test_external_dependencies_are_validated_per_owner(self):
+        catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
+        packages = {package["id"]: package for package in catalog["packages"]}
+        external = "work-items-agents/work-items"
+
+        borrowed = json.loads(json.dumps(catalog))
+        next(package for package in borrowed["packages"] if package["id"] == "base-agents/machine")[
+            "dependencies"]["required"].append(external)
+        with self.assertRaisesRegex(ValueError, "base-agents/machine names unknown dependency"):
+            SYNC.catalog_index(borrowed)
+
+        for mutation in (
+            lambda dependency: dependency.update(marketplace="Work_Items", id="Work_Items/work-items"),
+            lambda dependency: dependency.update(repository="not a repository"),
+        ):
+            invalid = json.loads(json.dumps(catalog))
+            engineering = next(package for package in invalid["packages"] if package["id"] == "base-agents/engineering")
+            mutation(engineering["external_dependencies"]["required"][0])
+            with self.subTest(dependency=engineering["external_dependencies"]["required"][0]):
+                with self.assertRaisesRegex(ValueError, "Invalid external dependency for base-agents/engineering"):
+                    SYNC.catalog_index(invalid)
+
+        duplicate = json.loads(json.dumps(catalog))
+        engineering = next(package for package in duplicate["packages"] if package["id"] == "base-agents/engineering")
+        engineering["external_dependencies"]["required"].append(dict(engineering["external_dependencies"]["required"][0]))
+        with self.assertRaisesRegex(ValueError, "Invalid external dependency for base-agents/engineering"):
+            SYNC.catalog_index(duplicate)
+
+        conflicting = json.loads(json.dumps(catalog))
+        machine = next(package for package in conflicting["packages"] if package["id"] == "base-agents/machine")
+        machine["dependencies"]["optional"].append(external)
+        machine["external_dependencies"] = {"required": [], "optional": [
+            {"id": external, "marketplace": "work-items-agents", "repository": "someone/else"}]}
+        with self.assertRaisesRegex(ValueError, "inconsistent ownership: work-items-agents"):
+            SYNC.catalog_index(conflicting)
+
+        self.assertEqual(
+            {"owner_repository": "tj-agents/work-items", "source": "https://github.com/tj-agents/work-items.git"},
+            SYNC.catalog_marketplaces(SYNC.catalog_index(catalog))["work-items-agents"],
+        )
+        self.assertEqual(set(packages), set(SYNC.catalog_index(catalog)))
+
     def test_task_recovery_contract_ships_for_both_hosts(self):
         _, output, skills, _ = SYNC.build(self.root)
         canonical = {
