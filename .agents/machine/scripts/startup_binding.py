@@ -37,8 +37,11 @@ def _acknowledged(directory: Path, token: str) -> bool:
 
 def _terminate(process: subprocess.Popen) -> None:
     if os.name == "nt":
-        subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
-                       capture_output=True, timeout=10, check=False)
+        try:
+            subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+                           capture_output=True, timeout=10, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            process.kill()
     else:
         os.killpg(process.pid, signal.SIGTERM)
     try:
@@ -88,7 +91,10 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
             return process.wait()
         except BaseException:
             if process.poll() is None:
-                _terminate(process)
+                try:
+                    _terminate(process)
+                except (OSError, subprocess.SubprocessError) as error:
+                    print(f"launch: native child cleanup failed: {error}", file=sys.stderr)
             raise
 
 
