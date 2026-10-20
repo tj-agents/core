@@ -67,6 +67,7 @@ class SweepTests(unittest.TestCase):
         self.assertEqual('kept: a session is working in it', self.outcome(outcomes, 'Feature/Busy'))
         self.assertEqual(4, len(outcomes))
 
+
     def test_the_primary_checkout_is_never_a_candidate(self):
         outcomes = self.sweep()
 
@@ -113,6 +114,19 @@ class SweepTests(unittest.TestCase):
         self.assertEqual([link], removed)
         self.assertFalse(os.path.lexists(link))
         self.assertEqual('keep', (target / 'SKILL.md').read_text(encoding='utf-8'))
+
+    def test_only_empty_unregistered_folders_are_cleared(self):
+        empty = self.primary / '.worktrees' / 'Fix-Gone'
+        empty.mkdir()
+        kept = self.primary / '.worktrees' / 'Fix-HasFiles'
+        kept.mkdir()
+        (kept / 'notes.md').write_text('x', encoding='utf-8')
+
+        outcomes = self.sweep()
+
+        self.assertFalse(empty.exists())
+        self.assertTrue((kept / 'notes.md').is_file())
+        self.assertIn('removed empty leftover folder', outcomes.values())
 
     def test_worktree_listing_parses_branches_and_detached_heads(self):
         porcelain = ('worktree C:/r\nHEAD aaa\nbranch refs/heads/main\n\n'
