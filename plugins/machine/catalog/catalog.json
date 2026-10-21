@@ -513,7 +513,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:273fd4d4238a3a961242ae8421ef07beb412a8c69c74b17380df41dec6b3b97f",
+      "digest": "sha256:68f5e4894ecc5b80f324cb025ce82086bd4ac0b25196a7f27fb8e7ce2d4dc350",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -604,6 +604,18 @@
             "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py:*)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py:*)",
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py:*)",
@@ -819,7 +831,10 @@
                 "-B",
                 [
                   "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py"
                 ],
                 [
                   "status",
@@ -879,7 +894,10 @@
                 "-B",
                 [
                   "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py"
                 ],
                 "item"
               ],
@@ -921,7 +939,10 @@
                 "-B",
                 [
                   "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py"
                 ],
                 "claim"
               ],
@@ -954,6 +975,69 @@
                   "python",
                   "-B",
                   "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                  "end"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py"
+                ],
+                [
+                  "register",
+                  "bind"
+                ]
+              ],
+              "justification": "machine:recover-agents records a validated external reference or binds it to an existing execution through the shipped CLI.",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
+                  "register",
+                  "--provider",
+                  "github",
+                  "--scope",
+                  "github.com/owner/repository",
+                  "--native-id",
+                  "42"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py",
+                  "bind",
+                  "--execution-key",
+                  "execution:123e4567-e89b-12d3-a456-426614174000",
+                  "--provider",
+                  "github",
+                  "--scope",
+                  "github.com/owner/repository",
+                  "--native-id",
+                  "42"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/other.py",
+                  "register"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py",
                   "end"
                 ]
               ]
