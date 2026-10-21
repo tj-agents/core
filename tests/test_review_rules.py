@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 import sys
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -128,6 +129,17 @@ class ReviewRulesTests(unittest.TestCase):
         with mock.patch.object(self.gate.shutil, "which", return_value=sys.executable):
             entries = self.gate.native_plugins("codex", str(self.project))
         self.assertEqual(self.project.resolve(), Path(entries[0]["name"]).resolve())
+
+    def test_relative_host_executable_is_frozen_before_the_directory_change(self):
+        binary = str(Path("relative-bin") / "codex")
+        self.gate.native_plugins.cache_clear()
+        self.addCleanup(self.gate.native_plugins.cache_clear)
+        completed = subprocess.CompletedProcess([], 0, '{"installed": [{"enabled": true}]}', '')
+        with mock.patch.object(self.gate.shutil, "which", return_value=binary), mock.patch.object(
+                self.gate.subprocess, "run", return_value=completed) as launch:
+            self.gate.native_plugins("codex", str(self.project))
+        self.assertEqual(str((Path.cwd() / binary).resolve()), launch.call_args.args[0][0])
+        self.assertEqual(str(self.project), launch.call_args.kwargs["cwd"])
 
     def test_missing_native_inventory_never_falls_back_to_another_host(self):
         self.selection("stack@selected")
