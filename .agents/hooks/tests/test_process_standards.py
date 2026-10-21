@@ -83,7 +83,7 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertNotIn("concurrent fixes", address)
 
     def test_always_on_instructions_own_the_stage_pointer_rule(self):
-        instructions = authored_skill("session-guidance").read_text(
+        instructions = authored_skill("session").read_text(
             encoding="utf-8"
         )
 
@@ -95,7 +95,7 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertEqual(1, self.corpus().count("stage is actually entered"))
 
     def test_always_on_instructions_reconcile_known_problems_before_terminal_results(self):
-        instructions = authored_skill("session-guidance").read_text(
+        instructions = authored_skill("session").read_text(
             encoding="utf-8"
         )
         flat = " ".join(instructions.split())
@@ -108,7 +108,7 @@ class ProcessStandardsTests(unittest.TestCase):
         )
 
     def test_a_standards_defect_hands_off_in_the_same_turn(self):
-        instructions = authored_skill("session-guidance").read_text(
+        instructions = authored_skill("session").read_text(
             encoding="utf-8"
         )
         flat = " ".join(instructions.split())
@@ -137,7 +137,7 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn(phrase, self_repair)
 
     def test_callout_checks_standards_before_an_apology(self):
-        instructions = authored_skill("session-guidance").read_text(encoding="utf-8")
+        instructions = authored_skill("session").read_text(encoding="utf-8")
         section = " ".join(
             instructions.split("## When the user calls out a mistake", 1)[1].split("## ", 1)[0].split()
         )
