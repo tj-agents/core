@@ -37,7 +37,7 @@ Agent Workboard is outside scope and is not a dependency.
 - Worktree: `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Refactor-WorkflowAgentStore`.
 - Branch: `Refactor/WorkflowAgentStore`.
 - Base: `112df9f5f9714acf443c84fe911cc081f9772dc5`, fetched `origin/main` on 21 October 2026.
-- PR: not opened.
+- PR: [Core #352](https://github.com/tj-agents/core/pull/352), S1 draft with `human-gate`.
 - Pickup: exact native identity and first read-only action recorded in the dispatched pickup file.
 
 Native history, the supported store status command, registered branches/worktrees, current plans and
@@ -319,10 +319,10 @@ liveness. Resolve that overlap through current native ownership and review evide
 
 ## Execution readiness
 
-Verdict: S1 locally qualified; independent readiness passed. Frozen review and CI remain. S2/S3 are not yet implementation-ready.
+Verdict: S1 independent source review passed at `ce9b3966883580a67ee1921e9b03354db381e5a7`; the CI fixture repair needs incremental review and exact-head CI. S2/S3 are not yet implementation-ready.
 Execution authorization: architecture and implementation through reviewed PR preparation.
 Transfer: none; retain this owner under the explicit dispatch.
-Unresolved: S1 frozen review and exact-head CI; S2 exact source/route mapping and S3 coordinated publication/native acceptance.
+Unresolved: S1 incremental review and exact-head CI after the tier fixture correction; S2 exact source/route mapping and S3 coordinated publication/native acceptance.
 Resolver: current owner and a bounded independent readiness reader. No new architecture successor.
 
 ## Verification
@@ -377,16 +377,16 @@ old checkout and goal; a new catalog slice still needs its current checkout/regi
 
 ## Next Steps
 
-Finish S1 authored line-ending cleanup and AST uniqueness checks;
-run the repository-provider and final isolated-package checks. Restore existing generated catalog
-digests and exclude generated distribution output, measure the authored slice, commit it and synchronize
-once with origin/main before frozen Engineering review. Publish a reviewed draft under the explicit
-architecture merge hold; the repository currently has no human-gate label, so establish that hold before
-delivery binding can infer standing merge authority. Continue the recorded S2 source mapping and readiness
-before its required parent/child stack. The explicit merge and installation gates remain in force.
+Complete S1's tier-fixture repair review and observe exact-head CI on PR #352. Its native and three
+independent source lenses passed at `ce9b3966`; both platform matrices identified only the stale
+three-package expectation in `test_stack_tiers.py`. This commit adds Agent Store to both tier assertions.
+The three native process fixtures limited in the local reviewer environment passed on both CI platforms.
+The delivery binding confirms absent merge authority through `human-gate`; do not enqueue or merge.
+Continue S2's bounded Machine dependency cleanup and generic Workflow mapping/readiness, then implement
+the necessary parent/child stack under the existing dispatch. Native installation remains an S3 gate.
 
 Scope: whole plan through all remaining phases and terminal delivery within the dispatched authority.
-Current slice: S1 canonical Agent Store package, read-only inspection and consumer cutover.
+Current slice: S1 canonical Agent Store package, with reviewed implementation and a CI fixture correction.
 Remaining scope: implementation, caller migration, both-host verification, review, coherent PR delivery,
 and explicit merge/installation gates when reached.
 Done when: the requested namespace cutover satisfies acceptance, or only an evidenced external gate
