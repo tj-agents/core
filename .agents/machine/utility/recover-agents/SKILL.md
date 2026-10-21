@@ -40,9 +40,11 @@ profile. Unknown live identity requires reconciliation before a resume.
 
 ## Continue a work item
 
-When asked to continue a work item, run `work_item_sessions.py status '<feature>/<item>'`, then `resume`
-on the same `<feature>/<item>`. Without `--handle` it resumes the single not-ended owner; with several
-sessions and no single owner, pass `--handle`; with no sessions, start a new owner from the work item
-README's `## Next Steps` and `claim` it. Run `interrupted` to find and resume sessions whose process died
-without closing cleanly. See [`work-item-sessions.md`](../../resources/work-item-sessions.md) for the
-session store's schema and commands.
+When asked to continue a work item, use the shipped `scripts/work_item_sessions.py` facade. Run `status`
+then `resume` with the same local `<feature>/<item>`, `--execution-key`, or complete `--provider`, `--scope`
+and `--native-id` reference. Without `--handle` it resumes the single not-ended owner; with several sessions
+and no single owner, pass `--handle`; with no sessions, start a new owner from the work item README's
+`## Next Steps` and `claim` it. Use `register` to create a native-only execution before its first native
+claim, and `bind` to attach a verified reference to an existing execution. Run `interrupted` to find and
+resume sessions whose process died without closing cleanly. See
+[`work-item-sessions.md`](../../resources/work-item-sessions.md) for the session store's schema and commands.
