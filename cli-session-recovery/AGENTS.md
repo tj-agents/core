@@ -28,7 +28,7 @@ Maintain a reliable Windows recovery system for Tommy's Claude Code and Codex CL
 3. Inspect `C:\Users\TommySeery\.cli-session-vault` read-only. Hash important JSON files before any deployment or real save.
 4. Reproduce using module functions or `-DryRun` first.
 5. Run `tests\cli-session-vault.tests.ps1` and parse every deployable PowerShell file.
-6. Deploy only with `install-cli-session-recovery.ps1`; it creates a timestamped backup of the live scripts.
+6. Deploy only with `./setup.ps1` from the core checkout, which runs `install-cli-session-recovery.ps1` when its `-Check` reports drift; the installer creates a timestamped backup of each live file it replaces.
 7. Prove recovery-state JSON hashes did not change during deployment.
 8. Run the installed Restore dry run and check saved, running, missing, detached, and window counts.
 9. Only then perform the requested real Save or Restore.
@@ -40,7 +40,7 @@ Visible tabs, live CLI processes, distinct resumable IDs, detached processes, sa
 - Repository: `C:\Users\TommySeery\source\repos\tj-agents\core` (the main checkout, not a worktree)
 - Source: `cli-session-recovery`
 - Tests: `cli-session-recovery\tests\cli-session-vault.tests.ps1` from the repository root, or `tests\cli-session-vault.tests.ps1` from this directory
-- Installer: `cli-session-recovery\install-cli-session-recovery.ps1` from the repository root, or `install-cli-session-recovery.ps1` from this directory
+- Installer: run `./setup.ps1` at the repository root; it invokes `cli-session-recovery\install-cli-session-recovery.ps1` from the main checkout. Add `-Check` to the installer to report drift without writing.
 - Installed scripts: `C:\Users\TommySeery\*.ps1` plus the hidden-save VBS launcher
 - Runtime vault: `C:\Users\TommySeery\.cli-session-vault` — never commit it
 - Desktop interface, and the only supported way for Tommy to run this: `SAVE CLI SESSIONS.lnk` and `RESTORE CLI SESSIONS.lnk`. Never have him run a script by hand from a frozen Terminal.
