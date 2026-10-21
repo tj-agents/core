@@ -23,7 +23,6 @@ import time
 
 GIT_TIMEOUT_SECONDS = 30
 SWEEP_TIMEOUT_SECONDS = 1800
-LOCK_STALE_SECONDS = 3600
 SCRIPT_NAME = "plugin_autoupdate.py"
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 CLI_TIMEOUT_SECONDS = 60
@@ -74,7 +73,10 @@ def is_pinned(ref: object) -> bool:
 
 
 def load_toml(path: Path) -> dict:
-    import tomllib
+    try:
+        import tomllib
+    except ImportError:
+        return {}
 
     try:
         with path.open("rb") as stream:
@@ -392,32 +394,45 @@ def packaged_copies(codex_config: dict) -> list[Path]:
 
 
 def self_update(current: Path, codex_config: dict) -> bool:
-    candidates = [path for path in packaged_copies(codex_config) if path.resolve() != current.resolve()]
+    candidates = [path for path in packaged_copies(codex_config)
+                  if path.resolve() != current.resolve() and path.with_name("machine_events.py").is_file()]
     if not candidates:
         return False
     newest = max(candidates, key=lambda path: path.stat().st_mtime)
     try:
-        if newest.read_bytes() == current.read_bytes():
-            return False
-        shutil.copyfile(newest, current.with_name(current.name + ".next"))
-        os.replace(current.with_name(current.name + ".next"), current)
+        changed = False
+        for source, target in ((newest, current), (newest.with_name("machine_events.py"), current.with_name("machine_events.py"))):
+            if not source.is_file() or (target.is_file() and source.read_bytes() == target.read_bytes()):
+                continue
+            shutil.copyfile(source, target.with_name(target.name + ".next"))
+            os.replace(target.with_name(target.name + ".next"), target)
+            changed = True
     except OSError:
         return False
-    return True
+    return changed
 
 
-def acquire_lock(path: Path) -> bool:
+def acquire_lock(path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
+    stream = path.open("a+b")
     try:
-        if time.time() - path.stat().st_mtime > LOCK_STALE_SECONDS:
-            path.unlink(missing_ok=True)
+        if os.name == "nt":
+            import msvcrt
+
+            stream.seek(0)
+            if not stream.read(1):
+                stream.write(b"0")
+                stream.flush()
+            stream.seek(0)
+            msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
-        pass
-    try:
-        os.close(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
-    except FileExistsError:
-        return False
-    return True
+        stream.close()
+        return None
+    return stream
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -427,15 +442,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-self-update", action="store_true")
     parser.add_argument("--no-sweep", action="store_true")
+    parser.add_argument("--retry-failures", action="store_true")
     arguments = parser.parse_args(argv)
     directory = state_directory()
-    lock = directory / "plugin-autoupdate.lock"
-    if not acquire_lock(lock):
+    lock = acquire_lock(directory / "plugin-autoupdate.lock")
+    if lock is None:
         return 0
     try:
         state_file = directory / "plugin-autoupdate.json"
         state = read_json(state_file)
         recorded = state.get("revisions") if isinstance(state.get("revisions"), dict) else {}
+        if arguments.retry_failures:
+            recorded = {key: value for key, value in recorded.items() if not key.startswith("failed:")}
         previous = state.get("project_only") if isinstance(state.get("project_only"), list) else []
         config = load_codex_config()
         executable = shutil.which("codex")
@@ -446,8 +464,9 @@ def main(argv: list[str] | None = None) -> int:
         if not arguments.no_self_update:
             self_update(Path(__file__), load_codex_config())
     finally:
-        lock.unlink(missing_ok=True)
-    return 0
+        lock.close()
+    results = outcomes.get("marketplaces", {})
+    return int(any(str(value).startswith(("failed", "unreachable")) for value in results.values()))
 
 
 if __name__ == "__main__":

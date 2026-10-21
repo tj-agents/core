@@ -112,9 +112,9 @@ result.
 
 `M008` is a `mistake`, observed on 2026-10-11: this session began a second standards correction after
 `session-42` had already claimed it. Cause: confirmed duplicate-writer attempt. Source owner:
-`engineering/session-guidance`. Impact: parallel edits could produce conflicting guidance; `P2`. State:
+`engineering/session`. Impact: parallel edits could produce conflicting guidance; `P2`. State:
 `blocked`; reason: `session-42` owns the causal correction; `blocked_by: conflict`; conflicting owner:
-`session-42`; conflicting paths: `.agents/engineering/policy/session-guidance/SKILL.md` and
+`session-42`; conflicting paths: `.agents/engineering/policy/session/SKILL.md` and
 `MISTAKES.md`; repair link: `MISTAKES.md#M008` and `session-42`. Resolver: `session-42`'s owner. Resume
 when that result is reconciled or it releases those paths. Next action: append this evidence to the
 canonical incident and stop the duplicate writer. Resolution condition: the correction passes its causal

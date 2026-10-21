@@ -14,12 +14,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".agents" / "engineering" / "workflow"
 PACKAGE = ROOT / "plugins" / "engineering"
-REVIEW_FAMILY = ("review", "incremental-review", "big-review", "big-review-all", "docs-review", "address-review")
-DELEGATES_NATIVE_LAYER = ("incremental-review", "big-review", "docs-review")
+REVIEW_FAMILY = ("review", "incremental-review", "staged-review", "staged-review-all", "docs-review", "address-review")
+DELEGATES_NATIVE_LAYER = ("incremental-review", "staged-review", "docs-review")
 
 
 def body(skill):
-    return (WORKFLOW / skill / "SKILL.md").read_text(encoding="utf-8")
+    kind = "utility" if skill == "review" else "workflow"
+    return (WORKFLOW.parent / kind / skill / "SKILL.md").read_text(encoding="utf-8")
 
 
 def section(text, heading):
@@ -77,7 +78,8 @@ class NativeLayerNamesTheHostReviewer(unittest.TestCase):
     def test_the_packaged_procedure_is_the_authored_one(self):
         for skill in ("review", *DELEGATES_NATIVE_LAYER):
             with self.subTest(skill=skill):
-                packaged = PACKAGE / ".agents" / "engineering" / "workflow" / skill / "SKILL.md"
+                kind = "utility" if skill == "review" else "workflow"
+                packaged = PACKAGE / ".agents" / "engineering" / kind / skill / "SKILL.md"
                 self.assertEqual(body(skill), packaged.read_text(encoding="utf-8"))
 
 
@@ -88,7 +90,7 @@ class ReviewRunsWithoutRepositoryHelpers(unittest.TestCase):
         texts["review-lifecycle"] = lifecycle.read_text(encoding="utf-8")
         for skill, text in texts.items():
             with self.subTest(skill=skill):
-                self.assertIsNone(re.search(r"python(?: -B)? (?!<engineering>/)\S+\.py", text))
+                self.assertIsNone(re.search(r"python(?: -B)? (?!(?:<engineering>|<review-skill>)/)\S+\.py", text))
                 self.assertIsNone(re.search(r"(?<!<engineering>/workflows/)workflow_ops\.py", text))
 
     def test_every_engineering_helper_the_review_names_is_shipped(self):
@@ -167,6 +169,19 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
         self.assertEqual("src/Authorization/Startup.cs", descriptor["security"]["first_path"])
         self.assertEqual("src/Authorization/Startup.cs", descriptor["security"]["trunk_first_path"])
         self.assertTrue(Path(descriptor["bundle"]["tree"]).is_dir())
+
+    def test_standards_resolver_runs_from_either_relocated_host_entry(self):
+        for tree in ("skills", "codex-skills"):
+            with self.subTest(tree=tree):
+                completed = self.run_packaged(
+                    tree + "/review/scripts/review_rules.py", "--project", str(self.repository),
+                    "--host", "claude" if tree == "skills" else "codex",
+                )
+                self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
+                result = json.loads(completed.stdout)
+                self.assertIsNone(result["selection"])
+                self.assertEqual([], result["rules"])
+                self.assertTrue(result["diagnostics"])
 
     def test_stack_child_inherits_its_parent_layers_security_paths(self):
         self.git("checkout", "-q", "-b", "stack-child")

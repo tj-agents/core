@@ -49,6 +49,32 @@ GENERATOR_SPEC.loader.exec_module(GENERATOR)
 
 
 class CodexHookSnapshotTests(unittest.TestCase):
+    def test_packaged_machine_session_start_acknowledges_and_registers_fixture(self):
+        with tempfile.TemporaryDirectory(prefix="machine hook fixture \u00fc ") as directory:
+            temporary = Path(directory)
+            payload = temporary / "cache" / "tj-agents" / "machine" / "local"
+            shutil.copytree(ROOT / "plugins" / "machine", payload)
+            manifest = json.loads((payload / "hooks" / "codex.json").read_text(encoding="utf-8"))
+            command = manifest["hooks"]["SessionStart"][0]["hooks"][0][HOST_COMMAND]
+            command = command.replace("${PLUGIN_ROOT}", str(payload))
+            token = "fixture-" + "a" * 40
+            environment = dict(os.environ, PLUGIN_DATA=str(temporary / "data"),
+                               AGENT_STATE_DIRECTORY=str(temporary / "state"),
+                               TJ_AGENTS_STARTUP_ACK_DIRECTORY=str(temporary),
+                               TJ_AGENTS_STARTUP_ACK_TOKEN=token)
+            result = subprocess.run(
+                command, shell=True, cwd=temporary, env=environment,
+                input=json.dumps({"hook_event_name": "SessionStart", "session_id": "fixture-session",
+                                  "cwd": str(temporary)}),
+                capture_output=True, text=True, encoding="utf-8", timeout=20,
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertEqual(token, (temporary / token).read_text(encoding="utf-8"))
+            registration = json.loads((temporary / "state" / "cli-sessions" /
+                                       "fixture-session.json").read_text(encoding="utf-8"))
+            self.assertEqual("fixture-session", registration["session_id"])
+            self.assertEqual(str(temporary), registration["cwd"])
+
     def test_concurrent_delayed_reads_keep_digest_order_and_reject_tampering(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

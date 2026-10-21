@@ -1,6 +1,6 @@
 ---
 name: incremental-review
-description: Select and run the canonical isolated review workflow over only commits added after the canonical work order's completed watermark, appending one frozen pass and moving the marker only after parent synthesis. Use for new commits since a prior full or staged review, including remediation commits that require a fresh watermark.
+description: Review changes since a completed review, using its recorded watermark for descendant commits and comparing old and new patch series for a design sweep of rebased work or a stack. Use for later commits, remediation checks or a relative design sweep; workflow evidence advances only after parent synthesis over a reconciled candidate.
 
 kind: workflow
 domain: process

@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 from pathlib import Path
 import sys
@@ -53,6 +54,18 @@ class ArmTests(unittest.TestCase):
         arguments = self.shared.start_detached.call_args.args[1]
         self.assertEqual(str(ROOT), arguments[arguments.index('--repo') + 1])
         self.assertEqual('sweep.py', arguments[arguments.index('--sweep') + 1])
+
+    def test_claude_arm_passes_its_transcript_and_the_size_at_arming(self):
+        self.entry['host'] = 'claude'
+        with tempfile.TemporaryDirectory() as home:
+            transcript = Path(home) / 'projects' / 'C--repo' / 'own.jsonl'
+            transcript.parent.mkdir(parents=True)
+            transcript.write_bytes(b'{}\n')
+            with mock.patch.dict(os.environ, {'CLAUDE_CONFIG_DIR': home}):
+                self.arm()
+        arguments = self.shared.start_detached.call_args.args[1]
+        self.assertEqual(str(transcript), arguments[arguments.index('--transcript') + 1])
+        self.assertEqual('3', arguments[arguments.index('--transcript-offset') + 1])
 
     def test_arm_refuses_without_an_active_turn(self):
         for row in (None, {'ended_at': 5, 'turn_state': 'working'}, {'ended_at': None, 'turn_state': 'awaiting_input'}):
@@ -137,6 +150,90 @@ class WatcherTests(unittest.TestCase):
         with mock.patch.object(watcher.session_close, 'verified_live', return_value=False):
             self.assertIsNone(self.wait([(1e9, self.row('awaiting_input', 1005))]))
 
+    def test_a_prompt_after_an_interrupted_turn_cancels(self):
+        timeline = [(1004, self.row('working', 990)), (1e9, self.row('working', 1004))]
+        self.assertIsNone(self.wait(timeline))
+        self.assertLess(self.clock.now, 1005)
+
+    def test_a_prompt_and_its_stop_inside_one_poll_cancel(self):
+        timeline = [(1002, self.row('awaiting_input', 1001)), (1e9, self.row('awaiting_input', 1002))]
+        self.assertIsNone(self.wait(timeline))
+
+    def transcript(self, *records):
+        path = Path(os.environ['AGENT_STATE_DIRECTORY']) / 'transcript.jsonl'
+        path.write_text(''.join(json.dumps(record) + '\n' for record in records), encoding='utf-8')
+        self.args.transcript, self.args.transcript_offset = str(path), 0
+        return path
+
+    def test_a_blocked_stop_hook_cancels(self):
+        self.transcript({'type': 'assistant', 'message': {'content': 'done'}},
+                        {'type': 'attachment', 'attachment': {'type': 'hook_blocking_error', 'hookEvent': 'Stop'}},
+                        {'type': 'system', 'subtype': 'stop_hook_summary'})
+        self.assertIsNone(self.wait([(1e9, self.row('awaiting_input', 1005))]))
+
+    def test_idle_counts_only_after_every_stop_hook_finished(self):
+        path = self.transcript({'type': 'assistant', 'message': {'content': 'done'}})
+        sleep = self.clock.sleep
+
+        def finish_hooks_at_1010(seconds):
+            sleep(seconds)
+            if self.clock.now >= 1010 and 'stop_hook_summary' not in path.read_text(encoding='utf-8'):
+                with path.open('a', encoding='utf-8') as stream:
+                    stream.write(json.dumps({'type': 'system', 'subtype': 'stop_hook_summary'}) + '\n')
+        self.clock.sleep = finish_hooks_at_1010
+        self.assertEqual(1005, self.wait([(1e9, self.row('awaiting_input', 1005))]))
+        self.assertGreaterEqual(self.clock.now, 1010 + self.args.idle)
+
+    def test_transcript_written_before_arming_is_ignored(self):
+        path = self.transcript({'type': 'attachment', 'attachment': {'type': 'hook_blocking_error', 'hookEvent': 'Stop'}})
+        self.args.transcript_offset = path.stat().st_size
+        with path.open('a', encoding='utf-8') as stream:
+            stream.write(json.dumps({'type': 'system', 'subtype': 'stop_hook_summary'}) + '\n')
+        self.assertEqual('finished', watcher.transcript_verdict(self.args))
+
+    def test_compaction_after_arming_does_not_cancel_a_claude_close(self):
+        self.transcript({'type': 'user', 'isCompactSummary': True, 'message': {'content': 'summary'}},
+                        {'type': 'assistant', 'message': {'content': 'done'}},
+                        {'type': 'system', 'subtype': 'stop_hook_summary'})
+        timeline = [(1004, self.row('working', 1002)), (1e9, self.row('awaiting_input', 1004))]
+        self.assertEqual(1004, self.wait(timeline))
+
+    def test_a_registry_blip_after_the_final_stop_only_restarts_the_claude_idle_wait(self):
+        self.transcript({'type': 'assistant', 'message': {'content': 'done'}},
+                        {'type': 'system', 'subtype': 'stop_hook_summary'})
+        timeline = [(1002, self.row('awaiting_input', 1001)), (1003, self.row('working', 1002)),
+                    (1e9, self.row('awaiting_input', 1003))]
+        self.assertEqual(1003, self.wait(timeline))
+        self.assertGreaterEqual(self.clock.now, 1003 + self.args.idle)
+
+    def test_a_claude_prompt_after_arming_cancels_even_without_a_stop(self):
+        self.transcript({'type': 'user', 'message': {'content': '[Request interrupted by user]'}},
+                        {'type': 'user', 'message': {'content': [{'type': 'text', 'text': 'wait, also do X'}]}})
+        self.assertIsNone(self.wait([(1e9, self.row('working', 1004))]))
+
+    def test_a_turn_injected_after_the_final_stop_cancels(self):
+        self.transcript({'type': 'assistant', 'message': {'content': 'done'}},
+                        {'type': 'system', 'subtype': 'stop_hook_summary'},
+                        {'type': 'user', 'isMeta': True, 'message': {'content': '<task-notification>'}})
+        self.assertIsNone(self.wait([(1e9, self.row('awaiting_input', 1005))]))
+
+    def test_tool_results_after_arming_are_not_prompts(self):
+        self.transcript({'type': 'user', 'message': {'content': [{'type': 'tool_result', 'content': 'armed'}]}},
+                        {'type': 'assistant', 'message': {'content': 'done'}},
+                        {'type': 'system', 'subtype': 'stop_hook_summary'})
+        self.assertEqual('finished', watcher.transcript_verdict(self.args))
+
+    def test_the_session_store_is_read_without_taking_a_write_lock(self):
+        store = watcher.session_close.register_session._load_session_store()
+        connection = store.connect()
+        store.start_session(connection, 'claude', 'own', str(Path.cwd()), pid=123, pid_started_at=100.5)
+        connection.execute('BEGIN IMMEDIATE')
+        try:
+            self.assertEqual('working', watcher.session_row(self.args)['turn_state'])
+        finally:
+            connection.rollback()
+            connection.close()
+
     def test_refused_close_is_recorded_and_never_sweeps(self):
         with mock.patch.object(watcher, 'wait_for_idle', return_value=1005), \
                 mock.patch.object(watcher, 'registered_entry', return_value=None), \
@@ -175,6 +272,45 @@ class WatcherTests(unittest.TestCase):
                 self.assertRaisesRegex(RuntimeError, 'tab refused'):
             watcher.close_session(self.args, 1005)
         reopen.assert_called_once_with(entry, 'closed')
+
+    def test_unconfirmed_host_exit_is_refused_reopened_and_never_swept(self):
+        entry = {'host': 'claude', 'session_id': 'own', 'pid': 123, 'pid_started_at': 100.5}
+        with mock.patch.object(watcher, 'wait_for_idle', return_value=1005), \
+                mock.patch.object(watcher, 'registered_entry', return_value=entry), \
+                mock.patch.object(watcher.session_close, 'awaiting_input_activity'), \
+                mock.patch.object(watcher.session_close, 'qualified_windows_wrapper', return_value=None), \
+                mock.patch.object(watcher.session_close, '_record_own_end'), \
+                mock.patch.object(watcher.session_close, '_reopen_own_end') as reopen, \
+                mock.patch.object(watcher.close, 'close_host'), \
+                mock.patch.object(watcher.session_close, 'verified_exited', return_value=False), \
+                mock.patch.object(watcher, 'EXIT_WAIT_SECONDS', 0), \
+                mock.patch.object(watcher, 'sweep') as sweep:
+            self.assertEqual(2, watcher.main(['--host', 'claude', '--session-id', 'own', '--pid', '123',
+                                              '--pid-started-at', '100.5', '--armed-at', '1000']))
+        reopen.assert_called_once_with(entry, 'closed')
+        sweep.assert_not_called()
+        self.assertIn('host exit was not confirmed',
+                      watcher.session_close.read_json(watcher.outcome_path('own'))['status'])
+
+    def test_tab_refusal_reaches_the_receipt_without_signalling_or_sweeping(self):
+        entry = {'host': 'claude', 'session_id': 'own', 'pid': 123, 'pid_started_at': 100.5}
+        with mock.patch.object(watcher, 'wait_for_idle', return_value=1005), \
+                mock.patch.object(watcher, 'registered_entry', return_value=entry), \
+                mock.patch.object(watcher.session_close, 'awaiting_input_activity'), \
+                mock.patch.object(watcher.session_close, 'qualified_windows_wrapper', return_value=None), \
+                mock.patch.object(watcher.session_close, '_record_own_end'), \
+                mock.patch.object(watcher.session_close, '_reopen_own_end') as reopen, \
+                mock.patch.object(watcher.close.close_tab, 'close_entry',
+                                  side_effect=watcher.close.close_tab.TerminalRefusal('tab ambiguous')), \
+                mock.patch.object(watcher.close.os, 'kill') as killer, \
+                mock.patch.object(watcher, 'sweep') as sweep:
+            self.assertEqual(2, watcher.main(['--host', 'claude', '--session-id', 'own', '--pid', '123',
+                                              '--pid-started-at', '100.5', '--armed-at', '1000']))
+        reopen.assert_called_once_with(entry, 'closed')
+        killer.assert_not_called()
+        sweep.assert_not_called()
+        self.assertEqual('refused: tab ambiguous',
+                         watcher.session_close.read_json(watcher.outcome_path('own'))['status'])
 
 
 if __name__ == '__main__':

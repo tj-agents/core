@@ -153,7 +153,7 @@ with a test that `review-prepare` names the skill for such a path.
   - `handle_stop` blocks while `session_exit_required` is set or the worktree exists.
   - `cli_clear` sets `checkout_retained` and `session_exit_required = True`, so `--clear` on a removed
     worktree never releases the block.
-  - This contradicts `engineering:session-guidance`, under which only a terminal goal closes its own session.
+  - This contradicts `engineering:session`, under which only a terminal goal closes its own session.
 - **Source owner:** core engineering hooks.
 - **State:** open.
 - **Next action:** stop blocking when the obligation's worktree is gone, or recorded as retained, and the
@@ -183,7 +183,7 @@ with a test that `review-prepare` names the skill for such a path.
   dotnet M003 were likewise recorded only after his callouts.
 - **Impact and priority:** P1. Known problems stay invisible to other sessions and to the source owner, and
   Tommy has to prompt for every record.
-- **Cause:** `engineering:session-guidance` ("Record noticed problems") says to record while the observation
+- **Cause:** `engineering:session` ("Record noticed problems") says to record while the observation
   is available, but nothing enforces it. Recording was conflated with repair: being unable to launch a
   repair session was treated as a reason to postpone the record.
 - **Source owner:** core engineering (session guidance, `write-debt` and `write-mistake`).
@@ -251,7 +251,7 @@ with a test that `review-prepare` names the skill for such a path.
 - **Impact and priority:** P1. Wasted wall-clock and tokens on every multi-part task, review fragmentation,
   merge conflicts between the agent's own branches, and repeated frustration.
 - **Cause (observed, not all verified):**
-  - `engineering:session-guidance` "Keep large changes reviewable" says to define PR-sized slices before a
+  - `engineering:session` "Keep large changes reviewable" says to define PR-sized slices before a
     "large refactor or multi-concern change" and "Deliver one slice at a time by default", with "A phase label or
     an existing open PR never justifies accumulating the whole goal in one diff". Nothing says that a small or
     single-purpose goal, or one the user will not review in stages, is one PR.
@@ -259,7 +259,7 @@ with a test that `review-prepare` names the skill for such a path.
   - The Concertable delivery-binding gate expects one PR per checkout, so each stacked PR forced a manual
     re-bind.
   - `engineering:open-pr` opens a draft per slice and has no "one PR for the goal" default.
-- **Source owner:** core engineering (`session-guidance`, `git-branching`, `open-pr`, `plan-authoring` slice
+- **Source owner:** core engineering (`session`, `git-branching`, `open-pr`, `plan-authoring` slice
   wording) and the delivery-binding gate.
 - **State:** open.
 - **Next action:**
