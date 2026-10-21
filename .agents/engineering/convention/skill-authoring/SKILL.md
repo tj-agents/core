@@ -73,7 +73,7 @@ supplies an implementation only for a host that lacks one. Never give the same c
 or different update paths per host.
 
 ```text
-Claude Code has /review; Codex has `codex review`.
+Both hosts ship a native code reviewer.
 Skill `review`: each host's entry point invokes its own native reviewer.
 ```
 
