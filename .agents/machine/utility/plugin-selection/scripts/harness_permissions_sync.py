@@ -63,6 +63,15 @@ def read_json(path: Path) -> Any:
         return None
 
 
+def _restore(path: Path, text: str | None) -> None:
+    if text is None:
+        if path.exists():
+            _safe_path(path)
+            path.unlink()
+        return
+    write_text_atomic(path, text)
+
+
 def write_text_atomic(path: Path, text: str) -> None:
     _safe_path(path.parent)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -405,12 +414,21 @@ def synchronize(environ: dict, mode: str) -> tuple[list[str], list[str]]:
             changes.append(f"record harness permission ownership in {state}")
     if mode == "check":
         return changes, warnings
-    for path, text in writes:
-        if text is None:
-            _safe_path(path)
-            path.unlink()
-        else:
-            write_text_atomic(path, text)
+    before = [path.read_text(encoding="utf-8-sig") if path.is_file() else None for path, _ in writes]
+    try:
+        for path, text in writes:
+            if text is None:
+                _safe_path(path)
+                path.unlink()
+            else:
+                write_text_atomic(path, text)
+    except Exception as error:
+        for (path, _text), original in zip(writes, before):
+            try:
+                _restore(path, original)
+            except Exception as rollback:
+                raise PermissionSyncError(f"permission update failed and rollback failed ({rollback})") from error
+        raise PermissionSyncError(f"permission update failed ({error})") from error
     return changes, warnings
 
 

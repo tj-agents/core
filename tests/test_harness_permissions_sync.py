@@ -171,6 +171,23 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertFalse(self.rules.exists())
         self.assert_converged()
 
+    def test_a_failing_sidecar_write_rolls_back_the_settings_and_rules_writes(self):
+        self.install_claude({"claude_allow": ["Bash(shipped)"], "codex_prefix_rules": []})
+        self.install_codex({"claude_allow": [], "codex_prefix_rules": [RULE]})
+        self.write_settings(["Bash(personal)"])
+        before = snapshot(self.root)
+        real_write = SYNC.write_text_atomic
+
+        def failing_write(path, text):
+            if path.name == "harness-permissions.json":
+                raise OSError("disk full")
+            real_write(path, text)
+
+        with mock.patch.object(SYNC, "write_text_atomic", side_effect=failing_write):
+            with self.assertRaises(SYNC.PermissionSyncError):
+                self.apply()
+        self.assertEqual(before, snapshot(self.root))
+
     def test_check_writes_nothing(self):
         self.install_claude({"claude_allow": ["Bash(shipped)"], "codex_prefix_rules": []})
         self.install_codex({"claude_allow": [], "codex_prefix_rules": [RULE]})
