@@ -1,11 +1,11 @@
 ---
-name: session-guidance
-description: Session guidance for an explicitly selected engineering lifecycle, including workflow ownership, staged skill loading, repair responsibility and authorized delivery continuity.
+name: session
+description: Own the engineering session from task selection through repair and completion. Use when starting, continuing or finishing work under an explicitly selected engineering lifecycle.
 kind: policy
 domain: process
 ---
 
-# Selected engineering session guidance
+# Engineering session
 
 These conventions apply when engineering is selected for the current scope. They grant no
 implementation, publication or installation authority beyond the standing standards-defect default

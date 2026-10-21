@@ -142,7 +142,7 @@
         "review",
         "review-lifecycle",
         "self-repair",
-        "session-guidance",
+        "session",
         "skill-authoring",
         "skill-routes",
         "stack",
@@ -171,7 +171,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:16b9715081bcee9fd4f2c45fae88737212b91638ffd4cba36d176a465e526b13",
+      "digest": "sha256:403bd8620f0081143da98d66b417ccee905048b8893d0a2259b7f458caec1b99",
       "harness": {
         "marketplaces": [
           {
