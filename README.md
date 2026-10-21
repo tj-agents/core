@@ -125,7 +125,7 @@ establish installed-host trust or acceptance.
 - `shell/` owns the PowerShell profile, one concern per file.
 - `cli-session-recovery/` owns save/restore scripts and their regression suite.
 - `setup.ps1` and `setup.sh` wrap `.agents/machine/scripts/setup_machine.py`, which installs the profile,
-  the hidden Git Bash proxy, CLI session recovery and everything else this machine needs.
+  the hidden Git Bash proxy and everything else this machine needs.
 
 ### Windows CLI hook windows
 
@@ -203,7 +203,7 @@ entries, then copies the launch-check runtime to `~/.agents-state/bin`. It write
 the PowerShell profile that exists on Linux. The block defines the `claude` and `codex` functions and, on
 Windows, loads the main checkout's `shell/profile.ps1`. It replaces older profile and launcher blocks in
 place, keeps other lines, encoding and BOM, and keeps one `.pre-tj-agents.bak` copy of a changed profile.
-On Windows setup then builds the hidden Git Bash proxy and installs CLI session recovery. On both
+On Windows setup then builds the hidden Git Bash proxy. On both
 platforms it delivers Codex profile agents with `pwsh` when Codex is set up, catches up plugins and merge
 policies for repositories whose default branch moved since the last catch-up, converges installed
 packages' declared harness permissions (removing owned rules that are no longer declared), removes

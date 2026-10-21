@@ -349,28 +349,6 @@ class HiddenBashTests(Machine):
 
 
 class InstallerStepTests(Machine):
-    def test_cli_session_recovery_installs_only_when_its_check_reports_drift(self):
-        installer = self.checkout / "cli-session-recovery" / "install-cli-session-recovery.ps1"
-        installer.parent.mkdir()
-        installer.write_text("", encoding="utf-8")
-        state = {"installed": False}
-
-        def run(command, **kwargs):
-            self.calls.append(command)
-            self.assertEqual(str(installer), command[command.index("-File") + 1])
-            if "-Check" in command:
-                return completed(0 if state["installed"] else 1, "deploy save-sessions.ps1\n")
-            state["installed"] = True
-            return completed(0, "Installed CLI session recovery utilities.\n")
-
-        self.converge(step("CLI session recovery"), self.context(run=run))
-        self.assertEqual(1, sum("-Check" not in command for command in self.calls))
-
-    def test_cli_session_recovery_is_windows_only(self):
-        out = io.StringIO()
-        setup.run_steps([step("CLI session recovery")], self.context(windows=False), False, out)
-        self.assertIn("n/a", out.getvalue())
-
     def test_codex_agents_are_delivered_with_pwsh_from_the_main_checkout(self):
         installer = self.checkout / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
         installer.parent.mkdir(parents=True)
@@ -598,17 +576,15 @@ class RunStepsTests(Machine):
         later.assert_not_called()
 
     def test_windows_only_steps_skip_on_linux_without_running_anything(self):
-        for name in ("hidden Git Bash for Claude", "CLI session recovery"):
-            with self.subTest(step=name):
-                out = io.StringIO()
-                self.assertEqual(0, setup.run_steps([step(name)], self.context(windows=False), True, out))
-                self.assertIn(f"n/a    {name}: Windows only", out.getvalue())
+        out = io.StringIO()
+        self.assertEqual(0, setup.run_steps([step("hidden Git Bash for Claude")], self.context(windows=False), True, out))
+        self.assertIn("n/a    hidden Git Bash for Claude: Windows only", out.getvalue())
 
     def test_the_steps_run_in_the_documented_order(self):
         self.assertEqual([
             "preconditions", "event channel and publishers", "Claude marketplace auto-update",
             "retired jobs and listener", "launch-check runtime", "shell profiles", "hidden Git Bash for Claude",
-            "CLI session recovery", "Codex profile agents", "plugin and merge-policy catch-up", "harness permissions",
+            "Codex profile agents", "plugin and merge-policy catch-up", "harness permissions",
             "legacy Codex configuration",
         ], [item.name for item in setup.STEPS])
 
