@@ -16,6 +16,9 @@ class ProblemRecordTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="record provider ")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
+        primary = patch("problem_records.primary_checkout", return_value=self.root)
+        primary.start()
+        self.addCleanup(primary.stop)
         self.selection = self.root / ".problem-records.json"
         self.skill = self.root / "installed provider" / "SKILL.md"
         self.skill.parent.mkdir()
@@ -104,6 +107,26 @@ class PrimaryCheckoutTests(unittest.TestCase):
                 with self.subTest(directory=directory):
                     self.assertEqual(root, primary_checkout(directory))
                     self.assertEqual(selected, declaration(primary_checkout(directory)))
+
+    def test_reader_uses_only_the_primary_selection_from_a_linked_worktree(self):
+        with tempfile.TemporaryDirectory(prefix="selected reader ") as raw:
+            root = Path(raw).resolve() / "source"
+            feature = Path(raw).resolve() / "feature"
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "-C", str(root), "-c", "user.name=Fixture", "-c",
+                            "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"], check=True)
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "feature", str(feature)], check=True)
+            for directory, provider in ((root, "primary:work-item"), (feature, "foreign:work-item")):
+                (directory / ".problem-records.json").write_text(json.dumps({"schema_version": 1, "provider": provider}), encoding="utf-8")
+            skill = Path(raw) / "installed" / "SKILL.md"
+            reader = skill.parent / "scripts" / "read_problem_record.py"
+            reader.parent.mkdir(parents=True)
+            skill.write_text("provider", encoding="utf-8")
+            value = {"record": "https://example.invalid/issues/1", "kind": "bug", "state": "open", "body": "evidence"}
+            reader.write_text("import json, sys\nassert sys.argv[sys.argv.index('--root') + 1] == " + repr(str(root)) + "\nprint(" + repr(json.dumps(value)) + ")\n", encoding="utf-8")
+            with patch("skill_router.resolved_skill", return_value=(skill, "provider")) as resolve:
+                self.assertEqual(value, read_record(feature, value["record"], "codex"))
+                resolve.assert_called_once_with("primary:work-item", "codex")
 
     def test_bare_repository_entry_is_never_the_primary_checkout(self):
         with tempfile.TemporaryDirectory(prefix="bare tracker ") as raw:
