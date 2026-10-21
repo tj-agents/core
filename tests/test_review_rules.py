@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -103,14 +104,30 @@ class ReviewRulesTests(unittest.TestCase):
         cache = profile / "plugins/cache"
         cache.parent.mkdir(parents=True)
         self.root.joinpath("cache").rename(cache)
+        unrelated = cache / "selected/unrelated/version/tier.json"
+        unrelated.parent.mkdir(parents=True)
+        unrelated.write_text("invalid unrelated declaration", encoding="utf-8")
         with mock.patch.dict(os.environ, {"CODEX_HOME": str(profile)}), mock.patch.object(
                 self.gate, "native_plugins", return_value=[
                     {"marketplaceName": "selected", "name": "stack", "version": "version"},
+                    {"marketplaceName": "selected", "name": "unrelated", "version": "version"},
                 ]) as inventory:
             result = RULES.resolve(self.project, self.gate, host="codex")
-        inventory.assert_called_once_with("codex")
+        inventory.assert_called_once_with("codex", str(self.project.resolve()))
         self.assertEqual(["stack:style"], [rule["name"] for rule in result["rules"]])
         self.assertTrue(Path(result["rules"][0]["path"]).is_relative_to(cache.resolve()))
+
+    def test_native_inventory_executes_in_the_reviewed_repository(self):
+        script = self.project / "plugin"
+        script.write_text(
+            'import json, os\nprint(json.dumps({"installed": [{"enabled": True, "name": os.getcwd()}]}))\n',
+            encoding="utf-8",
+        )
+        self.gate.native_plugins.cache_clear()
+        self.addCleanup(self.gate.native_plugins.cache_clear)
+        with mock.patch.object(self.gate.shutil, "which", return_value=sys.executable):
+            entries = self.gate.native_plugins("codex", str(self.project))
+        self.assertEqual(self.project.resolve(), Path(entries[0]["name"]).resolve())
 
     def test_missing_native_inventory_never_falls_back_to_another_host(self):
         self.selection("stack@selected")

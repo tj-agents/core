@@ -939,13 +939,14 @@ def active_host():
 
 
 @functools.lru_cache(maxsize=2)
-def native_plugins(harness):
+def native_plugins(harness, project=None):
     binary = shutil.which(harness)
     if binary is None:
         return ()
     try:
         result = subprocess.run(
             [binary, "plugin", "list", "--json"], capture_output=True, text=True,
+            cwd=project,
             encoding="utf-8", errors="replace", timeout=8,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
