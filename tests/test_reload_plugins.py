@@ -24,13 +24,57 @@ class RefreshCliTests(unittest.TestCase):
                 mock.patch.object(REFRESH, "run", return_value="[]") as run, mock.patch.object(REFRESH, "verify") as verify, \
                 mock.patch.object(REFRESH, "read_json", return_value={"tj-agents": {}}), \
                 mock.patch("sys.stdout"), mock.patch("sys.stderr"):
-            self.assertEqual(0, REFRESH.main(["--host", "claude"]))
+            self.assertEqual(0, REFRESH.main(["--host", "claude", "--all"]))
         self.assertEqual([call.args[0] for call in run.call_args_list], [
             ["claude", "plugin", "marketplace", "update", "tj-agents"],
             ["claude", "plugin", "list", "--json"],
             ["claude", "plugin", "update", "machine@tj-agents", "--scope", "user"],
         ])
         verify.assert_not_called()
+
+    def test_default_applies_published_events_and_falls_back_to_a_full_refresh_when_unconfigured(self):
+        for result, code in (("current", 0), ("updated", 0), ("failed", 1), ("offline", 1)):
+            with self.subTest(result=result), mock.patch.object(REFRESH.launch_check, "check", return_value=result), \
+                    mock.patch.object(REFRESH, "refresh") as refresh, mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+                self.assertEqual(code, REFRESH.main([]))
+                refresh.assert_not_called()
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="unconfigured"), \
+                mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude"), \
+                mock.patch.object(REFRESH, "selection", return_value=({}, [])), \
+                mock.patch.object(REFRESH, "refresh") as refresh, mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(0, REFRESH.main(["--host", "claude"]))
+        refresh.assert_called_once()
+
+    def test_a_published_repository_refreshes_only_the_claude_marketplaces_that_list_or_publish_it(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name, plugins in (("tj-agents", [{"name": "base", "source": {
+                    "source": "git-subdir", "url": "https://github.com/tj-agents/core.git", "path": "plugins/base"}}]),
+                                  ("other", [{"name": "kit", "source": "./plugins/kit"}])):
+                catalog = root / name / ".claude-plugin/marketplace.json"
+                catalog.parent.mkdir(parents=True)
+                catalog.write_text(json.dumps({"plugins": plugins}), encoding="utf-8")
+            (root / "plugins").mkdir()
+            (root / "plugins/known_marketplaces.json").write_text(json.dumps({
+                "tj-agents": {"source": {"source": "github", "repo": "tj-agents/marketplace"},
+                              "installLocation": str(root / "tj-agents")},
+                "other": {"source": {"source": "github", "repo": "tj-agents/other"},
+                          "installLocation": str(root / "other")}}), encoding="utf-8")
+            (root / "settings.json").write_text(json.dumps({"enabledPlugins": {
+                "base@tj-agents": True, "kit@other": True}}), encoding="utf-8")
+            for repositories, chosen in (({"tj-agents/core"}, {"tj-agents"}), ({"tj-agents/marketplace"}, {"tj-agents"}),
+                                         ({"tj-agents/other"}, {"other"}), ({"tj-agents/none"}, None)):
+                with self.subTest(repositories=repositories), \
+                        mock.patch.object(REFRESH, "configuration_root", return_value=root), \
+                        mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude"), \
+                        mock.patch.object(REFRESH, "refresh") as refresh:
+                    self.assertTrue(REFRESH.refresh_repositories(root / "project", repositories))
+                    if chosen is None:
+                        refresh.assert_not_called()
+                    else:
+                        self.assertEqual(chosen, set(refresh.call_args.args[3]))
+                        self.assertEqual([identity for identity in ("base@tj-agents", "kit@other")
+                                          if identity.rsplit("@", 1)[1] in chosen], refresh.call_args.args[4])
 
     def test_refresh_updates_applicable_claude_local_installations(self):
         inventory = [{"id": "machine@tj-agents", "scope": "local", "projectPath": str(ROOT)},

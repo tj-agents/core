@@ -195,7 +195,7 @@
               "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
             ]
           ],
-          "justification": "Reads the current plan corpus and recorded work-item status to report scoped unfinished work; it does not write repository or session state",
+          "justification": "Reads plans and local execution status, labels a selected repository's plans as supporting context and names its provider; an invalid current-repository selection stops the scan. It writes no repository or session state",
           "match": [
             [
               "python3",

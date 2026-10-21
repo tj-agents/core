@@ -235,8 +235,7 @@ class RecoveryTests(unittest.TestCase):
         cli.resolve_codex_executable.return_value = ("native-codex", {})
         real_load = RECOVERY._load
         with mock.patch.object(RECOVERY, "_load", side_effect=lambda name: cli if name == "agent_cli" else real_load(name)), \
-             mock.patch.object(RECOVERY, "_verify_codex_resume"), \
-             mock.patch.object(RECOVERY, "_sync_codex"):
+             mock.patch.object(RECOVERY, "_verify_codex_resume"):
             with self.assertRaises(ValueError):
                 RECOVERY.open_session("codex", "exact_id", roots={"codex": self.root / "sessions"})
             RECOVERY.open_session("codex", "exact_id", roots={"codex": self.root / "sessions"}, confirm_closed=True)
@@ -264,7 +263,6 @@ class RecoveryTests(unittest.TestCase):
         with mock.patch.object(cli, "resolve_codex_executable", return_value=("native-codex", {})), \
              mock.patch.object(cli, "launch_tab") as launch, \
              mock.patch.object(RECOVERY, "_verify_codex_resume"), \
-             mock.patch.object(RECOVERY, "_sync_codex"), \
              contextlib.redirect_stdout(io.StringIO()):
             code = RECOVERY.main([
                 "open", "--host", "codex", "--id", "exact_id", "--confirm-closed",
@@ -554,40 +552,6 @@ Observed blocker: no send was attempted."""
 
     def test_loader_caches_native_exception_identity(self):
         self.assertIs(RECOVERY._load("agent_cli").LaunchTimeout, RECOVERY._load("agent_cli").LaunchTimeout)
-
-    def _legacy_sync_codex_loads_the_python_sync_module_on_linux(self):
-        sync = mock.Mock()
-        sync.SyncError = RECOVERY._load("codex_marketplace_sync").SyncError
-        with mock.patch.object(RECOVERY, "os", SimpleNamespace(name="posix")), \
-             mock.patch.object(RECOVERY, "_load", return_value=sync):
-            RECOVERY._sync_codex("native-codex", self.cwd)
-        sync.sync_codex_standards.assert_called_once_with("native-codex", self.cwd, out=mock.ANY)
-
-    def _legacy_sync_codex_propagates_a_sync_error(self):
-        sync = RECOVERY._load("codex_marketplace_sync")
-        with mock.patch.object(sync, "sync_codex_standards", side_effect=sync.SyncError("offline")), \
-             mock.patch.object(RECOVERY, "_load", return_value=sync):
-            with self.assertRaisesRegex(sync.SyncError, "offline"):
-                RECOVERY._sync_codex("native-codex", self.cwd)
-
-    def _legacy_sync_codex_propagates_a_missing_sync_module(self):
-        with mock.patch.object(RECOVERY, "_load", side_effect=RuntimeError("sync missing")):
-            with self.assertRaisesRegex(RuntimeError, "sync missing"):
-                RECOVERY._sync_codex("native-codex", self.cwd)
-
-    def _legacy_linux_sync_failure_does_not_launch_the_recovered_tab(self):
-        self.write_codex()
-        cli = mock.Mock()
-        cli.resolve_tab_directory.side_effect = lambda value: Path(value)
-        cli.resolve_codex_executable.return_value = ("native-codex", {})
-        sync = RECOVERY._load("codex_marketplace_sync")
-        real_load = RECOVERY._load
-        with mock.patch.object(RECOVERY, "_load", side_effect=lambda name: cli if name == "agent_cli" else real_load(name)), \
-             mock.patch.object(RECOVERY, "_verify_codex_resume"), \
-             mock.patch.object(RECOVERY, "_sync_codex", side_effect=sync.SyncError("offline")):
-            with self.assertRaisesRegex(sync.SyncError, "offline"):
-                RECOVERY.open_session("codex", "exact_id", roots={"codex": self.root / "sessions"}, confirm_closed=True)
-        cli.launch_tab.assert_not_called()
 
     def test_main_reports_native_launch_failure(self):
         cli = RECOVERY._load("agent_cli")

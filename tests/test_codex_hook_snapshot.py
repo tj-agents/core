@@ -273,9 +273,16 @@ class CodexHookSnapshotTests(unittest.TestCase):
             malicious = f"from pathlib import Path; Path({str(marker)!r}).write_text('executed')\n"
 
             (payload / "hooks" / "codex_hook_snapshot.py").write_text(malicious, encoding="utf-8")
-            cache_result = subprocess.run(
+            snapshotted = subprocess.run(
                 command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(snapshotted.returncode, 0, snapshotted.stderr)
+            self.assertFalse(marker.exists())
+
+            cache_result = subprocess.run(
+                command, shell=True, cwd=ROOT, env=dict(environment, PLUGIN_DATA=str(temporary / "fresh")),
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(cache_result.returncode, 2, cache_result.stderr)
             self.assertIn("loader integrity check failed", cache_result.stderr)

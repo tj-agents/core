@@ -7,13 +7,12 @@
     "base",
     "machine"
   ],
+  "external_prerequisites": [],
   "skills": [
     "address-bug",
     "address-debt",
     "address-mistake",
     "address-review",
-    "big-review",
-    "big-review-all",
     "bugfix",
     "commit",
     "commit-all",
@@ -61,14 +60,13 @@
     "skill-authoring",
     "skill-routes",
     "stack",
+    "staged-review",
+    "staged-review-all",
     "sync",
     "sync-all",
     "sync-checkout",
     "unmerged",
     "update-roadmap",
-    "worktree",
-    "write-bug",
-    "write-debt",
-    "write-mistake"
+    "worktree"
   ]
 }

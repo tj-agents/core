@@ -5,7 +5,9 @@ cancels it without closing anything. After a close it runs the worktree sweep fo
 """
 
 import argparse
+import json
 import os
+import sqlite3
 import subprocess
 import sys
 import time
@@ -32,6 +34,8 @@ def arguments(argv=None):
     parser.add_argument("--sweep")
     parser.add_argument("--state-directory")
     parser.add_argument("--host-names")
+    parser.add_argument("--transcript")
+    parser.add_argument("--transcript-offset", type=int, default=0)
     return parser.parse_args(argv)
 
 
@@ -47,17 +51,56 @@ def session_row(args):
     store = session_close.register_session._load_session_store()
     if store is None:
         raise Refusal("session turn store is unavailable")
-    connection = store.connect()
+    uri = store.database_path().resolve().as_uri() + "?mode=ro"
+    connection = sqlite3.connect(uri, uri=True, timeout=5)
     try:
+        connection.row_factory = sqlite3.Row
         return store.get_session(connection, store.session_handle(args.host, args.session_id))
     finally:
         connection.close()
 
 
+def is_prompt(record):
+    if record.get("type") != "user" or record.get("isMeta") or record.get("isCompactSummary"):
+        return False
+    content = (record.get("message") or {}).get("content")
+    return isinstance(content, str) or (isinstance(content, list) and not any(
+        isinstance(item, dict) and item.get("type") == "tool_result" for item in content))
+
+
+def transcript_verdict(args):
+    """Judge the Claude transcript written since arming: "cancel", "finished", "pending", or None without one."""
+    if not args.transcript:
+        return None
+    try:
+        with open(args.transcript, "rb") as stream:
+            stream.seek(args.transcript_offset)
+            lines = stream.read().splitlines()
+    except OSError:
+        return "pending"
+    verdict = "pending"
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(record, dict):
+            continue
+        attachment = record.get("attachment")
+        if (isinstance(attachment, dict) and attachment.get("type") == "hook_blocking_error"
+                and attachment.get("hookEvent") == "Stop"):
+            return "cancel"
+        if record.get("type") == "system" and record.get("subtype") == "stop_hook_summary":
+            verdict = "finished"
+        elif record.get("type") in ("user", "assistant") and (verdict == "finished" or is_prompt(record)):
+            return "cancel"
+    return verdict
+
+
 def wait_for_idle(args, clock=time.time, sleep=time.sleep):
     """Return the idle turn's activity token, or None when the close is cancelled."""
     deadline = clock() + args.timeout
-    stopped, since = None, None
+    stopped, since, settled = None, None, None
     while clock() < deadline:
         if not session_close.verified_live(args.pid, args.pid_started_at):
             return None
@@ -65,14 +108,25 @@ def wait_for_idle(args, clock=time.time, sleep=time.sleep):
         if not isinstance(row, dict) or row.get("ended_at") is not None or row.get("pid") != args.pid:
             return None
         activity = row.get("last_activity_at")
-        if row.get("turn_state") == "awaiting_input" and session_close.finite_positive(activity) \
-                and activity > args.armed_at:
-            if activity != stopped:
-                stopped, since = activity, clock()
-            elif clock() - since >= args.idle:
-                return stopped
-        elif stopped is not None:
+        if not session_close.finite_positive(activity):
             return None
+        verdict = transcript_verdict(args)
+        if verdict == "cancel":
+            return None
+        if activity > args.armed_at:
+            awaiting = row.get("turn_state") == "awaiting_input"
+            if not awaiting or stopped not in (None, activity):
+                if verdict is None:
+                    return None
+                stopped = settled = None
+                if not awaiting:
+                    sleep(POLL_SECONDS)
+                    continue
+            verdict = verdict or "finished"
+            if stopped is None or verdict != settled:
+                stopped, since, settled = activity, clock(), verdict
+            elif verdict == "finished" and clock() - since >= args.idle:
+                return stopped
         sleep(POLL_SECONDS)
     return None
 
@@ -81,8 +135,8 @@ def close_session(args, activity):
     entry = registered_entry(args)
     if entry is None:
         raise Refusal("the armed session is no longer registered")
-    session_close.awaiting_input_activity(entry, activity)
     wrapper = session_close.qualified_windows_wrapper(entry)
+    session_close.awaiting_input_activity(entry, activity)
     session_close._record_own_end(entry, "closed")
     try:
         close.close_host(entry, wrapper)
@@ -124,7 +178,7 @@ def main(argv=None):
         else:
             close_session(args, activity)
             status = "closed"
-    except (OSError, ValueError, RuntimeError) as error:
+    except (OSError, ValueError, RuntimeError, sqlite3.Error) as error:
         status = "refused: " + str(error)
     session_close.write_json(outcome_path(args.session_id), {"status": status, "at": time.time()})
     if status == "closed":

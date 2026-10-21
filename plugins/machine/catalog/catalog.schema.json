@@ -93,6 +93,9 @@
         "external_prerequisites": {
           "$ref": "#/$defs/dependencies"
         },
+        "external_dependencies": {
+          "$ref": "#/$defs/externalDependencies"
+        },
         "harness": {
           "$ref": "../plugins/harness.schema.json#/$defs/requires"
         },
@@ -118,6 +121,36 @@
         },
         "optional": {
           "$ref": "#/$defs/stringList"
+        }
+      }
+    },
+    "externalDependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "marketplace", "repository"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "marketplace": { "$ref": "#/$defs/identifier" },
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        }
+      }
+    },
+    "externalDependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "optional"],
+      "properties": {
+        "required": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/externalDependency" },
+          "uniqueItems": true
+        },
+        "optional": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/externalDependency" },
+          "uniqueItems": true
         }
       }
     }

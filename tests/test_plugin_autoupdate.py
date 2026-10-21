@@ -5,7 +5,9 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -25,7 +27,7 @@ def load(name):
 
 
 UPDATE = load('plugin_autoupdate')
-SETUP = load('setup_machine')
+import setup_machine as SETUP  # noqa: E402
 CORE = 'https://github.com/tj-agents/core.git'
 MARKET = 'https://github.com/tj-agents/marketplace.git'
 OLD = 'a' * 40
@@ -185,6 +187,13 @@ def idle():
 
 
 class RefreshTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix='codex home ')
+        self.addCleanup(temp.cleanup)
+        patcher = mock.patch.dict(os.environ, {'CODEX_HOME': temp.name})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_an_unchanged_revision_runs_no_cli_command(self):
         run = mock.Mock(return_value=True)
 
@@ -208,16 +217,55 @@ class RefreshTests(unittest.TestCase):
             mock.call(['codex', 'plugin', 'add', 'machine@direct-core'], cwd=ROOT),
         ], run.call_args_list)
 
-    def test_a_changed_marketplace_waits_while_a_codex_session_is_running(self):
+    def test_cache_first_hooks_wait_while_a_codex_session_is_running(self):
         run = mock.Mock(return_value=True)
+        preserve = mock.Mock()
         recorded = {'codex:direct-core': OLD}
 
         outcomes = UPDATE.refresh_codex('codex', target(), recorded, revision=lambda *_: NEW, run=run,
-                                        busy=lambda: True)
+                                        busy=lambda: True, packages=lambda name: [{'snapshot_first': False}],
+                                        preserve=preserve)
 
         self.assertIn('deferred', outcomes['direct-core'])
         self.assertEqual(OLD, recorded['codex:direct-core'])
         run.assert_not_called()
+        preserve.assert_not_called()
+
+    def test_snapshot_first_hooks_are_preserved_then_upgraded_while_a_codex_session_runs(self):
+        order = []
+        hooks = [{'plugin': 'base', 'snapshot_first': True}]
+        busy = mock.Mock(return_value=True)
+
+        def run(command, cwd):
+            order.append(command[2])
+            return True
+
+        outcomes = UPDATE.refresh_codex('codex', target(), {'codex:direct-core': OLD}, revision=lambda *_: NEW,
+                                        run=run, busy=busy, packages=lambda name: hooks,
+                                        preserve=lambda name, packages: order.append(('preserve', name, packages)))
+
+        self.assertEqual('updated', outcomes['direct-core'])
+        self.assertEqual([('preserve', 'direct-core', hooks), 'marketplace', 'add', 'add'], order)
+        busy.assert_not_called()
+
+    def test_a_running_session_keeps_its_hooks_after_the_cache_is_replaced(self):
+        cache = Path(os.environ['CODEX_HOME']) / 'plugins' / 'cache' / 'tj-agents' / 'base' / 'local'
+        shutil.copytree(ROOT / 'plugins' / 'base', cache)
+        field = 'commandWindows' if os.name == 'nt' else 'command'
+        manifest = json.loads((cache / 'hooks' / 'codex.json').read_text(encoding='utf-8'))
+        command = manifest['hooks']['SessionStart'][0]['hooks'][0][field].replace('${PLUGIN_ROOT}', str(cache))
+        packages = UPDATE.hook_packages('tj-agents')
+        self.assertEqual([('base', cache, True)], [(p['plugin'], p['root'], p['snapshot_first']) for p in packages])
+
+        UPDATE.preserve_hook_snapshots('tj-agents', packages)
+        (cache / 'hooks' / 'codex_hook_snapshot.py').write_text("raise SystemExit('new loader')\n", encoding='utf-8')
+        (cache / 'hooks' / 'hook_runtime.py').write_text("raise SystemExit('new hooks')\n", encoding='utf-8')
+        data = Path(os.environ['CODEX_HOME']) / 'plugins' / 'data' / 'base-tj-agents'
+        result = subprocess.run(command, shell=True, cwd=ROOT, env=dict(os.environ, PLUGIN_DATA=str(data)),
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn('base:idea-initialization', result.stdout)
 
     def test_an_unchanged_marketplace_never_asks_whether_sessions_are_running(self):
         busy = mock.Mock(return_value=True)
@@ -328,6 +376,23 @@ class DeclaredRefreshTests(unittest.TestCase):
         popen.assert_not_called()
         self.assertLess(elapsed, 5)
         self.assertEqual({'codex:direct-core', 'codex:tj-agents'}, set(recorded))
+
+    def test_a_repository_filter_refreshes_only_marketplaces_that_list_or_publish_it(self):
+        machine = Machine(self)
+        project = machine.project('kit-user', tj_agents(None, 'kit'))
+        machine.installed('direct-core', 'base', 'machine')
+        machine.installed('tj-agents', 'kit')
+        machine.manifest('tj-agents', [{'name': 'kit', 'source': {
+            'source': 'git-subdir', 'url': 'https://github.com/tj-agents/kit.git', 'path': 'plugins/kit'}}])
+        run = mock.Mock(return_value=True)
+        recorded = {'codex:direct-core': OLD, 'codex:tj-agents': OLD}
+
+        for repositories, refreshed in (({'tj-agents/kit'}, {'tj-agents'}), ({'tj-agents/core'}, {'direct-core'}),
+                                        ({'tj-agents/elsewhere'}, set())):
+            with self.subTest(repositories=repositories):
+                outcomes = UPDATE.refresh_declared('codex', user_config([project]), dict(recorded), run=run, busy=idle,
+                                                   revision=lambda *_: OLD, repositories=repositories)
+                self.assertEqual(refreshed, set(outcomes['marketplaces']))
 
     def test_codex_writing_its_own_configuration_does_not_trigger_another_refresh(self):
         machine = Machine(self)
@@ -457,6 +522,7 @@ class LockAndSelfUpdateTests(unittest.TestCase):
             old = Path(temp) / 'old-package' / UPDATE.SCRIPT_NAME
             old.parent.mkdir()
             old.write_text('old updater', encoding='utf-8')
+            old.with_name('machine_events.py').write_text('old listener', encoding='utf-8')
             with mock.patch.object(UPDATE, 'packaged_copies', return_value=[old]):
                 self.assertFalse(UPDATE.self_update(stable, {}))
             self.assertEqual('current updater', stable.read_text(encoding='utf-8'))
@@ -469,8 +535,9 @@ class LockAndSelfUpdateTests(unittest.TestCase):
             stable.write_text('old', encoding='utf-8')
             packaged = Path(temp) / 'package' / UPDATE.SCRIPT_NAME
             packaged.parent.mkdir()
+            for name in UPDATE.RUNTIME:
+                packaged.with_name(name).write_text('new ' + name, encoding='utf-8')
             packaged.write_text('new', encoding='utf-8')
-            packaged.with_name('machine_events.py').write_text('new listener', encoding='utf-8')
             stable.with_name('machine_events.py').write_text('old listener', encoding='utf-8')
 
             with mock.patch.object(UPDATE, 'packaged_copies', return_value=[packaged]):
@@ -478,7 +545,8 @@ class LockAndSelfUpdateTests(unittest.TestCase):
                 self.assertFalse(UPDATE.self_update(stable, {}))
 
             self.assertEqual('new', stable.read_text(encoding='utf-8'))
-            self.assertEqual('new listener', stable.with_name('machine_events.py').read_text(encoding='utf-8'))
+            for name in UPDATE.RUNTIME[1:]:
+                self.assertEqual('new ' + name, stable.with_name(name).read_text(encoding='utf-8'))
 
 
     def test_only_enabled_installed_machine_packages_are_self_update_sources(self):
@@ -545,28 +613,49 @@ class SetupTests(unittest.TestCase):
             self.assertTrue(saved['tj-agents']['autoUpdate'])
             self.assertFalse(saved['legacy']['autoUpdate'])
 
-    def test_retired_launcher_blocks_are_removed_and_other_profile_lines_kept(self):
+    def test_launchers_replace_retired_blocks_keep_other_lines_and_are_idempotent(self):
         with tempfile.TemporaryDirectory(prefix='profile ü ') as temp:
             profile = Path(temp) / 'Microsoft.PowerShell_profile.ps1'
-            profile.write_bytes(b'\xef\xbb\xbf' + (
+            original = (b'\xef\xbb\xbf' + (
                 "$env:Path = 'x'\r\n"
                 "# >>> base-agents claude launcher >>>\r\nfunction global:claude {}\r\n"
                 "# <<< base-agents claude launcher <<<\r\n"
                 "# >>> base-agents codex launcher >>>\r\nfunction global:codex {}\r\n"
                 "# <<< base-agents codex launcher <<<\r\n"
                 ". 'accounts.ps1'\r\n").encode('utf-8'))
+            profile.write_bytes(original)
+            script = Path(temp) / "it's bin" / 'launch_check.py'
 
-            self.assertEqual([profile], SETUP.remove_retired_launchers([profile]))
-            self.assertEqual([], SETUP.remove_retired_launchers([profile]))
+            self.assertEqual([profile], SETUP.install_shell_profiles([profile], 'C:/Python/python.exe', script))
+            installed = profile.read_bytes()
+            self.assertEqual([], SETUP.install_shell_profiles([profile], 'C:/Python/python.exe', script))
+            self.assertEqual(installed, profile.read_bytes())
 
-            raw = profile.read_bytes()
-            self.assertTrue(raw.startswith(b'\xef\xbb\xbf'))
-            self.assertEqual("$env:Path = 'x'\r\n. 'accounts.ps1'\r\n", raw[3:].decode('utf-8'))
-            self.assertTrue(profile.with_name(profile.name + '.pre-autoupdate.bak').is_file())
+            self.assertTrue(installed.startswith(b'\xef\xbb\xbf'))
+            text = installed[3:].decode('utf-8')
+            self.assertTrue(text.startswith("$env:Path = 'x'\r\n. 'accounts.ps1'\r\n\r\n" + SETUP.PROFILE_START + '\r\n'))
+            self.assertTrue(text.endswith(SETUP.PROFILE_END + '\r\n'))
+            self.assertNotIn('base-agents', text)
+            self.assertNotIn('\n', text.replace('\r\n', ''))
+            self.assertIn("it''s bin", text)
+            self.assertEqual(original, profile.with_name(profile.name + '.pre-tj-agents.bak').read_bytes())
 
-    def test_a_missing_profile_is_skipped(self):
+            self.assertEqual([profile], SETUP.install_shell_profiles([profile], 'C:/Python314/python.exe', script))
+            moved = profile.read_bytes()[3:].decode('utf-8')
+            self.assertEqual(1, moved.count(SETUP.PROFILE_START))
+            self.assertIn('Python314', moved)
+            self.assertNotIn("'C:/Python/python.exe'", moved)
+
+    def test_only_existing_profiles_change_and_the_first_is_created_when_none_exist(self):
         with tempfile.TemporaryDirectory(prefix='profile ') as temp:
-            self.assertEqual([], SETUP.remove_retired_launchers([Path(temp) / 'absent.ps1']))
+            bashrc, zshrc = Path(temp) / '.bashrc', Path(temp) / '.zshrc'
+            self.assertEqual([bashrc], SETUP.install_shell_profiles([bashrc, zshrc], '/usr/bin/python3', Path('/s.py')))
+            self.assertFalse(zshrc.exists())
+            zshrc.write_text('export A=1', encoding='utf-8')
+            self.assertEqual([zshrc], SETUP.install_shell_profiles([bashrc, zshrc], '/usr/bin/python3', Path('/s.py')))
+            self.assertEqual('export A=1\n\n' + SETUP.posix_block('/usr/bin/python3', Path('/s.py')) + '\n',
+                             zshrc.read_text(encoding='utf-8'))
+            self.assertFalse(bashrc.with_name('.bashrc.pre-tj-agents.bak').exists())
 
 
 

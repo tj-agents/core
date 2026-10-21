@@ -44,13 +44,6 @@ def remote_owners(root: Path, run=subprocess.run) -> set[str]:
     return owners
 
 
-def owned(root: Path, run=subprocess.run) -> bool:
-    if not (root / ".git").exists():
-        return False
-    owners = remote_owners(root, run)
-    return bool(owners) and not owners - repo_owners()
-
-
 def resolve_scope(root: Path, scope: str | None, run=subprocess.run) -> str:
     if scope not in {None, "project", "local"}:
         raise lock_io.LockError(f"Unknown repository scope: {scope}")

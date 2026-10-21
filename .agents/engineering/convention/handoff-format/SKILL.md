@@ -28,12 +28,12 @@ turn explicitly targets that worktree. A summary or paraphrased next action is n
   the worktree doesn't exist yet — and keep it inside the paste-ready prompt.
 - For **non-plan** work, make the prompt self-contained for zero context: name the branch or PR, relevant
   working files, and exact next action.
-- For a recorded repair, name the exact repository record path, stable ID and kind. Require the successor
-  to invoke and execute `engineering:address-bug`, `engineering:address-mistake` or
-  `engineering:address-debt` for that record before repair. Do not substitute a generic fix prompt or
-  merely mention the skill. A plan-managed pointer keeps this mandatory invocation in its goal's
-  `## Next Steps`; a non-plan prompt states it directly. Reconcile the record and existing repair owner
-  before dispatch; if the exact record cannot be found, establish it before launching.
+- For a recorded repair, name the selected provider's canonical URI, stable ID and kind. Require the
+  successor to invoke and execute `engineering:address-bug`,
+  `engineering:address-mistake` or `engineering:address-debt` for that record before repair. Do not
+  substitute a generic fix prompt or merely mention the skill. A plan-managed pointer keeps this mandatory
+  invocation in its goal's `## Next Steps`; a non-plan prompt states it directly. Reconcile the record and
+  existing repair owner before dispatch; if the exact record cannot be found, establish it before launching.
 - For **plan-managed** work, introduce each handoff with one `Why:` line derived from the first paragraph of
   the ledger's current `## Next Steps`. This makes the purpose explicit without duplicating the operational
   procedure. Then end with the paste-ready prompt, which is ONLY the pointer — an opener line then the read

@@ -27,6 +27,30 @@ class StartupBindingTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="startup binding ")
         self.addCleanup(self.temp.cleanup)
         self.project = Path(self.temp.name)
+        patcher = mock.patch.object(BINDING.launch_check, "check", return_value="current")
+        self.check = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_plugin_check_runs_after_the_claim_and_before_the_native_cli_and_never_blocks_it(self):
+        status = self.project / "launch.status.json"
+        order = []
+        self.check.side_effect = lambda project: order.append(
+            ("check", project, json.loads(status.read_text(encoding="utf-8"))["phase"]))
+
+        def run(*_args, **_kwargs):
+            order.append("native")
+            return 0
+
+        arguments = ["--host", "codex", "--project", str(self.project), "--target", "codex", "--status-file",
+                     str(status), "--", "resume", "id"]
+        with mock.patch.object(BINDING, "run_session", side_effect=run), mock.patch("sys.stdout"):
+            self.assertEqual(0, BINDING.main(arguments))
+            self.assertEqual([("check", self.project.resolve(), "checking-plugins"), "native"], order)
+            status.unlink()
+            self.check.side_effect = RuntimeError("broken check")
+            with mock.patch("sys.stderr"):
+                self.assertEqual(0, BINDING.main(arguments))
+        self.assertEqual("native", order[-1])
 
     def test_status_file_reports_preparation_failure_and_exit(self):
         status = self.project / "launch.status.json"

@@ -1,8 +1,7 @@
 """Shared launch primitives for the native agent CLIs, on Windows and POSIX.
 
 Imported by open-claude, handoff-claude and handoff-codex so the environment scrub, executable discovery,
-standards sync, lane lookup and terminal argument escaping have one owner. The terminal profile launchers
-reuse its standards sync implementation. Not runnable on its own.
+lane lookup and terminal argument escaping have one owner. Not runnable on its own.
 """
 
 import glob
