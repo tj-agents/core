@@ -1,6 +1,7 @@
 {
   "fresh_selection": [
     "base@base-agents",
+    "agent-store@base-agents",
     "engineering@base-agents",
     "machine@base-agents"
   ],

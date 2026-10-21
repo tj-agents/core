@@ -2,6 +2,7 @@
   "schema_version": 1,
   "plugin": "base-agents/engineering",
   "source_roots": [
+    ".agents/agent-store/runtime",
     ".agents/engineering",
     ".agents/engineering/resources/problem-records.md",
     ".agents/hooks/continuation_stop.py",
@@ -9,7 +10,6 @@
     ".agents/hooks/hook_dispatch.py",
     ".agents/hooks/merge_cleanup_gate.py",
     ".agents/hooks/problem_records.py",
-    ".agents/machine/scripts/repository_identity.py",
     ".agents/workflows",
     ".agents/workflows/repository_configuration.py",
     ".agents/workflows/review_evidence.py",
@@ -23,6 +23,7 @@
       }
     ],
     "plugins": [
+      "base-agents/agent-store",
       "base-agents/base",
       "base-agents/engineering",
       "base-agents/machine"

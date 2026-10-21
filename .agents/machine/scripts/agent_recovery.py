@@ -32,6 +32,14 @@ MODULES = {}
 
 
 def _script_path(name):
+    if name == "session_store":
+        candidate = (
+            HERE.parents[2] / ".agents" / "agent-store" / "runtime" / "session_store.py"
+            if len(HERE.parents) > 2 else None
+        )
+        if candidate is not None and candidate.is_file():
+            return candidate
+        raise RuntimeError(f"The shared {name}.py helper was not found relative to {HERE}.")
     peer = HERE.parent / "utility/peer-cli/scripts" / f"{name}.py"
     packaged = tuple(HERE.parents[2] / layout / "peer-cli/scripts" / f"{name}.py"
                      for layout in ("skills", "codex-skills")) if len(HERE.parents) > 2 else ()

@@ -1,0 +1,15 @@
+{
+  "name": "agent-store",
+  "description": "Recorded agent executions, sessions, ownership and references.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tj-agents/core",
+  "keywords": [
+    "agents",
+    "executions",
+    "registry"
+  ],
+  "displayName": "Agent Store",
+  "skills": "./skills/"
+}

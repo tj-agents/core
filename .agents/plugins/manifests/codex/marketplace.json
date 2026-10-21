@@ -17,6 +17,18 @@
       "category": "Productivity"
     },
     {
+      "name": "agent-store",
+      "source": {
+        "source": "local",
+        "path": "./plugins/agent-store"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
       "name": "engineering",
       "source": {
         "source": "local",

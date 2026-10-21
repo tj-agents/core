@@ -24,12 +24,18 @@ sys.path.insert(0, str(WORKFLOWS))
 
 from workflow_runtime import (
     ContractViolation,
-    ReadOnlyWorkItemStore,
     RepositoryStateProvider,
     WorkflowContract,
     select_state_provider,
 )
 import workflow_runtime
+READER_SPEC = importlib.util.spec_from_file_location(
+    "agent_store_reader", ROOT / ".agents" / "agent-store" / "runtime" / "reader.py"
+)
+READER = importlib.util.module_from_spec(READER_SPEC)
+READER_SPEC.loader.exec_module(READER)
+ReadOnlyWorkItemStore = READER.ReadOnlyWorkItemStore
+StoreReadError = READER.StoreReadError
 from host_runtime import HostAdapterRegistry, WriterLeaseRegistry
 from fixtures.lane_expectations import authored_skill
 
@@ -1912,7 +1918,7 @@ class RepositoryProviderTests(unittest.TestCase):
         return state
 
     def write_session_store_with_writer(self, status):
-        path = ROOT / ".agents" / "machine" / "scripts" / "session_store.py"
+        path = ROOT / ".agents" / "agent-store" / "runtime" / "session_store.py"
         spec = importlib.util.spec_from_file_location("workflow_contract_session_store", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -1974,7 +1980,7 @@ class RepositoryProviderTests(unittest.TestCase):
         state = self.root / "v3-reader-state"
         state.mkdir()
         database = state / "sessions.db"
-        source = ROOT / ".agents" / "machine" / "scripts" / "session_store.py"
+        source = ROOT / ".agents" / "agent-store" / "runtime" / "session_store.py"
         spec = importlib.util.spec_from_file_location("workflow_contract_v3_session_store", source)
         session_store = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(session_store)
@@ -2008,7 +2014,7 @@ class RepositoryProviderTests(unittest.TestCase):
         self.assertEqual(before, database.read_bytes())
 
         missing = state / "missing.db"
-        with self.assertRaisesRegex(ContractViolation, "does not exist"):
+        with self.assertRaisesRegex(StoreReadError, "does not exist"):
             ReadOnlyWorkItemStore(missing).work_item(key)
         self.assertFalse(missing.exists())
 
@@ -2023,7 +2029,7 @@ class RepositoryProviderTests(unittest.TestCase):
         connection.commit()
         connection.close()
         before = malformed.read_bytes()
-        with self.assertRaisesRegex(ContractViolation, "missing required columns"):
+        with self.assertRaisesRegex(StoreReadError, "missing required columns"):
             ReadOnlyWorkItemStore(malformed).work_item(key)
         self.assertEqual(before, malformed.read_bytes())
 
@@ -2032,7 +2038,7 @@ class RepositoryProviderTests(unittest.TestCase):
         connection.commit()
         connection.close()
         before = database.read_bytes()
-        with self.assertRaisesRegex(ContractViolation, "unsupported schema version 5"):
+        with self.assertRaisesRegex(StoreReadError, "unsupported schema version 5"):
             ReadOnlyWorkItemStore(database).work_item(key)
         self.assertEqual(before, database.read_bytes())
 
@@ -2127,7 +2133,7 @@ class RepositoryProviderTests(unittest.TestCase):
         connection.close()
 
         before = database.read_bytes()
-        with self.assertRaisesRegex(ContractViolation, "missing required columns.*native_id"):
+        with self.assertRaisesRegex(StoreReadError, "missing required columns.*native_id"):
             ReadOnlyWorkItemStore(database).work_item("execution:missing-reference-column")
         self.assertEqual(before, database.read_bytes())
 
@@ -2206,7 +2212,7 @@ class RepositoryProviderTests(unittest.TestCase):
             "Done when: the runtime work item is verified.\n",
             encoding="utf-8",
         )
-        path = ROOT / ".agents" / "machine" / "scripts" / "session_store.py"
+        path = ROOT / ".agents" / "agent-store" / "runtime" / "session_store.py"
         spec = importlib.util.spec_from_file_location("linked_worktree_session_store", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -2267,7 +2273,7 @@ class RepositoryProviderTests(unittest.TestCase):
         broken = mock.Mock()
         broken.execute.side_effect = sqlite3.OperationalError("query failure")
         with mock.patch.object(store, "_connection", return_value=broken):
-            with self.assertRaisesRegex(ContractViolation, "query failed"):
+            with self.assertRaisesRegex(StoreReadError, "query failed"):
                 store.work_item(key)
         broken.close.assert_called_once()
 

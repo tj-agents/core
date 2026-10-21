@@ -83,6 +83,100 @@
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
       "marketplace": "base-agents",
+      "id": "base-agents/agent-store",
+      "name": "agent-store",
+      "package_path": "plugins/agent-store",
+      "description": "Recorded agent executions, sessions, ownership and references.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "inspect"
+      ],
+      "dependencies": {
+        "required": [],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "python>=3.9"
+        ],
+        "optional": []
+      },
+      "digest": "sha256:506bbb97896024ecc5f3f0631d82339635e69711011a27c0db41b1c65007a2b8",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "base-agents",
+            "repository": "tj-agents/core"
+          }
+        ],
+        "plugins": [
+          "base-agents/agent-store"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py",
+                  "${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py",
+                  "${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py"
+                ]
+              ],
+              "justification": "Read recorded agent execution and session metadata without creating or modifying its database or observing native processes.",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py",
+                  "--repository",
+                  "github.com/owner/repo"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/writer.py"
+                ]
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "base-agents",
       "id": "base-agents/engineering",
       "name": "engineering",
       "package_path": "plugins/engineering",
@@ -156,6 +250,7 @@
       "dependencies": {
         "required": [
           "base-agents/base",
+          "base-agents/agent-store",
           "base-agents/machine"
         ],
         "optional": []
@@ -180,6 +275,7 @@
           }
         ],
         "plugins": [
+          "base-agents/agent-store",
           "base-agents/base",
           "base-agents/engineering",
           "base-agents/machine"
@@ -497,7 +593,8 @@
       ],
       "dependencies": {
         "required": [
-          "base-agents/base"
+          "base-agents/base",
+          "base-agents/agent-store"
         ],
         "optional": []
       },
@@ -525,10 +622,18 @@
           }
         ],
         "plugins": [
+          "base-agents/agent-store",
           "base-agents/base",
           "base-agents/machine"
         ],
         "hooks": [
+          {
+            "path": ".agents/agent-store/runtime/session_store.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
           {
             "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
             "hosts": [
@@ -545,13 +650,6 @@
           },
           {
             "path": "resources/machine/scripts/reap_orphans.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "resources/machine/scripts/session_store.py",
             "hosts": [
               "claude",
               "codex"
