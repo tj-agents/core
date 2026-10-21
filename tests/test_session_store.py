@@ -23,9 +23,18 @@ SPEC.loader.exec_module(STORE)
 GIT = shutil.which("git")
 
 
+def _git_environment():
+    environment = os.environ.copy()
+    for name in tuple(environment):
+        if name == "GIT_CONFIG_COUNT" or name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")):
+            environment.pop(name)
+    return environment
+
+
 def _run_git(cwd, *args):
     result = subprocess.run(
         ["git", "-C", str(cwd), *args], capture_output=True, text=True, timeout=15,
+        env=_git_environment(),
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr)
@@ -59,20 +68,33 @@ class SchemaTests(unittest.TestCase):
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
             ).fetchall()
         }
-        self.assertEqual({"sessions", "work_items"}, tables)
+        self.assertEqual({"sessions", "work_items", "work_item_references"}, tables)
         version = connection.execute("PRAGMA user_version").fetchone()[0]
-        self.assertEqual(3, version)
+        self.assertEqual(4, version)
 
     def test_reconnecting_does_not_lose_the_schema_version(self):
         STORE.connect(self.db_path).close()
         connection = STORE.connect(self.db_path)
         self.addCleanup(connection.close)
-        self.assertEqual(3, connection.execute("PRAGMA user_version").fetchone()[0])
+        self.assertEqual(4, connection.execute("PRAGMA user_version").fetchone()[0])
 
     def test_migration_deduplicates_legacy_owner_rows_before_creating_the_index(self):
         self.db_path.parent.mkdir()
         connection = sqlite3.connect(self.db_path)
-        connection.executescript(STORE.WORK_ITEMS_SCHEMA)
+        connection.executescript(
+            """
+            CREATE TABLE work_items (
+                key TEXT PRIMARY KEY,
+                repo TEXT NOT NULL,
+                feature TEXT NOT NULL,
+                item TEXT NOT NULL,
+                status TEXT NOT NULL,
+                branch TEXT,
+                pr TEXT,
+                updated_at REAL
+            );
+            """
+        )
         connection.executescript(STORE.SESSIONS_SCHEMA)
         connection.execute("PRAGMA user_version = 1")
         connection.execute(
@@ -95,7 +117,7 @@ class SchemaTests(unittest.TestCase):
             "SELECT handle FROM sessions WHERE work_item = 'key-1' AND role = 'owner'"
         ).fetchall()
         self.assertEqual(["codex:new"], [row[0] for row in owners])
-        self.assertEqual(3, migrated.execute("PRAGMA user_version").fetchone()[0])
+        self.assertEqual(4, migrated.execute("PRAGMA user_version").fetchone()[0])
 
     def test_v2_migration_preserves_rows_constraints_and_reopens_idempotently(self):
         self.db_path.parent.mkdir()
@@ -144,16 +166,191 @@ class SchemaTests(unittest.TestCase):
         self.assertIsNone(item["title"])
         self.assertIsNone(item["plan_path"])
         self.assertEqual("claude:one", STORE.get_session(migrated, "claude:one")["handle"])
-        self.assertEqual(3, migrated.execute("PRAGMA user_version").fetchone()[0])
+        self.assertEqual(4, migrated.execute("PRAGMA user_version").fetchone()[0])
         migrated.close()
 
         reopened = STORE.connect(self.db_path)
         self.addCleanup(reopened.close)
         self.assertEqual("key-1", STORE.get_work_item(reopened, "key-1")["key"])
-        self.assertEqual(3, reopened.execute("PRAGMA user_version").fetchone()[0])
+        self.assertEqual(4, reopened.execute("PRAGMA user_version").fetchone()[0])
 
+    def test_v3_migration_preserves_owner_links_and_enables_native_references(self):
+        self.db_path.parent.mkdir()
+        connection = sqlite3.connect(self.db_path)
+        connection.executescript(
+            """
+            CREATE TABLE work_items (
+                key TEXT PRIMARY KEY, repo TEXT NOT NULL, feature TEXT NOT NULL, item TEXT NOT NULL,
+                status TEXT NOT NULL, branch TEXT, pr TEXT, title TEXT, plan_path TEXT, updated_at REAL
+            );
+            CREATE TABLE sessions (
+                handle TEXT PRIMARY KEY, host TEXT NOT NULL, session_id TEXT NOT NULL,
+                work_item TEXT REFERENCES work_items(key), role TEXT
+            );
+            CREATE UNIQUE INDEX idx_sessions_one_owner_per_work_item
+            ON sessions(work_item) WHERE role = 'owner';
+            """
+        )
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA user_version = 3")
+        connection.execute(
+            "INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("legacy", "github.com/example/repo", "feature", "item", "active", "topic", None,
+             "Legacy title", "plans/feature/README.md", 1.0),
+        )
+        connection.execute(
+            "INSERT INTO sessions (handle, host, session_id, work_item, role) VALUES (?, ?, ?, ?, ?)",
+            ("codex:owner", "codex", "owner", "legacy", "owner"),
+        )
+        connection.commit()
+        connection.close()
 
-    def test_migration_starts_an_immediate_transaction_before_reading_legacy_owners(self):
+        migrated = STORE.connect(self.db_path)
+        self.addCleanup(migrated.close)
+        self.assertEqual(4, migrated.execute("PRAGMA user_version").fetchone()[0])
+        self.assertEqual([], migrated.execute("PRAGMA foreign_key_check").fetchall())
+        self.assertEqual("owner", STORE.get_session(migrated, "codex:owner")["role"])
+        self.assertEqual("Legacy title", STORE.get_work_item(migrated, "legacy")["title"])
+        with self.assertRaises(sqlite3.IntegrityError):
+            migrated.execute(
+                "INSERT INTO work_items (key, repo, feature, item, status) VALUES (?, ?, ?, ?, ?)",
+                ("invalid", "repo", "only-feature", None, "active"),
+            )
+        migrated.rollback()
+        item, created = STORE.resolve_or_create_work_item_reference(
+            migrated, "GitHub", "GitHub.com/Owner/Repository", "42", "github.com/example/repo",
+        )
+        self.assertTrue(created)
+        self.assertTrue(item["key"].startswith("execution:"))
+        self.assertIsNone(item["feature"])
+        self.assertEqual(
+            {"provider": "github", "scope": "github.com/owner/repository", "native_id": "42", "work_item": item["key"]},
+            STORE.get_work_item_reference(migrated, "github", "github.com/owner/repository", "42"),
+        )
+
+    def test_v3_migration_failure_rolls_back_work_items_sessions_and_version(self):
+        class FailingConnection(sqlite3.Connection):
+            def execute(self, sql, *args, **kwargs):
+                if sql.strip().startswith("ALTER TABLE work_items_v4 RENAME"):
+                    raise sqlite3.OperationalError("injected migration failure")
+                return super().execute(sql, *args, **kwargs)
+
+        self.db_path.parent.mkdir()
+        connection = sqlite3.connect(self.db_path, factory=FailingConnection)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.executescript(
+            """
+            CREATE TABLE work_items (
+                key TEXT PRIMARY KEY, repo TEXT NOT NULL, feature TEXT NOT NULL, item TEXT NOT NULL,
+                status TEXT NOT NULL, branch TEXT, pr TEXT, title TEXT, plan_path TEXT, updated_at REAL
+            );
+            CREATE TABLE sessions (
+                handle TEXT PRIMARY KEY, host TEXT NOT NULL, session_id TEXT NOT NULL,
+                work_item TEXT REFERENCES work_items(key), role TEXT
+            );
+            """
+        )
+        connection.execute("PRAGMA user_version = 3")
+        connection.execute(
+            "INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("legacy", "repo", "feature", "item", "active", None, None, "Title", None, 1.0),
+        )
+        connection.execute(
+            "INSERT INTO sessions (handle, host, session_id, work_item, role) VALUES (?, ?, ?, ?, ?)",
+            ("claude:owner", "claude", "owner", "legacy", "owner"),
+        )
+        connection.commit()
+
+        with self.assertRaisesRegex(sqlite3.OperationalError, "injected migration failure"):
+            STORE._ensure_schema(connection)
+        self.assertEqual(3, connection.execute("PRAGMA user_version").fetchone()[0])
+        self.assertEqual("Title", connection.execute("SELECT title FROM work_items WHERE key = 'legacy'").fetchone()[0])
+        self.assertEqual("legacy", connection.execute("SELECT work_item FROM sessions WHERE handle = 'claude:owner'").fetchone()[0])
+        self.assertEqual([], connection.execute("PRAGMA foreign_key_check").fetchall())
+        self.assertEqual(1, connection.execute("PRAGMA foreign_keys").fetchone()[0])
+        self.assertNotIn(
+            "work_items_v4",
+            {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()},
+        )
+        connection.close()
+
+    def test_future_schema_is_refused_without_migration(self):
+        self.db_path.parent.mkdir()
+        connection = sqlite3.connect(self.db_path)
+        connection.execute("PRAGMA user_version = 5")
+        connection.commit()
+        connection.close()
+
+        with self.assertRaisesRegex(RuntimeError, "unsupported schema version 5"):
+            STORE.connect(self.db_path)
+        connection = sqlite3.connect(self.db_path)
+        try:
+            self.assertEqual(5, connection.execute("PRAGMA user_version").fetchone()[0])
+            self.assertEqual([], connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall())
+        finally:
+            connection.close()
+
+    def test_concurrent_reference_resolution_creates_one_execution(self):
+        barrier = threading.Barrier(2)
+        results = []
+        errors = []
+
+        def resolve():
+            connection = STORE.connect(self.db_path)
+            try:
+                barrier.wait(timeout=5)
+                results.append(STORE.resolve_or_create_work_item_reference(
+                    connection, "github", "github.com/owner/repository", "42", "github.com/local/repo",
+                ))
+            except Exception as error:
+                errors.append(error)
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=resolve) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+
+        self.assertEqual([], errors)
+        self.assertEqual(2, len(results))
+        self.assertEqual({results[0][0]["key"]}, {item["key"] for item, _created in results})
+        self.assertEqual(1, sum(created for _item, created in results))
+        connection = STORE.connect(self.db_path)
+        try:
+            self.assertEqual(1, connection.execute("SELECT COUNT(*) FROM work_items").fetchone()[0])
+            self.assertEqual(1, connection.execute("SELECT COUNT(*) FROM work_item_references").fetchone()[0])
+        finally:
+            connection.close()
+
+    def test_binding_is_idempotent_and_conflict_preserves_session_ownership(self):
+        connection = STORE.connect(self.db_path)
+        self.addCleanup(connection.close)
+        STORE.upsert_work_item(connection, "local-a", "repo", "feature", "item")
+        STORE.upsert_work_item(connection, "local-b", "repo", "feature", "other")
+        STORE.ensure_session(connection, "codex", "owner")
+        STORE.set_session_ownership(connection, "codex:owner", "owner", "local-a")
+
+        self.assertTrue(STORE.bind_work_item_reference(
+            connection, "local-a", "azure-devops", "DEV.AZURE.COM/Organization", "7",
+        ))
+        self.assertFalse(STORE.bind_work_item_reference(
+            connection, "local-a", "azure-devops", "dev.azure.com/organization", "7",
+        ))
+        with self.assertRaisesRegex(ValueError, "already bound to local-a, not local-b"):
+            STORE.bind_work_item_reference(
+                connection, "local-b", "azure-devops", "dev.azure.com/organization", "7",
+            )
+        self.assertEqual("owner", STORE.get_session(connection, "codex:owner")["role"])
+        self.assertEqual("local-a", STORE.get_session(connection, "codex:owner")["work_item"])
+        self.assertEqual(
+            "local-a",
+            STORE.get_work_item_reference(connection, "azure-devops", "dev.azure.com/organization", "7")["work_item"],
+        )
+
+    def test_migration_rereads_the_version_under_an_immediate_transaction(self):
         class RecordingConnection(sqlite3.Connection):
             commands = []
 
@@ -165,10 +362,10 @@ class SchemaTests(unittest.TestCase):
         connection = sqlite3.connect(self.db_path, factory=RecordingConnection)
         self.addCleanup(connection.close)
         STORE._ensure_schema(connection)
-        self.assertEqual("BEGIN IMMEDIATE", connection.commands[0])
+        self.assertIn("BEGIN IMMEDIATE", connection.commands)
         self.assertLess(
             connection.commands.index("BEGIN IMMEDIATE"),
-            connection.commands.index("PRAGMA user_version"),
+            len(connection.commands) - 1 - connection.commands[::-1].index("PRAGMA user_version"),
         )
 
     def test_connect_enables_wal_and_foreign_keys(self):
@@ -232,6 +429,21 @@ class SchemaTests(unittest.TestCase):
                 "INSERT INTO sessions (handle, host, session_id, role, work_item) "
                 "VALUES ('codex:b', 'codex', 'b', 'owner', 'key-1')"
             )
+    def test_github_references_allow_punctuation_prefixed_repository_names(self):
+        for repository in (".github", "_tools", "-tools"):
+            with self.subTest(repository=repository):
+                self.assertEqual(
+                    ("github", f"github.com/owner/{repository}", "42"),
+                    STORE.normalise_work_item_reference("GitHub", f"GitHub.com/Owner/{repository}", "42"),
+                )
+        for provider, scope, native_id in (
+            ("github", "gitlab.com/owner/.github", "42"),
+            ("gitlab", "github.com/owner/.github", "42"),
+            ("github", "github.com/owner/.github", "042"),
+        ):
+            with self.subTest(provider=provider, scope=scope, native_id=native_id):
+                with self.assertRaises(ValueError):
+                    STORE.normalise_work_item_reference(provider, scope, native_id)
 
 
 @unittest.skipUnless(GIT, "git is required for repo-identity and hook lifecycle tests")
@@ -807,7 +1019,7 @@ class ClaimWorkItemTests(unittest.TestCase):
         try:
             with self.assertRaisesRegex(ValueError, "title must be non-empty"):
                 STORE.claim_registered_work_item(
-                    connection, "claude", "registered", self.temp.name, "key-1", "repo", "feature", "item",
+                    connection, "claude", "registered", self.temp.name, "key-1", "repo", "repo", "feature", "item",
                     "owner", title="  ", registration={"title": "Claude tab", "pid": 1, "pid_started_at": 1.0},
                 )
             self.assertIsNone(STORE.get_work_item(connection, "key-1"))

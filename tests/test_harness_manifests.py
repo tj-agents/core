@@ -344,6 +344,9 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
         expected_paths = {
             f"{root}/.agents/machine/scripts/work_item_sessions.py",
             f"{root}/resources/machine/scripts/work_item_sessions.py",
+            f"{root}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
+            f"{root}/skills/recover-agents/scripts/work_item_sessions.py",
+            f"{root}/codex-skills/recover-agents/scripts/work_item_sessions.py",
         }
         for rule in rules:
             command = rule["pattern"][-1]
