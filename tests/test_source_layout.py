@@ -329,7 +329,7 @@ class SourceLayoutTests(unittest.TestCase):
             SYNC.build(self.root)
 
     def test_a_host_only_term_in_a_shared_definition_fails_generation(self):
-        shared = self.root / ".agents/engineering/workflow/review/SKILL.md"
+        shared = self.root / ".agents/engineering/utility/review/SKILL.md"
         original = shared.read_text(encoding="utf-8")
         for host, term in (
             ("claude", "`code-review`"),

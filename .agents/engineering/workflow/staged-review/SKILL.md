@@ -1,5 +1,5 @@
 ---
-name: big-review
+name: staged-review
 description: Select and drive the canonical isolated review workflow for a very large immutable branch diff in resumable, dependency-ordered area stages recorded in the branch's one canonical work order. Use for hundreds or thousands of changed files, a multi-service diff, or to resume one staged review area.
 
 kind: workflow
@@ -16,11 +16,11 @@ never creates a `BIG-*` competitor.
 
 ## When to use
 
-Use this for an explicit big/staged review, normally more than 300 changed files or several substantial
+Use this for explicit resumable partitioning, normally more than 300 changed files or several substantial
 components. Use ordinary `review` for a one-sitting candidate and `incremental-review` when a completed
 watermark already covers the original candidate.
 
-One invocation reviews the next incomplete area unless the user names an area. `big-review-all` drives all
+One invocation reviews the next incomplete area unless the user names an area. `staged-review-all` drives all
 remaining areas through this same selector.
 
 ## First run — freeze and partition
@@ -38,7 +38,7 @@ Derive stages from the frozen diff rather than a remembered repository map:
 - shared contracts and foundations precede consumers, adapters, tests, and UI; and
 - unmatched files enter an explicit final `Everything else` stage.
 
-Resolve routed skills and local guidance once from the frozen path set, then map them to the stages that
+Resolve injected standards, routed skills and local guidance once from the frozen path set, then map them to the stages that
 triggered them. Record route-table identity, applicable skills, local `AGENTS.md`, and security sensitivity
 without copying the rules.
 
