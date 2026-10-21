@@ -37,7 +37,7 @@ Visible tabs, live CLI processes, distinct resumable IDs, detached processes, sa
 
 ## Source and deployment
 
-- Repository: `C:\Users\TommySeery\source\repos\base-agents`
+- Repository: `C:\Users\TommySeery\source\repos\tj-agents\core` (the main checkout, not a worktree)
 - Source: `cli-session-recovery`
 - Tests: `cli-session-recovery\tests\cli-session-vault.tests.ps1` from the repository root, or `tests\cli-session-vault.tests.ps1` from this directory
 - Installer: `cli-session-recovery\install-cli-session-recovery.ps1` from the repository root, or `install-cli-session-recovery.ps1` from this directory

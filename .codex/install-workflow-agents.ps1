@@ -9,8 +9,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ownershipManifestName = '.base-agents-delivery.json'
-$pendingManifestName = '.base-agents-delivery.pending.json'
+$ownershipManifestName = '.tj-agents-delivery.json'
+$pendingManifestName = '.tj-agents-delivery.pending.json'
+$legacyOwnershipManifestName = '.base-agents-delivery.json'
+$legacyPendingManifestName = '.base-agents-delivery.pending.json'
+$ownershipOwner = 'tj-agents'
+$legacyOwnershipOwner = 'base-agents'
 
 if ($Verify -and ($Apply -or $Uninstall)) {
     throw '-Verify cannot be combined with -Apply or -Uninstall.'
@@ -131,26 +135,45 @@ function Resolve-ManagedProject([string] $Path) {
     return $project
 }
 
-function Read-OwnershipManifest([string] $ManifestPath) {
+function Resolve-OwnershipState([string] $Current, [string] $Legacy) {
+    Assert-SafeDeliveryPath $Current
+    Assert-SafeDeliveryPath $Legacy
+    $hasCurrent = Test-Path -LiteralPath $Current
+    $hasLegacy = Test-Path -LiteralPath $Legacy
+    if ($hasCurrent -and $hasLegacy) {
+        throw "Both $Current and legacy $Legacy exist. Remove the stale one, then rerun."
+    }
+    if ($hasLegacy) { return [pscustomobject]@{ Path = $Legacy; Owner = $legacyOwnershipOwner } }
+    return [pscustomobject]@{ Path = $Current; Owner = $ownershipOwner }
+}
+
+function Remove-LegacyOwnershipState([string[]] $Paths) {
+    foreach ($path in $Paths) {
+        Assert-SafeDeliveryPath $path
+        if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
+    }
+}
+
+function Read-OwnershipManifest([string] $ManifestPath, [string] $Owner = $ownershipOwner) {
     $owned = @{}
     if (-not (Test-Path -LiteralPath $ManifestPath)) { return $owned }
     Assert-SafeDeliveryPath $ManifestPath
     $item = Get-Item -Force -LiteralPath $ManifestPath
     if (-not $item.PSIsContainer -and $item.Length -ge 0) {
         try { $manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json }
-        catch { throw "Invalid base-agents ownership state: $ManifestPath" }
+        catch { throw "Invalid $Owner ownership state: $ManifestPath" }
     }
     else {
-        throw "Base-agents ownership state is not a file: $ManifestPath"
+        throw "Ownership state is not a file: $ManifestPath"
     }
-    if ($manifest.schema_version -ne 1 -or $manifest.owner -ne 'base-agents') {
-        throw "Unsupported base-agents ownership state: $ManifestPath"
+    if ($manifest.schema_version -ne 1 -or $manifest.owner -ne $Owner) {
+        throw "Unsupported $Owner ownership state: $ManifestPath"
     }
     foreach ($entry in @($manifest.files)) {
         Assert-AgentName ([string] $entry.name) 'owned'
         $digest = ([string] $entry.sha256).ToUpperInvariant()
         if ($digest -notmatch '^[0-9A-F]{64}$' -or $owned.ContainsKey([string] $entry.name)) {
-            throw "Invalid base-agents ownership entry in $ManifestPath"
+            throw "Invalid $Owner ownership entry in $ManifestPath"
         }
         $owned[[string] $entry.name] = $digest
     }
@@ -173,8 +196,8 @@ function Write-OwnershipManifest([string] $ManifestPath, [hashtable] $Owned) {
     $files = @($Owned.GetEnumerator() | Sort-Object Name | ForEach-Object {
         [ordered]@{ name = $_.Name; sha256 = $_.Value }
     })
-    $value = [ordered]@{ schema_version = 1; owner = 'base-agents'; files = $files }
-    $temporary = Join-Path $parent ('.base-agents-delivery.{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
+    $value = [ordered]@{ schema_version = 1; owner = $ownershipOwner; files = $files }
+    $temporary = Join-Path $parent ('.tj-agents-delivery.{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
     Assert-SafeDeliveryPath $temporary
     $utf8 = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($temporary, (($value | ConvertTo-Json -Depth 4) + "`n"), $utf8)
@@ -226,7 +249,7 @@ function Assert-ProjectsMigrated([string[]] $Projects, [string[]] $Names, [hasht
         }
     }
     if ($problems.Count) {
-        throw "Project migration verification failed; base-agents-owned role copies remain: $($problems -join ', ')"
+        throw "Project migration verification failed; tj-agents-owned role copies remain: $($problems -join ', ')"
     }
 }
 
@@ -291,13 +314,17 @@ $profile = Resolve-CodexProfile $CodexHome
 $target = Join-Path $profile 'agents'
 $manifestPath = Join-Path $target $ownershipManifestName
 $pendingPath = Join-Path $target $pendingManifestName
+$legacyManifestPath = Join-Path $target $legacyOwnershipManifestName
+$legacyPendingPath = Join-Path $target $legacyPendingManifestName
 Assert-SafeDeliveryPath $target
 $migrationProjects = @(
     $MigrateProjectRoot | ForEach-Object { Resolve-ManagedProject $_ } | Sort-Object -Unique
 )
-$ownedDigests = Read-OwnershipManifest $manifestPath
-$pendingExists = Test-Path -LiteralPath $pendingPath
-$pendingDigests = Read-OwnershipManifest $pendingPath
+$manifestState = Resolve-OwnershipState $manifestPath $legacyManifestPath
+$ownedDigests = Read-OwnershipManifest $manifestState.Path $manifestState.Owner
+$pendingState = Resolve-OwnershipState $pendingPath $legacyPendingPath
+$pendingExists = Test-Path -LiteralPath $pendingState.Path
+$pendingDigests = Read-OwnershipManifest $pendingState.Path $pendingState.Owner
 if ($pendingExists) {
     foreach ($name in @($pendingDigests.Keys)) {
         $destination = Join-Path $target $name
@@ -322,11 +349,11 @@ if ($pendingExists) {
 
 if ($Verify) {
     if ($pendingExists) {
-        throw "Profile verification found an interrupted install journal at $pendingPath. Rerun with -Apply to recover it."
+        throw "Profile verification found an interrupted install journal at $($pendingState.Path). Rerun with -Apply to recover it."
     }
     Assert-ProfileRoles $target $sourceFiles $ownedDigests
     Assert-ProjectsMigrated $migrationProjects $projectManagedNames $projectKnownDigests
-    $suffix = if ($migrationProjects.Count) { '; known base-agents project copies absent' } else { '' }
+    $suffix = if ($migrationProjects.Count) { '; known tj-agents project copies absent' } else { '' }
     Write-Output "VERIFIED: $($sourceFiles.Count) profile agent(s)$suffix."
     exit 0
 }
@@ -334,7 +361,7 @@ if ($Verify) {
 $changes = 0
 if ($Uninstall) {
     if ($pendingExists) {
-        throw "Profile uninstall found an interrupted install journal at $pendingPath. Rerun with -Apply before uninstalling."
+        throw "Profile uninstall found an interrupted install journal at $($pendingState.Path). Rerun with -Apply before uninstalling."
     }
     foreach ($name in @($ownedDigests.Keys | Sort-Object)) {
         $destination = Join-Path $target $name
@@ -355,11 +382,12 @@ if ($Uninstall) {
     }
     if ($Apply) {
         Write-OwnershipManifest $manifestPath @{}
+        Remove-LegacyOwnershipState @($legacyManifestPath, $legacyPendingPath)
         Remove-DirectoryIfEmpty $target
         Write-Output "UNINSTALLED: $changes change(s), unrelated profile agents preserved."
     }
     else {
-        Write-Output "PREVIEW ONLY: $changes change(s); rerun with -Uninstall -Apply to remove owned base-agents profile roles."
+        Write-Output "PREVIEW ONLY: $changes change(s); rerun with -Uninstall -Apply to remove owned tj-agents profile roles."
     }
     exit 0
 }
@@ -383,7 +411,7 @@ foreach ($file in $sourceFiles) {
             $state = 'REPLACE'
         }
         else {
-            throw "Refusing to overwrite an unowned or modified profile agent: $destination. Move the personal file aside or restore the recorded base-agents content, then rerun."
+            throw "Refusing to overwrite an unowned or modified profile agent: $destination. Move the personal file aside or restore the recorded tj-agents content, then rerun."
         }
     }
     $installActions += [pscustomobject]@{
@@ -431,7 +459,7 @@ foreach ($action in $installActions) {
         New-Item -ItemType Directory -Force -Path $target | Out-Null
         Assert-SafeDeliveryPath $target
         Assert-SafeDeliveryPath $action.Destination
-        $temporary = Join-Path $target ('.base-agents-delivery.{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
+        $temporary = Join-Path $target ('.tj-agents-delivery.{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
         try {
             Assert-SafeDeliveryPath $temporary
             Copy-Item -LiteralPath $action.File.FullName -Destination $temporary
@@ -464,6 +492,7 @@ if ($Apply) {
     # install can never remove the only usable project-scoped copy.
     Assert-ProfileRoles $target $sourceFiles $newOwned
     Write-OwnershipManifest $pendingPath @{}
+    Remove-LegacyOwnershipState @($legacyManifestPath, $legacyPendingPath)
 }
 
 foreach ($project in $migrationProjects) {
