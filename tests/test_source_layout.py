@@ -2,9 +2,12 @@
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import posixpath
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -56,7 +59,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(82, len(skills))
+        self.assertEqual(83, len(skills))
         self.assertEqual("machine", skills["hook-control"]["plugin"])
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
@@ -110,11 +113,11 @@ class SourceLayoutTests(unittest.TestCase):
         _, output, _, _ = SYNC.build(self.root)
         catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
         engineering = next(package for package in catalog["packages"] if package["id"] == "base-agents/engineering")
-        self.assertEqual(["base-agents/base", "base-agents/machine"], engineering["dependencies"]["required"])
+        self.assertEqual(["base-agents/base", "base-agents/agent-store", "base-agents/machine"], engineering["dependencies"]["required"])
         self.assertEqual([], engineering["external_dependencies"]["required"])
         harness = json.loads(output["plugins/engineering/harness.json"].decode("utf-8"))
         self.assertEqual([{"id": "base-agents", "repository": "tj-agents/core"}], harness["requires"]["marketplaces"])
-        self.assertEqual(["base-agents/base", "base-agents/engineering", "base-agents/machine"], harness["requires"]["plugins"])
+        self.assertEqual(["base-agents/agent-store", "base-agents/base", "base-agents/engineering", "base-agents/machine"], harness["requires"]["plugins"])
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertEqual([], selection["external_prerequisites"])
 
@@ -221,6 +224,55 @@ class SourceLayoutTests(unittest.TestCase):
             ),
         )
 
+    def test_agent_store_inspection_runs_from_each_isolated_host_package(self):
+        _, output, _, _ = SYNC.build(self.root)
+        runtime = ".agents/agent-store/runtime"
+        for plugin in ("agent-store", "machine", "engineering"):
+            for name in ("session_store.py", "repository_identity.py", "reader.py"):
+                self.assertEqual(
+                    SYNC.canonical_output_bytes((self.root / runtime / name).read_bytes()),
+                    output[f"plugins/{plugin}/{runtime}/{name}"],
+                )
+        isolated = self.root / "isolated package \u00e9"
+        for relative, body in output.items():
+            if relative.startswith("plugins/agent-store/"):
+                destination = isolated / relative.removeprefix("plugins/agent-store/")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(body)
+        spec = importlib.util.spec_from_file_location(
+            "isolated_agent_store", isolated / runtime / "session_store.py"
+        )
+        store = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(store)
+        database = self.root / "fixture state \u00e9" / "sessions.db"
+        connection = store.connect(database)
+        try:
+            store.upsert_work_item(
+                connection, "github.com/example/repo:fixture/task", "github.com/example/repo",
+                "fixture", "task", status="active", title="Fixture execution",
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        before = database.read_bytes()
+        environment = os.environ.copy()
+        environment["AGENT_STATE_DIRECTORY"] = str(self.root / "unused state")
+        for entry in ("skills", "codex-skills"):
+            with self.subTest(host=entry):
+                result = subprocess.run(
+                    [sys.executable, "-I", "-B", str(isolated / entry / "inspect/scripts/inspect.py"),
+                     "--database", str(database)],
+                    cwd=isolated, env=environment, capture_output=True, text=True,
+                    encoding="utf-8", timeout=15,
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual("recorded", payload["state_kind"])
+                self.assertEqual("not-observed", payload["liveness"])
+                self.assertEqual("Fixture execution", payload["work_items"][0]["title"])
+                self.assertEqual(before, database.read_bytes())
+        self.assertFalse((self.root / "unused state").exists())
+
     def test_generated_text_bytes_are_stable_across_checkout_line_endings(self):
         source = self.root / ".agents/base/policy/plan-artifacts/templates/PLAN.md"
         lf = source.read_bytes().replace(b"\r\n", b"\n")
@@ -250,7 +302,7 @@ class SourceLayoutTests(unittest.TestCase):
             for entry in compatibility["fresh_selection"]
         ]
 
-        self.assertEqual(["base", "engineering", "machine"], fresh_plugins)
+        self.assertEqual(["base", "agent-store", "engineering", "machine"], fresh_plugins)
         self.assertEqual(fresh_plugins, default_plugins)
         self.assertEqual(
             fresh_plugins,

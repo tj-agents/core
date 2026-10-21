@@ -2,6 +2,7 @@
   "schema_version": 1,
   "plugin": "base-agents/machine",
   "source_roots": [
+    ".agents/agent-store/runtime",
     ".agents/catalog/catalog.schema.json",
     ".agents/catalog/plugins.schema.json",
     ".agents/hooks/hook_dispatch.py",
@@ -19,10 +20,18 @@
       }
     ],
     "plugins": [
+      "base-agents/agent-store",
       "base-agents/base",
       "base-agents/machine"
     ],
     "hooks": [
+      {
+        "path": ".agents/agent-store/runtime/session_store.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
       {
         "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
         "hosts": [
@@ -39,13 +48,6 @@
       },
       {
         "path": "resources/machine/scripts/reap_orphans.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "resources/machine/scripts/session_store.py",
         "hosts": [
           "claude",
           "codex"

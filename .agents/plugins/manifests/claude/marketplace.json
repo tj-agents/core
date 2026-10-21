@@ -16,6 +16,17 @@
       ]
     },
     {
+      "name": "agent-store",
+      "source": "./plugins/agent-store",
+      "description": "Recorded agent executions, sessions, ownership and references.",
+      "category": "Productivity",
+      "keywords": [
+        "agents",
+        "executions",
+        "registry"
+      ]
+    },
+    {
       "name": "engineering",
       "source": "./plugins/engineering",
       "description": "Selected engineering workflows, reviews and Git operations.",
