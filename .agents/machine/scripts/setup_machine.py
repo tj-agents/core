@@ -258,7 +258,7 @@ def powershell_block(python: str, script: Path, loader: Path | None, newline: st
 
 def posix_block(python: str, script: Path) -> str:
     def quoted(value: object) -> str:
-        return "'" + str(value).replace("'", "'\''") + "'"
+        return "'" + str(value).replace("'", "'\\''") + "'"
 
     return "\n".join([PROFILE_START, *(
         f'{name}() {{ [ -x {quoted(python)} ] && {quoted(python)} -I -B {quoted(script)}; command {name} "$@"; }}'
@@ -702,6 +702,7 @@ def apply_codex_legacy(context: Context) -> list[str]:
     changes = []
     path = codex_config_path(context)
     entries = legacy_config_entries(context)
+    deliveries = legacy_deliveries(context)
     if entries:
         raw = path.read_bytes()
         bom = raw.startswith(codecs.BOM_UTF8)
@@ -713,7 +714,7 @@ def apply_codex_legacy(context: Context) -> list[str]:
                              "they are not standalone tables")
         write_profile(path, updated, bom)
         changes += [f"removed [{table_name(parts)}] from {path}" for parts in entries]
-    for source, target in legacy_deliveries(context):
+    for source, target in deliveries:
         value = json.loads(source.read_text(encoding="utf-8-sig"))
         if not isinstance(value, dict) or value.get("schema_version") != 1 or value.get("owner") != LEGACY_DELIVERY_OWNER:
             raise SetupError(f"Unsupported legacy delivery manifest: {source}")
