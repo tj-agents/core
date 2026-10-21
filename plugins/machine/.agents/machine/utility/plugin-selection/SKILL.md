@@ -59,9 +59,12 @@ existing selections are kept. With no requested stack or plugin, a new selection
 engineering and machine packages. `preview` lists the changed files, `write` applies them together, and `check`
 exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
 
-A Git repository whose remotes all belong to `repo-owners.json` owners always selects the personal-project
-profile (`personal`, with its base and machine capabilities). Any other repository never does.
-`--plugin personal` also selects it explicitly. Selecting a profile does not prove its instructions loaded.
+Personal is only for personal projects explicitly adopting `personal@tj-agents`. Read the repository's
+README.md and AGENTS.md before selection; a GitHub owner, home directory or publisher account never
+establishes personal scope. `--plugin personal` selects it explicitly, and later adoption preserves that
+selection. Ownership alone never adds it. Infonetica, including `tj-agents/infonetica` work-tooling source
+and its worktrees, is work scope: never select or inject Personal there. Owner-based project/local file
+placement is independent of this policy boundary. Selecting a profile does not prove its instructions loaded.
 
 A bare `--plugin <name>` selects from `tj-agents`. Add a foreign plugin with
 `--plugin concertable@agents --marketplace agents=Concertable/agents`. Subsequent adoption preserves

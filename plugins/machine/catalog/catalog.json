@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:a2cab6fc76f856bd3dbb98348a4f5c9361db45b4a3b2c53d92526505b6e75a29",
+      "digest": "sha256:77c1dc1e5eec9ad0a109ecca64b137c0b59398591e3a8110a99e87a3839ac541",
       "harness": {
         "marketplaces": [
           {
@@ -151,10 +151,7 @@
         "sync-checkout",
         "unmerged",
         "update-roadmap",
-        "worktree",
-        "write-bug",
-        "write-debt",
-        "write-mistake"
+        "worktree"
       ],
       "dependencies": {
         "required": [
@@ -174,7 +171,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:e5060282e34f833a3d7317d40212d31a8f7572039e73464786a054a5d50be188",
+      "digest": "sha256:cc280f1abdcace7e1b00e80fae740f7723cb2933d95b16ddb877b29959033a24",
       "harness": {
         "marketplaces": [
           {
@@ -355,7 +352,7 @@
                   "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
                 ]
               ],
-              "justification": "Reads the current plan corpus and recorded work-item status to report scoped unfinished work; it does not write repository or session state",
+              "justification": "Reads plans and local execution status, labels a selected repository's plans as supporting context and names its provider; an invalid current-repository selection stops the scan. It writes no repository or session state",
               "match": [
                 [
                   "python3",
@@ -459,6 +456,10 @@
             ]
           }
         }
+      },
+      "external_dependencies": {
+        "required": [],
+        "optional": []
       }
     },
     {
@@ -512,7 +513,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:c844dda4ed211550aa0afb6efb31c7890cfc03d1bc9890797ecded92749c0286",
+      "digest": "sha256:273fd4d4238a3a961242ae8421ef07beb412a8c69c74b17380df41dec6b3b97f",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
