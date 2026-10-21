@@ -1,6 +1,6 @@
 ---
-name: big-review-all
-description: Drive every remaining stage of one canonical staged big review to completion unattended, keeping dependency-ordered stages serial while the review pipeline may parallelize only independent read-only lenses or subregions inside the active stage. Use to do all stages, finish a big review, or run the entire staged pass.
+name: staged-review-all
+description: Drive every remaining stage of one canonical staged review to completion unattended, keeping dependency-ordered stages serial while the review pipeline may parallelize only independent read-only lenses or subregions inside the active stage. Use to do all stages, finish a staged review, or run the entire staged pass.
 
 kind: workflow
 domain: process
@@ -8,7 +8,7 @@ domain: process
 
 # Drive a staged review to completion
 
-This is a thin unattended driver over `big-review`, not a second review lifecycle. The strong parent owns
+This is a thin unattended driver over `staged-review`, not a second review lifecycle. The strong parent owns
 the loop and the canonical `reviews/<branch-slug>.md` work order.
 
 Derive the current branch's canonical work order. If the user names a file, normalize it to a
@@ -17,7 +17,12 @@ staged mode with `[ ]` or `[~]` coverage, or in `parent-finalization` with every
 `Cross-area notes status`, `Parent summary status`, judgments, status, anchor watermark, or required
 security watermark. A fully finalized file has nothing to drive; later commits route to `incremental-review`.
 
-Run the next stage through `big-review`, inspect the parent-written coverage and cross-area notes, then run
+```text
+Coverage: foundations [x], API [ ], UI [ ]
+Next: staged-review for API, then UI, then parent finalization.
+```
+
+Run the next stage through `staged-review`, inspect the parent-written coverage and cross-area notes, then run
 the next remaining stage or parent finalization. Keep stages strictly serial because later stages consume
 earlier notes and share one judgment. Do not spawn a subordinate that owns a stage or writes the work order,
 and do not allow a lens to subdispatch. The canonical review pipeline may concurrently run only independent
