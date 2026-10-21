@@ -3,16 +3,16 @@ name: lanes
 description: Pick the model and thinking effort a piece of work is worth by declaring an ordinal lane (L1 most capable to L7 cheapest) that each harness resolves to its own model, so no skill, agent or workflow stage ever names a model. Covers the ladder and what each rung is for, the four questions that choose a rung, why a merge or publish never raises a lane, re-routing per phase rather than running a whole task in its highest lane, where a lane is applied (skill front matter, a delegated lane agent, a workflow stage), and the three places the Claude and Codex ladders are deliberately not level. Use when adding or reviewing a skill or agent, when clerical work is running on an expensive model, when tempted to write a model name anywhere, or when a new model needs pricing into the ladder.
 
 kind: policy
-domain: process
+domain: machine
 ---
 
 # Lanes
 
 **A lane is what work is worth, not which model runs it.** Declare `lane: L5`; never write a model name.
 Two tables — `claude.json` and `codex.json` — are the only places a model name may appear, so a new model
-or a reprice is a one-file change per harness and every consumer inherits it. They live at
-`.agents/lanes/` in the source repository, at `../../.agents/lanes/` from an installed host entry, and at `../../../lanes/` from the packaged canonical definition, alongside
-`resolve.py`.
+or a reprice is a one-file change per harness and every consumer inherits it. They live at `../../../lanes/` from this canonical source definition, at
+`../../resources/lanes/` from an installed host entry, and at
+`../../../../resources/lanes/` from the packaged canonical definition, alongside `resolve.py`.
 
 ## The ladder
 
@@ -99,9 +99,6 @@ An unavailable cheaper setting does not block an owner capable of safely complet
 with that owner and record a material fallback once; never claim a model switch occurred merely because
 a lane was recorded. Missing capability required for correctness remains a real gate. L1 remains reserved
 for critical design; delegate substantial implementation or review rather than running it at L1.
-For a massive plan whose design is a substantial phase, `engineering:plans` normally transfers execution
-to a fresh harness after a durable phased checkpoint. That decision is about the work and its context,
-not a lane change.
 
 ## Where a lane is applied
 

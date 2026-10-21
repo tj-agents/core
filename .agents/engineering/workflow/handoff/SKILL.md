@@ -80,7 +80,7 @@ resolver and resume condition.
    pickup procedure below. Otherwise write the prompt
    to a UTF-8 file and invoke the selected launcher's packaged script once, following its loaded
    instructions. Preserve a user-selected model, effort or frontier request; otherwise choose and pass the
-   cheapest suitable lane for the remaining work per `engineering:lanes`. A merge, handoff, file count or
+   cheapest suitable lane for the remaining work per `machine:lanes`. A merge, handoff, file count or
    delivery operation does not raise it: use L5 for small already-decided file deletion or move, config or
    docs cleanup, and L4 only for specified implementation that still needs code-level judgement.
    L7 is in-session only and cannot open either handoff launcher. Claude handoff also requires an explicit
@@ -188,7 +188,7 @@ distinct transfer, reconcile the completed attempt and its current owner before 
    workstream and returns its outcome; it does not adopt, close, or rewrite the originating goal.
 3. Write the self-contained side-workstream prompt to UTF-8 and invoke the selected launcher once. An
    explicit prompt-only request returns that prompt without launching. Preserve an explicit model, effort,
-   or frontier request; otherwise select a lane under `engineering:lanes` when the remaining work warrants it.
+   or frontier request; otherwise select a lane under `machine:lanes` when the remaining work warrants it.
 4. Verify submission. Success proves launch, not that the successor has read its goal. Release only the
    side-workstream writer lease, retain the original task's writer lease, and continue the original task.
    On failure, retain both task records and continue only work independent of the unlaunched side task.
