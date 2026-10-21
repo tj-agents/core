@@ -206,18 +206,46 @@ No administrative GitHub credential is stored in Actions.
 
 The listener re-reads GitHub and invokes the installed github-actions plugin's `merge-policy reconcile`
 for committed policy changes as Tommy's saved `gh` account. Install that plugin before setup. It invokes
-`plugin_autoupdate.py` for marketplace changes, and the existing sweep for main-branch changes. It
+`plugin_autoupdate.py` for marketplace changes. It
 catches up once on startup and after an offline gap, coalesces duplicates and retries failures a
 bounded number of times. There are no periodic GitHub checks. Native process-exit notifications resume
 plugin refreshes deferred while Codex sessions are alive. Nothing runs at CLI startup.
 
 Runtime logs rotate at `~/.agents-state/machine-events.log`. Package regeneration jobs publish a second
 hint after pushing generated packages because GitHub's own token cannot trigger another push workflow.
-Existing repositories need the prepared uniform caller merged; service scaffolding emits it for new
-repositories. GitHub Free's repository ruleset limitations still apply to private repositories.
+Repository enrollment is explicit: merge the uniform caller only into an approved personal repository.
+The generic service scaffold does not generate it. GitHub Free's repository ruleset limitations still
+apply to private repositories.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
 loaded; new sessions pick up the update. `install.ps1` still wires the Windows `shell/` profile.
+
+### Refresh and repository boundaries
+
+An event refresh updates the installed bytes of plugins already selected by trusted project or user
+configuration. Those shared tools can also serve employer projects that select them. A refresh does not
+adopt the personal profile, generate project workflows or apply a merge policy to every project that uses
+GitHub Actions. Running sessions retain their loaded instructions; Codex updates that would disrupt an
+active session wait for its process to exit before the listener retries them.
+
+The personal event publishers and automatic ruleset reconciliation are restricted to `tj-agents`,
+`Concertable` and `tomjseery`. Hints request a GitHub re-read, and only a changed, committed
+`.github/merge-policy.json` can trigger that repository's ruleset reconciliation. Publisher adoption is
+owned by [github-actions:machine-events](https://github.com/tj-agents/github-actions/blob/main/.agents/github-actions/utility/machine-events/SKILL.md);
+the policy writer also enforces its owner boundary before GitHub access.
+
+Repository plugin adoption follows
+[machine:plugin-selection](.agents/machine/utility/plugin-selection/SKILL.md). Employer-project agent
+settings use its local scope and Git metadata exclusions. The local writer resolves the exact checkout
+and `git rev-parse --git-path info/exclude`, including shared Git metadata for linked worktrees; it refuses
+tracked local targets. A home directory, current branch or linked worktree is not permission to adopt a
+personal profile. For example, a linked worktree of an employer repository still receives local agent
+settings, with no personal publisher or personal merge rules.
+
+Setup installs one listener per machine user, independent of the checkout or worktree used to invoke it.
+Event handling and catch-up do not edit or remove worktrees. The separate
+[merge cleanup workflow](.agents/engineering/workflow/merge/SKILL.md) owns worktree cleanup and its proof
+requirements. The machine event fixtures cover both event and catch-up paths without launching agents.
 
 ### Recover from a faulty installed hook
 

@@ -60,8 +60,7 @@ class ReconcileTests(unittest.TestCase):
     def setUp(self):
         self.refresh = mock.Mock(return_value=0)
         self.policy = mock.Mock()
-        self.sweep = mock.Mock()
-        self.reconciler = events.Reconciler(refresh=self.refresh, policy=self.policy, sweep=self.sweep)
+        self.reconciler = events.Reconciler(refresh=self.refresh, policy=self.policy)
 
     def test_duplicate_hint_does_not_repeat_work_and_changed_policy_uses_only_repo(self):
         self.reconciler.repository(current())
@@ -82,7 +81,31 @@ class ReconcileTests(unittest.TestCase):
         self.reconciler.catch_up([current(f"tj-agents/repo{i}") for i in range(50)])
         self.refresh.assert_called_once_with()
         self.assertEqual(50, self.policy.call_count)
-        self.sweep.assert_called_once_with()
+
+    def test_personal_events_and_catch_up_never_launch_worktree_cleanup(self):
+        pending = mock.Mock()
+        pending.get.side_effect = ["tj-agents/core", None, KeyboardInterrupt]
+        reconciler = events.Reconciler(refresh=self.refresh, policy=self.policy)
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "state.json"
+            with (
+                mock.patch.object(events, "require_tommy"),
+                mock.patch.object(events, "repository_state", return_value=current()),
+                mock.patch.object(events, "catch_up_states", return_value=[current(), current("employer/project")]),
+                mock.patch.object(events.plugins, "state_directory", return_value=Path(directory)),
+                mock.patch.object(events.plugins, "load_codex_config", return_value={}),
+                mock.patch.object(events.plugins, "sweep_worktrees") as cleanup,
+                self.assertRaises(KeyboardInterrupt),
+            ):
+                events.process_pending(pending, reconciler, state)
+        cleanup.assert_not_called()
+        self.policy.assert_called_once_with("tj-agents/core")
+        self.assertEqual(2, self.refresh.call_count)
+
+    def test_plugin_refresh_keeps_the_generic_updater_cleanup_disabled(self):
+        with mock.patch.object(events.plugins, "main", return_value=0) as update:
+            self.assertEqual(0, events.refresh_plugins())
+        self.assertIn("--no-sweep", update.call_args.args[0])
 
     def test_absent_policy_never_gets_a_default_gate(self):
         self.reconciler.repository(current(policy=None, marketplace=False))
