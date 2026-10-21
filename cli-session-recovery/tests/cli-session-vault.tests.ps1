@@ -774,6 +774,19 @@ try {
     $reinstalledClaudeCommands = @($reinstalledClaudeSettings.hooks.PSObject.Properties.Value.hooks.command)
     Assert-Equal 0 @($reinstalledClaudeCommands | Where-Object { $_ -match '(?i)cli-session-hook\.ps1' }).Count 'Repeated installs must keep Claude recovery hooks absent.'
     Assert-Equal 1 @($reinstalledClaudeCommands | Where-Object { $_ -match '(?i)other-hook\.ps1' }).Count 'Repeated installs must continue preserving unrelated Claude hooks.'
+    $installer = Join-Path $PSScriptRoot '..\install-cli-session-recovery.ps1'
+    $backupRoot = Join-Path $installProfile '.cli-session-vault\deployment-backups'
+    Assert-Equal 1 @(Get-ChildItem -LiteralPath $backupRoot -Directory).Count 'A repeated install with nothing changed must not create another backup folder.'
+    $null = & $installer -UserProfilePath $installProfile -Check
+    Assert-Equal 0 $LASTEXITCODE 'An installed profile must pass -Check.'
+    $installedLauncherHash = (Get-FileHash -LiteralPath $installedLauncher -Algorithm SHA256).Hash
+    [System.IO.File]::AppendAllText($installedLauncher, "' drift`r`n")
+    $drift = @(& $installer -UserProfilePath $installProfile -Check)
+    Assert-Equal 1 $LASTEXITCODE '-Check must fail when a deployed file drifted.'
+    Assert-Equal 1 @($drift | Where-Object { $_ -like '*save-sessions-hidden.vbs' }).Count '-Check must name the drifted file.'
+    & $installer -UserProfilePath $installProfile | Out-Null
+    Assert-Equal $installedLauncherHash (Get-FileHash -LiteralPath $installedLauncher -Algorithm SHA256).Hash 'Install must restore a drifted file.'
+    Assert-Equal 2 @(Get-ChildItem -LiteralPath $backupRoot -Directory).Count 'Install must back up only the drifted deployment.'
 } finally {
     Remove-Item -LiteralPath $installProfile -Recurse -Force -ErrorAction SilentlyContinue
 }
