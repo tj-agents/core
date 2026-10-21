@@ -58,6 +58,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 extra_environment: Mapping[str, str] | None = None,
                 timeout: float = STARTUP_TIMEOUT_SECONDS,
                 on_running: Callable[..., None] | None = None,
+                on_unconfirmed: Callable[..., None] | None = None,
                 require_session_start: bool = False,
                 on_phase: Callable[[str], None] | None = None) -> int:
     phase = on_phase or (lambda _name: None)
@@ -81,11 +82,16 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
             if require_session_start:
                 phase("waiting-session-start")
                 deadline = time.monotonic() + timeout
+                unconfirmed = False
                 while not _acknowledged(directory, token):
                     if process.poll() is not None:
                         return process.returncode
-                    if time.monotonic() >= deadline:
-                        raise StartupBindingError(f"native {host} did not acknowledge SessionStart before the startup deadline")
+                    if not unconfirmed and time.monotonic() >= deadline:
+                        if on_unconfirmed is not None:
+                            on_unconfirmed(process.pid)
+                        print(f"launch: native {host} is still running, but SessionStart was not acknowledged; "
+                              "leaving the session open; do not relaunch", file=sys.stderr, flush=True)
+                        unconfirmed = True
                     time.sleep(0.05)
             running(process.pid)
             return process.wait()
@@ -143,6 +149,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if parsed.status_file is not None:
             options["on_phase"] = phase
         returncode = run_session(parsed.host, parsed.target, parsed.project, arguments, **options,
+                                 on_unconfirmed=lambda child_pid: report("unconfirmed", child_pid=child_pid),
                                  on_running=lambda child_pid=None: report("running", running_at=time.time(), child_pid=child_pid))
     except StartupBindingError as error:
         message = f"launch: {parsed.host} launch failed: {error}"

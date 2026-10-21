@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:3fa5ae476dfc9a311f3319b941d30a79cb670d14823a9e0de84f1353159fd0aa",
+      "digest": "sha256:a2cab6fc76f856bd3dbb98348a4f5c9361db45b4a3b2c53d92526505b6e75a29",
       "harness": {
         "marketplaces": [
           {
@@ -97,8 +97,6 @@
         "address-debt",
         "address-mistake",
         "address-review",
-        "big-review",
-        "big-review-all",
         "bugfix",
         "commit",
         "commit-all",
@@ -142,10 +140,12 @@
         "review",
         "review-lifecycle",
         "self-repair",
-        "session-guidance",
+        "session",
         "skill-authoring",
         "skill-routes",
         "stack",
+        "staged-review",
+        "staged-review-all",
         "sync",
         "sync-all",
         "sync-checkout",
@@ -174,7 +174,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:1ff306a8dc5f167a245ab33cdfb11d3c88e2181c793eaafaf5fb8af75fa33b3b",
+      "digest": "sha256:e5060282e34f833a3d7317d40212d31a8f7572039e73464786a054a5d50be188",
       "harness": {
         "marketplaces": [
           {
@@ -512,7 +512,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:179c74796e118021eb79c6967f1333db6dfcdc6a6b5222bd502939aaf58ae76c",
+      "digest": "sha256:c844dda4ed211550aa0afb6efb31c7890cfc03d1bc9890797ecded92749c0286",
       "digest_excludes": [
         "catalog/catalog.json"
       ],

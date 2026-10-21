@@ -181,24 +181,69 @@ resources remain covered.
 
 ## Machine setup and updates
 
-Run once per machine, and again whenever you like; it changes nothing that is already set:
+Run once per machine. Rerunning setup converges on the same channel and service configuration:
 
 ```text
 ./setup.ps1          # Windows (PowerShell)
-./setup.sh           # Linux and macOS (bash and python3)
+./setup.sh           # Linux (bash and python3)
 ```
 
-It turns on Claude's own auto-update for every marketplace an enabled plugin comes from, removes the
-retired `claude`/`codex` profile launcher, and schedules `plugin_autoupdate.py` hidden at logon and hourly
-(Task Scheduler on Windows, crontab on Linux). It reads Codex selections from the user configuration and
-the `.codex/config.toml` of each repository with exact saved trust, one declaration per marketplace (user
-first, then an unpinned one). Each run checks every source once with `git ls-remote` and upgrades a
-marketplace and its selected plugins only when a revision changed or a plugin cache is missing, and never
-while a registered Codex session is running. An untrusted repository remains subject to Codex's native
-admission. Nothing runs when `claude` or `codex` starts.
+It enables Claude's native auto-update, removes the retired CLI launchers and installs one hidden
+machine event listener in `~/.agents-state/bin`. Windows uses a logon-only Task Scheduler task with
+failure restart and no execution limit. Linux uses a systemd user service with failure restart; systemd
+is required. Setup removes the former hourly plugin-autoupdate and merge-gates tasks or cron entries.
+Rerunning setup reuses the shared channel, replaces the runtime and restarts the same listener.
+
+The listener holds a blocking HTTPS JSON subscription to ntfy.sh. Main-branch callers use the shared
+`tj-agents/github-actions/.github/actions/machine-events` publisher. Setup reuses or creates the
+unguessable `MACHINE_EVENTS_TOPIC` Actions variable on core, configures the same variable for active
+repositories in tj-agents, Concertable and tomjseery, and saves it in `~/.agents-state/machine-events.json`.
+The same value is stored as an Actions secret for callers, so public run logs mask it.
+The topic is an untrusted public hint channel; it contains only repository names and change categories.
+No administrative GitHub credential is stored in Actions.
+
+The listener re-reads GitHub and invokes the installed github-actions plugin's `merge-policy reconcile`
+for committed policy changes as Tommy's saved `gh` account. Install that plugin before setup. It invokes
+`plugin_autoupdate.py` for marketplace changes. It
+catches up once on startup and after an offline gap, coalesces duplicates and retries failures a
+bounded number of times. There are no periodic GitHub checks. Native process-exit notifications resume
+plugin refreshes deferred while Codex sessions are alive. Nothing runs at CLI startup.
+
+Runtime logs rotate at `~/.agents-state/machine-events.log`. Package regeneration jobs publish a second
+hint after pushing generated packages because GitHub's own token cannot trigger another push workflow.
+Repository enrollment is explicit: merge the uniform caller only into an approved personal repository.
+The generic service scaffold does not generate it. GitHub Free's repository ruleset limitations still
+apply to private repositories.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
 loaded; new sessions pick up the update. `install.ps1` still wires the Windows `shell/` profile.
+
+### Refresh and repository boundaries
+
+An event refresh updates the installed bytes of plugins already selected by trusted project or user
+configuration. Those shared tools can also serve employer projects that select them. A refresh does not
+adopt the personal profile, generate project workflows or apply a merge policy to every project that uses
+GitHub Actions. Running sessions retain their loaded instructions; Codex updates that would disrupt an
+active session wait for its process to exit before the listener retries them.
+
+The personal event publishers and automatic ruleset reconciliation are restricted to `tj-agents`,
+`Concertable` and `tomjseery`. Hints request a GitHub re-read, and only a changed, committed
+`.github/merge-policy.json` can trigger that repository's ruleset reconciliation. Publisher adoption is
+owned by [github-actions:machine-events](https://github.com/tj-agents/github-actions/blob/main/.agents/github-actions/utility/machine-events/SKILL.md);
+the policy writer also enforces its owner boundary before GitHub access.
+
+Repository plugin adoption follows
+[machine:plugin-selection](.agents/machine/utility/plugin-selection/SKILL.md). Employer-project agent
+settings use its local scope and Git metadata exclusions. The local writer resolves the exact checkout
+and `git rev-parse --git-path info/exclude`, including shared Git metadata for linked worktrees; it refuses
+tracked local targets. A home directory, current branch or linked worktree is not permission to adopt a
+personal profile. For example, a linked worktree of an employer repository still receives local agent
+settings, with no personal publisher or personal merge rules.
+
+Setup installs one listener per machine user, independent of the checkout or worktree used to invoke it.
+Event handling and catch-up do not edit or remove worktrees. The separate
+[merge cleanup workflow](.agents/engineering/workflow/merge/SKILL.md) owns worktree cleanup and its proof
+requirements. The machine event fixtures cover both event and catch-up paths without launching agents.
 
 ### Recover from a faulty installed hook
 

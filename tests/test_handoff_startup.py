@@ -84,6 +84,18 @@ class HandoffStartupTests(unittest.TestCase):
                 self.assertIn(str(receipt), error)
                 self.assertNotIn('"startup": "verified"', output)
 
+    def test_live_session_without_acknowledgement_reports_uncertainty_without_retry(self):
+        for host in ('codex', 'claude'):
+            with self.subTest(host=host):
+                status = {'state': 'unconfirmed', 'child_pid': 4242}
+                result, output, error, receipt = self.run_launch(host, status)
+                self.assertEqual(3, result)
+                self.assertEqual(status, json.loads(receipt.read_text(encoding='utf-8')))
+                self.assertIn('still running', error)
+                self.assertIn('do not relaunch', error)
+                self.assertIn(str(receipt), error)
+                self.assertNotIn('"startup": "verified"', output)
+
     def test_missing_wrapper_is_abandoned_atomically_for_either_host(self):
         for host in ('codex', 'claude'):
             with self.subTest(host=host):
