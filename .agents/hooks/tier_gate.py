@@ -943,6 +943,7 @@ def native_plugins(harness, project=None):
     binary = shutil.which(harness)
     if binary is None:
         return ()
+    binary = str(Path(binary).resolve())
     try:
         result = subprocess.run(
             [binary, "plugin", "list", "--json"], capture_output=True, text=True,
