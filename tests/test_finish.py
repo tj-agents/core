@@ -275,12 +275,13 @@ class FinishReaperProcessTests(unittest.TestCase):
                     time.sleep(.05)
                 self.assertTrue(results)
                 result_path = results[0]
+                host.wait(timeout=session_close.DEFAULT_TIMEOUTS["AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS"])
                 for _ in range(300):
                     result = json.loads(result_path.read_text(encoding="utf-8"))
                     if result.get("status") == "session-closed":
                         break
                     time.sleep(.05)
-                self.assertEqual("session-closed", result["status"])
+                self.assertEqual("session-closed", result.get("status"), result)
                 self.assertTrue(result["session_exited"])
                 self.assertEqual("ours", result["session_id"])
                 self.assertTrue(worktree.is_dir())

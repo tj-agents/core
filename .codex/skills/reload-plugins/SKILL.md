@@ -1,6 +1,6 @@
 ---
 name: reload-plugins
-description: Load the latest published tj-agents plugins into this CLI, named after Claude Code's native /reload-plugins. Use when a skill or hook is missing or out of date after a merge, or when asked to reload, refresh or update the plugins.
+description: Load the latest published tj-agents plugins into this CLI, named after Claude Code's native /reload-plugins. Run it yourself, without asking, whenever plugins look outdated - a skill or hook is missing or behaves like an older version, or a plugin PR just merged - or when asked to reload, refresh or update the plugins.
 kind: utility
 domain: machine
 ---
@@ -12,6 +12,6 @@ This entry point adds only Codex's mechanism.
 
 ## Codex
 
-Codex has no native plugin reload, so run the shared script with `--host codex`. It upgrades each
-selected marketplace and re-adds its plugins. Codex then loads them in a new session, so tell the user to
-start one.
+Codex has no in-session reload. When this session needs the change now, the conversation resumes in a
+fresh process: ask the user to exit and run `codex resume <this-session-id>`. New sessions load it on
+their own.

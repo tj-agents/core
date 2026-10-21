@@ -11,9 +11,13 @@ Location: `~/.agents-state/sessions.db` (honouring `AGENT_STATE_DIRECTORY`), SQL
   `bounded: <scope>`), pid, pid_started_at, started_at, last_activity_at, turn_state
   (`working`/`awaiting_input`), ended_at, end_reason (`finished`/`closed`/`handed_off`), predecessor,
   successor.
-- `work_items`: one row per `<repo>:<feature>/<item>` key. Columns: repo, feature, item, status
+- `work_items`: one row per local `<repo>:<feature>/<item>` key or `execution:<uuid>` native key. Native
+  rows have both `feature` and `item` null. Columns: repo, feature, item, status
   (`proposed`/`active`/`blocked`/`paused`/`delivery-gated`/`done`), branch, pr, durable title,
   repository-relative plan path, updated_at.
+- `work_item_references`: native provider references bound to a work item. GitHub references use
+  `github.com/<owner>/<repository>` and a positive canonical issue number. Azure DevOps references use
+  `dev.azure.com/<organization>` and a positive canonical work-item ID.
 - `repo` is the `origin` remote as lowercase host plus path (`github.com/owner/name`; Azure DevOps SSH, HTTPS and legacy `visualstudio.com` remotes map to `dev.azure.com/<org>/<project>/_git/<repo>`, including the short `<org>.visualstudio.com/[DefaultCollection/]_git/<repo>` form, which maps to `dev.azure.com/<org>/<repo>/_git/<repo>`), else the absolute `git-common-dir`.
 
 ## Hook lifecycle
@@ -39,20 +43,23 @@ ancestor of the worktree's current HEAD), else `closed`. Only `closed` authorize
 
 ## Commands
 
-`work_item_sessions.py` is the only CLI over the store. Run it with `python -B` on Windows or `python3 -B`
-on Linux/macOS:
+`recover-agents/scripts/work_item_sessions.py` is the shipped CLI facade over the store. Run it with
+`python -B` on Windows or `python3 -B` on Linux/macOS:
 
 ```sh
-python -B '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' status '<feature>/<item>'
-python -B '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' resume '<feature>/<item>'
-python -B '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' item '<feature>/<item>' --status proposed --title 'Useful task title'
-python -B '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' claim '<feature>/<item>' --host codex --role owner --status active --title 'Useful task title'
+python -B '<skill-directory>/scripts/work_item_sessions.py' status '<feature>/<item>'
+python -B '<skill-directory>/scripts/work_item_sessions.py' resume '<feature>/<item>'
+python -B '<skill-directory>/scripts/work_item_sessions.py' item '<feature>/<item>' --status proposed --title 'Useful task title'
+python -B '<skill-directory>/scripts/work_item_sessions.py' claim '<feature>/<item>' --host codex --role owner --status active --title 'Useful task title'
+python -B '<skill-directory>/scripts/work_item_sessions.py' register --provider github --scope github.com/owner/repository --native-id 42
 ```
 
-- `claim <feature>/<item> --host claude|codex [--role owner|"bounded: <scope>"] [--predecessor <handle>]
+- `claim [<feature>/<item>|--execution-key execution:<uuid>|--provider <provider> --scope <scope> --native-id <id>]
+  --host claude|codex [--role owner|"bounded: <scope>"] [--predecessor <handle>]
   [--status <status>] [--title <title>] [--plan-path <path>]`: requires the current host's exact native
-  session identity. It creates a new item as `active` when `--status` is omitted; for an existing item,
-  omitted status and metadata preserve their stored values. New items require a non-empty `--title`.
+  session identity. A local selector creates a new item as `active` when `--status` is omitted; a native
+  reference must first be registered. For an existing item, omitted status and metadata preserve their
+  stored values. New local items require a non-empty `--title`.
   `--plan-path` must be an existing file within the current repository, written relative to its root with
   `/`; legacy `GOAL.md` paths are valid. A successful `owner` claim fills a still-`NULL` branch, in the
   same transaction, when the current branch is not the default. Refuses a second live owner unless
@@ -60,10 +67,13 @@ python -B '<skill-directory>/../../resources/machine/scripts/work_item_sessions.
   transaction that also clears `role` on every other owner row for the key, so at most one row owns a
   work item at a time, ever; a partial unique index enforces this at the database level. `--role` must be
   exactly `owner` or `bounded: <non-empty scope>`.
-- `status <feature>/<item>`: read-only; reports the durable title and plan path alongside each session's
+- `status [<feature>/<item>|--execution-key execution:<uuid>|--provider <provider> --scope <scope> --native-id <id>]`:
+  read-only; reports the durable title and plan path alongside each session's
   role, turn state and computed status.
-- `find --worktree <absolute-path>`: read-only; reports the work item and handle recorded for that path.
-- `resume <feature>/<item> [--handle <handle>]`: without `--handle`, resumes the single owner that is not
+- `find --worktree <absolute-path>`: read-only; reports the work item, execution key, native references and handle
+  recorded for that path.
+- `resume [<feature>/<item>|--execution-key execution:<uuid>|--provider <provider> --scope <scope> --native-id <id>]
+  [--handle <handle>]`: without `--handle`, resumes the single owner that is not
   ended or ended `closed`; refuses foreign, stale, live, unknown, finished or handed-off sessions, then
   calls `agent_recovery.open_session`.
 - `interrupted [--resume <handle>...]`: lists not-ended sessions whose recorded pid is dead, grouped by
@@ -71,6 +81,17 @@ python -B '<skill-directory>/../../resources/machine/scripts/work_item_sessions.
   `closed`, refusing stale, unknown, foreign, live, finished or handed-off ones.
 - `end --host claude|codex --reason finished|closed|handed_off [--successor <handle>]`: records the
   current session's end reason.
-- `item <feature>/<item> --status <status> [--pr <url>] [--title <title>] [--plan-path <path>]`: records
+- `item [<feature>/<item>|--execution-key execution:<uuid>|--provider <provider> --scope <scope> --native-id <id>]
+  --status <status> [--pr <url>] [--title <title>] [--plan-path <path>]`: records
   work-item status, filling a still-`NULL` branch from a non-default branch. Creating a new item requires
   a non-empty title; no plan path is required for a quick chore or an item whose plan is not yet known.
+- `register --provider <provider> --scope <scope> --native-id <id>`: atomically creates or finds one native-only
+  execution and binds the reference without claiming a session. It does not use cloud credentials or network access.
+- `bind [<feature>/<item>|--execution-key execution:<uuid>] --provider <provider> --scope <scope> --native-id <id>`:
+  atomically binds an existing execution. Repeating the same binding succeeds unchanged; a reference already bound to
+  another execution is refused. Binding does not change sessions, owners, status or branch.
+
+## Rollout
+
+Schema 4 writers require active host readers that accept schema 4. Older installed Machine snapshots still reject it,
+so source and generated-package checks do not authorize opening the live session store with this writer.

@@ -33,6 +33,7 @@ LEGACY_HEADER = (
     "if (Test-Path $agentUtilitiesShell) { . $agentUtilitiesShell }\r\n"
     'else { Write-Host "profile: agent-utilities missing at $agentUtilitiesShell" -ForegroundColor Red }\r\n'
 )
+LAUNCH_CHECK_BLOCK = "# >>> tj-agents launch check >>>\r\nfunction global:claude {}\r\n# <<< tj-agents launch check <<<"
 HIDDEN_BASH_BLOCK = "# >>> core hidden bash >>>\r\n. 'C:\\old\\shell\\hidden-bash-profile.ps1'\r\n# <<< core hidden bash <<<\r\n"
 LEGACY_CODEX_CONFIG = """model = "gpt"
 
@@ -172,40 +173,45 @@ class ProfileTests(Machine):
     def profiles(self):
         return [self.documents / name / "Microsoft.PowerShell_profile.ps1" for name in setup.PROFILE_NAMES]
 
+    def script(self):
+        return self.home / ".agents-state" / "bin" / "launch_check.py"
+
+    def block(self, newline="\r\n", loader=None):
+        loader = loader or self.checkout / "shell" / "profile.ps1"
+        return setup.powershell_block(setup.plugin_autoupdate.console_python(), self.script(), loader, newline)
+
     def test_legacy_profiles_converge_in_place_and_preserve_unrelated_lines(self):
         windows, core = self.profiles()
         windows.parent.mkdir(parents=True)
         core.parent.mkdir(parents=True)
         windows.write_bytes((LEGACY_HEADER + "Write-Output 'keep-me'\r\n").encode("utf-8"))
-        core.write_bytes(BOM + ("$env:Path = 'x'\r\n" + LEGACY_BLOCK + "\r\n. 'accounts.ps1'\r\n").encode("utf-8"))
-        context = self.context()
+        original = BOM + ("$env:Path = 'x'\r\n" + LEGACY_BLOCK + "\r\n" + HIDDEN_BASH_BLOCK + ". 'accounts.ps1'\r\n"
+                          + LAUNCH_CHECK_BLOCK + "\r\n").encode("utf-8")
+        core.write_bytes(original)
 
-        self.converge(step("PowerShell profile"), context)
+        self.converge(step("shell profiles"), self.context())
 
-        loader = self.checkout / "shell" / "profile.ps1"
-        block = setup.profile_block(loader, "\r\n")
-        self.assertEqual(BOM + ("$env:Path = 'x'\r\n" + block + "\r\n. 'accounts.ps1'\r\n").encode("utf-8"), core.read_bytes())
-        self.assertEqual((block + "\r\nWrite-Output 'keep-me'\r\n").encode("utf-8"), windows.read_bytes())
+        self.assertEqual(BOM + ("$env:Path = 'x'\r\n" + self.block() + "\r\n. 'accounts.ps1'\r\n").encode("utf-8"),
+                         core.read_bytes())
+        self.assertEqual((self.block() + "\r\nWrite-Output 'keep-me'\r\n").encode("utf-8"), windows.read_bytes())
+        self.assertEqual(original, core.with_name(core.name + ".pre-tj-agents.bak").read_bytes())
         for path in (windows, core):
-            self.assertEqual(1, len(list(path.parent.glob(path.name + ".pre-tj-agents.*.bak"))))
+            self.assertEqual(1, len(list(path.parent.glob("*.bak"))))
         self.assertNotIn("base-agents", core.read_text(encoding="utf-8-sig"))
 
     def test_missing_profiles_are_created_with_the_block(self):
-        self.converge(step("PowerShell profile"), self.context())
+        self.converge(step("shell profiles"), self.context())
         for path in self.profiles():
-            text = path.read_bytes()
-            self.assertTrue(text.startswith(BOM))
-            self.assertIn(str(self.checkout / "shell" / "profile.ps1").encode("utf-8"), text)
+            self.assertEqual(BOM + (self.block() + "\r\n").encode("utf-8"), path.read_bytes())
             self.assertEqual([], list(path.parent.glob("*.bak")))
 
     def test_an_existing_block_for_another_checkout_is_rewired(self):
         path = self.profiles()[1]
         path.parent.mkdir(parents=True)
-        path.write_text("first\n" + setup.profile_block(Path("C:/worktree/shell/profile.ps1"), "\n") + "\nlast\n",
+        path.write_text("first\n" + self.block("\n", Path("C:/worktree/shell/profile.ps1")) + "\nlast\n",
                         encoding="utf-8")
         setup.apply_profile(self.context())
-        self.assertEqual("first\n" + setup.profile_block(self.checkout / "shell" / "profile.ps1", "\n") + "\nlast\n",
-                         path.read_text(encoding="utf-8"))
+        self.assertEqual("first\n" + self.block("\n") + "\nlast\n", path.read_text(encoding="utf-8"))
 
     def test_duplicate_managed_blocks_collapse_to_one(self):
         path = self.profiles()[1]
@@ -214,7 +220,7 @@ class ProfileTests(Machine):
         setup.apply_profile(self.context())
         text = path.read_bytes().decode("utf-8")
         self.assertEqual(1, text.count(setup.PROFILE_START))
-        self.assertEqual("a\r\n" + setup.profile_block(self.checkout / "shell" / "profile.ps1", "\r\n") + "\r\nb\r\nc\r\n", text)
+        self.assertEqual("a\r\n" + self.block() + "\r\nb\r\nc\r\n", text)
 
     def test_malformed_markers_are_rejected_without_writing(self):
         path = self.profiles()[1]
@@ -222,35 +228,68 @@ class ProfileTests(Machine):
         path.write_text("# >>> base-agents >>>\nno end\n", encoding="utf-8")
         before = snapshot(self.root)
         out, err = io.StringIO(), io.StringIO()
-        self.assertEqual(2, setup.run_steps([step("PowerShell profile")], self.context(), False, out, err))
+        self.assertEqual(2, setup.run_steps([step("shell profiles")], self.context(), False, out, err))
         self.assertIn("Malformed", err.getvalue())
         self.assertEqual(before, snapshot(self.root))
 
-    def test_the_profile_is_windows_only(self):
-        out = io.StringIO()
-        self.assertEqual(0, setup.run_steps([step("PowerShell profile")], self.context(windows=False), False, out))
-        self.assertIn("n/a", out.getvalue())
-        self.assertFalse(self.documents.exists())
+    def test_linux_wires_only_existing_profiles_and_never_loads_the_windows_profile(self):
+        zshrc = self.home / ".zshrc"
+        zshrc.write_text("export A=1", encoding="utf-8")
+        powershell = self.home / ".config" / "powershell" / "Microsoft.PowerShell_profile.ps1"
+        powershell.parent.mkdir(parents=True)
+        powershell.write_bytes(b"keep\n# >>> base-agents >>>\nold\n# <<< base-agents <<<\n")
+        python = setup.plugin_autoupdate.console_python()
+
+        self.converge(step("shell profiles"), self.context(windows=False))
+
+        self.assertFalse((self.home / ".bashrc").exists())
+        self.assertEqual("export A=1\n\n" + setup.posix_block(python, self.script()) + "\n",
+                         zshrc.read_text(encoding="utf-8"))
+        self.assertEqual(("keep\n" + setup.powershell_block(python, self.script(), None, "\n") + "\n").encode("utf-8"),
+                         powershell.read_bytes())
+        self.assertNotIn("profile.ps1", powershell.read_text(encoding="utf-8"))
+
+    def test_linux_creates_bashrc_when_no_profile_exists(self):
+        self.converge(step("shell profiles"), self.context(windows=False))
+        self.assertEqual([self.home / ".bashrc"],
+                         [path for path in setup.profile_paths(self.context(windows=False)) if path.exists()])
 
 
 class RetiredTests(Machine):
-    def test_retired_blocks_are_removed_and_the_hidden_bash_double_load_is_retired(self):
-        path = self.documents / "PowerShell" / "Microsoft.PowerShell_profile.ps1"
-        path.parent.mkdir(parents=True)
-        path.write_bytes(BOM + ("keep\r\n" + HIDDEN_BASH_BLOCK + "# >>> core codex no-daemon >>>\r\nx\r\n"
-                                "# <<< core codex no-daemon <<<\r\n" + LEGACY_BLOCK + "\r\n").encode("utf-8"))
-        self.converge(step("retired launchers and jobs"), self.context(run=self.no_tasks))
-        self.assertEqual(BOM + ("keep\r\n" + LEGACY_BLOCK + "\r\n").encode("utf-8"), path.read_bytes())
+    def test_the_retired_listener_task_and_jobs_are_deleted_once(self):
+        tasks = set(setup.RETIRED_TASKS)
 
-    def test_linux_profiles_also_drop_the_retired_base_agents_block(self):
-        bashrc = self.home / ".bashrc"
-        bashrc.write_text("keep\n# >>> base-agents >>>\nold\n# <<< base-agents <<<\n", encoding="utf-8")
+        def run(command, **kwargs):
+            self.calls.append(command)
+            name = command[command.index("/tn") + 1]
+            if command[1] == "/query":
+                return completed(0 if name in tasks else 1)
+            if command[1] == "/delete":
+                tasks.discard(name)
+            return completed()
 
-        def cron(command, **kwargs):
-            return completed(0, "0 5 * * * backup\n")
+        self.converge(step("retired jobs and listener"), self.context(run=run))
+        self.assertIn("tj-agents machine events", setup.RETIRED_TASKS)
+        self.assertEqual(len(setup.RETIRED_TASKS), sum(command[1] == "/delete" for command in self.calls))
 
-        self.converge(step("retired launchers and jobs"), self.context(windows=False, run=cron))
-        self.assertEqual("keep\n", bashrc.read_text(encoding="utf-8"))
+    def test_the_linux_listener_service_and_cron_jobs_are_removed(self):
+        unit = self.home / ".config" / "systemd" / "user" / setup.RETIRED_SERVICE
+        unit.parent.mkdir(parents=True)
+        unit.write_text("[Service]\n", encoding="utf-8")
+        crontab = {"text": "0 5 * * * backup\n@reboot old # tj-agents-plugin-autoupdate\n"}
+
+        def run(command, **kwargs):
+            self.calls.append(command)
+            if command == ["crontab", "-l"]:
+                return completed(0, crontab["text"])
+            if command == ["crontab", "-"]:
+                crontab["text"] = kwargs["input"]
+            return completed()
+
+        self.converge(step("retired jobs and listener"), self.context(windows=False, run=run))
+        self.assertFalse(unit.exists())
+        self.assertEqual("0 5 * * * backup\n", crontab["text"])
+        self.assertIn(["systemctl", "--user", "disable", "--now", setup.RETIRED_SERVICE], self.calls)
 
 
 class HiddenBashTests(Machine):
@@ -410,7 +449,7 @@ class LegacyCodexTests(Machine):
         current = json.loads((self.codex / "agents" / ".tj-agents-delivery.json").read_text(encoding="utf-8"))
         self.assertEqual("tj-agents", current["owner"])
         self.assertEqual([{"name": "lane-l1.toml", "sha256": "A" * 64}], current["files"])
-        self.assertEqual(1, len(list(self.codex.glob("config.toml.pre-tj-agents.*.bak"))))
+        self.assertTrue((self.codex / "config.toml.pre-tj-agents.bak").is_file())
 
     def test_crlf_and_bom_are_preserved(self):
         self.config.write_bytes(BOM + LEGACY_CODEX_CONFIG.replace("\n", "\r\n").encode("utf-8"))
@@ -435,21 +474,42 @@ class LegacyCodexTests(Machine):
         self.assertEqual([], setup.check_codex_legacy(self.context(windows=False)))
 
 
-class ListenerTests(Machine):
-    def test_the_linux_listener_is_installed_once(self):
-        state = {"active": False}
+class RuntimeTests(Machine):
+    def test_the_launch_check_runtime_is_installed_once(self):
+        self.converge(step("launch-check runtime"), self.context(windows=False))
+        for name in setup.plugin_autoupdate.RUNTIME:
+            self.assertEqual((SCRIPTS / name).read_bytes(), (self.home / ".agents-state" / "bin" / name).read_bytes())
 
-        def run(command, **kwargs):
-            self.calls.append(command)
-            if command[-2:] == ["--quiet", setup.SYSTEMD_SERVICE]:
-                return completed(0 if state["active"] else 3)
-            if command[2] == "restart":
-                state["active"] = True
-            return completed()
 
-        self.converge(step("machine event listener"), self.context(windows=False, run=run))
-        self.assertTrue((self.home / ".agents-state" / "bin" / "machine_events.py").is_file())
-        self.assertEqual(1, sum(command[2:3] == ["restart"] for command in self.calls))
+class CatchUpTests(Machine):
+    rows = [
+        {"nameWithOwner": "tj-agents/core", "defaultBranchRef": {"target": {"oid": "a" * 40}}},
+        {"nameWithOwner": "tj-agents/old", "isArchived": True, "defaultBranchRef": {"target": {"oid": "b" * 40}}},
+        {"nameWithOwner": "tj-agents/empty", "defaultBranchRef": None},
+    ]
+
+    def test_catch_up_runs_only_when_a_default_branch_moved(self):
+        state = self.home / ".agents-state" / "machine-events-state.json"
+
+        def catch_up(argv):
+            setup.plugin_autoupdate.write_json(state, {"tj-agents/core": {"revision": "a" * 40, "policy": None}})
+            return 0
+
+        with mock.patch.object(setup.machine_events, "catch_up_states", lambda api: iter(self.rows)), \
+                mock.patch.object(setup.machine_events, "main", side_effect=catch_up) as main, \
+                mock.patch.object(setup.launch_check, "mark_current", return_value=True) as mark:
+            self.converge(step("plugin and merge-policy catch-up"), self.context(windows=False))
+        main.assert_called_once_with([])
+        mark.assert_called_once_with()
+
+    def test_catch_up_failures_fail_the_step(self):
+        err = io.StringIO()
+        with mock.patch.object(setup.machine_events, "catch_up_states", lambda api: iter(self.rows)), \
+                mock.patch.object(setup.machine_events, "main", return_value=1), \
+                mock.patch.object(setup.launch_check, "mark_current", side_effect=OSError("offline")):
+            self.assertEqual(2, setup.run_steps([step("plugin and merge-policy catch-up")], self.context(windows=False),
+                                                False, io.StringIO(), err))
+        self.assertIn("machine-events.log", err.getvalue())
 
 
 class AutoUpdateTests(Machine):
@@ -503,7 +563,7 @@ class RunStepsTests(Machine):
         (codex / "config.toml").write_text(LEGACY_CODEX_CONFIG, encoding="utf-8")
 
     def file_steps(self):
-        return [step(name) for name in ("retired launchers and jobs", "PowerShell profile",
+        return [step(name) for name in ("retired jobs and listener", "shell profiles",
                                         "legacy Codex configuration", "harness permissions")]
 
     def test_check_writes_nothing_and_reports_drift_until_converged(self):
@@ -513,7 +573,7 @@ class RunStepsTests(Machine):
         out = io.StringIO()
         self.assertEqual(1, setup.run_steps(self.file_steps(), context, True, out, io.StringIO()))
         self.assertEqual(before, snapshot(self.root))
-        self.assertIn("drift  PowerShell profile", out.getvalue())
+        self.assertIn("drift  shell profiles", out.getvalue())
         self.assertIn("drift  legacy Codex configuration", out.getvalue())
         self.assertEqual(0, setup.run_steps(self.file_steps(), context, False, io.StringIO(), io.StringIO()))
         converged = snapshot(self.root)
@@ -538,7 +598,7 @@ class RunStepsTests(Machine):
         later.assert_not_called()
 
     def test_windows_only_steps_skip_on_linux_without_running_anything(self):
-        for name in ("PowerShell profile", "hidden Git Bash for Claude", "CLI session recovery"):
+        for name in ("hidden Git Bash for Claude", "CLI session recovery"):
             with self.subTest(step=name):
                 out = io.StringIO()
                 self.assertEqual(0, setup.run_steps([step(name)], self.context(windows=False), True, out))
@@ -547,8 +607,9 @@ class RunStepsTests(Machine):
     def test_the_steps_run_in_the_documented_order(self):
         self.assertEqual([
             "preconditions", "event channel and publishers", "Claude marketplace auto-update",
-            "retired launchers and jobs", "PowerShell profile", "hidden Git Bash for Claude", "CLI session recovery",
-            "Codex profile agents", "harness permissions", "legacy Codex configuration", "machine event listener",
+            "retired jobs and listener", "launch-check runtime", "shell profiles", "hidden Git Bash for Claude",
+            "CLI session recovery", "Codex profile agents", "plugin and merge-policy catch-up", "harness permissions",
+            "legacy Codex configuration",
         ], [item.name for item in setup.STEPS])
 
 

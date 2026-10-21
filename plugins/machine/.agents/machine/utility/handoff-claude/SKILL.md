@@ -30,7 +30,7 @@ rather than a new window.
 
 The launcher prints its successful handoff event only after this attempt's native SessionStart is
 confirmed through the startup wrapper. A terminal accepting the command is insufficient. A CLI that exits
-before confirmation returns nonzero without a successful handoff event. Launch performs no plugin refresh.
+before confirmation returns nonzero without a successful handoff event. The tab first applies plugin updates published since the last check.
 This confirms startup; reading the goal and accepting ownership remain separate pickup evidence.
 
 Exit code **3** means startup or terminal submission remains uncertain. The error retains the attempt's

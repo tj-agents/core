@@ -1,31 +1,21 @@
-"""React to GitHub hints over one blocking ntfy stream (Python 3.11+)."""
+"""Reconcile merge policy and plugins from GitHub for one repository or every owned one (Python 3.11+)."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
-from collections import OrderedDict
 import json
 import logging
 from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 import re
-import select
-import sqlite3
 import subprocess
 import sys
-import threading
-import time
-import urllib.parse
-import urllib.request
 
 import plugin_autoupdate as plugins
 
 OWNERS = ("tj-agents", "Concertable", "tomjseery")
 TOPIC_VARIABLE = "MACHINE_EVENTS_TOPIC"
-SERVICE_NAME = "tj-agents machine events"
-MAX_LINE = 16384
 LOG = logging.getLogger("machine-events")
 FIELDS = """nameWithOwner isArchived isFork
 defaultBranchRef { name target { oid } }
@@ -183,160 +173,16 @@ class Reconciler:
         return failures
 
 
-class Pending:
-    def __init__(self):
-        self.items = OrderedDict()
-        self.condition = threading.Condition()
-
-    def put(self, repository):
-        with self.condition:
-            if repository in self.items or len(self.items) < 256:
-                self.items[repository] = None
-            self.condition.notify()
-
-    def get(self):
-        with self.condition:
-            self.condition.wait_for(lambda: bool(self.items))
-            return self.items.popitem(last=False)[0]
-
-
-def process_pending(pending, reconciler, state_file):
-    def runtime_digest():
-        return hashlib.sha256(Path(__file__).read_bytes() + Path(plugins.__file__).read_bytes()).digest()
-
-    running_bytes = runtime_digest()
-    waiter = None
-    while True:
-        repository = pending.get()
-        for attempt in range(3):
-            try:
-                require_tommy()
-                if repository is None:
-                    for failed in reconciler.catch_up(catch_up_states()):
-                        pending.put(failed)
-                else:
-                    reconciler.repository(repository_state(repository))
-                plugins.write_json(state_file, reconciler.state)
-                if runtime_digest() != running_bytes:
-                    os._exit(75)
-                outcomes = plugins.read_json(plugins.state_directory() / "plugin-autoupdate.json").get("outcomes", {})
-                deferred = any(str(value).startswith("deferred")
-                               for value in outcomes.get("marketplaces", {}).values())
-                if deferred and (waiter is None or not waiter.is_alive()):
-                    waiter = threading.Thread(target=wait_for_sessions, args=(pending,), daemon=True)
-                    waiter.start()
-                break
-            except Exception:
-                LOG.exception("Reconciliation failed for %s (attempt %s)", repository or "catch-up", attempt + 1)
-                if attempt < 2:
-                    time.sleep(2 ** (attempt + 1))
-
-
-def session_pids():
-    database = plugins.state_directory() / "sessions.db"
-    if not database.is_file():
-        return []
-    connection = sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True, timeout=5)
-    try:
-        rows = connection.execute("SELECT profile, pid FROM sessions WHERE ended_at IS NULL").fetchall()
-    finally:
-        connection.close()
-    home = os.path.normcase(str(plugins.codex_home().resolve()))
-    return sorted({pid for profile, pid in rows if isinstance(pid, int) and pid > 0
-                   and isinstance(profile, str) and os.path.normcase(str(Path(profile).resolve())) == home})
-
-
-def wait_for_exit(pid):
-    if os.name == "nt":
-        import ctypes
-        from ctypes import wintypes
-
-        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-        kernel.OpenProcess.restype = wintypes.HANDLE
-        kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
-        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-        handle = kernel.OpenProcess(0x00100000, False, pid)
-        if not handle:
-            if ctypes.get_last_error() == 87:
-                return
-            raise OSError(ctypes.get_last_error(), "Cannot wait for registered Codex process")
-        try:
-            if kernel.WaitForSingleObject(handle, 0xFFFFFFFF) != 0:
-                raise OSError("Codex process wait failed")
-        finally:
-            kernel.CloseHandle(handle)
-    else:
-        try:
-            descriptor = os.pidfd_open(pid)
-        except ProcessLookupError:
-            return
-        try:
-            select.select([descriptor], [], [])
-        finally:
-            os.close(descriptor)
-
-
-def wait_for_sessions(pending):
-    try:
-        for pid in session_pids():
-            wait_for_exit(pid)
-        pending.put(None)
-    except Exception:
-        LOG.exception("Cannot subscribe to the deferred Codex process exit")
-
-
 def topic_value(value):
     if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", value):
         raise ValueError("Machine event topic must contain 32-128 letters, digits, underscores or hyphens")
     return value
 
 
-def subscribe(topic, pending, cursor_file, opener=urllib.request.urlopen):
-    cursor = plugins.read_json(cursor_file).get("since", "all")
-    delay = 1
-    opened = False
-    started_at = time.monotonic()
-    pending.put(None)
-    while True:
-        connected_at = time.monotonic()
-        try:
-            url = "https://ntfy.sh/" + topic + "/json?" + urllib.parse.urlencode({"since": cursor})
-            with opener(url, timeout=90) as response:
-                if opened or time.monotonic() - started_at > 60:
-                    pending.put(None)
-                opened = True
-                while True:
-                    line = response.readline(MAX_LINE + 1)
-                    if not line:
-                        raise ConnectionError("Event stream disconnected")
-                    if len(line) > MAX_LINE:
-                        raise ValueError("Event exceeds the maximum line length")
-                    try:
-                        envelope = json.loads(line)
-                    except (ValueError, UnicodeError):
-                        continue
-                    repository = parse_hint(envelope)
-                    if repository:
-                        pending.put(repository)
-                    if isinstance(envelope, dict) and envelope.get("event") == "message":
-                        message_id = envelope.get("id")
-                        if isinstance(message_id, str) and re.fullmatch(r"[A-Za-z0-9]{1,64}", message_id):
-                            cursor = message_id
-                            plugins.write_json(cursor_file, {"since": cursor})
-        except Exception as error:
-            LOG.warning("Event stream interrupted: %s", type(error).__name__)
-            if time.monotonic() - connected_at > 60:
-                delay = 1
-            time.sleep(delay)
-            delay = min(delay * 2, 60)
-
-
 def main(argv=None):
     if sys.version_info < (3, 11):
         raise RuntimeError("machine_events requires Python 3.11 or newer")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--once", action="store_true")
     parser.add_argument("--repo")
     parser.add_argument("--state-directory", type=Path)
     arguments = parser.parse_args(argv)
@@ -354,21 +200,16 @@ def main(argv=None):
     try:
         state_file = directory / "machine-events-state.json"
         reconciler = Reconciler(plugins.read_json(state_file))
-        if arguments.once:
-            require_tommy()
-            failures = []
-            if arguments.repo:
-                if not valid_repository(arguments.repo):
-                    raise ValueError("Unsupported repository")
-                reconciler.repository(repository_state(arguments.repo))
-            else:
-                failures = reconciler.catch_up(catch_up_states())
-            plugins.write_json(state_file, reconciler.state)
-            return int(bool(failures))
-        topic = topic_value(plugins.read_json(directory / "machine-events.json").get("topic"))
-        pending = Pending()
-        threading.Thread(target=process_pending, args=(pending, reconciler, state_file), daemon=True).start()
-        subscribe(topic, pending, directory / "machine-events-cursor.json")
+        require_tommy()
+        failures = []
+        if arguments.repo:
+            if not valid_repository(arguments.repo):
+                raise ValueError("Unsupported repository")
+            reconciler.repository(repository_state(arguments.repo))
+        else:
+            failures = reconciler.catch_up(catch_up_states())
+        plugins.write_json(state_file, reconciler.state)
+        return int(bool(failures))
     finally:
         lock.close()
 
