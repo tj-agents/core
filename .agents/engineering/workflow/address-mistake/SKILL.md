@@ -19,7 +19,7 @@ engine.
 2. Reconcile the existing goal, session, branch, PR, or writer before writing or dispatching. If a repair
    already owns the cause, link it and append evidence rather than creating a second writer. Keep blocked
    and deferred incidents current with their real reason, resolver, and observable resume condition.
-3. For a defect in a consumed standard, follow the shipped `engineering:session-guidance` rule for the
+3. For a defect in a consumed standard, follow the shipped `engineering:session` rule for the
    source-owner repair. For an authorized local governing correction with no existing repair owner,
    establish its governing source and evidence first, then enter the appropriate shipped lifecycle: an
    existing goal uses `engineering:plan-execution`, an existing behavior defect uses `engineering:bugfix`,
@@ -34,3 +34,8 @@ engine.
 
 Answer a user's direct question before entering this workflow. Recording or selecting an incident does
 not grant repair or publication authority beyond the active task.
+
+```text
+Input: M008 records a defect in a consumed engineering standard; no repair owns its cause.
+Action: follow engineering:session's source-owner repair rule before starting the correction.
+```
