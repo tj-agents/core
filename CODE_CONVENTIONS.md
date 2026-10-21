@@ -46,9 +46,9 @@ incomplete.
   behaviour differs by platform pin the platform explicitly.
 
 Repository tooling (`.agents/sync-generated.ps1`, `.codex/install-workflow-agents.ps1`) may use PowerShell 7
-(`pwsh`), but it must run under `pwsh` on Linux as well as on Windows. `shell/`, `install.ps1` and
+(`pwsh`), but it must run under `pwsh` on Linux as well as on Windows. `shell/` and
 `cli-session-recovery/` are the Windows PowerShell profile and its tools, and are Windows-only by
-design.
+design; `setup_machine.py` installs them on Windows and reports them as not applicable on Linux.
 
 ## Python and portability
 

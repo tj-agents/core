@@ -2,6 +2,7 @@
 
 Read `README.md` before changing repository structure.
 Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts, hooks, or launchers.
+Install machine state only through `./setup.ps1` or `./setup.sh`; rerunning converges.
 Shipped code must run on Windows and Linux; follow
 [Supported platforms](CODE_CONVENTIONS.md#supported-platforms).
 
