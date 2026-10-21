@@ -9,8 +9,12 @@ from pathlib import Path, PurePosixPath
 import re
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sync_plugin_packages import core_marketplace
+
 
 ROOT = Path(__file__).resolve().parents[1]
+DISTRIBUTION_REPOSITORY = "tj-agents/marketplace"
 HOST_ROOTS = {
     "codex": re.compile(r"\$\{PLUGIN_ROOT\}/([^\"']+)"),
     "claude": re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"'@]+)"),
@@ -53,6 +57,7 @@ def validate_requires(root: Path, config: dict, catalog: dict, plugin: str, requ
     if set(requires) != REQUIRED_KEYS:
         raise ValueError(f"{plugin}: harness requires fields must be {sorted(REQUIRED_KEYS)}")
     required_marketplaces = requires["marketplaces"]
+    marketplace_name = core_marketplace(root, config)
     entries = {package["id"]: package for package in catalog["packages"]}
     catalog_marketplaces = {}
     for package in entries.values():
@@ -62,12 +67,9 @@ def validate_requires(root: Path, config: dict, catalog: dict, plugin: str, requ
     for marketplace in required_marketplaces:
         if set(marketplace) != {"id", "repository"}:
             raise ValueError(f"{plugin}: invalid marketplace declaration")
-        package = catalog_marketplaces.get(marketplace["id"])
-        if package is None or package["owner_repository"] != marketplace["repository"]:
+        if marketplace["id"] not in catalog_marketplaces or marketplace["repository"] != DISTRIBUTION_REPOSITORY:
             raise ValueError(f"{plugin}: marketplace declaration disagrees with catalog: {marketplace}")
-        if package["source"].removesuffix(".git") != f"https://github.com/{marketplace['repository']}":
-            raise ValueError(f"{plugin}: marketplace source disagrees with catalog owner: {marketplace}")
-    plugin_id = f"base-agents/{plugin}"
+    plugin_id = f"{marketplace_name}/{plugin}"
     if plugin_id not in entries:
         raise ValueError(f"{plugin}: missing catalog entry {plugin_id}")
     expected_plugins = sorted([plugin_id, *entries[plugin_id]["dependencies"]["required"]])
@@ -115,7 +117,7 @@ def synchronize(root: Path, check: bool) -> dict[str, dict]:
         required = {"schema_version", "plugin", "source_roots", "requires"}
         if set(manifest) != required or manifest.get("schema_version") != 1:
             raise ValueError(f"{path}: invalid manifest shape or schema version")
-        if manifest["plugin"] != f"base-agents/{plugin}":
+        if manifest["plugin"] != f"{core_marketplace(root, config)}/{plugin}":
             raise ValueError(f"{path}: plugin identity mismatch")
         expected_roots = sorted(scope["root"] for scope in config["scopes"] if scope["plugin"] == plugin)
         roots = manifest["source_roots"]

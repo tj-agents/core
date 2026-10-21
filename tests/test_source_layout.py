@@ -423,7 +423,7 @@ class SourceLayoutTests(unittest.TestCase):
     def test_catalog_digest_exclusion_cannot_be_widened(self):
         path = self.root / ".agents/catalog/catalog.json"
         catalog = json.loads(path.read_text(encoding="utf-8"))
-        machine = next(package for package in catalog["packages"] if package["id"] == "base-agents/machine")
+        machine = next(package for package in catalog["packages"] if package["id"] == "tj-agents/machine")
         machine["digest_excludes"].append("codex-skills/plugin-selection/SKILL.md")
         path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "digest exclusion drift"):
