@@ -16,6 +16,7 @@ from typing import Callable, Mapping, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import launch_check
 import launch_status
 from terminal_command import command_for_target, without_binding_state
 
@@ -143,6 +144,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if parsed.status_file is not None:
             report("preparing", phase=name)
             print(f"launch: {parsed.host} startup: {name}", flush=True)
+
+    phase("checking-plugins")
+    try:
+        launch_check.check(parsed.project.resolve())
+    except Exception as error:
+        print(f"plugins: update check failed: {error}", file=sys.stderr)
 
     try:
         options = {"require_session_start": True} if parsed.require_session_start else {}
