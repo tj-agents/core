@@ -44,7 +44,9 @@ Do not substitute a merge-base-to-head full review because the watermark is no l
 If the old comparison cannot be recovered, report that missing baseline instead of guessing.
 A sweep reports its exact comparison and coverage without claiming a new delivery watermark. A delivery
 workflow reconciles the rewritten candidate and its preserved evidence before stamping completion; the
-ordinary descendant-only preparation below cannot establish that reconciliation.
+ordinary descendant-only preparation below cannot establish that reconciliation. For a requested design
+sweep, call `review` with the resolved bounded changed-patch scopes, report its assessment and return here;
+do not continue into descendant-only preparation or reselect the sweep from that supplied candidate.
 
 Set the prior completed watermark as the full base SHA and the current target head as the full head SHA.
 Freeze the exact sorted changed paths and their SHA-256 digest and materialize the candidate bundle exactly

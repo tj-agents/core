@@ -10,7 +10,8 @@ domain: process
 
 Review is a bounded assessment that returns actionable findings. It can run directly or be called by a
 workflow; it does not own implementation or delivery. Source review is read-only unless `--fix` or the
-calling workflow's existing authorization includes remediation.
+calling workflow's existing authorization includes remediation. `--fix` uses lifecycle-backed review
+evidence before remediation, even when invoked directly.
 
 ## Arguments and selection
 
@@ -37,14 +38,21 @@ Resolve full base/head SHAs and the exact paths before reviewing. Keep that cand
 belong to a subsequent pass. Read the root and nearest path-specific repository instructions and relevant
 architecture. For an existing frozen bundle, read its exported frozen tree, never the live checkout.
 
-A direct review needs no plan, new worktree, branch synchronization or review-state machinery. When a
-calling workflow requires delivery evidence, apply `review-lifecycle` for preparation, the immutable
-bundle and completion proof. Preserve a supplied descriptor and its scope.
+Before running a host reviewer that reads checkout `HEAD`, verify that its checkout is clean at the
+resolved frozen head. Reuse a matching checkout; otherwise create a disposable detached worktree at that
+exact commit and run the reviewer and standards resolver there. Never switch an occupied checkout or
+substitute its current head. Remove the disposable checkout after preserving the result and any required
+evidence. A host that accepts an explicit range may use that range directly.
+
+A current-checkout assessment needs no plan, branch synchronization or review-state machinery. For `--fix`
+or a calling workflow that requires delivery evidence, apply `review-lifecycle` for preparation, the
+immutable bundle, canonical work order and completion proof before dispatch. Preserve a supplied
+descriptor and its scope.
 
 ## Stage 2 - select the result destination
 
-Return findings directly for a standalone review. An existing staged, incremental or workflow-owned review
-uses `review-lifecycle`'s canonical artifact, resolved with
+Return findings directly for a standalone assessment. `--fix`, staged, incremental and workflow-owned
+reviews use `review-lifecycle`'s canonical artifact, resolved with
 `<engineering>/workflows/workflow_ops.py review-path`. The parent alone writes it and retains earlier
 findings and dispositions. Record the frozen candidate before dispatch and leave interrupted work incomplete.
 
@@ -111,5 +119,6 @@ Report findings first, then the reviewed scope, standards applied and material c
 there are no findings. A clean result does not claim checks or reviewers that did not run.
 
 A calling workflow completes its work order, host coverage and security evidence through `review-lifecycle`
-before advancing. Standalone review ends with its assessment. Post only under `--comment` or prior explicit
-authority; remediate only under the authorization above and review the resulting delta again.
+before advancing. Standalone assessment ends with its findings. `--fix` completes its canonical review before
+`address-review` resolves those findings and `incremental-review` checks the repairs. Post only under
+`--comment` or prior explicit authority; remediate only under the authorization above and review the resulting delta again.

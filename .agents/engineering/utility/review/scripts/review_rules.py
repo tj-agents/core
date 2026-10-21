@@ -58,13 +58,13 @@ def conventions(declaration):
     return result
 
 
-def host_declarations(gate, host):
+def host_declarations(gate, host, identities, project):
     if host not in ("codex", "claude"):
         raise ValueError("Specify the reviewing host with --host codex or --host claude")
     variable = "CODEX_HOME" if host == "codex" else "CLAUDE_CONFIG_DIR"
     profile = Path(os.environ.get(variable) or Path.home() / ("." + host))
     cache = (profile / "plugins/cache").resolve()
-    entries = gate.native_plugins(host)
+    entries = gate.native_plugins(host, str(project))
     if not entries:
         raise ValueError("The reviewing host's enabled plugin inventory is unavailable or empty")
     found = []
@@ -72,6 +72,8 @@ def host_declarations(gate, host):
         if host == "codex":
             parts = [entry.get(key) for key in ("marketplaceName", "name", "version")]
             if not all(isinstance(part, str) and part for part in parts):
+                continue
+            if parts[1] + "@" + parts[0] not in identities:
                 continue
             payload = cache.joinpath(*parts).resolve()
         else:
@@ -81,6 +83,8 @@ def host_declarations(gate, host):
             payload = Path(location).resolve()
         if not payload.is_relative_to(cache) or len(payload.relative_to(cache).parts) != 3:
             raise ValueError("Enabled plugin escapes the reviewing host's cache: " + str(payload))
+        if payload.parent.name + "@" + payload.parent.parent.name not in identities:
+            continue
         declaration = payload / "tier.json"
         if not declaration.is_file():
             continue
@@ -110,7 +114,7 @@ def resolve(project, gate=None, found=None, host=None):
             or len(set(identities)) != len(identities)):
         raise ValueError("Invalid repository plugin selection in " + str(path))
     gate = gate or tier_gate()
-    declarations = list(host_declarations(gate, host) if found is None else found)
+    declarations = list(host_declarations(gate, host, identities, project) if found is None else found)
     selected = [item for item in declarations if item.id in identities]
     missing = sorted(set(identities) - {item.id for item in selected})
     if missing:
