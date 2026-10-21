@@ -51,11 +51,13 @@ class PackagedEngineeringHooks(unittest.TestCase):
         return json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
 
     def test_context_uses_its_packaged_contract_without_mutating_the_caller(self):
-        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
-        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
+        script = ".agents/engineering/policy/session/scripts/session-context.py"
+        contract = self.package / ".agents/engineering/policy/session/SKILL.md"
         result = self.run_hook(script)
         self.assertEqual(0, result.returncode, result.stderr)
         context = self.additional_context(result)
+        self.assertIn("engineering:session (source SHA-256", context)
+        self.assertNotIn("engineering:session-guidance", context)
         self.assertIn("engineering:plan-execution", context)
         self.assertIn(str(contract), context)
         self.assertIn("source SHA-256", context)
@@ -65,17 +67,17 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertEqual([], list(self.cwd.iterdir()))
 
     def test_missing_context_contract_is_an_actionable_error(self):
-        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
+        contract = self.package / ".agents/engineering/policy/session/SKILL.md"
         contract.unlink()
         result = self.run_hook(
-            ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+            ".agents/engineering/policy/session/scripts/session-context.py"
         )
         self.assertNotEqual(0, result.returncode)
         self.assertIn("cannot read contract", result.stderr)
         self.assertEqual("", result.stdout)
 
     def test_uses_the_payload_checkout_for_routine_design_delegation(self):
-        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        script = ".agents/engineering/policy/session/scripts/session-context.py"
         project = self.root / "configured repository"
         agents = project / ".agents"
         agents.mkdir(parents=True)
@@ -150,7 +152,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertEqual([], list(self.cwd.iterdir()))
 
     def test_context_fails_when_the_packaged_settings_reader_is_missing(self):
-        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        script = ".agents/engineering/policy/session/scripts/session-context.py"
         project = self.root / "configured repository"
         (project / ".agents").mkdir(parents=True)
         reader = self.package / "workflows" / "repository_configuration.py"
@@ -162,14 +164,14 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertIn("repository settings reader is unavailable", context)
 
     def test_instruction_fragment_stays_static_without_stdin(self):
-        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        script = ".agents/engineering/policy/session/scripts/session-context.py"
         result = self.run_without_stdin(script, ("--instruction-fragment",))
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertNotIn("auto_approve_design=", result.stdout)
 
     def test_user_prompt_context_includes_routine_delegation_guidance(self):
-        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
-        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
+        script = ".agents/engineering/policy/session/scripts/session-context.py"
+        contract = self.package / ".agents/engineering/policy/session/SKILL.md"
         headings = (
             "## When the user calls out a mistake",
             "## A task has an owning lifecycle — load it before the first edit",
@@ -193,7 +195,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 context = output["additionalContext"]
                 source = context.split("\n\n", 1)[0].split("Source: ", 1)[1]
                 self.assertTrue(source.endswith(str(
-                    Path(".agents") / "engineering" / "policy" / "session-guidance" / "SKILL.md"
+                    Path(".agents") / "engineering" / "policy" / "session" / "SKILL.md"
                 )))
                 self.assertIn("source SHA-256", context)
                 self.assertIn(expected, context)
@@ -215,8 +217,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertEqual([], list(self.cwd.iterdir()))
 
     def test_prompt_context_reports_missing_and_empty_sections(self):
-        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
-        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
+        script = ".agents/engineering/policy/session/scripts/session-context.py"
+        contract = self.package / ".agents/engineering/policy/session/SKILL.md"
         headings = (
             "## When the user calls out a mistake",
             "## A task has an owning lifecycle — load it before the first edit",
