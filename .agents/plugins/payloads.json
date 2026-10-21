@@ -8,6 +8,9 @@
     ],
     "machine": [
       "machine"
+    ],
+    "agent-store": [
+      "process"
     ]
   }
 }

@@ -19,6 +19,11 @@ AWAIT_PICKUP = RECOVERY.await_pickup
 
 
 class RecoveryTests(unittest.TestCase):
+    def test_store_loader_requires_the_canonical_runtime(self):
+        with mock.patch.object(RECOVERY, "HERE", Path("staging")):
+            with self.assertRaisesRegex(RuntimeError, "session_store.py"):
+                RECOVERY._script_path("session_store")
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="synthetic recovery ")
         self.addCleanup(self.temp.cleanup)
