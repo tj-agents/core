@@ -73,7 +73,10 @@ def is_pinned(ref: object) -> bool:
 
 
 def load_toml(path: Path) -> dict:
-    import tomllib
+    try:
+        import tomllib
+    except ImportError:
+        return {}
 
     try:
         with path.open("rb") as stream:

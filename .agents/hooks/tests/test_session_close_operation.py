@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 from pathlib import Path
 import sys
@@ -53,6 +54,18 @@ class ArmTests(unittest.TestCase):
         arguments = self.shared.start_detached.call_args.args[1]
         self.assertEqual(str(ROOT), arguments[arguments.index('--repo') + 1])
         self.assertEqual('sweep.py', arguments[arguments.index('--sweep') + 1])
+
+    def test_claude_arm_passes_its_transcript_and_the_size_at_arming(self):
+        self.entry['host'] = 'claude'
+        with tempfile.TemporaryDirectory() as home:
+            transcript = Path(home) / 'projects' / 'C--repo' / 'own.jsonl'
+            transcript.parent.mkdir(parents=True)
+            transcript.write_bytes(b'{}\n')
+            with mock.patch.dict(os.environ, {'CLAUDE_CONFIG_DIR': home}):
+                self.arm()
+        arguments = self.shared.start_detached.call_args.args[1]
+        self.assertEqual(str(transcript), arguments[arguments.index('--transcript') + 1])
+        self.assertEqual('3', arguments[arguments.index('--transcript-offset') + 1])
 
     def test_arm_refuses_without_an_active_turn(self):
         for row in (None, {'ended_at': 5, 'turn_state': 'working'}, {'ended_at': None, 'turn_state': 'awaiting_input'}):
@@ -136,6 +149,58 @@ class WatcherTests(unittest.TestCase):
         self.assertIsNone(self.wait([(1e9, {**self.row('awaiting_input', 1005), 'ended_at': 1006})]))
         with mock.patch.object(watcher.session_close, 'verified_live', return_value=False):
             self.assertIsNone(self.wait([(1e9, self.row('awaiting_input', 1005))]))
+
+    def test_a_prompt_after_an_interrupted_turn_cancels(self):
+        timeline = [(1004, self.row('working', 990)), (1e9, self.row('working', 1004))]
+        self.assertIsNone(self.wait(timeline))
+        self.assertLess(self.clock.now, 1005)
+
+    def test_a_prompt_and_its_stop_inside_one_poll_cancel(self):
+        timeline = [(1002, self.row('awaiting_input', 1001)), (1e9, self.row('awaiting_input', 1002))]
+        self.assertIsNone(self.wait(timeline))
+
+    def transcript(self, *records):
+        path = Path(os.environ['AGENT_STATE_DIRECTORY']) / 'transcript.jsonl'
+        path.write_text(''.join(json.dumps(record) + '\n' for record in records), encoding='utf-8')
+        self.args.transcript, self.args.transcript_offset = str(path), 0
+        return path
+
+    def test_a_blocked_stop_hook_cancels(self):
+        self.transcript({'type': 'assistant', 'message': {'content': 'done'}},
+                        {'type': 'attachment', 'attachment': {'type': 'hook_blocking_error', 'hookEvent': 'Stop'}},
+                        {'type': 'system', 'subtype': 'stop_hook_summary'})
+        self.assertIsNone(self.wait([(1e9, self.row('awaiting_input', 1005))]))
+
+    def test_idle_counts_only_after_every_stop_hook_finished(self):
+        path = self.transcript({'type': 'assistant', 'message': {'content': 'done'}})
+        sleep = self.clock.sleep
+
+        def finish_hooks_at_1010(seconds):
+            sleep(seconds)
+            if self.clock.now >= 1010 and 'stop_hook_summary' not in path.read_text(encoding='utf-8'):
+                with path.open('a', encoding='utf-8') as stream:
+                    stream.write(json.dumps({'type': 'system', 'subtype': 'stop_hook_summary'}) + '\n')
+        self.clock.sleep = finish_hooks_at_1010
+        self.assertEqual(1005, self.wait([(1e9, self.row('awaiting_input', 1005))]))
+        self.assertGreaterEqual(self.clock.now, 1010 + self.args.idle)
+
+    def test_transcript_written_before_arming_is_ignored(self):
+        path = self.transcript({'type': 'attachment', 'attachment': {'type': 'hook_blocking_error', 'hookEvent': 'Stop'}})
+        self.args.transcript_offset = path.stat().st_size
+        with path.open('a', encoding='utf-8') as stream:
+            stream.write(json.dumps({'type': 'system', 'subtype': 'stop_hook_summary'}) + '\n')
+        self.assertEqual('finished', watcher.stop_hooks_verdict(self.args))
+
+    def test_the_session_store_is_read_without_taking_a_write_lock(self):
+        store = watcher.session_close.register_session._load_session_store()
+        connection = store.connect()
+        store.start_session(connection, 'claude', 'own', str(Path.cwd()), pid=123, pid_started_at=100.5)
+        connection.execute('BEGIN IMMEDIATE')
+        try:
+            self.assertEqual('working', watcher.session_row(self.args)['turn_state'])
+        finally:
+            connection.rollback()
+            connection.close()
 
     def test_refused_close_is_recorded_and_never_sweeps(self):
         with mock.patch.object(watcher, 'wait_for_idle', return_value=1005), \
