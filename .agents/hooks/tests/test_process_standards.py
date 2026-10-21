@@ -382,11 +382,9 @@ class ProcessStandardsTests(unittest.TestCase):
                     self.root / f".agents/machine/utility/handoff-{host}/SKILL.md"
                 ).read_text(encoding="utf-8")
                 flat_launcher = " ".join(launcher.split())
-                self.assertIn("After a small or medium plan", flat_launcher)
-                self.assertIn("planning alone does not call for this launcher", flat_launcher)
-                self.assertIn("After a massive plan", flat_launcher)
-                self.assertIn("normally transfers execution to one fresh harness", flat_launcher)
-                self.assertIn("even in the same checkout", flat_launcher)
+                self.assertNotIn("After a small or medium plan", flat_launcher)
+                self.assertNotIn("After a massive plan", flat_launcher)
+                self.assertNotIn("engineering:plans", launcher)
                 self.assertNotIn("Split a job that designs and then delivers", launcher)
 
     def test_side_handoff_submission_keeps_the_parent_executing(self):
@@ -400,7 +398,10 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn("retain the originating goal and foreground writer lease", flat_launcher)
                 self.assertIn("continue its next action in the same turn", flat_launcher)
                 self.assertIn("does not satisfy the originating goal's completion condition", flat_launcher)
-                self.assertIn("full-goal transfer follows `engineering:handoff`", flat_launcher)
+                self.assertIn("Accept an already authorized prepared dispatch", flat_launcher)
+                self.assertIn("The caller owns the checkpoint, release and pickup rules", flat_launcher)
+                self.assertIn("successful submission is not pickup", flat_launcher)
+                self.assertNotIn("engineering:handoff", launcher)
                 self.assertNotIn("the handoff happened. Report it and stop.", launcher)
 
     def test_plan_artifacts_always_reach_merged_default_branch(self):

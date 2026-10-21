@@ -12,13 +12,13 @@ Close when every outcome you own is finished: delivery, validation and handoffs 
 waits on an answer, approval or check. A PR waiting only for the user's review or merge is finished work. Honor an
 explicit keep-open request. Do not offer optional follow-ups to avoid closing.
 
-A user callout about a mistake opens an unresolved repair outcome. Answer it and handle that outcome
-before reassessing completion. When engineering is selected, follow `engineering:self-repair`. A question
-about missed close-out does not instruct you to close immediately.
+A user callout about a mistake opens an unresolved repair outcome. Answer the direct question and preserve
+the repair outcome until its current owner resolves it before reassessing completion. A question about missed
+close-out does not instruct you to close immediately.
 
 ```text
 User: "Why didn't you close when the work was done?"
-Action: explain the omission and keep the repair active. In an engineering scope, run engineering:self-repair.
+Action: explain the omission and keep the repair outcome active.
 ```
 
 Close with the host's own close capability if it exposes one (a tool that archives or settles the current

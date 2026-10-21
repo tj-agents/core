@@ -34,10 +34,10 @@ Agent Workboard is outside scope and is not a dependency.
 
 - Native owner: `codex:01a16053-d03d-7753-8ad9-3174781fba89`.
 - Execution: `github.com/tj-agents/core:workflow/agent-store-architecture`.
-- Worktree: `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Refactor-WorkflowAgentStore`.
-- Branch: `Refactor/WorkflowAgentStore`.
-- Base: `112df9f5f9714acf443c84fe911cc081f9772dc5`, fetched `origin/main` on 21 October 2026.
-- PR: [Core #352](https://github.com/tj-agents/core/pull/352), S1 draft with `human-gate`.
+- Worktree: `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Refactor-MachineWorkflowBoundary`.
+- Branch: `Refactor/MachineWorkflowBoundary`.
+- Base/parent: `Refactor/WorkflowAgentStore` at `5e815d0658597f031c332e9d2a3e3bb35d886e8a` (PR #352).
+- PR: not opened for S2a. Parent: [Core #352](https://github.com/tj-agents/core/pull/352), S1 with `human-gate`; full and incremental source reviews complete, Windows CI pending.
 - Pickup: exact native identity and first read-only action recorded in the dispatched pickup file.
 
 Native history, the supported store status command, registered branches/worktrees, current plans and
@@ -272,7 +272,42 @@ The retained candidate has 763 runtime/test lines and no schema or writer algori
 covers source ownership, isolated packaging, detached staging, SQLite read isolation and exact-head CI.
 No Workflow lifecycle changes may expand this frozen S1 scope.
 
-### S2: Workflow owner and caller cutover
+### S2a: Machine capability boundary
+
+S1 source review passed. The current parent includes its focused tier-fixture correction; independent
+incremental review and exact-head CI remain with PR #352. The architecture merge hold prevents landing
+that parent now, while the dispatch requires completing all authorized dependent preparation before a
+final approval request. S2a therefore branches from its verified tip and must target that parent in its PR.
+A second checkout is actively required because S1's frozen review and CI still own its existing checkout.
+This child is now the canonical goal's current execution location; the parent plan is a frozen slice snapshot.
+No other checkout may write this current goal.
+
+A bounded independent source reader checked this prerequisite against `ce9b3966`. The parent resolved
+its only remaining ownership decision: host capability/cost selection belongs to Machine, domain machine.
+The slice is roughly 15 substantive paths and fewer than 300 substantive lines beyond a mechanical policy
+move; it stays separate from the broader lifecycle replacement. No launch algorithm, model value, stored
+identity or writer behavior changes. Personal, Infonetica and Marketplace fetched-main scans contain no
+current `engineering:lanes` caller, so this slice needs no external profile mutation.
+
+
+1. Move .agents/engineering/policy/lanes/ to .agents/machine/policy/lanes/ (including TECH_DEBT.md if present, preserving existing unfinished debt). Set domain: machine; kind remains policy. This is host capability/cost selection, so Machine is its logical owner. Keep bare name lanes, public namespace machine:lanes; no engineering alias. Remove the sentence directing large-plan execution transfer through engineering:plans; Engineering's plans already owns that policy. Existing lane data stays under .agents/lanes and its resource maps to both consuming packages stay unchanged.
+2. Correct relative resource locators inside the moved canonical policy: from .agents/machine/policy/lanes, ../../../lanes still resolves shared .agents/lanes in source but Machine package uses resources/lanes. Use explicit source and generated paths consistent with PACKAGING; the host entry located <package>/skills/lanes uses ../../resources/lanes. Do not point into Engineering or author checkout. Give concrete commands only for paths that ship.
+3. Update all current engineering:lanes calls to machine:lanes, both thin lane adapters' canonical path/domain, and catalog skill membership. New source scope is already declared for Machine. Update current source references to engineering/policy/lanes and package assertions. Preserve historical observed evidence rather than rewriting history; list any remaining matches and justification.
+4. Machine handoff-codex and handoff-claude are transport adapters. Replace the paragraph beginning 'If the launcher printed its confirmation' with equivalent launch evidence and duplicate-attempt safeguards while making the already selected caller own full-goal/side-workstream checkpoint, release and pickup rules. Add the clear contract: accept an already authorized prepared dispatch; do not call a higher-level workflow to prepare it again. Preserve the originating goal for a side transfer and distinguish submission from pickup. A launcher-only request can finish at verified submission. Retain exact exit-code3 no-retry rule.
+5. Remove the last four lines of the launch-lane paragraph that prescribe small/large plan transfers through engineering:plans. Keep the concrete lane-selection/launch behavior and references to machine:lanes. In Claude's effort paragraph, state directly that explicit user-selected model/effort/frontier is preserved; drop the upward engineering:handoff reference.
+6. Change only launch_claude.py's error string at resolve_model for redirected L1: '--lane {args.lane} routes to Codex {route["lane"]}; use machine:handoff-codex, or omit --lane for an explicit user-named model.' Keep existing rejection and route behavior; no new comment.
+7. Shared .agents/lanes/handoff-agent-body.md becomes a native routing proxy request without naming an upper-level workflow: 'You are a routing proxy. Return a required native handoff request to your parent for {host} {lane}. The parent owns authorization and context preparation. Do not inspect, execute, delegate, or otherwise advance the delegated task.' Keep placeholders and proxy behavior. Generated agent tests should assert the prepared-parent boundary rather than the removed Engineering invocation.
+8. Machine close keeps a user-called-out mistake unresolved: answer the direct question and preserve the repair outcome until its current owner resolves it; a missed-close question does not instruct immediate closure. Remove calls to engineering:self-repair from this Machine skill. Engineering session keeps that selected-discipline instruction unchanged. Do not add another repair workflow or weaken close preconditions.
+
+
+S2a verification: lane-table and process-standard checks; targeted handoff argument/model-resolution
+fixtures; generation, catalog, harness and tier checks; source/packaged Machine lane resource resolution;
+old active namespace/path grep; native routing proxy still returning only the parent request. Review the
+child delta against its exact parent and validate the cumulative tree on Windows and Linux. Keep generated
+output uncommitted. Bounded L4 implementation owns only this specified transformation; parent retains
+architecture, acceptance, review synthesis and delivery. No native model session is a test fixture.
+
+### S2b: Workflow owner and caller cutover
 
 Depends on S1's supported store paths. Move and consolidate the generic lifecycle definitions, transfer
 helper and entry routing, removing their superseded Base/Engineering names and wrappers. Preserve the
@@ -308,7 +343,7 @@ Use supported native installation/update paths only when authorized. Preserve ru
 validate fresh activation and affected bound readers with deterministic fixtures. Linux installed-host
 acceptance needs a supported Linux host; CI source execution is separately labelled evidence.
 
-Current-main consumer inventory was refreshed on 21 October 2026. Personal at `e7d0db0b` and
+Current-main consumer inventory was refreshed on 21 October 2026. Personal at `09ab438d` and
 Infonetica at `59644f17` have no authored calls to the lifecycle names being retired. Their current
 Engineering feature, addressing and PR operations remain valid. Personal explicitly depends on Engineering
 and Machine; Infonetica explicitly depends on Work, Base and Engineering under the tj-agents marketplace.
@@ -319,10 +354,10 @@ liveness. Resolve that overlap through current native ownership and review evide
 
 ## Execution readiness
 
-Verdict: S1 independent source review passed at `ce9b3966883580a67ee1921e9b03354db381e5a7`; the CI fixture repair needs incremental review and exact-head CI. S2/S3 are not yet implementation-ready.
+Verdict: S2a implementation and focused verification are complete; its immutable candidate is ready for independent review. S1 Windows CI and S2b/S3 readiness remain separate gates.
 Execution authorization: architecture and implementation through reviewed PR preparation.
 Transfer: none; retain this owner under the explicit dispatch.
-Unresolved: S1 incremental review and exact-head CI after the tier fixture correction; S2 exact source/route mapping and S3 coordinated publication/native acceptance.
+Unresolved: S1 Windows exact-head CI; S2a independent review/CI; S2b exact source/route mapping and S3 coordinated publication/native acceptance. None blocks independent preparation.
 Resolver: current owner and a bounded independent readiness reader. No new architecture successor.
 
 ## Verification
@@ -375,18 +410,35 @@ inventory with status closed and activity 8 October 2026. The recorded parent Co
 from the selected profile's recovery inventory. No owner was reopened, closed or repurposed. Preserve the
 old checkout and goal; a new catalog slice still needs its current checkout/registry reconciliation.
 
+S2a's bounded L4 writer returned its lease. The 17-file authored delta is 60 added/64 removed lines,
+including a 96%-similarity policy move; the existing debt file moved intact. Lane tables (29), process
+standards (22), Claude launcher (41, one skip), Codex launcher (37, one skip), startup (20), harness (6),
+tier payload (13), tier predicates (14), source-layout and transfer fixtures passed. Generation/digest
+checks and retired active namespace checks passed; generated output was restored and no output is staged.
+The parent reconciled the actual diff against the approved source boundary. This commit is the S2a candidate.
+
+S1 full and incremental private review receipts approve exact head `5e815d06`; no actionable findings.
+Linux CI run `39695061838` passed; Windows remains running. The small reviewer test wrote only a bytecode
+cache in its disposable bundle; archive comparison proved all source bytes unchanged and that cache was
+removed before the successful review-record. Review approval does not grant architecture merge authority.
+
+S2b evidence found one production consumer of the unwired prompt router: `continuation_stop` reads its
+control/receipt helpers. Retire the obsolete prompt router with the old lifecycle names while preserving
+those readers, the existing temp receipt path/keys and unrelated continuation owner checks. Do not enable
+any retired enforcement hook. New Base SessionStart context supplies the canonical routing guidance.
+The exact smaller status-package and subsequent lifecycle specifications remain under readiness assessment.
+
 ## Next Steps
 
-Complete S1's tier-fixture repair review and observe exact-head CI on PR #352. Its native and three
-independent source lenses passed at `ce9b3966`; both platform matrices identified only the stale
-three-package expectation in `test_stack_tiers.py`. This commit adds Agent Store to both tier assertions.
-The three native process fixtures limited in the local reviewer environment passed on both CI platforms.
-The delivery binding confirms absent merge authority through `human-gate`; do not enqueue or merge.
-Continue S2's bounded Machine dependency cleanup and generic Workflow mapping/readiness, then implement
-the necessary parent/child stack under the existing dispatch. Native installation remains an S3 gate.
+Review this committed S2a candidate against `5e815d0658597f031c332e9d2a3e3bb35d886e8a`, then open
+its draft against `Refactor/WorkflowAgentStore` with `human-gate` and obtain exact-head platform CI.
+The parent continues S1 Windows CI in its preserved checkout. Continue S2b readiness under the same goal:
+first publish Workflow status with direct Agent Store access, then perform the lifecycle/artifact/entry
+routing cutover. This separates the independently usable read operation from authority/continuation policy.
+The architecture merge hold and S3 native installation gate remain explicit.
 
 Scope: whole plan through all remaining phases and terminal delivery within the dispatched authority.
-Current slice: S1 canonical Agent Store package, with reviewed implementation and a CI fixture correction.
+Current slice: S2a review and platform verification, stacked on S1.
 Remaining scope: implementation, caller migration, both-host verification, review, coherent PR delivery,
 and explicit merge/installation gates when reached.
 Done when: the requested namespace cutover satisfies acceptance, or only an evidenced external gate
