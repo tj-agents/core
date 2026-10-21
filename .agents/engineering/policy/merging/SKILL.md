@@ -20,7 +20,8 @@ approval requirement on top of it.
 A goal file's bare existence authorizes nothing — the authority is the user's observed instruction,
 recorded with the goal. What still gates a merge keeps its own typed owner: an explicit user limitation
 or merge hold, a repository's stop classes, stop paths, hold labels and stricter recorded delivery rules,
-and the ordinary gates — current-head review and green checks. Outside the goal's own PRs nothing is
+a `.github/merge-policy.json` with `agents_may_merge: false` (the reviewed, green PR waits for Tommy;
+`github-actions:merge-policy` enforces it), and the ordinary gates — current-head review and green checks. Outside the goal's own PRs nothing is
 covered: not another repository, not a PR the goal did not create, and never publishing to a package feed.
 
 ## Persistent continuation
