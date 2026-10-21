@@ -73,8 +73,8 @@ supplies an implementation only for a host that lacks one. Never give the same c
 or different update paths per host.
 
 ```text
-Claude Code has /reload-plugins; Codex has none.
-Skill `reload-plugins`: Claude's entry point asks for /reload-plugins; Codex's runs the shared script.
+Claude Code has /review; Codex has `codex review`.
+Skill `review`: each host's entry point invokes its own native reviewer.
 ```
 
 ## Write the description as the selection trigger
