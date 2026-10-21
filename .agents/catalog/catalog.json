@@ -5,8 +5,8 @@
     {
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "base-agents",
-      "id": "base-agents/base",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/base",
       "name": "base",
       "package_path": "plugins/base",
       "description": "Maintained plans and common agent behavior.",
@@ -36,12 +36,12 @@
       "harness": {
         "marketplaces": [
           {
-            "id": "base-agents",
-            "repository": "tj-agents/core"
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
           }
         ],
         "plugins": [
-          "base-agents/base"
+          "tj-agents/base"
         ],
         "hooks": [
           {
@@ -82,8 +82,8 @@
     {
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "base-agents",
-      "id": "base-agents/engineering",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/engineering",
       "name": "engineering",
       "package_path": "plugins/engineering",
       "description": "Selected engineering workflows, reviews and Git operations.",
@@ -158,8 +158,8 @@
       ],
       "dependencies": {
         "required": [
-          "base-agents/base",
-          "base-agents/machine"
+          "tj-agents/base",
+          "tj-agents/machine"
         ],
         "optional": []
       },
@@ -178,14 +178,14 @@
       "harness": {
         "marketplaces": [
           {
-            "id": "base-agents",
-            "repository": "tj-agents/core"
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
           }
         ],
         "plugins": [
-          "base-agents/base",
-          "base-agents/engineering",
-          "base-agents/machine"
+          "tj-agents/base",
+          "tj-agents/engineering",
+          "tj-agents/machine"
         ],
         "hooks": [
           {
@@ -464,8 +464,8 @@
     {
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "base-agents",
-      "id": "base-agents/machine",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/machine",
       "name": "machine",
       "package_path": "plugins/machine",
       "description": "Explicit harness, history and clipboard utilities.",
@@ -496,7 +496,7 @@
       ],
       "dependencies": {
         "required": [
-          "base-agents/base"
+          "tj-agents/base"
         ],
         "optional": []
       },
@@ -519,13 +519,13 @@
       "harness": {
         "marketplaces": [
           {
-            "id": "base-agents",
-            "repository": "tj-agents/core"
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
           }
         ],
         "plugins": [
-          "base-agents/base",
-          "base-agents/machine"
+          "tj-agents/base",
+          "tj-agents/machine"
         ],
         "hooks": [
           {
