@@ -51,7 +51,7 @@ Generated from canonical `.agents/` definitions.
 - `review` — workflow — `.agents/engineering/workflow/review/SKILL.md`
 - `review-lifecycle` — convention — `.agents/engineering/convention/review-lifecycle/SKILL.md`
 - `self-repair` — workflow — `.agents/engineering/workflow/self-repair/SKILL.md`
-- `session-guidance` — policy — `.agents/engineering/policy/session-guidance/SKILL.md`
+- `session` — policy — `.agents/engineering/policy/session/SKILL.md`
 - `skill-authoring` — convention — `.agents/engineering/convention/skill-authoring/SKILL.md`
 - `skill-routes` — convention — `.agents/engineering/convention/skill-routes/SKILL.md`
 - `stack` — operation — `.agents/engineering/operation/stack/SKILL.md`
