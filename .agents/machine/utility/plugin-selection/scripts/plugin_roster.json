@@ -8,9 +8,6 @@
     "machine": [
       "base"
     ],
-    "work-items": [
-      "base"
-    ],
     "cpp": [],
     "gpp": [
       "cpp"
