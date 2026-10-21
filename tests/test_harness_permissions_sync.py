@@ -1,3 +1,4 @@
+from collections import namedtuple
 import importlib.util
 import json
 from pathlib import Path
@@ -9,15 +10,11 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / ".agents/machine/utility/plugin-selection/scripts/harness_permissions_sync.py"
-ROLLING_SCRIPT = ROOT / ".agents/machine/scripts/rolling_plugins.py"
 sys.path.insert(0, str(SCRIPT.parent))
 SPEC = importlib.util.spec_from_file_location("harness_permissions_sync", SCRIPT)
 SYNC = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SYNC)
-ROLLING_SPEC = importlib.util.spec_from_file_location("rolling_plugins", ROLLING_SCRIPT)
-ROLLING = importlib.util.module_from_spec(ROLLING_SPEC)
-sys.modules[ROLLING_SPEC.name] = ROLLING
-ROLLING_SPEC.loader.exec_module(ROLLING)
+VerifiedRoot = namedtuple("VerifiedRoot", "identity root revision repository")
 
 
 def harness(root: Path, permissions: dict) -> None:
@@ -34,7 +31,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.environ = {"CLAUDE_CONFIG_DIR": str(self.root / "claude"), "CODEX_HOME": str(self.root / "codex"), "AGENT_STATE_DIRECTORY": str(self.root / "state")}
 
     def verified(self, identity: str, root: Path, repository="https://github.com/tj-agents/core.git"):
-        return ROLLING.VerifiedRoot(identity, root, "a" * 40, repository)
+        return VerifiedRoot(identity, root, "a" * 40, repository)
 
     def test_removes_stale_owned_claude_grants_and_preserves_user_grants(self):
         root = self.root / "engineering"
@@ -46,7 +43,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         SYNC.apply_verified(self.environ, "claude", self.root, [])
         self.assertEqual(["Bash(personal)"], json.loads(settings.read_text(encoding="utf-8"))["permissions"]["allow"])
 
-    def test_external_rolling_root_without_a_harness_is_ignored(self):
+    def test_external_root_without_a_harness_is_ignored(self):
         root = self.root / "dotnet"
         root.mkdir()
         SYNC.apply_verified(self.environ, "claude", self.root, [self.verified("dotnet@tj-agents", root, "https://github.com/tj-agents/dotnet.git")])

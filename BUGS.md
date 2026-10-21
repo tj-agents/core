@@ -181,7 +181,7 @@ Next action: none for this repaired validator defect. Live refresh B013 remains 
 
 ## B013 — Fresh Codex entry starts after rolling refresh exceeds its deadline
 
-**Kind:** bug. **Observed:** 2026-10-19. **State:** blocked.
+**Kind:** bug. **Observed:** 2026-10-19. **State:** resolved.
 **Source owner:** Core rolling-plugin launcher; the originating Concertable launch-repair owner
 retains implementation authority under the explicit personal-projects handoff. No second repair writer.
 **Observation:** A fresh actual Windows Codex invocation through the installed normal launcher emitted
@@ -197,6 +197,8 @@ registrations and running package generations converged at the entry point users
 repair its cause, and verify an actual fresh Windows/Linux session and installed generations.
 **Resume condition:** a fresh normal launcher completes current publisher/package convergence and
 loads the mandatory rule; version output or a continued session after refresh failure is insufficient.
+**Resolution:** the rolling launcher refresh was removed; launchers start native CLIs with no
+pre-launch refresh and plugins update only through native `tj-agents` marketplace mechanisms.
 
 ## B014 — Project-selection guidance omitted exact Codex repository trust
 
