@@ -1,5 +1,14 @@
 # Automatic grants for skill-owned harness capabilities
 
+<!-- BEGIN plan-tracker-migration -->
+Current work is tracked through the selected Personal GitHub provider. This document retains design, decisions and historical evidence. Recording does not change implementation authority or existing delivery ownership.
+
+- [Reconcile and verify current native harness grants](https://github.com/tj-agents/core/issues/346)
+- [Reconcile harness policy PR 100 with the published grant implementation](https://github.com/tj-agents/core/issues/347)
+- [Verify selected-package grants in native startup and linked worktrees](https://github.com/tj-agents/core/issues/348)
+- [Verify constrained harness grants survive an authorized native handoff](https://github.com/tj-agents/core/issues/349)
+<!-- END plan-tracker-migration -->
+
 Status: first schema compatibility slice locally verified; review and delivery next.
 
 ## Outcome and authority
