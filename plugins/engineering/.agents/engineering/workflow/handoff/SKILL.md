@@ -7,22 +7,37 @@ domain: process
 
 # Transfer a context or bounded side workstream
 
-Hand off only when the user asks or the work needs a separate session; never hand off work the current
-session can do. An unqualified request to hand off means performing the transfer. Preparing a pointer alone
-does not complete it. Respect an explicitly named target harness; otherwise select `machine:handoff-codex`.
+An explicit request to hand off means performing the transfer, even when the current session could do
+the work. Without an explicit request, hand off only when the work needs a separate session. Preparing a
+pointer alone does not complete a handoff. Respect an explicitly named target harness; otherwise select
+`machine:handoff-codex`.
 The machine plugin and that launcher's documented platform
 and CLI prerequisites must be available. Resolve the skill using native discovery and load its
 instructions; do not guess a sibling-plugin or author-checkout path.
 
+After the identity, authority and capability checks below, dispatch the unresolved work immediately.
+Capture its objective, known context, constraints and open questions; the successor owns the delegated
+technical decisions and execution setup. Do not perform that investigation first or require a completed
+design, implementation plan or new delivery checkout before launching. Use a verified existing repository
+checkout as the starting directory when delivery setup is unresolved; the successor must establish
+appropriate isolation and ownership before deliverable writes. Preserve explicit user limits.
+
+```text
+Request: Hand off the architecture decision; keep this CLI and checkout open.
+Predecessor: Launch one successor with the objective, constraints and unresolved questions.
+Successor: Decide the architecture and establish isolated execution before deliverable writes.
+```
+
 When an active task surfaces a distinct, independently actionable side workstream whose authorization is
 separate — granted by the user, or standing, as with `engineering:session`'s standards-defect
-default — select this workflow in **bounded side-workstream** mode immediately. Give the side workstream one isolated
-checkout and one successor; the originating session retains its active goal and remains its only writer.
+default — select this workflow in **bounded side-workstream** mode immediately. Give the side workstream
+one successor and isolate its deliverable writes; the originating session retains its active goal and
+remains its only writer.
 This is not a full-goal transfer. Do not offload a step that is inseparable from the original task's next
 action, create duplicate writers, or hand off work that overlaps the original checkout's owned paths.
 
-Before launching the successor, capture the side-workstream authorization, the exact checkout and branch,
-the useful source context, and a concrete completion expectation in its canonical goal or plan. Respect
+Before launching the successor, capture the side-workstream authorization, exact starting checkout and branch,
+the useful source context, and a concrete completion expectation in its canonical goal or brief. Respect
 explicit user limits and existing external-action gates. A prior authorization to hand off that workstream
 does not require repetitive permission. Prompt-only requests remain prompt-only. If the launcher is
 unavailable or fails, preserve the side-workstream task and report that fact honestly while the original
@@ -163,10 +178,12 @@ distinct transfer, reconcile the completed attempt and its current owner before 
 
 ## Bounded side-workstream handoff
 
-1. Keep the original goal, worktree, branch, and next action with the current session. Create or select a
-   separate isolated checkout for the side workstream using `engineering:open-worktree`; do not reuse the
-   original active checkout.
-2. Create or update the side workstream's canonical goal or plan with its authorization, exact checkout,
+1. Keep the original goal, worktree, branch, and next action with the current session. Use the side
+   workstream's verified checkout when one exists; otherwise launch from a verified repository checkout
+   and delegate setup. Before deliverable writes, the successor creates or selects a separate isolated
+   checkout through `engineering:open-worktree` and reconciles ownership. It must not write the side
+   workstream's deliverables in the original active checkout.
+2. Create or update the side workstream's canonical goal or brief with its authorization, starting checkout,
    relevant context, completion expectation, gates, and the one next action. The successor owns only that
    workstream and returns its outcome; it does not adopt, close, or rewrite the originating goal.
 3. Write the self-contained side-workstream prompt to UTF-8 and invoke the selected launcher once. An
