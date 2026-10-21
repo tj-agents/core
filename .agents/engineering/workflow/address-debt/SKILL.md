@@ -1,6 +1,6 @@
 ---
 name: address-debt
-description: Take one tech-debt item all the way to a focused PR in its selected checkout — survey the selected Work Items provider or the unselected repository's debt registers, pick one high-value item, fix it, verify resolution under its retention rules, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
+description: Take one Work Items debt item all the way to a focused PR in its selected checkout — survey the selected provider, pick one high-value item, fix it, verify resolution under its retention rules, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
 
 kind: workflow
 domain: process
@@ -8,15 +8,14 @@ domain: process
 
 # Working one tech-debt item — or a small bundle — to a PR
 
-Take a tech-debt item all the way to a focused PR in its selected checkout, so nothing touches in-flight
-branches. This is the *resolution* workflow; the shared contract owns the record's facts, retention, and
-verified closure. A single item is the default shape; bundling more than one into the same PR is the
-exception below, not a second workflow.
+Take a Work Items debt item all the way to a focused PR in its selected checkout, so nothing touches
+in-flight branches. This is the *resolution* workflow; `work-items:write-debt` owns the record's facts,
+retention, and verified closure. A single item is the default shape; bundling more than one into the same
+PR is the exception below, not a second workflow.
 
 Read [the shared problem-record contract](../../resources/problem-records.md) first. In each repository,
-use the selected Work Items provider to list, read, update and close debt, or the unselected
-repository's debt registers. Selection failure blocks that repository's record operation; retain unsent
-facts under the shared guidance.
+use the selected Work Items provider to list, read, update and close debt. Provider failure blocks that
+repository's record operation; retain unsent facts under the shared guidance.
 
 ## Steps
 
@@ -32,13 +31,13 @@ facts under the shared guidance.
      remote default. Select or reuse an available checkout under `engineering:git-branching`; use
      `open-worktree` when concurrent work or necessary isolation requires another checkout. Each active
      writer has one owning branch and checkout.
-   - **Polyrepo-root mode:** run Step 2's survey across every child repository's debt items as one
+   - **Polyrepo-root mode:** run Step 2's survey across every child repository's selected debt items as one
      combined list. Once the primary item is selected, its child repo owns this run. Select the branch
      and checkout there under the same `git-branching` and `open-worktree` rules as single-repo mode. A second item may join the bundle only if it also lives in that same child
      repo, on top of passing the Step 2 bundling test below — a PR belongs to one repo, so cross-repo
      bundling doesn't exist. Every other child repo stays untouched; picking from more than one of them is a
      future run, not this one.
-2. **Pick the item(s) fast.** List titles and severity across the debt items in one pass (in
+2. **Pick the item(s) fast.** List titles and severity across the selected debt items in one pass (in
    polyrepo-root mode, across every child repository's set, combined); do not read each entry in full or
    deep-dive candidates before choosing. Rule an item out only for a fact one command settles: already in
    flight (`git branch -a` or `git worktree list` naming that area, run within whichever repo the candidate
@@ -75,11 +74,11 @@ facts under the shared guidance.
    branch.
 5. **Verify.** Build the affected projects to zero errors and run the affected unit/integration tests. Do
    not run local E2E for PR-bound work; the merge queue owns that gate per the repository's plan floor.
-6. **Close the loop.** Give each item its own commit — never squash a bundle into one — so the PR reads as N
-   independent, individually-revertable changes. Update each canonical item with progress and resolve it
-   through its owner only after its resolution condition is verified. Then push and open one PR covering the
-   whole bundle following the `open-pr` standard, with a body section per item. Do not set an E2E label
-   while opening the PR; the merge procedure's tier selection normalizes it mechanically at merge time.
+6. **Close the loop.** Give each item its own commit — never squash a bundle into one — so the PR reads as
+   N independent, individually-revertable changes. Update each canonical item with progress and close it
+   only through its provider after its resolution condition is verified. Then push and open one PR covering
+   the whole bundle following the `open-pr` standard, with a body section per item. Do not set an E2E label while opening the PR; the merge procedure's tier selection normalizes it
+   mechanically at merge time.
 
 Don't ask to confirm reversible steps — investigate, fix, build, commit, and push on the branch. Surface
 the item(s) you picked before starting, and flag anything irreversible.
@@ -87,7 +86,7 @@ the item(s) you picked before starting, and flag anything irreversible.
 ## Bounded dispatch, and the state that outlives a stage
 
 The Step 2 survey and Step 3 investigation may use independent read-only Workflow v2 roles —
-`evidence-explorer` over the debt items and surrounding code, `test-impact-analyst` for the
+`evidence-explorer` over the selected debt items and surrounding code, `test-impact-analyst` for the
 affected projects and their commands — through the semantic envelopes in `.agents/workflows/contract/v2`, or
 the packaged `../../workflows/contract/v2` bundle. Picking, bundling, the split call, and the fix stay with
 the parent. A bundled item whose transformation is disjoint from every other may go to a `mechanical-worker`
