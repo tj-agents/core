@@ -54,7 +54,8 @@ def enabled_from(identities: object, marketplace: str) -> list[str]:
 
 
 def superseded(marketplace: str, source: object, offered: set[str], enabled: list[str], canonical: set[str]) -> bool:
-    return marketplace != CANONICAL and owned(source) and bool((offered | {identity.rpartition("@")[0] for identity in enabled}) & canonical)
+    names = offered | {identity.rpartition("@")[0] for identity in enabled}
+    return marketplace != CANONICAL and owned(source) and bool(names & canonical)
 
 
 def replacement(identities: list[str]) -> str:
