@@ -189,7 +189,31 @@ class WatcherTests(unittest.TestCase):
         self.args.transcript_offset = path.stat().st_size
         with path.open('a', encoding='utf-8') as stream:
             stream.write(json.dumps({'type': 'system', 'subtype': 'stop_hook_summary'}) + '\n')
-        self.assertEqual('finished', watcher.stop_hooks_verdict(self.args))
+        self.assertEqual('finished', watcher.transcript_verdict(self.args))
+
+    def test_compaction_after_arming_does_not_cancel_a_claude_close(self):
+        self.transcript({'type': 'user', 'isCompactSummary': True, 'message': {'content': 'summary'}},
+                        {'type': 'assistant', 'message': {'content': 'done'}},
+                        {'type': 'system', 'subtype': 'stop_hook_summary'})
+        timeline = [(1004, self.row('working', 1002)), (1e9, self.row('awaiting_input', 1004))]
+        self.assertEqual(1004, self.wait(timeline))
+
+    def test_a_claude_prompt_after_arming_cancels_even_without_a_stop(self):
+        self.transcript({'type': 'user', 'message': {'content': '[Request interrupted by user]'}},
+                        {'type': 'user', 'message': {'content': [{'type': 'text', 'text': 'wait, also do X'}]}})
+        self.assertIsNone(self.wait([(1e9, self.row('working', 1004))]))
+
+    def test_a_turn_injected_after_the_final_stop_cancels(self):
+        self.transcript({'type': 'assistant', 'message': {'content': 'done'}},
+                        {'type': 'system', 'subtype': 'stop_hook_summary'},
+                        {'type': 'user', 'isMeta': True, 'message': {'content': '<task-notification>'}})
+        self.assertIsNone(self.wait([(1e9, self.row('awaiting_input', 1005))]))
+
+    def test_tool_results_after_arming_are_not_prompts(self):
+        self.transcript({'type': 'user', 'message': {'content': [{'type': 'tool_result', 'content': 'armed'}]}},
+                        {'type': 'assistant', 'message': {'content': 'done'}},
+                        {'type': 'system', 'subtype': 'stop_hook_summary'})
+        self.assertEqual('finished', watcher.transcript_verdict(self.args))
 
     def test_the_session_store_is_read_without_taking_a_write_lock(self):
         store = watcher.session_close.register_session._load_session_store()

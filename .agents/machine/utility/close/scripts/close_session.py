@@ -89,7 +89,8 @@ def arm():
     scripts = peer_scripts()
     shared.start_detached(here.with_name('close_watcher.py'), arguments,
                           [scripts / 'close.py', scripts / 'close_tab.py', scripts / 'windows_terminal_uia.ps1'])
-    return {'operation': 'session-close', 'status': 'armed', 'session_id': entry['session_id']}
+    return {'operation': 'session-close', 'status': 'armed', 'session_id': entry['session_id'],
+            'transcript_checked': transcript is not None}
 
 
 def main(argv=None):

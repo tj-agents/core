@@ -51,7 +51,8 @@ def session_row(args):
     store = session_close.register_session._load_session_store()
     if store is None:
         raise Refusal("session turn store is unavailable")
-    connection = sqlite3.connect(store.database_path().as_uri() + "?mode=ro", uri=True, timeout=5)
+    uri = store.database_path().resolve().as_uri() + "?mode=ro"
+    connection = sqlite3.connect(uri, uri=True, timeout=5)
     try:
         connection.row_factory = sqlite3.Row
         return store.get_session(connection, store.session_handle(args.host, args.session_id))
@@ -59,17 +60,25 @@ def session_row(args):
         connection.close()
 
 
-def stop_hooks_verdict(args):
-    """Read the Claude transcript written since arming: "blocked", "finished" or "pending"."""
+def is_prompt(record):
+    if record.get("type") != "user" or record.get("isMeta") or record.get("isCompactSummary"):
+        return False
+    content = (record.get("message") or {}).get("content")
+    return isinstance(content, str) or (isinstance(content, list) and not any(
+        isinstance(item, dict) and item.get("type") == "tool_result" for item in content))
+
+
+def transcript_verdict(args):
+    """Judge the Claude transcript written since arming: "cancel", "finished", "pending", or None without one."""
     if not args.transcript:
-        return "finished"
+        return None
     try:
         with open(args.transcript, "rb") as stream:
             stream.seek(args.transcript_offset)
             lines = stream.read().splitlines()
     except OSError:
         return "pending"
-    finished = False
+    verdict = "pending"
     for line in lines:
         try:
             record = json.loads(line)
@@ -80,10 +89,12 @@ def stop_hooks_verdict(args):
         attachment = record.get("attachment")
         if (isinstance(attachment, dict) and attachment.get("type") == "hook_blocking_error"
                 and attachment.get("hookEvent") == "Stop"):
-            return "blocked"
+            return "cancel"
         if record.get("type") == "system" and record.get("subtype") == "stop_hook_summary":
-            finished = True
-    return "finished" if finished else "pending"
+            verdict = "finished"
+        elif record.get("type") in ("user", "assistant") and (verdict == "finished" or is_prompt(record)):
+            return "cancel"
+    return verdict
 
 
 def wait_for_idle(args, clock=time.time, sleep=time.sleep):
@@ -99,12 +110,18 @@ def wait_for_idle(args, clock=time.time, sleep=time.sleep):
         activity = row.get("last_activity_at")
         if not session_close.finite_positive(activity):
             return None
+        verdict = transcript_verdict(args)
+        if verdict == "cancel":
+            return None
         if activity > args.armed_at:
-            if row.get("turn_state") != "awaiting_input" or stopped not in (None, activity):
+            if row.get("turn_state") != "awaiting_input":
+                if verdict is None or stopped is not None:
+                    return None
+                sleep(POLL_SECONDS)
+                continue
+            if stopped not in (None, activity):
                 return None
-            verdict = stop_hooks_verdict(args)
-            if verdict == "blocked":
-                return None
+            verdict = verdict or "finished"
             if stopped is None or verdict != settled:
                 stopped, since, settled = activity, clock(), verdict
             elif verdict == "finished" and clock() - since >= args.idle:
