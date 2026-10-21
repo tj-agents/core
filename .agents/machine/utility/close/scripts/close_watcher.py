@@ -114,13 +114,14 @@ def wait_for_idle(args, clock=time.time, sleep=time.sleep):
         if verdict == "cancel":
             return None
         if activity > args.armed_at:
-            if row.get("turn_state") != "awaiting_input":
-                if verdict is None or stopped is not None:
+            awaiting = row.get("turn_state") == "awaiting_input"
+            if not awaiting or stopped not in (None, activity):
+                if verdict is None:
                     return None
-                sleep(POLL_SECONDS)
-                continue
-            if stopped not in (None, activity):
-                return None
+                stopped = settled = None
+                if not awaiting:
+                    sleep(POLL_SECONDS)
+                    continue
             verdict = verdict or "finished"
             if stopped is None or verdict != settled:
                 stopped, since, settled = activity, clock(), verdict

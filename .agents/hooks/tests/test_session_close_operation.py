@@ -198,6 +198,14 @@ class WatcherTests(unittest.TestCase):
         timeline = [(1004, self.row('working', 1002)), (1e9, self.row('awaiting_input', 1004))]
         self.assertEqual(1004, self.wait(timeline))
 
+    def test_a_registry_blip_after_the_final_stop_only_restarts_the_claude_idle_wait(self):
+        self.transcript({'type': 'assistant', 'message': {'content': 'done'}},
+                        {'type': 'system', 'subtype': 'stop_hook_summary'})
+        timeline = [(1002, self.row('awaiting_input', 1001)), (1003, self.row('working', 1002)),
+                    (1e9, self.row('awaiting_input', 1003))]
+        self.assertEqual(1003, self.wait(timeline))
+        self.assertGreaterEqual(self.clock.now, 1003 + self.args.idle)
+
     def test_a_claude_prompt_after_arming_cancels_even_without_a_stop(self):
         self.transcript({'type': 'user', 'message': {'content': '[Request interrupted by user]'}},
                         {'type': 'user', 'message': {'content': [{'type': 'text', 'text': 'wait, also do X'}]}})
