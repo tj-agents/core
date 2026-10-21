@@ -226,10 +226,20 @@ class WorkItemSessionsTests(unittest.TestCase):
         session_id = "01a12aa7-5b58-7312-9400-ef710762147f"
         connection = self._connection()
         try:
-            STORE.start_session(connection, "codex", session_id, other, title="Joining Codex tab", pid=os.getpid(), pid_started_at=time.time())
+            self.assertIsNone(STORE.get_session(connection, f"codex:{session_id}"))
         finally:
             connection.close()
-        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": session_id}, clear=False):
+        entry = {
+            "host": "codex",
+            "session_id": session_id,
+            "pid": os.getpid(),
+            "pid_started_at": time.time(),
+            "title": "Joining Codex tab",
+        }
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": session_id}, clear=False), \
+                mock.patch.object(WIS, "_session_close", return_value=types.SimpleNamespace(
+                    own_host_and_entry=mock.Mock(return_value=entry),
+                )):
             WIS.cmd_claim(
                 host="codex", provider="github", scope="github.com/owner/repository", native_id="42", cwd=other,
             )
@@ -244,6 +254,9 @@ class WorkItemSessionsTests(unittest.TestCase):
         self.assertEqual(home["branch"], item["branch"])
         self.assertEqual("github.com/tj-agents/other", session["repo"])
         self.assertEqual(str(other), session["cwd"])
+        self.assertEqual("join-branch", session["branch"])
+        self.assertEqual(self._run_git(other, "rev-parse", "HEAD"), session["head"])
+        self.assertEqual("Joining Codex tab", session["title"])
         self.assertEqual(execution, session["work_item"])
         match = WIS.cmd_find(str(other))["matches"]
         self.assertEqual(execution, match[0]["work_item"])
@@ -252,13 +265,88 @@ class WorkItemSessionsTests(unittest.TestCase):
             [{"provider": "github", "scope": "github.com/owner/repository", "native_id": "42"}],
             match[0]["references"],
         )
-        match = WIS.cmd_find(str(other))["matches"]
-        self.assertEqual(execution, match[0]["work_item"])
-        self.assertEqual(execution, match[0]["execution_key"])
-        self.assertEqual(
-            [{"provider": "github", "scope": "github.com/owner/repository", "native_id": "42"}],
-            match[0]["references"],
-        )
+
+    def test_native_home_claim_and_item_fill_null_branches_from_feature_branches(self):
+        self._run_git(self.repo, "branch", "-M", "main")
+        claimed = WIS.cmd_register("github", "github.com/owner/repository", "42", cwd=self.repo)
+        self._run_git(self.repo, "checkout", "-b", "native-claim-branch")
+        session_id = "01a12aa7-5b58-7312-9400-ef710762147f"
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": session_id}, clear=False):
+            self._register_current_session("codex", session_id, "Codex tab")
+            WIS.cmd_claim(
+                host="codex", provider="github", scope="github.com/owner/repository", native_id="42",
+                cwd=self.repo,
+            )
+
+        self._run_git(self.repo, "checkout", "main")
+        updated = WIS.cmd_register("github", "github.com/owner/repository", "43", cwd=self.repo)
+        self._run_git(self.repo, "checkout", "-b", "native-item-branch")
+        WIS.cmd_item(execution_key=updated["execution_key"], status="active", cwd=self.repo)
+
+        connection = self._connection()
+        try:
+            claimed_item = STORE.get_work_item(connection, claimed["execution_key"])
+            updated_item = STORE.get_work_item(connection, updated["execution_key"])
+        finally:
+            connection.close()
+        self.assertEqual("native-claim-branch", claimed_item["branch"])
+        self.assertEqual("native-item-branch", updated_item["branch"])
+
+    def test_foreign_native_plan_paths_reject_claim_and_item_without_mutation(self):
+        home_plan = self._write_plan("HOME.md")
+        registered = WIS.cmd_register("github", "github.com/owner/repository", "42", cwd=self.repo)
+        execution = registered["execution_key"]
+        WIS.cmd_item(execution_key=execution, status="active", plan_path=home_plan, cwd=self.repo)
+        connection = self._connection()
+        try:
+            before = STORE.get_work_item(connection, execution)
+        finally:
+            connection.close()
+
+        other = self.root / "foreign repository"
+        other.mkdir()
+        self._run_git(other, "init")
+        self._run_git(other, "config", "user.email", "test@example.com")
+        self._run_git(other, "config", "user.name", "Test User")
+        plan = other / "plans" / "FOREIGN.md"
+        plan.parent.mkdir()
+        plan.write_text("# Foreign\n", encoding="utf-8")
+        self._run_git(other, "add", "plans/FOREIGN.md")
+        self._run_git(other, "commit", "-m", "initial")
+        self._run_git(other, "remote", "add", "origin", "https://github.com/tj-agents/other.git")
+        foreign_plan = plan.relative_to(other).as_posix()
+
+        session_id = "01a12aa7-5b58-7312-9400-ef710762147f"
+        entry = {
+            "host": "codex",
+            "session_id": session_id,
+            "pid": os.getpid(),
+            "pid_started_at": time.time(),
+            "title": "Foreign Codex tab",
+        }
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": session_id}, clear=False), \
+                mock.patch.object(WIS, "_session_close", return_value=types.SimpleNamespace(
+                    own_host_and_entry=mock.Mock(return_value=entry),
+                )):
+            with self.assertRaisesRegex(ValueError, "different repository"):
+                WIS.cmd_claim(
+                    host="codex", role="owner", provider="github", scope="github.com/owner/repository",
+                    native_id="42", plan_path=foreign_plan, cwd=other,
+                )
+        with self.assertRaisesRegex(ValueError, "different repository"):
+            WIS.cmd_item(
+                execution_key=execution, status="paused", plan_path=foreign_plan, cwd=other,
+            )
+
+        connection = self._connection()
+        try:
+            after = STORE.get_work_item(connection, execution)
+            session = STORE.get_session(connection, f"codex:{session_id}")
+        finally:
+            connection.close()
+        self.assertEqual(before, after)
+        self.assertEqual(home_plan, after["plan_path"])
+        self.assertIsNone(session)
 
     def test_claim_keeps_durable_metadata_separate_from_host_tab_titles(self):
         plan_path = self._write_plan()
