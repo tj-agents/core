@@ -61,7 +61,7 @@ def declaration(root):
 
 
 def read_record(root, reference, harness):
-    root = Path(root).resolve()
+    root = primary_checkout(root)
     selected = declaration(root)
     if selected is None:
         raise RecordError("source repository has no selected problem-record provider")

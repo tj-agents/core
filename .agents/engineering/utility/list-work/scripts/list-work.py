@@ -226,8 +226,10 @@ for entry in plan_entries():
     else:
         continue
     status_reason = ""
-    work_item = ""
-    if item is not None:
+    work_item = work_item_key
+    if selection and item is not None:
+        state = "supporting"
+    elif item is not None:
         relative_path = path.relative_to(member).as_posix()
         work_item = work_item_key
         try:
