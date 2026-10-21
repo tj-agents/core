@@ -1,8 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$UserProfilePath = $env:USERPROFILE,
-    [switch]$DeferAutoSaveStart,
-    [switch]$Check
+    [switch]$DeferAutoSaveStart
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,11 +13,9 @@ $codexHooksTarget = Join-Path $UserProfilePath '.codex\hooks.json'
 $claudeSettingsTarget = Join-Path $UserProfilePath '.claude\settings.json'
 $targetProfile = [System.IO.Path]::GetFullPath($UserProfilePath).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
 $currentProfile = [System.IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
-$isCurrentProfile = [string]::Equals($targetProfile, $currentProfile, [System.StringComparison]::OrdinalIgnoreCase)
-$desktopDirectory = if ($isCurrentProfile) { [Environment]::GetFolderPath('Desktop') } else { Join-Path $UserProfilePath 'Desktop' }
+$desktopDirectory = if ([string]::Equals($targetProfile, $currentProfile, [System.StringComparison]::OrdinalIgnoreCase)) { [Environment]::GetFolderPath('Desktop') } else { Join-Path $UserProfilePath 'Desktop' }
 $saveShortcutPath = Join-Path $desktopDirectory 'SAVE CLI SESSIONS.lnk'
 $restoreShortcutPath = Join-Path $desktopDirectory 'RESTORE CLI SESSIONS.lnk'
-$autoSaveTaskName = 'CLI Session AutoSave'
 $names = @(
     'save-sessions-hidden.vbs',
     'configure-cli-session-autosave.ps1',
@@ -67,90 +64,22 @@ function Remove-CliSessionRecoveryHooks($Settings) {
     return $Settings
 }
 
-function Test-CliSessionRecoveryHooks([string] $Path) {
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
-    $settings = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
-    $hooksProperty = $settings.PSObject.Properties['hooks']
-    if (-not $hooksProperty) { return $false }
-    foreach ($eventProperty in @($settings.hooks.PSObject.Properties)) {
-        foreach ($group in @($eventProperty.Value)) {
-            $groupHooksProperty = $group.PSObject.Properties['hooks']
-            if (-not $groupHooksProperty) { continue }
-            if (@($groupHooksProperty.Value | Where-Object { [string]$_.command -match '(?i)cli-session-hook\.ps1' }).Count) { return $true }
-        }
-    }
-    return $false
+New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
+foreach ($name in $names) {
+    $target = Join-Path $UserProfilePath $name
+    if (Test-Path -LiteralPath $target) { Copy-Item -LiteralPath $target -Destination (Join-Path $backupDirectory $name) }
+}
+if (Test-Path -LiteralPath $codexHooksTarget) {
+    Copy-Item -LiteralPath $codexHooksTarget -Destination (Join-Path $backupDirectory 'codex-hooks.json')
+}
+if (Test-Path -LiteralPath $claudeSettingsTarget) {
+    Copy-Item -LiteralPath $claudeSettingsTarget -Destination (Join-Path $backupDirectory 'claude-settings.json')
+}
+foreach ($shortcutPath in @($saveShortcutPath, $restoreShortcutPath)) {
+    if (Test-Path -LiteralPath $shortcutPath) { Copy-Item -LiteralPath $shortcutPath -Destination (Join-Path $backupDirectory (Split-Path $shortcutPath -Leaf)) }
 }
 
-$shortcutShell = New-Object -ComObject WScript.Shell
-$shortcuts = @(
-    [pscustomobject]@{
-        Path = $saveShortcutPath
-        TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
-        Arguments = "`"$(Join-Path $UserProfilePath 'save-sessions-hidden.vbs')`""
-        Description = 'Save exact CLI sessions for recovery'
-    },
-    [pscustomobject]@{
-        Path = $restoreShortcutPath
-        TargetPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-        Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$(Join-Path $UserProfilePath 'restore-sessions.ps1')`""
-        Description = 'Restore saved CLI sessions'
-    }
-)
-
-function Test-ShortcutCurrent($Shortcut) {
-    if (-not (Test-Path -LiteralPath $Shortcut.Path -PathType Leaf)) { return $false }
-    $existing = $shortcutShell.CreateShortcut($Shortcut.Path)
-    return [string]::Equals($existing.TargetPath, $Shortcut.TargetPath, [System.StringComparison]::OrdinalIgnoreCase) -and
-        $existing.Arguments -eq $Shortcut.Arguments -and
-        [string]::Equals($existing.WorkingDirectory, $UserProfilePath, [System.StringComparison]::OrdinalIgnoreCase)
-}
-
-$staleNames = @($names | Where-Object {
-    $target = Join-Path $UserProfilePath $_
-    -not (Test-Path -LiteralPath $target -PathType Leaf) -or
-        (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath (Join-Path $sourceDirectory $_) -Algorithm SHA256).Hash
-})
-$codexHooksStale = -not (Test-Path -LiteralPath $codexHooksTarget -PathType Leaf) -or (Test-CliSessionRecoveryHooks $codexHooksTarget)
-$claudeSettingsStale = Test-CliSessionRecoveryHooks $claudeSettingsTarget
-$staleShortcuts = @($shortcuts | Where-Object { -not (Test-ShortcutCurrent $_) })
-$autoSaveTaskMissing = $false
-if ($isCurrentProfile) {
-    $listenerPath = Join-Path $UserProfilePath 'cli-session-shutdown-listener.ps1'
-    $registeredAutoSaveTask = Get-ScheduledTask -TaskName $autoSaveTaskName -ErrorAction SilentlyContinue
-    $autoSaveTaskMissing = -not $registeredAutoSaveTask -or -not ([string]$registeredAutoSaveTask.Actions.Arguments -like "*$listenerPath*")
-}
-
-$drift = @()
-$drift += @($staleNames | ForEach-Object { "deploy $(Join-Path $UserProfilePath $_)" })
-if ($codexHooksStale) { $drift += "remove recovery hooks from $codexHooksTarget" }
-if ($claudeSettingsStale) { $drift += "remove recovery hooks from $claudeSettingsTarget" }
-$drift += @($staleShortcuts | ForEach-Object { "update shortcut $($_.Path)" })
-if ($autoSaveTaskMissing) { $drift += "register the $autoSaveTaskName task" }
-
-if ($Check) {
-    $drift | ForEach-Object { Write-Output $_ }
-    if ($drift.Count) { exit 1 }
-    Write-Output 'CLI session recovery is current.'
-    exit 0
-}
-
-$backedUp = $false
-function Backup-DeployedFile([string] $Path, [string] $Name) {
-    if (-not (Test-Path -LiteralPath $Path)) { return }
-    if (-not $script:backedUp) {
-        New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
-        $script:backedUp = $true
-    }
-    Copy-Item -LiteralPath $Path -Destination (Join-Path $backupDirectory $Name)
-}
-
-foreach ($name in $staleNames) { Backup-DeployedFile (Join-Path $UserProfilePath $name) $name }
-if ($codexHooksStale) { Backup-DeployedFile $codexHooksTarget 'codex-hooks.json' }
-if ($claudeSettingsStale) { Backup-DeployedFile $claudeSettingsTarget 'claude-settings.json' }
-foreach ($shortcut in $staleShortcuts) { Backup-DeployedFile $shortcut.Path (Split-Path $shortcut.Path -Leaf) }
-
-foreach ($name in $staleNames) {
+foreach ($name in $names) {
     $source = Join-Path $sourceDirectory $name
     $target = Join-Path $UserProfilePath $name
     $temporary = "$target.$PID.$([guid]::NewGuid().ToString('N')).tmp"
@@ -158,20 +87,18 @@ foreach ($name in $staleNames) {
     Move-Item -LiteralPath $temporary -Destination $target -Force
 }
 
-if ($codexHooksStale) {
-    New-Item -ItemType Directory -Path (Split-Path -Parent $codexHooksTarget) -Force | Out-Null
-    $codexHooks = if (Test-Path -LiteralPath $codexHooksTarget) {
-        Get-Content -LiteralPath $codexHooksTarget -Raw | ConvertFrom-Json
-    } else {
-        Get-Content -LiteralPath $codexHooksSource -Raw | ConvertFrom-Json
-    }
-    $codexHooks = Remove-CliSessionRecoveryHooks $codexHooks
-    $codexHooksTemporary = "$codexHooksTarget.$PID.$([guid]::NewGuid().ToString('N')).tmp"
-    [System.IO.File]::WriteAllText($codexHooksTemporary, ($codexHooks | ConvertTo-Json -Depth 100), (New-Object System.Text.UTF8Encoding($false)))
-    Move-Item -LiteralPath $codexHooksTemporary -Destination $codexHooksTarget -Force
+New-Item -ItemType Directory -Path (Split-Path -Parent $codexHooksTarget) -Force | Out-Null
+$codexHooks = if (Test-Path -LiteralPath $codexHooksTarget) {
+    Get-Content -LiteralPath $codexHooksTarget -Raw | ConvertFrom-Json
+} else {
+    Get-Content -LiteralPath $codexHooksSource -Raw | ConvertFrom-Json
 }
+$codexHooks = Remove-CliSessionRecoveryHooks $codexHooks
+$codexHooksTemporary = "$codexHooksTarget.$PID.$([guid]::NewGuid().ToString('N')).tmp"
+[System.IO.File]::WriteAllText($codexHooksTemporary, ($codexHooks | ConvertTo-Json -Depth 100), (New-Object System.Text.UTF8Encoding($false)))
+Move-Item -LiteralPath $codexHooksTemporary -Destination $codexHooksTarget -Force
 
-if ($claudeSettingsStale) {
+if (Test-Path -LiteralPath $claudeSettingsTarget) {
     $claudeSettings = Get-Content -LiteralPath $claudeSettingsTarget -Raw | ConvertFrom-Json
     $claudeSettings = Remove-CliSessionRecoveryHooks $claudeSettings
     $claudeSettingsTemporary = "$claudeSettingsTarget.$PID.$([guid]::NewGuid().ToString('N')).tmp"
@@ -179,15 +106,20 @@ if ($claudeSettingsStale) {
     Move-Item -LiteralPath $claudeSettingsTemporary -Destination $claudeSettingsTarget -Force
 }
 
-if ($staleShortcuts.Count) { New-Item -ItemType Directory -Path $desktopDirectory -Force | Out-Null }
-foreach ($shortcut in $staleShortcuts) {
-    $link = $shortcutShell.CreateShortcut($shortcut.Path)
-    $link.TargetPath = $shortcut.TargetPath
-    $link.Arguments = $shortcut.Arguments
-    $link.WorkingDirectory = $UserProfilePath
-    $link.Description = $shortcut.Description
-    $link.Save()
-}
+New-Item -ItemType Directory -Path $desktopDirectory -Force | Out-Null
+$shortcutShell = New-Object -ComObject WScript.Shell
+$saveShortcut = $shortcutShell.CreateShortcut($saveShortcutPath)
+$saveShortcut.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
+$saveShortcut.Arguments = "`"$(Join-Path $UserProfilePath 'save-sessions-hidden.vbs')`""
+$saveShortcut.WorkingDirectory = $UserProfilePath
+$saveShortcut.Description = 'Save exact CLI sessions for recovery'
+$saveShortcut.Save()
+$restoreShortcut = $shortcutShell.CreateShortcut($restoreShortcutPath)
+$restoreShortcut.TargetPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$restoreShortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$(Join-Path $UserProfilePath 'restore-sessions.ps1')`""
+$restoreShortcut.WorkingDirectory = $UserProfilePath
+$restoreShortcut.Description = 'Restore saved CLI sessions'
+$restoreShortcut.Save()
 
 $manifest = foreach ($name in $names) {
     $target = Join-Path $UserProfilePath $name
@@ -198,19 +130,16 @@ if (Test-Path -LiteralPath $claudeSettingsTarget) {
     $manifest += [pscustomobject]@{ Path=$claudeSettingsTarget; SHA256=(Get-FileHash -LiteralPath $claudeSettingsTarget -Algorithm SHA256).Hash }
 }
 $manifest += @($saveShortcutPath, $restoreShortcutPath) | ForEach-Object { [pscustomobject]@{ Path=$_; SHA256=(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash } }
-if ($backedUp) {
-    $manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $backupDirectory 'installed-files.json') -Encoding UTF8
-}
+$manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $backupDirectory 'installed-files.json') -Encoding UTF8
 
 $autoSaveTask = $null
-if ($isCurrentProfile) {
+if ([string]::Equals($targetProfile, $currentProfile, [System.StringComparison]::OrdinalIgnoreCase)) {
     $configureAutoSave = Join-Path $UserProfilePath 'configure-cli-session-autosave.ps1'
     $autoSaveTask = & $configureAutoSave -UserProfilePath $UserProfilePath -Disabled:$DeferAutoSaveStart -Start:(-not $DeferAutoSaveStart)
 }
 
 Write-Output "Installed CLI session recovery utilities."
-if ($backedUp) { Write-Output "Previous live files: $backupDirectory" }
-else { Write-Output 'No deployed file changed; no backup was needed.' }
+Write-Output "Previous live files: $backupDirectory"
 $manifest | Format-Table -AutoSize
 if ($autoSaveTask) { $autoSaveTask | Format-List }
 if ($DeferAutoSaveStart -and $autoSaveTask) { Write-Output 'CLI Session AutoSave was installed disabled for deployment-state verification.' }
