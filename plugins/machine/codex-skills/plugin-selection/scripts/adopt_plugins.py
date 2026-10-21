@@ -98,8 +98,6 @@ def plan(root: Path, stacks: list[str], plugins: list[str], scope: str | None, m
         raise lock_io.LockError(f"Repository root is not a directory: {root}")
     roster = load_roster()
     names, foreign = requested_plugins(stacks, plugins, roster)
-    if root.is_dir() and repo_config.owned(root):
-        names.add("personal")
     declared = {}
     for value in marketplaces:
         name, source = parse_marketplace(value)

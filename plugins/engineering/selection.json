@@ -7,6 +7,7 @@
     "base",
     "machine"
   ],
+  "external_prerequisites": [],
   "skills": [
     "address-bug",
     "address-debt",
@@ -66,9 +67,6 @@
     "sync-checkout",
     "unmerged",
     "update-roadmap",
-    "worktree",
-    "write-bug",
-    "write-debt",
-    "write-mistake"
+    "worktree"
   ]
 }
