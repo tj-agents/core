@@ -40,10 +40,16 @@ Visible tabs, live CLI processes, distinct resumable IDs, detached processes, sa
 - Repository: `C:\Users\TommySeery\source\repos\tj-agents\core` (the main checkout, not a worktree)
 - Source: `cli-session-recovery`
 - Tests: `cli-session-recovery\tests\cli-session-vault.tests.ps1` from the repository root, or `tests\cli-session-vault.tests.ps1` from this directory
-- Installer: run `./setup.ps1` at the repository root; it invokes `cli-session-recovery\install-cli-session-recovery.ps1` from the main checkout. Add `-Check` to the installer to report drift without writing.
+- Installer: run `./setup.ps1` at the repository root; it invokes `cli-session-recovery\install-cli-session-recovery.ps1` from the main checkout.
 - Installed scripts: `C:\Users\TommySeery\*.ps1` plus the hidden-save VBS launcher
 - Runtime vault: `C:\Users\TommySeery\.cli-session-vault` — never commit it
 - Desktop interface, and the only supported way for Tommy to run this: `SAVE CLI SESSIONS.lnk` and `RESTORE CLI SESSIONS.lnk`. Never have him run a script by hand from a frozen Terminal.
+
+Report deployment drift without writing anything:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-cli-session-recovery.ps1 -Check
+```
 
 The repository is the source of truth. Modify the existing filenames; do not create `v1`, `v2`, `working`, or similar copies. Git history provides rollback.
 
