@@ -69,7 +69,7 @@ a meta-only PR (the path list in `engineering:merge-docs`) gates on
 `engineering:docs-review`, not a code review, and normally lands through that flow rather than
 this one; a pure close-out — net diff deletions only — is exempt, which that doc states. Any runtime,
 product, package or test-selection path makes it a code PR and requires
-`engineering:review`, or `engineering:big-review` when the branch is
+`engineering:review`, or `engineering:staged-review` when the branch is
 too large for one pass. Commits added after the review require
 `engineering:incremental-review`. **Do not proceed while findings remain open.**
 
