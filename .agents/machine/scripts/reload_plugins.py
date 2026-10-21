@@ -16,9 +16,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import agent_cli
 from codex_hook_trust import AppServer, github_repository
+import launch_check
 import plugin_autoupdate
 
 TIMEOUT = 300
+ADOPTION = "Claude: /reload-plugins adopts updates in open sessions. Codex: resume the conversation in a new process."
 
 
 class RefreshError(RuntimeError):
@@ -109,6 +111,24 @@ def refresh(host: str, executable: str, project: Path, marketplaces: dict, plugi
             run([executable, "plugin", "add", identity], project)
     if host == "codex":
         plugin_autoupdate.remove_user_plugins(user_config, set(plugins) - user_enabled)
+
+
+def publishers(name: str, plugins: list[str]) -> set[str]:
+    location = read_json(configuration_root("claude") / "plugins/known_marketplaces.json").get(name, {}).get("installLocation")
+    catalog = read_json(Path(location) / ".claude-plugin/marketplace.json") if location else {}
+    wanted = {identity.rsplit("@", 1)[0] for identity in plugins if identity.rsplit("@", 1)[1] == name}
+    return {repository(entry["source"].get("url")) for entry in catalog.get("plugins", [])
+            if isinstance(entry, dict) and entry.get("name") in wanted and isinstance(entry.get("source"), dict)}
+
+
+def refresh_repositories(project: Path, repositories: set[str]) -> bool:
+    marketplaces, plugins = selection("claude", "", project)
+    chosen = {name: repo for name, repo in marketplaces.items()
+              if repo in repositories or publishers(name, plugins) & repositories}
+    if chosen:
+        refresh("claude", agent_cli.resolve_claude_executable(), project, chosen,
+                [identity for identity in plugins if identity.rsplit("@", 1)[1] in chosen])
+    return True
 
 
 def package_tree(root: Path) -> dict[str, bytes]:
@@ -220,9 +240,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", choices=("claude", "codex", "both"), default="both")
     parser.add_argument("--project", type=Path, default=Path.cwd())
     modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--all", action="store_true", help="Refresh every selected plugin, not only published changes")
     modes.add_argument("--verify", action="store_true", help="Refresh, then inspect native installations and remote main revisions")
     modes.add_argument("--verify-only", action="store_true", help="Inspect without changing plugins")
     arguments = parser.parse_args(argv)
+    if not (arguments.all or arguments.verify or arguments.verify_only):
+        result = launch_check.check(arguments.project.resolve())
+        if result != "unconfigured":
+            print(json.dumps({"check": result}))
+            if result == "updated":
+                print(ADOPTION, file=sys.stderr)
+            return int(result in {"failed", "offline", "busy"})
     hosts = ("claude", "codex") if arguments.host == "both" else (arguments.host,)
     reports = []
     for host in hosts:
@@ -238,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
             report = {"host": host, "problems": [str(error)]}
         reports.append(report)
     print(json.dumps(reports, indent=2))
-    print("Claude: /reload-plugins adopts updates in open sessions. Codex: start a new session.", file=sys.stderr)
+    print(ADOPTION, file=sys.stderr)
     return int(any(report["problems"] for report in reports))
 
 

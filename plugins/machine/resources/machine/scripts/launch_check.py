@@ -1,0 +1,205 @@
+#!/usr/bin/env python3
+"""Apply plugin updates published since the last check, then return (Python 3.11+).
+
+One non-blocking poll of the machine event topic. Nothing else runs unless an event arrived.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import re
+import socket
+import sys
+import threading
+import time
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+SERVER = "ntfy.sh"
+POLL_TIMEOUT_SECONDS = 3
+MAX_RESPONSE = 1 << 20
+RETRY_SECONDS = 3600
+HOSTS = ("claude", "codex")
+TOPIC = re.compile(r"[A-Za-z0-9_-]{32,128}")
+MESSAGE_ID = re.compile(r"[A-Za-z0-9]{1,64}")
+
+
+def state_directory() -> Path:
+    return Path(os.environ.get("AGENT_STATE_DIRECTORY") or Path.home() / ".agents-state")
+
+
+def read_json(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def https_get(path: str) -> bytes:
+    connected = {}
+
+    def connect() -> None:
+        try:
+            connected["socket"] = socket.create_connection((SERVER, 443), timeout=POLL_TIMEOUT_SECONDS)
+        except OSError as error:
+            connected["error"] = error
+
+    worker = threading.Thread(target=connect, daemon=True)
+    worker.start()
+    import ssl
+
+    context = ssl.create_default_context()
+    worker.join(POLL_TIMEOUT_SECONDS)
+    if "socket" not in connected:
+        raise connected.get("error") or TimeoutError("event server did not answer")
+    response = bytearray()
+    with context.wrap_socket(connected["socket"], server_hostname=SERVER) as stream:
+        stream.sendall(f"GET {path} HTTP/1.0\r\nHost: {SERVER}\r\nUser-Agent: tj-agents-launch-check\r\n\r\n"
+                       .encode("ascii"))
+        while len(response) <= MAX_RESPONSE + 65536 and (chunk := stream.recv(65536)):
+            response += chunk
+    head, _, body = bytes(response).partition(b"\r\n\r\n")
+    status = head.split(b" ", 2)[1:2]
+    if status != [b"200"]:
+        raise OSError(f"event server answered {b''.join(status).decode('ascii', 'replace') or 'nothing'}")
+    return body
+
+
+def poll(topic: str, since: str, fetch=https_get) -> list[dict]:
+    body = fetch(f"/{topic}/json?poll=1&since={since}")
+    if len(body) > MAX_RESPONSE:
+        raise ValueError("event backlog exceeds the poll limit")
+    envelopes = []
+    for line in body.splitlines():
+        try:
+            envelope = json.loads(line)
+        except ValueError:
+            continue
+        if (isinstance(envelope, dict) and envelope.get("event") == "message"
+                and isinstance(envelope.get("id"), str) and MESSAGE_ID.fullmatch(envelope["id"])):
+            envelopes.append(envelope)
+    return envelopes
+
+
+def update_host(host: str, repositories: set[str], project: Path) -> bool:
+    try:
+        if host == "codex":
+            import plugin_autoupdate
+
+            arguments = ["--no-sweep", "--no-self-update", "--retry-failures"]
+            for repository in sorted(repositories):
+                arguments += ["--repository", repository]
+            return plugin_autoupdate.main(arguments) == 0
+        import reload_plugins
+
+        return reload_plugins.refresh_repositories(project, repositories)
+    except Exception as error:
+        print(f"plugins: {host} update failed: {error}", file=sys.stderr)
+        return False
+
+
+def apply(envelopes: list[dict], cursor: dict, path: Path, project: Path, update, now: float) -> str:
+    import machine_events
+    import plugin_autoupdate
+
+    lock = plugin_autoupdate.acquire_lock(path.with_name("launch-check.lock"))
+    if lock is None:
+        return "busy"
+    try:
+        identifiers = [envelope["id"] for envelope in envelopes]
+        last = identifiers[-1]
+        hosts = cursor.get("hosts") if isinstance(cursor.get("hosts"), dict) else {}
+        work = {}
+        for host in HOSTS:
+            state = hosts.get(host) if isinstance(hosts.get(host), dict) else {}
+            applied = state.get("applied")
+            start = identifiers.index(applied) + 1 if applied in identifiers else 0
+            repositories = {repository.casefold() for envelope in envelopes[start:]
+                            if (repository := machine_events.parse_hint(envelope))}
+            attempted = state.get("attempted_at")
+            if not repositories:
+                hosts[host] = {"applied": last}
+            elif (state.get("attempted_through") == last and isinstance(attempted, (int, float))
+                  and now - attempted < RETRY_SECONDS):
+                hosts[host] = state
+            else:
+                work[host] = repositories
+        if work:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=len(work)) as pool:
+                results = dict(zip(work, pool.map(lambda host: update(host, work[host], project), work)))
+            for host, succeeded in results.items():
+                previous = hosts.get(host) if isinstance(hosts.get(host), dict) else {}
+                hosts[host] = ({"applied": last} if succeeded else
+                               {"applied": previous.get("applied"), "attempted_through": last, "attempted_at": now})
+        if all(hosts[host].get("applied") == last for host in HOSTS):
+            plugin_autoupdate.write_json(path, {"since": last})
+        else:
+            plugin_autoupdate.write_json(path, {"since": cursor.get("since", "all"), "hosts": hosts})
+        if work and Path(__file__).resolve().parent == (state_directory() / "bin").resolve():
+            plugin_autoupdate.self_update(Path(plugin_autoupdate.__file__), plugin_autoupdate.load_codex_config())
+    finally:
+        lock.close()
+    if not work:
+        return "current"
+    failed = sorted(host for host, succeeded in results.items() if not succeeded)
+    named = ", ".join(sorted(set().union(*work.values())))
+    if failed:
+        print(f"plugins: {', '.join(failed)} update from {named} failed; a later check retries it", file=sys.stderr)
+        return "failed"
+    print(f"plugins: updated from {named}", file=sys.stderr)
+    return "updated"
+
+
+def check(project: Path, fetch=https_get, update=update_host, now: float | None = None) -> str:
+    directory = state_directory()
+    topic = read_json(directory / "machine-events.json").get("topic")
+    if not isinstance(topic, str) or not TOPIC.fullmatch(topic):
+        return "unconfigured"
+    path = directory / "machine-events-cursor.json"
+    cursor = read_json(path)
+    since = cursor.get("since")
+    if not isinstance(since, str) or not MESSAGE_ID.fullmatch(since):
+        since = cursor["since"] = "all"
+    try:
+        envelopes = poll(topic, since, fetch)
+    except (OSError, ValueError) as error:
+        print(f"plugins: update check skipped ({type(error).__name__})", file=sys.stderr)
+        return "offline"
+    if not envelopes:
+        return "current"
+    return apply(envelopes, cursor, path, project, update, time.time() if now is None else now)
+
+
+def mark_current(fetch=https_get) -> bool:
+    directory = state_directory()
+    topic = read_json(directory / "machine-events.json").get("topic")
+    if not isinstance(topic, str) or not TOPIC.fullmatch(topic):
+        return False
+    envelopes = poll(topic, "all", fetch)
+    if envelopes:
+        import plugin_autoupdate
+
+        plugin_autoupdate.write_json(directory / "machine-events-cursor.json", {"since": envelopes[-1]["id"]})
+    return True
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--project", type=Path, default=Path.cwd())
+    arguments = parser.parse_args(argv)
+    try:
+        check(arguments.project.resolve())
+    except Exception as error:
+        print(f"plugins: update check failed: {error}", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

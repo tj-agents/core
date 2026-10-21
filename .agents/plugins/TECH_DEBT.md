@@ -13,9 +13,8 @@ The current profile was repaired with native installation of the three core pack
 trust for 13 hook definitions, and the shipped session recorder. This establishes the current CLI's
 attachment; it does not supply automatic installation or prove fresh-session hook execution.
 
-`codex_marketplace_sync.sync_codex_standards` refreshes already enabled Git plugins and can succeed with
-none selected. `handoff-codex` checks that refresh and submits a terminal launch but does not establish
-core dependency installation or a registered successor attachment. Installing the merged work plugin
+`handoff-codex` submits a terminal launch but does not establish core dependency installation or a
+registered successor attachment. Installing the merged work plugin
 does not itself supply this mechanism: [work PR #1](https://github.com/tj-agents/work/pull/1) merged on
 2026-10-10, but its published manifests declare skills without lifecycle hooks, and its
 [README](https://github.com/tj-agents/work/blob/main/README.md) delegates repository-local installation
@@ -126,7 +125,7 @@ that share a package id.
 ## Codex hook commands need an inline loader authenticator
 
 `bind_codex_hook_snapshots` embeds a small readable Python bootstrap in each Codex hook command. It reads
-the packaged loader, or its retained snapshot when the cache has gone, normalizes newlines, verifies the
+its retained snapshot's loader, or the packaged loader before a snapshot exists, normalizes newlines, verifies the
 loader SHA-256 embedded in the command, stages those bytes in a private temporary file, then calls it with
 `runpy`. The authenticated command is still necessary: invoking a packaged loader directly would execute a
 mutable file before any package or snapshot integrity check can run.

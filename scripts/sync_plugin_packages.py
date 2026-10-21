@@ -22,6 +22,32 @@ def load(path: Path):
     return json.loads(read(path))
 
 
+EMPTY_EXTERNAL_DEPENDENCIES = {"required": [], "optional": []}
+
+
+def external_dependencies(owner: str, entries) -> list[dict[str, str]]:
+    if not isinstance(entries, list):
+        raise ValueError(f"External dependencies for {owner} must be a list")
+    seen: set[str] = set()
+    for entry in entries:
+        if (
+            not isinstance(entry, dict)
+            or set(entry) != {"id", "marketplace", "repository"}
+            or not all(isinstance(value, str) for value in entry.values())
+            or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", entry["marketplace"])
+            or not re.fullmatch(rf"{re.escape(entry['marketplace'])}/[a-z0-9][a-z0-9-]*", entry["id"])
+            or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", entry["repository"])
+            or entry["id"] in seen
+        ):
+            raise ValueError(f"Invalid external dependency for {owner}: {entry!r}")
+        seen.add(entry["id"])
+    return entries
+
+
+def external_prerequisites(config: dict, plugin: str) -> list[dict[str, str]]:
+    return external_dependencies(plugin, config["external_prerequisites"][plugin])
+
+
 def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[str]) -> None:
     known_roots = ("${PLUGIN_ROOT}", "%PLUGIN_ROOT%", "${CLAUDE_PLUGIN_ROOT}", "os.environ['PLUGIN_ROOT']")
     host_fields = {
@@ -114,6 +140,24 @@ def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[s
                                     raise ValueError(f"{hook_path}: {field} script target is missing: {script}")
 
 
+def catalog_marketplaces(packages: dict[str, dict]) -> dict[str, dict[str, str]]:
+    marketplaces: dict[str, dict[str, str]] = {}
+
+    def claim(marketplace: str, owner_repository: str, source: str) -> None:
+        owner = {"owner_repository": owner_repository, "source": source}
+        if marketplaces.setdefault(marketplace, owner) != owner:
+            raise ValueError(f"Catalog marketplace has inconsistent ownership: {marketplace}")
+
+    for package in packages.values():
+        claim(package["marketplace"], package["owner_repository"], package["source"])
+        declared = package.get("external_dependencies", EMPTY_EXTERNAL_DEPENDENCIES)
+        for kind in ("required", "optional"):
+            for dependency in declared[kind]:
+                repository = dependency["repository"]
+                claim(dependency["marketplace"], repository, f"https://github.com/{repository}.git")
+    return marketplaces
+
+
 def catalog_index(catalog: dict) -> dict[str, dict]:
     if catalog.get("schema_version") != 1 or catalog.get("digest_format") != "sha256-tree-v1":
         raise ValueError("Unsupported capability catalog schema or digest format")
@@ -132,11 +176,25 @@ def catalog_index(catalog: dict) -> dict[str, dict]:
     if not plugins:
         raise ValueError("Capability catalog has no packages")
     for plugin_id, plugin in plugins.items():
+        declared = plugin.get("external_dependencies", EMPTY_EXTERNAL_DEPENDENCIES)
+        if not isinstance(declared, dict) or set(declared) != {"required", "optional"}:
+            raise ValueError(f"Invalid external dependency declaration: {plugin_id}")
         dependencies = plugin.get("dependencies", {})
+        owned: dict[str, str] = {}
+        for kind in ("required", "optional"):
+            for dependency in external_dependencies(plugin_id, declared[kind]):
+                if (
+                    dependency["id"] in plugins
+                    or dependency["id"] in owned
+                    or dependency["id"] not in dependencies.get(kind, [])
+                ):
+                    raise ValueError(f"Invalid external dependency for {plugin_id}: {dependency!r}")
+                owned[dependency["id"]] = kind
         for kind in ("required", "optional"):
             for dependency in dependencies.get(kind, []):
-                if dependency not in plugins:
+                if dependency not in plugins and owned.get(dependency) != kind:
                     raise ValueError(f"{plugin_id} names unknown dependency {dependency}")
+    catalog_marketplaces(plugins)
     visiting: set[str] = set()
     visited: set[str] = set()
 
@@ -147,7 +205,8 @@ def catalog_index(catalog: dict) -> dict[str, dict]:
             return
         visiting.add(plugin_id)
         for dependency in plugins[plugin_id]["dependencies"]["required"]:
-            visit(dependency)
+            if dependency in plugins:
+                visit(dependency)
         visiting.remove(plugin_id)
         visited.add(plugin_id)
 
@@ -287,9 +346,8 @@ def codex_snapshot_bootstrap(loader: str) -> str:
         "r=Path(sys.argv[1]);e=sys.argv[2];"
         "s=os.environ.get('TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY','');d=Path(os.environ.get('PLUGIN_DATA','')).resolve();"
         "k=hashlib.sha256((str(r)+chr(0)+e).encode()).hexdigest();"
-        "p=Path(s)/k/'hooks'/'codex_hook_snapshot.py' if s else r/'hooks'/'codex_hook_snapshot.py';"
+        "p=(Path(s) if s else d/'hook-snapshots')/k/'hooks'/'codex_hook_snapshot.py';"
         "p=p if p.is_file() else r/'hooks'/'codex_hook_snapshot.py';"
-        "p=p if p.is_file() or s else d/'hook-snapshots'/k/'hooks'/'codex_hook_snapshot.py';"
         "b=p.read_bytes() if p.is_file() else b'';n=chr(10).encode();"
         "b=b.replace(chr(13).encode()+n,n).replace(chr(13).encode(),n);"
         f"h=hashlib.sha256(b).hexdigest();h=='{digest}' or (sys.stderr.write('Codex hook snapshot loader integrity check failed'+chr(10)),sys.exit(2));"
@@ -367,6 +425,10 @@ def validate_configuration(root: Path, config: dict) -> set[str]:
         unknown = set(prerequisites) - plugins
         if unknown:
             raise ValueError(f"Unknown prerequisite for {plugin}: {sorted(unknown)}")
+    if set(config.get("external_prerequisites", {})) != plugins:
+        raise ValueError("External prerequisite owners do not match declared plugins")
+    for plugin in plugins:
+        external_prerequisites(config, plugin)
 
     visiting: set[str] = set()
     visited: set[str] = set()
@@ -880,6 +942,7 @@ def build(root: Path, validate_catalog_digests: bool = True):
             "plugin": plugin,
             "payloads": payloads[plugin],
             "prerequisites": config["prerequisites"][plugin],
+            "external_prerequisites": external_prerequisites(config, plugin),
             "skills": owned,
         }
         emit(f"plugins/{plugin}/selection.json", json.dumps(selection, indent=2) + "\n")
@@ -930,9 +993,15 @@ def build(root: Path, validate_catalog_digests: bool = True):
         entry = catalog_plugins.get(plugin_id)
         if entry is None:
             raise ValueError(f"Catalog is missing local plugin {plugin_id}")
-        expected_dependencies = [f"{marketplace}/{value}" for value in config["prerequisites"][plugin]]
+        external = external_prerequisites(config, plugin)
+        expected_dependencies = [
+            *[f"{marketplace}/{value}" for value in config["prerequisites"][plugin]],
+            *[value["id"] for value in external],
+        ]
         if entry["dependencies"]["required"] != expected_dependencies:
             raise ValueError(f"Catalog prerequisite drift: {plugin_id}")
+        if entry.get("external_dependencies", {"required": [], "optional": []}) != {"required": external, "optional": []}:
+            raise ValueError(f"Catalog external prerequisite drift: {plugin_id}")
         if entry["skills"] != sorted(name for name, skill in skills.items() if skill["plugin"] == plugin):
             raise ValueError(f"Catalog skill roster drift: {plugin_id}")
         if entry["package_path"] != f"plugins/{plugin}":

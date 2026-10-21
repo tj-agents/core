@@ -6,6 +6,7 @@
   "prerequisites": [
     "base"
   ],
+  "external_prerequisites": [],
   "skills": [
     "auto-memory",
     "clip",

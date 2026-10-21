@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from problem_records import RecordError, declaration, read_record
+from problem_records import RecordError, declaration, primary_checkout, read_record
 
 
 class ProblemRecordTests(unittest.TestCase):
@@ -16,6 +16,9 @@ class ProblemRecordTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="record provider ")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
+        primary = patch("problem_records.primary_checkout", return_value=self.root)
+        primary.start()
+        self.addCleanup(primary.stop)
         self.selection = self.root / ".problem-records.json"
         self.skill = self.root / "installed provider" / "SKILL.md"
         self.skill.parent.mkdir()
@@ -84,6 +87,69 @@ class ProblemRecordTests(unittest.TestCase):
                 read_record(self.root, self.reference, "codex")
             with patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 1, "", "private details")), self.assertRaisesRegex(RecordError, "could not read"):
                 read_record(self.root, self.reference, "codex")
+
+
+class PrimaryCheckoutTests(unittest.TestCase):
+    def test_primary_selection_wins_from_feature_and_nested_directory(self):
+        with tempfile.TemporaryDirectory(prefix="selected tracker ") as raw:
+            root = Path(raw).resolve() / "source é"
+            feature = Path(raw).resolve() / "feature é"
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "-C", str(root), "-c", "user.name=Fixture", "-c",
+                            "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"], check=True)
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "feature", str(feature)], check=True)
+            nested = feature / "nested"
+            nested.mkdir()
+            selected = {"schema_version": 1, "provider": "fixture:manage"}
+            (root / ".problem-records.json").write_text(json.dumps(selected), encoding="utf-8")
+            (feature / ".problem-records.json").write_text("invalid override", encoding="utf-8")
+            for directory in (root, feature, nested):
+                with self.subTest(directory=directory):
+                    self.assertEqual(root, primary_checkout(directory))
+                    self.assertEqual(selected, declaration(primary_checkout(directory)))
+
+    def test_reader_uses_only_the_primary_selection_from_a_linked_worktree(self):
+        with tempfile.TemporaryDirectory(prefix="selected reader ") as raw:
+            root = Path(raw).resolve() / "source"
+            feature = Path(raw).resolve() / "feature"
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "-C", str(root), "-c", "user.name=Fixture", "-c",
+                            "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"], check=True)
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "feature", str(feature)], check=True)
+            for directory, provider in ((root, "primary:work-item"), (feature, "foreign:work-item")):
+                (directory / ".problem-records.json").write_text(json.dumps({"schema_version": 1, "provider": provider}), encoding="utf-8")
+            skill = Path(raw) / "installed" / "SKILL.md"
+            reader = skill.parent / "scripts" / "read_problem_record.py"
+            reader.parent.mkdir(parents=True)
+            skill.write_text("provider", encoding="utf-8")
+            value = {"record": "https://example.invalid/issues/1", "kind": "bug", "state": "open", "body": "evidence"}
+            reader.write_text("import json, sys\nassert sys.argv[sys.argv.index('--root') + 1] == " + repr(str(root)) + "\nprint(" + repr(json.dumps(value)) + ")\n", encoding="utf-8")
+            with patch("skill_router.resolved_skill", return_value=(skill, "provider")) as resolve:
+                self.assertEqual(value, read_record(feature, value["record"], "codex"))
+                resolve.assert_called_once_with("primary:work-item", "codex")
+
+    def test_bare_repository_entry_is_never_the_primary_checkout(self):
+        with tempfile.TemporaryDirectory(prefix="bare tracker ") as raw:
+            source = Path(raw).resolve() / "source"
+            bare = Path(raw).resolve() / "bare.git"
+            checkout = Path(raw).resolve() / "checkout"
+            subprocess.run(["git", "init", "-q", str(source)], check=True)
+            subprocess.run(["git", "-C", str(source), "-c", "user.name=Fixture", "-c",
+                            "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"], check=True)
+            subprocess.run(["git", "clone", "-q", "--bare", str(source), str(bare)], check=True)
+            subprocess.run(["git", "-C", str(bare), "worktree", "add", "-q", "-b", "work", str(checkout)], check=True)
+            selected = {"schema_version": 1, "provider": "fixture:manage"}
+            (checkout / ".problem-records.json").write_text(json.dumps(selected), encoding="utf-8")
+            nested = checkout / "nested"
+            nested.mkdir()
+            self.assertEqual(checkout, primary_checkout(nested))
+            self.assertEqual(selected, declaration(primary_checkout(nested)))
+
+    def test_non_repository_and_unavailable_git_fail_visibly(self):
+        with tempfile.TemporaryDirectory() as directory, self.assertRaises(RecordError):
+            primary_checkout(directory)
+        with patch("problem_records.subprocess.run", side_effect=OSError("unavailable")), self.assertRaises(RecordError):
+            primary_checkout(".")
 
 
 if __name__ == "__main__":

@@ -70,12 +70,16 @@ continuation preserves its relevant instructions. Read again only for changed in
 
 ## Record noticed problems
 
-When a bug, mistake, or deliberate debt is noticed or reported, record it under the relevant shared
-problem-record convention while the observation is available: `engineering:write-bug`,
-`engineering:write-mistake`, or `engineering:write-debt`. Reconcile an existing record and repair owner
-first; repeated evidence updates that record. Recording stays within the current authorization and grants
-no separate authority to repair, publish, dispatch, or schedule work. Use the addressing workflow only
-when repair is already authorized, and preserve the original task while the record is updated.
+When a bug, mistake, or deliberate debt is noticed or reported, record it while the observation is available
+through the selected profile under [the recording contract](../../resources/problem-records.md).
+Preserve the observed bug, mistake or debt intent. Reconcile an existing record and repair owner first;
+repeated evidence updates that record. Recording stays within the current authorization and grants no
+separate authority to repair, publish, dispatch, or schedule work. Use the addressing workflow only when
+repair is already authorized, and preserve the original task while the record is updated.
+
+Feature, story, task and untyped recording requests use the selected profile's creation operation. Its
+policy resolves intent and native type; [repository selection](../../resources/problem-records.md#repository-selection)
+never grants permission to start implementation.
 
 ## Keep large changes reviewable
 
@@ -124,7 +128,8 @@ User calls out a mistake: answer and follow engineering:self-repair while the re
 ## Maintain the right source owner
 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
-out-of-scope defects with an objective resolution condition in the existing project's debt or plan owner.
+out-of-scope defects with an objective resolution condition through the relevant shared writer. Plans
+link the canonical record under [the shared recording contract](../../resources/problem-records.md).
 A defect in a consumed standards package or its source repository is the exception: a stale or broken
 standard, including the automation that missed it, is a defect to diagnose, never a manual step to hand
 to the user, and so is a standard that caused or failed to prevent a mistake. Diagnose it and follow
@@ -133,5 +138,5 @@ current task resumes. That workflow owns the repair authorization and delivery p
 limits still hold.
 Before committing or returning a terminal result, check the work against the standards that governed
 it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt
-entry. `engineering:write-debt` defines the selected repository convention. Do not create a second
+entry. The shared recording contract defines that destination. Do not create a second
 ledger for a standalone goal just to satisfy a repository-oriented procedure.

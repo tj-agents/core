@@ -1,6 +1,10 @@
 # core
 
 Read `README.md` before changing repository structure.
+Personal applies only to explicitly adopted personal projects. GitHub ownership and permission to commit
+agent configuration do not establish personal scope. Infonetica is work scope, including the
+`tj-agents/infonetica` plugin source repository and every worktree: never select or inject Personal there.
+Read the target repository's README.md and AGENTS.md before selecting its policy profiles.
 Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts, hooks, or launchers.
 Install machine state only through `./setup.ps1` or `./setup.sh`; rerunning converges.
 Shipped code must run on Windows and Linux; follow

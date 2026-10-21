@@ -18,6 +18,31 @@ class RecordError(ValueError):
     pass
 
 
+def primary_checkout(directory):
+    try:
+        root = subprocess.run(
+            ["git", "-C", str(directory), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, encoding="utf-8", timeout=5, check=False,
+        )
+        if root.returncode:
+            raise RecordError("source repository root could not be resolved")
+        worktree = Path(root.stdout.strip()).resolve()
+        listed = subprocess.run(
+            ["git", "-C", str(worktree), "worktree", "list", "--porcelain", "-z"],
+            capture_output=True, text=True, encoding="utf-8", timeout=5, check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise RecordError("source primary checkout could not be resolved") from error
+    entries = []
+    for block in listed.stdout.split("\0\0"):
+        fields = block.strip("\0").split("\0")
+        if fields[0].startswith("worktree ") and fields[0][9:] and "bare" not in fields[1:]:
+            entries.append(Path(fields[0][9:]).resolve())
+    if listed.returncode or not entries or worktree not in entries or not entries[0].is_dir():
+        raise RecordError("source primary checkout could not be resolved")
+    return entries[0]
+
+
 def declaration(root):
     path = Path(root) / CONFIG
     if path.is_symlink():
@@ -36,7 +61,7 @@ def declaration(root):
 
 
 def read_record(root, reference, harness):
-    root = Path(root).resolve()
+    root = primary_checkout(root)
     selected = declaration(root)
     if selected is None:
         raise RecordError("source repository has no selected problem-record provider")

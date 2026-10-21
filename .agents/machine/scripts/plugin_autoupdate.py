@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -24,11 +25,15 @@ import time
 GIT_TIMEOUT_SECONDS = 30
 SWEEP_TIMEOUT_SECONDS = 1800
 SCRIPT_NAME = "plugin_autoupdate.py"
+RUNTIME = ("plugin_autoupdate.py", "machine_events.py", "launch_check.py", "reload_plugins.py", "agent_cli.py",
+           "codex_hook_trust.py")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 CLI_TIMEOUT_SECONDS = 60
 STILL_ACTIVE = 259
 FAILURE_BACKOFF_SECONDS = 24 * 60 * 60
 RETIRED = "retired"
+HOOK_DIGEST = re.compile(r'"(sha256:[0-9a-f]{64})"')
+SNAPSHOT_FIRST = "(Path(s) if s else d/'hook-snapshots')/k/"
 
 
 def state_directory() -> Path:
@@ -73,13 +78,22 @@ def is_pinned(ref: object) -> bool:
 
 
 def load_toml(path: Path) -> dict:
-    import tomllib
+    try:
+        import tomllib
+    except ImportError:
+        return {}
 
     try:
         with path.open("rb") as stream:
             return tomllib.load(stream)
     except (OSError, tomllib.TOMLDecodeError):
         return {}
+
+
+def github_repository(source: object) -> str | None:
+    match = re.fullmatch(r"(?:(?:https?://|ssh://git@|git@)github\.com[/:])?([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)"
+                         r"(?:\.git)?/?", source.strip()) if isinstance(source, str) else None
+    return f"{match[1]}/{match[2]}".casefold() if match else None
 
 
 def git_marketplace(source: object) -> dict | None:
@@ -210,6 +224,36 @@ def codex_session_running(alive=process_alive) -> bool:
                for profile, pid in rows)
 
 
+def hook_packages(marketplace: str) -> list[dict]:
+    packages = []
+    for path in sorted((codex_home() / "plugins" / "cache" / marketplace).glob("*/*/hooks/codex.json")):
+        try:
+            hooks = json.loads(path.read_text(encoding="utf-8"))["hooks"]
+            commands = [hook.get("commandWindows") or hook.get("command") or "" for groups in hooks.values()
+                        for group in groups for hook in group["hooks"]]
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            continue
+        digests = {match[1] for command in commands if (match := HOOK_DIGEST.search(command))}
+        if len(digests) == 1:
+            packages.append({"plugin": path.parents[2].name, "root": path.parents[1], "digest": digests.pop(),
+                             "snapshot_first": all(SNAPSHOT_FIRST in command for command in commands)})
+    return packages
+
+
+def preserve_hook_snapshots(marketplace: str, packages: list[dict]) -> None:
+    for package in packages:
+        plugin, root = package["plugin"], package["root"]
+        try:
+            spec = importlib.util.spec_from_file_location("codex_hook_snapshot_" + plugin,
+                                                          root / "hooks" / "codex_hook_snapshot.py")
+            loader = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(loader)
+            loader.snapshot_root(root, package["digest"], plugin,
+                                 codex_home() / "plugins" / "data" / f"{plugin}-{marketplace}" / "hook-snapshots")
+        except (Exception, SystemExit):
+            continue
+
+
 def remote_revision(source: str, ref: object = None) -> str | None:
     reference = ref if isinstance(ref, str) and ref else "HEAD"
     if is_pinned(reference):
@@ -242,7 +286,8 @@ def run_cli(command: list[str], *, cwd: Path) -> bool | str:
 
 
 def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, revision=remote_revision,
-                  run=run_cli, now: float | None = None, busy=codex_session_running) -> dict[str, str]:
+                  run=run_cli, now: float | None = None, busy=codex_session_running, packages=hook_packages,
+                  preserve=preserve_hook_snapshots) -> dict[str, str]:
     now = time.time() if now is None else now
     outcomes: dict[str, str] = {}
     references = sorted({(source["source"], source.get("ref") or "HEAD")
@@ -268,10 +313,13 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
         if isinstance(failed_at, (int, float)) and now - failed_at < FAILURE_BACKOFF_SECONDS:
             outcomes[marketplace] = "failed recently; retried after 24 hours"
             continue
-        running = busy() if running is None else running
-        if running:
-            outcomes[marketplace] = "deferred while a Codex session is running"
-            continue
+        hooks = packages(marketplace)
+        if not all(package["snapshot_first"] for package in hooks):
+            running = busy() if running is None else running
+            if running:
+                outcomes[marketplace] = "deferred while a Codex session is running"
+                continue
+        preserve(marketplace, hooks)
         refreshed = run([executable, "plugin", "marketplace", "upgrade", marketplace],
                         cwd=target["project"]) is True
         retired = []
@@ -317,13 +365,20 @@ def remove_user_plugins(path: Path, identities: set[str]) -> None:
         write_text(path, text)
 
 
-def refresh_declared(executable: str, config: dict, recorded: dict, previous: list[str] = (), **options) -> dict:
+def publishes(target: dict, repositories: set[str]) -> bool:
+    return any(github_repository(source["source"]) in repositories for source in [target, *target["publishers"]])
+
+
+def refresh_declared(executable: str, config: dict, recorded: dict, previous: list[str] = (),
+                     repositories: set[str] | None = None, **options) -> dict:
     targets, ignored = declared_targets(config)
     for name, target in targets.items():
         inspect_installation(name, target)
     declared = set().union(*(enabled_identities(layer) for _, layer in declarations(config)[1:]))
     project_only = declared - (enabled_identities(config) - set(previous))
-    outcomes = refresh_codex(executable, targets, recorded, **options)
+    selected = {name: target for name, target in targets.items()
+                if repositories is None or publishes(target, repositories)}
+    outcomes = refresh_codex(executable, selected, recorded, **options)
     remove_user_plugins(codex_home() / "config.toml", project_only)
     kept = {prefix + "codex:" + name for name in targets for prefix in ("", "retired:", "failed:")}
     for key in [key for key in recorded if key not in kept]:
@@ -391,15 +446,16 @@ def packaged_copies(codex_config: dict) -> list[Path]:
 
 
 def self_update(current: Path, codex_config: dict) -> bool:
-    candidates = [path for path in packaged_copies(codex_config)
-                  if path.resolve() != current.resolve() and path.with_name("machine_events.py").is_file()]
+    candidates = [path for path in packaged_copies(codex_config) if path.resolve() != current.resolve()
+                  and all(path.with_name(name).is_file() for name in RUNTIME)]
     if not candidates:
         return False
     newest = max(candidates, key=lambda path: path.stat().st_mtime)
     try:
         changed = False
-        for source, target in ((newest, current), (newest.with_name("machine_events.py"), current.with_name("machine_events.py"))):
-            if not source.is_file() or (target.is_file() and source.read_bytes() == target.read_bytes()):
+        for name in RUNTIME:
+            source, target = newest.with_name(name), current.with_name(name)
+            if target.is_file() and source.read_bytes() == target.read_bytes():
                 continue
             shutil.copyfile(source, target.with_name(target.name + ".next"))
             os.replace(target.with_name(target.name + ".next"), target)
@@ -440,11 +496,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-self-update", action="store_true")
     parser.add_argument("--no-sweep", action="store_true")
     parser.add_argument("--retry-failures", action="store_true")
+    parser.add_argument("--repository", action="append", type=str.casefold,
+                        help="Refresh only marketplaces that list or publish from this owner/name")
     arguments = parser.parse_args(argv)
     directory = state_directory()
     lock = acquire_lock(directory / "plugin-autoupdate.lock")
     if lock is None:
-        return 0
+        return 1
     try:
         state_file = directory / "plugin-autoupdate.json"
         state = read_json(state_file)
@@ -454,7 +512,8 @@ def main(argv: list[str] | None = None) -> int:
         previous = state.get("project_only") if isinstance(state.get("project_only"), list) else []
         config = load_codex_config()
         executable = shutil.which("codex")
-        outcomes = refresh_declared(executable, config, recorded, previous) if executable else {}
+        repositories = set(arguments.repository) if arguments.repository else None
+        outcomes = refresh_declared(executable, config, recorded, previous, repositories) if executable else {}
         sweep = "skipped" if arguments.no_sweep else sweep_worktrees(config)
         write_json(state_file, {"revisions": recorded, "project_only": outcomes.get("project_only", previous),
                                 "last_run": time.time(), "outcomes": outcomes, "worktree_sweep": sweep})
@@ -463,7 +522,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         lock.close()
     results = outcomes.get("marketplaces", {})
-    return int(any(str(value).startswith(("failed", "unreachable")) for value in results.values()))
+    return int(any(str(value).startswith(("failed", "unreachable", "deferred")) for value in results.values()))
 
 
 if __name__ == "__main__":

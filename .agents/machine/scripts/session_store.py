@@ -5,11 +5,13 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 import socket
 import sqlite3
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 
 
@@ -26,7 +28,7 @@ def _load_repository_identity():
 _repository_identity = _load_repository_identity()
 normalise_remote = _repository_identity.normalise_remote
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 GIT_TIMEOUT = 3
 HOOK_GIT_TIMEOUT = 2
 REGISTRY_REPLACE_ATTEMPTS = 40
@@ -37,16 +39,36 @@ WORK_ITEMS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS work_items (
     key TEXT PRIMARY KEY,
     repo TEXT NOT NULL,
-    feature TEXT NOT NULL,
-    item TEXT NOT NULL,
+    feature TEXT,
+    item TEXT,
     status TEXT NOT NULL,
     branch TEXT,
     pr TEXT,
     title TEXT,
     plan_path TEXT,
-    updated_at REAL
+    updated_at REAL,
+    CHECK ((feature IS NULL AND item IS NULL) OR (feature IS NOT NULL AND item IS NOT NULL))
 )
 """
+
+WORK_ITEM_REFERENCES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS work_item_references (
+    provider TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    native_id TEXT NOT NULL,
+    work_item TEXT NOT NULL REFERENCES work_items(key),
+    PRIMARY KEY (provider, scope, native_id)
+)
+"""
+
+WORK_ITEM_REFERENCES_ITEM_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_work_item_references_item ON work_item_references(work_item)
+"""
+
+_GITHUB_SCOPE = re.compile(r"github\.com/[a-z0-9][a-z0-9_.-]*/[a-z0-9_.-]+$")
+_AZURE_SCOPE = re.compile(r"dev\.azure\.com/[a-z0-9][a-z0-9-]*$")
+_NATIVE_ID = re.compile(r"[1-9][0-9]*$")
+_EXECUTION_KEY = re.compile(r"execution:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 SESSIONS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -144,22 +166,43 @@ def connect(path=None):
 
 
 def _ensure_schema(connection):
+    version = connection.execute("PRAGMA user_version").fetchone()[0]
+    if version > SCHEMA_VERSION:
+        raise RuntimeError(f"session store has unsupported schema version {version}")
+    foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()[0]
+    foreign_keys_disabled = version < 4
+    if foreign_keys_disabled:
+        connection.execute("PRAGMA foreign_keys = OFF")
     connection.execute("BEGIN IMMEDIATE")
     try:
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        if version > SCHEMA_VERSION:
+            raise RuntimeError(f"session store has unsupported schema version {version}")
+        migrating_to_v4 = version < 4
         connection.execute(WORK_ITEMS_SCHEMA)
         connection.execute(SESSIONS_SCHEMA)
-        version = connection.execute("PRAGMA user_version").fetchone()[0]
         if version < 2:
             _deduplicate_owner_rows(connection)
         connection.execute(SESSIONS_ONE_OWNER_INDEX)
         if version < 3:
             _add_work_item_metadata_columns(connection)
+        if migrating_to_v4:
+            _migrate_work_items_to_v4(connection)
+        connection.execute(WORK_ITEM_REFERENCES_SCHEMA)
+        connection.execute(WORK_ITEM_REFERENCES_ITEM_INDEX)
         if version < SCHEMA_VERSION:
             connection.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
+        if migrating_to_v4:
+            violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+            if violations:
+                raise RuntimeError(f"session store migration foreign key check failed: {violations!r}")
         connection.commit()
     except Exception:
         connection.rollback()
         raise
+    finally:
+        if foreign_keys_disabled and foreign_keys:
+            connection.execute("PRAGMA foreign_keys = ON")
 
 
 def _add_work_item_metadata_columns(connection):
@@ -170,6 +213,44 @@ def _add_work_item_metadata_columns(connection):
         connection.execute("ALTER TABLE work_items ADD COLUMN title TEXT")
     if "plan_path" not in columns:
         connection.execute("ALTER TABLE work_items ADD COLUMN plan_path TEXT")
+
+
+def _migrate_work_items_to_v4(connection):
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(work_items)").fetchall()}
+    required = {"key", "repo", "feature", "item", "status", "branch", "pr", "updated_at"}
+    missing = required - columns
+    if missing:
+        raise RuntimeError(f"session store work_items table is missing columns {sorted(missing)!r}")
+    connection.execute(
+        """
+        CREATE TABLE work_items_v4 (
+            key TEXT PRIMARY KEY,
+            repo TEXT NOT NULL,
+            feature TEXT,
+            item TEXT,
+            status TEXT NOT NULL,
+            branch TEXT,
+            pr TEXT,
+            title TEXT,
+            plan_path TEXT,
+            updated_at REAL,
+            CHECK ((feature IS NULL AND item IS NULL) OR (feature IS NOT NULL AND item IS NOT NULL))
+        )
+        """
+    )
+    title = "title" if "title" in columns else "NULL"
+    plan_path = "plan_path" if "plan_path" in columns else "NULL"
+    connection.execute(
+        """
+        INSERT INTO work_items_v4 (
+            key, repo, feature, item, status, branch, pr, title, plan_path, updated_at
+        )
+        SELECT key, repo, feature, item, status, branch, pr, %s, %s, updated_at
+        FROM work_items
+        """ % (title, plan_path)
+    )
+    connection.execute("DROP TABLE work_items")
+    connection.execute("ALTER TABLE work_items_v4 RENAME TO work_items")
 
 
 def _deduplicate_owner_rows(connection):
@@ -287,6 +368,107 @@ def session_handle(host, session_id):
 
 def work_item_key(repo, feature, item):
     return f"{repo}:{feature}/{item}"
+
+
+def execution_key():
+    return f"execution:{uuid.uuid4()}"
+
+
+def validate_execution_key(value):
+    if not isinstance(value, str) or not _EXECUTION_KEY.fullmatch(value):
+        raise ValueError("execution key must be execution:<lowercase UUID>")
+    return value
+
+
+def normalise_work_item_reference(provider, scope, native_id):
+    if not all(isinstance(value, str) and value.strip() for value in (provider, scope, native_id)):
+        raise ValueError("provider, scope and native id are required")
+    provider = provider.strip().casefold()
+    scope = scope.strip().casefold()
+    native_id = native_id.strip()
+    if provider == "github":
+        if not _GITHUB_SCOPE.fullmatch(scope):
+            raise ValueError("GitHub scope must be github.com/<lowercase-owner>/<lowercase-repository>")
+    elif provider == "azure-devops":
+        if not _AZURE_SCOPE.fullmatch(scope):
+            raise ValueError("Azure DevOps scope must be dev.azure.com/<lowercase-organization>")
+    else:
+        raise ValueError("provider must be github or azure-devops")
+    if not _NATIVE_ID.fullmatch(native_id):
+        raise ValueError("native id must be a positive canonical decimal number")
+    return provider, scope, native_id
+
+
+def get_work_item_reference(connection, provider, scope, native_id):
+    provider, scope, native_id = normalise_work_item_reference(provider, scope, native_id)
+    row = connection.execute(
+        "SELECT provider, scope, native_id, work_item FROM work_item_references "
+        "WHERE provider = ? AND scope = ? AND native_id = ?",
+        (provider, scope, native_id),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def work_item_references(connection, key):
+    rows = connection.execute(
+        "SELECT provider, scope, native_id FROM work_item_references WHERE work_item = ? "
+        "ORDER BY provider, scope, native_id",
+        (key,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _insert_work_item_reference_locked(connection, key, provider, scope, native_id):
+    reference = get_work_item_reference(connection, provider, scope, native_id)
+    if reference is not None:
+        if reference["work_item"] == key:
+            return False
+        raise ValueError(
+            f"{provider}/{scope}/{native_id} is already bound to {reference['work_item']}, not {key}"
+        )
+    if get_work_item(connection, key) is None:
+        raise ValueError(f"work item does not exist: {key}")
+    connection.execute(
+        "INSERT INTO work_item_references (provider, scope, native_id, work_item) VALUES (?, ?, ?, ?)",
+        (provider, scope, native_id, key),
+    )
+    return True
+
+
+def bind_work_item_reference(connection, key, provider, scope, native_id):
+    provider, scope, native_id = normalise_work_item_reference(provider, scope, native_id)
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        changed = _insert_work_item_reference_locked(connection, key, provider, scope, native_id)
+        connection.commit()
+        return changed
+    except Exception:
+        connection.rollback()
+        raise
+
+
+def resolve_or_create_work_item_reference(connection, provider, scope, native_id, repo, branch=None):
+    provider, scope, native_id = normalise_work_item_reference(provider, scope, native_id)
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        reference = get_work_item_reference(connection, provider, scope, native_id)
+        if reference is not None:
+            item = get_work_item(connection, reference["work_item"])
+            if item is None:
+                raise RuntimeError(f"reference {provider}/{scope}/{native_id} has a missing work item")
+            connection.commit()
+            return item, False
+        key = execution_key()
+        _upsert_work_item_locked(
+            connection, key, repo, None, None, status="active", branch=branch,
+        )
+        _insert_work_item_reference_locked(connection, key, provider, scope, native_id)
+        item = get_work_item(connection, key)
+        connection.commit()
+        return item, True
+    except Exception:
+        connection.rollback()
+        raise
 
 
 def _start_session_locked(
@@ -439,6 +621,10 @@ def get_work_item(connection, key):
 def _upsert_work_item_locked(
     connection, key, repo, feature, item, status=None, branch=None, pr=None, title=None, plan_path=None,
 ):
+    if (feature is None) != (item is None):
+        raise ValueError("work item feature and item must both be present or both be absent")
+    if feature is None:
+        validate_execution_key(key)
     now = time.time()
     connection.execute(
         """
@@ -495,7 +681,14 @@ def _demote_other_owners_locked(connection, item, keep_handle):
     )
 
 
-def _claim_work_item_locked(connection, handle, key, role, predecessor=None, branch=None):
+def _claim_work_item_locked(connection, handle, key, role, predecessor=None, branch=None, require_existing_binding=False):
+    current = get_session(connection, handle)
+    if current is None:
+        raise ValueError(f"{handle} is not a registered current native session")
+    if require_existing_binding and current["work_item"] not in (None, key):
+        raise ValueError(
+            f"{handle} is attached to {current['work_item']}; bind the remote reference explicitly before claiming"
+        )
     removed = None
     if role == "owner":
         others = [row for row in live_owners(connection, key) if row["handle"] != handle]
@@ -518,10 +711,13 @@ def _claim_work_item_locked(connection, handle, key, role, predecessor=None, bra
     return removed
 
 
-def claim_work_item(connection, handle, key, role, predecessor=None, branch=None):
+def claim_work_item(connection, handle, key, role, predecessor=None, branch=None, require_existing_binding=False):
     connection.execute("BEGIN IMMEDIATE")
     try:
-        removed = _claim_work_item_locked(connection, handle, key, role, predecessor=predecessor, branch=branch)
+        removed = _claim_work_item_locked(
+            connection, handle, key, role, predecessor=predecessor, branch=branch,
+            require_existing_binding=require_existing_binding,
+        )
         connection.commit()
         return removed
     except Exception:
@@ -530,9 +726,9 @@ def claim_work_item(connection, handle, key, role, predecessor=None, branch=None
 
 
 def claim_registered_work_item(
-    connection, host, session_id, cwd, key, repo, feature, item, role,
+    connection, host, session_id, cwd, key, work_item_repo, current_repo, feature, item, role,
     status=None, branch=None, session_branch=None, head=None, title=None, plan_path=None,
-    predecessor=None, registration=None,
+    predecessor=None, registration=None, require_existing_binding=False,
 ):
     handle = session_handle(host, session_id)
     connection.execute("BEGIN IMMEDIATE")
@@ -544,7 +740,7 @@ def claim_registered_work_item(
             _start_session_locked(
                 connection, host, session_id, cwd, title=registration.get("title"),
                 pid=registration.get("pid"), pid_started_at=registration.get("pid_started_at"),
-                repo=repo, branch=session_branch, head=head,
+                repo=current_repo, branch=session_branch, head=head,
             )
         elif session["ended_at"] is not None:
             raise ValueError(f"{handle} is not a current native session")
@@ -555,10 +751,13 @@ def claim_registered_work_item(
             raise ValueError("a non-empty --title is required when creating a work item")
         item_branch = branch if existing is None or role == "owner" else None
         _upsert_work_item_locked(
-            connection, key, repo, feature, item, status=status, branch=item_branch,
+            connection, key, work_item_repo, feature, item, status=status, branch=item_branch,
             title=title, plan_path=plan_path,
         )
-        removed = _claim_work_item_locked(connection, handle, key, role, predecessor=predecessor, branch=branch)
+        removed = _claim_work_item_locked(
+            connection, handle, key, role, predecessor=predecessor, branch=branch,
+            require_existing_binding=require_existing_binding,
+        )
         connection.commit()
         return removed
     except Exception:

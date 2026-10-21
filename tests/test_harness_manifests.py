@@ -135,7 +135,7 @@ class HarnessManifestTests(unittest.TestCase):
         import plugin_selection
 
         config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
-        self.assertEqual(plugin_selection.MARKETPLACE_NAME, HARNESS.core_marketplace(ROOT, config))
+        self.assertEqual(plugin_selection.MARKETPLACE_NAME, HARNESS.PACKAGES.core_marketplace(ROOT, config))
         self.assertEqual(plugin_selection.MARKETPLACE_REPOSITORY, HARNESS.DISTRIBUTION_REPOSITORY)
         for path in (ROOT / ".agents/plugins/harness").glob("*.json"):
             with self.subTest(path=path.name):
@@ -360,6 +360,9 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
         expected_paths = {
             f"{root}/.agents/machine/scripts/work_item_sessions.py",
             f"{root}/resources/machine/scripts/work_item_sessions.py",
+            f"{root}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
+            f"{root}/skills/recover-agents/scripts/work_item_sessions.py",
+            f"{root}/codex-skills/recover-agents/scripts/work_item_sessions.py",
         }
         for rule in rules:
             command = rule["pattern"][-1]

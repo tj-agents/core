@@ -24,9 +24,12 @@ owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
 Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
-Recorded defects default to `BUGS.md` when a repository has no declared problem-register owner.
-`engineering:write-bug`, `write-mistake`, and `write-debt` share record semantics; their corresponding
-address workflows reuse the existing repair lifecycle.
+The [recording contract](.agents/engineering/resources/problem-records.md) routes remote work-item
+operations to the repository's explicitly selected profile. Personal owns GitHub records; Infonetica owns
+Azure Boards records and native type policy. Core owns the shared SQLite agent execution/session registry
+and reusable engineering lifecycles. Installing Engineering does not select or install a recording
+profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
+registers remain evidence only.
 Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.9+
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
 current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or
@@ -35,7 +38,7 @@ probe is required before claiming enforcement. The host coverage limit is tracke
 `.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents a generated native-instruction
 fallback.
 Codex hook commands use a per-session temporary snapshot preseeded for the running session's hooks.
-This lets those hooks keep running after a startup refresh replaces an inactive package cache entry.
+This lets those hooks keep running after a plugin update replaces an inactive package cache entry.
 New sessions create a fresh snapshot from the verified package; snapshots outside the plugin cache are
 left in place. A changed hook definition still requires Codex trust review before it runs.
 
@@ -193,20 +196,26 @@ nothing and exits 1 when something would change:
 
 Installed paths always point at the main checkout (the parent of `git rev-parse --git-common-dir`),
 never the worktree that ran setup. In order, setup verifies the saved `gh` login, configures the event
-channel and publishers, enables Claude's native auto-update, and removes retired launcher blocks and
-scheduled jobs. On Windows it then wires one `# >>> tj-agents >>>` block into both PowerShell profiles
-(replacing an older profile block in place, keeping other lines, and backing up a changed profile),
-builds the hidden Git Bash proxy and installs CLI session recovery. On both platforms it delivers Codex
-profile agents with `pwsh` when Codex is set up, converges installed packages' declared harness
-permissions (removing owned rules that are no longer declared), removes retired Codex configuration
-and migrates the old agent delivery manifest. Finally it installs one hidden machine event listener
-in `~/.agents-state/bin`. Windows uses a logon-only Task Scheduler task with
-failure restart and no execution limit. Linux uses a systemd user service with failure restart; systemd
-is required. Setup removes the former hourly plugin-autoupdate and merge-gates tasks or cron entries.
-Rerunning setup reuses the shared channel; it replaces the runtime and restarts the listener only when
-the installed runtime or its registration drifted.
+channel and publishers, and enables Claude's native auto-update. It removes the retired machine event
+listener task or systemd service and the former hourly plugin-autoupdate and merge-gates tasks or cron
+entries, then copies the launch-check runtime to `~/.agents-state/bin`. It writes one
+`# >>> tj-agents >>>` block into both PowerShell profiles on Windows, and into `~/.bashrc`, `~/.zshrc` or
+the PowerShell profile that exists on Linux. The block defines the `claude` and `codex` functions and, on
+Windows, loads the main checkout's `shell/profile.ps1`. It replaces older profile and launcher blocks in
+place, keeps other lines, encoding and BOM, and keeps one `.pre-tj-agents.bak` copy of a changed profile.
+On Windows setup then builds the hidden Git Bash proxy and installs CLI session recovery. On both
+platforms it delivers Codex profile agents with `pwsh` when Codex is set up, catches up plugins and merge
+policies for repositories whose default branch moved since the last catch-up, converges installed
+packages' declared harness permissions (removing owned rules that are no longer declared), removes
+retired Codex configuration and migrates the old agent delivery manifest. Nothing runs in the background.
 
-The listener holds a blocking HTTPS JSON subscription to ntfy.sh. Main-branch callers use the shared
+Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: one non-blocking ntfy.sh
+poll for events since the saved cursor. With none it starts the CLI immediately; offline it starts anyway.
+With events it updates, on both hosts in parallel, only the marketplaces and enabled plugins that list or
+publish the named repositories, and advances the cursor once both hosts succeed. A failed host retries on
+a later launch, at most hourly. `machine:reload-plugins` runs the same check in a running session.
+
+Main-branch callers publish events through the shared
 `tj-agents/github-actions/.github/actions/machine-events` publisher. Setup reuses or creates the
 unguessable `MACHINE_EVENTS_TOPIC` Actions variable on core, configures the same variable for active
 repositories in tj-agents, Concertable and tomjseery, and saves it in `~/.agents-state/machine-events.json`.
@@ -214,14 +223,16 @@ The same value is stored as an Actions secret for callers, so public run logs ma
 The topic is an untrusted public hint channel; it contains only repository names and change categories.
 No administrative GitHub credential is stored in Actions.
 
-The listener re-reads GitHub and invokes the installed github-actions plugin's `merge-policy reconcile`
-for committed policy changes as Tommy's saved `gh` account. Install that plugin before setup. It invokes
-`plugin_autoupdate.py` for marketplace changes. It
-catches up once on startup and after an offline gap, coalesces duplicates and retries failures a
-bounded number of times. There are no periodic GitHub checks. Native process-exit notifications resume
-plugin refreshes deferred while Codex sessions are alive. Nothing runs at CLI startup.
+Setup's catch-up runs `machine_events.py` once, which re-reads GitHub and invokes the
+installed github-actions plugin's `merge-policy reconcile` for committed policy changes as Tommy's saved
+`gh` account. Install that plugin before setup. Launches do not reconcile merge policy; run
+`machine_events.py --repo <owner/name>` after a policy change.
 
-Runtime logs rotate at `~/.agents-state/machine-events.log`. Package regeneration jobs publish a second
+A Codex upgrade first snapshots each installed hook package, so a running Codex session keeps calling the
+hooks it started with. Only packages whose hook loader still reads the cache first wait for running Codex
+sessions to exit.
+
+Catch-up logs rotate at `~/.agents-state/machine-events.log`. Package regeneration jobs publish a second
 hint after pushing generated packages because GitHub's own token cannot trigger another push workflow.
 Repository enrollment is explicit: merge the uniform caller only into an approved personal repository.
 The generic service scaffold does not generate it. GitHub Free's repository ruleset limitations still
@@ -235,14 +246,18 @@ loaded; new sessions pick up the update.
 An event refresh updates the installed bytes of plugins already selected by trusted project or user
 configuration. Those shared tools can also serve employer projects that select them. A refresh does not
 adopt the personal profile, generate project workflows or apply a merge policy to every project that uses
-GitHub Actions. Running sessions retain their loaded instructions; Codex updates that would disrupt an
-active session wait for its process to exit before the listener retries them.
+GitHub Actions. Running sessions retain their loaded instructions and hook snapshots.
 
 The personal event publishers and automatic ruleset reconciliation are restricted to `tj-agents`,
 `Concertable` and `tomjseery`. Hints request a GitHub re-read, and only a changed, committed
 `.github/merge-policy.json` can trigger that repository's ruleset reconciliation. Publisher adoption is
 owned by [github-actions:machine-events](https://github.com/tj-agents/github-actions/blob/main/.agents/github-actions/utility/machine-events/SKILL.md);
 the policy writer also enforces its owner boundary before GitHub access.
+
+Personal is for explicitly adopted personal projects only. A GitHub owner or permission to commit agent
+configuration does not establish personal scope. Infonetica is work scope, including the
+`tj-agents/infonetica` plugin source repository and all its worktrees; never select or inject Personal
+there. Read the target repository's README.md and AGENTS.md before choosing its policy profiles.
 
 Repository plugin adoption follows
 [machine:plugin-selection](.agents/machine/utility/plugin-selection/SKILL.md). Employer-project agent
@@ -252,8 +267,8 @@ tracked local targets. A home directory, current branch or linked worktree is no
 personal profile. For example, a linked worktree of an employer repository still receives local agent
 settings, with no personal publisher or personal merge rules.
 
-Setup installs one listener per machine user, independent of the checkout or worktree used to invoke it.
-Event handling and catch-up do not edit or remove worktrees. The separate
+Setup installs one launch check per machine user, independent of the checkout or worktree used to invoke it.
+Launch checks and catch-up do not edit or remove worktrees. The separate
 [merge cleanup workflow](.agents/engineering/workflow/merge/SKILL.md) owns worktree cleanup and its proof
 requirements. The machine event fixtures cover both event and catch-up paths without launching agents.
 

@@ -2,36 +2,87 @@
   "schema_version": 1,
   "plugins": {
     "base": [],
-    "engineering": ["base"],
-    "machine": ["base"],
+    "engineering": [
+      "base"
+    ],
+    "machine": [
+      "base"
+    ],
     "cpp": [],
-    "gpp": ["cpp"],
-    "msvc": ["cpp"],
-    "win32": ["cpp"],
+    "gpp": [
+      "cpp"
+    ],
+    "msvc": [
+      "cpp"
+    ],
+    "win32": [
+      "cpp"
+    ],
     "dotnet": [],
-    "efcore": ["dotnet"],
-    "azure": ["dotnet"],
+    "efcore": [
+      "dotnet"
+    ],
+    "azure": [
+      "dotnet"
+    ],
     "react": [],
     "nvim": [],
     "rust": [],
     "python": [],
     "github-actions": [],
     "template": [],
-    "personal": ["base", "machine"],
-    "work": ["base"],
-    "infonetica": ["work"]
+    "personal": [
+      "base",
+      "engineering",
+      "machine"
+    ],
+    "work": [
+      "base"
+    ],
+    "infonetica": [
+      "engineering",
+      "work"
+    ]
   },
   "stacks": {
-    "dotnet": ["dotnet"],
-    "azure": ["dotnet", "azure"],
-    "react": ["react"],
-    "cpp-gcc": ["cpp", "gpp"],
-    "cpp-msvc": ["cpp", "msvc"],
-    "win32": ["cpp", "msvc", "win32"],
-    "neovim": ["nvim"],
-    "rust": ["rust"],
-    "python": ["python"],
-    "github-actions": ["github-actions"],
-    "plugin-repository": ["template", "python"]
+    "dotnet": [
+      "dotnet"
+    ],
+    "azure": [
+      "dotnet",
+      "azure"
+    ],
+    "react": [
+      "react"
+    ],
+    "cpp-gcc": [
+      "cpp",
+      "gpp"
+    ],
+    "cpp-msvc": [
+      "cpp",
+      "msvc"
+    ],
+    "win32": [
+      "cpp",
+      "msvc",
+      "win32"
+    ],
+    "neovim": [
+      "nvim"
+    ],
+    "rust": [
+      "rust"
+    ],
+    "python": [
+      "python"
+    ],
+    "github-actions": [
+      "github-actions"
+    ],
+    "plugin-repository": [
+      "template",
+      "python"
+    ]
   }
 }

@@ -1,6 +1,6 @@
 import importlib.util
-import io
 import json
+import logging
 import os
 from pathlib import Path
 import subprocess
@@ -8,7 +8,6 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
-import xml.etree.ElementTree as ET
 
 SCRIPTS = Path(__file__).resolve().parents[1] / ".agents/machine/scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -23,37 +22,13 @@ def current(repository="tj-agents/core", revision="a", policy="policy", marketpl
 
 
 class HintTests(unittest.TestCase):
-    def test_only_valid_repo_hints_enter_the_queue(self):
+    def test_only_valid_repo_hints_are_accepted(self):
         for message in ({"v": 1, "repo": "other/repo"}, {"v": 1, "repo": "tj-agents/../x"},
                         {"v": True, "repo": "tj-agents/core"}, [], "garbage"):
             self.assertIsNone(events.parse_hint({"event": "message", "message": json.dumps(message)}))
         message = {"v": 1, "repo": "tj-agents/core", "policy": {"agents_may_merge": True}, "command": "evil"}
         self.assertEqual("tj-agents/core", events.parse_hint({"event": "message", "message": json.dumps(message)}))
         self.assertIsNone(events.parse_hint({"event": "keepalive"}))
-
-    def test_pending_work_coalesces_and_is_bounded(self):
-        pending = events.Pending()
-        for _ in range(1000):
-            pending.put("tj-agents/core")
-        self.assertEqual(1, len(pending.items))
-        for index in range(500):
-            pending.put(f"tj-agents/r{index}")
-        self.assertEqual(256, len(pending.items))
-        self.assertEqual("tj-agents/core", pending.get())
-
-    def test_keepalive_is_idle_and_replay_cursor_is_saved_after_enqueue(self):
-        with tempfile.TemporaryDirectory() as directory:
-            cursor = Path(directory) / "cursor.json"
-            lines = [{"event": "open"}, {"event": "keepalive"},
-                     {"event": "message", "id": "abc123", "message": json.dumps({"v": 1, "repo": "tj-agents/core"})}]
-            response = io.BytesIO(b"\n".join(json.dumps(line).encode() for line in lines) + b"\n")
-            pending = events.Pending()
-            opener = mock.Mock(return_value=response)
-            with mock.patch.object(events.time, "sleep", side_effect=KeyboardInterrupt), self.assertRaises(KeyboardInterrupt):
-                events.subscribe("a" * 48, pending, cursor, opener=opener)
-            self.assertEqual([None, "tj-agents/core"], list(pending.items))
-            self.assertEqual({"since": "abc123"}, json.loads(cursor.read_text(encoding="utf-8")))
-            self.assertIn("since=all", opener.call_args.args[0])
 
 
 class ReconcileTests(unittest.TestCase):
@@ -82,25 +57,27 @@ class ReconcileTests(unittest.TestCase):
         self.refresh.assert_called_once_with()
         self.assertEqual(50, self.policy.call_count)
 
-    def test_personal_events_and_catch_up_never_launch_worktree_cleanup(self):
-        pending = mock.Mock()
-        pending.get.side_effect = ["tj-agents/core", None, KeyboardInterrupt]
-        reconciler = events.Reconciler(refresh=self.refresh, policy=self.policy)
+    def test_repository_and_catch_up_reconciliation_never_launch_worktree_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
-            state = Path(directory) / "state.json"
             with (
+                mock.patch.dict(os.environ),
+                mock.patch.object(events, "RotatingFileHandler", return_value=logging.NullHandler()),
                 mock.patch.object(events, "require_tommy"),
                 mock.patch.object(events, "repository_state", return_value=current()),
                 mock.patch.object(events, "catch_up_states", return_value=[current(), current("employer/project")]),
-                mock.patch.object(events.plugins, "state_directory", return_value=Path(directory)),
-                mock.patch.object(events.plugins, "load_codex_config", return_value={}),
+                mock.patch.object(events.Reconciler, "__init__", autospec=True, side_effect=self.bind),
                 mock.patch.object(events.plugins, "sweep_worktrees") as cleanup,
-                self.assertRaises(KeyboardInterrupt),
             ):
-                events.process_pending(pending, reconciler, state)
+                self.assertEqual(0, events.main(["--repo", "tj-agents/core", "--state-directory", directory]))
+                self.assertEqual(0, events.main(["--state-directory", directory]))
         cleanup.assert_not_called()
         self.policy.assert_called_once_with("tj-agents/core")
         self.assertEqual(2, self.refresh.call_count)
+
+    def bind(self, reconciler, state=None, refresh=None, policy=None):
+        reconciler.state = state if state is not None else {}
+        reconciler.refresh = self.refresh
+        reconciler.policy = self.policy
 
     def test_plugin_refresh_keeps_the_generic_updater_cleanup_disabled(self):
         with mock.patch.object(events.plugins, "main", return_value=0) as update:
@@ -145,27 +122,6 @@ class IdentityTests(unittest.TestCase):
         self.assertEqual(["reconcile", "--repo", "tj-agents/core"], run.call_args.args[0][-3:])
         self.assertEqual(events.plugins.NO_WINDOW, run.call_args.kwargs["creationflags"])
 
-    def test_native_exit_notification_uses_a_dummy_process(self):
-        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(0.1)"],
-                                 creationflags=events.plugins.NO_WINDOW)
-        try:
-            events.wait_for_exit(child.pid)
-            self.assertEqual(0, child.wait(timeout=5))
-        finally:
-            if child.poll() is None:
-                child.terminate()
-                child.wait(timeout=5)
-
-    def test_worker_rechecks_saved_identity_before_each_reconciliation(self):
-        pending = mock.Mock()
-        pending.get.side_effect = ["tj-agents/core", KeyboardInterrupt]
-        reconciler = mock.Mock()
-        with mock.patch.object(events, "require_tommy", side_effect=RuntimeError("saved account changed")) as identity, mock.patch.object(events, "repository_state") as read, mock.patch.object(events.time, "sleep"), self.assertLogs(events.LOG, level="ERROR"), self.assertRaises(KeyboardInterrupt):
-            events.process_pending(pending, reconciler, Path("unused-state.json"))
-        self.assertEqual(3, identity.call_count)
-        read.assert_not_called()
-        reconciler.repository.assert_not_called()
-
     def test_listener_lock_has_no_age_expiry_and_releases_with_handle(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "lock"
@@ -181,28 +137,6 @@ class IdentityTests(unittest.TestCase):
 
 
 class SetupTests(unittest.TestCase):
-    def test_windows_registration_is_logon_only_hidden_and_restarts_without_time_limit(self):
-        xml = setup.windows_task_xml("PC\\Tommy & Co", "C:/Python/pythonw.exe", Path("C:/state dir/event.py"))
-        root = ET.fromstring(xml)
-        ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
-        self.assertIsNotNone(root.find("t:Triggers/t:LogonTrigger", ns))
-        self.assertIsNone(root.find("t:Triggers/t:TimeTrigger", ns))
-        self.assertEqual("PT0S", root.find("t:Settings/t:ExecutionTimeLimit", ns).text)
-        self.assertIsNotNone(root.find("t:Settings/t:RestartOnFailure", ns))
-        self.assertEqual("true", root.find("t:Settings/t:Hidden", ns).text)
-
-    def test_linux_service_quotes_paths_and_has_no_timer(self):
-        with tempfile.TemporaryDirectory(prefix="machine ü ") as directory:
-            calls = []
-            run = lambda command, **kwargs: calls.append(command)
-            home = Path(directory)
-            setup.schedule_systemd(home / "100% state/event.py", home, run=run)
-            unit = (home / ".config/systemd/user/tj-agents-machine-events.service").read_text(encoding="utf-8")
-            self.assertIn("100%% state", unit)
-            self.assertIn("Restart=always", unit)
-            self.assertNotIn("OnCalendar", unit)
-            self.assertEqual("restart", calls[-1][2])
-
     def test_only_retired_cron_jobs_are_removed_idempotently(self):
         text = "0 5 * * * backup\n@reboot old # tj-agents-plugin-autoupdate\n17 * * * * old # tj-agents-merge-gates\n"
         run = mock.Mock(return_value=mock.Mock(returncode=0, stdout=text))
@@ -261,10 +195,30 @@ class SetupTests(unittest.TestCase):
 
     def test_installation_copies_the_complete_standalone_runtime(self):
         with tempfile.TemporaryDirectory(prefix="runtime ü ") as directory:
-            script = setup.install_listener(Path(directory))
-            self.assertEqual("machine_events.py", script.name)
-            for name in ("machine_events.py", "plugin_autoupdate.py"):
+            script = setup.install_runtime(Path(directory))
+            self.assertEqual("launch_check.py", script.name)
+            for name in events.plugins.RUNTIME:
                 self.assertEqual((SCRIPTS / name).read_bytes(), (Path(directory) / name).read_bytes())
+            result = subprocess.run([sys.executable, "-I", "-B", str(script), "--help"], capture_output=True,
+                                    text=True, timeout=30)
+            self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_the_listener_service_and_task_are_retired_and_never_scheduled(self):
+        self.assertIn("tj-agents machine events", setup.RETIRED_TASKS)
+        for name in ("schedule_windows", "schedule_systemd", "windows_task_xml"):
+            self.assertFalse(hasattr(setup, name))
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            unit = home / ".config/systemd/user" / setup.RETIRED_SERVICE
+            unit.parent.mkdir(parents=True)
+            unit.write_text("[Service]\n", encoding="utf-8")
+            run = mock.Mock()
+            self.assertTrue(setup.remove_retired_service(home, run=run))
+            self.assertFalse(unit.exists())
+            self.assertEqual(["systemctl", "--user", "disable", "--now", setup.RETIRED_SERVICE],
+                             run.call_args_list[0].args[0])
+            self.assertFalse(setup.remove_retired_service(home, run=run))
+            self.assertEqual(2, run.call_count)
 
 
 if __name__ == "__main__":
