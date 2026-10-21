@@ -71,15 +71,15 @@ continuation preserves its relevant instructions. Read again only for changed in
 ## Record noticed problems
 
 When a bug, mistake, or deliberate debt is noticed or reported, record it while the observation is available
-under [the shared recording contract](../../resources/problem-records.md): `work-items:write-bug`,
-`work-items:write-mistake` or `work-items:write-debt`. Reconcile an existing record and repair owner first;
+through the selected profile under [the recording contract](../../resources/problem-records.md).
+Preserve the observed bug, mistake or debt intent. Reconcile an existing record and repair owner first;
 repeated evidence updates that record. Recording stays within the current authorization and grants no
 separate authority to repair, publish, dispatch, or schedule work. Use the addressing workflow only when
 repair is already authorized, and preserve the original task while the record is updated.
 
-Recording requests for features or tasks select `work-items:write-feature` or `work-items:write-task`;
-an untyped recording request selects `work-items:write-issue`. These writers share
-[repository selection](../../resources/problem-records.md#repository-selection).
+Feature, story, task and untyped recording requests use the selected profile's creation operation. Its
+policy resolves intent and native type; [repository selection](../../resources/problem-records.md#repository-selection)
+never grants permission to start implementation.
 
 ## Keep large changes reviewable
 
