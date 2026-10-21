@@ -34,3 +34,8 @@ engine.
 
 Answer a user's direct question before entering this workflow. Recording or selecting an incident does
 not grant repair or publication authority beyond the active task.
+
+```text
+Input: M008 records a defect in a consumed engineering standard; no repair owns its cause.
+Action: follow engineering:session's source-owner repair rule before starting the correction.
+```
