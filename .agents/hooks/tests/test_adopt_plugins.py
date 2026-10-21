@@ -51,12 +51,24 @@ class AdoptPluginsTests(unittest.TestCase):
         adopt_plugins.run(self.root, ["react"], [], "write")
         self.assertNotIn("personal@tj-agents", self.plugins())
         adopt_plugins.run(self.root, [], ["personal"], "write")
-        self.assertEqual(["base@tj-agents", "machine@tj-agents", "personal@tj-agents", "react@tj-agents"], self.plugins())
+        self.assertEqual(["base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "personal@tj-agents", "react@tj-agents"], self.plugins())
         self.assertEqual([], adopt_plugins.run(self.root, [], ["personal"], "check"))
         self.assertEqual([], adopt_plugins.run(self.root, [], ["machine"], "check"))
         claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
         self.assertTrue(claude["enabledPlugins"]["personal@tj-agents"])
+        self.assertTrue(claude["enabledPlugins"]["engineering@tj-agents"])
         self.assertIn('[plugins."personal@tj-agents"]', (self.root / ".codex/config.toml").read_text(encoding="utf-8"))
+        self.assertIn('[plugins."engineering@tj-agents"]', (self.root / ".codex/config.toml").read_text(encoding="utf-8"))
+
+    def test_infonetica_selects_engineering_without_personal(self):
+        adopt_plugins.run(self.root, [], ["infonetica"], "write")
+        self.assertEqual(["base@tj-agents", "engineering@tj-agents", "infonetica@tj-agents", "work@tj-agents"], self.plugins())
+        claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
+        self.assertTrue(claude["enabledPlugins"]["engineering@tj-agents"])
+        codex = (self.root / ".codex/config.toml").read_text(encoding="utf-8")
+        self.assertIn('[plugins."engineering@tj-agents"]', codex)
+        self.assertNotIn('[plugins."personal@tj-agents"]', codex)
+        self.assertEqual([], adopt_plugins.run(self.root, [], ["infonetica"], "check"))
 
     def test_repository_ownership_does_not_select_personal(self):
         for remote in ("git@github.com:tomjseery/Concertable.git",
