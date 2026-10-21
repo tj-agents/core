@@ -4,9 +4,9 @@
   "selection_cases": [
     {"id": "review-current", "request": "Review the current branch without fixing it.", "expected_skill": "review", "description_terms": ["full code review", "review a branch"]},
     {"id": "review-pr", "request": "Code review PR 42 and leave the tree unchanged.", "expected_skill": "review", "description_terms": ["full code review", "review a branch"]},
-    {"id": "incremental", "request": "Review only the commits added since the last completed review.", "expected_skill": "incremental-review", "description_terms": ["commits added after", "fresh watermark"]},
-    {"id": "large", "request": "Review this very large branch in resumable stages.", "expected_skill": "big-review", "description_terms": ["very large", "resumable"]},
-    {"id": "large-all", "request": "Run the whole staged big review to completion unattended.", "expected_skill": "big-review-all", "description_terms": ["every remaining stage", "unattended"]},
+    {"id": "incremental", "request": "Review only the commits added since the last completed review.", "expected_skill": "incremental-review", "description_terms": ["changes since a completed review", "descendant commits"]},
+    {"id": "large", "request": "Review this very large branch in resumable stages.", "expected_skill": "staged-review", "description_terms": ["very large", "resumable"]},
+    {"id": "large-all", "request": "Run the whole staged big review to completion unattended.", "expected_skill": "staged-review-all", "description_terms": ["every remaining stage", "unattended"]},
     {"id": "address", "request": "Fix every open finding in the current review work order.", "expected_skill": "address-review", "description_terms": ["serially resolve", "open findings"]},
     {"id": "docs", "request": "Review this documentation-only branch.", "expected_skill": "docs-review", "description_terms": ["documentation or agent-metadata-only", "review docs"]}
   ],
