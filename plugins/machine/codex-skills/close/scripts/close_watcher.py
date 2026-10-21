@@ -86,12 +86,14 @@ def close_session(args, activity):
     session_close._record_own_end(entry, "closed")
     try:
         close.close_host(entry, wrapper)
+        deadline = time.time() + EXIT_WAIT_SECONDS
+        while not session_close.verified_exited(entry["pid"], entry["pid_started_at"]):
+            if time.time() >= deadline:
+                raise Refusal("terminal tab closed but registered host exit was not confirmed")
+            time.sleep(POLL_SECONDS)
     except Exception:
         session_close._reopen_own_end(entry, "closed")
         raise
-    deadline = time.time() + EXIT_WAIT_SECONDS
-    while time.time() < deadline and not session_close.verified_exited(entry["pid"], entry["pid_started_at"]):
-        time.sleep(POLL_SECONDS)
 
 
 def sweep(args):

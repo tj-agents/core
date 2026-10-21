@@ -114,6 +114,17 @@ when delivery is authorized. Bind remote monitoring to the exact repository, hea
 pending CI is owned without an active monitor. A failed test selects `engineering:failing-tests` and its
 diagnose, repair and focused verification loop. Do not weaken a check merely to produce a pass.
 
+## Finish the session
+
+Before returning a completed outcome, select `machine:close` and apply its completion decision. It owns
+the final-action ordering, keep-open requests and terminal closure. A new mistake callout returns to
+`engineering:self-repair` above before completion is reassessed.
+
+```text
+Delivery and validation complete, no owned wait: apply machine:close before the final reply.
+User calls out a mistake: answer and follow engineering:self-repair while the repair stays active.
+```
+
 ## Maintain the right source owner
 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
