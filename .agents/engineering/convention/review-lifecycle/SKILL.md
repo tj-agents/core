@@ -11,7 +11,7 @@ domain: process
 A review file is one branch's live work order, not an archive. Ordinary full, incremental, documentation
 and combined reviews use an editable body in repository-private Git state. Resolve its absolute path with
 `<engineering>/workflows/workflow_ops.py --root <checkout> --workflow-run-id <id> review-path`; never assemble a machine-local path.
-Big/staged reviews use `review-path --durable`, retaining `reviews/<branch-slug>.md` with `/` replaced by `-`.
+Staged reviews use `review-path --durable`, retaining `reviews/<branch-slug>.md` with `/` replaced by `-`.
 That operation promotes an existing private body without losing its findings. Existing durable work orders
 remain canonical through their lifecycle. If the user names a path, resolve it and reject it unless it
 equals the runtime's derived canonical path exactly. Selectors never create competing artifacts.
@@ -26,6 +26,39 @@ Private proof requires the exact head; legacy review-only transport compatibilit
 
 The strong parent is the sole writer. Native review and fresh lenses return candidate evidence only. They
 never edit the file, assign final severity, approve the change, or see one another's conclusions.
+
+## Workflow preparation and completion
+
+This evidence contract applies when a workflow needs a recorded review, including staged and incremental
+passes. A standalone `review` returns its assessment without creating this state. An implementation owner
+synchronizes once with its actual base before freezing; a review-only owner does not mutate the branch.
+Use `python` on Windows or `python3` on Linux/macOS for these installed-package commands:
+
+```bash
+python <engineering>/workflows/workflow_ops.py --root <repository-root> --workflow-run-id <id> review-prepare --base <actual-base> --head HEAD --synchronize
+```
+
+Omit `--synchronize` for a review-only candidate. The helper returns the descriptor, binary patch, exact
+path manifest and exported frozen tree. Preserve its immutable identities and use one concurrent wave
+for independent native, specialist and security checks. Validate bounded `review-lens` results against
+Workflow v2; an unavailable or invalid dispatch returns the same check to the parent after one focused
+recovery. The parent verifies evidence, assigns severity and writes the one work order.
+
+For an agent-surface candidate, add the moving coverage record defined by `base:plan-artifacts`, then run
+`<engineering>/workflows/workflow_ops.py review-host-check --descriptor <descriptor-path>
+--work-order <canonical-work-order>` with the same root and run id. Failure leaves the pass incomplete.
+
+The descriptor's `security.first_path` requires security review. Its `trunk_first_path` also requires it
+when the prior security marker is absent, unresolvable or followed by a sensitive change. Review
+`<trunk_base>..<frozen-head>`, or `<frozen-base>..<frozen-head>` when no trunk base exists. Stamp the security
+marker only after that evidence passes synthesis and the whole pass completes.
+
+Set the current and active-pass judgments, complete status and exact frozen-head watermark only after
+every required check completes. Run `review-record --descriptor <descriptor-path>
+--work-order <canonical-work-order>` before removing the bundle. Failure keeps delivery blocked. Remove
+the disposable bundle after completion, cancellation or terminal failure; an interrupted pass regenerates
+it from its descriptor and reproduces its identity before resuming. Remediation remains `address-review`
+followed by a fresh `incremental-review` pass under the calling workflow's authority.
 
 ## Immutable pass identity
 

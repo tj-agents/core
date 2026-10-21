@@ -1,6 +1,6 @@
 ---
 name: incremental-review
-description: Select and run the canonical isolated review workflow over only commits added after the canonical work order's completed watermark, appending one frozen pass and moving the marker only after parent synthesis. Use for new commits since a prior full or staged review, including remediation commits that require a fresh watermark.
+description: Review changes since a completed review, using its recorded watermark for descendant commits and comparing old and new patch series for a design sweep of rebased work or a stack. Use for later commits, remediation checks or a relative design sweep; workflow evidence advances only after parent synthesis over a reconciled candidate.
 
 kind: workflow
 domain: process
@@ -29,6 +29,22 @@ git log -20 --format='%h  %ci  %s'
 Ask which commit the existing review covered; never infer it from dates or prose.
 
 ## Freeze the delta
+
+A design sweep of already reviewed work is a bounded call to the `review` utility over only the later
+changes. For a rebased branch or stack, resolve each layer's old reviewed base/head and current parent/head
+from its existing pass and stack map, then compare the patch series:
+
+```bash
+git range-diff <old-base>..<reviewed-head> <current-parent>..<current-head>
+```
+
+Review added, changed or removed patches and conflict resolutions; equivalent patches retain their earlier
+review. Keep stack layers in dependency order and include changed cross-layer contracts in the sweep.
+Do not substitute a merge-base-to-head full review because the watermark is no longer an ancestor.
+If the old comparison cannot be recovered, report that missing baseline instead of guessing.
+A sweep reports its exact comparison and coverage without claiming a new delivery watermark. A delivery
+workflow reconciles the rewritten candidate and its preserved evidence before stamping completion; the
+ordinary descendant-only preparation below cannot establish that reconciliation.
 
 Set the prior completed watermark as the full base SHA and the current target head as the full head SHA.
 Freeze the exact sorted changed paths and their SHA-256 digest and materialize the candidate bundle exactly

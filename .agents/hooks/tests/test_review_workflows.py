@@ -45,8 +45,8 @@ class ReviewWorkflowAcceptanceTests(unittest.TestCase):
                 "review-current": "review",
                 "review-pr": "review",
                 "incremental": "incremental-review",
-                "large": "big-review",
-                "large-all": "big-review-all",
+                "large": "staged-review",
+                "large-all": "staged-review-all",
                 "address": "address-review",
                 "docs": "docs-review",
             },
@@ -339,8 +339,8 @@ class ReviewWorkflowAcceptanceTests(unittest.TestCase):
         lifecycle = authored_skill("review-lifecycle").read_text(encoding="utf-8")
         review = authored_skill("review").read_text(encoding="utf-8")
         incremental = authored_skill("incremental-review").read_text(encoding="utf-8")
-        big = authored_skill("big-review").read_text(encoding="utf-8")
-        big_all = authored_skill("big-review-all").read_text(encoding="utf-8")
+        big = authored_skill("staged-review").read_text(encoding="utf-8")
+        big_all = authored_skill("staged-review-all").read_text(encoding="utf-8")
         address = authored_skill("address-review").read_text(encoding="utf-8")
         docs = authored_skill("docs-review").read_text(encoding="utf-8")
         role = (ROOT / ".agents" / "workflows" / "roles" / "review-lens.md").read_text(
@@ -398,8 +398,8 @@ class ReviewWorkflowAcceptanceTests(unittest.TestCase):
             "review",
             "review-lifecycle",
             "incremental-review",
-            "big-review",
-            "big-review-all",
+            "staged-review",
+            "staged-review-all",
             "address-review",
             "docs-review",
         )

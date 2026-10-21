@@ -60,7 +60,7 @@ selection or semantics. Deck recovery defects belong to the deck's own plan, not
 |---|---|---|---|
 | `resume-plan` | compatibility entry | supported | `plan-execution` |
 | `continue-roadmap` | compatibility entry | supported | `plan-authoring` |
-| `big-review-all` | driver | retained | drives `big-review`; no removal gate |
+| `staged-review-all` | driver | retained | drives `staged-review`; no removal gate |
 
 The release letter in `compatibility.json` is the contraction gate. Release **A** publishes the new workflows
 and thin entries. Release **B** may mark an entry `deprecated` once every standards-managed consumer has
