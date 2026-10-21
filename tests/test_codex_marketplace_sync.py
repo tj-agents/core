@@ -52,19 +52,19 @@ class FakeCodex:
             if self.fail_upgrade:
                 return completed(argv, 1, stdout='upgrade failed')
             return completed(argv, 0, stdout=json.dumps(
-                {'selectedMarketplaces': ['base-agents'], 'upgradedRoots': ['cache'], 'errors': []}
+                {'selectedMarketplaces': ['tj-agents'], 'upgradedRoots': ['cache'], 'errors': []}
             ))
         if arguments == ['plugin', 'list', '--available', '--json']:
             if self.empty_inventory:
                 return completed(argv, 0, stdout=json.dumps({'installed': [], 'available': []}))
             return completed(argv, 0, stdout=json.dumps({
                 'installed': [
-                    {'pluginId': 'base@base-agents', 'enabled': True, 'marketplaceSource': {'sourceType': 'git'}},
+                    {'pluginId': 'base@tj-agents', 'enabled': True, 'marketplaceSource': {'sourceType': 'git'}},
                     {'pluginId': 'local@local', 'enabled': True, 'marketplaceSource': {'sourceType': 'local'}},
                 ],
                 'available': [
-                    {'pluginId': 'engineering@base-agents', 'enabled': True, 'marketplaceSource': {'sourceType': 'git'}},
-                    {'pluginId': 'unused@base-agents', 'enabled': False, 'marketplaceSource': {'sourceType': 'git'}},
+                    {'pluginId': 'engineering@tj-agents', 'enabled': True, 'marketplaceSource': {'sourceType': 'git'}},
+                    {'pluginId': 'unused@tj-agents', 'enabled': False, 'marketplaceSource': {'sourceType': 'git'}},
                 ],
             }))
         if len(arguments) == 4 and arguments[0] == 'plugin' and arguments[1] == 'add':
@@ -89,7 +89,7 @@ class MainCliTests(unittest.TestCase):
 
     def test_a_successful_sync_exits_zero(self):
         import unittest.mock as mock
-        with mock.patch.object(SYNC, 'sync_codex_standards', return_value=['base@base-agents']) as synced:
+        with mock.patch.object(SYNC, 'sync_codex_standards', return_value=['base@tj-agents']) as synced:
             code = SYNC.main(['--codex', str(self.native_codex), '--project', str(self.project)])
         self.assertEqual(code, 0)
         synced.assert_called_once()
@@ -213,7 +213,7 @@ class EffectiveCodexSelectionTests(unittest.TestCase):
             SYNC.codex_config_selection('codex', Path.cwd(), ['-p', 'legacy'])
 
     def test_selected_tj_agents_plugin_without_a_git_marketplace_source_fails_closed(self):
-        response = {'config': {'marketplaces': {}, 'plugins': {'base@base-agents': {'enabled': True}}}}
+        response = {'config': {'marketplaces': {}, 'plugins': {'base@tj-agents': {'enabled': True}}}}
 
         class Server:
             def __init__(self, *_arguments, **_kwargs):

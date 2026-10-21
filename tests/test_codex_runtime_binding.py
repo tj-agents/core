@@ -42,7 +42,7 @@ class CodexRuntimeBindingTests(unittest.TestCase):
         self.package = self.root / "package"
         self.package.mkdir()
         self.verified = ROLLING.VerifiedRoot(
-            "base@base-agents", self.package, "a" * 40, "https://github.com/tj-agents/core.git",
+            "base@tj-agents", self.package, "a" * 40, "https://github.com/tj-agents/core.git",
         )
         self.prepared = ROLLING.Prepared(
             "codex", (), (self.verified,), self.home / "plugins/cache/.tj-agents-rolling/codex/catalogs/codex/a",
@@ -86,12 +86,12 @@ class CodexRuntimeBindingTests(unittest.TestCase):
 
     def test_unset_marketplace_fields_reported_as_null_are_omitted(self):
         rendered = RUNTIME.toml_value({
-            "base-agents": {"source_type": "git", "source": "https://github.com/tj-agents/core.git",
+            "tj-agents": {"source_type": "git", "source": "https://github.com/tj-agents/core.git",
                             "ref": None, "sparse_paths": None, "last_updated": None},
         })
         self.assertEqual(
             rendered,
-            '{ "base-agents" = { "source" = "https://github.com/tj-agents/core.git", "source_type" = "git" } }',
+            '{ "tj-agents" = { "source" = "https://github.com/tj-agents/core.git", "source_type" = "git" } }',
         )
         with self.assertRaises(RUNTIME.RuntimeBindingError):
             RUNTIME.toml_value([None])
@@ -99,27 +99,27 @@ class CodexRuntimeBindingTests(unittest.TestCase):
     def test_disabled_logical_hook_state_is_mapped_to_its_runtime_alias(self):
         states = RUNTIME._disabled_hook_states(
             {
-                "base@base-agents:hooks/codex.json:stop:0": {"enabled": False, "trusted_hash": "sha256:x"},
+                "base@tj-agents:hooks/codex.json:stop:0": {"enabled": False, "trusted_hash": "sha256:x"},
                 "other@outside:hooks/codex.json": {"enabled": False},
             },
-            {"base@base-agents": "base@tj-run-aabbcc-base-agents"},
+            {"base@tj-agents": "base@tj-run-aabbcc-tj-agents"},
         )
         self.assertEqual({
-            "base@tj-run-aabbcc-base-agents:hooks/codex.json:stop:0": {"enabled": False, "trusted_hash": "sha256:x"},
+            "base@tj-run-aabbcc-tj-agents:hooks/codex.json:stop:0": {"enabled": False, "trusted_hash": "sha256:x"},
         }, states)
 
     def test_trust_hash_does_not_reenable_a_disabled_hook(self):
         state = RUNTIME._runtime_hook_state(
-            {"base@base-agents:hooks/codex.json:stop:0": {"enabled": False}},
-            {"base@base-agents:hooks/codex.json:stop:0": {"trusted_hash": "sha256:x"}},
+            {"base@tj-agents:hooks/codex.json:stop:0": {"enabled": False}},
+            {"base@tj-agents:hooks/codex.json:stop:0": {"trusted_hash": "sha256:x"}},
         )
         self.assertEqual({"enabled": False, "trusted_hash": "sha256:x"},
-                         state["base@base-agents:hooks/codex.json:stop:0"])
+                         state["base@tj-agents:hooks/codex.json:stop:0"])
 
     def test_runtime_receipt_rejects_tampering_and_validly_signed_path_escape(self):
         session = self.home / "plugins/cache/.tj-agents-rolling/codex/sessions/token"
         catalog = session / "catalog"
-        runtime = self.home / "plugins/cache/tj-run-aabbcc-base-agents/base/local"
+        runtime = self.home / "plugins/cache/tj-run-aabbcc-tj-agents/base/local"
         catalog.mkdir(parents=True)
         runtime.mkdir(parents=True)
         receipt = session / "runtime-receipt.json"
@@ -151,13 +151,13 @@ class CodexRuntimeBindingTests(unittest.TestCase):
 
     def test_cleanup_removes_only_the_owned_alias_and_session_after_exit(self):
         cache = self.home / "plugins/cache"
-        alias = cache / "tj-run-aabbcc-base-agents"
+        alias = cache / "tj-run-aabbcc-tj-agents"
         alias.mkdir(parents=True)
-        unrelated = cache / "base-agents"
+        unrelated = cache / "tj-agents"
         unrelated.mkdir()
         directory = cache / ".tj-agents-rolling/codex/sessions/token"
         directory.mkdir(parents=True)
-        binding = RUNTIME.RuntimeBinding(self.prepared, directory, {"base-agents": alias.name},
+        binding = RUNTIME.RuntimeBinding(self.prepared, directory, {"tj-agents": alias.name},
                                          directory / "runtime-receipt.json", "digest", {})
         RUNTIME.cleanup_runtime(binding, self.home)
         self.assertFalse(alias.exists())
@@ -243,12 +243,12 @@ class CodexRuntimeBindingTests(unittest.TestCase):
 
     def test_canonical_machine_refresh_is_retained_after_private_runtime_cleanup(self):
         logical_machine = ROLLING.VerifiedRoot(
-            "machine@base-agents", self.package, "a" * 40, "https://github.com/tj-agents/core.git",
+            "machine@tj-agents", self.package, "a" * 40, "https://github.com/tj-agents/core.git",
         )
         selected = replace(
             self.prepared, selected_roots=(self.verified, logical_machine),
         )
-        canonical = self.home / "plugins/cache/base-agents/machine/local"
+        canonical = self.home / "plugins/cache/tj-agents/machine/local"
 
         def publish(coordinator, *_arguments):
             self.assertEqual((logical_machine,), coordinator.selected_roots)
@@ -261,7 +261,7 @@ class CodexRuntimeBindingTests(unittest.TestCase):
         directory.mkdir(parents=True)
         alias = self.home / "plugins/cache/tj-run-current-base"
         alias.mkdir(parents=True)
-        binding = RUNTIME.RuntimeBinding(self.prepared, directory, {"base-agents": alias.name},
+        binding = RUNTIME.RuntimeBinding(self.prepared, directory, {"tj-agents": alias.name},
                                          directory / "runtime-receipt.json", "digest", {})
         RUNTIME.cleanup_runtime(binding, self.home)
         self.assertEqual("current coordinator", (canonical / "launcher.py").read_text(encoding="utf-8"))

@@ -123,17 +123,17 @@ class CodexGenerationTests(GenerationHarness):
         self.assertIn(f'runs {B[:12]}, superseded by {A[:12]}', self.context(self.prompt('codex', environ)))
 
     def test_duplicate_aliases_at_two_revisions_are_reported_as_mixed(self):
-        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-base-agents', 'base', A),
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-direct-core', 'base', A),
                                self.codex_root(f'tj-run-{SESSION}-tj-agents', 'base', B))
         self.install('codex', A, B)
 
         output = self.prompt('codex', environ)
 
         self.assertIn('several generations at once', self.context(output))
-        self.assertIn(f'base@tj-run-{SESSION}-base-agents {A[:12]}', self.context(output))
+        self.assertIn(f'base@tj-run-{SESSION}-direct-core {A[:12]}', self.context(output))
 
     def test_duplicate_aliases_at_the_newest_revision_are_silent(self):
-        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-base-agents', 'base', B),
+        environ = self.receipt(self.codex_root(f'tj-run-{SESSION}-direct-core', 'base', B),
                                self.codex_root(f'tj-run-{SESSION}-tj-agents', 'base', B))
         self.install('codex', A, B)
 

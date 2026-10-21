@@ -94,12 +94,13 @@ class ProfileMigrationTests(StandardsSyncHarness):
                 "source": {"source": "github", "repo": "tj-agents/marketplace"},
                 "installLocation": str(self.checkout),
             },
-            "base-agents": {"source": {"source": "github", "repo": "tj-agents/core"}, "installLocation": str(self.checkout)},
+            "react-agents": {"source": {"source": "github", "repo": "tj-agents/react"}, "installLocation": str(self.checkout)},
             "dotagents": {"source": {"source": "github", "repo": "tj-agents/dotnet"}, "installLocation": str(self.checkout)},
         })
         self.write(self.checkout / ".claude-plugin" / "marketplace.json", {
             "plugins": [
                 {"name": "base", "source": {"source": "github", "repo": "tj-agents/core"}},
+                {"name": "react", "source": {"source": "github", "repo": "tj-agents/react"}},
                 {"name": "dotnet", "source": {"source": "github", "repo": "tj-agents/dotnet"}},
             ],
         })
@@ -169,20 +170,20 @@ class ProfileMigrationTests(StandardsSyncHarness):
 
     def test_mixed_migration_and_scoped_deferral_reports_a_problem(self):
         self.configure_dotnet_sources()
-        self.install("base@base-agents")
-        self.install("base@tj-agents")
+        self.install("react@react-agents")
+        self.install("react@tj-agents")
         self.install("dotnet@dotagents")
         self.install("dotnet@tj-agents")
         other = Path(self.temp.name) / "scoped dotnet"
         other.mkdir()
         self.install("dotnet@dotagents", scope="project", project=other)
         self.write(other / ".claude" / "settings.json", {"enabledPlugins": {"dotnet@dotagents": False}})
-        self.enable({"base@base-agents": True, "dotnet@dotagents": True})
+        self.enable({"react@react-agents": True, "dotnet@dotagents": True})
         code, output = self.migrate()
         self.assertEqual(code, 1)
         self.assertIn("deferred for dotnet@tj-agents", output)
         self.assertEqual(self.profile()["enabledPlugins"], {
-            "base@tj-agents": True,
+            "react@tj-agents": True,
             "dotnet@dotagents": True,
         })
 
