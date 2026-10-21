@@ -1,7 +1,7 @@
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import sys
@@ -249,6 +249,11 @@ class ProfileTests(Machine):
                          powershell.read_bytes())
         self.assertNotIn("profile.ps1", powershell.read_text(encoding="utf-8"))
 
+    def test_posix_block_escapes_single_quotes_in_paths(self):
+        block = setup.posix_block("/opt/it's/python3", PurePosixPath("/home/o'neil/launch_check.py"))
+        self.assertIn("'/opt/it'\\''s/python3'", block)
+        self.assertIn("'/home/o'\\''neil/launch_check.py'", block)
+
     def test_linux_creates_bashrc_when_no_profile_exists(self):
         self.converge(step("shell profiles"), self.context(windows=False))
         self.assertEqual([self.home / ".bashrc"],
@@ -441,11 +446,16 @@ class LegacyCodexTests(Machine):
             setup.apply_codex_legacy(self.context(windows=False))
         self.assertEqual(before, snapshot(self.root))
 
-    def test_both_delivery_manifests_are_refused(self):
+    def test_both_delivery_manifests_are_refused_before_any_write(self):
+        self.config.write_text(LEGACY_CODEX_CONFIG, encoding="utf-8")
         for name in (".base-agents-delivery.json", ".tj-agents-delivery.json"):
             (self.codex / "agents" / name).write_text("{}", encoding="utf-8")
         with self.assertRaises(setup.SetupError):
             setup.check_codex_legacy(self.context(windows=False))
+        before = snapshot(self.root)
+        with self.assertRaises(setup.SetupError):
+            setup.apply_codex_legacy(self.context(windows=False))
+        self.assertEqual(before, snapshot(self.root))
 
     def test_a_current_config_needs_nothing(self):
         self.config.write_text(CONVERGED_CODEX_CONFIG, encoding="utf-8")
