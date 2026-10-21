@@ -72,7 +72,7 @@ class PluginSelectionTests(unittest.TestCase):
             ({"agents": {"repository": "Concertable/agents"}}, ["project"]),
             ({"alias": {"repository": "tj-agents/marketplace"}}, ["base@alias"]),
             ({"alias": {"repository": "tj-agents/core"}}, ["base@alias"]),
-            ({"base-agents": {"repository": "Concertable/agents"}}, ["base@base-agents"]),
+            ({"core": {"repository": "tj-agents/core"}}, ["base@core"]),
         )
         for marketplaces, identities in invalid:
             with self.subTest(marketplaces=marketplaces, identities=identities), self.assertRaises(LockError):

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plugin": "base-agents/engineering",
+  "plugin": "tj-agents/engineering",
   "source_roots": [
     ".agents/engineering",
     ".agents/engineering/resources/problem-records.md",
@@ -18,14 +18,14 @@
   "requires": {
     "marketplaces": [
       {
-        "id": "base-agents",
-        "repository": "tj-agents/core"
+        "id": "tj-agents",
+        "repository": "tj-agents/marketplace"
       }
     ],
     "plugins": [
-      "base-agents/base",
-      "base-agents/engineering",
-      "base-agents/machine"
+      "tj-agents/base",
+      "tj-agents/engineering",
+      "tj-agents/machine"
     ],
     "hooks": [
       {
