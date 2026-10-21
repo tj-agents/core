@@ -480,6 +480,21 @@ class WorkItemStatusTests(ListWorkHarness):
         self.assertIn('selected provider: fixture:manage', output)
         self.assertIn('list/read', output)
 
+    def test_selected_canonical_plan_never_uses_local_execution_status(self):
+        self.work_item()
+        self.select(self.here)
+        for status in ('active', 'done'):
+            with self.subTest(status=status):
+                self.write_work_item_status('reader-bridge', 'status-reader', status)
+                output = self.board()
+                self.assertIn('README.md', rows(output))
+                line = next(line for line in ROW.findall(output) if line.endswith('README.md'))
+                self.assertIn('supporting', line)
+                self.assertIn('reader-bridge/status-reader', line)
+                self.assertNotIn('unknown', output)
+        self.state_directory = self.home / 'absent-state'
+        self.assertIn('supporting', self.board())
+
     def test_sibling_selection_failures_are_skipped_without_aborting(self):
         application = self.repo('group', 'app')
         documentation = self.repo('group', 'docs')
