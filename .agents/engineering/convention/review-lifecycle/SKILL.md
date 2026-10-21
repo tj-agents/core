@@ -129,7 +129,8 @@ Use one status vocabulary:
 - `[wontfix]` a conscious final disposition whose reason and any required debt entry are recorded.
 
 Do not introduce a second deferred status. Any postponed work is `[wontfix]` here and must use
-`work-items:write-debt` in the same stroke, linking its record and objective resolution condition. Keep
+the selected profile to record debt in the same stroke, linking its record and objective resolution
+condition under [the recording contract](../../resources/problem-records.md). Keep
 review evidence in the work order; ordinary findings do not each require a tracker record.
 
 Use one severity vocabulary. `CRITICAL` is an immediately exploitable security, data-loss, or catastrophic

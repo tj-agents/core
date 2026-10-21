@@ -156,8 +156,7 @@
       "dependencies": {
         "required": [
           "base-agents/base",
-          "base-agents/machine",
-          "work-items-agents/work-items"
+          "base-agents/machine"
         ],
         "optional": []
       },
@@ -178,17 +177,12 @@
           {
             "id": "base-agents",
             "repository": "tj-agents/core"
-          },
-          {
-            "id": "work-items-agents",
-            "repository": "tj-agents/work-items"
           }
         ],
         "plugins": [
           "base-agents/base",
           "base-agents/engineering",
-          "base-agents/machine",
-          "work-items-agents/work-items"
+          "base-agents/machine"
         ],
         "hooks": [
           {
@@ -464,13 +458,7 @@
         }
       },
       "external_dependencies": {
-        "required": [
-          {
-            "id": "work-items-agents/work-items",
-            "marketplace": "work-items-agents",
-            "repository": "tj-agents/work-items"
-          }
-        ],
+        "required": [],
         "optional": []
       }
     },
