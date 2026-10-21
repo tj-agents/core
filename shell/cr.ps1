@@ -722,7 +722,7 @@ function cr {
     $pathBySid = @{}
     foreach ($f in $files) { $pathBySid[[IO.Path]::GetFileNameWithoutExtension($f.Name)] = $f.FullName }
 
-    # Row = "<label>  ||  <body>" TAB "<sid>".  fzf searches only what it displays - --nth applies after
+    # Row = "<label>  <body>" TAB "<sid>".  fzf searches only what it displays - --nth applies after
     # --with-nth, so a hidden body field would be unsearchable and the body has to ride in the shown
     # column. TAB opens a pane over the hidden sid, which also drives the resume.
     $today = (Get-Date).Date
@@ -735,14 +735,14 @@ function cr {
         if ($mt.Date -eq $today) { $when = '  today ' + $mt.ToString('HH:mm') }
         $flag = '    '
         foreach ($n in $inflight) { if ($n -like ("*" + $sid.Substring(0, 8) + "*")) { $flag = 'PLAN'; break } }
-        $label = "{0}  {1}  {2,7} KB  {3,-9} {4}" -f $when, $flag, [int]([long]$e[2] / 1KB), $e[4], $e[5]
-        "{0}  ||  {1}`t{2}" -f $label, $e[6], $sid
+        $label = "{0}  {1}  {2,7} KB  {3,-9}" -f $when, $flag, [int]([long]$e[2] / 1KB), $e[4]
+        "{0}  {1}`t{2}" -f $label, ($e[6] -creplace '^/(\S+) \1 ', '/$1 '), $sid
     }
     $rows = @($rows)
     if ($rows.Count -eq 0) { Write-Host "No matching conversations." -ForegroundColor Red; return }
 
     if ($List) {
-        foreach ($i in $rows) { (($i -split "`t")[0] -split '  \|\|  ', 2)[0] }
+        foreach ($i in $rows) { $r = ($i -split "`t")[0]; if ($r.Length -gt 160) { $r = $r.Substring(0, 160) }; $r }
         return
     }
 
@@ -1058,14 +1058,14 @@ function Invoke-CodexCr {
         $mt = [datetime]([long]$e[1])
         $when = $mt.ToString('MM-dd HH:mm')
         if ($mt.Date -eq $today) { $when = '  today ' + $mt.ToString('HH:mm') }
-        $label = "{0}  {1,7} KB  {2}" -f $when, [int]([long]$e[2] / 1KB), $e[3]
-        "{0}  ||  {1}`t{2}" -f $label, $e[4], $f.Name
+        $label = "{0}  {1,7} KB" -f $when, [int]([long]$e[2] / 1KB)
+        "{0}  {1}`t{2}" -f $label, $e[4], $f.Name
     }
     $rows = @($rows)
     if ($rows.Count -eq 0) { Write-Host "No matching conversations." -ForegroundColor Red; return }
 
     if ($List) {
-        foreach ($i in $rows) { (($i -split "`t")[0] -split '  \|\|  ', 2)[0] }
+        foreach ($i in $rows) { $r = ($i -split "`t")[0]; if ($r.Length -gt 160) { $r = $r.Substring(0, 160) }; $r }
         return
     }
 
