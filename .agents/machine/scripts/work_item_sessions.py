@@ -369,7 +369,6 @@ def cmd_claim(work_item=None, host=None, role=None, predecessor=None, status=Non
     connection = store.connect()
     try:
         kind, value = selector
-        item_branch = record_branch if kind == "local" else None
         reference = None
         if kind == "local":
             feature, item = value
@@ -389,10 +388,14 @@ def cmd_claim(work_item=None, host=None, role=None, predecessor=None, status=Non
             key = selected["key"]
             feature, item = selected["feature"], selected["item"]
             reference = {"provider": provider, "scope": scope, "native_id": native_id}
+        work_item_repo = selected["repo"] if selected else repo
+        if plan_path is not None and work_item_repo != repo:
+            raise ValueError("--plan-path cannot update a work item from a different repository")
+        item_branch = record_branch if work_item_repo == repo else None
         session_id, registration = _registered_current_session(connection, host, cwd)
         handle = store.session_handle(host, session_id)
         removed = store.claim_registered_work_item(
-            connection, host, session_id, cwd, key, selected["repo"] if selected else repo, feature, item, role,
+            connection, host, session_id, cwd, key, work_item_repo, repo, feature, item, role,
             status=status, branch=item_branch, session_branch=branch, head=head,
             title=title, plan_path=plan_path, predecessor=predecessor, registration=registration,
             require_existing_binding=kind == "reference",
@@ -589,9 +592,11 @@ def cmd_item(work_item=None, status=None, pr=None, title=None, plan_path=None, e
             if item_row is None:
                 raise ValueError("work item does not exist; register or bind the remote reference before updating it")
             key = item_row["key"]
+            if plan_path is not None and item_row["repo"] != repo:
+                raise ValueError("--plan-path cannot update a work item from a different repository")
             store.upsert_work_item(
                 connection, key, item_row["repo"], item_row["feature"], item_row["item"], status=status,
-                branch=None, pr=pr, title=title, plan_path=plan_path,
+                branch=record_branch if item_row["repo"] == repo else None, pr=pr, title=title, plan_path=plan_path,
             )
         if status == "done":
             keep = [

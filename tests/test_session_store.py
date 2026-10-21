@@ -429,6 +429,21 @@ class SchemaTests(unittest.TestCase):
                 "INSERT INTO sessions (handle, host, session_id, role, work_item) "
                 "VALUES ('codex:b', 'codex', 'b', 'owner', 'key-1')"
             )
+    def test_github_references_allow_punctuation_prefixed_repository_names(self):
+        for repository in (".github", "_tools", "-tools"):
+            with self.subTest(repository=repository):
+                self.assertEqual(
+                    ("github", f"github.com/owner/{repository}", "42"),
+                    STORE.normalise_work_item_reference("GitHub", f"GitHub.com/Owner/{repository}", "42"),
+                )
+        for provider, scope, native_id in (
+            ("github", "gitlab.com/owner/.github", "42"),
+            ("gitlab", "github.com/owner/.github", "42"),
+            ("github", "github.com/owner/.github", "042"),
+        ):
+            with self.subTest(provider=provider, scope=scope, native_id=native_id):
+                with self.assertRaises(ValueError):
+                    STORE.normalise_work_item_reference(provider, scope, native_id)
 
 
 @unittest.skipUnless(GIT, "git is required for repo-identity and hook lifecycle tests")
@@ -1004,7 +1019,7 @@ class ClaimWorkItemTests(unittest.TestCase):
         try:
             with self.assertRaisesRegex(ValueError, "title must be non-empty"):
                 STORE.claim_registered_work_item(
-                    connection, "claude", "registered", self.temp.name, "key-1", "repo", "feature", "item",
+                    connection, "claude", "registered", self.temp.name, "key-1", "repo", "repo", "feature", "item",
                     "owner", title="  ", registration={"title": "Claude tab", "pid": 1, "pid_started_at": 1.0},
                 )
             self.assertIsNone(STORE.get_work_item(connection, "key-1"))

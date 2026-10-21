@@ -65,7 +65,7 @@ WORK_ITEM_REFERENCES_ITEM_INDEX = """
 CREATE INDEX IF NOT EXISTS idx_work_item_references_item ON work_item_references(work_item)
 """
 
-_GITHUB_SCOPE = re.compile(r"github\.com/[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*$")
+_GITHUB_SCOPE = re.compile(r"github\.com/[a-z0-9][a-z0-9_.-]*/[a-z0-9_.-]+$")
 _AZURE_SCOPE = re.compile(r"dev\.azure\.com/[a-z0-9][a-z0-9-]*$")
 _NATIVE_ID = re.compile(r"[1-9][0-9]*$")
 _EXECUTION_KEY = re.compile(r"execution:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
@@ -726,7 +726,7 @@ def claim_work_item(connection, handle, key, role, predecessor=None, branch=None
 
 
 def claim_registered_work_item(
-    connection, host, session_id, cwd, key, repo, feature, item, role,
+    connection, host, session_id, cwd, key, work_item_repo, current_repo, feature, item, role,
     status=None, branch=None, session_branch=None, head=None, title=None, plan_path=None,
     predecessor=None, registration=None, require_existing_binding=False,
 ):
@@ -740,7 +740,7 @@ def claim_registered_work_item(
             _start_session_locked(
                 connection, host, session_id, cwd, title=registration.get("title"),
                 pid=registration.get("pid"), pid_started_at=registration.get("pid_started_at"),
-                repo=repo, branch=session_branch, head=head,
+                repo=current_repo, branch=session_branch, head=head,
             )
         elif session["ended_at"] is not None:
             raise ValueError(f"{handle} is not a current native session")
@@ -751,7 +751,7 @@ def claim_registered_work_item(
             raise ValueError("a non-empty --title is required when creating a work item")
         item_branch = branch if existing is None or role == "owner" else None
         _upsert_work_item_locked(
-            connection, key, repo, feature, item, status=status, branch=item_branch,
+            connection, key, work_item_repo, feature, item, status=status, branch=item_branch,
             title=title, plan_path=plan_path,
         )
         removed = _claim_work_item_locked(
