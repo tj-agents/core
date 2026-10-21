@@ -32,9 +32,6 @@ GIT_SOURCES = {"github", "git"}
 FULL_SHA = re.compile(r"[0-9a-f]{40}")
 PLUGIN_ROOT_PATH = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\s\"']+?\.py)(?:@[A-Za-z|]+)?(?=[\s\"']|$)")
 PROFILE_ALIASES = {
-    "base@tj-agents": ("base@base-agents",),
-    "engineering@tj-agents": ("engineering@base-agents",),
-    "machine@tj-agents": ("machine@base-agents",),
     "cpp@tj-agents": ("cpp@cpp-agents",),
     "msvc@tj-agents": ("msvc@cpp-agents",),
     "win32@tj-agents": ("win32@cpp-agents",),
@@ -43,9 +40,6 @@ PROFILE_ALIASES = {
 }
 STALE_PROFILE_ALIASES = {"dotnet@dotnet", "react@react"}
 PROFILE_REPOSITORIES = {
-    "base": "tj-agents/core",
-    "engineering": "tj-agents/core",
-    "machine": "tj-agents/core",
     "cpp": "tj-agents/cpp",
     "msvc": "tj-agents/cpp",
     "win32": "tj-agents/cpp",

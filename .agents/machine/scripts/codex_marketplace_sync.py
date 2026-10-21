@@ -20,7 +20,7 @@ from codex_hook_trust import AppServer, apply_trust, command as codex_command  #
 import rolling_plugins  # noqa: E402
 from claude_standards_sync import MARKETPLACE_TIMEOUT_SECONDS, PLUGIN_TIMEOUT_SECONDS  # noqa: E402
 
-TJ_AGENTS_MARKETPLACES = {"base-agents", "tj-agents", "dotagents", "cpp-agents", "react-agents"}
+TJ_AGENTS_MARKETPLACES = {"tj-agents", "dotagents", "cpp-agents", "react-agents"}
 
 
 class SyncError(Exception):

@@ -223,7 +223,7 @@ def _verify_trust(executable: str, project: Path, prepared: rolling_plugins.Prep
 def _refresh_coordinator(executable: str, project: Path, configuration: Path,
                          prepared: rolling_plugins.Prepared) -> None:
     roots = tuple(root for root in prepared.selected_roots
-                  if root.identity in {"machine@base-agents", "machine@tj-agents"})
+                  if root.identity == "machine@tj-agents")
     if roots:
         identities = {root.identity for root in roots}
         coordinator = replace(prepared, selected_roots=roots,
