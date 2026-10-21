@@ -126,7 +126,7 @@ that share a package id.
 ## Codex hook commands need an inline loader authenticator
 
 `bind_codex_hook_snapshots` embeds a small readable Python bootstrap in each Codex hook command. It reads
-the packaged loader, or its retained snapshot when the cache has gone, normalizes newlines, verifies the
+its retained snapshot's loader, or the packaged loader before a snapshot exists, normalizes newlines, verifies the
 loader SHA-256 embedded in the command, stages those bytes in a private temporary file, then calls it with
 `runpy`. The authenticated command is still necessary: invoking a packaged loader directly would execute a
 mutable file before any package or snapshot integrity check can run.
