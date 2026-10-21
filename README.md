@@ -201,7 +201,8 @@ Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: on
 poll for events since the saved cursor. With none it starts the CLI immediately; offline it starts anyway.
 With events it updates, on both hosts in parallel, only the marketplaces and enabled plugins that list or
 publish the named repositories, and advances the cursor once both hosts succeed. A failed host retries on
-a later launch, at most hourly. `machine:reload-plugins` runs the same check in a running session.
+a later launch, at most hourly. `machine:sync-plugins`, or `./sync.ps1` / `./sync.sh` here, runs the same
+check in a running session.
 
 Main-branch callers publish events through the shared
 `tj-agents/github-actions/.github/actions/machine-events` publisher. Setup reuses or creates the
@@ -291,9 +292,10 @@ Its native `plugin add` commands maintain the host's required user installation 
 repository settings remain the authored selection. Codex currently provides no cache-only install scope.
 Nothing updates packages in the launch path.
 
-For an explicit native refresh use `machine:reload-plugins`. Its default performs native marketplace
-and plugin updates; remote revision verification is opt-in and prints progress. `/reload-plugins`
-adopts updates in an open Claude session; start a new Codex session to load updated packages.
+For an explicit native refresh use `machine:sync-plugins`. Its default performs native marketplace
+and plugin updates; remote revision verification is opt-in and prints progress. In a Claude session it
+closes the session at the end of the turn and resumes it in a fresh process when the session runs an older
+plugin copy; start a new Codex session to load updated packages.
 
 Codex does not load agent definitions directly from plugins. Its engineering package supplies
 `scripts/install-codex-agents.ps1` for explicit profile delivery; launcher startup no longer copies

@@ -217,7 +217,7 @@ class RefreshTests(unittest.TestCase):
             mock.call(['codex', 'plugin', 'add', 'machine@base-agents'], cwd=ROOT),
         ], run.call_args_list)
 
-    def test_cache_first_hooks_wait_while_a_codex_session_is_running(self):
+    def test_a_running_codex_session_never_defers_an_upgrade(self):
         run = mock.Mock(return_value=True)
         preserve = mock.Mock()
         recorded = {'codex:base-agents': OLD}
@@ -226,10 +226,11 @@ class RefreshTests(unittest.TestCase):
                                         busy=lambda: True, packages=lambda name: [{'snapshot_first': False}],
                                         preserve=preserve)
 
-        self.assertIn('deferred', outcomes['base-agents'])
-        self.assertEqual(OLD, recorded['codex:base-agents'])
-        run.assert_not_called()
-        preserve.assert_not_called()
+        self.assertTrue(outcomes['base-agents'].startswith('updated'))
+        self.assertIn('restart Codex sessions', outcomes['base-agents'])
+        self.assertEqual(NEW, recorded['codex:base-agents'])
+        self.assertTrue(run.called)
+        preserve.assert_called_once()
 
     def test_snapshot_first_hooks_are_preserved_then_upgraded_while_a_codex_session_runs(self):
         order = []
