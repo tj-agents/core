@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the supervised machine event listener (Python 3.11+)."""
+"""Configure the machine event channel and the claude/codex launch check (Python 3.11+)."""
 
 from __future__ import annotations
 
@@ -11,16 +11,18 @@ import secrets
 import shutil
 import subprocess
 import sys
-import tempfile
-from xml.sax.saxutils import escape
 
+import launch_check
 import plugin_autoupdate
 import machine_events
 
-TASK_NAME = machine_events.SERVICE_NAME
-RETIRED_TASKS = ("tj-agents plugin autoupdate", "tj-agents merge gates")
+RETIRED_TASKS = ("tj-agents plugin autoupdate", "tj-agents merge gates", "tj-agents machine events")
 RETIRED_CRON_MARKERS = ("# tj-agents-plugin-autoupdate", "# tj-agents-merge-gates")
+RETIRED_SERVICE = "tj-agents-machine-events.service"
 COMMAND_TIMEOUT_SECONDS = 60
+LAUNCH_START = "# >>> tj-agents launch check >>>"
+LAUNCH_END = "# <<< tj-agents launch check <<<"
+HOSTS = ("claude", "codex")
 RETIRED_BLOCKS = (
     ("# >>> base-agents claude launcher >>>", "# <<< base-agents claude launcher <<<"),
     ("# >>> base-agents codex launcher >>>", "# <<< base-agents codex launcher <<<"),
@@ -50,7 +52,34 @@ def profile_paths(home: Path) -> list[Path]:
         documents = Path(os.environ.get("USERPROFILE") or home) / "Documents"
         return [documents / "PowerShell" / "Microsoft.PowerShell_profile.ps1",
                 documents / "WindowsPowerShell" / "Microsoft.PowerShell_profile.ps1"]
-    return [home / ".config" / "powershell" / "Microsoft.PowerShell_profile.ps1", home / ".bashrc"]
+    return [home / ".bashrc", home / ".zshrc", home / ".config" / "powershell" / "Microsoft.PowerShell_profile.ps1"]
+
+
+def powershell_block(python: str, script: Path, newline: str) -> str:
+    def quoted(value: object) -> str:
+        return "'" + str(value).replace("'", "''") + "'"
+
+    lines = [LAUNCH_START]
+    for name in HOSTS:
+        lines += [
+            f"function global:{name} {{",
+            f"    $tjAgentsTarget = Get-Command {name} -CommandType Application, ExternalScript"
+            " -ErrorAction SilentlyContinue | Select-Object -First 1",
+            f"    if (-not $tjAgentsTarget) {{ Write-Error '{name} was not found on PATH'; return }}",
+            f"    if (Test-Path -LiteralPath {quoted(python)}) {{ & {quoted(python)} -I -B {quoted(script)} }}",
+            "    & $tjAgentsTarget.Source @args",
+            "}",
+        ]
+    return newline.join([*lines, LAUNCH_END])
+
+
+def posix_block(python: str, script: Path) -> str:
+    def quoted(value: object) -> str:
+        return "'" + str(value).replace("'", "'\\''") + "'"
+
+    return "\n".join([LAUNCH_START, *(
+        f'{name}() {{ [ -x {quoted(python)} ] && {quoted(python)} -I -B {quoted(script)}; command {name} "$@"; }}'
+        for name in HOSTS), LAUNCH_END])
 
 
 def without_retired_blocks(text: str) -> str:
@@ -66,11 +95,20 @@ def without_retired_blocks(text: str) -> str:
     return text
 
 
-def remove_retired_launchers(paths: list[Path]) -> list[Path]:
-    cleaned = []
-    for path in paths:
+def with_launch_block(text: str, block: str) -> str:
+    text = without_retired_blocks(text)
+    if LAUNCH_START in text and LAUNCH_END in text[text.index(LAUNCH_START):]:
+        begin = text.index(LAUNCH_START)
+        return text[:begin] + block + text[text.index(LAUNCH_END, begin) + len(LAUNCH_END):]
+    newline = "\r\n" if "\r\n" in block else "\n"
+    return text + (newline if text and not text.endswith("\n") else "") + block + newline
+
+
+def install_launchers(paths: list[Path], python: str, script: Path) -> list[Path]:
+    changed = []
+    for path in [path for path in paths if path.is_file()] or paths[:1]:
         try:
-            raw = path.read_bytes()
+            raw = path.read_bytes() if path.is_file() else b""
         except OSError:
             continue
         encoding = "utf-8-sig" if raw.startswith(codecs.BOM_UTF8) else "utf-8"
@@ -78,60 +116,20 @@ def remove_retired_launchers(paths: list[Path]) -> list[Path]:
             text = raw.decode(encoding)
         except UnicodeError:
             continue
-        updated = without_retired_blocks(text)
+        if path.suffix.casefold() == ".ps1":
+            windows = "\r\n" in text or (not text and os.name == "nt")
+            block = powershell_block(python, script, "\r\n" if windows else "\n")
+        else:
+            block = posix_block(python, script)
+        updated = with_launch_block(text, block)
         if updated == text:
             continue
-        shutil.copyfile(path, path.with_name(path.name + ".pre-autoupdate.bak"))
+        if raw:
+            shutil.copyfile(path, path.with_name(path.name + ".pre-launch-check.bak"))
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(updated.encode(encoding))
-        cleaned.append(path)
-    return cleaned
-
-
-def windowless_python() -> str:
-    candidate = Path(sys.executable).with_name("pythonw.exe")
-    if candidate.is_file():
-        return str(candidate)
-    raise RuntimeError(f"pythonw.exe is required beside {sys.executable} for the hidden listener")
-
-
-def windows_task_xml(user: str, python: str, script: Path) -> str:
-    return f"""<?xml version="1.0" encoding="UTF-16"?>
-<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <Triggers>
-    <LogonTrigger><Enabled>true</Enabled><UserId>{escape(user)}</UserId></LogonTrigger>
-  </Triggers>
-  <Principals>
-    <Principal id="Author"><UserId>{escape(user)}</UserId><LogonType>InteractiveToken</LogonType>
-      <RunLevel>LeastPrivilege</RunLevel></Principal>
-  </Principals>
-  <Settings>
-    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
-    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
-    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
-    <StartWhenAvailable>true</StartWhenAvailable>
-    <RestartOnFailure><Interval>PT1M</Interval><Count>999</Count></RestartOnFailure>
-    <Hidden>true</Hidden>
-    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
-    <Enabled>true</Enabled>
-  </Settings>
-  <Actions Context="Author">
-    <Exec><Command>{escape(python)}</Command><Arguments>-B "{escape(str(script))}" --state-directory "{escape(str(script.parent.parent))}"</Arguments></Exec>
-  </Actions>
-</Task>
-"""
-
-
-def schedule_windows(script: Path, run=subprocess.run) -> None:
-    user = run(["whoami"], capture_output=True, text=True, encoding="utf-8", errors="replace",
-               timeout=COMMAND_TIMEOUT_SECONDS, check=True).stdout.strip()
-    descriptor, path = tempfile.mkstemp(suffix=".xml")
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-16") as stream:
-            stream.write(windows_task_xml(user, windowless_python(), script))
-        run(["schtasks.exe", "/create", "/tn", TASK_NAME, "/xml", path, "/f"], capture_output=True,
-            text=True, encoding="utf-8", errors="replace", timeout=COMMAND_TIMEOUT_SECONDS, check=True)
-    finally:
-        Path(path).unlink(missing_ok=True)
+        changed.append(path)
+    return changed
 
 
 def remove_retired_cron(run=subprocess.run) -> None:
@@ -150,26 +148,6 @@ def remove_retired_cron(run=subprocess.run) -> None:
         errors="replace", timeout=COMMAND_TIMEOUT_SECONDS, check=True)
 
 
-def systemd_unit(python: str, script: Path) -> str:
-    def quoted(value):
-        return '"' + str(value).replace("%", "%%").replace("\\", "\\\\").replace('"', '\\"') + '"'
-
-    return ("[Unit]\nDescription=tj-agents machine events\nAfter=network.target\n\n[Service]\n"
-            f"ExecStart={quoted(python)} -B {quoted(script)} --state-directory {quoted(script.parent.parent)}\nRestart=always\nRestartSec=5\n"
-            "\n[Install]\nWantedBy=default.target\n")
-
-
-def schedule_systemd(script: Path, home: Path, run=subprocess.run) -> None:
-    unit = home / ".config/systemd/user/tj-agents-machine-events.service"
-    unit.parent.mkdir(parents=True, exist_ok=True)
-    unit.write_text(systemd_unit(sys.executable, script), encoding="utf-8", newline="\n")
-    for command in (["systemctl", "--user", "daemon-reload"],
-                    ["systemctl", "--user", "enable", "tj-agents-machine-events.service"],
-                    ["systemctl", "--user", "restart", "tj-agents-machine-events.service"]):
-        run(command, capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=COMMAND_TIMEOUT_SECONDS, check=True)
-
-
 def remove_retired_windows(run=subprocess.run) -> None:
     for name in RETIRED_TASKS:
         existing = run(["schtasks.exe", "/query", "/tn", name], capture_output=True, text=True,
@@ -179,6 +157,24 @@ def remove_retired_windows(run=subprocess.run) -> None:
                 timeout=COMMAND_TIMEOUT_SECONDS, check=False, creationflags=plugin_autoupdate.NO_WINDOW)
             run(["schtasks.exe", "/delete", "/tn", name, "/f"], capture_output=True, text=True,
                 timeout=COMMAND_TIMEOUT_SECONDS, check=True, creationflags=plugin_autoupdate.NO_WINDOW)
+
+
+def systemctl(arguments: list[str], run=subprocess.run) -> None:
+    try:
+        run(["systemctl", "--user", *arguments], capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=COMMAND_TIMEOUT_SECONDS, check=False)
+    except FileNotFoundError:
+        pass
+
+
+def remove_retired_service(home: Path, run=subprocess.run) -> bool:
+    unit = home / ".config" / "systemd" / "user" / RETIRED_SERVICE
+    if not unit.exists():
+        return False
+    systemctl(["disable", "--now", RETIRED_SERVICE], run)
+    unit.unlink()
+    systemctl(["daemon-reload"], run)
+    return True
 
 
 def configure_topic(directory: Path, api=machine_events.gh) -> str:
@@ -227,14 +223,14 @@ def configure_publishers(topic: str, repositories, api=machine_events.gh, secret
     return changed
 
 
-def install_listener(directory: Path) -> Path:
+def install_runtime(directory: Path) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
-    for name in ("plugin_autoupdate.py", "machine_events.py"):
+    for name in plugin_autoupdate.RUNTIME:
         target = directory / name
         temporary = target.with_suffix(".next")
         shutil.copyfile(Path(__file__).with_name(name), temporary)
         os.replace(temporary, target)
-    return directory / "machine_events.py"
+    return directory / "launch_check.py"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -252,20 +248,22 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Channel configured for {configured} repository publishers")
     for name in enable_claude_autoupdate(plugin_autoupdate.claude_home()):
         print(f"Claude marketplace now auto-updates: {name}")
-    for path in remove_retired_launchers(profile_paths(home)):
-        print(f"Removed the retired launcher from {path}")
-    script = install_listener(directory / "bin")
     if os.name == "nt":
-        schedule_windows(script)
         remove_retired_windows()
-        subprocess.run(["schtasks.exe", "/end", "/tn", TASK_NAME], capture_output=True,
-                       timeout=COMMAND_TIMEOUT_SECONDS, check=False, creationflags=plugin_autoupdate.NO_WINDOW)
-        subprocess.run(["schtasks.exe", "/run", "/tn", TASK_NAME], capture_output=True,
-                       timeout=COMMAND_TIMEOUT_SECONDS, check=True, creationflags=plugin_autoupdate.NO_WINDOW)
     else:
         remove_retired_cron()
-        schedule_systemd(script, home)
-    print("Machine event listener installed and started; it catches up on startup")
+        remove_retired_service(home)
+    script = install_runtime(directory / "bin")
+    for path in install_launchers(profile_paths(home), plugin_autoupdate.console_python(), script):
+        print(f"claude and codex now check for published plugin updates before starting: {path}")
+    try:
+        launch_check.mark_current()
+    except (OSError, ValueError) as error:
+        print(f"Event channel unreachable ({type(error).__name__}); the first launch replays recent events")
+    if machine_events.main([]):
+        print("Catch-up left failures; see machine-events.log")
+        return 1
+    print("Plugins and merge policies are current")
     return 0
 
 
