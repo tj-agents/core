@@ -32,17 +32,6 @@ def _load_agent_cli():
     raise SystemExit(f'The shared agent_cli.py library was not found relative to {HERE}.')
 
 
-def _load_codex_marketplace_sync(agent_cli):
-    # Beside whichever agent_cli.py was actually found above, so both move together under every layout.
-    path = Path(agent_cli.__file__).resolve().parent / 'codex_marketplace_sync.py'
-    if not path.is_file():
-        raise agent_cli.LaunchError(f'Codex sync script missing: {path}')
-    spec = importlib.util.spec_from_file_location('codex_marketplace_sync', path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def parse_args(argv, agent_cli):
     parser = argparse.ArgumentParser(description='Hand prepared work to an independent Codex session in a new terminal tab.')
     parser.add_argument('--working-directory', required=True)
