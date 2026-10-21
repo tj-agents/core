@@ -62,7 +62,7 @@ LEGACY_DELIVERY_OWNER = "base-agents"
 DELIVERY_OWNER = "tj-agents"
 LEGACY_HOOK_STATE = "@base-agents:"
 LEGACY_PROJECT = "base-agents"
-WINDOWS_ONLY = "Windows only: shell/ and cli-session-recovery/ are the Windows PowerShell profile and its tools"
+WINDOWS_ONLY = "Windows only: shell/ is the Windows PowerShell profile and its tools"
 
 
 class SetupError(RuntimeError):
@@ -419,12 +419,6 @@ def apply_hidden_bash(context: Context) -> list[str]:
     return changes
 
 
-def windows_powershell(context: Context) -> str:
-    root = context.environ.get("SystemRoot")
-    candidate = Path(root) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe" if root else None
-    return str(candidate) if candidate and candidate.is_file() else "powershell.exe"
-
-
 def run_installer(context: Context, command: list[str]) -> subprocess.CompletedProcess:
     return context.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace",
                        timeout=INSTALLER_TIMEOUT_SECONDS, check=False, creationflags=plugin_autoupdate.NO_WINDOW)
@@ -432,28 +426,6 @@ def run_installer(context: Context, command: list[str]) -> subprocess.CompletedP
 
 def output_lines(result: subprocess.CompletedProcess) -> list[str]:
     return [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
-
-
-def recovery_command(context: Context, *flags: str) -> list[str]:
-    installer = context.checkout_path("cli-session-recovery", "install-cli-session-recovery.ps1")
-    return [windows_powershell(context), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-            "-File", str(installer), *flags]
-
-
-def check_recovery(context: Context) -> list[str]:
-    result = run_installer(context, recovery_command(context, "-Check"))
-    if result.returncode == 0:
-        return []
-    if result.returncode == 1:
-        return output_lines(result) or ["CLI session recovery drifted"]
-    raise SetupError(f"CLI session recovery check failed: {(result.stderr or result.stdout).strip()}")
-
-
-def apply_recovery(context: Context) -> list[str]:
-    result = run_installer(context, recovery_command(context))
-    if result.returncode:
-        raise SetupError(f"CLI session recovery install failed: {(result.stderr or result.stdout).strip()}")
-    return ["installed CLI session recovery"]
 
 
 def codex_agents_installer(context: Context) -> Path:
@@ -1028,8 +1000,6 @@ STEPS = (
     Step("launch-check runtime", check_runtime, apply_runtime),
     Step("shell profiles", check_profile, apply_profile),
     Step("hidden Git Bash for Claude", check_hidden_bash, apply_hidden_bash, needs_checkout("shell", "hidden-bash.c")),
-    Step("CLI session recovery", check_recovery, apply_recovery,
-         needs_checkout("cli-session-recovery", "install-cli-session-recovery.ps1")),
     Step("Codex profile agents", check_codex_agents, apply_codex_agents, skip_codex_agents),
     Step("plugin and merge-policy catch-up", check_catch_up, apply_catch_up),
     Step("harness permissions", lambda context: synchronize_permissions(context, "check"),
