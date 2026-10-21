@@ -18,6 +18,11 @@ Map whatever Tommy said to a `--since` value and use it in every command below.
 
 ## Gather (one message, parallel Bash calls)
 
+Read [repository selection](../../resources/problem-records.md#repository-selection) before gathering. When
+a provider is selected, use its list/read commands for recent and outstanding items, including items with no
+local plan. Merge their canonical identities into the workstreams below; provider state owns whether an item
+remains outstanding.
+
 ```bash
 SINCE="2 days ago"   # ← replace from the window above
 ```
@@ -64,7 +69,8 @@ Group the commits into **themes**, don't list them raw. Cluster by, in order:
 - **branch** — commits sharing an in-flight branch are one workstream.
 
 For each workstream capture: a **name**, the **subsystem**, whether it's **in-flight** (has an unmerged
-branch or an open ready PR) or **done** (all merged), and a one-line **what**.
+branch, an open ready PR, or an outstanding selected item) or **done** (all merged and any selected item
+verified resolved), and a one-line **what**.
 
 ## Optional resume commands
 
@@ -99,8 +105,8 @@ codex resume <id>   # <workstream name> — <3-6 words on what's left>
 ```
 ````
 
-One line per **unfinished** workstream (unmerged branch, open PR, uncommitted worktree, or a plan with
-outstanding phases), most-urgent first. Nothing else in that block — no merged work, no branch names,
+One line per **unfinished** workstream (unmerged branch, open PR, uncommitted worktree, outstanding selected
+item, or a plan with outstanding phases), most-urgent first. Nothing else in that block — no merged work, no branch names,
 no `git switch`. If Tommy reads only this block, he has what he needs.
 
 Then the detail, in the same order:

@@ -51,22 +51,36 @@ class AdoptPluginsTests(unittest.TestCase):
         adopt_plugins.run(self.root, ["react"], [], "write")
         self.assertNotIn("personal@tj-agents", self.plugins())
         adopt_plugins.run(self.root, [], ["personal"], "write")
-        self.assertEqual(["base@tj-agents", "machine@tj-agents", "personal@tj-agents", "react@tj-agents"], self.plugins())
+        self.assertEqual(["base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "personal@tj-agents", "react@tj-agents"], self.plugins())
         self.assertEqual([], adopt_plugins.run(self.root, [], ["personal"], "check"))
+        self.assertEqual([], adopt_plugins.run(self.root, [], ["machine"], "check"))
         claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
         self.assertTrue(claude["enabledPlugins"]["personal@tj-agents"])
+        self.assertTrue(claude["enabledPlugins"]["engineering@tj-agents"])
         self.assertIn('[plugins."personal@tj-agents"]', (self.root / ".codex/config.toml").read_text(encoding="utf-8"))
+        self.assertIn('[plugins."engineering@tj-agents"]', (self.root / ".codex/config.toml").read_text(encoding="utf-8"))
 
-    def test_owned_repositories_always_select_personal_and_foreign_ones_never_do(self):
-        for remote, personal in (("git@github.com:tomjseery/Concertable.git", True),
-                                 ("https://github.com/Infonetica/cris-erm.git", False)):
+    def test_infonetica_selects_engineering_without_personal(self):
+        adopt_plugins.run(self.root, [], ["infonetica"], "write")
+        self.assertEqual(["base@tj-agents", "engineering@tj-agents", "infonetica@tj-agents", "work@tj-agents"], self.plugins())
+        claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
+        self.assertTrue(claude["enabledPlugins"]["engineering@tj-agents"])
+        codex = (self.root / ".codex/config.toml").read_text(encoding="utf-8")
+        self.assertIn('[plugins."engineering@tj-agents"]', codex)
+        self.assertNotIn('[plugins."personal@tj-agents"]', codex)
+        self.assertEqual([], adopt_plugins.run(self.root, [], ["infonetica"], "check"))
+
+    def test_repository_ownership_does_not_select_personal(self):
+        for remote in ("git@github.com:tomjseery/Concertable.git",
+                       "https://github.com/tj-agents/infonetica.git",
+                       "https://github.com/Infonetica/cris-erm.git"):
             with self.subTest(remote=remote), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp).resolve()
                 subprocess.run(["git", "init", "-q", str(root)], check=True)
                 subprocess.run(["git", "-C", str(root), "remote", "add", "origin", remote], check=True)
                 adopt_plugins.run(root, [], ["machine"], "write")
                 selected = json.loads((root / ".agents/plugins.json").read_text(encoding="utf-8"))["plugins"]
-                self.assertEqual(personal, "personal@tj-agents" in selected)
+                self.assertNotIn("personal@tj-agents", selected)
 
     def test_existing_selection_is_extended_and_unknown_packages_are_kept(self):
         self.selection.parent.mkdir()
@@ -129,6 +143,19 @@ class AdoptPluginsTests(unittest.TestCase):
     def test_default_adoption_selects_the_core_packages(self):
         adopt_plugins.run(self.root, [], [], "write")
         self.assertEqual(["base@tj-agents", "engineering@tj-agents", "machine@tj-agents"], self.plugins())
+
+    def test_engineering_does_not_select_a_recording_profile(self):
+        adopt_plugins.run(self.root, [], ["engineering"], "write")
+        self.assertEqual(["base@tj-agents", "engineering@tj-agents"], self.plugins())
+        claude = json.loads((self.root / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        self.assertNotIn("work-items@tj-agents", claude["enabledPlugins"])
+        self.assertNotIn("personal@tj-agents", claude["enabledPlugins"])
+        self.assertNotIn("infonetica@tj-agents", claude["enabledPlugins"])
+        codex = (self.root / ".codex" / "config.toml").read_text(encoding="utf-8")
+        self.assertNotIn('[plugins."work-items@tj-agents"]', codex)
+        self.assertNotIn('[plugins."personal@tj-agents"]', codex)
+        self.assertNotIn('[plugins."infonetica@tj-agents"]', codex)
+        self.assertEqual([], adopt_plugins.run(self.root, [], ["engineering"], "check"))
 
     def test_local_scope_preserves_project_settings(self):
         adopt_plugins.run(self.root, [], ["react"], "write", "local")

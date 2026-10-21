@@ -24,9 +24,12 @@ owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
 Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
-Recorded defects default to `BUGS.md` when a repository has no declared problem-register owner.
-`engineering:write-bug`, `write-mistake`, and `write-debt` share record semantics; their corresponding
-address workflows reuse the existing repair lifecycle.
+The [recording contract](.agents/engineering/resources/problem-records.md) routes remote work-item
+operations to the repository's explicitly selected profile. Personal owns GitHub records; Infonetica owns
+Azure Boards records and native type policy. Core owns the shared SQLite agent execution/session registry
+and reusable engineering lifecycles. Installing Engineering does not select or install a recording
+profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
+registers remain evidence only.
 Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.9+
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
 current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or
@@ -231,6 +234,11 @@ The personal event publishers and automatic ruleset reconciliation are restricte
 `.github/merge-policy.json` can trigger that repository's ruleset reconciliation. Publisher adoption is
 owned by [github-actions:machine-events](https://github.com/tj-agents/github-actions/blob/main/.agents/github-actions/utility/machine-events/SKILL.md);
 the policy writer also enforces its owner boundary before GitHub access.
+
+Personal is for explicitly adopted personal projects only. A GitHub owner or permission to commit agent
+configuration does not establish personal scope. Infonetica is work scope, including the
+`tj-agents/infonetica` plugin source repository and all its worktrees; never select or inject Personal
+there. Read the target repository's README.md and AGENTS.md before choosing its policy profiles.
 
 Repository plugin adoption follows
 [machine:plugin-selection](.agents/machine/utility/plugin-selection/SKILL.md). Employer-project agent

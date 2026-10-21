@@ -381,6 +381,11 @@
       "base"
     ]
   },
+  "external_prerequisites": {
+    "base": [],
+    "engineering": [],
+    "machine": []
+  },
   "extended_host_adapters": [
     "persistent-workflow",
     "reload-plugins",
