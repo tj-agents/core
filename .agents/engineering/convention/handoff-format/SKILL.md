@@ -28,8 +28,8 @@ turn explicitly targets that worktree. A summary or paraphrased next action is n
   the worktree doesn't exist yet — and keep it inside the paste-ready prompt.
 - For **non-plan** work, make the prompt self-contained for zero context: name the branch or PR, relevant
   working files, and exact next action.
-- For a recorded repair, name the selected provider's canonical URI or the unselected repository's register
-  path, stable ID and kind. Require the successor to invoke and execute `engineering:address-bug`,
+- For a recorded repair, name the selected provider's canonical URI, stable ID and kind. Require the
+  successor to invoke and execute `engineering:address-bug`,
   `engineering:address-mistake` or `engineering:address-debt` for that record before repair. Do not
   substitute a generic fix prompt or merely mention the skill. A plan-managed pointer keeps this mandatory
   invocation in its goal's `## Next Steps`; a non-plan prompt states it directly. Reconcile the record and

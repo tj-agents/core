@@ -41,7 +41,7 @@ maintained.
 - **A doc is either imported or summarized, never both.** An import already loads the body, so a summary
   beside it is the second copy.
 - **Never name violation sites in a rule doc.** They get fixed and the citation rots — silently, because
-  nothing checks it. Record violations as debt under
+  nothing checks it. Record violations with `work-items:write-debt` under
   [the shared recording contract](../../resources/problem-records.md).
 - **Never cite a transient artifact** — a plan filename, a phase number, a ticket — from a durable doc. The
   reference is engineered to dangle.
