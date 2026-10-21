@@ -235,6 +235,11 @@ The personal event publishers and automatic ruleset reconciliation are restricte
 owned by [github-actions:machine-events](https://github.com/tj-agents/github-actions/blob/main/.agents/github-actions/utility/machine-events/SKILL.md);
 the policy writer also enforces its owner boundary before GitHub access.
 
+Personal is for explicitly adopted personal projects only. A GitHub owner or permission to commit agent
+configuration does not establish personal scope. Infonetica is work scope, including the
+`tj-agents/infonetica` plugin source repository and all its worktrees; never select or inject Personal
+there. Read the target repository's README.md and AGENTS.md before choosing its policy profiles.
+
 Repository plugin adoption follows
 [machine:plugin-selection](.agents/machine/utility/plugin-selection/SKILL.md). Employer-project agent
 settings use its local scope and Git metadata exclusions. The local writer resolves the exact checkout
