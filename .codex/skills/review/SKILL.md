@@ -1,14 +1,14 @@
 ---
 name: review
-description: Run the canonical isolated code-review workflow over one frozen branch, PR, commit-range, or path candidate with the host's native reviewer, relevant fresh read-only lenses, validated evidence, and parent-only deduplication, severity, judgment, and work-order writing. Use for a first full code review when asked to review a branch or PR; use incremental-review for later commits, big-review for a very large diff, docs-review for a meta-only diff, and address-review for existing findings.
+description: Review a branch, PR, commit range or selected paths with the host's native reviewer and the relevant standards injected into that repository. Use for a full code review or a targeted review; use incremental-review for a later sweep, staged-review for explicit resumable partitioning, and docs-review for documentation.
 
-kind: workflow
+kind: utility
 domain: process
 ---
 
 # Canonical isolated code review
 
-Read and follow the [canonical shared definition](../../../.agents/engineering/workflow/review/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../../.agents/engineering/utility/review/SKILL.md) in full.
 This entry point adds only Codex's reviewers; the shared procedure is authored once under `.agents/`.
 
 ## Codex reviewers
