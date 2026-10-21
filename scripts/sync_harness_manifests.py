@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -16,6 +17,11 @@ HOST_ROOTS = {
     "claude": re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"'@]+)"),
 }
 REQUIRED_KEYS = {"marketplaces", "plugins", "hooks", "permissions"}
+PACKAGES_SPEC = importlib.util.spec_from_file_location(
+    "harness_package_sync", Path(__file__).resolve().with_name("sync_plugin_packages.py")
+)
+PACKAGES = importlib.util.module_from_spec(PACKAGES_SPEC)
+PACKAGES_SPEC.loader.exec_module(PACKAGES)
 
 
 def load(path: Path):
@@ -53,12 +59,8 @@ def validate_requires(root: Path, config: dict, catalog: dict, plugin: str, requ
     if set(requires) != REQUIRED_KEYS:
         raise ValueError(f"{plugin}: harness requires fields must be {sorted(REQUIRED_KEYS)}")
     required_marketplaces = requires["marketplaces"]
-    entries = {package["id"]: package for package in catalog["packages"]}
-    catalog_marketplaces = {}
-    for package in entries.values():
-        marketplace = catalog_marketplaces.setdefault(package["marketplace"], package)
-        if marketplace["owner_repository"] != package["owner_repository"] or marketplace["source"] != package["source"]:
-            raise ValueError(f"Catalog marketplace has inconsistent ownership: {package['marketplace']}")
+    entries = PACKAGES.catalog_index(catalog)
+    catalog_marketplaces = PACKAGES.catalog_marketplaces(entries)
     for marketplace in required_marketplaces:
         if set(marketplace) != {"id", "repository"}:
             raise ValueError(f"{plugin}: invalid marketplace declaration")

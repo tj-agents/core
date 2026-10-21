@@ -35,8 +35,9 @@ pass judgment are immutable. Remediation may only:
 
 - move a finding from `[ ]` to `[~]` to `[x]`;
 - append a concise disposition and fix evidence; or
-- mark `[wontfix]` with a final reason and, when work is postponed, create the owning debt entry or issue
-  with an objective resolution condition in the same stroke.
+- mark `[wontfix]` with a final reason and, when work is postponed, record debt through the selected
+  profile under [the recording contract](../../resources/problem-records.md) in the same stroke and link
+  its canonical record with an objective resolution condition.
 
 Do not reassess a high-confidence review finding as subjective and silently defer it. When part is fixable,
 split the blocked remainder and land the fixable part now. A genuinely irreversible or product/architecture
@@ -67,3 +68,12 @@ preflight and report its exact next action.
 
 Report fixed findings, any final dispositions and their durable owner, fixing commits, validation, canonical
 work order, and current watermark. Do not re-litigate a completed pass judgment.
+
+## Example
+
+```text
+Finding F-07 asks for paging beyond 1,000 records, but the provider endpoint has no continuation support
+yet. Mark F-07 `[wontfix]` with that reason and, in the same stroke, record the deferred paging as debt
+under the shared recording contract. Append the debt's identity and exit condition, every record fetched
+and verified in a queue above 1,000, to F-07; do not introduce a separate deferred status.
+```
