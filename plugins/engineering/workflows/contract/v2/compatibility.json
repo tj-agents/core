@@ -66,10 +66,10 @@
       "status": "supported",
       "replacement": "plan-authoring"
     },
-    "big-review-all": {
+    "staged-review-all": {
       "kind": "driver",
       "status": "retained",
-      "replacement": "big-review"
+      "replacement": "staged-review"
     }
   }
 }
