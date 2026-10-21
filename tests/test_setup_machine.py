@@ -212,7 +212,7 @@ class ProfileTests(Machine):
         path.parent.mkdir(parents=True)
         path.write_text("a\r\n" + LEGACY_BLOCK + "\r\nb\r\n" + LEGACY_BLOCK + "\r\nc\r\n", encoding="utf-8", newline="")
         setup.apply_profile(self.context())
-        text = path.read_text(encoding="utf-8", newline="")
+        text = path.read_bytes().decode("utf-8")
         self.assertEqual(1, text.count(setup.PROFILE_START))
         self.assertEqual("a\r\n" + setup.profile_block(self.checkout / "shell" / "profile.ps1", "\r\n") + "\r\nb\r\nc\r\n", text)
 
