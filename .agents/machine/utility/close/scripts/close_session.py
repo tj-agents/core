@@ -55,6 +55,12 @@ def sweep_script(shared):
         return None
 
 
+def claude_transcript(session_id):
+    home = Path(os.environ.get('CLAUDE_CONFIG_DIR') or Path.home() / '.claude')
+    matches = list((home / 'projects').glob('*/' + session_id + '.jsonl'))
+    return matches[0] if len(matches) == 1 else None
+
+
 def arm():
     shared = runtime()
     entry = verified_entry(shared)
@@ -73,6 +79,9 @@ def arm():
                  '--pid-started-at', repr(entry['pid_started_at']), '--armed-at', repr(time.time()),
                  '--state-directory', str(shared.state_directory()),
                  '--host-names', os.environ.get('AGENT_CLI_HOST_NAMES', '')]
+    transcript = claude_transcript(entry['session_id']) if entry['host'] == 'claude' else None
+    if transcript:
+        arguments += ['--transcript', str(transcript), '--transcript-offset', str(transcript.stat().st_size)]
     primary, sweep = primary_checkout(shared), sweep_script(shared)
     if primary and sweep:
         arguments += ['--repo', str(primary), '--sweep', str(sweep)]

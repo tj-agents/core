@@ -5,7 +5,9 @@ cancels it without closing anything. After a close it runs the worktree sweep fo
 """
 
 import argparse
+import json
 import os
+import sqlite3
 import subprocess
 import sys
 import time
@@ -32,6 +34,8 @@ def arguments(argv=None):
     parser.add_argument("--sweep")
     parser.add_argument("--state-directory")
     parser.add_argument("--host-names")
+    parser.add_argument("--transcript")
+    parser.add_argument("--transcript-offset", type=int, default=0)
     return parser.parse_args(argv)
 
 
@@ -47,17 +51,45 @@ def session_row(args):
     store = session_close.register_session._load_session_store()
     if store is None:
         raise Refusal("session turn store is unavailable")
-    connection = store.connect()
+    connection = sqlite3.connect(store.database_path().as_uri() + "?mode=ro", uri=True, timeout=5)
     try:
+        connection.row_factory = sqlite3.Row
         return store.get_session(connection, store.session_handle(args.host, args.session_id))
     finally:
         connection.close()
 
 
+def stop_hooks_verdict(args):
+    """Read the Claude transcript written since arming: "blocked", "finished" or "pending"."""
+    if not args.transcript:
+        return "finished"
+    try:
+        with open(args.transcript, "rb") as stream:
+            stream.seek(args.transcript_offset)
+            lines = stream.read().splitlines()
+    except OSError:
+        return "pending"
+    finished = False
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(record, dict):
+            continue
+        attachment = record.get("attachment")
+        if (isinstance(attachment, dict) and attachment.get("type") == "hook_blocking_error"
+                and attachment.get("hookEvent") == "Stop"):
+            return "blocked"
+        if record.get("type") == "system" and record.get("subtype") == "stop_hook_summary":
+            finished = True
+    return "finished" if finished else "pending"
+
+
 def wait_for_idle(args, clock=time.time, sleep=time.sleep):
     """Return the idle turn's activity token, or None when the close is cancelled."""
     deadline = clock() + args.timeout
-    stopped, since = None, None
+    stopped, since, settled = None, None, None
     while clock() < deadline:
         if not session_close.verified_live(args.pid, args.pid_started_at):
             return None
@@ -65,14 +97,18 @@ def wait_for_idle(args, clock=time.time, sleep=time.sleep):
         if not isinstance(row, dict) or row.get("ended_at") is not None or row.get("pid") != args.pid:
             return None
         activity = row.get("last_activity_at")
-        if row.get("turn_state") == "awaiting_input" and session_close.finite_positive(activity) \
-                and activity > args.armed_at:
-            if activity != stopped:
-                stopped, since = activity, clock()
-            elif clock() - since >= args.idle:
-                return stopped
-        elif stopped is not None:
+        if not session_close.finite_positive(activity):
             return None
+        if activity > args.armed_at:
+            if row.get("turn_state") != "awaiting_input" or stopped not in (None, activity):
+                return None
+            verdict = stop_hooks_verdict(args)
+            if verdict == "blocked":
+                return None
+            if stopped is None or verdict != settled:
+                stopped, since, settled = activity, clock(), verdict
+            elif verdict == "finished" and clock() - since >= args.idle:
+                return stopped
         sleep(POLL_SECONDS)
     return None
 
@@ -81,8 +117,8 @@ def close_session(args, activity):
     entry = registered_entry(args)
     if entry is None:
         raise Refusal("the armed session is no longer registered")
-    session_close.awaiting_input_activity(entry, activity)
     wrapper = session_close.qualified_windows_wrapper(entry)
+    session_close.awaiting_input_activity(entry, activity)
     session_close._record_own_end(entry, "closed")
     try:
         close.close_host(entry, wrapper)
@@ -124,7 +160,7 @@ def main(argv=None):
         else:
             close_session(args, activity)
             status = "closed"
-    except (OSError, ValueError, RuntimeError) as error:
+    except (OSError, ValueError, RuntimeError, sqlite3.Error) as error:
         status = "refused: " + str(error)
     session_close.write_json(outcome_path(args.session_id), {"status": status, "at": time.time()})
     if status == "closed":
