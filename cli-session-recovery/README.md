@@ -40,7 +40,7 @@ On 4 August 2026, 14 visible CLI tabs correctly produced 12 saved conversations:
 
 ## Architecture
 
-The source of truth is this repository. `install-cli-session-recovery.ps1` validates and deploys the files into `C:\Users\TommySeery`, backing up the previous live scripts first.
+The source of truth is this repository. `install-cli-session-recovery.ps1`, run by core's `./setup.ps1`, validates and deploys the files into `C:\Users\TommySeery`, backing up each previous live file it replaces.
 
 - `cli-session-hook.ps1` is a silent no-op for sessions that cached an old registration. The installer removes its Codex and Claude hook registrations.
 - `cli-session-vault.psm1` contains transcript-writer discovery, registry fallback, process matching, atomic JSON, window detection, and recovery selection logic.
@@ -71,10 +71,13 @@ Regression test:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\cli-session-vault.tests.ps1
 ```
 
-Install:
+Install by running `./setup.ps1` at the core checkout root. Setup runs this installer from the main
+checkout only when `install-cli-session-recovery.ps1 -Check` reports drift; rerunning converges. The
+installer backs up only the live files it replaces, so an unchanged rerun creates no backup folder.
+Report drift without writing anything:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-cli-session-recovery.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-cli-session-recovery.ps1 -Check
 ```
 
 Read-only restore preview:
