@@ -97,7 +97,7 @@ def main():
     mode.add_argument("--prompt-context", action="store_true")
     args = parser.parse_args()
     if sys.version_info < (3, 9):
-        print("session-guidance: Python 3.9 or newer is required.", file=sys.stderr)
+        print("session: Python 3.9 or newer is required.", file=sys.stderr)
         return 1
 
     contract = Path(__file__).resolve().parent.parent / "SKILL.md"
@@ -107,13 +107,13 @@ def main():
         if not text.startswith("---\n") or not body.strip():
             raise ValueError("missing frontmatter or contract body")
     except (OSError, UnicodeError, ValueError) as error:
-        print(f"session-guidance: cannot read contract at {contract}: {error}", file=sys.stderr)
+        print(f"session: cannot read contract at {contract}: {error}", file=sys.stderr)
         return 1
 
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    context = f"engineering:session-guidance (source SHA-256 {digest})\nSource: {contract}\n\n{body.strip()}"
+    context = f"engineering:session (source SHA-256 {digest})\nSource: {contract}\n\n{body.strip()}"
     if args.instruction_fragment:
-        print(f"<!-- BEGIN engineering:session-guidance sha256:{digest} -->\n{context}\n<!-- END engineering:session-guidance -->")
+        print(f"<!-- BEGIN engineering:session sha256:{digest} -->\n{context}\n<!-- END engineering:session -->")
         return 0
     try:
         root = hook_root()
@@ -127,11 +127,11 @@ def main():
     if args.prompt_context:
         try:
             context = (
-                f"engineering:session-guidance (source SHA-256 {digest})\n"
+                f"engineering:session (source SHA-256 {digest})\n"
                 f"Source: {contract}\n\n{prompt_context(body)}"
             )
         except ValueError as error:
-            print(f"session-guidance: {error}", file=sys.stderr)
+            print(f"session: {error}", file=sys.stderr)
             return 1
         if dynamic_context is not None:
             context = f"{context}\n\n{dynamic_context}"
