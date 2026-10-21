@@ -1,5 +1,21 @@
 # Tracker-aware source coverage
 
+## Current cutover — 21 October 2026
+
+This matrix supersedes the historical audit below. Source inspection, package tests and installed host acceptance are distinct evidence.
+
+| Owner and callers | Current disposition | Verification |
+| --- | --- | --- |
+| Core recording contract; session-guidance; bugfix/feature; address-bug/debt/mistake/review; self-repair; handoff; docs; skill-authoring; review-lifecycle | Selected profile owns recording/read/state and native content policy; Core supplies Engineering lifecycles. No Work Items dependency or Core writer aliases remain. | Selector15, provider8, source-layout24 and harness20 tests pass; examples and references resolve. |
+| Core list-work/recents; roadmap; plans/plan-authoring/execution/checkpoint; merge/persistent-workflow | Selected profile owns backlog inventory/state; local plan helpers fail visibly for selected/invalid declarations. Plans retain design/recovery. | Existing50 list-work tests and packaging checks pass. |
+| Core native session registry | Qualified external references bind to the existing SQLite execution/session store; reads create no execution. No cloud record schema or transport. | Schema4 writer validation and independent migration review pending; live activation held until installed readers support it. |
+| Personal | GitHub-only helper and work-item/create-work-item/address-work-item replace typed wrappers and external runtime dependency. Explicit adoption remains required. | Writer finishing deterministic tests, packaged CLI and generated host checks. |
+| Infonetica | Self-contained Azure helper, same three names, native New Products/CRIS policy; debt is Technical User Story. Retire create-devops-item and its callers. | Writer reports37 tests passing with one Core-discovery skip; final parent verification pending. |
+| Work | Delete12 generic tracker wrappers and dependency; retain8 communication/review utilities. |21 tests, Template conformance and generation49 pass. |
+| Marketplace and installed callers | Retire Work Items catalog/roster/bindings only after replacement sources and actual callers are verified. Separate consumer owner retains its migration. | Pending coordinated cutover; no compatibility aliases or installed-host completion claimed. |
+
+## Historical audit (superseded architecture)
+
 Core paths below are relative to `.agents/engineering/`; each skill path ends in `SKILL.md` unless a file is named. Authored Core and work-items skills were inspected for record creation, discovery, state, disposition and completion. Unrelated capability definitions retain their owners. Source inspection is not installed-host acceptance.
 
 | Skills or callers | Source paths | Previous behavior and disposition | Verification |

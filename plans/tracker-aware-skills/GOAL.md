@@ -1,5 +1,78 @@
 # Tracker-aware skills and generic issue routing
 
+## Current approved direction — 21 October 2026
+
+Tommy explicitly rejected the separate Work Items repository/package boundary, approved profile-owned
+recording, then authorized implementation with “yep lets go”. This direction supersedes historical shared
+cloud-runtime, Work Items dependency and typed-entry naming decisions below. Preserve existing source
+and remote data while migrating actual callers; retain no obsolete skill aliases or runtime wrappers.
+
+The approved public surface is the same three names under each owning namespace:
+`personal:work-item` / `infonetica:work-item` read/list/view through deterministic shipped scripts;
+`personal:create-work-item` / `infonetica:create-work-item` create records without starting execution;
+`personal:address-work-item` / `infonetica:address-work-item` reconcile an existing item and owner,
+then use the applicable Core Engineering lifecycle. Personal owns GitHub behavior and conventions.
+Infonetica owns Azure Boards behavior, native type/field mappings and employer authorization. Debt intent
+creates an existing Technical User Story in Infonetica, not Technical Debt Item. Optional typed meta-entry
+skills are unnecessary for the initial cutover. Work retains employer-neutral communications; remove its
+superseded tracker dispatch/wrapper family. Core owns only the shared SQLite execution/session registry,
+qualified external identity, ownership/status/resume links and reusable engineering workflows. Core does
+not install or select a recording profile on behalf of a consumer. Reading an item creates no execution.
+
+Same sole owner: `codex:01a15674-78c1-7703-8f6f-53e59ab10e57`. The distinct existing-record/consumer
+migration owner remains `codex:01a14ec8-5bdd-70a3-90c1-9d31a71289cf`. Do not overlap its consumer edits;
+record the changed provider interface and coordinated cutover dependency for that owner. No new handoff.
+
+Delivery map (source preparation may run concurrently because existing source PRs are manually held or
+externally gated; dependent publication/activation remains coordinated):
+
+1. Personal PR5, existing checkout `personal.worktrees/Refactor-SharedWorkItemRuntime`, base main already
+   included atb35d86d. Rehome existing GitHub runtime/schemas/receipts, add three current entry points,
+   retire typed wrappers/dependency, test packaged CLI and same-record reconciliation. Existing code moves
+   are reported separately; stop expansion for split assessment above1000 substantive changed lines.
+2. Infonetica PR12, existing checkout `infonetica/.worktrees/Refactor-WorkItemProvider`, head94a04f4,
+   fetched main23commits ahead before synchronization. Self-contained Azure helper, existing fixed auth/
+   scope/revision/idempotency invariants, three current operations and debt Story mapping. Source tests and
+   payload acceptance are independent of the existing employer billing/provenance gate. No live mutations.
+3. Work PR10, checkout `work/.worktrees/Feature-WorkItemSkills`, head04fe9db, fetched main6commits ahead.
+   Delete superseded tracker wrappers and requirements, preserve communication capabilities and later main
+   fixes. Verify remaining discovery/dependency closure; no new tracker abstraction in Work.
+4. Core PR298, checkout `core.worktrees/Feature-TrackerAwareSkills`, localbranch
+   `Feature/TrackerAwareSkills-new` tracking the PR branch. Correction16c7cbf removes restored Markdown
+   writing; latest synchronized head808d0b7d includes main01637cc6. Replace package-specific recording
+   calls with selected-profile operations and remove Engineering's automatic Work Items dependency.
+   Its interrupted review at808d0b7d is incomplete and superseded by this new candidate; preserve history.
+5. Core native-session writer branch `Feature/NativeWorkItemSessionWriters`, baseline0a5b5b72, remains
+   independently needed. Bounded writer owns its reconciled partial files/tests/docs. Core stores qualified
+   remote references and execution metadata only; no cloud schema/transport copy. Preserve stored data and
+   current real local execution identities. Windows/Linux/facade and migration tests precede review.
+6. After replacement source and actual callers are verified, remove Work Items marketplace/roster/install
+   bindings and retire its package. Source/runtime/consumer cutover is atomic in observable behavior;
+   no compatibility aliases or fallback queues. Do not delete remote repository history as routine cleanup.
+
+All source slices retain this one goal and owner, relevant independent review and exact-head checks.
+Known code relocation is mechanical scope; schema/CLI/policy changes remain substantive and must be
+measured per PR before final review. Never split into broken intermediate installed behavior merely to
+reduce size. Preserve dirty historical worktrees and the distinct migration owner's tracker/config writes.
+
+The Core298 manual merge hold, prior automatic-review refusals on35 workflow deletions and Personal3/4
+closures, narrow personal Projects credentials, and employer billing/provenance restrictions remain.
+The new architecture decision does not waive any of them. No live SQLite migration is allowed until all
+installed reader entry points accept schema4; older Machine snapshots currently reject it. No new hooks,
+gates, cloud account changes, broad credential scopes or model-session tests are authorized.
+
+Previously verified Work Items20 source/install behavior remains historical migration input, not proof of
+the replacement profiles' fresh-host acceptance. GitHub types/hierarchy/Projects/roadmaps stay distinct
+incomplete obligations, with live provisioning requiring the recorded narrow permission resolver.
+
+## Source checkpoint — 21 October 2026
+
+Core routing is committed at70146c07; Work wrapper removal atcb2633e. Core source-layout24, harness20, provider8 and selector15 tests pass; examples and three-repository skill-reference closure pass. Work generation49, Template conformance and21 tests pass. Personal/Infonetica provider writers and Core schema4 writer remain in progress. No replacement source has been published or live schema activated.
+
+Review scope uses each PR’s actual current main base, covering the complete remaining branch change rather than unrelated merged-main history. Core has55 paths including generated host deletions and plan artifacts, with ~1200 total changed lines; the existing single recording-boundary cutover remains atomic and removes aliases rather than splitting into inconsistent installed states. Independent review and exact-head checks remain required.
+
+## Historical initial plan (superseded architecture)
+
 ## Authorization and outcome
 
 On 18 October 2026 Tommy explicitly requested a separate source implementation handoff while the existing migration continues: ensure ALL affected skills send future bugs, mistakes, debt, features and tasks into the new selected work-item format. He requires `write-issue` to be a generic entry point that classifies the request and invokes the appropriate specific writer. This authorizes the source audit, necessary implementation, focused tests, independent review and source delivery through each repository's existing gates. This is execution, not another proposal-only investigation.
