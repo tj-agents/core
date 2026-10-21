@@ -56,7 +56,9 @@ main (#327), which #328 predates, so main was merged in first; that also clears 
 - [x] `startup_binding.py` runs the check, so `handoff-*`, `open-*` and `open-cli` launches get it.
 - [x] `setup_machine.py`: installs the terminal `claude`/`codex` functions, retires the listener service.
 - [x] `reload-plugins`: same check; agent runs it on its own judgement.
-- [ ] PR #328 body, CI.
+- [x] PR #328 body; CI green in full mode on 34f8b8f8 (verify-windows, verify-linux, guard, ci-required).
+- [ ] Tommy: review and merge #328, then run `./setup.ps1` once per machine (it retires the listener and
+  installs the functions); this delivery did not run setup or touch the real profile or tasks.
 
 ## Decisions
 
