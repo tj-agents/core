@@ -53,7 +53,7 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn(phrase, checkpoint)
 
     def test_staged_review_uses_its_own_resume_contract(self):
-        staged = authored_skill("big-review").read_text(
+        staged = authored_skill("staged-review").read_text(
             encoding="utf-8"
         )
 
@@ -83,7 +83,7 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertNotIn("concurrent fixes", address)
 
     def test_always_on_instructions_own_the_stage_pointer_rule(self):
-        instructions = authored_skill("session-guidance").read_text(
+        instructions = authored_skill("session").read_text(
             encoding="utf-8"
         )
 
@@ -95,7 +95,7 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertEqual(1, self.corpus().count("stage is actually entered"))
 
     def test_always_on_instructions_reconcile_known_problems_before_terminal_results(self):
-        instructions = authored_skill("session-guidance").read_text(
+        instructions = authored_skill("session").read_text(
             encoding="utf-8"
         )
         flat = " ".join(instructions.split())
@@ -108,7 +108,7 @@ class ProcessStandardsTests(unittest.TestCase):
         )
 
     def test_a_standards_defect_hands_off_in_the_same_turn(self):
-        instructions = authored_skill("session-guidance").read_text(
+        instructions = authored_skill("session").read_text(
             encoding="utf-8"
         )
         flat = " ".join(instructions.split())
@@ -137,7 +137,7 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn(phrase, self_repair)
 
     def test_callout_checks_standards_before_an_apology(self):
-        instructions = authored_skill("session-guidance").read_text(encoding="utf-8")
+        instructions = authored_skill("session").read_text(encoding="utf-8")
         section = " ".join(
             instructions.split("## When the user calls out a mistake", 1)[1].split("## ", 1)[0].split()
         )
@@ -464,12 +464,12 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertNotIn("delivering each completed slice through [`merge`]", execution)
         self.assertIn("including a planning-only slice", " ".join(execution.split()))
 
-    def test_review_rechecks_routed_rules_instead_of_citing_an_earlier_read(self):
+    def test_review_keeps_injected_scope_and_rechecks_rule_identities(self):
         body = authored_skill("review").read_text(encoding="utf-8")
         flat = " ".join(body.split())
 
-        self.assertIn("Read only identities returned as `load`", flat)
-        self.assertIn("an unchanged identity returned as `cached`", flat)
+        self.assertIn("reads `.agents/plugins.json`", flat)
+        self.assertIn("only when its recorded hash is unchanged", flat)
         self.assertIn("changed or missing hash requires a new body read", flat)
 
     def test_merge_docs_keeps_an_existing_isolated_branch(self):

@@ -12,7 +12,6 @@ This entry point adds only Claude Code's native mechanism.
 
 ## Claude Code
 
-Claude Code installs marketplace updates itself. Ask the user to type `/reload-plugins`, the built-in
-command that loads them into this session; an agent cannot run a slash command. When the newest published
-plugins are not installed yet, run `claude plugin marketplace update` first, then ask for
-`/reload-plugins`.
+Run the shared script with `--host claude` yourself, never hand that step to the user. A new session loads
+the result on its own; ask the user for `/reload-plugins`, which an agent cannot run, only when this
+session must use the change now.

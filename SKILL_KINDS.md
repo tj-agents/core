@@ -9,9 +9,14 @@ allowlist. A checker may enforce a deliberate semantic requirement for a particu
 |---|---|
 | `policy` | Agent-conduct rules active within an already selected scope: authorship mode, authority, continuation, credential scope or process selection. Examples: `goal-continuation`, `git-auth`, `learning`. |
 | `convention` | Requirements used to create or assess an artifact: code design, naming, document format, route-table semantics or evidence-record structure. Examples: `style`, `handoff-format`, `review-lifecycle`. |
-| `utility` | A bounded capability with a concrete input and result, called directly or by another skill. Examples: `commit`, `pull`, `clip`, `scaffold`, `failure-provenance`. It may have several steps and validation. |
-| `workflow` | A capability that keeps ownership of a task across distinct stages and advances it to a declared terminal outcome. Examples: `feature`, `review`, `plan-execution`, `debug-integration`, `stack`. |
+| `utility` | A bounded capability with a concrete input and result, called directly or by another skill. Examples: `commit`, `pull`, `clip`, `scaffold`, `failure-provenance`, `review`. It may have several steps and validation. |
+| `workflow` | A capability that keeps ownership of a task across distinct stages and advances it to a declared terminal outcome. Examples: `feature`, `plan-execution`, `debug-integration`, `stack`. |
 | `knowledge` | Descriptive context: proficiency, goals, reference material or orientation. Local interpretation and maintenance guards may accompany the facts; it does not govern unrelated work or own an execution lifecycle. |
+
+```text
+review: candidate -> findings; kind: utility
+plan-execution: implementation -> checks -> delivery; kind: workflow
+```
 
 Choose the primary responsibility, not a sentence's grammatical form. A convention may contain an example
 command or a short checklist. A utility may perform several commands, delegate to another utility, and

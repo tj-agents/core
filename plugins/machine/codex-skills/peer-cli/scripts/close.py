@@ -1,7 +1,6 @@
 """Close this verified session while retaining its checkout (Python 3.9+)."""
 import argparse
 import os
-import signal
 import sys
 import time
 import uuid
@@ -14,17 +13,7 @@ from session_close import _record_own_end, _reopen_own_end
 def close_host(entry, wrapper=None):
     if not session_close.verified_live(entry["pid"], entry["pid_started_at"]):
         raise session_close.Refusal("registered host identity changed before close")
-    if os.environ.get("AGENT_FINISH_CLOSE_MODE") == "process":
-        os.kill(entry["pid"], signal.SIGTERM)
-        return
-    try:
-        close_tab.close_entry(entry)
-    except close_tab.TerminalRefusal:
-        if not session_close.verified_live(entry["pid"], entry["pid_started_at"]):
-            raise session_close.Refusal("registered host identity changed before fallback close")
-        os.kill(entry["pid"], signal.SIGTERM)
-        if wrapper and session_close.verified_live(wrapper["pid"], wrapper["started_at"]):
-            os.kill(wrapper["pid"], signal.SIGTERM)
+    close_tab.close_entry(entry)
 
 
 def refresh_attachment(entry, worktree):

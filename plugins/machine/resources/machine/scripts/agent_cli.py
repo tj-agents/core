@@ -642,6 +642,9 @@ def await_handoff_startup(status_path, timeout=480, wrapper_timeout=45,
             raise LaunchError("the launch was abandoned before startup")
         if state == "failed":
             raise LaunchError(str(status.get("error") or "native startup failed"))
+        if state == "unconfirmed":
+            raise LaunchTimeout(f"native CLI is still running, but SessionStart was not acknowledged; "
+                                f"leave the tab open and do not relaunch; receipt: {status_path}")
         if state == "running" or (state == "exited" and status.get("running_at") and status.get("returncode") == 0):
             return
         if state == "exited":
