@@ -128,15 +128,19 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_default_adoption_selects_the_core_packages(self):
         adopt_plugins.run(self.root, [], [], "write")
-        self.assertEqual(["base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "work-items@tj-agents"], self.plugins())
+        self.assertEqual(["base@tj-agents", "engineering@tj-agents", "machine@tj-agents"], self.plugins())
 
-    def test_engineering_selects_work_items_in_both_host_settings(self):
+    def test_engineering_does_not_select_a_recording_profile(self):
         adopt_plugins.run(self.root, [], ["engineering"], "write")
-        self.assertEqual(["base@tj-agents", "engineering@tj-agents", "work-items@tj-agents"], self.plugins())
+        self.assertEqual(["base@tj-agents", "engineering@tj-agents"], self.plugins())
         claude = json.loads((self.root / ".claude" / "settings.json").read_text(encoding="utf-8"))
-        self.assertTrue(claude["enabledPlugins"]["work-items@tj-agents"])
+        self.assertNotIn("work-items@tj-agents", claude["enabledPlugins"])
+        self.assertNotIn("personal@tj-agents", claude["enabledPlugins"])
+        self.assertNotIn("infonetica@tj-agents", claude["enabledPlugins"])
         codex = (self.root / ".codex" / "config.toml").read_text(encoding="utf-8")
-        self.assertIn('[plugins."work-items@tj-agents"]', codex)
+        self.assertNotIn('[plugins."work-items@tj-agents"]', codex)
+        self.assertNotIn('[plugins."personal@tj-agents"]', codex)
+        self.assertNotIn('[plugins."infonetica@tj-agents"]', codex)
         self.assertEqual([], adopt_plugins.run(self.root, [], ["engineering"], "check"))
 
     def test_local_scope_preserves_project_settings(self):

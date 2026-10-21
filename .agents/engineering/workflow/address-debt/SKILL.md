@@ -1,6 +1,6 @@
 ---
 name: address-debt
-description: Take one Work Items debt item all the way to a focused PR in its selected checkout — survey the selected provider, pick one high-value item, fix it, verify resolution under its retention rules, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
+description: Take one debt item all the way to a focused PR in its selected checkout — survey the selected provider, pick one high-value item, fix it, verify resolution under its retention rules, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
 
 kind: workflow
 domain: process
@@ -8,13 +8,13 @@ domain: process
 
 # Working one tech-debt item — or a small bundle — to a PR
 
-Take a Work Items debt item all the way to a focused PR in its selected checkout, so nothing touches
-in-flight branches. This is the *resolution* workflow; `work-items:write-debt` owns the record's facts,
+Take a debt item all the way to a focused PR in its selected checkout, so nothing touches
+in-flight branches. This is the *resolution* workflow; the selected profile owns the record's facts,
 retention, and verified closure. A single item is the default shape; bundling more than one into the same
 PR is the exception below, not a second workflow.
 
 Read [the shared problem-record contract](../../resources/problem-records.md) first. In each repository,
-use the selected Work Items provider to list, read, update and close debt. Provider failure blocks that
+use the selected profile provider to list, read, update and close debt. Provider failure blocks that
 repository's record operation; retain unsent facts under the shared guidance.
 
 ## Steps
@@ -69,7 +69,7 @@ repository's record operation; retain unsent facts under the shared guidance.
 3. **Investigate.** Read the surrounding code and understand the real root cause before touching anything,
    for each item in the bundle.
 4. **Fix it properly.** Always the long-term, scalable solution, never the hacky shortcut — the shortcut
-   rule and its one exception are the `work-items:write-debt` standard. It can span multiple PRs; if it genuinely
+   decision remains subject to the repository's current-solution policy. It can span multiple PRs; if it genuinely
    needs splitting, say so in one line, drop it from any bundle, and start with the first PR on its own
    branch.
 5. **Verify.** Build the affected projects to zero errors and run the affected unit/integration tests. Do

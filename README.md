@@ -24,11 +24,12 @@ owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
 Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
-The [shared recording contract](.agents/engineering/resources/problem-records.md) routes future bugs,
-mistakes, debt, features and tasks to Work Items in a repository that selects a provider;
-`work-items:write-issue` classifies a recording request and delegates to the corresponding specific
-writer, and a selection failure retains unsent facts with its resolver and resume condition. Historical
-Markdown registers remain evidence only. The problem address workflows reuse the existing repair lifecycle.
+The [recording contract](.agents/engineering/resources/problem-records.md) routes remote work-item
+operations to the repository's explicitly selected profile. Personal owns GitHub records; Infonetica owns
+Azure Boards records and native type policy. Core owns the shared SQLite agent execution/session registry
+and reusable engineering lifecycles. Installing Engineering does not select or install a recording
+profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
+registers remain evidence only.
 Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.9+
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
 current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or

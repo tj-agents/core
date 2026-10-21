@@ -9,7 +9,6 @@
     "base@tj-agents",
     "engineering@tj-agents",
     "machine@tj-agents",
-    "personal@tj-agents",
-    "work-items@tj-agents"
+    "personal@tj-agents"
   ]
 }

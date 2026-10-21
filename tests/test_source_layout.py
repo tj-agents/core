@@ -106,30 +106,26 @@ class SourceLayoutTests(unittest.TestCase):
                 resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
                 self.assertEqual(resource, resolved)
 
-    def test_engineering_declares_the_work_items_provider(self):
+    def test_engineering_leaves_recording_profile_selection_to_the_repository(self):
         _, output, _, _ = SYNC.build(self.root)
         catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
         engineering = next(package for package in catalog["packages"] if package["id"] == "base-agents/engineering")
-        dependency = {
-            "id": "work-items-agents/work-items",
-            "marketplace": "work-items-agents",
-            "repository": "tj-agents/work-items",
-        }
-        self.assertIn(dependency["id"], engineering["dependencies"]["required"])
-        self.assertEqual([dependency], engineering["external_dependencies"]["required"])
+        self.assertEqual(["base-agents/base", "base-agents/machine"], engineering["dependencies"]["required"])
+        self.assertEqual([], engineering["external_dependencies"]["required"])
         harness = json.loads(output["plugins/engineering/harness.json"].decode("utf-8"))
-        self.assertIn(
-            {"id": dependency["marketplace"], "repository": dependency["repository"]},
-            harness["requires"]["marketplaces"],
-        )
-        self.assertIn(dependency["id"], harness["requires"]["plugins"])
+        self.assertEqual([{"id": "base-agents", "repository": "tj-agents/core"}], harness["requires"]["marketplaces"])
+        self.assertEqual(["base-agents/base", "base-agents/engineering", "base-agents/machine"], harness["requires"]["plugins"])
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
-        self.assertEqual([dependency], selection["external_prerequisites"])
+        self.assertEqual([], selection["external_prerequisites"])
 
     def test_external_dependencies_are_validated_per_owner(self):
         catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
         packages = {package["id"]: package for package in catalog["packages"]}
-        external = "work-items-agents/work-items"
+        external = "personal-agents/personal"
+        engineering = packages["base-agents/engineering"]
+        engineering["dependencies"]["required"].append(external)
+        engineering["external_dependencies"]["required"].append({
+            "id": external, "marketplace": "personal-agents", "repository": "tj-agents/personal"})
 
         borrowed = json.loads(json.dumps(catalog))
         next(package for package in borrowed["packages"] if package["id"] == "base-agents/machine")[
@@ -138,7 +134,7 @@ class SourceLayoutTests(unittest.TestCase):
             SYNC.catalog_index(borrowed)
 
         for mutation in (
-            lambda dependency: dependency.update(marketplace="Work_Items", id="Work_Items/work-items"),
+            lambda dependency: dependency.update(marketplace="Personal_Items", id="Personal_Items/personal"),
             lambda dependency: dependency.update(repository="not a repository"),
         ):
             invalid = json.loads(json.dumps(catalog))
@@ -158,13 +154,13 @@ class SourceLayoutTests(unittest.TestCase):
         machine = next(package for package in conflicting["packages"] if package["id"] == "base-agents/machine")
         machine["dependencies"]["optional"].append(external)
         machine["external_dependencies"] = {"required": [], "optional": [
-            {"id": external, "marketplace": "work-items-agents", "repository": "someone/else"}]}
-        with self.assertRaisesRegex(ValueError, "inconsistent ownership: work-items-agents"):
+            {"id": external, "marketplace": "personal-agents", "repository": "someone/else"}]}
+        with self.assertRaisesRegex(ValueError, "inconsistent ownership: personal-agents"):
             SYNC.catalog_index(conflicting)
 
         self.assertEqual(
-            {"owner_repository": "tj-agents/work-items", "source": "https://github.com/tj-agents/work-items.git"},
-            SYNC.catalog_marketplaces(SYNC.catalog_index(catalog))["work-items-agents"],
+            {"owner_repository": "tj-agents/personal", "source": "https://github.com/tj-agents/personal.git"},
+            SYNC.catalog_marketplaces(SYNC.catalog_index(catalog))["personal-agents"],
         )
         self.assertEqual(set(packages), set(SYNC.catalog_index(catalog)))
 

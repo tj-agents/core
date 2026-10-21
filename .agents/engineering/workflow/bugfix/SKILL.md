@@ -40,8 +40,8 @@ diagnoses the cause, and chooses the repair.
 
 ## Execute the repair lifecycle
 
-Read [the shared recording contract](../../resources/problem-records.md) and use `work-items:write-bug`
-to reconcile the canonical defect record as evidence becomes available. Update that record through the
+Read [the shared recording contract](../../resources/problem-records.md) and reconcile the canonical
+defect record through the selected profile as evidence becomes available. Update that record through the
 same contract after verifying its resolution condition; a delivered PR alone does not resolve it.
 
 1. Reproduce or anchor the defect in direct evidence. Separate symptoms from the first incorrect state or

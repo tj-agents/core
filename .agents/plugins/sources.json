@@ -383,13 +383,7 @@
   },
   "external_prerequisites": {
     "base": [],
-    "engineering": [
-      {
-        "id": "work-items-agents/work-items",
-        "marketplace": "work-items-agents",
-        "repository": "tj-agents/work-items"
-      }
-    ],
+    "engineering": [],
     "machine": []
   },
   "extended_host_adapters": [
