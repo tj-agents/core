@@ -99,6 +99,61 @@ def _parse_work_item(value):
     return match.group("feature"), match.group("item")
 
 
+def _remote_reference(provider, scope, native_id):
+    values = (provider, scope, native_id)
+    if all(value is None for value in values):
+        return None
+    if any(value is None for value in values):
+        raise ValueError("--provider, --scope and --native-id must be supplied together")
+    return _session_store().normalise_work_item_reference(provider, scope, native_id)
+
+
+def _selector(work_item=None, execution_key=None, provider=None, scope=None, native_id=None):
+    reference = _remote_reference(provider, scope, native_id)
+    selected = sum(value is not None for value in (work_item, execution_key, reference))
+    if selected != 1:
+        raise ValueError("select exactly one of <feature>/<item>, --execution-key or --provider/--scope/--native-id")
+    if work_item is not None:
+        feature, item = _parse_work_item(work_item)
+        return "local", (feature, item)
+    if execution_key is not None:
+        return "execution", _session_store().validate_execution_key(execution_key)
+    return "reference", reference
+
+
+def _label(item):
+    if item is None:
+        return None
+    if item["feature"] is not None:
+        return f"{item['feature']}/{item['item']}"
+    return item["key"]
+
+
+def _result_item(item, reference=None):
+    return {
+        "work_item": _label(item),
+        "execution_key": item["key"] if item else None,
+        "reference": reference,
+    }
+
+
+def _find_selected_work_item(connection, selector, cwd):
+    store = _session_store()
+    kind, value = selector
+    if kind == "local":
+        repo = _require_repo(cwd)
+        return store.get_work_item(connection, store.work_item_key(repo, *value)), None
+    if kind == "execution":
+        return store.get_work_item(connection, value), None
+    provider, scope, native_id = value
+    reference = store.get_work_item_reference(connection, provider, scope, native_id)
+    if reference is None:
+        return None, {"provider": provider, "scope": scope, "native_id": native_id}
+    return store.get_work_item(connection, reference["work_item"]), {
+        "provider": provider, "scope": scope, "native_id": native_id,
+    }
+
+
 def _validate_role(role):
     if role is None or role == "owner":
         return "owner"
@@ -301,27 +356,50 @@ def _unverified_launch(error):
     return _AGENT_RECOVERY is not None and _AGENT_RECOVERY.unverified_launch(error)
 
 
-def cmd_claim(work_item, host, role=None, predecessor=None, status=None, title=None, plan_path=None, cwd=None):
+def cmd_claim(work_item=None, host=None, role=None, predecessor=None, status=None, title=None, plan_path=None,
+              execution_key=None, provider=None, scope=None, native_id=None, cwd=None):
     store = _session_store()
     cwd = cwd or Path.cwd()
-    feature, item = _parse_work_item(work_item)
+    selector = _selector(work_item, execution_key, provider, scope, native_id)
     role = _validate_role(role)
     title = _validate_title(title)
     plan_path = _validate_plan_path(plan_path, cwd)
     repo, branch, head = _require_repo_branch_head(cwd)
-    key = store.work_item_key(repo, feature, item)
     record_branch = _branch_to_record(cwd, branch)
     connection = store.connect()
     try:
+        kind, value = selector
+        item_branch = record_branch if kind == "local" else None
+        reference = None
+        if kind == "local":
+            feature, item = value
+            key = store.work_item_key(repo, feature, item)
+            selected = store.get_work_item(connection, key)
+        elif kind == "execution":
+            key = value
+            selected = store.get_work_item(connection, key)
+            if selected is None:
+                raise ValueError(f"work item does not exist: {key}")
+            feature, item = selected["feature"], selected["item"]
+        else:
+            provider, scope, native_id = value
+            selected, _reference = _find_selected_work_item(connection, selector, cwd)
+            if selected is None:
+                raise ValueError("work item does not exist; register the remote reference before claiming it")
+            key = selected["key"]
+            feature, item = selected["feature"], selected["item"]
+            reference = {"provider": provider, "scope": scope, "native_id": native_id}
         session_id, registration = _registered_current_session(connection, host, cwd)
         handle = store.session_handle(host, session_id)
-        result = {"handle": handle, "work_item": f"{feature}/{item}"}
         removed = store.claim_registered_work_item(
-            connection, host, session_id, cwd, key, repo, feature, item, role,
-            status=status, branch=record_branch, session_branch=branch, head=head,
-            title=title, plan_path=plan_path,
-            predecessor=predecessor, registration=registration,
+            connection, host, session_id, cwd, key, selected["repo"] if selected else repo, feature, item, role,
+            status=status, branch=item_branch, session_branch=branch, head=head,
+            title=title, plan_path=plan_path, predecessor=predecessor, registration=registration,
+            require_existing_binding=kind == "reference",
         )
+        item_row = store.get_work_item(connection, key)
+        result = _result_item(item_row, reference)
+        result["handle"] = handle
         if removed:
             result["removed"] = removed
         return result
@@ -329,15 +407,14 @@ def cmd_claim(work_item, host, role=None, predecessor=None, status=None, title=N
         connection.close()
 
 
-def cmd_status(work_item, cwd=None):
+def cmd_status(work_item=None, execution_key=None, provider=None, scope=None, native_id=None, cwd=None):
     store = _session_store()
-    feature, item = _parse_work_item(work_item)
-    repo = _require_repo(cwd or Path.cwd())
-    key = store.work_item_key(repo, feature, item)
+    cwd = cwd or Path.cwd()
+    selector = _selector(work_item, execution_key, provider, scope, native_id)
     connection = store.connect()
     try:
-        item_row = store.get_work_item(connection, key)
-        rows = store.sessions_for_work_item(connection, key)
+        item_row, reference = _find_selected_work_item(connection, selector, cwd)
+        rows = store.sessions_for_work_item(connection, item_row["key"]) if item_row else []
     finally:
         connection.close()
     machine = socket.gethostname()
@@ -351,13 +428,14 @@ def cmd_status(work_item, cwd=None):
         }
         for row in rows
     ]
-    return {
-        "work_item": f"{feature}/{item}",
+    result = _result_item(item_row, reference)
+    result.update({
         "status": item_row["status"] if item_row else None,
         "title": item_row["title"] if item_row else None,
         "plan_path": item_row["plan_path"] if item_row else None,
         "sessions": sessions,
-    }
+    })
+    return result
 
 
 def cmd_find(worktree):
@@ -372,7 +450,9 @@ def cmd_find(worktree):
                 item_row = store.get_work_item(connection, row["work_item"])
                 if item_row:
                     matches.append({
-                        "work_item": f"{item_row['feature']}/{item_row['item']}",
+                        "work_item": _label(item_row),
+                        "execution_key": item_row["key"],
+                        "references": store.work_item_references(connection, item_row["key"]),
                         "handle": row["handle"],
                         "role": row["role"],
                     })
@@ -381,14 +461,15 @@ def cmd_find(worktree):
     return {"matches": matches}
 
 
-def cmd_resume(work_item, handle=None, cwd=None, prompt=None, prompt_path=None, title=None):
+def cmd_resume(work_item=None, handle=None, execution_key=None, provider=None, scope=None, native_id=None,
+               cwd=None, prompt=None, prompt_path=None, title=None):
     store = _session_store()
-    feature, item = _parse_work_item(work_item)
-    repo = _require_repo(cwd or Path.cwd())
-    key = store.work_item_key(repo, feature, item)
+    cwd = cwd or Path.cwd()
+    selector = _selector(work_item, execution_key, provider, scope, native_id)
     connection = store.connect()
     try:
-        rows = store.sessions_for_work_item(connection, key)
+        item_row, _reference = _find_selected_work_item(connection, selector, cwd)
+        rows = store.sessions_for_work_item(connection, item_row["key"]) if item_row else []
     finally:
         connection.close()
     if not rows:
@@ -432,7 +513,7 @@ def cmd_interrupted(resume_handles=None, cwd=None):
         for row in candidates:
             if row["work_item"] and row["work_item"] not in item_names:
                 item_row = store.get_work_item(connection, row["work_item"])
-                item_names[row["work_item"]] = f"{item_row['feature']}/{item_row['item']}" if item_row else row["work_item"]
+                item_names[row["work_item"]] = _label(item_row) if item_row else row["work_item"]
     finally:
         connection.close()
     machine = socket.gethostname()
@@ -480,28 +561,37 @@ def cmd_end(host, reason, successor=None):
     return {"handle": handle, "reason": reason}
 
 
-def cmd_item(work_item, status, pr=None, title=None, plan_path=None, cwd=None):
+def cmd_item(work_item=None, status=None, pr=None, title=None, plan_path=None, execution_key=None,
+             provider=None, scope=None, native_id=None, cwd=None):
     store = _session_store()
-    feature, item = _parse_work_item(work_item)
     cwd = cwd or Path.cwd()
+    selector = _selector(work_item, execution_key, provider, scope, native_id)
     title = _validate_title(title)
     plan_path = _validate_plan_path(plan_path, cwd)
     repo, branch, _head = _require_repo_branch_head(cwd)
     record_branch = _branch_to_record(cwd, branch)
-    key = store.work_item_key(repo, feature, item)
     connection = store.connect()
     try:
-        if store.get_work_item(connection, key) is None:
-            if title is None:
+        kind, value = selector
+        reference = None
+        if kind == "local":
+            feature, item = value
+            key = store.work_item_key(repo, feature, item)
+            item_row = store.get_work_item(connection, key)
+            if item_row is None and title is None:
                 raise ValueError("a non-empty --title is required when creating a work item")
             store.upsert_work_item(
                 connection, key, repo, feature, item, status=status, branch=record_branch, pr=pr,
                 title=title, plan_path=plan_path,
             )
         else:
+            item_row, reference = _find_selected_work_item(connection, selector, cwd)
+            if item_row is None:
+                raise ValueError("work item does not exist; register or bind the remote reference before updating it")
+            key = item_row["key"]
             store.upsert_work_item(
-                connection, key, repo, feature, item, status=status, branch=record_branch, pr=pr,
-                title=title, plan_path=plan_path,
+                connection, key, item_row["repo"], item_row["feature"], item_row["item"], status=status,
+                branch=None, pr=pr, title=title, plan_path=plan_path,
             )
         if status == "done":
             keep = [
@@ -513,9 +603,55 @@ def cmd_item(work_item, status, pr=None, title=None, plan_path=None, cwd=None):
             for row in store.sessions_for_work_item(connection, key):
                 if row["handle"] not in keep and _finished_elsewhere(row, machine):
                     store.delete_session(connection, row["session_id"])
+        result = _result_item(store.get_work_item(connection, key), reference)
+        result["status"] = status
+        return result
     finally:
         connection.close()
-    return {"work_item": f"{feature}/{item}", "status": status}
+
+
+def cmd_register(provider, scope, native_id, cwd=None):
+    store = _session_store()
+    cwd = cwd or Path.cwd()
+    repo, branch, _head = _require_repo_branch_head(cwd)
+    provider, scope, native_id = store.normalise_work_item_reference(provider, scope, native_id)
+    connection = store.connect()
+    try:
+        item_row, created = store.resolve_or_create_work_item_reference(
+            connection, provider, scope, native_id, repo, branch=_branch_to_record(cwd, branch),
+        )
+    finally:
+        connection.close()
+    result = _result_item(item_row, {"provider": provider, "scope": scope, "native_id": native_id})
+    result["created"] = created
+    return result
+
+
+def cmd_bind(work_item=None, execution_key=None, provider=None, scope=None, native_id=None, cwd=None):
+    store = _session_store()
+    cwd = cwd or Path.cwd()
+    reference = _remote_reference(provider, scope, native_id)
+    if reference is None:
+        raise ValueError("--provider, --scope and --native-id are required")
+    selected = sum(value is not None for value in (work_item, execution_key))
+    if selected != 1:
+        raise ValueError("bind needs exactly one of <feature>/<item> or --execution-key")
+    connection = store.connect()
+    try:
+        if work_item is not None:
+            feature, item = _parse_work_item(work_item)
+            key = store.work_item_key(_require_repo(cwd), feature, item)
+        else:
+            key = store.validate_execution_key(execution_key)
+        if store.get_work_item(connection, key) is None:
+            raise ValueError(f"work item does not exist: {key}")
+        changed = store.bind_work_item_reference(connection, key, *reference)
+        item_row = store.get_work_item(connection, key)
+    finally:
+        connection.close()
+    result = _result_item(item_row, {"provider": reference[0], "scope": reference[1], "native_id": reference[2]})
+    result["bound"] = changed
+    return result
 
 
 def _build_parser():
@@ -525,7 +661,7 @@ def _build_parser():
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     claim_parser = subparsers.add_parser("claim")
-    claim_parser.add_argument("work_item")
+    _add_selector_arguments(claim_parser)
     claim_parser.add_argument("--host", required=True, choices=("claude", "codex"))
     claim_parser.add_argument("--role", default="owner")
     claim_parser.add_argument("--predecessor")
@@ -534,13 +670,13 @@ def _build_parser():
     claim_parser.add_argument("--plan-path")
 
     status_parser = subparsers.add_parser("status")
-    status_parser.add_argument("work_item")
+    _add_selector_arguments(status_parser)
 
     find_parser = subparsers.add_parser("find")
     find_parser.add_argument("--worktree", required=True)
 
     resume_parser = subparsers.add_parser("resume")
-    resume_parser.add_argument("work_item")
+    _add_selector_arguments(resume_parser)
     resume_parser.add_argument("--handle")
     prompt_group = resume_parser.add_mutually_exclusive_group()
     prompt_group.add_argument("--prompt")
@@ -556,13 +692,33 @@ def _build_parser():
     end_parser.add_argument("--successor")
 
     item_parser = subparsers.add_parser("item")
-    item_parser.add_argument("work_item")
+    _add_selector_arguments(item_parser)
     item_parser.add_argument("--status", required=True, choices=WORK_ITEM_STATUSES)
     item_parser.add_argument("--pr")
     item_parser.add_argument("--title")
     item_parser.add_argument("--plan-path")
 
+    register_parser = subparsers.add_parser("register")
+    register_parser.add_argument("--provider", required=True)
+    register_parser.add_argument("--scope", required=True)
+    register_parser.add_argument("--native-id", required=True)
+
+    bind_parser = subparsers.add_parser("bind")
+    bind_parser.add_argument("work_item", nargs="?")
+    bind_parser.add_argument("--execution-key")
+    bind_parser.add_argument("--provider", required=True)
+    bind_parser.add_argument("--scope", required=True)
+    bind_parser.add_argument("--native-id", required=True)
+
     return parser
+
+
+def _add_selector_arguments(parser):
+    parser.add_argument("work_item", nargs="?")
+    parser.add_argument("--execution-key")
+    parser.add_argument("--provider")
+    parser.add_argument("--scope")
+    parser.add_argument("--native-id")
 
 
 def main(argv=None):
@@ -572,15 +728,21 @@ def main(argv=None):
             result = cmd_claim(
                 args.work_item, args.host, role=args.role, predecessor=args.predecessor,
                 status=args.status, title=args.title, plan_path=args.plan_path,
+                execution_key=args.execution_key, provider=args.provider, scope=args.scope,
+                native_id=args.native_id,
             )
         elif args.command == "status":
-            result = cmd_status(args.work_item)
+            result = cmd_status(
+                args.work_item, execution_key=args.execution_key, provider=args.provider,
+                scope=args.scope, native_id=args.native_id,
+            )
         elif args.command == "find":
             result = cmd_find(args.worktree)
         elif args.command == "resume":
             result = cmd_resume(
                 args.work_item, handle=args.handle, prompt=args.prompt,
-                prompt_path=args.prompt_path, title=args.title,
+                prompt_path=args.prompt_path, title=args.title, execution_key=args.execution_key,
+                provider=args.provider, scope=args.scope, native_id=args.native_id,
             )
         elif args.command == "interrupted":
             result = cmd_interrupted(resume_handles=args.resume_handles)
@@ -589,6 +751,15 @@ def main(argv=None):
         elif args.command == "item":
             result = cmd_item(
                 args.work_item, args.status, pr=args.pr, title=args.title, plan_path=args.plan_path,
+                execution_key=args.execution_key, provider=args.provider, scope=args.scope,
+                native_id=args.native_id,
+            )
+        elif args.command == "register":
+            result = cmd_register(args.provider, args.scope, args.native_id)
+        elif args.command == "bind":
+            result = cmd_bind(
+                args.work_item, execution_key=args.execution_key, provider=args.provider,
+                scope=args.scope, native_id=args.native_id,
             )
         else:
             raise ValueError(f"Unknown command: {args.command}")
