@@ -6,8 +6,8 @@ profile on a repository's behalf.
 
 ## Repository selection
 
-Selecting `personal@tj-agents` in the source repository's `.agents/plugins.json` selects
-`personal:work-item`. Any other profile is selected by a committed `.problem-records.json` naming its
+Selecting `personal@tj-agents` from the `tj-agents/marketplace` marketplace in the source repository's
+`.agents/plugins.json` selects `personal:work-item`. Any other profile is selected by a committed `.problem-records.json` naming its
 qualified read operation, for example `{"schema_version":1,"provider":"infonetica:work-item"}`; it takes
 precedence. Both are read from the primary checkout, the first non-bare entry of `git worktree list
 --porcelain`, resolved from any worktree or subdirectory; a feature worktree's copy never overrides it.
@@ -25,8 +25,8 @@ Core never adopts a provider.
 A session lists only the skills of the project it started in. When the needed operation is not listed,
 run `python -B <hooks>/problem_records.py --root <repository> --operation create|read|address --harness
 claude|codex` (`python3` on Linux/macOS) and follow the printed `skill`. `<hooks>` is the installed
-engineering plugin's `hooks` directory, two directories above its skill base directories, or `.agents/hooks`
-in a Core checkout. A failure, including a directory outside any repository, blocks the operation.
+engineering plugin's `hooks` directory, beside the `skills` directory that holds its skill base directories,
+or `.agents/hooks` in a Core checkout. A failure, including a directory outside any repository, blocks the operation.
 
 Use only the selected profile's qualified operation. It owns deterministic scripts, factual validation,
 request reconciliation, remote persistence, native type mapping, retention and verified closure. It also

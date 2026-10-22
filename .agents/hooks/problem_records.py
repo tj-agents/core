@@ -50,14 +50,20 @@ def primary_checkout(directory):
 def selects_personal(root):
     path = Path(root) / ".agents" / "plugins.json"
     if path.is_symlink():
-        return False
+        raise RecordError("plugin selection must be a regular repository file")
     try:
         value = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):
         return False
-    marketplace = (value.get("marketplaces") or {}).get("tj-agents") if isinstance(value, dict) else None
-    return (isinstance(value, dict) and value.get("schema_version") == 1 and isinstance(value.get("plugins"), list)
-            and "personal@tj-agents" in value["plugins"] and isinstance(marketplace, dict)
+    if not isinstance(value, dict) or type(value.get("schema_version")) is not int or value["schema_version"] != 1:
+        return False
+    plugins, marketplaces = value.get("plugins"), value.get("marketplaces")
+    if not isinstance(plugins, list) or any(not isinstance(plugin, str) for plugin in plugins):
+        return False
+    if not isinstance(marketplaces, dict) or any(not isinstance(details, dict) for details in marketplaces.values()):
+        return False
+    marketplace = marketplaces.get("tj-agents")
+    return ("personal@tj-agents" in plugins and isinstance(marketplace, dict)
             and marketplace.get("repository") == "tj-agents/marketplace")
 
 
