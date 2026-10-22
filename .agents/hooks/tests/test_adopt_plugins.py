@@ -51,7 +51,7 @@ class AdoptPluginsTests(unittest.TestCase):
         adopt_plugins.run(self.root, ["react"], [], "write")
         self.assertNotIn("personal@tj-agents", self.plugins())
         adopt_plugins.run(self.root, [], ["personal"], "write")
-        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "personal@tj-agents", "react@tj-agents"], self.plugins())
+        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "personal@tj-agents", "react@tj-agents", "workflow@tj-agents"], self.plugins())
         self.assertEqual([], adopt_plugins.run(self.root, [], ["personal"], "check"))
         self.assertEqual([], adopt_plugins.run(self.root, [], ["machine"], "check"))
         claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
@@ -62,7 +62,7 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_infonetica_selects_engineering_without_personal(self):
         adopt_plugins.run(self.root, [], ["infonetica"], "write")
-        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "infonetica@tj-agents", "machine@tj-agents", "work@tj-agents"], self.plugins())
+        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "infonetica@tj-agents", "machine@tj-agents", "work@tj-agents", "workflow@tj-agents"], self.plugins())
         claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
         self.assertTrue(claude["enabledPlugins"]["engineering@tj-agents"])
         codex = (self.root / ".codex/config.toml").read_text(encoding="utf-8")
@@ -142,11 +142,11 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_default_adoption_selects_the_core_packages(self):
         adopt_plugins.run(self.root, [], [], "write")
-        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents"], self.plugins())
+        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents"], self.plugins())
 
     def test_engineering_does_not_select_a_recording_profile(self):
         adopt_plugins.run(self.root, [], ["engineering"], "write")
-        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents"], self.plugins())
+        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents"], self.plugins())
         claude = json.loads((self.root / ".claude" / "settings.json").read_text(encoding="utf-8"))
         self.assertNotIn("work-items@tj-agents", claude["enabledPlugins"])
         self.assertNotIn("personal@tj-agents", claude["enabledPlugins"])
