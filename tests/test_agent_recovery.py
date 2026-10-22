@@ -331,6 +331,16 @@ Observed blocker: no send was attempted."""
         self.assertEqual(environment["force"], {"CLAUDE_CONFIG_DIR": RECOVERY._profile("claude", projects)})
         self.assertNotIn("clear", environment)
 
+    def test_claude_resume_re_passes_native_arguments_before_the_session(self):
+        projects = self.root / "native profile" / "projects"
+        self.write_claude(projects)
+        cli = mock.Mock()
+        cli.resolve_tab_directory.side_effect = lambda value: Path(value)
+        RECOVERY.open_session("claude", "claude_id", prompt="Continue.", roots={"claude": projects}, confirm_closed=True,
+                              cli=cli, native_arguments=["--add-dir", "C:/extra", "--settings", "s.json"])
+        self.assertEqual(["--add-dir", "C:/extra", "--settings", "s.json", "--resume", "claude_id", "Continue."],
+                         cli.open_claude_tab.call_args.args[2])
+
     def test_default_claude_profile_resumes_without_config_dir(self):
         home = self.root / "home"
         projects = home / ".claude" / "projects"

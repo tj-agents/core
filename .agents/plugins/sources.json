@@ -388,8 +388,8 @@
   },
   "extended_host_adapters": [
     "persistent-workflow",
-    "reload-plugins",
-    "review"
+    "review",
+    "sync-plugins"
   ],
   "host_only_terms": {
     "claude": [
