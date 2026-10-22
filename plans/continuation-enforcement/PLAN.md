@@ -1,5 +1,9 @@
 # Prevent premature terminal responses
 
+## Status
+
+Complete — 2026-10-10.
+
 ## Authorization
 
 Standing standards-defect authorization from `engineering:session-guidance` after a Codex session ended twice while an owned PR CI repair loop was active.
@@ -14,7 +18,7 @@ Do not assume the base package alone is sufficient. Determine whether the unmerg
 
 ## Next Steps
 
-Final source 13a22abe36841079c2e07866d8c4148c0ca6595f is pushed in core PR #184. Owner/binding refreshed. Fresh ordinary L4 incremental review b8482a6..13a22ab is in progress; source/package acceptance is recorded below. Exact-head Linux CI is green, Windows is actively monitored. After review and CI gates pass, run current-head PR/body/base preflight, merge, verify causal main regeneration and its complete CI, then complete the canonical goal, remove its owned scheduler/binding and safely close the source worktree. Retain the Rust host checkout and unrelated work.
+Complete. PR #184 is merged, causal package regeneration is verified and main CI 38082168822 passed both complete matrices. Terminal owner and cleanup closeout follow below.
 
 ## Deferred tech debt
 
@@ -109,3 +113,93 @@ Scope boundary: a fresh session without a routed execution obligation does not a
 2026-10-10 exact-head source CI 38076473447 passed guard, Windows and Linux for 13a22ab. Final review retains only R11: noun-subject Do questions changed from read-only to execution after auxiliary narrowing. Preserve sentence punctuation to distinguish the question while retaining direct Do/Have commands and later execution sentences. Coordinated-negation suggestions are pre-existing in the actual route and are excluded from this incremental repair. Fresh exact-head review/CI follow the small correction.
 
 2026-10-10 R11 acceptance: the two routing question/direct-request methods and actual receipt-to-Stop question method passed unchanged timeouts/assertions. The source preserves sentence punctuation before excluding ambiguous Do/Have interrogatives, retaining direct auxiliary commands and separate later execution. Latest main integrated at e63a6e6; no writer remains.
+
+2026-10-10 final source acceptance: exact-head CI 38079457158 passed guard, Windows and Linux at 202b330. Fresh native/general, workflow and authored-trunk security review envelopes validated; parent approved with all R1-R11 resolved. Delivery preflight, merge and causal main regeneration remain.
+
+2026-10-10 delivery acceptance: immutable integrity and both-host coverage passed; final source review approved with security watermark 202b330, exact-head source CI green, fresh body/base/delivery gates passed. PR #184 observed MERGED at 8582a40d81e116830dccbc704d7ee47586f23368; main push run 38082168822 is monitored under continuation-enforcement-main-ci.
+
+## Completion evidence
+
+```completion
+{
+  "outcome": "Shared continuation enforcement repaired, verified, reviewed and merged in tj-agents/core.",
+  "acceptance": [
+    {
+      "id": "cause",
+      "criterion": "Identify the shared cross-repository cause",
+      "evidence": [
+        {
+          "source": "plans/continuation-enforcement/PLAN.md#confirmed-cause",
+          "result": "Injected instructions did not establish durable ownership; missing general continuation Stop enforcement and a transcript-only shutdown listener permitted abandonment. The work plugin supplies no enforcement."
+        }
+      ],
+      "owner": "",
+      "next_action": ""
+    },
+    {
+      "id": "source",
+      "criterion": "Repair and verify shared continuation enforcement",
+      "evidence": [
+        {
+          "source": "https://github.com/tj-agents/core/actions/runs/38079457158",
+          "result": "Exact final 202b330 source passed full Windows and Linux matrices, focused route/Stop checks, package generation and Check; all R1-R11 review findings resolved."
+        }
+      ],
+      "owner": "",
+      "next_action": ""
+    },
+    {
+      "id": "hosts",
+      "criterion": "Verify both source and packaged host mappings",
+      "evidence": [
+        {
+          "source": "C:/Users/TommySeery/source/repos/tj-agents/core/.git/agent-workflow/runs/continuation-enforcement-main-ci/package-proof.json",
+          "result": "Generated continuation_stop.py, workflow_route.py and hook_dispatch.py match approved source byte for byte; both Codex and Claude Stop mappings include the gate. Disposable native Codex Stop continuation observed; normal-profile activation and live Claude acceptance remain separate integration debt."
+        }
+      ],
+      "owner": "",
+      "next_action": ""
+    },
+    {
+      "id": "delivery",
+      "criterion": "Review and merge the exact source head",
+      "evidence": [
+        {
+          "source": "https://github.com/tj-agents/core/pull/184",
+          "result": "Approved source and authored-trunk security review at 202b330; fresh gates passed; PR observed MERGED at 8582a40."
+        }
+      ],
+      "owner": "",
+      "next_action": ""
+    },
+    {
+      "id": "main",
+      "criterion": "Verify causal main regeneration and complete CI",
+      "evidence": [
+        {
+          "source": "https://github.com/tj-agents/core/actions/runs/38082168822",
+          "result": "Full Windows/Linux and regeneration success at exact merge 8582a40; bot commit e75234f explicitly regenerates this merge."
+        }
+      ],
+      "owner": "",
+      "next_action": ""
+    }
+  ],
+  "deliveries": [
+    {
+      "repository": "tj-agents/core",
+      "pr": 184,
+      "head": "202b330ca177ecbf36ac7fd0a12f21e9dbd00a3d"
+    }
+  ],
+  "open_tasks": []
+}
+```
+
+## Terminal closeout
+
+2026-10-10: canonical completion check passed with no open tasks; durable owner reached complete. Exact owned scheduler task is absent and the terminal delivery binding was released. Full main CI and causal generated-package evidence remain in the common Git workflow state. The completed goal and review are retained in the primary core checkout; Rust remains the retained host.
+
+Cleanup verified: core source worktree and owned local branch removed without force; Rust host retained; all six existing primary changes preserved byte for byte. Terminal owner, CI, package and cleanup evidence persist in common Git workflow state.
+
+Own-session closure attempted after completion through the canonical close.py helper; observer startup was not confirmed and the session remained open. Owning host debt is recorded in .agents/machine/TECH_DEBT.md. This does not reopen the delivered continuation source repair or imply normal-profile activation.

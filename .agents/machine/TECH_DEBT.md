@@ -133,3 +133,95 @@ their canonical home in `.agents`; platform folders should contain only OS-speci
 OS-specific integration into its owning directories, and update installation, packaging and imports
 with Windows and Linux verification. Keep this structural change separate from the functional Linux
 port so each delivery remains reviewable.
+
+## Own-session closure can fail before the exit observer confirms startup
+
+On 2026-10-10, after core PR #184 merged and its full causal main CI passed, the canonical Windows `peer-cli/scripts/close.py` ran from the retained Rust host checkout and refused with `session exit observer did not confirm startup`. The source worktree and branch had already been safely removed, and the terminal continuation task and binding were absent. The session remained open. Record this host failure separately from continuation enforcement under Tommy's direction to note unrelated host issues as debt. No startup cause is established and no process-identity check was bypassed.
+
+**Resolution condition.** A fresh native Windows own-session close confirms the matching observer startup and armed receipts, records exit of the exact registered host identity, closes its uniquely identified tab when supported, and preserves other sessions and the retained checkout. Diagnose the failed handshake before changing timeout or ownership checks.
+
+## D-MACHINE-TASK-TITLES: Terminal names must explain the current task
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-11, Tommy could not identify the agents by their names. On 2026-10-12
+  he clarified the exact visible symptom: `Read handoff...`. Inspection confirms two native Codex names,
+  `Read handoff instructions` and `Read and follow handoff instructions`, despite descriptive titles in
+  launcher arguments and the peer registry. The earlier record was too vague and did not check this surface.
+- **Impact and priority:** P2; generic labels obscure independent tasks and force chat inspection.
+- **Source owner:** core machine launch/resume naming contract; engineering handoff supplies the task name.
+- **State:** open.
+- **Repair link:** [BUGS.md B006](../../BUGS.md#b006-native-handoff-sessions-display-generic-read-instruction-names)
+  owns the concrete native-name failure and its evidence. This debt owns the naming/acceptance convention;
+  it does not create another runtime repair. Worktree names remain separately owned by
+  [D-ENGINEERING-WORKTREE-NAMES](../engineering/policy/git-branching/TECH_DEBT.md#d-engineering-worktree-names-worktree-and-branch-names-must-describe-the-active-change).
+- **Next action:** require concrete task names and verification of the native session list and actual
+  visible terminal labels after startup/resume. Stop treating a correct launch argument or registry value
+  as proof that the user sees that name.
+- **Resolution condition:** new and resumed contexts visibly describe their work; the convention rejects
+  generic `Read handoff...`/`Read the file...` names and preserves the exact existing context when renaming.
+  Verify native names and visible terminal labels on supported hosts, linked to B006's runtime evidence.
+- **Verification evidence:** user correction, two native-index matches, launcher and peer-registry titles,
+  and inspected launch/resume code. Both convention correction and runtime acceptance remain outstanding.
+  Repeated 2026-10-14: Tommy reports that open-CLI and handoff terminal names still do not
+  explain the session purpose.
+
+## D-MACHINE-SQLITE-OWNER-DISCOVERY: Review work has no discoverable work-item association
+
+- **Kind:** bug. **Observed/reported:** 2026-10-21 while locating the owner of review-skill trimming,
+  injected-standards selection and the unfinished big-review rename.
+- **Evidence:** a read-only query of `~/.agents-state/sessions.db` found 11 work items and 93 sessions,
+  no review work item, and one review-related session whose `work_item` and `role` were null. The local
+  checkout's recovery helper scans native histories; current `origin/main` already documents SQLite-first
+  discovery. This establishes missing association and stale helper use, not a failed SQL engine.
+- **Impact and priority:** P2; owner discovery requires history searches instead of a direct work-item,
+  checkout and native-session lookup.
+- **Source owner:** Core machine session registration and recovery. **State:** deferred at Tommy's explicit
+  request; repair separately from the review capability changes.
+- **Next action:** identify why this work was not registered, reconcile its exact existing owner, and
+  verify that the active discovery entry point uses the published SQLite-first implementation. Assess
+  registration and migration coverage before selecting a repair; do not invent an owner association.
+- **Resolution condition:** a topic query finds the actual review work item, its current worktree and
+  exact native owner through SQLite, with explicit ambiguity or missing-registration results and no
+  duplicate owner launched. Verify both supported hosts and retain native history only as fallback.
+
+## D-MACHINE-STALE-MARKETPLACE-INVENTORY
+
+Observed 2026-10-21 during review-capability delivery: `codex plugin list --json` failed because cpp-agents points to `C:/Users/TommySeery/source/repos/tj-agents/cpp.worktrees/Feature-ExplanationSkill`, which has no supported marketplace manifest. The launcher returned exit zero despite the typed CLI failure. This blocks native inventory and review; repair the configuration and exit-status propagation in their owning runtime work, then verify installed review. Keep this outside the review capability PR.
+
+## D-MACHINE-REVIEW-LENS-MODEL
+
+Observed 2026-10-21: the review_lens agent failed before starting because gpt-5.3-codex-spark is unsupported with this ChatGPT account. A lane_l4 read-only reviewer started successfully. Resolve by selecting a supported review model and observing a completed dispatch rather than treating spawn acceptance as execution.
+
+## D-MACHINE-REVIEW-PREPARE-CACHE-COST
+
+Observed 2026-10-21: review-prepare took many minutes before returning a candidate while the shared Git-private runs tree held 499 descriptors. The restricted attempt ultimately reported Access denied for its run directory, and duplicated recovery was stopped. Investigate the exact slow operation and permission boundary; candidate preparation should not stall behind unrelated historical review housekeeping. Keep this outside the review capability PR.
+
+## D-MACHINE-WINDOWS-EMPTY-GIT-CONFIG-ENV
+
+Observed 2026-10-21: test_stack_tiers had two Git fixture failures with missing GIT_CONFIG_VALUE_1 after unittest environment restoration. All 34 passed in a child fixture environment without inherited command-line Git configuration. The inherited environment contains empty Git config values; investigate Windows restoration of those values without changing production Git configuration or weakening any tests.
+
+## D-MACHINE-PR-MONITOR-MERGE-STATE-NOISE
+
+Observed 2026-10-21 during review/capability, PR #338 at 7809ddcf. Reconnecting the existing PR monitor returned a nonterminal material-transition when merge_state alternated unknown/unstable while state=open, auto_merge=false and the same two Windows checks remained pending. That creates active model work without a useful delivery transition. Investigate normalization/debouncing of transient forge merge state in a separate automation task; preserve real queue/merge/failure transitions. No monitor fix belongs in this review capability PR.
+
+## D-MACHINE-AUTO-REVIEW-MERGE-TIMEOUT
+
+Observed 2026-10-21 while landing review/capability, PR #338. Automatic permission approval review exceeded its deadline for a combined verification-and-merge command before executing it. A fresh read proved all exact-head checks green; base reconciliation passed; the permitted one-time retry with only the pinned merge command succeeded. Investigate review latency for bounded multi-step commands separately. Do not treat an approval timeout as evidence that an authorized merge is unsafe.
+
+## D-MACHINE-PRIMARY-SYNC-PRESERVATION
+
+During review/capability closeout on 2026-10-21, a safe primary fast-forward from 1bb1c130 to merged main aborted because existing tracked and untracked local notes overlap incoming files. All local edits were preserved and only the two isolated delivery worktrees were removed after cleanup proof. Handle primary sync as separate preservation/reconciliation work; do not reset or discard those notes.
+
+## D-MACHINE-WORK-ITEM-RETIRED-PLAN-PATH
+
+The work-item done command rejected --plan-path after the plan was deleted in merged closeout PR #341. Recovery used the frozen reviewed helper from the primary checkout containing the preserved local completion record; review/capability is now done and its owner session is finished. Reconcile plan-retirement ordering and historical plan references in separate workflow work so closing a delivered item does not depend on a retired repository file being present in the current checkout.
+
+## D-MACHINE-PREAWARD-PLUGIN-READINESS
+
+2026-10-21 follow-up to review/capability, handed to the separate plugin freshness/launch work described by Tommy (SYMMETRIC_PLUGIN_LAUNCH.md). Do not restore the retired expensive per-launch network wrapper as an incidental review fix.
+
+Observed: the installed Codex engineering review entry was still kind=workflow after source PR #338 and generated publication. The native refresh installed the new kind=utility entry and shipped selected-rules helper. Current Preaward selection at infonetica/cris-preaward/.agents/plugins.json is excluded by .git/info/exclude and declares base, dotnet, engineering, infonetica, machine, react and work from tj-agents. The refreshed review_rules.py now resolves this exact selection successfully with no diagnostics, returning .NET, relevant employer and other applicable conventions. This was a standards-scope preflight, not a code review or a fresh Codex-session adoption test.
+
+Repaired a concrete inventory blocker through the native marketplace add command: the global cpp-agents source pointed to the nonexistent tj-agents/cpp.worktrees/Feature-ExplanationSkill. The canonical tj-agents/cpp publisher has the same cpp-agents marketplace identity and was registered in its place. The prior native configuration was backed up under ~/.agents-state/repair-backups/review-preaward. Native plugin inventory now works.
+
+Remaining automation evidence for that owner: the default reload utility read the merged native enabled list and stopped on kit@tj-agents, which is absent from the current marketplace despite not being selected by Preaward. A bounded recovery reused the shipped helper functions limited to the seven exact project-selected identities; all seven native refresh commands completed. The full native-byte verification then reported dotnet@tj-agents differs from its marketplace publisher bytes. Marketplace checkout and remote main both were 2aa887fbc590baa8e03ff6f7e762180414bf90be. No root cause inferred: check mutable local-version cache reuse, source revision changes during verification, and selected-scope handling. Do not label package freshness or already-open session adoption as verified. No updater/wrapper implementation was changed here; that separate agent owns freshness, launch symmetry and running-session behavior. Tommy should not have to execute refresh maintenance manually.
