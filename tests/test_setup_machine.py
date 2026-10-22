@@ -361,6 +361,43 @@ class HiddenBashTests(Machine):
         self.assertFalse((self.checkout / "shell" / "hidden-bash.exe").exists())
         self.assertFalse((self.checkout / "shell" / "hidden-bash.build.exe").exists())
 
+    def test_rebuilding_renames_the_running_proxy_aside_instead_of_replacing_it(self):
+        proxy = self.checkout / "shell" / "hidden-bash.exe"
+        proxy.write_bytes(b"old")
+        build = proxy.with_name("hidden-bash.build.exe")
+        build.write_bytes(b"new")
+
+        setup.install_hidden_bash(build, proxy)
+
+        self.assertEqual(b"new", proxy.read_bytes())
+        self.assertFalse(build.exists())
+        first_asides = setup.hidden_bash_stale_asides(proxy)
+        self.assertEqual(1, len(first_asides))
+        self.assertEqual(b"old", first_asides[0].read_bytes())
+
+        second_build = proxy.with_name("hidden-bash.build.exe")
+        second_build.write_bytes(b"newer")
+        setup.install_hidden_bash(second_build, proxy)
+
+        self.assertEqual(b"newer", proxy.read_bytes())
+        second_asides = setup.hidden_bash_stale_asides(proxy)
+        self.assertEqual(1, len(second_asides))
+        self.assertEqual(b"new", second_asides[0].read_bytes())
+        self.assertNotEqual(first_asides[0], second_asides[0])
+
+    def test_a_stale_aside_that_cannot_be_deleted_is_ignored(self):
+        proxy = self.checkout / "shell" / "hidden-bash.exe"
+        proxy.write_bytes(b"old")
+        stuck = proxy.with_name(f"{proxy.stem}.stale-stuck{proxy.suffix}")
+        stuck.mkdir()
+        build = proxy.with_name("hidden-bash.build.exe")
+        build.write_bytes(b"new")
+
+        setup.install_hidden_bash(build, proxy)
+
+        self.assertEqual(b"new", proxy.read_bytes())
+        self.assertTrue(stuck.is_dir())
+
     def test_hidden_bash_is_windows_only(self):
         out = io.StringIO()
         setup.run_steps([step("hidden Git Bash for Claude")], self.context(windows=False), False, out)

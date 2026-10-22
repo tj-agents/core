@@ -390,6 +390,22 @@ def check_hidden_bash(context: Context) -> list[str]:
     return (["build shell/hidden-bash.exe"] if stale else []) + [f"set user {name}" for name in variables]
 
 
+def hidden_bash_stale_asides(proxy: Path) -> list[Path]:
+    return sorted(proxy.parent.glob(f"{proxy.stem}.stale-*{proxy.suffix}"))
+
+
+def install_hidden_bash(build: Path, proxy: Path) -> None:
+    for stale in hidden_bash_stale_asides(proxy):
+        try:
+            stale.unlink()
+        except OSError:
+            pass
+    if proxy.exists():
+        aside = proxy.with_name(f"{proxy.stem}.stale-{secrets.token_hex(4)}{proxy.suffix}")
+        os.replace(proxy, aside)
+    os.replace(build, proxy)
+
+
 def build_hidden_bash(context: Context, real: str) -> None:
     source, proxy = hidden_bash_paths(context)
     compiler = context.which("clang.exe") or context.which("gcc.exe")
@@ -407,7 +423,7 @@ def build_hidden_bash(context: Context, real: str) -> None:
                             env={**context.environ, "TJ_AGENTS_REAL_GIT_BASH": real})
         if probe.returncode != 73 or probe.stdout != "HIDDEN_BASH_OK":
             raise SetupError("The hidden Bash proxy did not preserve Bash output and exit status")
-        os.replace(build, proxy)
+        install_hidden_bash(build, proxy)
     finally:
         build.unlink(missing_ok=True)
 
