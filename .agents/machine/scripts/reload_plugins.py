@@ -20,7 +20,8 @@ import launch_check
 import plugin_autoupdate
 
 TIMEOUT = 300
-ADOPTION = "Claude: /reload-plugins adopts updates in open sessions. Codex: resume the conversation in a new process."
+IN_USE = ".in_use"
+ADOPTION = "Codex adopts updates when the conversation resumes in a new process."
 
 
 class RefreshError(RuntimeError):
@@ -83,34 +84,101 @@ def run(command: list[str], project: Path) -> str:
     return result.stdout
 
 
-def refresh(host: str, executable: str, project: Path, marketplaces: dict, plugins: list[str]) -> None:
+def applies(entry: dict, project: Path) -> bool:
+    if entry.get("scope") in {"user", "managed"}:
+        return True
+    owner = entry.get("projectPath")
+    return bool(owner) and project.resolve().is_relative_to(Path(owner).resolve())
+
+
+def path_key(path: object) -> str:
+    return os.path.normcase(str(Path(path).resolve()))
+
+
+def declared_scopes(identity: str, project: Path) -> list[str]:
+    return [scope for scope, name in (("project", "settings.json"), ("local", "settings.local.json"))
+            if read_json(project / ".claude" / name).get("enabledPlugins", {}).get(identity) is True]
+
+
+def update_targets(identity: str, project: Path, installations: list) -> list[tuple[str, Path]]:
+    declared = declared_scopes(identity, project)
+    targets = {(scope, path_key(project)): (scope, project) for scope in declared or ["user"]}
+    for entry in installations:
+        scope = entry.get("scope")
+        if entry.get("id") != identity or scope not in {"user", "project", "local"} or not applies(entry, project):
+            continue
+        owner = project if scope == "user" else Path(entry["projectPath"])
+        targets.setdefault((scope, path_key(owner)), (scope, owner))
+    return [targets[key] for key in sorted(targets)]
+
+
+def update_result(output: str, identity: str, scope: str) -> dict:
+    for line in reversed(output.splitlines()):
+        try:
+            value = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(value, dict):
+            break
+    else:
+        raise RefreshError(f"{identity} ({scope}): claude plugin update printed no result")
+    outcome = value.get("updateOutcome")
+    if outcome not in {"updated", "up_to_date"} or value.get("refreshFailed") or not value.get("newVersion"):
+        raise RefreshError(f"{identity} ({scope}) was not updated: {value.get('message') or outcome}")
+    return value
+
+
+def plugin_errors(installations: list, project: Path) -> list[str]:
+    return [f"{entry.get('id')} ({entry.get('scope')}): {error}" for entry in installations
+            if entry.get("enabled") is True and applies(entry, project) for error in entry.get("errors") or []]
+
+
+def persistence_problems(expected: list[tuple[str, str, Path, str]], installations: list) -> list[str]:
+    problems = []
+    for identity, scope, owner, version in expected:
+        entry = next((entry for entry in installations if entry.get("id") == identity and entry.get("scope") == scope
+                      and (scope == "user" or entry.get("projectPath") and path_key(entry["projectPath"]) == path_key(owner))),
+                     None)
+        if entry is None or entry.get("version") != version:
+            found = entry.get("version") if entry else "nothing"
+            problems.append(f"{identity} ({scope}) update did not persist: installed_plugins.json has {found}, "
+                            f"the update reported {version}")
+    return problems
+
+
+def refresh_claude(executable: str, project: Path, plugins: list[str]) -> list[str]:
+    installations = json.loads(run([executable, "plugin", "list", "--json"], project))
+    expected, updated = [], []
+    for identity in plugins:
+        for scope in declared_scopes(identity, project):
+            run([executable, "plugin", "install", identity, "--scope", scope], project)
+        for scope, owner in update_targets(identity, project, installations):
+            result = update_result(run([executable, "plugin", "update", identity, "--scope", scope, "--json"], owner),
+                                   identity, scope)
+            expected.append((identity, scope, owner, result["newVersion"]))
+            if result["updateOutcome"] == "updated" and identity not in updated:
+                updated.append(identity)
+    after = json.loads(run([executable, "plugin", "list", "--json"], project))
+    problems = persistence_problems(expected, after) + plugin_errors(after, project)
+    if problems:
+        raise RefreshError("; ".join(problems))
+    return updated
+
+
+def refresh(host: str, executable: str, project: Path, marketplaces: dict, plugins: list[str]) -> list[str]:
     known = read_json(configuration_root(host) / "plugins/known_marketplaces.json") if host == "claude" else {}
     for name in marketplaces:
         if host == "claude" and name not in known:
             run([executable, "plugin", "marketplace", "add", marketplaces[name]], project)
         run([executable, "plugin", "marketplace", "update" if host == "claude" else "upgrade", name], project)
-    installations = (json.loads(run([executable, "plugin", "list", "--json"], project))
-                     if host == "claude" and plugins else [])
+    if host == "claude":
+        return refresh_claude(executable, project, plugins) if plugins else []
     user_config = configuration_root(host) / "config.toml"
     user_enabled = plugin_autoupdate.enabled_identities(plugin_autoupdate.load_toml(user_config))
     for identity in plugins:
-        if host == "claude":
-            declared = {scope for scope, name in (("project", "settings.json"), ("local", "settings.local.json"))
-                        if read_json(project / ".claude" / name).get("enabledPlugins", {}).get(identity) is True}
-            scopes = set(declared) or {"user"}
-            for entry in installations:
-                owner = entry.get("projectPath")
-                if (entry.get("id") == identity and entry.get("scope") == "local" and owner
-                        and project.resolve().is_relative_to(Path(owner).resolve())):
-                    scopes.add("local")
-            for scope in sorted(declared):
-                run([executable, "plugin", "install", identity, "--scope", scope], project)
-            for scope in sorted(scopes):
-                run([executable, "plugin", "update", identity, "--scope", scope], project)
-        else:
-            run([executable, "plugin", "add", identity], project)
-    if host == "codex":
-        plugin_autoupdate.remove_user_plugins(user_config, set(plugins) - user_enabled)
+        run([executable, "plugin", "add", identity], project)
+    plugin_autoupdate.remove_user_plugins(user_config, set(plugins) - user_enabled)
+    return []
 
 
 def publishers(name: str, plugins: list[str]) -> set[str]:
@@ -121,13 +189,15 @@ def publishers(name: str, plugins: list[str]) -> set[str]:
             if isinstance(entry, dict) and entry.get("name") in wanted and isinstance(entry.get("source"), dict)}
 
 
-def refresh_repositories(project: Path, repositories: set[str]) -> bool:
+def refresh_repositories(project: Path, repositories: set[str], updated: set[str] | None = None) -> bool:
     marketplaces, plugins = selection("claude", "", project)
     chosen = {name: repo for name, repo in marketplaces.items()
               if repo in repositories or publishers(name, plugins) & repositories}
     if chosen:
-        refresh("claude", agent_cli.resolve_claude_executable(), project, chosen,
-                [identity for identity in plugins if identity.rsplit("@", 1)[1] in chosen])
+        changed = refresh("claude", agent_cli.resolve_claude_executable(), project, chosen,
+                          [identity for identity in plugins if identity.rsplit("@", 1)[1] in chosen])
+        if updated is not None:
+            updated.update(changed)
     return True
 
 
@@ -136,9 +206,12 @@ def package_tree(root: Path) -> dict[str, bytes]:
         raise RefreshError(f"Missing plugin directory: {root}")
     result = {}
     for path in root.rglob("*"):
+        parts = path.relative_to(root).parts
+        if parts[0] == IN_USE:
+            continue
         if path.is_symlink():
             raise RefreshError(f"Unexpected plugin symlink: {path}")
-        if path.is_file() and ".git" not in path.relative_to(root).parts:
+        if path.is_file() and ".git" not in parts:
             result[path.relative_to(root).as_posix()] = path.read_bytes()
     return result
 
@@ -183,10 +256,11 @@ def verify_packages(host: str, executable: str, project: Path, marketplaces: dic
     inventory = json.loads(run([executable, "plugin", "list", "--json"], project))
     entries = inventory if host == "claude" else inventory.get("installed", [])
     if host == "claude":
-        entries = [entry for entry in entries if entry.get("scope") in {"user", "managed"}
-                   or entry.get("projectPath") and project.resolve().is_relative_to(Path(entry["projectPath"]).resolve())]
+        entries = [entry for entry in entries if applies(entry, project)]
     installed = {entry.get("id", entry.get("pluginId")) for entry in entries if entry.get("enabled") is True}
     problems = [f"Missing enabled native installation: {identity}" for identity in plugins if identity not in installed]
+    if host == "claude":
+        problems += plugin_errors(entries, project)
     revisions = {}
     publishers = {}
     for name, repo in marketplaces.items():
@@ -235,37 +309,107 @@ def verify_packages(host: str, executable: str, project: Path, marketplaces: dic
     return {"host": host, "plugins": plugins, "marketplaces": revisions, "problems": problems}
 
 
+def executable_for(host: str) -> str:
+    return agent_cli.resolve_claude_executable() if host == "claude" else agent_cli.resolve_codex_executable()[0]
+
+
+def review_legacy(hosts: tuple[str, ...], project: Path) -> tuple[list[str], dict[str, list[str]]]:
+    import legacy_marketplaces
+
+    removed, problems = [], {}
+    for host in hosts:
+        try:
+            gone, found = legacy_marketplaces.review(host, project, lambda host=host: executable_for(host), run)
+        except (RefreshError, agent_cli.LaunchError, OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
+            gone, found = [], [f"legacy marketplace review failed: {error}"]
+        removed += gone
+        if found:
+            problems[host] = found
+    return removed, problems
+
+
+def relaunch_session(project: Path, updated: set[str]) -> dict | None:
+    import session_relaunch
+
+    identity = session_relaunch.session_identity()
+    if identity is None:
+        return None
+    installed = read_json(configuration_root("claude") / "plugins/installed_plugins.json").get("plugins") or {}
+    _, plugins = selection("claude", "", project)
+    stale = session_relaunch.stale_plugins(identity[1], project, plugins, installed, updated)
+    if not stale:
+        return None
+    if os.environ.get("CLAUDE_CODE_CHILD_SESSION"):
+        return {"relaunch": "skipped", "stale": stale, "reason": "a child session cannot relaunch its parent; "
+                                                              "run sync-plugins from the parent session"}
+    try:
+        result = session_relaunch.relaunch(project, installed)
+    except Exception as error:
+        return {"relaunch": "failed", "stale": stale, "error": str(error)}
+    print("plugins: this Claude session closes when the turn ends and resumes in a fresh process with "
+          + ", ".join(stale), file=sys.stderr)
+    return {**result, "stale": stale}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", choices=("claude", "codex", "both"), default="both")
     parser.add_argument("--project", type=Path, default=Path.cwd())
+    parser.add_argument("--no-relaunch", action="store_true", help="Never relaunch the calling Claude session")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--all", action="store_true", help="Refresh every selected plugin, not only published changes")
     modes.add_argument("--verify", action="store_true", help="Refresh, then inspect native installations and remote main revisions")
     modes.add_argument("--verify-only", action="store_true", help="Inspect without changing plugins")
     arguments = parser.parse_args(argv)
+    project = arguments.project.resolve()
+    hosts = ("claude", "codex") if arguments.host == "both" else (arguments.host,)
+    updated: set[str] = set()
+    removed, legacy = review_legacy(hosts, project)
+    relaunch_allowed = "claude" in hosts and not arguments.no_relaunch and not arguments.verify_only
     if not (arguments.all or arguments.verify or arguments.verify_only):
-        result = launch_check.check(arguments.project.resolve())
+        result = launch_check.check(project, update=lambda host, repositories, root:
+                                    launch_check.update_host(host, repositories, root, updated))
         if result != "unconfigured":
-            print(json.dumps({"check": result}))
+            summary = {"check": result}
+            if removed:
+                summary["legacy_removed"] = removed
+            if legacy:
+                summary["legacy_problems"] = legacy
+            relaunched = relaunch_session(project, updated) if relaunch_allowed and result != "failed" else None
+            if relaunched:
+                summary["claude"] = relaunched
+            print(json.dumps(summary, indent=2))
             if result == "updated":
                 print(ADOPTION, file=sys.stderr)
-            return int(result in {"failed", "offline", "busy"})
-    hosts = ("claude", "codex") if arguments.host == "both" else (arguments.host,)
+            for line in [line for found in legacy.values() for line in found]:
+                print("plugins: " + line, file=sys.stderr)
+            failed = bool(legacy) or bool(relaunched and relaunched["relaunch"] == "failed")
+            return int(result in {"failed", "offline", "busy"} or failed)
     reports = []
     for host in hosts:
         try:
-            executable = (agent_cli.resolve_claude_executable() if host == "claude"
-                          else agent_cli.resolve_codex_executable()[0])
-            marketplaces, plugins = selection(host, executable, arguments.project.resolve())
-            if not arguments.verify_only:
-                refresh(host, executable, arguments.project.resolve(), marketplaces, plugins)
-            report = (verify(host, executable, arguments.project.resolve(), marketplaces, plugins)
+            executable = executable_for(host)
+            marketplaces, plugins = selection(host, executable, project)
+            changed = [] if arguments.verify_only else refresh(host, executable, project, marketplaces, plugins)
+            updated.update(changed)
+            report = (verify(host, executable, project, marketplaces, plugins)
                       if arguments.verify or arguments.verify_only else {"host": host, "plugins": plugins, "problems": []})
         except (RefreshError, agent_cli.LaunchError, OSError, ValueError, RuntimeError, KeyError, TypeError, subprocess.TimeoutExpired) as error:
             report = {"host": host, "problems": [str(error)]}
+        refreshed = not report["problems"]
+        report["problems"] = report["problems"] + legacy.get(host, [])
+        report["legacy_removed"] = [name for name in removed if name.startswith(host + ":")]
+        if host == "claude" and relaunch_allowed and refreshed:
+            relaunched = relaunch_session(project, updated)
+            if relaunched:
+                report["relaunch"] = relaunched
+                if relaunched["relaunch"] == "failed":
+                    report["problems"].append("relaunch failed: " + relaunched["error"])
         reports.append(report)
     print(json.dumps(reports, indent=2))
+    for report in reports:
+        for problem in report["problems"]:
+            print(f"plugins: {report['host']}: {problem}", file=sys.stderr)
     print(ADOPTION, file=sys.stderr)
     return int(any(report["problems"] for report in reports))
 
