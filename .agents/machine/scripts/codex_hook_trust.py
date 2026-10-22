@@ -275,7 +275,7 @@ def main(argv=None):
     parser.add_argument("--project", type=Path, default=Path.cwd())
     parser.add_argument("--preview", action="store_true")
     arguments = parser.parse_args(argv)
-    if os.environ.get("BASE_AGENTS_CODEX_HOOK_TRUST", "").casefold() == "off":
+    if os.environ.get("TJ_AGENTS_CODEX_HOOK_TRUST", "").casefold() == "off":
         return 0
     try:
         updates = apply_trust(arguments.codex, arguments.project.resolve(strict=True), arguments.preview)

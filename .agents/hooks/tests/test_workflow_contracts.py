@@ -736,7 +736,7 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.assertEqual('name = "personal-former-name"\n', former_profile.read_text(encoding="utf-8"))
                     self.assertEqual('name = "former"\n', former.read_text(encoding="utf-8"))
                     self.assertFalse((project_target / generated[0].name).exists())
-                    ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
+                    ownership = json.loads((target / ".tj-agents-delivery.json").read_text(encoding="utf-8"))
                     self.assertEqual([path.name for path in generated], sorted(item["name"] for item in ownership["files"]))
 
                     verified = subprocess.run(
@@ -826,7 +826,7 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.assertEqual(
                         sorted([unrelated_profile, former_profile]), sorted(target.glob("*.toml"))
                     )
-                    self.assertFalse((target / ".base-agents-delivery.json").exists())
+                    self.assertFalse((target / ".tj-agents-delivery.json").exists())
 
                     environment = os.environ.copy()
                     environment["CODEX_HOME"] = str(codex_home)
@@ -877,7 +877,7 @@ class WorkflowGenerationTests(unittest.TestCase):
                         text=True,
                     )
                     self.assertEqual(0, applied.returncode, applied.stderr)
-                    ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
+                    ownership = json.loads((target / ".tj-agents-delivery.json").read_text(encoding="utf-8"))
                     self.assertNotIn(generated[0].name, [item["name"] for item in ownership["files"]])
                     removed = subprocess.run(
                         [
@@ -917,7 +917,7 @@ class WorkflowGenerationTests(unittest.TestCase):
                     # ownership manifest. The retry may adopt only files named with the journal's exact digest.
                     pending = {
                         "schema_version": 1,
-                        "owner": "base-agents",
+                        "owner": "tj-agents",
                         "files": [
                             {
                                 "name": path.name,
@@ -926,7 +926,7 @@ class WorkflowGenerationTests(unittest.TestCase):
                             for path in generated
                         ],
                     }
-                    (target / ".base-agents-delivery.pending.json").write_text(
+                    (target / ".tj-agents-delivery.pending.json").write_text(
                         json.dumps(pending), encoding="utf-8"
                     )
                     shutil.copy2(generated[0], target / generated[0].name)
@@ -945,8 +945,8 @@ class WorkflowGenerationTests(unittest.TestCase):
                         text=True,
                     )
                     self.assertEqual(0, recovered.returncode, recovered.stderr)
-                    self.assertFalse((target / ".base-agents-delivery.pending.json").exists())
-                    ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
+                    self.assertFalse((target / ".tj-agents-delivery.pending.json").exists())
+                    ownership = json.loads((target / ".tj-agents-delivery.json").read_text(encoding="utf-8"))
                     self.assertEqual([path.name for path in generated], sorted(item["name"] for item in ownership["files"]))
 
                     upgraded_content = generated[0].read_bytes() + b"\n# upgraded\n"
@@ -974,6 +974,106 @@ class WorkflowGenerationTests(unittest.TestCase):
                     )
                     self.assertEqual(0, removed.returncode, removed.stderr)
                     self.assertFalse(target.exists())
+
+    def test_codex_installer_migrates_the_legacy_ownership_manifest_in_place(self):
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    bundle = root / "bundle" / ".codex"
+                    shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", bundle / "agents")
+                    script = bundle / "install-workflow-agents.ps1"
+                    shutil.copy2(ROOT / ".codex" / script.name, script)
+                    shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
+                    codex_home = root / "codex-home"
+                    target = codex_home / "agents"
+
+                    def run(*flags):
+                        return subprocess.run(
+                            [*arguments, "-File", str(script), "-CodexHome", str(codex_home), *flags],
+                            capture_output=True,
+                            text=True,
+                        )
+
+                    installed = run("-Apply")
+                    self.assertEqual(0, installed.returncode, installed.stderr)
+                    current = target / ".tj-agents-delivery.json"
+                    legacy = target / ".base-agents-delivery.json"
+                    ownership = json.loads(current.read_text(encoding="utf-8"))
+                    self.assertEqual("tj-agents", ownership["owner"])
+                    ownership["owner"] = "base-agents"
+                    legacy.write_text(json.dumps(ownership), encoding="utf-8")
+                    current.unlink()
+
+                    verified = run("-Verify")
+                    self.assertEqual(0, verified.returncode, verified.stderr)
+                    migrated = run("-Apply")
+                    self.assertEqual(0, migrated.returncode, migrated.stderr)
+                    self.assertFalse(legacy.exists())
+                    self.assertEqual("tj-agents", json.loads(current.read_text(encoding="utf-8"))["owner"])
+                    self.assertEqual(sorted(item["name"] for item in ownership["files"]),
+                                     sorted(item["name"] for item in json.loads(current.read_text(encoding="utf-8"))["files"]))
+                    self.assertIn("INSTALLED: 0 change(s)", migrated.stdout)
+
+                    legacy.write_text(json.dumps(ownership), encoding="utf-8")
+                    healed = run("-Apply")
+                    self.assertEqual(0, healed.returncode, healed.stderr)
+                    self.assertFalse(legacy.exists())
+                    self.assertEqual("tj-agents", json.loads(current.read_text(encoding="utf-8"))["owner"])
+
+                    conflicting = dict(ownership)
+                    conflicting["files"] = [{"name": "unknown.toml", "sha256": "A" * 64}]
+                    legacy.write_text(json.dumps(conflicting), encoding="utf-8")
+                    ambiguous = run("-Apply")
+                    self.assertNotEqual(0, ambiguous.returncode)
+                    self.assertIn("legacy", ambiguous.stderr)
+
+    def test_codex_installer_verify_uses_current_ownership_when_legacy_is_a_migrated_subset(self):
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    bundle = root / "bundle" / ".codex"
+                    source = bundle / "agents"
+                    shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
+                    script = bundle / "install-workflow-agents.ps1"
+                    shutil.copy2(ROOT / ".codex" / script.name, script)
+                    shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
+                    codex_home = root / "codex-home"
+                    target = codex_home / "agents"
+
+                    def run(*flags):
+                        return subprocess.run(
+                            [*arguments, "-File", str(script), "-CodexHome", str(codex_home), *flags],
+                            capture_output=True,
+                            text=True,
+                        )
+
+                    installed = run("-Apply")
+                    self.assertEqual(0, installed.returncode, installed.stderr)
+                    current = target / ".tj-agents-delivery.json"
+                    legacy = target / ".base-agents-delivery.json"
+                    ownership = json.loads(current.read_text(encoding="utf-8"))
+                    retiring = ownership["files"][0]["name"]
+
+                    # A legacy manifest proven migrated (every entry matches current exactly) but a strict
+                    # subset that omits the role this run retires from the generated bundle.
+                    subset = dict(ownership)
+                    subset["owner"] = "base-agents"
+                    subset["files"] = [item for item in ownership["files"] if item["name"] != retiring]
+                    legacy.write_text(json.dumps(subset), encoding="utf-8")
+
+                    (source / retiring).unlink()
+                    (target / retiring).unlink()
+
+                    verified = run("-Verify")
+                    self.assertNotEqual(0, verified.returncode)
+                    self.assertIn("owned role missing", verified.stderr)
+                    self.assertIn(retiring, verified.stderr)
 
     def test_codex_installer_migrates_only_digest_proven_former_project_agents(self):
         hosts = powershell_hosts()
