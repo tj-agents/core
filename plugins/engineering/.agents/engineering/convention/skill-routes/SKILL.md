@@ -36,7 +36,7 @@ of its own service repo. It ports verbatim. A row keyed on **location** — a to
 Only the two **area floors** are location-keyed, and they change in exactly one way: the monorepo anchors
 them under `api/` and `app/`; a carved single-stack repo anchors its floor at its own root. Everything
 else — the layer routes, every name-shaped row, and the meta rows (`^plans/…`, `^reviews/…`, an
-`AGENTS.md`, a `TECH_DEBT.md`) whose directories exist in every repo alike — carries no monorepo path and
+`AGENTS.md`) whose directories exist in every repo alike — carries no monorepo path and
 ports unchanged.
 
 ## A carved repo is registered here; it carries no table

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plugin": "base-agents/machine",
+  "plugin": "tj-agents/machine",
   "source_roots": [
     ".agents/agent-store/runtime",
     ".agents/catalog/catalog.schema.json",
@@ -15,14 +15,14 @@
   "requires": {
     "marketplaces": [
       {
-        "id": "base-agents",
-        "repository": "tj-agents/core"
+        "id": "tj-agents",
+        "repository": "tj-agents/marketplace"
       }
     ],
     "plugins": [
-      "base-agents/agent-store",
-      "base-agents/base",
-      "base-agents/machine"
+      "tj-agents/agent-store",
+      "tj-agents/base",
+      "tj-agents/machine"
     ],
     "hooks": [
       {
@@ -136,18 +136,18 @@
         "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
         "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
         "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-        "Bash(python -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
-        "Bash(python -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
-        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)"
+        "Bash(python -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)"
       ],
       "codex_prefix_rules": [
         {
@@ -654,9 +654,9 @@
             [
               "${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py",
               "${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py",
-              "${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py",
-              "${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py",
-              "${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py"
+              "${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py",
+              "${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py",
+              "${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py"
             ]
           ],
           "justification": "Refresh selected tj-agents plugins through native host commands, with optional remote verification.",
