@@ -232,6 +232,20 @@ class ProfileTests(Machine):
         self.assertIn("Malformed", err.getvalue())
         self.assertEqual(before, snapshot(self.root))
 
+    def test_an_undecodable_profile_is_skipped_with_a_reason_and_the_others_still_wire(self):
+        windows, core = self.profiles()
+        windows.parent.mkdir(parents=True)
+        core.parent.mkdir(parents=True)
+        undecodable = "$x = 'é'\r\n".encode("utf-16")
+        windows.write_bytes(undecodable)
+
+        out, err = io.StringIO(), io.StringIO()
+        self.assertEqual(0, setup.run_steps([step("shell profiles")], self.context(), False, out, err))
+
+        self.assertEqual(undecodable, windows.read_bytes())
+        self.assertEqual(BOM + (self.block() + "\r\n").encode("utf-8"), core.read_bytes())
+        self.assertIn(f"apply  shell profiles: {windows}: cannot decode as UTF-8", out.getvalue())
+
     def test_linux_wires_only_existing_profiles_and_never_loads_the_windows_profile(self):
         zshrc = self.home / ".zshrc"
         zshrc.write_text("export A=1", encoding="utf-8")
