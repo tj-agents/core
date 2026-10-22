@@ -54,12 +54,6 @@ LEGACY_PROFILE_HEADER = re.compile(
 PROFILE_NAMES = ("WindowsPowerShell", "PowerShell")
 DEFAULT_GIT_BASH = r"C:\Program Files\Git\bin\bash.exe"
 HIDDEN_BASH_PROBE = ("-c", "printf HIDDEN_BASH_OK; exit 73")
-LEGACY_DELIVERY = (
-    (".base-agents-delivery.json", ".tj-agents-delivery.json"),
-    (".base-agents-delivery.pending.json", ".tj-agents-delivery.pending.json"),
-)
-LEGACY_DELIVERY_OWNER = "base-agents"
-DELIVERY_OWNER = "tj-agents"
 LEGACY_HOOK_STATE = "@base-agents:"
 LEGACY_PROJECT = "base-agents"
 WINDOWS_ONLY = "Windows only: shell/ is the Windows PowerShell profile and its tools"
@@ -174,21 +168,32 @@ class WindowsUserEnvironment:
         send(wintypes.HWND(0xFFFF), 0x001A, 0, "Environment", 0x0002, 5000, ctypes.byref(ctypes.c_size_t()))
 
 
-def read_profile(path: Path) -> tuple[str, bool] | None:
+PROFILE_BOMS = (
+    (codecs.BOM_UTF16_LE, "utf-16-le"),
+    (codecs.BOM_UTF16_BE, "utf-16-be"),
+    (codecs.BOM_UTF8, "utf-8"),
+)
+PROFILE_BOM_BYTES = {encoding: bom for bom, encoding in PROFILE_BOMS}
+
+
+def read_profile(path: Path) -> tuple[str, str, bool] | None:
     try:
         raw = path.read_bytes()
     except FileNotFoundError:
         return None
-    bom = raw.startswith(codecs.BOM_UTF8)
-    return raw[len(codecs.BOM_UTF8):].decode("utf-8") if bom else raw.decode("utf-8"), bom
+    for bom, encoding in PROFILE_BOMS:
+        if raw.startswith(bom):
+            return raw[len(bom):].decode(encoding), encoding, True
+    return raw.decode("utf-8"), "utf-8", False
 
 
-def write_profile(path: Path, text: str, bom: bool) -> None:
+def write_profile(path: Path, text: str, encoding: str, bom: bool) -> None:
     if path.exists():
         shutil.copyfile(path, path.with_name(path.name + PROFILE_BACKUP))
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".next")
-    temporary.write_bytes((codecs.BOM_UTF8 if bom else b"") + text.encode("utf-8"))
+    prefix = PROFILE_BOM_BYTES[encoding] if bom else b""
+    temporary.write_bytes(prefix + text.encode(encoding))
     os.replace(temporary, path)
 
 
@@ -289,7 +294,7 @@ def wired_profile(text: str, block: str, newline: str) -> str:
 
 
 def shell_profile_updates(paths: list[Path], python: str, script: Path, loader: Path | None,
-                          windows: bool) -> tuple[list[tuple[Path, str, bool]], list[str]]:
+                          windows: bool) -> tuple[list[tuple[Path, str, str, bool]], list[str]]:
     targets = paths if windows else [path for path in paths if path.is_file()] or paths[:1]
     updates = []
     warnings = []
@@ -297,10 +302,10 @@ def shell_profile_updates(paths: list[Path], python: str, script: Path, loader: 
         try:
             current = read_profile(path)
         except UnicodeDecodeError as error:
-            warnings.append(f"{path}: cannot decode as UTF-8 ({error}); leaving this profile untouched")
+            warnings.append(f"{path}: cannot decode as UTF-8 or UTF-16 ({error}); leaving this profile untouched")
             continue
         powershell = path.suffix.casefold() == ".ps1"
-        text, bom = current if current is not None else ("", windows and powershell)
+        text, encoding, bom = current if current is not None else ("", "utf-8", windows and powershell)
         if powershell:
             newline = "\r\n" if "\r\n" in text or ("\n" not in text and windows) else "\n"
             block = powershell_block(python, script, loader, newline)
@@ -309,16 +314,16 @@ def shell_profile_updates(paths: list[Path], python: str, script: Path, loader: 
             block = posix_block(python, script)
         wired = wired_profile(text, block, newline)
         if wired != text:
-            updates.append((path, wired, bom))
+            updates.append((path, wired, encoding, bom))
     return updates, warnings
 
 
 def install_shell_profiles(paths: list[Path], python: str, script: Path, loader: Path | None = None,
                            windows: bool = False) -> list[Path]:
     updates, _ = shell_profile_updates(paths, python, script, loader, windows)
-    for path, text, bom in updates:
-        write_profile(path, text, bom)
-    return [path for path, _, _ in updates]
+    for path, text, encoding, bom in updates:
+        write_profile(path, text, encoding, bom)
+    return [path for path, _, _, _ in updates]
 
 
 def profile_loader(context: Context) -> Path | None:
@@ -334,21 +339,25 @@ def launch_script(context: Context) -> Path:
     return context.state_directory / "bin" / "launch_check.py"
 
 
-def profile_updates(context: Context) -> tuple[list[tuple[Path, str, bool]], list[str]]:
+def profile_updates(context: Context) -> tuple[list[tuple[Path, str, str, bool]], list[str]]:
     return shell_profile_updates(profile_paths(context), plugin_autoupdate.console_python(), launch_script(context),
                                  profile_loader(context), context.windows)
 
 
 def check_profile(context: Context) -> list[str]:
     updates, warnings = profile_updates(context)
-    return warnings + [f"wire {path}" for path, _, _ in updates]
+    for warning in warnings:
+        print(f"warning shell profiles: {warning}", file=sys.stderr)
+    return [f"wire {path}" for path, _, _, _ in updates]
 
 
 def apply_profile(context: Context) -> list[str]:
     updates, warnings = profile_updates(context)
-    changes = list(warnings)
-    for path, text, bom in updates:
-        write_profile(path, text, bom)
+    for warning in warnings:
+        print(f"warning shell profiles: {warning}", file=sys.stderr)
+    changes = []
+    for path, text, encoding, bom in updates:
+        write_profile(path, text, encoding, bom)
         changes.append(f"wired {path}")
     return changes
 
@@ -400,10 +409,16 @@ def install_hidden_bash(build: Path, proxy: Path) -> None:
             stale.unlink()
         except OSError:
             pass
+    aside = None
     if proxy.exists():
         aside = proxy.with_name(f"{proxy.stem}.stale-{secrets.token_hex(4)}{proxy.suffix}")
         os.replace(proxy, aside)
-    os.replace(build, proxy)
+    try:
+        os.replace(build, proxy)
+    except OSError:
+        if aside is not None:
+            os.replace(aside, proxy)
+        raise
 
 
 def build_hidden_bash(context: Context, real: str) -> None:
@@ -487,20 +502,16 @@ def apply_codex_agents(context: Context) -> list[str]:
 
 
 def permission_sync(context: Context):
-    candidates = []
-    if context.checkout is not None:
-        candidates.append(context.checkout / ".agents" / "machine" / "utility" / "plugin-selection" / "scripts")
-    candidates.append(context.script_directory.parent / "utility" / "plugin-selection" / "scripts")
-    for directory in candidates:
-        path = directory / "harness_permissions_sync.py"
-        if path.is_file():
-            if str(directory) not in sys.path:
-                sys.path.insert(0, str(directory))
-            spec = importlib.util.spec_from_file_location("tj_agents_harness_permissions_sync", path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            return module
-    raise SetupError("harness_permissions_sync.py is not available beside setup or in the main checkout")
+    directory = context.script_directory.parent / "utility" / "plugin-selection" / "scripts"
+    path = directory / "harness_permissions_sync.py"
+    if not path.is_file():
+        raise SetupError("harness_permissions_sync.py is not available beside setup_machine.py")
+    if str(directory) not in sys.path:
+        sys.path.insert(0, str(directory))
+    spec = importlib.util.spec_from_file_location("tj_agents_harness_permissions_sync", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def permissions_environment(context: Context) -> dict:
@@ -703,48 +714,9 @@ def legacy_config_entries(context: Context) -> list[tuple[str, ...]]:
     return legacy_keys(document)
 
 
-def _delivery_manifest_value(path: Path) -> dict | None:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError):
-        return None
-    return value if isinstance(value, dict) else None
-
-
-def _legacy_delivery_migrated(source: Path, target: Path) -> bool:
-    legacy_value = _delivery_manifest_value(source)
-    current_value = _delivery_manifest_value(target)
-    if legacy_value is None or current_value is None:
-        return False
-    if legacy_value.get("schema_version") != 1 or legacy_value.get("owner") != LEGACY_DELIVERY_OWNER:
-        return False
-    if current_value.get("schema_version") != 1 or current_value.get("owner") != DELIVERY_OWNER:
-        return False
-    legacy_files, current_files = legacy_value.get("files"), current_value.get("files")
-    if not isinstance(legacy_files, list) or not isinstance(current_files, list):
-        return False
-    current_digests = {entry.get("name"): entry.get("sha256") for entry in current_files if isinstance(entry, dict)}
-    return all(isinstance(entry, dict) and current_digests.get(entry.get("name")) == entry.get("sha256")
-               for entry in legacy_files)
-
-
-def legacy_deliveries(context: Context) -> list[tuple[Path, Path]]:
-    directory = context.codex_home / "agents"
-    found = []
-    for legacy, current in LEGACY_DELIVERY:
-        source, target = directory / legacy, directory / current
-        if not source.is_file():
-            continue
-        if target.exists():
-            if not _legacy_delivery_migrated(source, target):
-                raise SetupError(f"Both {source} and {target} exist; remove the stale one")
-        found.append((source, target))
-    return found
-
-
 def check_codex_legacy(context: Context) -> list[str]:
-    pending = [f"remove [{table_name(parts)}] from {codex_config_path(context)}" for parts in legacy_config_entries(context)]
-    return pending + [f"rename {source.name} to {target.name}" for source, target in legacy_deliveries(context)]
+    path = codex_config_path(context)
+    return [f"remove [{table_name(parts)}] from {path}" for parts in legacy_config_entries(context)]
 
 
 def apply_codex_legacy(context: Context) -> list[str]:
@@ -753,7 +725,6 @@ def apply_codex_legacy(context: Context) -> list[str]:
     changes = []
     path = codex_config_path(context)
     entries = legacy_config_entries(context)
-    deliveries = legacy_deliveries(context)
     if entries:
         raw = path.read_bytes()
         bom = raw.startswith(codecs.BOM_UTF8)
@@ -763,19 +734,8 @@ def apply_codex_legacy(context: Context) -> list[str]:
         if remaining:
             raise SetupError(f"{path}: cannot remove {', '.join(map(table_name, remaining))} automatically; "
                              "they are not standalone tables")
-        write_profile(path, updated, bom)
+        write_profile(path, updated, "utf-8", bom)
         changes += [f"removed [{table_name(parts)}] from {path}" for parts in entries]
-    for source, target in deliveries:
-        if not target.exists():
-            value = json.loads(source.read_text(encoding="utf-8-sig"))
-            if not isinstance(value, dict) or value.get("schema_version") != 1 or value.get("owner") != LEGACY_DELIVERY_OWNER:
-                raise SetupError(f"Unsupported legacy delivery manifest: {source}")
-            value["owner"] = DELIVERY_OWNER
-            temporary = target.with_name(target.name + ".next")
-            temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8", newline="\n")
-            os.replace(temporary, target)
-        source.unlink()
-        changes.append(f"renamed {source.name} to {target.name}")
     return changes
 
 
@@ -980,8 +940,6 @@ def install_runtime(directory: Path, source: Path = Path(__file__).resolve().par
 
 
 def runtime_source(context: Context) -> Path:
-    if context.checkout is not None:
-        return context.checkout / ".agents" / "machine" / "scripts"
     return context.script_directory
 
 
@@ -1099,12 +1057,26 @@ def run_steps(steps, context: Context, check_only: bool, out=sys.stdout, err=sys
     return 1 if drift else 0
 
 
-def machine_context() -> Context:
+def canonical_script(checkout: Path) -> Path:
+    return checkout / ".agents" / "machine" / "scripts" / "setup_machine.py"
+
+
+def reexec_if_not_main_checkout(checkout: Path | None, running: Path, argv: list[str],
+                                run: Callable = subprocess.run) -> int | None:
+    if checkout is None:
+        return None
+    canonical = canonical_script(checkout)
+    if not canonical.is_file() or same_path(canonical, running):
+        return None
+    return run([sys.executable, str(canonical), *argv], check=False).returncode
+
+
+def machine_context(checkout: Path | None = None) -> Context:
     home = Path.home()
     windows = os.name == "nt"
     return Context(
         home=home,
-        checkout=main_checkout(Path(__file__).resolve().parent),
+        checkout=checkout if checkout is not None else main_checkout(Path(__file__).resolve().parent),
         environ=dict(os.environ),
         windows=windows,
         documents=documents_directory(home) if windows else None,
@@ -1116,10 +1088,16 @@ def main(argv: list[str] | None = None) -> int:
     if sys.version_info < (3, 11):
         print("setup_machine requires Python 3.11 or newer", file=sys.stderr)
         return 2
+    arguments = list(argv if argv is not None else sys.argv[1:])
+    running = Path(__file__).resolve()
+    checkout = main_checkout(running.parent)
+    delegated = reexec_if_not_main_checkout(checkout, running, arguments)
+    if delegated is not None:
+        return delegated
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="report drift, write nothing, exit 1 on drift")
-    arguments = parser.parse_args(argv)
-    return run_steps(STEPS, machine_context(), arguments.check)
+    parsed = parser.parse_args(arguments)
+    return run_steps(STEPS, machine_context(checkout), parsed.check)
 
 
 if __name__ == "__main__":

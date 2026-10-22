@@ -1,8 +1,8 @@
+import contextlib
 import io
 import json
 import os
 from pathlib import Path, PurePosixPath
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -169,6 +169,48 @@ class MainCheckoutTests(Machine):
         self.assertIsNone(setup.main_checkout(self.root, run=lambda *args, **kwargs: completed(128)))
 
 
+class ReexecTests(Machine):
+    def canonical(self):
+        path = setup.canonical_script(self.checkout)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+        return path
+
+    def test_running_from_a_worktree_reexecs_the_main_checkouts_script(self):
+        canonical = self.canonical()
+        running = self.root / "worktree" / "scripts" / "setup_machine.py"
+        running.parent.mkdir(parents=True)
+        running.write_text("", encoding="utf-8")
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append(command)
+            return completed(7)
+
+        result = setup.reexec_if_not_main_checkout(self.checkout, running, ["--check"], run=run)
+
+        self.assertEqual(7, result)
+        self.assertEqual([[sys.executable, str(canonical), "--check"]], calls)
+
+    def test_running_the_canonical_script_does_not_reexec(self):
+        canonical = self.canonical()
+
+        result = setup.reexec_if_not_main_checkout(self.checkout, canonical, [], run=self.unexpected_run)
+
+        self.assertIsNone(result)
+
+    def test_without_a_main_checkout_nothing_is_reexeced(self):
+        result = setup.reexec_if_not_main_checkout(None, self.root / "setup_machine.py", [], run=self.unexpected_run)
+
+        self.assertIsNone(result)
+
+    def test_a_main_checkout_missing_the_canonical_script_is_not_reexeced(self):
+        result = setup.reexec_if_not_main_checkout(self.checkout, self.root / "setup_machine.py", [],
+                                                    run=self.unexpected_run)
+
+        self.assertIsNone(result)
+
+
 class ProfileTests(Machine):
     def profiles(self):
         return [self.documents / name / "Microsoft.PowerShell_profile.ps1" for name in setup.PROFILE_NAMES]
@@ -236,42 +278,43 @@ class ProfileTests(Machine):
         windows, core = self.profiles()
         windows.parent.mkdir(parents=True)
         core.parent.mkdir(parents=True)
-        undecodable = "$x = 'é'\r\n".encode("utf-16")
+        undecodable = b"$x = \xe9\r\n"
         windows.write_bytes(undecodable)
 
         out, err = io.StringIO(), io.StringIO()
-        self.assertEqual(0, setup.run_steps([step("shell profiles")], self.context(), False, out, err))
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(0, setup.run_steps([step("shell profiles")], self.context(), False, out, err))
 
         self.assertEqual(undecodable, windows.read_bytes())
         self.assertEqual(BOM + (self.block() + "\r\n").encode("utf-8"), core.read_bytes())
-        self.assertIn(f"apply  shell profiles: {windows}: cannot decode as UTF-8", out.getvalue())
+        self.assertIn(f"warning shell profiles: {windows}: cannot decode as UTF-8 or UTF-16", err.getvalue())
 
-    def test_linux_wires_only_existing_profiles_and_never_loads_the_windows_profile(self):
-        zshrc = self.home / ".zshrc"
-        zshrc.write_text("export A=1", encoding="utf-8")
-        powershell = self.home / ".config" / "powershell" / "Microsoft.PowerShell_profile.ps1"
-        powershell.parent.mkdir(parents=True)
-        powershell.write_bytes(b"keep\n# >>> base-agents >>>\nold\n# <<< base-agents <<<\n")
-        python = setup.plugin_autoupdate.console_python()
+    def test_an_undecodable_profile_reports_a_warning_not_drift(self):
+        windows, core = self.profiles()
+        windows.parent.mkdir(parents=True)
+        core.parent.mkdir(parents=True)
+        core.write_bytes(BOM + (self.block() + "\r\n").encode("utf-8"))
+        undecodable = b"$x = \xe9\r\n"
+        windows.write_bytes(undecodable)
 
-        self.converge(step("shell profiles"), self.context(windows=False))
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(0, setup.run_steps([step("shell profiles")], self.context(), True, out, err))
 
-        self.assertFalse((self.home / ".bashrc").exists())
-        self.assertEqual("export A=1\n\n" + setup.posix_block(python, self.script()) + "\n",
-                         zshrc.read_text(encoding="utf-8"))
-        self.assertEqual(("keep\n" + setup.powershell_block(python, self.script(), None, "\n") + "\n").encode("utf-8"),
-                         powershell.read_bytes())
-        self.assertNotIn("profile.ps1", powershell.read_text(encoding="utf-8"))
+        self.assertIn("ok     shell profiles", out.getvalue())
+        self.assertNotIn("drift", out.getvalue())
+        self.assertIn(f"warning shell profiles: {windows}: cannot decode as UTF-8 or UTF-16", err.getvalue())
 
-    def test_posix_block_escapes_single_quotes_in_paths(self):
-        block = setup.posix_block("/opt/it's/python3", PurePosixPath("/home/o'neil/launch_check.py"))
-        self.assertIn("'/opt/it'\\''s/python3'", block)
-        self.assertIn("'/home/o'\\''neil/launch_check.py'", block)
+    def test_utf16_bom_profiles_are_decoded_and_written_back_in_the_same_encoding(self):
+        windows, core = self.profiles()
+        windows.parent.mkdir(parents=True)
+        core.parent.mkdir(parents=True)
+        windows.write_bytes(setup.codecs.BOM_UTF16_LE + "Write-Output 'keep-me'\r\n".encode("utf-16-le"))
 
-    def test_linux_creates_bashrc_when_no_profile_exists(self):
-        self.converge(step("shell profiles"), self.context(windows=False))
-        self.assertEqual([self.home / ".bashrc"],
-                         [path for path in setup.profile_paths(self.context(windows=False)) if path.exists()])
+        self.converge(step("shell profiles"), self.context())
+
+        expected = setup.codecs.BOM_UTF16_LE + ("Write-Output 'keep-me'\r\n\r\n" + self.block() + "\r\n").encode("utf-16-le")
+        self.assertEqual(expected, windows.read_bytes())
 
 
 class RetiredTests(Machine):
@@ -398,6 +441,25 @@ class HiddenBashTests(Machine):
         self.assertEqual(b"new", proxy.read_bytes())
         self.assertTrue(stuck.is_dir())
 
+    def test_a_failed_install_restores_the_moved_aside_proxy(self):
+        proxy = self.checkout / "shell" / "hidden-bash.exe"
+        proxy.write_bytes(b"old")
+        build = proxy.with_name("hidden-bash.build.exe")
+        build.write_bytes(b"new")
+        real_replace = os.replace
+
+        def failing_replace(source, destination):
+            if Path(source) == build:
+                raise OSError("disk full")
+            real_replace(source, destination)
+
+        with mock.patch.object(setup.os, "replace", side_effect=failing_replace):
+            with self.assertRaises(OSError):
+                setup.install_hidden_bash(build, proxy)
+
+        self.assertEqual(b"old", proxy.read_bytes())
+        self.assertEqual([], setup.hidden_bash_stale_asides(proxy))
+
     def test_hidden_bash_is_windows_only(self):
         out = io.StringIO()
         setup.run_steps([step("hidden Git Bash for Claude")], self.context(windows=False), False, out)
@@ -461,44 +523,42 @@ class PermissionStepTests(Machine):
         self.assertEqual(["Bash(mine)", "Bash(shipped)"], json.loads(settings.read_text(encoding="utf-8"))["permissions"]["allow"])
         self.assertFalse(rules.exists())
 
-    def test_the_permission_sync_module_is_loaded_from_the_main_checkout_not_the_invoking_script_directory(self):
-        checkout_scripts = self.checkout / ".agents" / "machine" / "utility" / "plugin-selection" / "scripts"
-        checkout_scripts.mkdir(parents=True)
-        (checkout_scripts / "harness_permissions_sync.py").write_text("SOURCE = 'checkout'\n", encoding="utf-8")
-        stale = self.root / "invoking worktree" / "machine" / "scripts"
-        stale_scripts = stale.parent / "utility" / "plugin-selection" / "scripts"
-        stale_scripts.mkdir(parents=True)
-        (stale_scripts / "harness_permissions_sync.py").write_text("SOURCE = 'worktree'\n", encoding="utf-8")
+    def test_the_permission_sync_module_is_loaded_beside_the_running_script(self):
+        running = self.root / "running" / "machine" / "scripts"
+        running_scripts = running.parent / "utility" / "plugin-selection" / "scripts"
+        running_scripts.mkdir(parents=True)
+        (running_scripts / "harness_permissions_sync.py").write_text("SOURCE = 'running'\n", encoding="utf-8")
         context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
                                 run=self.unexpected_run, which=lambda name: None, documents=self.documents,
-                                script_directory=stale)
+                                script_directory=running)
 
         module = setup.permission_sync(context)
 
-        self.assertEqual("checkout", module.SOURCE)
+        self.assertEqual("running", module.SOURCE)
+
+    def test_a_missing_permission_sync_module_is_reported(self):
+        context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
+                                run=self.unexpected_run, which=lambda name: None, documents=self.documents,
+                                script_directory=self.root / "no such scripts directory")
+
+        with self.assertRaises(setup.SetupError):
+            setup.permission_sync(context)
 
 
 class LegacyCodexTests(Machine):
     def setUp(self):
         super().setUp()
         self.codex = self.home / ".codex"
-        (self.codex / "agents").mkdir(parents=True)
+        self.codex.mkdir(parents=True)
         self.config = self.codex / "config.toml"
 
-    def test_legacy_tables_and_delivery_manifest_converge_without_touching_other_settings(self):
+    def test_legacy_tables_converge_without_touching_other_settings(self):
         self.config.write_text(LEGACY_CODEX_CONFIG, encoding="utf-8", newline="")
-        legacy = self.codex / "agents" / ".base-agents-delivery.json"
-        legacy.write_text(json.dumps({"schema_version": 1, "owner": "base-agents",
-                                      "files": [{"name": "lane-l1.toml", "sha256": "A" * 64}]}), encoding="utf-8")
 
         self.converge(step("legacy Codex configuration"), self.context(windows=False))
 
         self.assertEqual(CONVERGED_CODEX_CONFIG, self.config.read_text(encoding="utf-8"))
         tomllib.loads(self.config.read_text(encoding="utf-8"))
-        self.assertFalse(legacy.exists())
-        current = json.loads((self.codex / "agents" / ".tj-agents-delivery.json").read_text(encoding="utf-8"))
-        self.assertEqual("tj-agents", current["owner"])
-        self.assertEqual([{"name": "lane-l1.toml", "sha256": "A" * 64}], current["files"])
         self.assertTrue((self.codex / "config.toml.pre-tj-agents.bak").is_file())
 
     def test_crlf_and_bom_are_preserved(self):
@@ -513,66 +573,30 @@ class LegacyCodexTests(Machine):
             setup.apply_codex_legacy(self.context(windows=False))
         self.assertEqual(before, snapshot(self.root))
 
-    def test_both_delivery_manifests_are_refused_before_any_write(self):
-        self.config.write_text(LEGACY_CODEX_CONFIG, encoding="utf-8")
-        for name in (".base-agents-delivery.json", ".tj-agents-delivery.json"):
-            (self.codex / "agents" / name).write_text("{}", encoding="utf-8")
-        with self.assertRaises(setup.SetupError):
-            setup.check_codex_legacy(self.context(windows=False))
-        before = snapshot(self.root)
-        with self.assertRaises(setup.SetupError):
-            setup.apply_codex_legacy(self.context(windows=False))
-        self.assertEqual(before, snapshot(self.root))
-
-    def test_an_interrupted_delivery_migration_self_heals(self):
-        self.config.write_text(CONVERGED_CODEX_CONFIG, encoding="utf-8")
-        files = [{"name": "lane-l1.toml", "sha256": "A" * 64}]
-        legacy = self.codex / "agents" / ".base-agents-delivery.json"
-        current = self.codex / "agents" / ".tj-agents-delivery.json"
-        legacy.write_text(json.dumps({"schema_version": 1, "owner": "base-agents", "files": files}),
-                          encoding="utf-8")
-        current.write_text(json.dumps({"schema_version": 1, "owner": "tj-agents", "files": files}),
-                           encoding="utf-8")
-
-        self.assertEqual([f"rename {legacy.name} to {current.name}"],
-                         setup.check_codex_legacy(self.context(windows=False)))
-        setup.apply_codex_legacy(self.context(windows=False))
-
-        self.assertFalse(legacy.exists())
-        self.assertEqual({"schema_version": 1, "owner": "tj-agents", "files": files},
-                         json.loads(current.read_text(encoding="utf-8")))
-
     def test_a_current_config_needs_nothing(self):
         self.config.write_text(CONVERGED_CODEX_CONFIG, encoding="utf-8")
         self.assertEqual([], setup.check_codex_legacy(self.context(windows=False)))
 
 
 class RuntimeTests(Machine):
-    def setUp(self):
-        super().setUp()
-        self.checkout_scripts = self.checkout / ".agents" / "machine" / "scripts"
-        self.checkout_scripts.mkdir(parents=True)
-        for name in setup.plugin_autoupdate.RUNTIME:
-            shutil.copy2(SCRIPTS / name, self.checkout_scripts / name)
-
     def test_the_launch_check_runtime_is_installed_once(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
         for name in setup.plugin_autoupdate.RUNTIME:
             self.assertEqual((SCRIPTS / name).read_bytes(), (self.home / ".agents-state" / "bin" / name).read_bytes())
 
-    def test_the_runtime_is_installed_from_the_main_checkout_not_the_invoking_script_directory(self):
-        stale = self.root / "invoking worktree" / "scripts"
-        stale.mkdir(parents=True)
+    def test_the_runtime_is_installed_from_the_running_scripts_directory(self):
+        running = self.root / "running" / "scripts"
+        running.mkdir(parents=True)
         for name in setup.plugin_autoupdate.RUNTIME:
-            (stale / name).write_text("stale worktree copy\n", encoding="utf-8")
+            (running / name).write_text("running script copy\n", encoding="utf-8")
         context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
                                 run=self.unexpected_run, which=lambda name: None, documents=self.documents,
-                                script_directory=stale)
+                                script_directory=running)
 
         setup.apply_runtime(context)
 
         for name in setup.plugin_autoupdate.RUNTIME:
-            self.assertEqual((self.checkout_scripts / name).read_bytes(),
+            self.assertEqual((running / name).read_bytes(),
                              (self.home / ".agents-state" / "bin" / name).read_bytes())
 
 
