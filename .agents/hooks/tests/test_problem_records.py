@@ -97,11 +97,17 @@ class ProblemRecordTests(unittest.TestCase):
         self.assertEqual({"schema_version": 1, "provider": "personal:work-item"}, declaration(self.root))
         self.select()
         self.assertEqual("optional:manage", declaration(self.root)["provider"])
-        (agents / "plugins.json").write_text("{", encoding="utf-8")
         self.selection.unlink()
+        for value in ({"schema_version": 1, "plugins": ["personal@tj-agents"], "marketplaces": ["tj-agents"]},
+                      {"schema_version": 1, "plugins": ["personal@tj-agents"], "marketplaces": {"tj-agents": {"repository": "fork/marketplace"}}},
+                      {"schema_version": True, "plugins": ["personal@tj-agents"], "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}}):
+            with self.subTest(value=value):
+                (agents / "plugins.json").write_text(json.dumps(value), encoding="utf-8")
+                self.assertIsNone(declaration(self.root))
+        (agents / "plugins.json").write_text("{", encoding="utf-8")
         self.assertIsNone(declaration(self.root))
 
-    def test_operation_prefers_the_provider_operation_skill_then_the_provider(self):
+    def test_operation_uses_a_work_item_providers_dedicated_skill_and_never_falls_back(self):
         self.select({"schema_version": 1, "provider": "personal:work-item"})
         installed = {"personal:create-work-item": self.root / "create" / "SKILL.md", "personal:work-item": self.skill}
         with patch("skill_router.resolved_skill", side_effect=lambda name, host: (installed[name], "") if name in installed else None):
@@ -125,6 +131,13 @@ class ProblemRecordTests(unittest.TestCase):
             operation_skill(self.root, "create", "codex")
         with self.assertRaises(RecordError):
             operation_skill(self.root, "delete", "codex")
+
+    def test_command_reports_a_missing_helper_as_a_block(self):
+        self.select()
+        with patch("problem_records.installed_skill", side_effect=ImportError("skill_router")), patch("sys.stderr") as stderr:
+            self.addCleanup(os.chdir, os.getcwd())
+            self.assertEqual(2, main(["--root", str(self.root), "--operation", "read", "--harness", "codex"]))
+        self.assertIn("write no other record", "".join(call.args[0] for call in stderr.write.call_args_list))
 
     def test_command_reports_a_block_and_writes_nothing(self):
         self.addCleanup(os.chdir, os.getcwd())
