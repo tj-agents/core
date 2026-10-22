@@ -186,7 +186,7 @@ class AdoptPluginsTests(unittest.TestCase):
                          document["marketplaces"])
         self.assertNotIn("revision", json.dumps(document))
         self.assertNotIn("tj-agents/core", json.dumps(document))
-        self.assertEqual(["base@tj-agents", "concertable@agents", "engineering@tj-agents", "machine@tj-agents"], self.plugins())
+        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "concertable@agents", "engineering@tj-agents", "machine@tj-agents"], self.plugins())
         claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
         self.assertTrue(claude["enabledPlugins"]["base@tj-agents"])
         codex = (self.root / ".codex/config.toml").read_text(encoding="utf-8")
