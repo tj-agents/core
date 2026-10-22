@@ -22,9 +22,9 @@
     "peer-cli",
     "plugin-selection",
     "recover-agents",
-    "reload-plugins",
     "search",
     "search-claude",
-    "search-codex"
+    "search-codex",
+    "sync-plugins"
   ]
 }
