@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -8,7 +9,7 @@ from unittest.mock import patch
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from problem_records import RecordError, declaration, primary_checkout, read_record
+from problem_records import RecordError, declaration, main, operation_skill, primary_checkout, read_record
 
 
 class ProblemRecordTests(unittest.TestCase):
@@ -87,6 +88,33 @@ class ProblemRecordTests(unittest.TestCase):
                 read_record(self.root, self.reference, "codex")
             with patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 1, "", "private details")), self.assertRaisesRegex(RecordError, "could not read"):
                 read_record(self.root, self.reference, "codex")
+
+    def test_operation_prefers_the_provider_operation_skill_then_the_provider(self):
+        self.select({"schema_version": 1, "provider": "personal:work-item"})
+        installed = {"personal:create-work-item": self.root / "create" / "SKILL.md", "personal:work-item": self.skill}
+        with patch("skill_router.resolved_skill", side_effect=lambda name, host: (installed[name], "") if name in installed else None):
+            for operation, expected in (("create", "personal:create-work-item"), ("read", "personal:work-item"), ("address", "personal:work-item")):
+                with self.subTest(operation=operation):
+                    found = operation_skill(self.root, operation, "claude")
+                    self.assertEqual((expected, str(installed[expected]), "personal:work-item", str(self.root)),
+                                     (found["operation"], found["skill"], found["provider"], found["primary"]))
+
+    def test_operation_without_selection_or_installed_provider_blocks(self):
+        with self.assertRaisesRegex(RecordError, "no selected"):
+            operation_skill(self.root, "create", "codex")
+        self.select()
+        with patch("skill_router.resolved_skill", return_value=None), self.assertRaisesRegex(RecordError, "not installed"):
+            operation_skill(self.root, "create", "codex")
+        with self.assertRaises(RecordError):
+            operation_skill(self.root, "delete", "codex")
+
+    def test_command_reports_a_block_and_writes_nothing(self):
+        self.addCleanup(os.chdir, os.getcwd())
+        before = sorted(self.root.rglob("*"))
+        with patch("sys.stderr") as stderr:
+            self.assertEqual(2, main(["--root", str(self.root), "--operation", "create", "--harness", "claude"]))
+        self.assertIn("write no other record", "".join(call.args[0] for call in stderr.write.call_args_list))
+        self.assertEqual(before, sorted(self.root.rglob("*")))
 
 
 class PrimaryCheckoutTests(unittest.TestCase):
