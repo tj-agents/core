@@ -19,12 +19,35 @@ open-pr route to it. Existing intended items are reused. No new tracker item, ho
 flag or second repair workflow is introduced. This is instruction-level policy, not proof that a model
 will comply or an API caller has conversational permission.
 
-Source review and local validation are recorded below when complete. Generated Core package output is
+Source review and local validation are recorded below. Generated Core package output is
 refreshed only for validation and excluded from the source commit. Installation and fresh-session
 acceptance remain separate; this source change does not update already-loaded instructions. The live
 session-store writer was not activated: its shipped rollout notice requires compatible installed
 readers before schema-4 writes. Native-history recovery identified this session as the live owner of
 the self-repair investigation and found no separate live owner of the Azure-creation topic.
+
+## Source verification ? 22 October 2026
+
+Core's focused policy checks passed: 22 process-standard tests, 9 problem-record tests, 24 source-layout
+tests, 13 packaged engineering-hook tests, and skill packaging. Package generation converged with zero
+changes on its check pass. Changed guidance passed the installed template example checker. Generated
+packages are validation output and are excluded from authored source commits.
+
+Independent read-only reviews assessed the committed Core and Infonetica changes. They found an obsolete
+source-mutation fixture in the packaged hook tests and a caller that could begin implementing an existing
+item before reconciling its writer. The fixture now mutates current policy wording; implement and ship
+reconcile existing item ownership before editing or switching branches, preserve the established branch,
+and forward the existing identity. The ship guidance also distinguishes Azure creation from the separate
+push decision. Final reviewed candidates and their coverage limits belong to the branch review evidence.
+
+Infonetica's local suite and Core tier-payload checker passed. Its initially skipped Core parity assertion
+passed when the Core checkout path was supplied explicitly. No Azure create call, issue creation,
+publication or installation was performed. The source checks exercise package contracts and helpers, not
+live model consent compliance. Linux execution and fresh installed Codex/Claude sessions are unverified.
+
+A whole-checkout documentation scan found two broken links only in generated copies of a pre-existing,
+untracked git-branching debt note. That unrelated note is outside this change. Frozen committed-tree
+reachability is assessed separately in review; the temporary whole-checkout scan is not delivery evidence.
 
 The following sections retain the investigation and earlier source snapshot as evidence; the accepted
 implementation supersedes their proposed or pending policy decisions.
