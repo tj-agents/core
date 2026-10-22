@@ -27,17 +27,6 @@
       ]
     },
     {
-      "name": "engineering",
-      "source": "./plugins/engineering",
-      "description": "Selected engineering workflows, reviews and Git operations.",
-      "category": "Productivity",
-      "keywords": [
-        "engineering",
-        "workflow",
-        "git"
-      ]
-    },
-    {
       "name": "machine",
       "source": "./plugins/machine",
       "description": "Explicit harness, history and clipboard utilities.",
@@ -46,6 +35,28 @@
         "machine",
         "sessions",
         "handoff"
+      ]
+    },
+    {
+      "name": "workflow",
+      "source": "./plugins/workflow",
+      "description": "Goal lifecycle and recorded work status.",
+      "category": "Productivity",
+      "keywords": [
+        "workflow",
+        "status",
+        "plans"
+      ]
+    },
+    {
+      "name": "engineering",
+      "source": "./plugins/engineering",
+      "description": "Selected engineering workflows, reviews and Git operations.",
+      "category": "Productivity",
+      "keywords": [
+        "engineering",
+        "workflow",
+        "git"
       ]
     }
   ]

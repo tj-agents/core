@@ -30,7 +30,7 @@ launches; repair and preservation actions may continue.
 2. Respect explicit user limits. Do not create a repair for an explicitly rejected change, and do not
    silently widen the repair into product work, profile installation, destructive cleanup, or unrelated
    standards redesign.
-3. Use the selected profile under [the recording contract](../../resources/problem-records.md) to
+3. Use the selected profile under [the recording contract](../../../workflow/resources/problem-records.md) to
    preserve the observed problem intent and update its canonical record. If the same source repair has a live canonical owner,
    reconcile that owner and contribute the new evidence without creating a duplicate writer.
 

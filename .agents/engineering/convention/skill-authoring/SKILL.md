@@ -93,7 +93,7 @@ says which entry points do which, and what generation checks.
 
 Generation copies every file beside a canonical `SKILL.md` into each package that contains the skill. Keep
 plans, reviews, working notes and debt records out of a skill folder. Record a skill's debt with
-the selected profile under [the recording contract](../../resources/problem-records.md).
+the selected profile under [the recording contract](../../../workflow/resources/problem-records.md).
 
 ## Replace names cleanly
 
