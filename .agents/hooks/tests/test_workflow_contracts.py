@@ -1030,6 +1030,51 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.assertNotEqual(0, ambiguous.returncode)
                     self.assertIn("legacy", ambiguous.stderr)
 
+    def test_codex_installer_verify_uses_current_ownership_when_legacy_is_a_migrated_subset(self):
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    bundle = root / "bundle" / ".codex"
+                    source = bundle / "agents"
+                    shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
+                    script = bundle / "install-workflow-agents.ps1"
+                    shutil.copy2(ROOT / ".codex" / script.name, script)
+                    shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
+                    codex_home = root / "codex-home"
+                    target = codex_home / "agents"
+
+                    def run(*flags):
+                        return subprocess.run(
+                            [*arguments, "-File", str(script), "-CodexHome", str(codex_home), *flags],
+                            capture_output=True,
+                            text=True,
+                        )
+
+                    installed = run("-Apply")
+                    self.assertEqual(0, installed.returncode, installed.stderr)
+                    current = target / ".tj-agents-delivery.json"
+                    legacy = target / ".base-agents-delivery.json"
+                    ownership = json.loads(current.read_text(encoding="utf-8"))
+                    retiring = ownership["files"][0]["name"]
+
+                    # A legacy manifest proven migrated (every entry matches current exactly) but a strict
+                    # subset that omits the role this run retires from the generated bundle.
+                    subset = dict(ownership)
+                    subset["owner"] = "base-agents"
+                    subset["files"] = [item for item in ownership["files"] if item["name"] != retiring]
+                    legacy.write_text(json.dumps(subset), encoding="utf-8")
+
+                    (source / retiring).unlink()
+                    (target / retiring).unlink()
+
+                    verified = run("-Verify")
+                    self.assertNotEqual(0, verified.returncode)
+                    self.assertIn("owned role missing", verified.stderr)
+                    self.assertIn(retiring, verified.stderr)
+
     def test_codex_installer_migrates_only_digest_proven_former_project_agents(self):
         hosts = powershell_hosts()
         self.assertNotEqual([], hosts)

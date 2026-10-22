@@ -63,28 +63,32 @@ def read_json(path: Path) -> Any:
         return None
 
 
-def _restore(path: Path, text: str | None) -> None:
-    if text is None:
+def _restore(path: Path, data: bytes | None) -> None:
+    if data is None:
         if path.exists():
             _safe_path(path)
             path.unlink()
         return
-    write_text_atomic(path, text)
+    write_bytes_atomic(path, data)
 
 
-def write_text_atomic(path: Path, text: str) -> None:
+def write_bytes_atomic(path: Path, data: bytes) -> None:
     _safe_path(path.parent)
     path.parent.mkdir(parents=True, exist_ok=True)
     _safe_path(path.parent)
     descriptor, temp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(text)
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(data)
         _safe_path(path)
         os.replace(temp, str(path))
     finally:
         if os.path.exists(temp):
             os.unlink(temp)
+
+
+def write_text_atomic(path: Path, text: str) -> None:
+    write_bytes_atomic(path, text.encode("utf-8"))
 
 
 def claude_config_root(environ: dict) -> Path:
@@ -414,7 +418,8 @@ def synchronize(environ: dict, mode: str) -> tuple[list[str], list[str]]:
             changes.append(f"record harness permission ownership in {state}")
     if mode == "check":
         return changes, warnings
-    before = [path.read_text(encoding="utf-8-sig") if path.is_file() else None for path, _ in writes]
+    before = [path.read_bytes() if path.is_file() else None for path, _ in writes]
+    completed = 0
     try:
         for path, text in writes:
             if text is None:
@@ -422,12 +427,17 @@ def synchronize(environ: dict, mode: str) -> tuple[list[str], list[str]]:
                 path.unlink()
             else:
                 write_text_atomic(path, text)
+            completed += 1
     except Exception as error:
-        for (path, _text), original in zip(writes, before):
+        failures = []
+        for (path, _text), original in zip(writes[:completed], before[:completed]):
             try:
                 _restore(path, original)
             except Exception as rollback:
-                raise PermissionSyncError(f"permission update failed and rollback failed ({rollback})") from error
+                failures.append(f"{path} ({rollback})")
+        if failures:
+            raise PermissionSyncError(
+                f"permission update failed ({error}) and rollback failed for: {', '.join(failures)}") from error
         raise PermissionSyncError(f"permission update failed ({error})") from error
     return changes, warnings
 

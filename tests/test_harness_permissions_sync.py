@@ -188,6 +188,66 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
                 self.apply()
         self.assertEqual(before, snapshot(self.root))
 
+    def test_rollback_restores_exact_bytes_including_bom_and_crlf(self):
+        self.install_claude({"claude_allow": ["Bash(shipped)"], "codex_prefix_rules": []})
+        self.settings.parent.mkdir(parents=True, exist_ok=True)
+        original = (b"\xef\xbb\xbf" + json.dumps({"permissions": {"allow": ["Bash(personal)"]}}, indent=2)
+                    .encode("utf-8").replace(b"\n", b"\r\n"))
+        self.settings.write_bytes(original)
+        real_write = SYNC.write_text_atomic
+
+        def failing_write(path, text):
+            if path.name == "harness-permissions.json":
+                raise OSError("disk full")
+            real_write(path, text)
+
+        with mock.patch.object(SYNC, "write_text_atomic", side_effect=failing_write):
+            with self.assertRaises(SYNC.PermissionSyncError):
+                self.apply()
+
+        self.assertEqual(original, self.settings.read_bytes())
+
+    def test_rollback_attempts_every_completed_write_and_reports_every_restore_failure(self):
+        self.install_claude({"claude_allow": ["Bash(shipped)"], "codex_prefix_rules": []})
+        self.install_codex({"claude_allow": [], "codex_prefix_rules": [RULE]})
+        self.write_settings(["Bash(personal)"])
+        real_write = SYNC.write_text_atomic
+
+        def failing_write(path, text):
+            if path.name == "harness-permissions.json":
+                raise OSError("disk full")
+            real_write(path, text)
+
+        with mock.patch.object(SYNC, "write_text_atomic", side_effect=failing_write), \
+                mock.patch.object(SYNC, "_restore", side_effect=OSError("cannot restore")):
+            with self.assertRaises(SYNC.PermissionSyncError) as caught:
+                self.apply()
+
+        message = str(caught.exception)
+        self.assertIn(str(self.settings), message)
+        self.assertIn(str(self.rules), message)
+
+    def test_a_failure_before_any_write_completes_attempts_no_restores(self):
+        self.install_claude({"claude_allow": ["Bash(shipped)"], "codex_prefix_rules": []})
+        self.install_codex({"claude_allow": [], "codex_prefix_rules": [RULE]})
+        self.write_settings(["Bash(personal)"])
+        before = snapshot(self.root)
+        restores = []
+
+        def tracking_restore(path, data):
+            restores.append(path)
+
+        def failing_write(path, text):
+            raise OSError("disk full")
+
+        with mock.patch.object(SYNC, "write_text_atomic", side_effect=failing_write), \
+                mock.patch.object(SYNC, "_restore", side_effect=tracking_restore):
+            with self.assertRaises(SYNC.PermissionSyncError):
+                self.apply()
+
+        self.assertEqual([], restores)
+        self.assertEqual(before, snapshot(self.root))
+
     def test_check_writes_nothing(self):
         self.install_claude({"claude_allow": ["Bash(shipped)"], "codex_prefix_rules": []})
         self.install_codex({"claude_allow": [], "codex_prefix_rules": [RULE]})

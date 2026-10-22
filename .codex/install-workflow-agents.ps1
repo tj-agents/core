@@ -161,8 +161,8 @@ function Resolve-OwnershipState([string] $Current, [string] $Legacy) {
         if ($Apply) {
             Assert-SafeDeliveryPath $Legacy
             Remove-Item -LiteralPath $Legacy -Force
-            $hasLegacy = $false
         }
+        return [pscustomobject]@{ Path = $Current; Owner = $ownershipOwner }
     }
     if ($hasLegacy) { return [pscustomobject]@{ Path = $Legacy; Owner = $legacyOwnershipOwner } }
     return [pscustomobject]@{ Path = $Current; Owner = $ownershipOwner }
