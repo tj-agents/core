@@ -289,11 +289,16 @@ def wired_profile(text: str, block: str, newline: str) -> str:
 
 
 def shell_profile_updates(paths: list[Path], python: str, script: Path, loader: Path | None,
-                          windows: bool) -> list[tuple[Path, str, bool]]:
+                          windows: bool) -> tuple[list[tuple[Path, str, bool]], list[str]]:
     targets = paths if windows else [path for path in paths if path.is_file()] or paths[:1]
     updates = []
+    warnings = []
     for path in targets:
-        current = read_profile(path)
+        try:
+            current = read_profile(path)
+        except UnicodeDecodeError as error:
+            warnings.append(f"{path}: cannot decode as UTF-8 ({error}); leaving this profile untouched")
+            continue
         powershell = path.suffix.casefold() == ".ps1"
         text, bom = current if current is not None else ("", windows and powershell)
         if powershell:
@@ -305,12 +310,12 @@ def shell_profile_updates(paths: list[Path], python: str, script: Path, loader: 
         wired = wired_profile(text, block, newline)
         if wired != text:
             updates.append((path, wired, bom))
-    return updates
+    return updates, warnings
 
 
 def install_shell_profiles(paths: list[Path], python: str, script: Path, loader: Path | None = None,
                            windows: bool = False) -> list[Path]:
-    updates = shell_profile_updates(paths, python, script, loader, windows)
+    updates, _ = shell_profile_updates(paths, python, script, loader, windows)
     for path, text, bom in updates:
         write_profile(path, text, bom)
     return [path for path, _, _ in updates]
@@ -329,18 +334,20 @@ def launch_script(context: Context) -> Path:
     return context.state_directory / "bin" / "launch_check.py"
 
 
-def profile_updates(context: Context) -> list[tuple[Path, str, bool]]:
+def profile_updates(context: Context) -> tuple[list[tuple[Path, str, bool]], list[str]]:
     return shell_profile_updates(profile_paths(context), plugin_autoupdate.console_python(), launch_script(context),
                                  profile_loader(context), context.windows)
 
 
 def check_profile(context: Context) -> list[str]:
-    return [f"wire {path}" for path, _, _ in profile_updates(context)]
+    updates, warnings = profile_updates(context)
+    return warnings + [f"wire {path}" for path, _, _ in updates]
 
 
 def apply_profile(context: Context) -> list[str]:
-    changes = []
-    for path, text, bom in profile_updates(context):
+    updates, warnings = profile_updates(context)
+    changes = list(warnings)
+    for path, text, bom in updates:
         write_profile(path, text, bom)
         changes.append(f"wired {path}")
     return changes
