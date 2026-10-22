@@ -25,7 +25,7 @@ def load(name):
 
 
 CHECK = load("launch_check")
-SETUP = load("setup_machine")
+import setup_machine as SETUP  # noqa: E402
 TOPIC = "t" * 40
 
 
@@ -193,7 +193,7 @@ class TerminalFunctionTests(unittest.TestCase):
                     target.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{echo}" "$@"\n', encoding="utf-8")
                     target.chmod(0o755)
             profile = directory / "profile.ps1"
-            SETUP.install_launchers([profile], sys.executable, check)
+            SETUP.install_shell_profiles([profile], sys.executable, check)
             for name in ("claude", "codex"):
                 with self.subTest(name=name):
                     log.unlink(missing_ok=True)
@@ -221,7 +221,7 @@ class PosixFunctionTests(unittest.TestCase):
             target.write_text(f'#!/bin/sh\nprintf "%s|" "$@" >> "{log}"\nexit 7\n', encoding="utf-8")
             target.chmod(0o755)
             rc = directory / ".bashrc"
-            SETUP.install_launchers([rc], sys.executable, check)
+            SETUP.install_shell_profiles([rc], sys.executable, check)
             result = subprocess.run(["bash", "-c", f". '{rc}'; claude 'two words' --flag"],
                                     env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
                                     capture_output=True, text=True, timeout=60)

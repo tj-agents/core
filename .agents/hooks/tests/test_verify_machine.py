@@ -23,11 +23,11 @@ class VerifyMachineTests(unittest.TestCase):
             claude.mkdir()
             codex.mkdir()
             (claude / "settings.json").write_text(
-                '{"enabledPlugins":{"base@base-agents":true},"permissions":{"allow":["Read"]}}',
+                '{"enabledPlugins":{"base@tj-agents":true},"permissions":{"allow":["Read"]}}',
                 encoding="utf-8",
             )
             (codex / "config.toml").write_text(
-                'notify = ["python", "notify.py"]\n[plugins."base@base-agents"]\nenabled = true\n'
+                'notify = ["python", "notify.py"]\n[plugins."base@tj-agents"]\nenabled = true\n'
                 '[hooks.state."trusted"]\ntrusted_hash = "sha256:x"\n'
                 '[marketplaces.openai-bundled]\nsource_type = "local"\n'
                 '[plugins."browser@openai-bundled"]\nenabled = true\n',
@@ -86,7 +86,7 @@ class VerifyMachineTests(unittest.TestCase):
                 'hooks = { state = { trusted = "x" } }\n'
                 'agents = { reviewer = { config_file = "private-agent" } }\n'
                 '[profiles.work]\nnotify = ["secret-command"]\n'
-                'plugins = { "base@base-agents" = { enabled = true } }\n'
+                'plugins = { "base@tj-agents" = { enabled = true } }\n'
                 'marketplaces = { custom = { source = "tj-agents/core" } }\n'
                 'hooks = { state = { trusted = "x" }, custom = { command = "private" } }\n'
                 'model_instructions_file = "private-path"\n'

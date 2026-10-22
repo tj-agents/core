@@ -6,6 +6,7 @@ agent configuration do not establish personal scope. Infonetica is work scope, i
 `tj-agents/infonetica` plugin source repository and every worktree: never select or inject Personal there.
 Read the target repository's README.md and AGENTS.md before selecting its policy profiles.
 Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts, hooks, or launchers.
+Install machine state only through `./setup.ps1` or `./setup.sh`; rerunning converges.
 Shipped code must run on Windows and Linux; follow
 [Supported platforms](CODE_CONVENTIONS.md#supported-platforms).
 
