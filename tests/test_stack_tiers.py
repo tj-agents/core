@@ -191,7 +191,7 @@ class DeclarationDiscovery(unittest.TestCase):
     def test_the_gates_own_install_cache_precedes_the_home_caches(self):
         with tempfile.TemporaryDirectory() as home:
             own = Path(home) / ".codex" / "plugins" / "cache"
-            script = own / "base-agents" / "engineering" / "1.0.0" / "hooks" / "tier_gate.py"
+            script = own / "tj-agents" / "engineering" / "1.0.0" / "hooks" / "tier_gate.py"
             script.parent.mkdir(parents=True)
             (Path(home) / ".claude" / "plugins" / "cache").mkdir(parents=True)
             cleared = {name: "" for name in (*gate.PLUGIN_ROOT_VARIABLES, "CLAUDE_CONFIG_DIR", "CODEX_HOME")}
@@ -285,7 +285,7 @@ class Applicability(TemporaryProject):
     def setUp(self):
         super().setUp()
         self.found = [
-            declaration("base", "base-agents", BASE),
+            declaration("base", "tj-agents", BASE),
             declaration("dotnet", "dotagents", DOTNET),
         ]
 
@@ -325,12 +325,12 @@ class Applicability(TemporaryProject):
 
 class SessionStatement(TemporaryProject):
     def test_nothing_is_said_when_no_stack_tier_is_installed(self):
-        found = [declaration("base", "base-agents", BASE)]
+        found = [declaration("base", "tj-agents", BASE)]
         self.assertEqual(gate.statement(self.project, found), "")
 
     def test_the_statement_names_what_applies_and_what_does_not(self):
         found = [
-            declaration("base", "base-agents", BASE),
+            declaration("base", "tj-agents", BASE),
             declaration("dotnet", "dotagents", DOTNET),
             declaration("react", "react-agents", REACT),
         ]
@@ -355,7 +355,7 @@ class Gate(TemporaryProject):
     def setUp(self):
         super().setUp()
         self.found = [
-            declaration("base", "base-agents", BASE),
+            declaration("base", "tj-agents", BASE),
             declaration("dotnet", "dotagents", DOTNET),
         ]
 
@@ -397,7 +397,7 @@ class Gate(TemporaryProject):
 
 
 class ShippedDeclarations(unittest.TestCase):
-    def test_every_base_agents_package_declares_itself_ubiquitous(self):
+    def test_every_core_package_declares_itself_ubiquitous(self):
         names = sorted(path.stem for path in DECLARED.glob("*.json"))
         self.assertEqual(names, ["base", "engineering", "machine"])
         for path in DECLARED.glob("*.json"):
