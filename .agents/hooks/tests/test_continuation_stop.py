@@ -276,6 +276,37 @@ class ContinuationStopTests(unittest.TestCase):
             self.assertEqual("reason", continuation_stop.once_per_stop(session, "reason"))
             self.assertIsNone(continuation_stop.once_per_stop({**session, "stop_hook_active": True}, "reason"))
 
+    def test_source_and_generated_stop_hooks_block_a_routed_missing_owner(self):
+        scratch = Path(self.temp.name) / "receipt"
+        with patch.object(continuation_receipts.tempfile, "gettempdir", return_value=str(scratch)):
+            receipt = continuation_receipts.receipt_path(self.session)
+            receipt.parent.mkdir(parents=True)
+            receipt.write_text(json.dumps(self.receipt()), encoding="utf-8")
+            self.assertEqual(self.receipt(), continuation_receipts.read_receipt(self.session))
+        payload = json.dumps(self.payload())
+        environment = dict(
+            os.environ,
+            TEMP=str(scratch),
+            TMP=str(scratch),
+            TMPDIR=str(scratch),
+            AGENT_STATE_DIRECTORY=str(scratch / "state"),
+        )
+        scripts = (SCRIPT, ROOT / "plugins/engineering/hooks/continuation_stop.py")
+        for script in scripts:
+            with self.subTest(script=script):
+                result = subprocess.run(
+                    [sys.executable, "-B", str(script)],
+                    input=payload,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    cwd=self.root,
+                    env=environment,
+                    timeout=20,
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual("block", json.loads(result.stdout)["decision"])
+
     def test_invalid_owner_artifacts_block_unrouted_stop(self):
         path = self.root / ".agents/continuation/owner.json"
         path.parent.mkdir(parents=True)

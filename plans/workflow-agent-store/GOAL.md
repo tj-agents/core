@@ -488,15 +488,42 @@ Only WORKFLOW_AGENT_STORE.md and its README pointer are authored. The parent cor
 reference to7c77e7d5. Its publication records architecture, not shipped or installed behavior; Core keeps
 this sole implementation goal. Pin lifecycle evidence and link the shared decision after the source commit.
 
+## Lifecycle review repairs and S3 preparation - 22 October 2026
+
+The full Lifecycle review at4675ff4c5fced788ca648db717a0a527c975e10a completed with three low-severity
+findings. Native review found the stale focused-CI mapping; API-contract and authority/security lenses
+returned no findings. Parent retained the independently identified persisted-receipt test loss and the
+separately verified unchanged idea-initialization coverage loss. The broader claim that Codex startup
+was untested was rejected against the existing real dispatcher test and corrected by its reviewer.
+Windows/Linux/ci-required39757265551 pass at the full-review head.
+
+Commitfb1a25fab3a3386ac319664f942cffcf27869b71 repairs the CI path and pins focused-suite classification;
+all23 selector tests pass. The coverage repair restores real source/generated Stop subprocesses against
+an on-disk receipt and both Base policy contracts under installed paths with spaces and an unrelated cwd.
+The five package tests execute both host commands, including the full Codex fingerprint/snapshot verifier
+with isolated data. All32 continuation and five policy tests pass. No runtime timeout or behavior changed.
+Generated test payloads are restored and excluded. Fresh incremental review and exact-head CI follow.
+
+Core declaration-only PR356 is a pushed draft with human-gate at5a66dfee72e7f484ad15facc121ef0a79e27d64b,
+based on Lifecycle4675ff4c. Canonical adoption preview/write/check and semantic settings-preservation checks
+pass for its three paths. Actual native admission reports Agent Store and Workflow unavailable; no final
+review or activation is claimed. This Lifecycle checkout still owns the goal until its repair review is
+complete and the supported claim is moved. The selection child is a preparation snapshot, not another owner.
+
+The standing shared decision is committed in Docs at3c013e3846ecc0063e0f10e18bf46b1703a374c7 with full
+source pins and a Core355 link. Native and independent factual/contradiction reviews returned no findings.
+Parent completion recording and draft publication are next, followed by Docs declaration closure. No
+architecture merge, installation or rejected six-consumer publication authority has been granted.
+
 ## Next Steps
 
-Finish the focused CI correction and freeze the corrected Lifecycle candidate for independent
-review and exact-head CI. Then pin and publish the shared standing decision and prepare Core's three
-project declarations. Preserve the six checked consumer commits without retrying their denied publication.
+Complete the incremental review of the Lifecycle repairs and exact-head CI. Publish the reviewed
+shared decision, then add its three declaration changes. Reconcile Core PR356 with the completed
+Lifecycle parent and transfer this sole owner to that final declaration checkout through the supported claim. Preserve the six checked consumer commits without retrying their denied publication.
 Complete every independent source/review action before presenting the concrete publication/activation gates.
 
 Scope: whole plan through all remaining phases and terminal delivery within the dispatched authority.
-Current slice: S2b2 lifecycle preservation, verification and review preparation.
+Current slice: S2b2 review remediation and S3 source preparation.
 Remaining scope: lifecycle review/CI, standing shared decision, Core and Docs project declarations,
 held native-admission reviews, and explicit publication/installation gates.
 Done when: the namespace cutover satisfies acceptance, or only evidenced external gates remain after
