@@ -410,6 +410,22 @@ class PermissionStepTests(Machine):
         self.assertEqual(["Bash(mine)", "Bash(shipped)"], json.loads(settings.read_text(encoding="utf-8"))["permissions"]["allow"])
         self.assertFalse(rules.exists())
 
+    def test_the_permission_sync_module_is_loaded_from_the_main_checkout_not_the_invoking_script_directory(self):
+        checkout_scripts = self.checkout / ".agents" / "machine" / "utility" / "plugin-selection" / "scripts"
+        checkout_scripts.mkdir(parents=True)
+        (checkout_scripts / "harness_permissions_sync.py").write_text("SOURCE = 'checkout'\n", encoding="utf-8")
+        stale = self.root / "invoking worktree" / "machine" / "scripts"
+        stale_scripts = stale.parent / "utility" / "plugin-selection" / "scripts"
+        stale_scripts.mkdir(parents=True)
+        (stale_scripts / "harness_permissions_sync.py").write_text("SOURCE = 'worktree'\n", encoding="utf-8")
+        context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
+                                run=self.unexpected_run, which=lambda name: None, documents=self.documents,
+                                script_directory=stale)
+
+        module = setup.permission_sync(context)
+
+        self.assertEqual("checkout", module.SOURCE)
+
 
 class LegacyCodexTests(Machine):
     def setUp(self):
@@ -481,10 +497,32 @@ class LegacyCodexTests(Machine):
 
 
 class RuntimeTests(Machine):
+    def setUp(self):
+        super().setUp()
+        self.checkout_scripts = self.checkout / ".agents" / "machine" / "scripts"
+        self.checkout_scripts.mkdir(parents=True)
+        for name in setup.plugin_autoupdate.RUNTIME:
+            shutil.copy2(SCRIPTS / name, self.checkout_scripts / name)
+
     def test_the_launch_check_runtime_is_installed_once(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
         for name in setup.plugin_autoupdate.RUNTIME:
             self.assertEqual((SCRIPTS / name).read_bytes(), (self.home / ".agents-state" / "bin" / name).read_bytes())
+
+    def test_the_runtime_is_installed_from_the_main_checkout_not_the_invoking_script_directory(self):
+        stale = self.root / "invoking worktree" / "scripts"
+        stale.mkdir(parents=True)
+        for name in setup.plugin_autoupdate.RUNTIME:
+            (stale / name).write_text("stale worktree copy\n", encoding="utf-8")
+        context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
+                                run=self.unexpected_run, which=lambda name: None, documents=self.documents,
+                                script_directory=stale)
+
+        setup.apply_runtime(context)
+
+        for name in setup.plugin_autoupdate.RUNTIME:
+            self.assertEqual((self.checkout_scripts / name).read_bytes(),
+                             (self.home / ".agents-state" / "bin" / name).read_bytes())
 
 
 class CatchUpTests(Machine):

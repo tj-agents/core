@@ -464,9 +464,10 @@ def apply_codex_agents(context: Context) -> list[str]:
 
 
 def permission_sync(context: Context):
-    candidates = [context.script_directory.parent / "utility" / "plugin-selection" / "scripts"]
+    candidates = []
     if context.checkout is not None:
         candidates.append(context.checkout / ".agents" / "machine" / "utility" / "plugin-selection" / "scripts")
+    candidates.append(context.script_directory.parent / "utility" / "plugin-selection" / "scripts")
     for directory in candidates:
         path = directory / "harness_permissions_sync.py"
         if path.is_file():
@@ -955,15 +956,22 @@ def install_runtime(directory: Path, source: Path = Path(__file__).resolve().par
     return directory / "launch_check.py"
 
 
+def runtime_source(context: Context) -> Path:
+    if context.checkout is not None:
+        return context.checkout / ".agents" / "machine" / "scripts"
+    return context.script_directory
+
+
 def check_runtime(context: Context) -> list[str]:
     directory = launch_script(context).parent
+    source = runtime_source(context)
     return [f"install {directory / name}" for name in plugin_autoupdate.RUNTIME
             if not (directory / name).is_file()
-            or (directory / name).read_bytes() != (context.script_directory / name).read_bytes()]
+            or (directory / name).read_bytes() != (source / name).read_bytes()]
 
 
 def apply_runtime(context: Context) -> list[str]:
-    install_runtime(launch_script(context).parent, context.script_directory)
+    install_runtime(launch_script(context).parent, runtime_source(context))
     return [f"installed the launch-check runtime in {launch_script(context).parent}"]
 
 
