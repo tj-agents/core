@@ -6,11 +6,12 @@ profile on a repository's behalf.
 
 ## Repository selection
 
-A committed `.problem-records.json` in the source repository's primary checkout selects the profile's
-qualified read operation, for example `{"schema_version":1,"provider":"personal:work-item"}`.
-The primary checkout is the first non-bare entry of `git worktree list --porcelain`, resolved from any
-worktree or subdirectory; a feature worktree's copy never overrides it. Read the declaration before any
-tracker operation. Selection requires repository authorization; installing Core never adopts a provider.
+Selecting `personal@tj-agents` in the source repository's `.agents/plugins.json` selects
+`personal:work-item`. Any other profile is selected by a committed `.problem-records.json` naming its
+qualified read operation, for example `{"schema_version":1,"provider":"infonetica:work-item"}`; it takes
+precedence. Both are read from the primary checkout, the first non-bare entry of `git worktree list
+--porcelain`, resolved from any worktree or subdirectory; a feature worktree's copy never overrides it.
+Read the selection before any tracker operation. Selection requires repository authorization; installing Core never adopts a provider.
 
 ## Selected profile operations
 
@@ -51,9 +52,9 @@ another profile, redirect employer evidence, create a Markdown register or selec
 
 ## Repositories without a provider
 
-Without a valid declaration, tracker operations block. Retain unsent facts in the active task or goal with
-the resolver and observable resume condition. Existing `BUGS.md`, `MISTAKES.md` and `TECH_DEBT.md` files
-remain historical evidence that may be read and linked; do not update them as an active backlog.
+Without a valid selection, tracker operations block. Retain unsent facts in the active task or goal with
+the resolver and observable resume condition. Markdown registers (`BUGS.md`, `MISTAKES.md`, `TECH_DEBT.md`)
+are retired; never create or update one.
 
 Plans, review artifacts and roadmaps retain design and recovery evidence and link canonical record
 identities. Preserve existing remote identities and history. Repository and employer policy controls

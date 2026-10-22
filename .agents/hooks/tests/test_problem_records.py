@@ -89,6 +89,17 @@ class ProblemRecordTests(unittest.TestCase):
             with patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 1, "", "private details")), self.assertRaisesRegex(RecordError, "could not read"):
                 read_record(self.root, self.reference, "codex")
 
+    def test_personal_selection_implies_the_personal_provider_and_a_declaration_wins(self):
+        agents = self.root / ".agents"
+        agents.mkdir()
+        (agents / "plugins.json").write_text(json.dumps({"schema_version": 1, "plugins": ["personal@tj-agents"]}), encoding="utf-8")
+        self.assertEqual({"schema_version": 1, "provider": "personal:work-item"}, declaration(self.root))
+        self.select()
+        self.assertEqual("optional:manage", declaration(self.root)["provider"])
+        (agents / "plugins.json").write_text("{", encoding="utf-8")
+        self.selection.unlink()
+        self.assertIsNone(declaration(self.root))
+
     def test_operation_prefers_the_provider_operation_skill_then_the_provider(self):
         self.select({"schema_version": 1, "provider": "personal:work-item"})
         installed = {"personal:create-work-item": self.root / "create" / "SKILL.md", "personal:work-item": self.skill}

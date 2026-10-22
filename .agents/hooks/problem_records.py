@@ -14,6 +14,7 @@ if sys.version_info < (3, 9):
 CONFIG = ".problem-records.json"
 PROVIDER = re.compile(r"[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*")
 REFERENCE = re.compile(r"[a-z][a-z0-9+.-]*://[^\s]+")
+PERSONAL = {"schema_version": 1, "provider": "personal:work-item"}
 OPERATIONS = {"read": (), "create": ("create-work-item",), "address": ("address-work-item",)}
 
 
@@ -46,12 +47,20 @@ def primary_checkout(directory):
     return entries[0]
 
 
+def selects_personal(root):
+    try:
+        plugins = json.loads((Path(root) / ".agents" / "plugins.json").read_text(encoding="utf-8-sig")).get("plugins")
+    except (OSError, ValueError, AttributeError):
+        return False
+    return isinstance(plugins, list) and "personal@tj-agents" in plugins
+
+
 def declaration(root):
     path = Path(root) / CONFIG
     if path.is_symlink():
         raise RecordError("problem-record selection must be a regular repository file")
     if not path.exists():
-        return None
+        return dict(PERSONAL) if selects_personal(root) else None
     try:
         value = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, ValueError) as error:
