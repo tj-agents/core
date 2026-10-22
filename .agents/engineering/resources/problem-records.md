@@ -11,7 +11,8 @@ Selecting `personal@tj-agents` in the source repository's `.agents/plugins.json`
 qualified read operation, for example `{"schema_version":1,"provider":"infonetica:work-item"}`; it takes
 precedence. Both are read from the primary checkout, the first non-bare entry of `git worktree list
 --porcelain`, resolved from any worktree or subdirectory; a feature worktree's copy never overrides it.
-Read the selection before any tracker operation. Selection requires repository authorization; installing Core never adopts a provider.
+Read the selection before any tracker operation. Selection requires repository authorization; installing
+Core never adopts a provider.
 
 ## Selected profile operations
 
