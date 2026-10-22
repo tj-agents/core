@@ -461,25 +461,30 @@ def validate_configuration(root: Path, config: dict) -> set[str]:
     return plugins
 
 
-def validate_default_selection(
-    root: Path,
-    config: dict,
-    skills: dict[str, dict],
-    compatibility: dict,
-) -> None:
+def core_marketplace(root: Path, config: dict) -> str:
     codex_marketplace_path = inside(
         root, f"{config['host_manifest_roots']['codex']}/marketplace.json"
     )
     claude_marketplace_path = inside(
         root, f"{config['host_manifest_roots']['claude']}/marketplace.json"
     )
-    codex_marketplace = load(codex_marketplace_path)
-    claude_marketplace = load(claude_marketplace_path)
-    marketplace_name = codex_marketplace.get("name")
+    marketplace_name = load(codex_marketplace_path).get("name")
     if not marketplace_name:
         raise ValueError(f"{codex_marketplace_path}: missing marketplace name")
-    if claude_marketplace.get("name") != marketplace_name:
+    if load(claude_marketplace_path).get("name") != marketplace_name:
         raise ValueError("Codex and Claude marketplace names must match")
+    return marketplace_name
+
+
+def validate_default_selection(
+    root: Path,
+    config: dict,
+    skills: dict[str, dict],
+    compatibility: dict,
+) -> None:
+    codex_marketplace = load(inside(root, f"{config['host_manifest_roots']['codex']}/marketplace.json"))
+    claude_marketplace = load(inside(root, f"{config['host_manifest_roots']['claude']}/marketplace.json"))
+    marketplace_name = core_marketplace(root, config)
 
     fresh_entries = compatibility.get("fresh_selection")
     if not isinstance(fresh_entries, list) or not fresh_entries:
@@ -828,6 +833,7 @@ def build(root: Path, validate_catalog_digests: bool = True):
     catalog_plugins = catalog_index(catalog)
     if any(package["owner_repository"] != "tj-agents/core" for package in catalog_plugins.values()):
         raise ValueError("Core's authored catalog may contain only core packages")
+    marketplace = core_marketplace(root, config)
     harnesses = {
         path.stem: load(path)
         for path in (root / ".agents/plugins/harness").glob("*.json")
@@ -901,7 +907,7 @@ def build(root: Path, validate_catalog_digests: bool = True):
     manifests: dict[str, dict[str, dict]] = {plugin: {} for plugin in plugins}
     for plugin in sorted(plugins):
         harness = harnesses.get(plugin)
-        if harness is None or harness.get("plugin") != f"base-agents/{plugin}":
+        if harness is None or harness.get("plugin") != f"{marketplace}/{plugin}":
             raise ValueError(f"Missing or mismatched harness manifest: {plugin}")
         emit(f"plugins/{plugin}/harness.json", json.dumps(harness, indent=2) + "\n")
         for host, tree in (("codex", "codex-skills"), ("claude", "skills")):
@@ -983,13 +989,13 @@ def build(root: Path, validate_catalog_digests: bool = True):
     validate_hook_outputs(output, config, plugins)
 
     for plugin in sorted(plugins):
-        plugin_id = f"base-agents/{plugin}"
+        plugin_id = f"{marketplace}/{plugin}"
         entry = catalog_plugins.get(plugin_id)
         if entry is None:
             raise ValueError(f"Catalog is missing local plugin {plugin_id}")
         external = external_prerequisites(config, plugin)
         expected_dependencies = [
-            *[f"base-agents/{value}" for value in config["prerequisites"][plugin]],
+            *[f"{marketplace}/{value}" for value in config["prerequisites"][plugin]],
             *[value["id"] for value in external],
         ]
         if entry["dependencies"]["required"] != expected_dependencies:
@@ -1002,10 +1008,10 @@ def build(root: Path, validate_catalog_digests: bool = True):
             raise ValueError(f"Catalog package path drift: {plugin_id}")
         if entry.get("harness") != harnesses[plugin]["requires"]:
             raise ValueError(f"Catalog harness drift: {plugin_id}")
-        allowed_excludes = ["catalog/catalog.json"] if plugin_id == "base-agents/machine" else []
+        allowed_excludes = ["catalog/catalog.json"] if plugin == "machine" else []
         if entry.get("digest_excludes", []) != allowed_excludes:
             raise ValueError(f"Catalog digest exclusion drift: {plugin_id}")
-        if entry["marketplace"] != "base-agents" or entry["owner_repository"] != "tj-agents/core":
+        if entry["marketplace"] != marketplace or entry["owner_repository"] != "tj-agents/core":
             raise ValueError(f"Catalog owner drift: {plugin_id}")
         if validate_catalog_digests:
             actual_digest = output_tree_digest(

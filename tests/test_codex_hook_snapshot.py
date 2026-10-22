@@ -253,7 +253,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
     def test_bootstrap_rejects_tampered_cache_and_snapshot_loaders_before_execution(self):
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
-            payload = temporary / "cache" / "base-agents" / "base" / "2.1.16"
+            payload = temporary / "cache" / "tj-agents" / "base" / "2.1.16"
             shutil.copytree(ROOT / "plugins" / "base", payload)
             data = temporary / "data"
             marker = temporary / "loader-executed"
@@ -351,7 +351,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
     def test_hook_survives_deleted_cache_path_and_rejects_modified_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
-            payload = temporary / "cache" / "base-agents" / "base" / "2.1.16"
+            payload = temporary / "cache" / "tj-agents" / "base" / "2.1.16"
             shutil.copytree(ROOT / "plugins" / "base", payload)
             data = temporary / "data"
             manifest = json.loads((payload / "hooks" / "codex.json").read_text(encoding="utf-8"))
@@ -391,7 +391,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
     def test_same_version_refresh_keeps_each_trusted_package_callable(self):
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
-            payload = temporary / "cache" / "base-agents" / "base" / "2.1.16"
+            payload = temporary / "cache" / "tj-agents" / "base" / "2.1.16"
             shutil.copytree(ROOT / "plugins" / "base", payload)
             data = temporary / "data"
             manifest = json.loads((payload / "hooks" / "codex.json").read_text(encoding="utf-8"))

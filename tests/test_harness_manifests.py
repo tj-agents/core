@@ -112,7 +112,7 @@ class HarnessManifestTests(unittest.TestCase):
         original = json.loads((ROOT / ".agents/plugins/harness/machine.json").read_text(encoding="utf-8"))["requires"]
         for command in (
             r"PowerShell(& *\handoff-codex\scripts\launch-codex.ps1 *)",
-            r"PowerShell(& *\.claude\plugins\cache\base-agents\machine\*\handoff-codex\scripts\launch-codex.ps1 *)",
+            r"PowerShell(& *\.claude\plugins\cache\tj-agents\machine\*\handoff-codex\scripts\launch-codex.ps1 *)",
         ):
             with self.subTest(command=command):
                 requires = json.loads(json.dumps(original))
@@ -127,6 +127,22 @@ class HarnessManifestTests(unittest.TestCase):
         requires["marketplaces"][0]["repository"] = "another-org/core"
         with self.assertRaisesRegex(ValueError, "disagrees with catalog"):
             HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
+        requires["marketplaces"][0]["repository"] = "tj-agents/core"
+        with self.assertRaisesRegex(ValueError, "disagrees with catalog"):
+            HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
+
+    def test_core_marketplace_identity_matches_plugin_selection(self):
+        import plugin_selection
+
+        config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
+        self.assertEqual(plugin_selection.MARKETPLACE_NAME, HARNESS.PACKAGES.core_marketplace(ROOT, config))
+        self.assertEqual(plugin_selection.MARKETPLACE_REPOSITORY, HARNESS.DISTRIBUTION_REPOSITORY)
+        for path in (ROOT / ".agents/plugins/harness").glob("*.json"):
+            with self.subTest(path=path.name):
+                manifest = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual(f"{plugin_selection.MARKETPLACE_NAME}/{path.stem}", manifest["plugin"])
+                self.assertEqual([{"id": plugin_selection.MARKETPLACE_NAME, "repository": plugin_selection.MARKETPLACE_REPOSITORY}],
+                                 manifest["requires"]["marketplaces"])
 
 
 class HarnessPermissionValidationTests(unittest.TestCase):
@@ -213,7 +229,7 @@ class HarnessManifestSchemaTests(unittest.TestCase):
 
 
 class HarnessPermissionCoverageTests(unittest.TestCase):
-    PLUGIN_ROOT = r"C:\scratch\base-agents-root"
+    PLUGIN_ROOT = r"C:\scratch\tj-agents-root"
 
     def rendered(self, plugin):
         manifest = json.loads((ROOT / f".agents/plugins/harness/{plugin}.json").read_text(encoding="utf-8"))
@@ -372,7 +388,7 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
             checks.extend((plugin, tokens, True) for rule in codex_rules for tokens in rule["match"])
             checks.extend((plugin, tokens, False) for rule in codex_rules for tokens in rule["not_match"])
         with tempfile.TemporaryDirectory() as raw:
-            rules_path = Path(raw) / "base-agents.rules"
+            rules_path = Path(raw) / "tj-agents.rules"
             rules_path.write_text("\n".join(harness_permissions.codex_rule_lines(rules)), encoding="utf-8")
             for plugin, tokens, allowed in checks:
                 with self.subTest(plugin=plugin):

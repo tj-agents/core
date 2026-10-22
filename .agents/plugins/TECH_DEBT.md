@@ -36,11 +36,10 @@ paths on Codex and Claude without silently broadening employer scope.
 
 Tommy requested on 2026-10-11 that this repository publish one `core@agents` plugin containing its core
 capabilities, with consistent identities such as `cpp@agents` for stack owners. The published core
-manifests still use the `base-agents` marketplace and separate `base`, `engineering` and `machine`
+manifests use the `tj-agents` marketplace name but separate `base`, `engineering` and `machine`
 packages. The [central marketplace](https://github.com/tj-agents/marketplace/blob/main/.claude-plugin/marketplace.json)
-is named `tj-agents` and also lists those three packages separately. The inspected Claude profile still
-uses `engineering@base-agents` and `cpp@cpp-agents`. Repository names have changed without completing
-the requested package and installed-profile identity migration.
+is named `tj-agents` and also lists those three packages separately. The requested single package and
+`agents` marketplace identity migration is not done.
 
 **Resolution condition.** Agree the cross-repository migration in `tj-agents/docs`, implement one core
 distribution in this repository, and publish the consistent `agents` marketplace. Update generated

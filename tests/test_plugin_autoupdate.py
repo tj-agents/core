@@ -27,7 +27,7 @@ def load(name):
 
 
 UPDATE = load('plugin_autoupdate')
-SETUP = load('setup_machine')
+import setup_machine as SETUP  # noqa: E402
 CORE = 'https://github.com/tj-agents/core.git'
 MARKET = 'https://github.com/tj-agents/marketplace.git'
 OLD = 'a' * 40
@@ -38,14 +38,14 @@ PINNED = 'c' * 40
 def user_config(projects=()):
     return {
         'marketplaces': {
-            'base-agents': {'source_type': 'git', 'source': CORE},
+            'direct-core': {'source_type': 'git', 'source': CORE},
             'local-only': {'source_type': 'local', 'source': 'C:/somewhere'},
             'unused': {'source_type': 'git', 'source': 'https://github.com/tj-agents/unused.git'},
         },
         'plugins': {
-            'base@base-agents': {'enabled': True},
-            'machine@base-agents': {'enabled': True},
-            'engineering@base-agents': {'enabled': False},
+            'base@direct-core': {'enabled': True},
+            'machine@direct-core': {'enabled': True},
+            'engineering@direct-core': {'enabled': False},
             'tool@local-only': {'enabled': True},
             'kit@tj-agents': {'enabled': True},
         },
@@ -94,8 +94,8 @@ class DeclaredTargetTests(unittest.TestCase):
     def test_user_and_project_declarations_form_one_union_without_starting_codex(self):
         machine = Machine(self)
         docs = machine.project('docs', tj_agents(None, 'base'))
-        cpp = machine.project('cpp', '[plugins."base@base-agents"]\nenabled = true\n'
-                                     '[plugins."machine@base-agents"]\nenabled = false\n')
+        cpp = machine.project('cpp', '[plugins."base@direct-core"]\nenabled = true\n'
+                                     '[plugins."machine@direct-core"]\nenabled = false\n')
         with mock.patch.object(UPDATE.subprocess, 'Popen') as popen, \
                 mock.patch.object(UPDATE.subprocess, 'run') as run:
             targets, ignored = UPDATE.declared_targets(user_config([docs, cpp]))
@@ -103,9 +103,9 @@ class DeclaredTargetTests(unittest.TestCase):
         popen.assert_not_called()
         run.assert_not_called()
         self.assertEqual([], ignored)
-        self.assertEqual(['base-agents', 'tj-agents'], sorted(targets))
-        self.assertEqual(['base@base-agents', 'machine@base-agents'], targets['base-agents']['plugins'])
-        self.assertEqual(Path.home(), targets['base-agents']['project'])
+        self.assertEqual(['direct-core', 'tj-agents'], sorted(targets))
+        self.assertEqual(['base@direct-core', 'machine@direct-core'], targets['direct-core']['plugins'])
+        self.assertEqual(Path.home(), targets['direct-core']['project'])
         self.assertEqual(['base@tj-agents'], targets['tj-agents']['plugins'])
         self.assertEqual(docs, targets['tj-agents']['project'])
 
@@ -113,16 +113,16 @@ class DeclaredTargetTests(unittest.TestCase):
         machine = Machine(self)
         stale = machine.project('stale', tj_agents(PINNED, 'base', 'kit'))
         current = machine.project('current', tj_agents(None, 'base', 'python'))
-        sandbox = machine.project('sandbox', '[marketplaces.base-agents]\nsource_type = "git"\n'
+        sandbox = machine.project('sandbox', '[marketplaces.direct-core]\nsource_type = "git"\n'
                                              f'source = "{CORE}"\nref = "{PINNED}"\n'
-                                             '[plugins."base@base-agents"]\nenabled = true\n')
+                                             '[plugins."base@direct-core"]\nenabled = true\n')
 
         targets, ignored = UPDATE.declared_targets(user_config([stale, current, sandbox]))
 
         self.assertIsNone(targets['tj-agents']['ref'])
         self.assertEqual(['base@tj-agents', 'python@tj-agents'], targets['tj-agents']['plugins'])
-        self.assertIsNone(targets['base-agents']['ref'])
-        self.assertEqual(Path.home(), targets['base-agents']['project'])
+        self.assertIsNone(targets['direct-core']['ref'])
+        self.assertEqual(Path.home(), targets['direct-core']['project'])
         self.assertEqual(2, len(ignored))
         self.assertTrue(any(str(stale) in line and PINNED in line for line in ignored))
         self.assertTrue(any(str(sandbox) in line for line in ignored))
@@ -178,8 +178,8 @@ class DeclaredTargetTests(unittest.TestCase):
 
 
 def target(**extra):
-    return {'base-agents': {'source': CORE, 'ref': None, 'project': ROOT,
-                            'plugins': ['base@base-agents', 'machine@base-agents'], **extra}}
+    return {'direct-core': {'source': CORE, 'ref': None, 'project': ROOT,
+                            'plugins': ['base@direct-core', 'machine@direct-core'], **extra}}
 
 
 def idle():
@@ -197,37 +197,37 @@ class RefreshTests(unittest.TestCase):
     def test_an_unchanged_revision_runs_no_cli_command(self):
         run = mock.Mock(return_value=True)
 
-        outcomes = UPDATE.refresh_codex('codex', target(), {'codex:base-agents': OLD},
+        outcomes = UPDATE.refresh_codex('codex', target(), {'codex:direct-core': OLD},
                                         revision=lambda *_: OLD, run=run, busy=idle)
 
-        self.assertEqual({'base-agents': 'current'}, outcomes)
+        self.assertEqual({'direct-core': 'current'}, outcomes)
         run.assert_not_called()
 
     def test_a_changed_revision_upgrades_then_re_adds_from_the_declaring_project(self):
         run = mock.Mock(return_value=True)
-        recorded = {'codex:base-agents': OLD}
+        recorded = {'codex:direct-core': OLD}
 
         outcomes = UPDATE.refresh_codex('codex', target(), recorded, revision=lambda *_: NEW, run=run, busy=idle)
 
-        self.assertEqual({'base-agents': 'updated'}, outcomes)
-        self.assertEqual(NEW, recorded['codex:base-agents'])
+        self.assertEqual({'direct-core': 'updated'}, outcomes)
+        self.assertEqual(NEW, recorded['codex:direct-core'])
         self.assertEqual([
-            mock.call(['codex', 'plugin', 'marketplace', 'upgrade', 'base-agents'], cwd=ROOT),
-            mock.call(['codex', 'plugin', 'add', 'base@base-agents'], cwd=ROOT),
-            mock.call(['codex', 'plugin', 'add', 'machine@base-agents'], cwd=ROOT),
+            mock.call(['codex', 'plugin', 'marketplace', 'upgrade', 'direct-core'], cwd=ROOT),
+            mock.call(['codex', 'plugin', 'add', 'base@direct-core'], cwd=ROOT),
+            mock.call(['codex', 'plugin', 'add', 'machine@direct-core'], cwd=ROOT),
         ], run.call_args_list)
 
     def test_cache_first_hooks_wait_while_a_codex_session_is_running(self):
         run = mock.Mock(return_value=True)
         preserve = mock.Mock()
-        recorded = {'codex:base-agents': OLD}
+        recorded = {'codex:direct-core': OLD}
 
         outcomes = UPDATE.refresh_codex('codex', target(), recorded, revision=lambda *_: NEW, run=run,
                                         busy=lambda: True, packages=lambda name: [{'snapshot_first': False}],
                                         preserve=preserve)
 
-        self.assertIn('deferred', outcomes['base-agents'])
-        self.assertEqual(OLD, recorded['codex:base-agents'])
+        self.assertIn('deferred', outcomes['direct-core'])
+        self.assertEqual(OLD, recorded['codex:direct-core'])
         run.assert_not_called()
         preserve.assert_not_called()
 
@@ -240,12 +240,12 @@ class RefreshTests(unittest.TestCase):
             order.append(command[2])
             return True
 
-        outcomes = UPDATE.refresh_codex('codex', target(), {'codex:base-agents': OLD}, revision=lambda *_: NEW,
+        outcomes = UPDATE.refresh_codex('codex', target(), {'codex:direct-core': OLD}, revision=lambda *_: NEW,
                                         run=run, busy=busy, packages=lambda name: hooks,
                                         preserve=lambda name, packages: order.append(('preserve', name, packages)))
 
-        self.assertEqual('updated', outcomes['base-agents'])
-        self.assertEqual([('preserve', 'base-agents', hooks), 'marketplace', 'add', 'add'], order)
+        self.assertEqual('updated', outcomes['direct-core'])
+        self.assertEqual([('preserve', 'direct-core', hooks), 'marketplace', 'add', 'add'], order)
         busy.assert_not_called()
 
     def test_a_running_session_keeps_its_hooks_after_the_cache_is_replaced(self):
@@ -269,55 +269,55 @@ class RefreshTests(unittest.TestCase):
 
     def test_an_unchanged_marketplace_never_asks_whether_sessions_are_running(self):
         busy = mock.Mock(return_value=True)
-        UPDATE.refresh_codex('codex', target(), {'codex:base-agents': OLD}, revision=lambda *_: OLD,
+        UPDATE.refresh_codex('codex', target(), {'codex:direct-core': OLD}, revision=lambda *_: OLD,
                              run=mock.Mock(), busy=busy)
         busy.assert_not_called()
 
     def test_a_failed_refresh_keeps_the_old_revision_and_waits_a_day(self):
-        recorded = {'codex:base-agents': OLD}
+        recorded = {'codex:direct-core': OLD}
         failing = mock.Mock(return_value=False)
 
         self.assertEqual('failed', UPDATE.refresh_codex(
-            'codex', target(), recorded, revision=lambda *_: NEW, run=failing, now=1000.0, busy=idle)['base-agents'])
+            'codex', target(), recorded, revision=lambda *_: NEW, run=failing, now=1000.0, busy=idle)['direct-core'])
         retry = mock.Mock(return_value=True)
         soon = UPDATE.refresh_codex('codex', target(), recorded, revision=lambda *_: NEW, run=retry, now=2000.0,
                                     busy=idle)
-        self.assertEqual(OLD, recorded['codex:base-agents'])
+        self.assertEqual(OLD, recorded['codex:direct-core'])
         later = UPDATE.refresh_codex('codex', target(), recorded, revision=lambda *_: NEW, run=retry,
                                      now=1000.0 + UPDATE.FAILURE_BACKOFF_SECONDS + 1, busy=idle)
 
-        self.assertIn('retried after 24 hours', soon['base-agents'])
-        self.assertEqual('updated', later['base-agents'])
-        self.assertNotIn('failed:codex:base-agents', recorded)
+        self.assertIn('retried after 24 hours', soon['direct-core'])
+        self.assertEqual('updated', later['direct-core'])
+        self.assertNotIn('failed:codex:direct-core', recorded)
 
     def test_an_unreachable_source_changes_nothing(self):
         run = mock.Mock(return_value=True)
 
         outcomes = UPDATE.refresh_codex('codex', target(), {}, revision=lambda *_: None, run=run, busy=idle)
 
-        self.assertEqual({'base-agents': 'unreachable'}, outcomes)
+        self.assertEqual({'direct-core': 'unreachable'}, outcomes)
         run.assert_not_called()
 
     def test_a_retired_plugin_is_skipped_once_and_never_forces_another_refresh(self):
-        targets = target(plugins=['base@base-agents', 'kit@base-agents'], missing=['kit@base-agents'])
+        targets = target(plugins=['base@direct-core', 'kit@direct-core'], missing=['kit@direct-core'])
         recorded = {}
 
         def run(command, cwd):
-            return UPDATE.RETIRED if command[-1] == 'kit@base-agents' else True
+            return UPDATE.RETIRED if command[-1] == 'kit@direct-core' else True
 
         first = UPDATE.refresh_codex('codex', targets, recorded, revision=lambda *_: NEW, run=run, busy=idle)
         again = mock.Mock(return_value=True)
         second = UPDATE.refresh_codex('codex', targets, recorded, revision=lambda *_: NEW, run=again, busy=idle)
 
-        self.assertTrue(first['base-agents'].startswith('updated'))
-        self.assertIn('kit@base-agents', first['base-agents'])
-        self.assertEqual({'base-agents': 'current'}, second)
+        self.assertTrue(first['direct-core'].startswith('updated'))
+        self.assertIn('kit@direct-core', first['direct-core'])
+        self.assertEqual({'direct-core': 'current'}, second)
         again.assert_not_called()
 
     def test_a_missing_installation_is_added_at_an_unchanged_revision(self):
         run = mock.Mock(return_value=True)
-        self.assertEqual({'base-agents': 'updated'}, UPDATE.refresh_codex(
-            'codex', target(missing=['base@base-agents']), {'codex:base-agents': OLD},
+        self.assertEqual({'direct-core': 'updated'}, UPDATE.refresh_codex(
+            'codex', target(missing=['base@direct-core']), {'codex:direct-core': OLD},
             revision=lambda *_: OLD, run=run, busy=idle))
         self.assertTrue(run.called)
 
@@ -329,10 +329,10 @@ class RefreshTests(unittest.TestCase):
         UPDATE.refresh_codex('codex', targets, recorded, revision=lambda *_: OLD, run=run, busy=idle)
         run.reset_mock()
 
-        self.assertEqual({'base-agents': 'current'}, UPDATE.refresh_codex(
+        self.assertEqual({'direct-core': 'current'}, UPDATE.refresh_codex(
             'codex', targets, recorded, revision=lambda *_: OLD, run=run, busy=idle))
         run.assert_not_called()
-        self.assertEqual({'base-agents': 'updated'}, UPDATE.refresh_codex(
+        self.assertEqual({'direct-core': 'updated'}, UPDATE.refresh_codex(
             'codex', targets, recorded, revision=lambda source, ref: NEW if source == publisher else OLD,
             run=run, busy=idle))
 
@@ -341,7 +341,7 @@ class RefreshTests(unittest.TestCase):
         recorded = {}
         run = mock.Mock(return_value=True)
 
-        self.assertEqual({'base-agents': 'updated'}, UPDATE.refresh_codex(
+        self.assertEqual({'direct-core': 'updated'}, UPDATE.refresh_codex(
             'codex', target(publishers=[{'source': retired, 'ref': 'removed'}]), recorded,
             revision=lambda source, ref: None if source == retired else NEW, run=run, busy=idle))
         self.assertEqual({}, recorded)
@@ -356,10 +356,10 @@ class DeclaredRefreshTests(unittest.TestCase):
     def test_a_no_change_run_over_many_projects_checks_each_source_once_and_runs_no_cli(self):
         machine = Machine(self)
         projects = [machine.project(f'repo-{index:02}', tj_agents(None, 'base')) for index in range(40)]
-        machine.installed('base-agents', 'base', 'machine')
+        machine.installed('direct-core', 'base', 'machine')
         machine.installed('tj-agents', 'base')
         revision = mock.Mock(return_value=OLD)
-        recorded = {'codex:base-agents': OLD, 'codex:tj-agents': OLD,
+        recorded = {'codex:direct-core': OLD, 'codex:tj-agents': OLD,
                     'targets:C:/old': {}, 'codex:tj-agents:' + 'f' * 64: OLD}
         run = mock.Mock(return_value=True)
 
@@ -370,24 +370,24 @@ class DeclaredRefreshTests(unittest.TestCase):
                                                revision=revision)
             elapsed = UPDATE.time.monotonic() - started
 
-        self.assertEqual({'base-agents': 'current', 'tj-agents': 'current'}, outcomes['marketplaces'])
+        self.assertEqual({'direct-core': 'current', 'tj-agents': 'current'}, outcomes['marketplaces'])
         self.assertEqual(2, revision.call_count)
         run.assert_not_called()
         popen.assert_not_called()
         self.assertLess(elapsed, 5)
-        self.assertEqual({'codex:base-agents', 'codex:tj-agents'}, set(recorded))
+        self.assertEqual({'codex:direct-core', 'codex:tj-agents'}, set(recorded))
 
     def test_a_repository_filter_refreshes_only_marketplaces_that_list_or_publish_it(self):
         machine = Machine(self)
         project = machine.project('kit-user', tj_agents(None, 'kit'))
-        machine.installed('base-agents', 'base', 'machine')
+        machine.installed('direct-core', 'base', 'machine')
         machine.installed('tj-agents', 'kit')
         machine.manifest('tj-agents', [{'name': 'kit', 'source': {
             'source': 'git-subdir', 'url': 'https://github.com/tj-agents/kit.git', 'path': 'plugins/kit'}}])
         run = mock.Mock(return_value=True)
-        recorded = {'codex:base-agents': OLD, 'codex:tj-agents': OLD}
+        recorded = {'codex:direct-core': OLD, 'codex:tj-agents': OLD}
 
-        for repositories, refreshed in (({'tj-agents/kit'}, {'tj-agents'}), ({'tj-agents/core'}, {'base-agents'}),
+        for repositories, refreshed in (({'tj-agents/kit'}, {'tj-agents'}), ({'tj-agents/core'}, {'direct-core'}),
                                         ({'tj-agents/elsewhere'}, set())):
             with self.subTest(repositories=repositories):
                 outcomes = UPDATE.refresh_declared('codex', user_config([project]), dict(recorded), run=run, busy=idle,
@@ -398,7 +398,7 @@ class DeclaredRefreshTests(unittest.TestCase):
         machine = Machine(self)
         docs = machine.project('docs', tj_agents(None, 'base'))
         machine.installed('tj-agents', 'base')
-        machine.installed('base-agents', 'base', 'machine')
+        machine.installed('direct-core', 'base', 'machine')
         user = machine.home / 'config.toml'
         recorded = {}
 
@@ -420,9 +420,9 @@ class DeclaredRefreshTests(unittest.TestCase):
         machine = Machine(self)
         work = machine.project('work', tj_agents(None, 'infonetica'))
         machine.installed('tj-agents', 'infonetica')
-        machine.installed('base-agents', 'base', 'machine')
+        machine.installed('direct-core', 'base', 'machine')
         user = machine.home / 'config.toml'
-        user.write_text('[plugins."base@base-agents"]\nenabled = true\n', encoding='utf-8')
+        user.write_text('[plugins."base@direct-core"]\nenabled = true\n', encoding='utf-8')
 
         def run(command, cwd):
             if command[2] == 'add':
@@ -440,7 +440,7 @@ class DeclaredRefreshTests(unittest.TestCase):
         self.assertEqual(['infonetica@tj-agents'], first['project_only'])
         self.assertEqual(['infonetica@tj-agents'], second['project_only'])
         self.assertNotIn('infonetica@tj-agents', text)
-        self.assertIn('[plugins."base@base-agents"]\nenabled = true', text)
+        self.assertIn('[plugins."base@direct-core"]\nenabled = true', text)
 
 
 class SessionDetectionTests(unittest.TestCase):
@@ -554,20 +554,20 @@ class LockAndSelfUpdateTests(unittest.TestCase):
             claude = Path(temp) / 'claude'
             (claude / 'plugins').mkdir(parents=True)
             current = Path(temp) / 'claude-cache' / 'tj-agents' / 'machine' / 'new'
-            legacy = Path(temp) / 'claude-cache' / 'base-agents' / 'machine' / 'old'
+            legacy = Path(temp) / 'claude-cache' / 'direct-core' / 'machine' / 'old'
             (claude / 'settings.json').write_text(json.dumps({'enabledPlugins': {
-                'machine@tj-agents': True, 'machine@base-agents': False}}), encoding='utf-8')
+                'machine@tj-agents': True, 'machine@direct-core': False}}), encoding='utf-8')
             (claude / 'plugins' / 'installed_plugins.json').write_text(json.dumps({'plugins': {
                 'machine@tj-agents': [{'installPath': str(current)}],
-                'machine@base-agents': [{'installPath': str(legacy)}]}}), encoding='utf-8')
+                'machine@direct-core': [{'installPath': str(legacy)}]}}), encoding='utf-8')
             codex = Path(temp) / 'codex'
-            config = {'plugins': {'machine@base-agents': {'enabled': True},
+            config = {'plugins': {'machine@direct-core': {'enabled': True},
                                   'machine@retired': {'enabled': False}}}
 
             with mock.patch.dict(os.environ, {'CODEX_HOME': str(codex)}):
                 roots = UPDATE.installed_plugin_roots('machine', claude, config)
 
-            self.assertEqual([current, codex / 'plugins' / 'cache' / 'base-agents' / 'machine' / 'local'], roots)
+            self.assertEqual([current, codex / 'plugins' / 'cache' / 'direct-core' / 'machine' / 'local'], roots)
 
 
     def test_the_sweep_is_skipped_when_no_engineering_package_is_installed(self):
@@ -626,36 +626,36 @@ class SetupTests(unittest.TestCase):
             profile.write_bytes(original)
             script = Path(temp) / "it's bin" / 'launch_check.py'
 
-            self.assertEqual([profile], SETUP.install_launchers([profile], 'C:/Python/python.exe', script))
+            self.assertEqual([profile], SETUP.install_shell_profiles([profile], 'C:/Python/python.exe', script))
             installed = profile.read_bytes()
-            self.assertEqual([], SETUP.install_launchers([profile], 'C:/Python/python.exe', script))
+            self.assertEqual([], SETUP.install_shell_profiles([profile], 'C:/Python/python.exe', script))
             self.assertEqual(installed, profile.read_bytes())
 
             self.assertTrue(installed.startswith(b'\xef\xbb\xbf'))
             text = installed[3:].decode('utf-8')
-            self.assertTrue(text.startswith("$env:Path = 'x'\r\n. 'accounts.ps1'\r\n" + SETUP.LAUNCH_START + '\r\n'))
-            self.assertTrue(text.endswith(SETUP.LAUNCH_END + '\r\n'))
+            self.assertTrue(text.startswith("$env:Path = 'x'\r\n. 'accounts.ps1'\r\n\r\n" + SETUP.PROFILE_START + '\r\n'))
+            self.assertTrue(text.endswith(SETUP.PROFILE_END + '\r\n'))
             self.assertNotIn('base-agents', text)
             self.assertNotIn('\n', text.replace('\r\n', ''))
             self.assertIn("it''s bin", text)
-            self.assertEqual(original, profile.with_name(profile.name + '.pre-launch-check.bak').read_bytes())
+            self.assertEqual(original, profile.with_name(profile.name + '.pre-tj-agents.bak').read_bytes())
 
-            self.assertEqual([profile], SETUP.install_launchers([profile], 'C:/Python314/python.exe', script))
+            self.assertEqual([profile], SETUP.install_shell_profiles([profile], 'C:/Python314/python.exe', script))
             moved = profile.read_bytes()[3:].decode('utf-8')
-            self.assertEqual(1, moved.count(SETUP.LAUNCH_START))
+            self.assertEqual(1, moved.count(SETUP.PROFILE_START))
             self.assertIn('Python314', moved)
             self.assertNotIn("'C:/Python/python.exe'", moved)
 
     def test_only_existing_profiles_change_and_the_first_is_created_when_none_exist(self):
         with tempfile.TemporaryDirectory(prefix='profile ') as temp:
             bashrc, zshrc = Path(temp) / '.bashrc', Path(temp) / '.zshrc'
-            self.assertEqual([bashrc], SETUP.install_launchers([bashrc, zshrc], '/usr/bin/python3', Path('/s.py')))
+            self.assertEqual([bashrc], SETUP.install_shell_profiles([bashrc, zshrc], '/usr/bin/python3', Path('/s.py')))
             self.assertFalse(zshrc.exists())
             zshrc.write_text('export A=1', encoding='utf-8')
-            self.assertEqual([zshrc], SETUP.install_launchers([bashrc, zshrc], '/usr/bin/python3', Path('/s.py')))
-            self.assertEqual('export A=1\n' + SETUP.posix_block('/usr/bin/python3', Path('/s.py')) + '\n',
+            self.assertEqual([zshrc], SETUP.install_shell_profiles([bashrc, zshrc], '/usr/bin/python3', Path('/s.py')))
+            self.assertEqual('export A=1\n\n' + SETUP.posix_block('/usr/bin/python3', Path('/s.py')) + '\n',
                              zshrc.read_text(encoding='utf-8'))
-            self.assertFalse(bashrc.with_name('.bashrc.pre-launch-check.bak').exists())
+            self.assertFalse(bashrc.with_name('.bashrc.pre-tj-agents.bak').exists())
 
 
 
