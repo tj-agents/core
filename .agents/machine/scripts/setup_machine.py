@@ -679,15 +679,42 @@ def legacy_config_entries(context: Context) -> list[tuple[str, ...]]:
     return legacy_keys(document)
 
 
+def _delivery_manifest_value(path: Path) -> dict | None:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _legacy_delivery_migrated(source: Path, target: Path) -> bool:
+    legacy_value = _delivery_manifest_value(source)
+    current_value = _delivery_manifest_value(target)
+    if legacy_value is None or current_value is None:
+        return False
+    if legacy_value.get("schema_version") != 1 or legacy_value.get("owner") != LEGACY_DELIVERY_OWNER:
+        return False
+    if current_value.get("schema_version") != 1 or current_value.get("owner") != DELIVERY_OWNER:
+        return False
+    legacy_files, current_files = legacy_value.get("files"), current_value.get("files")
+    if not isinstance(legacy_files, list) or not isinstance(current_files, list):
+        return False
+    current_digests = {entry.get("name"): entry.get("sha256") for entry in current_files if isinstance(entry, dict)}
+    return all(isinstance(entry, dict) and current_digests.get(entry.get("name")) == entry.get("sha256")
+               for entry in legacy_files)
+
+
 def legacy_deliveries(context: Context) -> list[tuple[Path, Path]]:
     directory = context.codex_home / "agents"
     found = []
     for legacy, current in LEGACY_DELIVERY:
         source, target = directory / legacy, directory / current
-        if source.is_file():
-            if target.exists():
+        if not source.is_file():
+            continue
+        if target.exists():
+            if not _legacy_delivery_migrated(source, target):
                 raise SetupError(f"Both {source} and {target} exist; remove the stale one")
-            found.append((source, target))
+        found.append((source, target))
     return found
 
 
@@ -715,13 +742,14 @@ def apply_codex_legacy(context: Context) -> list[str]:
         write_profile(path, updated, bom)
         changes += [f"removed [{table_name(parts)}] from {path}" for parts in entries]
     for source, target in deliveries:
-        value = json.loads(source.read_text(encoding="utf-8-sig"))
-        if not isinstance(value, dict) or value.get("schema_version") != 1 or value.get("owner") != LEGACY_DELIVERY_OWNER:
-            raise SetupError(f"Unsupported legacy delivery manifest: {source}")
-        value["owner"] = DELIVERY_OWNER
-        temporary = target.with_name(target.name + ".next")
-        temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8", newline="\n")
-        os.replace(temporary, target)
+        if not target.exists():
+            value = json.loads(source.read_text(encoding="utf-8-sig"))
+            if not isinstance(value, dict) or value.get("schema_version") != 1 or value.get("owner") != LEGACY_DELIVERY_OWNER:
+                raise SetupError(f"Unsupported legacy delivery manifest: {source}")
+            value["owner"] = DELIVERY_OWNER
+            temporary = target.with_name(target.name + ".next")
+            temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8", newline="\n")
+            os.replace(temporary, target)
         source.unlink()
         changes.append(f"renamed {source.name} to {target.name}")
     return changes
