@@ -194,13 +194,13 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
         self.binding["workflow_handoff"] = {
             "workflow_id": "package-upgrade-plan",
             "state_artifact": "plans/package-upgrade.md",
-            "next_stage": "plan-execution",
+            "next_stage": "workflow:run",
         }
         successor = {
             **self.binding,
             "pr_url": "https://github.com/Concertable/agents/pull/71",
             "pr_number": 71,
-            "worktree": r"C:\source\agent-standards.worktrees\Feature-plan-execution",
+            "worktree": r"C:\source\agent-standards.worktrees\Feature-run",
             "branch": "Feature/Plan-execution",
             "remote_head_sha": SUCCESSOR_HEAD,
             "review": {**self.binding["review"], "work_order": "C:/source/.git/agent-workflow/reviews/successor/work-order.md"},
@@ -241,7 +241,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
         self.binding["workflow_handoff"] = {
             "workflow_id": "package-upgrade-plan",
             "state_artifact": "plans/package-upgrade.md",
-            "next_stage": "plan-execution",
+            "next_stage": "workflow:run",
         }
         self.binding["review"]["reviewed_sha"] = HEAD
         self.binding["merge_authorization"] = {
@@ -283,7 +283,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
         self.binding["workflow_handoff"] = {
             "workflow_id": "package-upgrade-plan",
             "state_artifact": "plans/package-upgrade.md",
-            "next_stage": "plan-execution",
+            "next_stage": "workflow:run",
         }
         successor = {
             **self.binding,
@@ -329,7 +329,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
         self.binding["workflow_handoff"] = {
             "workflow_id": "package-upgrade-plan",
             "state_artifact": "plans/package-upgrade.md",
-            "next_stage": "plan-execution",
+            "next_stage": "workflow:run",
         }
         successor = {
             **self.binding,
@@ -366,7 +366,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
         self.binding["workflow_handoff"] = {
             "workflow_id": "package-upgrade-plan",
             "state_artifact": r"C:\plans\package-upgrade.md",
-            "next_stage": "plan-execution",
+            "next_stage": "workflow:run",
         }
 
         with self.assertRaisesRegex(DeliveryContractViolation, "repository-relative"):
@@ -378,7 +378,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
                 self.binding["workflow_handoff"] = {
                     "workflow_id": "package-upgrade-plan",
                     "state_artifact": state_artifact,
-                    "next_stage": "plan-execution",
+                    "next_stage": "workflow:run",
                 }
 
                 with self.assertRaisesRegex(DeliveryContractViolation, "repository-relative"):
@@ -589,7 +589,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
         self.binding["workflow_handoff"] = {
             "workflow_id": "package-upgrade-plan",
             "state_artifact": "plans/package-upgrade.md",
-            "next_stage": "plan-execution",
+            "next_stage": "workflow:run",
         }
 
         decision = self.router.decide(
@@ -599,7 +599,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
 
         self.assertEqual("transfer", decision["kind"])
         self.assertEqual("implementation", decision["semantic_stage"])
-        self.assertEqual("plan-execution", decision["skill"])
+        self.assertEqual("workflow:run", decision["skill"])
         self.assertTrue(decision["close_delivery_binding"])
         self.assertFalse(decision["remove_continuation"])
 
@@ -607,7 +607,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
         self.binding["workflow_handoff"] = {
             "workflow_id": "package-upgrade-plan",
             "state_artifact": "plans/package-upgrade.md",
-            "next_stage": "plan-execution",
+            "next_stage": "workflow:run",
         }
 
         decision = self.router.decide(

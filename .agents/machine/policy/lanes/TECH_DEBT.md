@@ -11,7 +11,7 @@ in the azure app-profile goal, is read as choosing Claude.
 - Observed/reported: 2026-10-12. Tommy reported it after a Claude session treated "do u wanna finish this
   off" as an explicit Claude choice and ran the implementation in Claude lane agents. Cause confirmed: the
   rule text below has no default split.
-- Source owner: `engineering:handoff`, plus any launcher or workflow that applies the host choice.
+- Source owner: `workflow:handoff`, plus any launcher or workflow that applies the host choice.
 - Priority: P2. It changes the cost and host mix of delegated work, but no active harm is observed.
 - State: open. Repair link: none.
 - Next action: replace the handoff's Codex-only default with a weighted 2:1 Codex-to-Claude default when

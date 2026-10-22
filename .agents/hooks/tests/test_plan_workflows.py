@@ -9,7 +9,7 @@ WORKFLOWS = ROOT / ".agents" / "workflows"
 FIXTURE = Path(__file__).parent / "fixtures" / "plan_workflow_scenarios.json"
 sys.path.insert(0, str(WORKFLOWS))
 
-from fixtures.lane_expectations import authored_skill, packaged_adapter
+from fixtures.lane_expectations import authored_skill
 from workflow_runtime import (
     WorkflowContract,
     select_state_provider,
@@ -53,7 +53,6 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
                 "phase-checkpoint-without-stop",
                 "validation-failure-recovery",
                 "fresh-context-transfer",
-                "compatibility-entries",
                 "blocker-return-path",
                 "restart-recovery",
                 "review-finding-recovery",
@@ -68,7 +67,7 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
             {scenario["terminal"] for scenario in scenarios.values()},
         )
         for scenario in scenarios.values():
-            self.assertEqual("plan-execution", scenario["workflow"])
+            self.assertEqual("run", scenario["workflow"])
             self.assertTrue(scenario["events"])
 
     def test_selection_contract_binds_cases_to_authored_catalogue_metadata(self):
@@ -80,26 +79,26 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
                 "author-design-reference",
                 "execute-primary",
                 "execute-paraphrase",
-                "roadmap-compat",
-                "resume-compat",
+                "roadmap-choice",
+                "resume-reconstruction",
                 "feature-neighbor",
                 "review-neighbor",
             },
             set(cases),
         )
         self.assertEqual(
-            ["plan-authoring", "plan-authoring", "plan-authoring"],
+            ["plan", "plan", "plan"],
             [
                 cases[name]["expected_skill"]
                 for name in ("author-primary", "author-paraphrase", "author-design-reference")
             ],
         )
         self.assertEqual(
-            ["plan-execution", "plan-execution"],
+            ["run", "run"],
             [cases[name]["expected_skill"] for name in ("execute-primary", "execute-paraphrase")],
         )
-        self.assertEqual("continue-roadmap", cases["roadmap-compat"]["expected_skill"])
-        self.assertEqual("resume-plan", cases["resume-compat"]["expected_skill"])
+        self.assertEqual("plan", cases["roadmap-choice"]["expected_skill"])
+        self.assertEqual("resume", cases["resume-reconstruction"]["expected_skill"])
         self.assertEqual("feature", cases["feature-neighbor"]["expected_skill"])
         self.assertEqual("review", cases["review-neighbor"]["expected_skill"])
         descriptions = {}
@@ -132,7 +131,7 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
             set(outcomes),
         )
         for outcome in outcomes.values():
-            self.assertEqual("plan-authoring", outcome["workflow"])
+            self.assertEqual("plan", outcome["workflow"])
             self.assertEqual("Plan graph: 0 error(s), 0 warning(s)", outcome["plan_graph"])
             self.assertEqual(1, outcome["worktree_count"])
             self.assertTrue(outcome["changed_paths"])
@@ -153,34 +152,26 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
         self.assertEqual("continue", combined["terminal"])
         self.assertTrue(combined["implementation_authorized"])
         self.assertEqual("continue", combined["transfer"]["transition"])
-        self.assertEqual("plan-execution", combined["transfer"]["target_stage_id"])
+        self.assertEqual("workflow:run", combined["transfer"]["target_stage_id"])
         self.assertEqual(
             combined["state"]["workflow_id"],
             combined["execution_identity"],
         )
 
-    def test_plan_skills_keep_one_canonical_body_and_thin_host_entries(self):
-        for skill in (
-            "plan-authoring",
-            "plan-execution",
-            "resume-plan",
-            "continue-roadmap",
-            "failing-tests",
-        ):
-            canonical = authored_skill(skill)
-            plugin_canonical = ROOT / "plugins" / "engineering" / canonical.relative_to(ROOT)
-            self.assertEqual(
-                canonical.read_text(encoding="utf-8"),
-                plugin_canonical.read_text(encoding="utf-8"),
-            )
-            for host, tree in (("claude", "skills"), ("codex", "codex-skills")):
-                with self.subTest(skill=skill, host=host):
-                    adapter = (ROOT / f".{host}" / "skills" / skill / "SKILL.md")
+    def test_public_lifecycle_skills_have_workflow_owners_and_thin_adapters(self):
+        expected = {
+            "plan": ".agents/workflow/workflow/plan/SKILL.md",
+            "run": ".agents/workflow/workflow/run/SKILL.md",
+            "resume": ".agents/workflow/operation/resume/SKILL.md",
+            "handoff": ".agents/workflow/workflow/handoff/SKILL.md",
+            "plan-artifacts": ".agents/workflow/contract/plan-artifacts/SKILL.md",
+        }
+        for name, relative in expected.items():
+            with self.subTest(skill=name):
+                self.assertEqual(ROOT / relative, authored_skill(name))
+                for host in ("claude", "codex"):
+                    adapter = ROOT / f".{host}" / "skills" / name / "SKILL.md"
                     self.assertIn("canonical shared definition", adapter.read_text(encoding="utf-8"))
-                    packaged = (
-                        ROOT / "plugins" / "engineering" / tree / skill / "SKILL.md"
-                    ).read_text(encoding="utf-8")
-                    self.assertEqual(packaged_adapter(ROOT, skill, host), packaged)
 
     def test_trusted_continuation_resumes_without_reading_the_plan_corpus(self):
         outcome = self.run_scenario("trusted-continuation-resume")
@@ -228,10 +219,6 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
         )
         self.assertIn("**Neither is a compiler, restore, or generator error.**", failing)
         self.assertIn("diagnose/fix/rebuild loop", failing)
-        execution = authored_skill("plan-execution").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("once a test run itself comes back red", execution)
 
     def test_generic_unit_failure_stays_with_parent_or_repository_guidance(self):
         body = authored_skill("failing-tests").read_text(
@@ -249,7 +236,7 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
             with self.subTest(scenario=scenario["id"]):
                 outcome = self.run_scenario(scenario["id"])
                 self.assertEqual(scenario["entry"], outcome["entry"])
-                self.assertEqual("plan-execution", outcome["workflow"])
+                self.assertEqual("run", outcome["workflow"])
                 self.assertEqual(
                     scenario["events"],
                     [entry["event"] for entry in outcome["events"]],
@@ -322,18 +309,6 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
         self.assertEqual(
             scenario["resume_condition"],
             transfer["state"]["next_action"]["resume_condition"],
-        )
-
-    def test_compatibility_entries_have_one_semantic_owner_each(self):
-        outcome = self.run_scenario("compatibility-entries")
-        records = {entry["event"]: entry["record"] for entry in outcome["events"]}
-        self.assertEqual(
-            {"entry": "resume-plan", "owner": "plan-execution"},
-            records["resume-plan-entry"],
-        )
-        self.assertEqual(
-            {"entry": "continue-roadmap", "owner": "plan-authoring"},
-            records["continue-roadmap-entry"],
         )
 
     def test_dependency_blocker_records_typed_gate_and_reciprocal_return(self):

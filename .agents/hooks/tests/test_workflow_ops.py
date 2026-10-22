@@ -1513,7 +1513,7 @@ class HostCoverageWorkflowTests(RepositoryFixture):
         return {
             "schema_version": 1,
             "candidate_head": head,
-            "shared_source": ".agents/base/policy/plan-artifacts/SKILL.md",
+            "shared_source": ".agents/workflow/contract/plan-artifacts/SKILL.md",
             "hosts": [
                 {
                     "host": "claude",
