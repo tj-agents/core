@@ -20,6 +20,12 @@ tracker operation. Selection requires repository authorization; installing Core 
 | Record a new item | `personal:create-work-item` | `infonetica:create-work-item` |
 | Reconcile and carry out existing work | `personal:address-work-item` | `infonetica:address-work-item` |
 
+A session lists only the skills of the project it started in. When the needed operation is not listed,
+run `python -B <engineering plugin root>/hooks/problem_records.py --root <repository> --operation
+create|read|address --harness claude|codex`, the root being two directories above a loaded engineering
+skill's base directory, and follow the printed `skill`. A failure, including a directory outside any
+repository, blocks the operation.
+
 Use only the selected profile's qualified operation. It owns deterministic scripts, factual validation,
 request reconciliation, remote persistence, native type mapping, retention and verified closure. It also
 owns when recording is permitted and any required user decision. Selecting a provider, observing a

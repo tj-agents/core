@@ -22,8 +22,7 @@ stay here; shared plans link to their source owners.
 assessment of existing capabilities and solutions; [`base:goal-continuation`](.agents/base/policy/goal-continuation/SKILL.md)
 owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
-Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
-Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
+Known bugs, mistakes and debt are [GitHub issues](https://github.com/tj-agents/core/issues).
 The [recording contract](.agents/engineering/resources/problem-records.md) routes remote work-item
 operations to the repository's explicitly selected profile. Personal owns GitHub records; Infonetica owns
 Azure Boards records and native type policy. Core owns the shared SQLite agent execution/session registry
@@ -35,7 +34,7 @@ interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `
 current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or
 changed plugin hooks until they are reviewed and trusted in `/hooks`; a fresh missing-marketplace write
 probe is required before claiming enforcement. The host coverage limit is tracked in
-`.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents a generated native-instruction
+[core#402](https://github.com/tj-agents/core/issues/402). The `base:agent-files` skill documents a generated native-instruction
 fallback.
 Codex hook commands use a per-session temporary snapshot preseeded for the running session's hooks.
 This lets those hooks keep running after a plugin update replaces an inactive package cache entry.

@@ -121,7 +121,7 @@ adapter. Ordinary transfers and side workstreams do not automatically acquire th
 receipt. Integration still depends on the agent following multiple procedure steps correctly.
 
 Known launch and cleanup failures have existing owners in
-[machine debt](../../.agents/machine/TECH_DEBT.md): the pre-launch Claude refresh has no overall
+[core issues](https://github.com/tj-agents/core/issues), including [core#390](https://github.com/tj-agents/core/issues/390): the pre-launch Claude refresh has no overall
 process-tree deadline, own-session observer startup can fail, and a surviving Windows shell can pin a
 worktree. Existing native session-name diagnostics also show that a launcher title does not prove the
 name the user sees. Reconcile those repair owners before creating another repair.

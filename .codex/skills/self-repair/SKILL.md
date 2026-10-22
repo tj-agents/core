@@ -1,6 +1,6 @@
 ---
 name: self-repair
-description: Repair a demonstrated defect in explicitly authorized tj-agents standards or agent tooling. Use when a mistake exposes a reusable instruction, routing, hook or lifecycle defect; establish source and task scope before applying automatic repair authority.
+description: Repair a demonstrated defect in explicitly authorized tj-agents standards or agent tooling. Use when a mistake exposes a reusable instruction, routing, hook or lifecycle defect, before any host product feedback; establish source and task scope before applying automatic repair authority.
 
 kind: workflow
 domain: process

@@ -1,6 +1,6 @@
 ---
 name: session
-description: Own the engineering session from task selection through repair and completion. Use when starting, continuing or finishing work under an explicitly selected engineering lifecycle.
+description: Own the engineering session from task selection through repair and completion. Use when starting, continuing or finishing work under an explicitly selected engineering lifecycle, or when asked to note or record a bug, mistake or debt.
 kind: policy
 domain: process
 ---
@@ -18,7 +18,7 @@ an authorized task has a future decision that may outlive the current session.
 
 When the user calls out a mistake, answer the direct question first and correct the active task within
 its existing authorization. For a suspected reusable agent-standard or tooling defect, load
-`engineering:self-repair` to establish source ownership, causal evidence and repair eligibility. It owns
+`engineering:self-repair`, before any host product feedback, to establish source ownership, causal evidence and repair eligibility. It owns
 the automatic-repair boundary and the no-source-change outcome. Existing user limits and scope gates
 still apply. Personal application maintenance uses the existing engineering lifecycle within the
 authorized goal; it does not need a second repair workflow.
@@ -75,7 +75,7 @@ continuation preserves its relevant instructions. Read again only for changed in
 
 When a bug, mistake or deliberate debt is noticed or reported, preserve the facts in the active task and
 follow [the recording contract](../../resources/problem-records.md) for the selected profile's recording
-decision. Reconcile an existing record and repair owner first. Record or update only when that profile
+decision, never a Markdown file. Reconcile an existing record and repair owner first. Record or update only when that profile
 and the user's authority permit it; a provider selection does not itself authorize creation. Preserve
 the original task while a recording decision is pending or declined. Recording grants no separate
 authority to repair, publish, dispatch or schedule work.

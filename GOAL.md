@@ -42,7 +42,7 @@ Handoff lane: L3, because host recovery behavior requires open-ended investigati
 - The final focused suites and generation checks passed. Commits `ba5742e`, `edac04b`, and `f16d796` were pushed on `Fix/CodexHookRefresh`. Draft PR [#59](https://github.com/tj-agents/core/pull/59) is open with base `Refactor/RepoDeclaredConfigHarnessMove` and head `f16d7961b7f8980fafd0cf34b9a996991d7e3449`. Its `verify` check was in progress when observed.
 - The first PR CI run failed two `test_plan_artifacts` assertions: the test still expected a direct Codex script command and invoked the new verified loader from a package path outside its cache layout without `PLUGIN_DATA`. Updated the fixture to exercise the generated command in a valid cache layout; the eight focused plan-artifact, snapshot, and Windows-command tests pass locally.
 - The test correction was pushed as `d60f682`. Exact-head CI run [36428208729](https://github.com/tj-agents/core/actions/runs/36428208729) passed every `verify` stage, including source layout/package and shared runtime tests. Draft PR #59 remains open and targets `Refactor/RepoDeclaredConfigHarnessMove`.
-- Next: run installed-host acceptance after the package is released and trusted. The routed-skill injection proof remains tracked in `.agents/plugins/TECH_DEBT.md`. Do not merge either PR.
+- Next: run installed-host acceptance after the package is released and trusted. The routed-skill injection proof remains tracked in [core#403](https://github.com/tj-agents/core/issues/403). Do not merge either PR.
 
 ## Merge checkpoint (2026-09-28)
 
