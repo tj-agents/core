@@ -207,8 +207,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
 
         before = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
         contract.write_text(contract.read_text(encoding="utf-8").replace(
-            "Established standards defects still require immediate repair.",
-            "Established standards defects still require immediate repair. Canonical source changed.",
+            "Established standards defects follow",
+            "Canonical source changed. Established standards defects follow",
         ), encoding="utf-8")
         after = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertNotEqual(before, after)
