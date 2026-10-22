@@ -1,6 +1,6 @@
 ---
 name: session
-description: Own the engineering session from task selection through repair and completion. Use when starting, continuing or finishing work under an explicitly selected engineering lifecycle.
+description: Own the engineering session from task selection through repair and completion. Use when starting, continuing or finishing work under an explicitly selected engineering lifecycle, or when asked to note or record a bug, mistake or debt.
 kind: policy
 domain: process
 ---
@@ -8,17 +8,20 @@ domain: process
 # Engineering session
 
 These conventions apply when engineering is selected for the current scope. They grant no
-implementation, publication or installation authority beyond the standing standards-defect default
-below. Product profiles and compatibility policy remain
+implementation, publication or installation authority beyond the eligible internal repair authority in
+`engineering:self-repair`. Product profiles and compatibility policy remain
 with the project. The common maintained-plan contract is `base:plan-artifacts`. The common
 continuation owner is `base:goal-continuation`; it selects `engineering:persistent-workflow` when
 an authorized task has a future decision that may outlive the current session.
 
 ## When the user calls out a mistake
 
-When the user calls out a mistake, answer the direct question first, then load and follow
-`engineering:self-repair`. It owns whether a consumed Core standard caused or failed to prevent the
-mistake, and repairing it in this session. Existing user limits and scope gates still apply.
+When the user calls out a mistake, answer the direct question first and correct the active task within
+its existing authorization. For a suspected reusable agent-standard or tooling defect, load
+`engineering:self-repair` before any host product feedback, to establish source ownership, causal
+evidence and repair eligibility. It owns the automatic-repair boundary and the no-source-change outcome. Existing user limits and scope gates
+still apply. Personal application maintenance uses the existing engineering lifecycle within the
+authorized goal; it does not need a second repair workflow.
 Questions ask for reasoning: explain and defend recommendations with evidence, change them only for new
 evidence or a stated user decision, and say what changed.
 
@@ -26,7 +29,7 @@ During normal work, when an applicable standard is ambiguous, silent or improvab
 refinement in the same turn as a question to the user: name the standard, the gap, concrete wording or a
 snippet, and why. Continue the current task under the existing standard while awaiting the decision. If
 accepted, make the refinement in this session under the standing authorization.
-Established standards defects still require immediate repair.
+Established standards defects follow `engineering:self-repair`'s source and authority decision.
 
 ```text
 Standard: engineering:failing-tests. Gap: silent on timeouts under parallel test load.
@@ -70,15 +73,15 @@ continuation preserves its relevant instructions. Read again only for changed in
 
 ## Record noticed problems
 
-When a bug, mistake, or deliberate debt is noticed or reported, record it while the observation is available
-through the selected profile under [the recording contract](../../../workflow/resources/problem-records.md).
-Preserve the observed bug, mistake or debt intent. Reconcile an existing record and repair owner first;
-repeated evidence updates that record. Recording stays within the current authorization and grants no
-separate authority to repair, publish, dispatch, or schedule work. Use the addressing workflow only when
-repair is already authorized, and preserve the original task while the record is updated.
+When a bug, mistake or deliberate debt is noticed or reported, preserve the facts in the active task and
+follow [the recording contract](../../../workflow/resources/problem-records.md) for the selected profile's recording
+decision. Never record in a Markdown file. Reconcile an existing record and repair owner first. Record or update only when that profile
+and the user's authority permit it; a provider selection does not itself authorize creation. Preserve
+the original task while a recording decision is pending or declined. Recording grants no separate
+authority to repair, publish, dispatch or schedule work.
 
 Feature, story, task and untyped recording requests use the selected profile's creation operation. Its
-policy resolves intent and native type; [repository selection](../../../workflow/resources/problem-records.md#repository-selection)
+policy resolves intent and native type; [repository selection](../../resources/problem-records.md#repository-selection)
 never grants permission to start implementation.
 
 ## Keep large changes reviewable
@@ -118,11 +121,12 @@ diagnose, repair and focused verification loop. Do not weaken a check merely to 
 
 Before returning a completed outcome, select `machine:close` and apply its completion decision. It owns
 the final-action ordering, keep-open requests and terminal closure. A new mistake callout returns to
-`engineering:self-repair` above before completion is reassessed.
+the callout decision above before completion is reassessed.
 
 ```text
 Delivery and validation complete, no owned wait: apply machine:close before the final reply.
-User calls out a mistake: answer and follow engineering:self-repair while the repair stays active.
+User calls out a mistake: answer and correct the active task; assess suspected reusable defects through
+engineering:self-repair's source and authority boundary before starting a standards repair.
 ```
 
 ## Maintain the right source owner
@@ -130,13 +134,11 @@ User calls out a mistake: answer and follow engineering:self-repair while the re
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
 out-of-scope defects with an objective resolution condition through the relevant shared writer. Plans
 link the canonical record under [the shared recording contract](../../../workflow/resources/problem-records.md).
-A defect in a consumed standards package or its source repository is the exception: a stale or broken
-standard, including the automation that missed it, is a defect to diagnose, never a manual step to hand
-to the user, and so is a standard that caused or failed to prevent a mistake. Diagnose it and follow
-`engineering:self-repair` in the same turn, after answering the user's direct question and before the
-current task resumes. That workflow owns the repair authorization and delivery procedure; explicit user
-limits still hold.
-Before committing or returning a terminal result, check the work against the standards that governed
-it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt
-entry. The shared recording contract defines that destination. Do not create a second
+A defect in a consumed agent standard or tool is diagnosed at its source. Use `engineering:self-repair`
+to establish causal evidence and whether its internal repair authority applies. Follow that decision
+before starting a source change; outside automatic scope, explain the proposed repair and continue
+unaffected authorized work while awaiting a decision. That workflow owns the repair authorization and
+delivery procedure; explicit user limits still hold.
+Before committing or returning a terminal result, check the work against the standards that governed it and reconcile every problem encountered: it is fixed, routed to an existing
+owner, recorded when authorized, or retained in the active task pending the profile's recording decision. The shared recording contract defines that destination. Do not create a second
 ledger for a standalone goal just to satisfy a repository-oriented procedure.

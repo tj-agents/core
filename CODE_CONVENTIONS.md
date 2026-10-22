@@ -37,6 +37,12 @@ incomplete.
 - Skill and workflow instructions name the interpreter per platform: `python3` on Linux and macOS,
   `python` on Windows, where `python3` is usually the Microsoft Store alias stub. Never tell an agent
   to run `powershell.exe`, `pwsh` or `wt.exe` without saying which platform the instruction is for.
+
+  ```text
+  python3 -B scripts/update_catalog_digests.py   # Linux and macOS
+  python -B scripts/update_catalog_digests.py    # Windows
+  ```
+
 - Open terminal tabs through `agent_cli.launch_tab` (Windows Terminal, tmux, kitty, Konsole), never by
   calling a terminal program directly.
 - Find the home directory with `Path.home()`. Gate Windows-only locations such as `LOCALAPPDATA` behind
@@ -46,9 +52,9 @@ incomplete.
   behaviour differs by platform pin the platform explicitly.
 
 Repository tooling (`.agents/sync-generated.ps1`, `.codex/install-workflow-agents.ps1`) may use PowerShell 7
-(`pwsh`), but it must run under `pwsh` on Linux as well as on Windows. `shell/`, `install.ps1` and
+(`pwsh`), but it must run under `pwsh` on Linux as well as on Windows. `shell/` and
 `cli-session-recovery/` are the Windows PowerShell profile and its tools, and are Windows-only by
-design.
+design; `setup_machine.py` installs `shell/` on Windows and reports it as not applicable on Linux.
 
 ## Python and portability
 

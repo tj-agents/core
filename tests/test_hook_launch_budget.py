@@ -79,7 +79,7 @@ class HookBudgetUnderLoad(unittest.TestCase):
             folder.mkdir(parents=True)
             for index in range(20):
                 (folder / f"plan-{index}.md").write_text("# Plan\n" + "x" * 512, encoding="utf-8")
-        cache = cls.home / ".claude" / "plugins" / "cache" / "base-agents"
+        cache = cls.home / ".claude" / "plugins" / "cache" / "tj-agents"
         for plugin in PLUGINS:
             for version in range(20):
                 stale = cache / plugin / f"{version:012x}"
