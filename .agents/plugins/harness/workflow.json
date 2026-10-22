@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "plugin": "base-agents/workflow",
+  "source_roots": [
+    ".agents/agent-store/runtime",
+    ".agents/hooks/problem_records.py",
+    ".agents/tiers/workflow.json",
+    ".agents/workflow",
+    ".agents/workflow/resources/problem-records.md"
+  ],
+  "requires": {
+    "marketplaces": [
+      {
+        "id": "base-agents",
+        "repository": "tj-agents/core"
+      }
+    ],
+    "plugins": [
+      "base-agents/agent-store",
+      "base-agents/base",
+      "base-agents/machine",
+      "base-agents/workflow"
+    ],
+    "hooks": [],
+    "permissions": {
+      "claude_allow": [
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)"
+      ],
+      "codex_prefix_rules": [
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+              "${PLUGIN_ROOT}/skills/status/scripts/status.py",
+              "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
+            ]
+          ],
+          "justification": "Read selected work-item state and supporting plans without creating or changing agent-store records.",
+          "match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py",
+              "payments"
+            ],
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+              "payments",
+              "20",
+              "all"
+            ]
+          ],
+          "not_match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/writer.py"
+            ],
+            [
+              "python",
+              "${PLUGIN_ROOT}/skills/status/scripts/status.py",
+              "payments"
+            ]
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -58,7 +58,7 @@ continuation after its observed fingerprint changes; no record or skill creates 
 work by itself.
 
 When work cannot run, use the selected profile under
-[the recording contract](../../resources/problem-records.md) to update its canonical record with its
+[the recording contract](../../../workflow/resources/problem-records.md) to update its canonical record with its
 resolver and resume condition.
 
 ## Full context transfer

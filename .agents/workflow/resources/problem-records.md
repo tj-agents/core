@@ -1,8 +1,8 @@
 # Work and problem records
 
-Core owns agent execution tracking and reusable engineering workflows. The selected profile owns remote
-work-item content, native types, tracker operations and record policy. Core never installs or selects a
-profile on a repository's behalf.
+Core owns reusable agent execution. Machine attaches verified native/session references through the
+canonical Agent Store. The selected profile owns remote work-item content, native types, tracker operations
+and record policy. Core never installs or selects a profile on a repository's behalf.
 
 ## Repository selection
 

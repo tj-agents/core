@@ -16,18 +16,25 @@
       "domain": "process"
     },
     {
-      "name": "engineering",
-      "root": ".agents/engineering",
-      "layout": "kind",
-      "plugin": "engineering",
-      "domain": "process"
-    },
-    {
       "name": "machine",
       "root": ".agents/machine",
       "layout": "kind",
       "plugin": "machine",
       "domain": "machine"
+    },
+    {
+      "name": "workflow",
+      "root": ".agents/workflow",
+      "layout": "kind",
+      "plugin": "workflow",
+      "domain": "process"
+    },
+    {
+      "name": "engineering",
+      "root": ".agents/engineering",
+      "layout": "kind",
+      "plugin": "engineering",
+      "domain": "process"
     }
   ],
   "host_adapter_roots": {
@@ -54,13 +61,14 @@
   },
   "generated_roots": [
     "plugins/base",
-    "plugins/engineering",
+    "plugins/agent-store",
     "plugins/machine",
+    "plugins/workflow",
+    "plugins/engineering",
     "plugins/publication.json",
     ".agents/plugins/marketplace.json",
     ".claude-plugin/marketplace.json",
-    "CAPABILITIES.md",
-    "plugins/agent-store"
+    "CAPABILITIES.md"
   ],
   "resources": [
     {
@@ -125,8 +133,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/engineering/resources/problem-records.md",
-      "destination": ".agents/engineering/resources/problem-records.md"
+      "source": ".agents/workflow/resources/problem-records.md",
+      "destination": ".agents/workflow/resources/problem-records.md"
     },
     {
       "plugin": "machine",
@@ -392,26 +400,53 @@
       "plugin": "agent-store",
       "source": ".agents/tiers/agent-store.json",
       "destination": "tier.json"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/agent-store/runtime",
+      "destination": ".agents/agent-store/runtime"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/hooks/problem_records.py",
+      "destination": "hooks/problem_records.py"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/workflow/resources/problem-records.md",
+      "destination": ".agents/workflow/resources/problem-records.md"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/tiers/workflow.json",
+      "destination": "tier.json"
     }
   ],
   "prerequisites": {
     "base": [],
-    "engineering": [
-      "base",
-      "agent-store",
-      "machine"
-    ],
+    "agent-store": [],
     "machine": [
       "base",
       "agent-store"
     ],
-    "agent-store": []
+    "workflow": [
+      "base",
+      "agent-store",
+      "machine"
+    ],
+    "engineering": [
+      "base",
+      "workflow",
+      "agent-store",
+      "machine"
+    ]
   },
   "external_prerequisites": {
     "base": [],
-    "engineering": [],
+    "agent-store": [],
     "machine": [],
-    "agent-store": []
+    "workflow": [],
+    "engineering": []
   },
   "extended_host_adapters": [
     "persistent-workflow",

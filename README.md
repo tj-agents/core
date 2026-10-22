@@ -2,9 +2,9 @@
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
 The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core).
-Select `base@tj-agents`, `agent-store@tj-agents`, `engineering@tj-agents` and `machine@tj-agents` from
+Select `base@tj-agents`, `agent-store@tj-agents`, `machine@tj-agents`, `workflow@tj-agents` and `engineering@tj-agents` from
 [`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
-The repository publishes Base, Agent Store, Engineering and Machine packages. Agent Store owns recorded
+The repository publishes Base, Agent Store, Machine, Workflow and Engineering packages. Agent Store owns recorded
 execution/session state; Machine observes and operates native hosts; Engineering owns code work and delivery.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
@@ -25,10 +25,10 @@ owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
 Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
-The [recording contract](.agents/engineering/resources/problem-records.md) routes remote work-item
+The [recording contract](.agents/workflow/resources/problem-records.md) routes remote work-item
 operations to the repository's explicitly selected profile. Personal owns GitHub records; Infonetica owns
-Azure Boards records and native type policy. Core publishes the shared SQLite registry as Agent Store and the reusable engineering lifecycles as
-Engineering. Installing Engineering does not select or install a recording
+Azure Boards records and native type policy. Core publishes the shared SQLite registry as Agent Store, generic work status as Workflow, and reusable
+engineering lifecycles as Engineering. Installing Engineering does not select or install a recording
 profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
 registers remain evidence only.
 Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.9+
@@ -130,7 +130,7 @@ establish installed-host trust or acceptance.
 
 ## Layout
 
-- `.agents/` is the canonical host-neutral source. Base, Agent Store, Engineering and Machine ownership is expressed
+- `.agents/` is the canonical host-neutral source. Base, Agent Store, Machine, Workflow and Engineering ownership is expressed
   below it alongside shared workflows, hooks, schemas, tests and resources.
 - `.codex/` contains only Codex entry points and host configuration. `.claude/` contains only Claude
   entry points and host configuration. Their skills reference canonical `.agents/` definitions rather

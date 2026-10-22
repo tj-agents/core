@@ -18,7 +18,7 @@ Map whatever Tommy said to a `--since` value and use it in every command below.
 
 ## Gather (one message, parallel Bash calls)
 
-Read [repository selection](../../resources/problem-records.md#repository-selection) before gathering. When
+Read [repository selection](../../../workflow/resources/problem-records.md#repository-selection) before gathering. When
 a provider is selected, use its list/read commands for recent and outstanding items, including items with no
 local plan. Merge their canonical identities into the workstreams below; provider state owns whether an item
 remains outstanding.

@@ -3,13 +3,16 @@
     "base": [
       "behavior"
     ],
-    "engineering": [
+    "agent-store": [
       "process"
     ],
     "machine": [
       "machine"
     ],
-    "agent-store": [
+    "workflow": [
+      "process"
+    ],
+    "engineering": [
       "process"
     ]
   }

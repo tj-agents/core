@@ -209,7 +209,6 @@
         "handoff",
         "handoff-format",
         "incremental-review",
-        "list-work",
         "merge",
         "merge-docs",
         "merging",
@@ -249,6 +248,7 @@
       "dependencies": {
         "required": [
           "base-agents/base",
+          "base-agents/workflow",
           "base-agents/agent-store",
           "base-agents/machine"
         ],
@@ -277,7 +277,8 @@
           "base-agents/agent-store",
           "base-agents/base",
           "base-agents/engineering",
-          "base-agents/machine"
+          "base-agents/machine",
+          "base-agents/workflow"
         ],
         "hooks": [
           {
@@ -312,14 +313,6 @@
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
             "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
             "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
@@ -429,47 +422,6 @@
                 [
                   "python",
                   "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
-                  "${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py",
-                  "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
-                ]
-              ],
-              "justification": "Reads plans and local execution status, labels a selected repository's plans as supporting context and names its provider; an invalid current-repository selection stops the scan. It writes no repository or session state",
-              "match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
-                  "postgres"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/other.py"
                 ]
               ]
             },
@@ -1284,6 +1236,115 @@
                   "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
                   "--project",
                   "C:/repo"
+                ]
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "base-agents",
+      "id": "base-agents/workflow",
+      "name": "workflow",
+      "package_path": "plugins/workflow",
+      "description": "Goal lifecycle and recorded work status.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "status"
+      ],
+      "dependencies": {
+        "required": [
+          "base-agents/base",
+          "base-agents/agent-store",
+          "base-agents/machine"
+        ],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "exe:git",
+          "python>=3.9"
+        ],
+        "optional": []
+      },
+      "digest": "sha256:dbe8ab00c70956807045e4d4182c50cc886a7c517a400d6424585a78f6bd51a0",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "base-agents",
+            "repository": "tj-agents/core"
+          }
+        ],
+        "plugins": [
+          "base-agents/agent-store",
+          "base-agents/base",
+          "base-agents/machine",
+          "base-agents/workflow"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
+                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
+                ]
+              ],
+              "justification": "Read selected work-item state and supporting plans without creating or changing agent-store records.",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py",
+                  "payments"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+                  "payments",
+                  "20",
+                  "all"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/writer.py"
+                ],
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
+                  "payments"
                 ]
               ]
             }

@@ -71,14 +71,14 @@ continuation preserves its relevant instructions. Read again only for changed in
 ## Record noticed problems
 
 When a bug, mistake, or deliberate debt is noticed or reported, record it while the observation is available
-through the selected profile under [the recording contract](../../resources/problem-records.md).
+through the selected profile under [the recording contract](../../../workflow/resources/problem-records.md).
 Preserve the observed bug, mistake or debt intent. Reconcile an existing record and repair owner first;
 repeated evidence updates that record. Recording stays within the current authorization and grants no
 separate authority to repair, publish, dispatch, or schedule work. Use the addressing workflow only when
 repair is already authorized, and preserve the original task while the record is updated.
 
 Feature, story, task and untyped recording requests use the selected profile's creation operation. Its
-policy resolves intent and native type; [repository selection](../../resources/problem-records.md#repository-selection)
+policy resolves intent and native type; [repository selection](../../../workflow/resources/problem-records.md#repository-selection)
 never grants permission to start implementation.
 
 ## Keep large changes reviewable
@@ -129,7 +129,7 @@ User calls out a mistake: answer and follow engineering:self-repair while the re
 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
 out-of-scope defects with an objective resolution condition through the relevant shared writer. Plans
-link the canonical record under [the shared recording contract](../../resources/problem-records.md).
+link the canonical record under [the shared recording contract](../../../workflow/resources/problem-records.md).
 A defect in a consumed standards package or its source repository is the exception: a stale or broken
 standard, including the automation that missed it, is a defect to diagnose, never a manual step to hand
 to the user, and so is a standard that caused or failed to prevent a mistake. Diagnose it and follow
