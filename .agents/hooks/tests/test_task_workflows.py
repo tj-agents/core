@@ -91,7 +91,7 @@ class TaskWorkflowAcceptanceTests(unittest.TestCase):
             [cases[name]["expected_skill"] for name in ("bug-primary", "bug-paraphrase")],
         )
         self.assertEqual(
-            {"plan-authoring", "plan-execution", "review", "e2e-ui-debug", "failing-tests"},
+            {"plan", "run", "review", "e2e-ui-debug", "failing-tests"},
             {
                 cases[name]["expected_skill"]
                 for name in ("planning-only", "active-plan", "review-only", "named-e2e", "red-test")

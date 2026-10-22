@@ -1,11 +1,11 @@
 ---
 name: plan-artifacts
-description: Maintain one Markdown plan for a long-term goal or substantive planning request, automatically route authorized execution to its available workflow, and keep corrections and resumable progress in the same artifact.
-kind: policy
-domain: behavior
+description: Maintain one canonical Markdown plan or goal artifact for substantive work, with current recovery evidence and host-coverage records where applicable. Use when creating, revising, recovering, or reporting a substantive plan.
+kind: contract
+domain: process
 ---
 
 # Maintained plan artifacts
 
-Read and follow the [canonical shared definition](../../../.agents/base/policy/plan-artifacts/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../../.agents/workflow/contract/plan-artifacts/SKILL.md) in full.
 This entry point supplies only Codex discovery metadata; the shared procedure is authored once under `.agents/`.

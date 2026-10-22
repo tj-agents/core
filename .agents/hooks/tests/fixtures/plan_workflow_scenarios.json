@@ -4,64 +4,62 @@
     {
       "id": "author-primary",
       "request": "Design a phased plan and ledger for replacing the cache layer, but do not implement it.",
-      "expected_skill": "plan-authoring",
+      "expected_skill": "plan",
       "description_terms": [
-        "planning-only requests",
-        "do not use to execute an existing plan"
+        "substantive work",
+        "implementation-ready canonical plan"
       ]
     },
     {
       "id": "author-paraphrase",
       "request": "Break the billing migration into shippable stages with verification gates.",
-      "expected_skill": "plan-authoring",
+      "expected_skill": "plan",
       "description_terms": [
-        "planning-only requests",
-        "do not use to execute an existing plan"
+        "substantive work",
+        "implementation-ready canonical plan"
       ]
     },
     {
       "id": "author-design-reference",
       "request": "Research the authorization model and write AUTHORIZATION_MODEL.md so another agent can implement the decision; do not write production code.",
-      "expected_skill": "plan-authoring",
+      "expected_skill": "plan",
       "description_terms": [
-        "implementation-ready design documents",
-        "research decision or RFC"
+        "substantive work",
+        "implementation-ready canonical plan"
       ]
     },
     {
       "id": "execute-primary",
       "request": "Read plans/runtime/RUNTIME_PROGRESS.md and implement its Next Steps continuously.",
-      "expected_skill": "plan-execution",
+      "expected_skill": "run",
       "description_terms": [
-        "authorized long-term or multi-phase",
-        "resume the existing goal"
+        "sustained or multiphase",
+        "actual acceptance condition"
       ]
     },
     {
       "id": "execute-paraphrase",
       "request": "Resume the uniquely active import plan and keep going across its remaining phases.",
-      "expected_skill": "plan-execution",
+      "expected_skill": "run",
       "description_terms": [
-        "authorized long-term or multi-phase",
-        "resume the existing goal"
+        "sustained or multiphase",
+        "actual acceptance condition"
       ]
     },
     {
-      "id": "roadmap-compat",
-      "request": "Use continue-roadmap to choose and plan the next implementable payments item.",
-      "expected_skill": "continue-roadmap",
+      "id": "roadmap-choice",
+      "request": "Choose and plan the next implementable payments item.",
+      "expected_skill": "plan",
       "description_terms": [
-        "what to plan next",
-        "do not resume an existing plan"
+        "choose what to plan next"
       ]
     },
     {
-      "id": "resume-compat",
-      "request": "Use resume-plan for this legacy handoff.",
-      "expected_skill": "resume-plan",
+      "id": "resume-reconstruction",
+      "request": "Reconstruct the interrupted legacy handoff.",
+      "expected_skill": "resume",
       "description_terms": [
-        "explicit resume-plan invocation",
-        "ordinary natural-language requests"
+        "after interruption"
       ]
     },
     {
@@ -98,8 +96,8 @@
   "scenarios": [
     {
       "id": "multi-phase-continuation",
-      "entry": "plan-execution",
-      "workflow": "plan-execution",
+      "entry": "run",
+      "workflow": "run",
       "events": [
         "resolve",
         "implement-phase-one",
@@ -119,8 +117,8 @@
     },
     {
       "id": "phase-checkpoint-without-stop",
-      "entry": "plan-execution",
-      "workflow": "plan-execution",
+      "entry": "run",
+      "workflow": "run",
       "events": [
         "resolve",
         "implement-phase",
@@ -136,8 +134,8 @@
     },
     {
       "id": "validation-failure-recovery",
-      "entry": "plan-execution",
-      "workflow": "plan-execution",
+      "entry": "run",
+      "workflow": "run",
       "events": [
         "resolve",
         "validation-failed",
@@ -154,8 +152,8 @@
     },
     {
       "id": "fresh-context-transfer",
-      "entry": "plan-execution",
-      "workflow": "plan-execution",
+      "entry": "run",
+      "workflow": "run",
       "events": [
         "resolve",
         "checkpoint-transfer",
@@ -168,22 +166,9 @@
       "terminal": "transfer"
     },
     {
-      "id": "compatibility-entries",
-      "entry": "resume-plan",
-      "workflow": "plan-execution",
-      "events": [
-        "resolve",
-        "resume-plan-entry",
-        "continue-roadmap-entry",
-        "continue"
-      ],
-      "checkpoints": {},
-      "terminal": "continue"
-    },
-    {
       "id": "blocker-return-path",
-      "entry": "plan-execution",
-      "workflow": "plan-execution",
+      "entry": "run",
+      "workflow": "run",
       "events": [
         "resolve",
         "block",
@@ -200,8 +185,8 @@
     },
     {
       "id": "restart-recovery",
-      "entry": "plan-execution",
-      "workflow": "plan-execution",
+      "entry": "run",
+      "workflow": "run",
       "events": [
         "resolve",
         "checkpoint-restart",
@@ -217,8 +202,8 @@
     },
     {
       "id": "review-finding-recovery",
-      "entry": "plan-execution",
-      "workflow": "plan-execution",
+      "entry": "run",
+      "workflow": "run",
       "events": [
         "resolve",
         "checkpoint-review",
@@ -236,8 +221,8 @@
     },
     {
       "id": "trusted-continuation-resume",
-      "entry": "plan-execution",
-      "workflow": "plan-execution",
+      "entry": "run",
+      "workflow": "run",
       "events": [
         "accept-continuation",
         "implement-phase",
@@ -255,8 +240,8 @@
     },
     {
       "id": "contradicted-continuation-rereads",
-      "entry": "plan-execution",
-      "workflow": "plan-execution",
+      "entry": "run",
+      "workflow": "run",
       "events": [
         "contradicted-continuation",
         "implement-phase",
@@ -271,8 +256,8 @@
     },
     {
       "id": "pr-slice-rollover",
-      "entry": "plan-execution",
-      "workflow": "plan-execution",
+      "entry": "run",
+      "workflow": "run",
       "events": [
         "resolve",
         "checkpoint-slice-one",

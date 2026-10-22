@@ -166,7 +166,7 @@ class PlanAuthoringHarness:
         probe = provider.probe()
         state = provider.resolve(
             self.ledger,
-            "acceptance/plan-authoring",
+            "acceptance/plan",
             "implementation-ready",
         )
         provider.validate_checkpoint(state)
@@ -182,10 +182,10 @@ class PlanAuthoringHarness:
             transfer = self.contract.transition(
                 "continue",
                 "The same parent enters plan execution with the authored identity.",
-                target_stage_id="plan-execution",
+                target_stage_id="workflow:run",
             )
         return {
-            "workflow": "plan-authoring",
+            "workflow": "plan",
             "terminal": terminal,
             "implementation_authorized": scenario["implementation_authorized"],
             "probe": probe,

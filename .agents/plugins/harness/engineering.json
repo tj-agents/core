@@ -4,6 +4,7 @@
   "source_roots": [
     ".agents/agent-store/runtime",
     ".agents/engineering",
+    ".agents/hooks/continuation_receipts.py",
     ".agents/hooks/continuation_stop.py",
     ".agents/hooks/docs_reachability.py",
     ".agents/hooks/hook_dispatch.py",

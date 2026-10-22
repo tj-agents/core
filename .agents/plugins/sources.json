@@ -78,11 +78,6 @@
     },
     {
       "plugin": "base",
-      "source": ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
-      "destination": "resources/plan-artifacts/host_coverage.py"
-    },
-    {
-      "plugin": "base",
       "source": ".agents/hooks/codex_hook_snapshot.py",
       "destination": "hooks/codex_hook_snapshot.py"
     },
@@ -198,7 +193,7 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
+      "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
       "destination": "workflows/host_coverage.py"
     },
     {
@@ -303,8 +298,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/workflow_route.py",
-      "destination": "hooks/workflow_route.py"
+      "source": ".agents/hooks/continuation_receipts.py",
+      "destination": "hooks/continuation_receipts.py"
     },
     {
       "plugin": "engineering",
@@ -415,6 +410,11 @@
       "plugin": "workflow",
       "source": ".agents/workflow/resources/problem-records.md",
       "destination": ".agents/workflow/resources/problem-records.md"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
+      "destination": "resources/plan-artifacts/host_coverage.py"
     },
     {
       "plugin": "workflow",

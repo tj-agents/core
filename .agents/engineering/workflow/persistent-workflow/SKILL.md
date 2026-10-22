@@ -74,7 +74,7 @@ authority; this workflow does not create a competing plan or permission.
 Honor the user's limits on additional sessions, schedulers and child processes before choosing a
 continuation capability. When a required wake cannot be established within those limits, continue all
 authorized unblocked work in the foreground. Use the supported foreground remote monitor for an owned
-delivery wait; it does not establish durable unattended continuation. Apply `base:goal-continuation`
+delivery wait; it does not establish durable unattended continuation. Apply `workflow:run`
 before ending at a genuine boundary for the remaining whole goal. A completed slice or unavailable
 scheduler does not establish goal completion or a whole-goal blocker.
 

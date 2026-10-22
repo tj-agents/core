@@ -22,7 +22,7 @@ class ClassificationTests(unittest.TestCase):
         for path in ("README.md", "docs/usage.md", "plans/work/GOAL.md", "reviews/topic.md"):
             with self.subTest(path=path):
                 self.assertEqual(CI.classify([path])["mode"], "docs")
-        for path in ("AGENTS.md", "CLAUDE.md", ".agents/base/policy/plan-artifacts/SKILL.md",
+        for path in ("AGENTS.md", "CLAUDE.md", ".agents/workflow/contract/plan-artifacts/SKILL.md",
                      ".codex/agents/lane-l4.md", ".github/workflows/ci.yml", "scripts/ci_selection.py",
                      "tests/test_ci_selection.py", "scripts/new_tool.py", "CODE_CONVENTIONS.md"):
             with self.subTest(path=path):

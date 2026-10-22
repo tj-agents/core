@@ -79,7 +79,7 @@ def host_coverage_module():
         return HOST_COVERAGE_MODULE
     candidates = (
         Path(__file__).resolve().parent / "host_coverage.py",
-        Path(__file__).resolve().parents[1] / "base" / "policy" / "plan-artifacts" / "scripts" / "host_coverage.py",
+        Path(__file__).resolve().parents[1] / "workflow" / "contract" / "plan-artifacts" / "scripts" / "host_coverage.py",
     )
     path = next((candidate for candidate in candidates if candidate.is_file()), None)
     if path is None:

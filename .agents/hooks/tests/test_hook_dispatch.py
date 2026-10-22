@@ -213,7 +213,7 @@ class HookDispatchTests(unittest.TestCase):
         self.assertIn("continuation_stop.py failed with exit status 1", output["reason"])
         self.assertIn("Repair the gate and retry this Stop event.", output["reason"])
         self.assertIn("ModuleNotFoundError", result.stderr)
-        self.assertIn("workflow_route", result.stderr)
+        self.assertIn("continuation_receipts", result.stderr)
 
     def test_a_gate_past_the_deadline_keeps_finished_verdicts_and_reports_the_rest(self):
         started = time.monotonic()
