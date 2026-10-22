@@ -8,7 +8,7 @@ domain: process
 
 # Address a recorded bug
 
-Read [the shared problem-record contract](../../resources/problem-records.md). This workflow selects and
+Read [the shared problem-record contract](../../../workflow/resources/problem-records.md). This workflow selects and
 tracks repair; it does not replace `engineering:bugfix`, `engineering:failing-tests`, or an existing plan
 owner.
 

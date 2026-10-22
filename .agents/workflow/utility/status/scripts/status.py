@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import re
+import subprocess
 import sys
 import time
 
@@ -46,54 +47,58 @@ def is_repo(path):
     return (path / ".git").exists()
 
 
-def workflow_root():
-    script = Path(__file__).resolve()
-    skill_directory = script.parent.parent
-    if (script.parent.name == "scripts" and skill_directory.parent.name == "utility"
-            and skill_directory.parent.parent.name == "engineering"
-            and skill_directory.parent.parent.parent.name == ".agents"):
-        package_root = skill_directory.parents[3]
-        candidates = (package_root / ".agents" / "workflows", package_root / "workflows")
-    elif script.parent.name == "scripts" and skill_directory.parent.name in {"skills", "codex-skills"}:
-        candidates = (skill_directory.parent.parent / "workflows",)
-    else:
-        raise RuntimeError("list-work capability failure: the script has no supported runtime anchor")
-    for workflows in candidates:
-        if (workflows / "workflow_runtime.py").is_file():
-            return workflows
-    raise RuntimeError("list-work capability failure: own workflow runtime is unavailable")
+def package_root():
+    skill = Path(__file__).resolve().parent.parent
+    if skill.parent.name in {"skills", "codex-skills"}:
+        return skill.parent.parent
+    if (skill.parent.name == "utility" and skill.parent.parent.name == "workflow"
+            and skill.parent.parent.parent.name == ".agents"):
+        return skill.parents[3]
+    raise RuntimeError("status capability failure: the script has no supported runtime anchor")
+
+
+def owned_module(name, path):
+    if not path.is_file():
+        raise RuntimeError(f"status capability failure: own {name} is unavailable at {path}")
+    spec = importlib.util.spec_from_file_location(f"workflow_status_{name}", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"status capability failure: own {name} cannot be loaded")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except (ImportError, OSError, ValueError) as error:
+        raise RuntimeError(f"status capability failure: own {name} cannot be loaded: {error}") from error
+    return module
+
+
+def git(directory, *arguments):
+    try:
+        result = subprocess.run(["git", "-C", str(directory), *arguments],
+                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError(f"status repository identity unavailable: {error}") from error
+    return result.stdout.strip() if result.returncode == 0 else None
 
 
 def work_item_reader():
-    workflows = workflow_root()
-    runtime_path = workflows / "workflow_runtime.py"
-    spec = importlib.util.spec_from_file_location("list_work_workflow_runtime", runtime_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError("list-work capability failure: own workflow runtime cannot be loaded")
-    runtime = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(runtime)
-    provider_type = getattr(runtime, "RepositoryStateProvider", None)
-    contract_type = getattr(runtime, "WorkflowContract", None)
-    violation_type = getattr(runtime, "ContractViolation", None)
-    if not all((callable(provider_type), callable(contract_type), callable(violation_type))):
-        raise RuntimeError("list-work capability failure: own workflow runtime lacks work-item status support")
-    if not callable(getattr(provider_type, "work_item_status", None)):
-        raise RuntimeError("list-work capability failure: own workflow runtime lacks work-item status support")
-    try:
-        contract = contract_type(workflows)
-    except (OSError, ValueError, KeyError) as error:
-        raise RuntimeError("list-work capability failure: own workflow contract is unavailable") from error
-    return runtime, contract
+    package = package_root()
+    runtime = package / ".agents/agent-store/runtime"
+    store = owned_module("reader", runtime / "reader.py")
+    identity = owned_module("repository_identity", runtime / "repository_identity.py")
+    reader_type = getattr(store, "ReadOnlyWorkItemStore", None)
+    if not all((callable(reader_type),
+                callable(getattr(store, "StoreReadError", None)),
+                callable(getattr(identity, "repository_identity", None)),
+                callable(getattr(reader_type, "work_item", None)))):
+        raise RuntimeError("status capability failure: own Agent Store reader lacks work-item support")
+    return store, identity
 
 
 def record_selection_reader():
-    sys.path.insert(0, str(workflow_root().parent / "hooks"))
-    try:
-        import problem_records
-    except ImportError as error:
-        raise RuntimeError("list-work capability failure: own record-selection helper is unavailable") from error
-    return problem_records
-
+    package = package_root()
+    source = package / ".agents/hooks/problem_records.py"
+    packaged = package / "hooks/problem_records.py"
+    return owned_module("problem_records", source if source.is_file() else packaged)
 
 def record_selection(directory):
     if not any((path / ".git").exists() for path in (directory, *directory.parents)):
@@ -102,12 +107,12 @@ def record_selection(directory):
         primary = records.primary_checkout(directory)
         selected = records.declaration(primary)
     except records.RecordError as error:
-        raise RuntimeError("list-work record selection failed for %s: %s" % (directory, error)) from error
+        raise RuntimeError("status record selection failed for %s: %s" % (directory, error)) from error
     return (primary, selected["provider"]) if selected else None
 
 
 try:
-    runtime, contract = work_item_reader()
+    store, identity = work_item_reader()
     records = record_selection_reader()
     asked = record_selection(here)
 except RuntimeError as error:
@@ -203,7 +208,7 @@ DONE_BOX = re.compile(r"^\s*[-*]\s*\[[xX]\]", re.M)
 
 named, mentioned, hidden, elsewhere = [], [], 0, {}
 named_seen = False
-providers = {}
+repositories = {}
 for entry in plan_entries():
     path, folder, label, group = entry[:4]
     member, item, selection = entry[4:] if len(entry) > 4 else (None, None, None)
@@ -233,18 +238,18 @@ for entry in plan_entries():
         relative_path = path.relative_to(member).as_posix()
         work_item = work_item_key
         try:
-            provider = providers.get(member)
-            if provider is None:
-                provider = runtime.RepositoryStateProvider(member, contract)
-                providers[member] = provider
-            state = provider.work_item_status(relative_path)
-            if state not in {"proposed", "active", "delivery-gated", "blocked", "paused", "done"}:
-                raise runtime.ContractViolation("work-item status is unavailable")
+            repository = repositories.get(member)
+            if repository is None:
+                repository = identity.repository_identity(member, git)
+                if repository is None:
+                    raise RuntimeError("work-item repository identity is unavailable")
+                repositories[member] = repository
+            state = store.ReadOnlyWorkItemStore().work_item(f"{repository}:{work_item_key}")["status"]
             if state == "done":
                 if is_named:
                     hidden += 1
                 continue
-        except runtime.ContractViolation as error:
+        except (store.StoreReadError, RuntimeError) as error:
             state = "unknown"
             status_reason = str(error)
     else:
