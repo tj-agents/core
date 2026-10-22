@@ -1,5 +1,11 @@
 # Repository-declared plugin cutover
 
+<!-- BEGIN plan-tracker-migration -->
+Current work is tracked through the selected Personal GitHub provider. This document retains design, decisions and historical evidence. Recording does not change implementation authority or existing delivery ownership.
+
+- [Verify Linux native repository-declared plugin selection](https://github.com/tj-agents/core/issues/345)
+<!-- END plan-tracker-migration -->
+
 Authority: Tommy's 2026-10-20 handoff at ~/.claude/plans/core/handoff-repo-declared-plugins.md.
 Commit/push/open PRs; Tommy merges. The handoff supersedes launch-time refresh/self-heal and the
 repository's standing auto-merge policy for this goal. No automatic merge binding is armed.
