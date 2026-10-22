@@ -2,6 +2,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -21,6 +22,12 @@ RULE = {
     "justification": "test",
     "match": [["python", "-B", "${PLUGIN_ROOT}/run.py"]],
     "not_match": [["python", "${PLUGIN_ROOT}/run.py"]],
+}
+OLD_RULE = {
+    "pattern": [["python"], "-B", "${PLUGIN_ROOT}/old.py"],
+    "justification": "test",
+    "match": [["python", "-B", "${PLUGIN_ROOT}/old.py"]],
+    "not_match": [["python", "${PLUGIN_ROOT}/old.py"]],
 }
 DEAD_RULE = "Bash(python -B C:/Users/someone/.claude/plugins/cache/base-agents/engineering/0123/hooks/gate.py --clear:*)"
 
@@ -61,12 +68,29 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
             {marketplace: {"source": {"source": "github", "repo": repository}}}), encoding="utf-8")
         return root
 
+    def install_claude_versions(self, entries, repository="tj-agents/marketplace", identity="engineering@tj-agents"):
+        plugins = self.claude / "plugins"
+        plugins.mkdir(parents=True, exist_ok=True)
+        marketplace = identity.rsplit("@", 1)[1]
+        (plugins / "installed_plugins.json").write_text(json.dumps({"plugins": {identity: entries}}), encoding="utf-8")
+        (plugins / "known_marketplaces.json").write_text(json.dumps(
+            {marketplace: {"source": {"source": "github", "repo": repository}}}), encoding="utf-8")
+
     def uninstall_claude(self):
         (self.claude / "plugins" / "installed_plugins.json").write_text(json.dumps({"plugins": {}}), encoding="utf-8")
 
     def install_codex(self, permissions):
         root = self.codex / "plugins" / "cache" / "tj-agents" / "engineering" / "local"
         harness(root, permissions)
+        (self.codex / "config.toml").write_text(
+            '[marketplaces.tj-agents]\nsource_type = "git"\nsource = "https://github.com/tj-agents/marketplace.git"\n',
+            encoding="utf-8")
+        return root
+
+    def install_codex_version(self, version, permissions, mtime):
+        root = self.codex / "plugins" / "cache" / "tj-agents" / "engineering" / version
+        harness(root, permissions)
+        os.utime(root, (mtime, mtime))
         (self.codex / "config.toml").write_text(
             '[marketplaces.tj-agents]\nsource_type = "git"\nsource = "https://github.com/tj-agents/marketplace.git"\n',
             encoding="utf-8")
@@ -99,6 +123,38 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.apply()
         self.assertEqual(["Bash(personal)"], self.allow())
         self.assertEqual("keep", json.loads(self.settings.read_text(encoding="utf-8"))["model"])
+        self.assert_converged()
+
+    def test_only_the_current_claude_plugin_version_is_granted_and_stale_versions_are_pruned(self):
+        old_root = self.root / "claude-cache" / "engineering-old"
+        harness(old_root, {"claude_allow": ["Bash(old)"], "codex_prefix_rules": []})
+        self.install_claude_versions([{"installPath": str(old_root), "lastUpdated": "2026-01-01T00:00:00Z"}])
+        self.write_settings([])
+        self.apply()
+        self.assertEqual(["Bash(old)"], self.allow())
+
+        current_root = self.root / "claude-cache" / "engineering-current"
+        harness(current_root, {"claude_allow": ["Bash(current)"], "codex_prefix_rules": []})
+        self.install_claude_versions([
+            {"installPath": str(old_root), "lastUpdated": "2026-01-01T00:00:00Z"},
+            {"installPath": str(current_root), "lastUpdated": "2026-02-01T00:00:00Z"},
+        ])
+        self.apply()
+        self.assertEqual(["Bash(current)"], self.allow())
+        self.assert_converged()
+
+    def test_only_the_current_codex_plugin_version_is_rendered_and_stale_rules_are_pruned(self):
+        self.install_codex_version("old-version", {"claude_allow": [], "codex_prefix_rules": [OLD_RULE]}, mtime=1000)
+        self.apply()
+        text = self.rules.read_text(encoding="utf-8")
+        self.assertIn("old.py", text)
+        self.assertNotIn("run.py", text)
+
+        self.install_codex_version("new-version", {"claude_allow": [], "codex_prefix_rules": [RULE]}, mtime=2000)
+        self.apply()
+        text = self.rules.read_text(encoding="utf-8")
+        self.assertIn("run.py", text)
+        self.assertNotIn("old.py", text)
         self.assert_converged()
 
     def test_dead_owned_rules_for_retired_cache_roots_are_removed(self):
