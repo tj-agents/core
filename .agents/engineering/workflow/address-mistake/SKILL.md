@@ -14,8 +14,8 @@ engine.
 
 1. Use the selected profile provider's read/list/update/close commands. Reconcile the named incident, or
    select one actionable high-value record quickly. Do not deep-rank
-   every record. Prefer an unblocked `P0` or `P1`, then the first useful `P2` or `P3`; priority does not
-   pause unrelated work except for `engineering:self-repair`'s shared agent-lifecycle exception.
+   every record. Prefer an unblocked `P0` or `P1`, then the first useful `P2` or `P3`; priority alone does not
+   pause unrelated work. `engineering:self-repair` owns suspension of affected unsafe lifecycle operations.
 2. Reconcile the existing goal, session, branch, PR, or writer before writing or dispatching. If a repair
    already owns the cause, link it and append evidence rather than creating a second writer. Keep blocked
    and deferred incidents current with their real reason, resolver, and observable resume condition.

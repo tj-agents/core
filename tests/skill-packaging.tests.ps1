@@ -97,7 +97,7 @@ foreach ($name in $targets) {
 
 # Prove the packaged-dependency check has teeth: strip a shipped script from a scratch copy of an adapter
 # folder and confirm detection actually fails it, rather than trivially passing everything.
-$scratch = Join-Path ([System.IO.Path]::GetTempPath()) "base-agents-packaging-$([guid]::NewGuid().ToString('N'))"
+$scratch = Join-Path ([System.IO.Path]::GetTempPath()) "tj-agents-packaging-$([guid]::NewGuid().ToString('N'))"
 try {
     $source = Join-Path $pluginRoot 'skills\handoff-claude'
     Copy-Item -LiteralPath $source -Destination $scratch -Recurse
