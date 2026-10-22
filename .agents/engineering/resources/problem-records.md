@@ -10,7 +10,8 @@ Selecting `personal@tj-agents` in the source repository's `.agents/plugins.json`
 `personal:work-item`. Any other profile is selected by a committed `.problem-records.json` naming its
 precedence. Both are read from the primary checkout, the first non-bare entry of `git worktree list
 --porcelain`, resolved from any worktree or subdirectory; a feature worktree's copy never overrides it.
-Read the selection before any tracker operation. Selection requires repository authorization; installing Core never adopts a provider.
+Read the selection before any tracker operation. Selection requires repository authorization; installing
+Core never adopts a provider.
 
 ## Selected profile operations
 
