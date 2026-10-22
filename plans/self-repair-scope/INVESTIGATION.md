@@ -1,5 +1,46 @@
 # Self-repair investigation
 
+## User decision and investigation direction — 22 October 2026
+
+Tommy clarified that autonomous Azure Boards creation is unwanted. When Tommy explicitly requests an item, that request authorizes creation within its stated scope. When the AI proposes an item, it must first ask whether Tommy wants it created and wait for an affirmative answer. Discovering a problem, selecting an Infonetica provider, or having permission to implement code does not supply that answer. An item should represent work Tommy intends to address at some point; an observation alone is insufficient. This employer policy belongs in `tj-agents/infonetica`. Personal-project autonomy should remain available.
+
+The remaining question is the useful scope of self-repair. This investigation recommends separating three decisions: correcting the active task, repairing a reusable agent standard, and creating a tracker item. Permission for one does not imply permission for the others. No Azure Boards or GitHub item was created for this investigation, and no runtime policy was changed.
+
+## Concrete use cases
+
+| Situation | Useful response | Self-repair value |
+| --- | --- | --- |
+| A handoff workflow drops the active task or transfers to a second writer | Reproduce the workflow failure and repair the shared handoff implementation or governing rule | Strong: future sessions share the same defect |
+| An agent reports unattended delivery although its continuation scheduler never registered | Distinguish misleading workflow guidance from a runtime failure; repair the causal owner and test the unavailable-scheduler path | Strong when a reusable source defect is established; historical M003 supplies an observed incident |
+| An agent ignores a clear instruction to inspect state after a failed patch | Inspect the actual state, correct its report and complete the task | No automatic standards edit: historical M007 shows the mistake, but a mistake alone does not establish an inadequate rule |
+| A Concertable skill points at an unavailable standard or omits a required composition-validation root | Verify the broken route or missing requirement against the owning standard; repair `Concertable/agents` if the reusable source is defective | Strong, conditional on an established standards defect and source authority; this is a hypothetical example, not a diagnosed Concertable failure |
+| One Concertable application has an incorrect DI registration while its standard is adequate | Correct that application under its existing task and test it | Ordinary product repair; no additional self-repair or work item follows automatically |
+| A work session proposes an Azure item merely because a reusable agent rule misbehaved | Keep employer details private; correct the active task and propose a source repair when useful | Reusable source repair may help, but this is not employer product backlog; personal agent tooling already has a no-ADO rule |
+| A work session notices a separate product bug outside the requested change | Explain the finding; ask whether Tommy intends to address it and wants an item | A product backlog decision, not self-repair |
+| A preference changes, such as adopting a different library or design | Discuss the desired behavior and its scope | A design decision, not evidence that the previous standard was defective |
+
+Self-repair earns its cost when a concrete reusable instruction or runtime defect explains the observed mistake and a bounded correction can prevent recurrence. Repeated mistakes justify diagnosis; they do not prove another rule, hook or tracker item is needed. An adequate-rule/no-source-change outcome must be a normal result.
+
+## Recommended scope and policy ownership
+
+Keep the reusable repair mechanism in Engineering and limit its subject to agent standards, skills, routing, hooks and lifecycle tooling. Fix application behavior through its existing lifecycle. Diagnose which source owns the cause before changing it; the current self-repair skill names Core, while the session policy also refers to consumed standards packages more generally. Supporting Concertable's own standards requires an explicit source-owner boundary rather than treating all standards as Core-owned.
+
+Keep high autonomy for explicitly adopted personal projects, including a personally adopted Concertable standards repository. In an employer task, recommend and scope a separate standards repair before diverting that task into a cross-repository repair or source publication. The originating employer task's permissions still apply even when the proposed destination is a personal tooling repository. Stop an actually unsafe affected operation when necessary; a generic P1 source classification should not by itself take over unrelated employer work.
+
+Infonetica owns consent for Azure Boards creation, the requirement that items represent intended future work, and employer-specific metadata. Core's recording contract should defer to that policy and recognize 'awaiting a recording decision' without demanding a replacement issue or another tracker. Personal may retain proactive recording under its own adopted policy. Fixing a reusable agent standard does not itself require a product work item.
+
+## Additional source findings
+
+- Existing Infonetica `plugins/infonetica/skills/work-context/SKILL.md`, line 62, already says agent tooling receives no ADO work item. The new consent rule generalizes control over AI-originated employer product items; it should preserve that existing tooling boundary.
+- Core `.agents/engineering/policy/session/SKILL.md`, lines 71 onward, instructs agents to record noticed problems. The selected profile controls record policy, but this call site does not explicitly distinguish selection from consent to create.
+- The newer Infonetica source in `../infonetica.worktrees/Fix-TjAgentsDependencies/plugins/infonetica/skills/create-work-item/SKILL.md`, line 13, asks about assignment, parent and branch. It does not explicitly ask whether an AI-proposed item should exist. Its deterministic helper validates inputs, repository scope and request identity, then can POST; these are not proof of user intent.
+- Both the older `create-devops-item` surface and the newer `create-work-item` surface need to be accounted for by the actual source owner. `open-pr` currently tells the agent to invoke item creation when a linked item is missing; `ship` and `implement` also compose item creation. These paths must respect the same consent policy rather than making missing linkage an independent creation authorization. An existing intended work item should be reused when applicable.
+- `Concertable/agents/README.md` identifies that repository as the owner of reusable product-specific contracts, routes and hooks; its `AGENTS.md` contains explicit Personal adoption and its `.problem-records.json` selects `personal:work-item`. Its composition-testing and always-on skills demonstrate reusable instruction/routing surfaces that could benefit from standards repair. That evidence does not establish Personal adoption in every Concertable consumer; the inspected `Concertable/system` checkout had neither `.agents/plugins.json` nor `.problem-records.json` at its root.
+
+These findings are source inspection. No live employer operation, installed-host acceptance probe or autonomous standards repair was performed. Cross-repository source references above identify the inspected local checkout; source worktree contents are not claimed to be published behavior.
+
+## Initial source audit
+
 Requested investigation, 22 October 2026. This records policy gaps found by source inspection; it does not authorize a workflow redesign or report an observed employer-data disclosure. Audited Core main at 412b8d11493dea9ea27ff5fff1a2cc21e5e751d7.
 
 Current behavior: engineering:session routes user mistake callouts to engineering:self-repair after answering the direct question. Self-repair investigates whether a consumed Core standard, skill, hook, workflow or host enforcement caused or failed to prevent the mistake. It reconciles an existing repair owner, records through the selected profile, and repairs in the current session. Unrelated checkouts require a separate worktree of the standards source repository. Handoff requires the user to ask. Standing authority includes implementation, tests, review, PR, merge and source publication after that repository's gates. Explicit user limits remain binding. Shared ownership/completion/handoff/cleanup failures default to P1 and pause unrelated work and new launches until verified correction or explicit deferral. Completion currently permits repaired/tested/committed source or a recorded blocker, then resumption of the original task. Loaded sessions retain their old instructions.
@@ -8,7 +49,7 @@ Personal versus work: this is one shared Engineering workflow, applicable when E
 
 ## Expected boundary
 
-The workflow should distinguish investigating a callout from establishing a source defect and explain a truthful no-source-change outcome when the existing rule is adequate. A repair originating in an employer checkout should retain its incident and confidential evidence in the employer tracker, identify the separate Core source repair, and specify what sanitized evidence can cross that boundary. Completion should make source correction, publication and installed/fresh-session verification distinguishable.
+The workflow should distinguish investigating a callout from establishing a source defect and explain a truthful no-source-change outcome when the existing rule is adequate. An employer incident does not automatically belong in Azure Boards: retain relevant facts within the authorized employer task, respect the Infonetica creation decision, and identify any separately authorized standards repair without copying confidential evidence. Completion should make source correction, publication and installed/fresh-session verification distinguishable.
 
 ## Findings
 
@@ -40,8 +81,8 @@ A callout can interrupt authorized product work and begin a broadly authorized C
 
 ## Proposed resolution for a future repair
 
-Agree and document the existing workflow's causal decision outcomes, including an adequate-rule/no-source-change result. Define origin incident versus source repair ownership and provider selection without moving employer details to Personal. Define proportional source/publication/installed acceptance evidence and preserve explicit user limits, existing live repair ownership and monitoring-only deliveries. Verify representative personal and employer paths, including missing providers and an adequate existing rule. Keep implementation pending a repair request; this issue captures the requested investigation.
+Agree and document the existing workflow's causal decision outcomes, including an adequate-rule/no-source-change result. Define origin incident versus source repair ownership and provider selection without moving employer details to Personal or presuming any new employer item should be created. Apply the user's settled Azure creation policy in the Infonetica source owner and reconcile Core callers with it. Define proportional source/publication/installed acceptance evidence and preserve explicit user limits, existing live repair ownership and monitoring-only deliveries. Verify representative personal and employer paths, including declined creation, missing providers and an adequate existing rule. Keep the broader self-repair scope redesign pending a decision; this file captures the requested investigation.
 
 ## Record publication
 
-The selected Core provider resolves to personal:work-item. Existing open Core records were inspected successfully; none matched this investigation. Automatic approval review rejected creation of a GitHub issue because it considered the payload, external destination and Personal-provider use insufficiently authorized. No issue was published. This file preserves the requested investigation; publication remains pending explicit approval of this report and tj-agents/core as the destination.
+The selected Core provider resolves to personal:work-item. Existing open Core records were inspected successfully; none matched this investigation. Automatic approval review rejected the initial attempt to create a GitHub issue because it considered the payload, external destination and Personal-provider use insufficiently authorized. No issue was published. Tommy's subsequent direction is to investigate actual use cases and prevent AI-originated employer backlog creation without a decision. This file preserves that investigation; no publication is part of the current scope.
