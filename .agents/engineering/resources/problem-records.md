@@ -21,7 +21,14 @@ tracker operation. Selection requires repository authorization; installing Core 
 | Reconcile and carry out existing work | `personal:address-work-item` | `infonetica:address-work-item` |
 
 Use only the selected profile's qualified operation. It owns deterministic scripts, factual validation,
-request reconciliation, remote persistence, native type mapping, retention and verified closure. Preserve
+request reconciliation, remote persistence, native type mapping, retention and verified closure. It also
+owns when recording is permitted and any required user decision. Selecting a provider, observing a
+problem or authorizing a repair does not itself authorize creating a remote item. Apply the selected
+profile's decision before creation; keep personal recording autonomy with the personal profile.
+
+While a recording decision is pending or declined, retain relevant facts in the existing authorized task
+and continue unaffected work. Do not create a substitute item, switch providers or treat withheld
+recording consent as permission to publish elsewhere. Preserve
 the request's intent: a software defect, observed agent/process mistake, deliberate debt, feature, story
 or concrete task. The profile maps that intent to its actual tracker types; Core does not impose a shared
 remote schema. Recording never starts implementation. An explicit addressing request reuses the item's
@@ -50,4 +57,6 @@ where evidence may go; employer-owned facts stay within the selected employer pr
 The primary checkout selects personal:work-item. A new defect uses personal:create-work-item with bug
 intent; a repeated observation updates its existing GitHub identity. An explicit repair request uses
 personal:address-work-item and keeps the existing repair owner. Reading the item creates no execution.
+An employer profile requires a creation decision: retain the observation in the current task until that
+decision is supplied; selecting the profile does not satisfy it.
 ```

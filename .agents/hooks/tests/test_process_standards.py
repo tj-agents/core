@@ -103,22 +103,21 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn(
             "Before committing or returning a terminal result, check the work against the "
             "standards that governed it and reconcile every problem encountered: it is fixed, "
-            "handed off, or already has the owning debt entry",
+            "routed to an existing owner, recorded when authorized, or retained in the active task "
+            "pending the profile's recording decision.",
             flat,
         )
 
-    def test_a_standards_defect_hands_off_in_the_same_turn(self):
+    def test_standards_repair_requires_internal_source_authority(self):
         instructions = authored_skill("session").read_text(
             encoding="utf-8"
         )
         flat = " ".join(instructions.split())
 
         for phrase in (
-            "A defect in a consumed standards package or its source repository is the exception: "
-            "a stale or broken standard",
-            "and so is a standard that caused or failed to prevent a mistake",
-            "`engineering:self-repair` in the same turn, after answering the user's direct question and before the "
-            "current task resumes",
+            "A defect in a consumed agent standard or tool is diagnosed at its source",
+            "Use `engineering:self-repair` to establish causal evidence and whether its internal repair authority applies",
+            "outside automatic scope, explain the proposed repair and continue unaffected authorized work",
             "That workflow owns the repair authorization and delivery procedure",
             "explicit user limits still hold",
         ):
@@ -127,16 +126,20 @@ class ProcessStandardsTests(unittest.TestCase):
 
         self_repair = " ".join(authored_skill("self-repair").read_text(encoding="utf-8").split())
         for phrase in (
-            "reconcile that owner and contribute the new evidence without creating a duplicate writer",
-            "Fix the standard in the current session",
+            "Its owning source is an explicitly authorized `tj-agents` standards or tooling repository",
+            "Both the originating task and the source repository have explicitly adopted personal scope",
+            "`tj-agents/infonetica` is employer tooling and remains outside automatic repair",
+            "Conclude with no standards change when no reusable source defect is established",
+            "Reconcile that owner and contribute the evidence without creating a duplicate writer",
+            "Fix the standard or tool in the current session",
             "Hand the repair off only when the user asks",
-            "This standing authorization covers the bounded Core repair through implementation, tests, review, pull "
-            "request, merge, and publication",
+            "For an eligible automatic repair, standing authorization covers implementation, tests, review, pull "
+            "request, merge and publication in that source repository once its gates pass",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self_repair)
 
-    def test_callout_checks_standards_before_an_apology(self):
+    def test_callout_corrects_task_before_optional_standards_repair(self):
         instructions = authored_skill("session").read_text(encoding="utf-8")
         section = " ".join(
             instructions.split("## When the user calls out a mistake", 1)[1].split("## ", 1)[0].split()
@@ -145,7 +148,8 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertTrue(section.startswith("When the user calls out a mistake, answer the direct question first"))
         for phrase in (
             "`engineering:self-repair`",
-            "repairing it in this session",
+            "source ownership, causal evidence and repair eligibility",
+            "the automatic-repair boundary and the no-source-change outcome",
             "Existing user limits and scope gates still apply",
         ):
             with self.subTest(phrase=phrase):
@@ -153,7 +157,8 @@ class ProcessStandardsTests(unittest.TestCase):
 
         self_repair = " ".join(authored_skill("self-repair").read_text(encoding="utf-8").split())
         for phrase in (
-            "consumed Core standard, skill, hook, workflow, or host enforcement",
+            "a demonstrated defect in a reusable agent standard, skill, route, hook or lifecycle tool",
+            "An employer task does not grant automatic repair authority",
             "monitoring-only",
             "Monitoring does not grant delivery authority",
             "never authorizes taking over an unrelated pending delivery",
