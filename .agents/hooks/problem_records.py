@@ -1,4 +1,6 @@
+import argparse
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -12,6 +14,7 @@ if sys.version_info < (3, 9):
 CONFIG = ".problem-records.json"
 PROVIDER = re.compile(r"[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*")
 REFERENCE = re.compile(r"[a-z][a-z0-9+.-]*://[^\s]+")
+OPERATIONS = {"read": (), "create": ("create-work-item",), "address": ("address-work-item",)}
 
 
 class RecordError(ValueError):
@@ -60,21 +63,43 @@ def declaration(root):
     return value
 
 
-def read_record(root, reference, harness):
+def selected_provider(root):
     root = primary_checkout(root)
     selected = declaration(root)
     if selected is None:
         raise RecordError("source repository has no selected problem-record provider")
-    if harness not in {"codex", "claude"} or not isinstance(reference, str) or not REFERENCE.fullmatch(reference):
-        raise RecordError("provider reads require the actual host and a canonical record URI")
+    return root, selected["provider"]
+
+
+def installed_skill(name, harness):
     from skill_router import NativePluginDiscoveryError, resolved_skill
     try:
-        found = resolved_skill(selected["provider"], harness)
+        found = resolved_skill(name, harness)
     except (OSError, ValueError, RuntimeError, NativePluginDiscoveryError) as error:
         raise RecordError("selected problem-record provider could not be resolved") from error
-    if found is None:
+    return None if found is None else found[0]
+
+
+def operation_skill(root, operation, harness):
+    if harness not in {"codex", "claude"} or operation not in OPERATIONS:
+        raise RecordError("operation resolution requires the actual host and a read, create or address operation")
+    root, provider = selected_provider(root)
+    plugin = provider.split(":", 1)[0]
+    for name in [plugin + ":" + bare for bare in OPERATIONS[operation]] + [provider]:
+        skill = installed_skill(name, harness)
+        if skill is not None:
+            return {"primary": str(root), "provider": provider, "operation": name, "skill": str(skill)}
+    raise RecordError("selected problem-record provider is not installed")
+
+
+def read_record(root, reference, harness):
+    root, provider = selected_provider(root)
+    if harness not in {"codex", "claude"} or not isinstance(reference, str) or not REFERENCE.fullmatch(reference):
+        raise RecordError("provider reads require the actual host and a canonical record URI")
+    skill = installed_skill(provider, harness)
+    if skill is None:
         raise RecordError("selected problem-record provider is not installed")
-    skill_root = found[0].parent.resolve()
+    skill_root = skill.parent.resolve()
     reader = skill_root / "scripts/read_problem_record.py"
     if not reader.is_file() or not reader.resolve().is_relative_to(skill_root):
         raise RecordError("selected provider does not ship its record reader")
@@ -94,3 +119,22 @@ def read_record(root, reference, harness):
     if value["record"] != reference or not isinstance(value["kind"], str) or value["kind"] not in {"bug", "mistake", "debt"} or value["state"] != "open" or not isinstance(value["body"], str) or not value["body"].strip():
         raise RecordError("selected provider returned an unrelated, closed or invalid problem record")
     return value
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Print the installed skill for a repository's selected problem-record operation.")
+    parser.add_argument("--root", required=True)
+    parser.add_argument("--operation", required=True, choices=sorted(OPERATIONS))
+    parser.add_argument("--harness", required=True, choices=("claude", "codex"))
+    args = parser.parse_args(argv)
+    try:
+        os.chdir(args.root)
+        print(json.dumps(operation_skill(".", args.operation, args.harness)))
+    except (OSError, RecordError) as error:
+        print("problem-records: " + str(error) + "; retain the facts in the active task and write no other record", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
