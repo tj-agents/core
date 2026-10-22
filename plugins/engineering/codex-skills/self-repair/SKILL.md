@@ -1,12 +1,12 @@
 ---
 name: self-repair
-description: Repair, in the current session, the consumed Core standard that caused or failed to prevent an agent mistake the user called out. Use when a user identifies an agent mistake and the governing standard, skill, hook, workflow, or host enforcement may have caused or failed to prevent it.
+description: Repair a demonstrated defect in explicitly authorized tj-agents standards or agent tooling. Use when a mistake exposes a reusable instruction, routing, hook or lifecycle defect; establish source and task scope before applying automatic repair authority.
 
 kind: workflow
 domain: process
 ---
 
-# Repair a Core-caused agent mistake
+# Repair internal agent standards and tooling
 
 Read and follow the [canonical shared definition](../../.agents/engineering/workflow/self-repair/SKILL.md) in full.
 This entry point supplies only Codex discovery metadata; the shared procedure is authored once under `.agents/`.
