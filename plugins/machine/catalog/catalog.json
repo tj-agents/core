@@ -5,8 +5,8 @@
     {
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "base-agents",
-      "id": "base-agents/base",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/base",
       "name": "base",
       "package_path": "plugins/base",
       "description": "Maintained plans and common agent behavior.",
@@ -32,16 +32,16 @@
         ],
         "optional": []
       },
-      "digest": "sha256:86675ed72944f9082813fb4fda5f4f335027c95046ce27d52a0e77006f5431d6",
+      "digest": "sha256:68e973a171c4ec22199d79e5934090f67ff03e521930c4208c7bcd24160327d5",
       "harness": {
         "marketplaces": [
           {
-            "id": "base-agents",
-            "repository": "tj-agents/core"
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
           }
         ],
         "plugins": [
-          "base-agents/base"
+          "tj-agents/base"
         ],
         "hooks": [
           {
@@ -82,8 +82,8 @@
     {
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "base-agents",
-      "id": "base-agents/engineering",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/engineering",
       "name": "engineering",
       "package_path": "plugins/engineering",
       "description": "Selected engineering workflows, reviews and Git operations.",
@@ -155,8 +155,8 @@
       ],
       "dependencies": {
         "required": [
-          "base-agents/base",
-          "base-agents/machine"
+          "tj-agents/base",
+          "tj-agents/machine"
         ],
         "optional": []
       },
@@ -171,18 +171,18 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:d21f95b6a7ff4eefd9367f6684474da9d35385ed3d52bc629784762e20db4eac",
+      "digest": "sha256:c62228651fe62b4aac550213132412424d0fc202a54289f2f825d6e352d3ce01",
       "harness": {
         "marketplaces": [
           {
-            "id": "base-agents",
-            "repository": "tj-agents/core"
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
           }
         ],
         "plugins": [
-          "base-agents/base",
-          "base-agents/engineering",
-          "base-agents/machine"
+          "tj-agents/base",
+          "tj-agents/engineering",
+          "tj-agents/machine"
         ],
         "hooks": [
           {
@@ -465,8 +465,8 @@
     {
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "base-agents",
-      "id": "base-agents/machine",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/machine",
       "name": "machine",
       "package_path": "plugins/machine",
       "description": "Explicit harness, history and clipboard utilities.",
@@ -497,7 +497,7 @@
       ],
       "dependencies": {
         "required": [
-          "base-agents/base"
+          "tj-agents/base"
         ],
         "optional": []
       },
@@ -513,20 +513,20 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:bc96bc7c64815271374f651c7fd95f4bd28130bdcd741d9baf3ed43a3f9180d2",
+      "digest": "sha256:cc25427a27669b52f38bf8e0a4dda2ce49dc7863393b6ea2609e4b679e8b33ab",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
       "harness": {
         "marketplaces": [
           {
-            "id": "base-agents",
-            "repository": "tj-agents/core"
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
           }
         ],
         "plugins": [
-          "base-agents/base",
-          "base-agents/machine"
+          "tj-agents/base",
+          "tj-agents/machine"
         ],
         "hooks": [
           {
