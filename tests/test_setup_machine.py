@@ -316,6 +316,33 @@ class ProfileTests(Machine):
         expected = setup.codecs.BOM_UTF16_LE + ("Write-Output 'keep-me'\r\n\r\n" + self.block() + "\r\n").encode("utf-16-le")
         self.assertEqual(expected, windows.read_bytes())
 
+    def test_linux_wires_only_existing_profiles_and_never_loads_the_windows_profile(self):
+        zshrc = self.home / ".zshrc"
+        zshrc.write_text("export A=1", encoding="utf-8")
+        powershell = self.home / ".config" / "powershell" / "Microsoft.PowerShell_profile.ps1"
+        powershell.parent.mkdir(parents=True)
+        powershell.write_bytes(b"keep\n# >>> base-agents >>>\nold\n# <<< base-agents <<<\n")
+        python = setup.plugin_autoupdate.console_python()
+
+        self.converge(step("shell profiles"), self.context(windows=False))
+
+        self.assertFalse((self.home / ".bashrc").exists())
+        self.assertEqual("export A=1\n\n" + setup.posix_block(python, self.script()) + "\n",
+                         zshrc.read_text(encoding="utf-8"))
+        self.assertEqual(("keep\n" + setup.powershell_block(python, self.script(), None, "\n") + "\n").encode("utf-8"),
+                         powershell.read_bytes())
+        self.assertNotIn("profile.ps1", powershell.read_text(encoding="utf-8"))
+
+    def test_posix_block_escapes_single_quotes_in_paths(self):
+        block = setup.posix_block("/opt/it's/python3", PurePosixPath("/home/o'neil/launch_check.py"))
+        self.assertIn("'/opt/it'\\''s/python3'", block)
+        self.assertIn("'/home/o'\\''neil/launch_check.py'", block)
+
+    def test_linux_creates_bashrc_when_no_profile_exists(self):
+        self.converge(step("shell profiles"), self.context(windows=False))
+        self.assertEqual([self.home / ".bashrc"],
+                         [path for path in setup.profile_paths(self.context(windows=False)) if path.exists()])
+
 
 class RetiredTests(Machine):
     def test_the_retired_listener_task_and_jobs_are_deleted_once(self):
