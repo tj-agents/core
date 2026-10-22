@@ -18,9 +18,8 @@
       "skills": [
         "agent-files",
         "cd",
-        "goal-continuation",
         "idea-initialization",
-        "plan-artifacts"
+        "task-routing"
       ],
       "dependencies": {
         "required": [],
@@ -32,7 +31,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:86675ed72944f9082813fb4fda5f4f335027c95046ce27d52a0e77006f5431d6",
+      "digest": "sha256:4fc928b63b657fcc42563194cd170ac14627251245f4c03c3ec9719c57dea377",
       "harness": {
         "marketplaces": [
           {
@@ -53,6 +52,13 @@
           },
           {
             "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/base/policy/task-routing/scripts/session-context.py",
             "hosts": [
               "claude",
               "codex"
@@ -196,7 +202,6 @@
         "commit-all",
         "commit-push",
         "committing",
-        "continue-roadmap",
         "docs",
         "docs-review",
         "failing-tests",
@@ -206,8 +211,6 @@
         "git-branching",
         "guide",
         "guide-build",
-        "handoff",
-        "handoff-format",
         "incremental-review",
         "merge",
         "merge-docs",
@@ -216,9 +219,6 @@
         "open-worktree",
         "persistent-delivery",
         "persistent-workflow",
-        "plan-authoring",
-        "plan-checkpoint",
-        "plan-execution",
         "plans",
         "pr-preflight",
         "pr-screenshots",
@@ -228,7 +228,6 @@
         "push",
         "recents",
         "remote-validation",
-        "resume-plan",
         "review",
         "review-lifecycle",
         "self-repair",
@@ -265,7 +264,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:d21f95b6a7ff4eefd9367f6684474da9d35385ed3d52bc629784762e20db4eac",
+      "digest": "sha256:87a5b574e7436079108bfa63161da88d4cd47f9849573394c1063235131139dc",
       "harness": {
         "marketplaces": [
           {
@@ -562,7 +561,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:bc96bc7c64815271374f651c7fd95f4bd28130bdcd741d9baf3ed43a3f9180d2",
+      "digest": "sha256:7d3603739a47251a65fcc315a8d843d164423e58020f564dbc2cf64099a9651c",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -1257,6 +1256,11 @@
         "macos"
       ],
       "skills": [
+        "handoff",
+        "plan",
+        "plan-artifacts",
+        "resume",
+        "run",
         "status"
       ],
       "dependencies": {
@@ -1274,7 +1278,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:dbe8ab00c70956807045e4d4182c50cc886a7c517a400d6424585a78f6bd51a0",
+      "digest": "sha256:0b3f29715dea14727cf7e6b22b9df8eba18690cbd2807b967b70ba0ddb6b582f",
       "harness": {
         "marketplaces": [
           {

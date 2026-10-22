@@ -3,7 +3,6 @@
   "plugin": "base-agents/base",
   "source_roots": [
     ".agents/base",
-    ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
     ".agents/hooks/hook_dispatch.py",
     ".agents/hooks/hook_runtime.py"
   ],
@@ -27,6 +26,13 @@
       },
       {
         "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": ".agents/base/policy/task-routing/scripts/session-context.py",
         "hosts": [
           "claude",
           "codex"

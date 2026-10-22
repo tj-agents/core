@@ -196,7 +196,7 @@ class LaneDeclarationTests(unittest.TestCase):
         # switch outlives the skill. A lifecycle or orchestrating skill spans phases of varying shape, so
         # it must inherit the session's model and route each bounded phase down the ladder instead. Only
         # a leaf task that is one unvarying shape may pin: the clerical operations. Planning may span
-        # multiple lanes, so plan-authoring inherits and routes its phases. Adding a lane is a deliberate
+        # multiple lanes, so plan inherits and routes its phases. Adding a lane is a deliberate
         # declaration that a skill is such a leaf; declare it here too.
         expected = {
             "commit": "L7",
@@ -254,7 +254,7 @@ class GeneratedLaneAgentTests(unittest.TestCase):
         self.assertIn("The parent owns authorization and context preparation.", body)
         self.assertIn("Codex L1", body)
         self.assertIn("Do not inspect, execute, delegate", body)
-        self.assertNotIn("engineering:handoff", body)
+        self.assertNotIn("workflow:handoff", body)
 
     def test_claude_lane_agents_and_workflow_pins_never_select_fable(self):
         forbidden = table("claude")["frontier"]["model"]

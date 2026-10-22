@@ -17,10 +17,10 @@ Global architecture and cross-repository designs live in [`tj-agents/docs`](http
 (private; organization access required). Core-specific implementation plans and operational documentation
 stay here; shared plans link to their source owners.
 
-`base:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
+`workflow:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
 `base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
 [`base:idea-initialization`](.agents/base/policy/idea-initialization/SKILL.md) owns the once-per-idea
-assessment of existing capabilities and solutions; [`base:goal-continuation`](.agents/base/policy/goal-continuation/SKILL.md)
+assessment of existing capabilities and solutions; [`workflow:run`](.agents/workflow/workflow/run/SKILL.md)
 owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
