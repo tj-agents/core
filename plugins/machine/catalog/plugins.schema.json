@@ -47,20 +47,6 @@
               }
             }
           ]
-        },
-        "base-agents": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/source"
-            },
-            {
-              "properties": {
-                "repository": {
-                  "const": "tj-agents/core"
-                }
-              }
-            }
-          ]
         }
       },
       "additionalProperties": {

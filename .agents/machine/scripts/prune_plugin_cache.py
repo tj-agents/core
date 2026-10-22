@@ -12,7 +12,7 @@ still has hooks registered against the directory it resolved at startup, so `--p
 every later pass treats a live session's pins as live too. Removal is therefore a liveness check, not a
 side effect of update.
 
-Codex is deliberately out of scope; see the sibling TECH_DEBT.md for the condition that changes that.
+Codex is deliberately out of scope; see https://github.com/tj-agents/core/issues/383 for the condition that changes that.
 """
 
 import argparse

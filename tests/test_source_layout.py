@@ -112,12 +112,12 @@ class SourceLayoutTests(unittest.TestCase):
     def test_engineering_leaves_recording_profile_selection_to_the_repository(self):
         _, output, _, _ = SYNC.build(self.root)
         catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
-        engineering = next(package for package in catalog["packages"] if package["id"] == "base-agents/engineering")
-        self.assertEqual(["base-agents/base", "base-agents/agent-store", "base-agents/machine"], engineering["dependencies"]["required"])
+        engineering = next(package for package in catalog["packages"] if package["id"] == "tj-agents/engineering")
+        self.assertEqual(["tj-agents/base", "tj-agents/agent-store", "tj-agents/machine"], engineering["dependencies"]["required"])
         self.assertEqual([], engineering["external_dependencies"]["required"])
         harness = json.loads(output["plugins/engineering/harness.json"].decode("utf-8"))
-        self.assertEqual([{"id": "base-agents", "repository": "tj-agents/core"}], harness["requires"]["marketplaces"])
-        self.assertEqual(["base-agents/agent-store", "base-agents/base", "base-agents/engineering", "base-agents/machine"], harness["requires"]["plugins"])
+        self.assertEqual([{"id": "tj-agents", "repository": "tj-agents/marketplace"}], harness["requires"]["marketplaces"])
+        self.assertEqual(["tj-agents/agent-store", "tj-agents/base", "tj-agents/engineering", "tj-agents/machine"], harness["requires"]["plugins"])
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertEqual([], selection["external_prerequisites"])
 
@@ -125,15 +125,15 @@ class SourceLayoutTests(unittest.TestCase):
         catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
         packages = {package["id"]: package for package in catalog["packages"]}
         external = "personal-agents/personal"
-        engineering = packages["base-agents/engineering"]
+        engineering = packages["tj-agents/engineering"]
         engineering["dependencies"]["required"].append(external)
         engineering["external_dependencies"]["required"].append({
             "id": external, "marketplace": "personal-agents", "repository": "tj-agents/personal"})
 
         borrowed = json.loads(json.dumps(catalog))
-        next(package for package in borrowed["packages"] if package["id"] == "base-agents/machine")[
+        next(package for package in borrowed["packages"] if package["id"] == "tj-agents/machine")[
             "dependencies"]["required"].append(external)
-        with self.assertRaisesRegex(ValueError, "base-agents/machine names unknown dependency"):
+        with self.assertRaisesRegex(ValueError, "tj-agents/machine names unknown dependency"):
             SYNC.catalog_index(borrowed)
 
         for mutation in (
@@ -141,20 +141,20 @@ class SourceLayoutTests(unittest.TestCase):
             lambda dependency: dependency.update(repository="not a repository"),
         ):
             invalid = json.loads(json.dumps(catalog))
-            engineering = next(package for package in invalid["packages"] if package["id"] == "base-agents/engineering")
+            engineering = next(package for package in invalid["packages"] if package["id"] == "tj-agents/engineering")
             mutation(engineering["external_dependencies"]["required"][0])
             with self.subTest(dependency=engineering["external_dependencies"]["required"][0]):
-                with self.assertRaisesRegex(ValueError, "Invalid external dependency for base-agents/engineering"):
+                with self.assertRaisesRegex(ValueError, "Invalid external dependency for tj-agents/engineering"):
                     SYNC.catalog_index(invalid)
 
         duplicate = json.loads(json.dumps(catalog))
-        engineering = next(package for package in duplicate["packages"] if package["id"] == "base-agents/engineering")
+        engineering = next(package for package in duplicate["packages"] if package["id"] == "tj-agents/engineering")
         engineering["external_dependencies"]["required"].append(dict(engineering["external_dependencies"]["required"][0]))
-        with self.assertRaisesRegex(ValueError, "Invalid external dependency for base-agents/engineering"):
+        with self.assertRaisesRegex(ValueError, "Invalid external dependency for tj-agents/engineering"):
             SYNC.catalog_index(duplicate)
 
         conflicting = json.loads(json.dumps(catalog))
-        machine = next(package for package in conflicting["packages"] if package["id"] == "base-agents/machine")
+        machine = next(package for package in conflicting["packages"] if package["id"] == "tj-agents/machine")
         machine["dependencies"]["optional"].append(external)
         machine["external_dependencies"] = {"required": [], "optional": [
             {"id": external, "marketplace": "personal-agents", "repository": "someone/else"}]}
@@ -233,18 +233,18 @@ class SourceLayoutTests(unittest.TestCase):
                     SYNC.canonical_output_bytes((self.root / runtime / name).read_bytes()),
                     output[f"plugins/{plugin}/{runtime}/{name}"],
                 )
-        isolated = self.root / "isolated package \u00e9"
-        for relative, body in output.items():
+        isolated = self.root / "isolated package é"
+        for relative, value in output.items():
             if relative.startswith("plugins/agent-store/"):
                 destination = isolated / relative.removeprefix("plugins/agent-store/")
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                destination.write_bytes(body)
+                destination.write_bytes(value)
         spec = importlib.util.spec_from_file_location(
             "isolated_agent_store", isolated / runtime / "session_store.py"
         )
         store = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(store)
-        database = self.root / "fixture state \u00e9" / "sessions.db"
+        database = self.root / "fixture state é" / "sessions.db"
         connection = store.connect(database)
         try:
             store.upsert_work_item(
@@ -531,7 +531,7 @@ class SourceLayoutTests(unittest.TestCase):
     def test_catalog_digest_exclusion_cannot_be_widened(self):
         path = self.root / ".agents/catalog/catalog.json"
         catalog = json.loads(path.read_text(encoding="utf-8"))
-        machine = next(package for package in catalog["packages"] if package["id"] == "base-agents/machine")
+        machine = next(package for package in catalog["packages"] if package["id"] == "tj-agents/machine")
         machine["digest_excludes"].append("codex-skills/plugin-selection/SKILL.md")
         path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "digest exclusion drift"):

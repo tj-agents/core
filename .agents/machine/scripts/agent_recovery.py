@@ -673,7 +673,7 @@ def await_pickup(host, session_id, status_path, since, history_path=None, timeou
 
 
 def open_session(host, session_id, prompt="Continue the requested work.", title=None, roots=None, confirm_closed=False,
-                 prompt_path=None, model=None, dangerously_skip_permissions=False, cli=None):
+                 prompt_path=None, model=None, dangerously_skip_permissions=False, cli=None, native_arguments=()):
     item = find(host, session_id, roots)
     if item["status"] == "live":
         raise ValueError("That exact session is verified live; refusing to create a duplicate writer.")
@@ -705,7 +705,7 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
                 profile_environment = {"clear": ("CLAUDE_CONFIG_DIR",)}
             else:
                 profile_environment = {"force": {"CLAUDE_CONFIG_DIR": item["profile"]}}
-            arguments = ["--resume", session_id]
+            arguments = [*native_arguments, "--resume", session_id]
             if dangerously_skip_permissions:
                 arguments.append("--dangerously-skip-permissions")
             if model:
@@ -840,6 +840,7 @@ def main(argv=None):
     parser.add_argument("--title")
     parser.add_argument("--select", action="append", default=[])
     parser.add_argument("--confirm-closed", action="store_true")
+    parser.add_argument("--native-argument", action="append", default=[])
     parser.add_argument("--codex-history-root")
     parser.add_argument("--claude-history-root")
     args = parser.parse_args(argv)
@@ -898,8 +899,10 @@ def main(argv=None):
             return 0
         if len(hosts) != 1 or not args.id:
             raise ValueError("open requires one --host and an exact --id.")
+        if args.native_argument and hosts[0] != "claude":
+            raise ValueError("--native-argument is supported only for Claude sessions.")
         item = open_session(hosts[0], args.id, args.prompt if args.prompt_path else args.prompt or "Continue the requested work.", args.title, roots, args.confirm_closed,
-                            args.prompt_path, args.model)
+                            args.prompt_path, args.model, native_arguments=args.native_argument)
         print(json.dumps(item, indent=2))
         return 0
     except LaunchUnverified as exc:
