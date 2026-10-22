@@ -6,11 +6,13 @@ profile on a repository's behalf.
 
 ## Repository selection
 
-A committed `.problem-records.json` in the source repository's primary checkout selects the profile's
-qualified read operation, for example `{"schema_version":1,"provider":"personal:work-item"}`.
-The primary checkout is the first non-bare entry of `git worktree list --porcelain`, resolved from any
-worktree or subdirectory; a feature worktree's copy never overrides it. Read the declaration before any
-tracker operation. Selection requires repository authorization; installing Core never adopts a provider.
+Selecting `personal@tj-agents`, with the `tj-agents` marketplace at `tj-agents/marketplace`, in the source
+repository's `.agents/plugins.json` selects `personal:work-item`. Any other profile is selected by a committed `.problem-records.json` naming its
+qualified read operation, for example `{"schema_version":1,"provider":"infonetica:work-item"}`; it takes
+precedence. Both are read from the primary checkout, the first non-bare entry of `git worktree list
+--porcelain`, resolved from any worktree or subdirectory; a feature worktree's copy never overrides it.
+Read the selection before any tracker operation. Selection requires repository authorization; installing
+Core never adopts a provider.
 
 ## Selected profile operations
 
@@ -19,6 +21,12 @@ tracker operation. Selection requires repository authorization; installing Core 
 | Read, list or view an existing item | `personal:work-item` | `infonetica:work-item` |
 | Record a new item | `personal:create-work-item` | `infonetica:create-work-item` |
 | Reconcile and carry out existing work | `personal:address-work-item` | `infonetica:address-work-item` |
+
+A session lists only the skills of the project it started in. When the needed operation is not listed,
+run `python -B <hooks>/problem_records.py --root <repository> --operation create|read|address --harness
+claude|codex` (`python3` on Linux/macOS) and follow the printed `skill`. `<hooks>` is the installed
+engineering plugin's `hooks` directory, beside the `skills` directory that holds its skill base directories,
+or `.agents/hooks` in a Core checkout. A failure, including a directory outside any repository, blocks the operation.
 
 Use only the selected profile's qualified operation. It owns deterministic scripts, factual validation,
 request reconciliation, remote persistence, native type mapping, retention and verified closure. It also
@@ -45,9 +53,9 @@ another profile, redirect employer evidence, create a Markdown register or selec
 
 ## Repositories without a provider
 
-Without a valid declaration, tracker operations block. Retain unsent facts in the active task or goal with
-the resolver and observable resume condition. Existing `BUGS.md`, `MISTAKES.md` and `TECH_DEBT.md` files
-remain historical evidence that may be read and linked; do not update them as an active backlog.
+Without a valid selection, tracker operations block. Retain unsent facts in the active task or goal with
+the resolver and observable resume condition. Markdown registers (`BUGS.md`, `MISTAKES.md`, `TECH_DEBT.md`)
+are retired; never create or update one.
 
 Plans, review artifacts and roadmaps retain design and recovery evidence and link canonical record
 identities. Preserve existing remote identities and history. Repository and employer policy controls
