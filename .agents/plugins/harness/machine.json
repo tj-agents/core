@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plugin": "base-agents/machine",
+  "plugin": "tj-agents/machine",
   "source_roots": [
     ".agents/catalog/catalog.schema.json",
     ".agents/catalog/plugins.schema.json",
@@ -14,13 +14,13 @@
   "requires": {
     "marketplaces": [
       {
-        "id": "base-agents",
-        "repository": "tj-agents/core"
+        "id": "tj-agents",
+        "repository": "tj-agents/marketplace"
       }
     ],
     "plugins": [
-      "base-agents/base",
-      "base-agents/machine"
+      "tj-agents/base",
+      "tj-agents/machine"
     ],
     "hooks": [
       {

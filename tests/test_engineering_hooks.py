@@ -20,7 +20,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='engineering package with spaces ')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
-        self.package = self.root / 'cache' / 'base-agents' / 'engineering' / '2.1.16'
+        self.package = self.root / 'cache' / 'tj-agents' / 'engineering' / '2.1.16'
         shutil.copytree(ROOT / 'plugins/engineering', self.package)
         self.cwd = self.root / 'unrelated caller'
         self.cwd.mkdir()
