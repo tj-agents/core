@@ -421,6 +421,14 @@ def install_hidden_bash(build: Path, proxy: Path) -> None:
         raise
 
 
+def gui_flags(context: Context, compiler: str) -> list[str]:
+    target = context.run([compiler, "-dumpmachine"], capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=INSTALLER_TIMEOUT_SECONDS, check=False)
+    if target.returncode:
+        raise SetupError(f"{compiler} -dumpmachine failed: {(target.stderr or target.stdout).strip()}")
+    return ["-Wl,/subsystem:windows"] if "msvc" in target.stdout else ["-municode", "-mwindows"]
+
+
 def build_hidden_bash(context: Context, real: str) -> None:
     source, proxy = hidden_bash_paths(context)
     compiler = context.which("clang.exe") or context.which("gcc.exe")
@@ -428,7 +436,7 @@ def build_hidden_bash(context: Context, real: str) -> None:
         raise SetupError("clang.exe or gcc.exe is required to build the Windows GUI Bash proxy")
     build = proxy.with_name("hidden-bash.build.exe")
     try:
-        compiled = context.run([compiler, "-O2", "-municode", "-mwindows", str(source), "-o", str(build)],
+        compiled = context.run([compiler, "-O2", *gui_flags(context, compiler), str(source), "-o", str(build)],
                                capture_output=True, text=True, encoding="utf-8", errors="replace",
                                timeout=INSTALLER_TIMEOUT_SECONDS, check=False)
         if compiled.returncode or not build.is_file():
