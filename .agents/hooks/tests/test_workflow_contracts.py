@@ -1018,6 +1018,14 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.assertIn("INSTALLED: 0 change(s)", migrated.stdout)
 
                     legacy.write_text(json.dumps(ownership), encoding="utf-8")
+                    healed = run("-Apply")
+                    self.assertEqual(0, healed.returncode, healed.stderr)
+                    self.assertFalse(legacy.exists())
+                    self.assertEqual("tj-agents", json.loads(current.read_text(encoding="utf-8"))["owner"])
+
+                    conflicting = dict(ownership)
+                    conflicting["files"] = [{"name": "unknown.toml", "sha256": "A" * 64}]
+                    legacy.write_text(json.dumps(conflicting), encoding="utf-8")
                     ambiguous = run("-Apply")
                     self.assertNotEqual(0, ambiguous.returncode)
                     self.assertIn("legacy", ambiguous.stderr)

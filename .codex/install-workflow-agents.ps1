@@ -135,13 +135,34 @@ function Resolve-ManagedProject([string] $Path) {
     return $project
 }
 
+function Test-LegacyOwnershipMigrated([string] $Current, [string] $Legacy) {
+    try {
+        $currentOwned = Read-OwnershipManifest $Current $ownershipOwner
+        $legacyOwned = Read-OwnershipManifest $Legacy $legacyOwnershipOwner
+    }
+    catch {
+        return $false
+    }
+    $unmatched = @($legacyOwned.Keys | Where-Object {
+        -not $currentOwned.ContainsKey($_) -or $currentOwned[$_] -ne $legacyOwned[$_]
+    })
+    return $unmatched.Count -eq 0
+}
+
 function Resolve-OwnershipState([string] $Current, [string] $Legacy) {
     Assert-SafeDeliveryPath $Current
     Assert-SafeDeliveryPath $Legacy
     $hasCurrent = Test-Path -LiteralPath $Current
     $hasLegacy = Test-Path -LiteralPath $Legacy
     if ($hasCurrent -and $hasLegacy) {
-        throw "Both $Current and legacy $Legacy exist. Remove the stale one, then rerun."
+        if (-not (Test-LegacyOwnershipMigrated $Current $Legacy)) {
+            throw "Both $Current and legacy $Legacy exist. Remove the stale one, then rerun."
+        }
+        if ($Apply) {
+            Assert-SafeDeliveryPath $Legacy
+            Remove-Item -LiteralPath $Legacy -Force
+            $hasLegacy = $false
+        }
     }
     if ($hasLegacy) { return [pscustomobject]@{ Path = $Legacy; Owner = $legacyOwnershipOwner } }
     return [pscustomobject]@{ Path = $Current; Owner = $ownershipOwner }

@@ -457,6 +457,24 @@ class LegacyCodexTests(Machine):
             setup.apply_codex_legacy(self.context(windows=False))
         self.assertEqual(before, snapshot(self.root))
 
+    def test_an_interrupted_delivery_migration_self_heals(self):
+        self.config.write_text(CONVERGED_CODEX_CONFIG, encoding="utf-8")
+        files = [{"name": "lane-l1.toml", "sha256": "A" * 64}]
+        legacy = self.codex / "agents" / ".base-agents-delivery.json"
+        current = self.codex / "agents" / ".tj-agents-delivery.json"
+        legacy.write_text(json.dumps({"schema_version": 1, "owner": "base-agents", "files": files}),
+                          encoding="utf-8")
+        current.write_text(json.dumps({"schema_version": 1, "owner": "tj-agents", "files": files}),
+                           encoding="utf-8")
+
+        self.assertEqual([f"rename {legacy.name} to {current.name}"],
+                         setup.check_codex_legacy(self.context(windows=False)))
+        setup.apply_codex_legacy(self.context(windows=False))
+
+        self.assertFalse(legacy.exists())
+        self.assertEqual({"schema_version": 1, "owner": "tj-agents", "files": files},
+                         json.loads(current.read_text(encoding="utf-8")))
+
     def test_a_current_config_needs_nothing(self):
         self.config.write_text(CONVERGED_CODEX_CONFIG, encoding="utf-8")
         self.assertEqual([], setup.check_codex_legacy(self.context(windows=False)))
