@@ -389,8 +389,20 @@ class HiddenBashTests(Machine):
         self.real.parent.mkdir()
         self.real.write_text("", encoding="utf-8")
         self.environment = FakeUserEnvironment({"TJ_AGENTS_REAL_GIT_BASH": str(self.real)})
+        self.target = "x86_64-w64-mingw32\n"
+
+    def test_gui_flags_follow_the_compiler_target(self):
+        for target, flags in (("x86_64-w64-mingw32\n", ["-municode", "-mwindows"]),
+                              ("x86_64-pc-windows-msvc\n", ["-Wl,/subsystem:windows"])):
+            with self.subTest(target=target):
+                self.target = target
+                self.calls.clear()
+                setup.build_hidden_bash(self.context(run=self.run_compiler, which=lambda name: name), str(self.real))
+                self.assertEqual(["clang.exe", "-O2", *flags], self.calls[0][:2 + len(flags)])
 
     def run_compiler(self, command, **kwargs):
+        if command[1:] == ["-dumpmachine"]:
+            return completed(0, self.target)
         self.calls.append(command)
         if command[0] == "clang.exe":
             Path(command[-1]).write_bytes(b"proxy")
@@ -419,6 +431,8 @@ class HiddenBashTests(Machine):
 
     def test_a_failed_probe_keeps_the_previous_proxy(self):
         def broken(command, **kwargs):
+            if command[1:] == ["-dumpmachine"]:
+                return completed(0, self.target)
             if command[0] == "clang.exe":
                 Path(command[-1]).write_bytes(b"broken")
                 return completed()
