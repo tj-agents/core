@@ -177,7 +177,7 @@ class AdoptPluginsTests(unittest.TestCase):
                 "base-agents": {"repository": "tj-agents/core", "revision": "v2.1.18"},
                 "agents": {"repository": "Concertable/agents", "revision": "a" * 40},
             },
-            "plugins": ["base@base-agents", "engineering@base-agents", "machine@base-agents", "concertable@agents"],
+            "plugins": ["agent-store@base-agents", "base@base-agents", "engineering@base-agents", "machine@base-agents", "concertable@agents"],
         }), encoding="utf-8")
         adopt_plugins.run(self.root, [], [], "write")
         self.assertFalse(legacy.exists())
