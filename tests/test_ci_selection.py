@@ -39,6 +39,12 @@ class ClassificationTests(unittest.TestCase):
                          ".agents/hooks/tests/test_adopt_plugins.py"}.issubset(value["tests"]))
         CI.required_results(value, self.results(), "pull_request")
 
+    def test_relocated_handoff_helper_keeps_focused_transfer_coverage(self):
+        value = CI.classify([".agents/workflow/workflow/handoff/scripts/transfer.py"])
+        self.assertEqual("focused", value["mode"])
+        self.assertEqual([".agents/hooks/tests/test_handoff_transfer.py"], value["tests"])
+        CI.required_results(value, self.results(), "pull_request")
+
     @staticmethod
     def results():
         return {name: {"result": "success"} for name in
