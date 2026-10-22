@@ -1,0 +1,14 @@
+# Problem-record publication debt
+
+## D001 - Existing bug, mistake and debt records are stranded on unmerged branches
+
+- **Kind:** debt. **Observed/reported:** 2026-10-13; Tommy identified that repository-wide records retained only in feature worktrees are hard to discover or address while those branches remain unmerged. This session's B010, M016 and M003 recurrence were concrete examples; main and feature records also assigned different defects the same B009 ID.
+- **Cause:** confirmed shared convention gap and branch-local publication practice. The total backlog is not yet inventoried; do not claim every branch is affected.
+- **Impact and priority:** P1; deferred repair can be omitted, duplicated or lost independently of feature delivery.
+- **Source owner:** Core engineering shared problem-record conventions and their publication consumers. **State:** deferred.
+- **Repair link:** `.agents/engineering/resources/TECH_DEBT.md#D001`; related incident main M017 and immediate Docs/SharedProblemRecords convention correction. That bounded correction does not close this historical migration and enforcement debt.
+- **Deferral:** historical audit and any automated enforcement are separate future work; blocked_by: dependency. **Resolver:** Tommy/Core problem-record owner. **Resume when:** that owner resumes the historical audit under a bounded scope. No new agent CLI or background job is started by this entry.
+- **Next action:** inventory bug, mistake and area-owned TECH_DEBT.md records across active, stalled and abandoned branches/worktrees; reconcile existing repair owners and conflicting IDs; publish missing observations and current status independently of feature PRs. Add enforcement only if the audit establishes a remaining consumer gap.
+- **Declarative prevention:** shared records are available on main promptly; feature plans link to their canonical IDs, and delayed feature merges do not delay unrelated defect discovery or repair.
+- **Resolution condition:** the audited backlog has one reconciled canonical record per causal repair on remote main, old references map to those IDs, unrelated changes are preserved, both hosts follow the publication contract, and a stalled-feature example demonstrates that another owner can find and address its record from main. Delete this debt entry only after the whole condition is verified.
+- **Verification evidence:** source records for PR234 were local-only before this correction; fresh remote main already used B009 for a different defect and lacked M016. Other historical records remain unaudited. No complete migration or enforcement acceptance is claimed.

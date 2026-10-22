@@ -1,6 +1,6 @@
 # Completion is reported only at the verified user outcome
 
-Status: focused local verification passed. Candidate publication, review, CI and merge are active.
+Status: source outcome verified. PR #145 merged as 34bcd94; generated distribution e831904 is published. This session's cleanup is next.
 
 ## Authority
 
@@ -48,12 +48,11 @@ repository's gates. Return the outcome to Tommy in the final report.
 
 Scope: whole bounded standards-defect goal through review and authorized merge.
 Current slice: shared outcome completion check and continuation terminal enforcement.
-Remaining scope: implement, focused tests, generation checks, independent review, exact-head CI, merge and generated distribution verification.
+Remaining scope: run the final completion check, preserve this record in the primary checkout, and close this session/worktree through the verified cleanup helper.
 Done when: the delivered runtime rejects unsupported completion, with evidence and any installed-host limitations reported explicitly.
 
-1. Commit and publish the assessed slice; focused continuation, completion, PR-body and generation checks pass.
-2. Independently review the immutable candidate and repair findings while exact-head CI runs.
-3. Require exact-head CI, merge, observe generated distribution, and assess this goal with the completion check.
+1. Preserve this verified outcome record in the primary checkout and run the merge cleanup proof.
+2. Run the session's argument-free finish helper; its reaper owns physical removal after exit.
 
 ## Design decision
 
@@ -71,9 +70,9 @@ The canonical goal contains exactly one fenced `completion` JSON object with thi
   "outcome": "The shared completion workflow rejects unverified success on both host runtimes and preserves unresolved acceptance as owned actions.",
   "acceptance": [
     {"id": "enforcement", "criterion": "Foreground and child completion reject unchecked PR acceptance or missing outcome evidence.", "evidence": [{"source": "Git-private outcome-root-verify artifacts: final-completion-parser, final-pr-body, resumed-continuation and external-goal-fixed", "result": "Completion and PR-body suites pass. Focused foreground/child rejection, released binding, repaired binding, external goal, bytecode and alias cases passed across the recorded runs after fixture repairs."}], "owner": "current execution owner", "next_action": "Review the implementation and require the full CI matrix."},
-    {"id": "delivery", "criterion": "The reviewed candidate passes exact-head CI, merges, and is generated into the distribution.", "evidence": [], "owner": "current execution owner", "next_action": "Review, run CI, merge, and verify post-merge generation."}
+    {"id": "delivery", "criterion": "The reviewed candidate passes exact-head CI, merges, and is generated into the distribution.", "evidence": [{"source": "https://github.com/tj-agents/core/actions/runs/37711802429", "result": "Guard and full verify succeeded on reviewed head 7e394ff61c8fc147155fab2bf9972501c9ce1af2."}, {"source": "https://github.com/tj-agents/core/pull/145", "result": "Merged at 34bcd9475c773688170d8d17f833347f1a1a183f after the isolated incremental review found no actionable defect."}, {"source": "https://github.com/tj-agents/core/actions/runs/37713882521/job/113105805454", "result": "The merge-triggered regenerate job succeeded and published e83190433edb97b437befb31155696dddd95fd95. All three generated runtime files match authored source byte-for-byte in the synchronized primary checkout."}], "owner": "current execution owner", "next_action": "Source delivery complete; finish this session's cleanup."}
   ],
-  "deliveries": [],
+  "deliveries": [{"repository": "tj-agents/core", "pr": 145, "head": "7e394ff61c8fc147155fab2bf9972501c9ce1af2"}],
   "open_tasks": []
 }
 ```
@@ -95,7 +94,7 @@ must document that host boundary and must not claim installed-host adoption from
 ## Delivery slice and verification
 
 One atomic source/runtime/test slice on `Fix/OutcomeVerifiedCompletion`, based on
-`984ab5f336a06f38a250a676da82150d4c9461be` (`origin/main` at pickup). PR: not opened.
+`984ab5f336a06f38a250a676da82150d4c9461be` (`origin/main` at pickup). PR: https://github.com/tj-agents/core/pull/145.
 Expected under 1,000 substantive changed lines; reassess before exceeding that size. The validator,
 terminal enforcement, tests, and directly coupled workflow instructions must ship together so consumers
 can produce the required evidence before the new gate is applied. No always-loaded policy edits planned.
@@ -145,8 +144,10 @@ The existing oversized repo-declared-config ledger warning is outside this bound
   (`8bf14d5069886857-resumed-continuation.log`). The external-goal fixture lacked its completion record;
   the fixture now copies it and repairs the actual canonical goal path. Its isolated rerun passed
   (`caefe8508918dcdb-external-goal-fixed.log`). All selected boundaries now have passing evidence.
-- No source commit, PR or review exists yet. Generated outputs and `.verification-baseline/` are disposable
-  local verification material and must not be staged. No excluded cleanup/reaper source has changed.
+- Source commits a368650 and 7e394ff are published in PR #145. Full review found two completion bypasses;
+  both are fixed and their focused regressions pass. The isolated incremental native review and final CI
+  are running. Generated output was restored after verification; the disposable baseline was removed.
+  No excluded cleanup/reaper source has changed.
 
 ## Progress
 
@@ -154,3 +155,8 @@ The existing oversized repo-declared-config ledger warning is outside this bound
 - 2026-10-07: pickup confirmed; origin fetched, branch current, PR #115 inspected; L1 design complete.
 - 2026-10-08: implementation and coupled workflow/harness changes present; focused verification found fixture
   regressions and a nested-list parsing gap. Repair and verification remain owned in this checkout.
+- 2026-10-08: repairs passed focused tests, both review findings were fixed, isolated incremental review
+  approved 7e394ff, and full PR CI passed. PR #145 merged; its generation job published e831904.
+- 2026-10-08: the published completion helper returned `ready: true`, no blockers and no open tasks against
+  fresh PR #145 state. The continuation accepted the real `complete` checkpoint. Installed host activation
+  was not performed or claimed; arbitrary Codex final prose remains outside the available hook boundary.
