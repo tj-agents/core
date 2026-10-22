@@ -1,5 +1,5 @@
 {
-  "name": "base-agents",
+  "name": "tj-agents",
   "interface": {
     "displayName": "Agent capabilities"
   },

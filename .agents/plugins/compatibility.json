@@ -1,9 +1,9 @@
 {
   "fresh_selection": [
-    "base@base-agents",
-    "agent-store@base-agents",
-    "engineering@base-agents",
-    "machine@base-agents"
+    "base@tj-agents",
+    "agent-store@tj-agents",
+    "engineering@tj-agents",
+    "machine@tj-agents"
   ],
   "fresh_required_skills": [
     "cd",

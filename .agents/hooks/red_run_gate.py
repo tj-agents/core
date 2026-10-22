@@ -284,7 +284,7 @@ def resolve(names, harness):
         if found is None and ":" in name:
             # Prefer the qualified identity, but never let an uninstalled marketplace disarm the Stop
             # gate: handle_stop releases the turn when the owner cannot be resolved, so a machine
-            # without base-agents would end a turn on a red run unchallenged. A repo that still hosts
+            # without the tj-agents marketplace would end a turn on a red run unchallenged. A repo that still hosts
             # the skill unqualified answers instead.
             found = skill_router.resolved_skill(name.rpartition(":")[2], harness)
         if found is None:
