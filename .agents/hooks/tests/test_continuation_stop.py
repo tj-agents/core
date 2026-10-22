@@ -305,7 +305,10 @@ class ContinuationStopTests(unittest.TestCase):
                     timeout=20,
                 )
                 self.assertEqual(0, result.returncode, result.stderr)
-                self.assertEqual("block", json.loads(result.stdout)["decision"])
+                self.assertEqual("", result.stderr)
+                output = json.loads(result.stdout)
+                self.assertEqual("block", output["decision"])
+                self.assertIn("Initialize persistent-workflow", output["reason"])
 
     def test_invalid_owner_artifacts_block_unrouted_stop(self):
         path = self.root / ".agents/continuation/owner.json"
