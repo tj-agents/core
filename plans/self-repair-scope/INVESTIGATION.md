@@ -1,5 +1,33 @@
 # Self-repair investigation
 
+## Accepted implementation
+
+Tommy accepted the internal tooling boundary and requested the update. Core's self-repair source now
+limits automatic repairs to demonstrated reusable defects in authorized `tj-agents` tooling, with
+explicit personal scope for both the originating task and source. Employer tooling remains outside
+automatic scope, and other standards owners require explicit source-repair authority. Personal product
+maintenance retains the existing engineering lifecycles. An adequate rule permits no source change.
+
+Core's session, handoff, close and problem-record callers now follow that decision and permit retaining
+facts while a profile's recording decision is pending or declined. Both self-repair host adapters carry
+the same discovery description. The source-policy checks have been updated to the accepted contract.
+
+`C:/Users/TommySeery/source/repos/tj-agents/company.worktrees/Fix-AzureCreationConsent`, based on its
+current `origin/main`. `create-work-item` owns the creation decision; work-context, ship, implement and
+open-pr route to it. Existing intended items are reused. No new tracker item, host hook, runtime consent
+flag or second repair workflow is introduced. This is instruction-level policy, not proof that a model
+will comply or an API caller has conversational permission.
+
+Source review and local validation are recorded below when complete. Generated Core package output is
+refreshed only for validation and excluded from the source commit. Installation and fresh-session
+acceptance remain separate; this source change does not update already-loaded instructions. The live
+session-store writer was not activated: its shipped rollout notice requires compatible installed
+readers before schema-4 writes. Native-history recovery identified this session as the live owner of
+the self-repair investigation and found no separate live owner of the Azure-creation topic.
+
+The following sections retain the investigation and earlier source snapshot as evidence; the accepted
+implementation supersedes their proposed or pending policy decisions.
+
 ## User decision and investigation direction — 22 October 2026
 
 
