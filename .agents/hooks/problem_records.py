@@ -48,11 +48,17 @@ def primary_checkout(directory):
 
 
 def selects_personal(root):
-    try:
-        plugins = json.loads((Path(root) / ".agents" / "plugins.json").read_text(encoding="utf-8-sig")).get("plugins")
-    except (OSError, ValueError, AttributeError):
+    path = Path(root) / ".agents" / "plugins.json"
+    if path.is_symlink():
         return False
-    return isinstance(plugins, list) and "personal@tj-agents" in plugins
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return False
+    marketplace = (value.get("marketplaces") or {}).get("tj-agents") if isinstance(value, dict) else None
+    return (isinstance(value, dict) and value.get("schema_version") == 1 and isinstance(value.get("plugins"), list)
+            and "personal@tj-agents" in value["plugins"] and isinstance(marketplace, dict)
+            and marketplace.get("repository") == "tj-agents/marketplace")
 
 
 def declaration(root):
@@ -93,12 +99,12 @@ def operation_skill(root, operation, harness):
     if harness not in {"codex", "claude"} or operation not in OPERATIONS:
         raise RecordError("operation resolution requires the actual host and a read, create or address operation")
     root, provider = selected_provider(root)
-    plugin = provider.split(":", 1)[0]
-    for name in [plugin + ":" + bare for bare in OPERATIONS[operation]] + [provider]:
-        skill = installed_skill(name, harness)
-        if skill is not None:
-            return {"primary": str(root), "provider": provider, "operation": name, "skill": str(skill)}
-    raise RecordError("selected problem-record provider is not installed")
+    plugin, bare = provider.split(":", 1)
+    name = plugin + ":" + OPERATIONS[operation][0] if OPERATIONS[operation] and bare == "work-item" else provider
+    skill = installed_skill(name, harness)
+    if skill is None:
+        raise RecordError(name + " is not installed")
+    return {"primary": str(root), "provider": provider, "operation": name, "skill": str(skill)}
 
 
 def read_record(root, reference, harness):
@@ -139,7 +145,7 @@ def main(argv=None):
     try:
         os.chdir(args.root)
         print(json.dumps(operation_skill(".", args.operation, args.harness)))
-    except (OSError, RecordError) as error:
+    except (OSError, ImportError, RecordError) as error:
         print("problem-records: " + str(error) + "; retain the facts in the active task and write no other record", file=sys.stderr)
         return 2
     return 0

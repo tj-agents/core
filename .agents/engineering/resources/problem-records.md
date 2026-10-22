@@ -23,10 +23,10 @@ Core never adopts a provider.
 | Reconcile and carry out existing work | `personal:address-work-item` | `infonetica:address-work-item` |
 
 A session lists only the skills of the project it started in. When the needed operation is not listed,
-run `python -B <engineering plugin root>/hooks/problem_records.py --root <repository> --operation
-create|read|address --harness claude|codex`, the root being two directories above a loaded engineering
-skill's base directory, and follow the printed `skill`. A failure, including a directory outside any
-repository, blocks the operation.
+run `python -B <hooks>/problem_records.py --root <repository> --operation create|read|address --harness
+claude|codex` (`python3` on Linux/macOS) and follow the printed `skill`. `<hooks>` is the installed
+engineering plugin's `hooks` directory, two directories above its skill base directories, or `.agents/hooks`
+in a Core checkout. A failure, including a directory outside any repository, blocks the operation.
 
 Use only the selected profile's qualified operation. It owns deterministic scripts, factual validation,
 request reconciliation, remote persistence, native type mapping, retention and verified closure. It also

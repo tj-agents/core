@@ -92,7 +92,8 @@ class ProblemRecordTests(unittest.TestCase):
     def test_personal_selection_implies_the_personal_provider_and_a_declaration_wins(self):
         agents = self.root / ".agents"
         agents.mkdir()
-        (agents / "plugins.json").write_text(json.dumps({"schema_version": 1, "plugins": ["personal@tj-agents"]}), encoding="utf-8")
+        (agents / "plugins.json").write_text(json.dumps({"schema_version": 1, "plugins": ["personal@tj-agents"],
+                                                         "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}}), encoding="utf-8")
         self.assertEqual({"schema_version": 1, "provider": "personal:work-item"}, declaration(self.root))
         self.select()
         self.assertEqual("optional:manage", declaration(self.root)["provider"])
@@ -104,11 +105,17 @@ class ProblemRecordTests(unittest.TestCase):
         self.select({"schema_version": 1, "provider": "personal:work-item"})
         installed = {"personal:create-work-item": self.root / "create" / "SKILL.md", "personal:work-item": self.skill}
         with patch("skill_router.resolved_skill", side_effect=lambda name, host: (installed[name], "") if name in installed else None):
-            for operation, expected in (("create", "personal:create-work-item"), ("read", "personal:work-item"), ("address", "personal:work-item")):
+            for operation, expected in (("create", "personal:create-work-item"), ("read", "personal:work-item")):
                 with self.subTest(operation=operation):
                     found = operation_skill(self.root, operation, "claude")
                     self.assertEqual((expected, str(installed[expected]), "personal:work-item", str(self.root)),
                                      (found["operation"], found["skill"], found["provider"], found["primary"]))
+            with self.assertRaisesRegex(RecordError, "personal:address-work-item is not installed"):
+                operation_skill(self.root, "address", "claude")
+        self.select({"schema_version": 1, "provider": "work-items:manage"})
+        with patch("skill_router.resolved_skill", return_value=(self.skill, "")) as resolve:
+            self.assertEqual("work-items:manage", operation_skill(self.root, "create", "codex")["operation"])
+            resolve.assert_called_once_with("work-items:manage", "codex")
 
     def test_operation_without_selection_or_installed_provider_blocks(self):
         with self.assertRaisesRegex(RecordError, "no selected"):
