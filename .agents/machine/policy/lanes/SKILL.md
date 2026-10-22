@@ -50,6 +50,12 @@ adding one is a visible, reviewable decision and no skill silently changes model
 Declare the cheapest suitable lane explicitly rather than relying on absence: use L4 only for specified
 implementation that still needs code-level judgement, and L5 for small already-decided mechanical work.
 
+```text
+Task: Add already-designed working-directory validation to a launcher and its focused tests.
+Lane: L4, for specified implementation with local testable choices.
+Dispatch: A bounded implementation agent; the parent retains the whole goal.
+```
+
 ## Choosing a rung — four questions, in this order
 
 1. **Critical design or scale.** Is this a critical design decision, or a big complex plan with substantial
