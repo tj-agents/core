@@ -84,6 +84,17 @@ class ReconcileTests(unittest.TestCase):
             self.assertEqual(0, events.refresh_plugins())
         self.assertIn("--no-sweep", update.call_args.args[0])
 
+    def test_catch_up_upgrades_codex_marketplaces_while_a_codex_session_runs(self):
+        def declared(executable, config, recorded, previous, repositories):
+            target = {"tj-agents": {"source": "https://github.com/tj-agents/marketplace.git", "ref": None,
+                                    "project": Path.home(), "plugins": ["base@tj-agents"]}}
+            return {"marketplaces": events.plugins.refresh_codex(
+                executable, target, recorded, revision=lambda *_: "b" * 40, run=lambda *_, **__: True,
+                busy=lambda: True, packages=lambda name: [{"snapshot_first": False}], preserve=lambda *_: None)}
+
+        with tempfile.TemporaryDirectory() as state,                 mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state}),                 mock.patch.object(events.plugins.shutil, "which", return_value="codex"),                 mock.patch.object(events.plugins, "load_codex_config", return_value={}),                 mock.patch.object(events.plugins, "refresh_declared", side_effect=declared):
+            self.assertEqual([], events.Reconciler(policy=self.policy).catch_up([]))
+
     def test_absent_policy_never_gets_a_default_gate(self):
         self.reconciler.repository(current(policy=None, marketplace=False))
         self.policy.assert_not_called()

@@ -1,6 +1,6 @@
 ---
 name: session
-description: Own the engineering session from task selection through repair and completion. Use when starting, continuing or finishing work under an explicitly selected engineering lifecycle.
+description: Own the engineering session from task selection through repair and completion. Use when starting, continuing or finishing work under an explicitly selected engineering lifecycle, or when asked to note or record a bug, mistake or debt.
 kind: policy
 domain: process
 ---

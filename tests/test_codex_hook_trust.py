@@ -29,15 +29,15 @@ class HookTrustTests(unittest.TestCase):
             (root / "hooks/codex.json").write_text('{"hooks":{}}')
             (root / "hooks/context.py").write_text('print("context")\n')
         self.plugin = {
-            "pluginId": "base@base-agents", "installed": True, "enabled": True,
+            "pluginId": "base@tj-agents", "installed": True, "enabled": True,
             "marketplaceSource": {"sourceType": "git", "source": "https://github.com/tj-agents/core.git"},
             "source": {"source": "local", "path": str(self.source)},
         }
         self.hook = {
-            "pluginId": "base@base-agents", "source": "plugin", "isManaged": False,
+            "pluginId": "base@tj-agents", "source": "plugin", "isManaged": False,
             "enabled": True, "trustStatus": "modified",
             "sourcePath": str(self.cache / "hooks/codex.json"),
-            "key": "base@base-agents:hooks/codex.json:session_start:0:0",
+            "key": "base@tj-agents:hooks/codex.json:session_start:0:0",
             "currentHash": "sha256:" + "a" * 64,
         }
         self.archive = patch.object(TRUST, "committed_files", return_value=TRUST.package_files(self.source))
@@ -92,11 +92,11 @@ class HookTrustTests(unittest.TestCase):
     @patch.object(TRUST, "run")
     def test_only_tj_agents_plugin_hashes_are_selected(self, runner):
         runner.side_effect = self.git_result
-        outsider = dict(self.hook, pluginId="other@base-agents", key="other@base-agents:hook")
+        outsider = dict(self.hook, pluginId="other@tj-agents", key="other@tj-agents:hook")
         project = dict(self.hook, source="project", pluginId=None, key="project:hook")
         user = dict(self.hook, source="user", pluginId=None, key="user:hook")
-        disabled = dict(self.hook, enabled=False, key="base@base-agents:disabled")
-        trusted = dict(self.hook, trustStatus="trusted", key="base@base-agents:trusted")
+        disabled = dict(self.hook, enabled=False, key="base@tj-agents:disabled")
+        trusted = dict(self.hook, trustStatus="trusted", key="base@tj-agents:trusted")
         self.assertEqual(
             {self.hook["key"]: {"trusted_hash": self.hook["currentHash"]}},
             self.updates(self.hook, outsider, project, user, disabled, trusted),

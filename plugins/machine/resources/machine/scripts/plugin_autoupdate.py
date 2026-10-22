@@ -314,11 +314,9 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
             outcomes[marketplace] = "failed recently; retried after 24 hours"
             continue
         hooks = packages(marketplace)
-        if not all(package["snapshot_first"] for package in hooks):
+        cache_first = not all(package["snapshot_first"] for package in hooks)
+        if cache_first:
             running = busy() if running is None else running
-            if running:
-                outcomes[marketplace] = "deferred while a Codex session is running"
-                continue
         preserve(marketplace, hooks)
         refreshed = run([executable, "plugin", "marketplace", "upgrade", marketplace],
                         cwd=target["project"]) is True
@@ -337,7 +335,8 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
             if None not in published:
                 recorded[key] = head
             recorded.pop("failed:" + key, None)
-            outcomes[marketplace] = "updated" + retired
+            outcomes[marketplace] = "updated" + retired + (
+                "; restart Codex sessions opened before this update to reload their hooks" if cache_first and running else "")
         else:
             recorded["failed:" + key] = now
             outcomes[marketplace] = "failed" + retired
@@ -522,7 +521,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         lock.close()
     results = outcomes.get("marketplaces", {})
-    return int(any(str(value).startswith(("failed", "unreachable", "deferred")) for value in results.values()))
+    return int(any(str(value).startswith(("failed", "unreachable")) for value in results.values()))
 
 
 if __name__ == "__main__":

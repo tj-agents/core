@@ -7,7 +7,7 @@ Select `base@tj-agents`, `agent-store@tj-agents`, `engineering@tj-agents` and `m
 The repository publishes Base, Agent Store, Engineering and Machine packages. Agent Store owns recorded
 execution/session state; Machine observes and operates native hosts; Engineering owns code work and delivery.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
-The repository also owns explicit PowerShell profile and CLI session-recovery installation.
+The repository also owns machine setup: `./setup.ps1` or `./setup.sh` is the one entry point.
 
 `engineering:skill-authoring` owns skill selection triggers, names, and sizing; the
 [`template:check` validator](https://github.com/tj-agents/template) owns required skill content and layout
@@ -23,8 +23,7 @@ stay here; shared plans link to their source owners.
 assessment of existing capabilities and solutions; [`base:goal-continuation`](.agents/base/policy/goal-continuation/SKILL.md)
 owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
-Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
-Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
+Known bugs, mistakes and debt are [GitHub issues](https://github.com/tj-agents/core/issues).
 The [recording contract](.agents/engineering/resources/problem-records.md) routes remote work-item
 operations to the repository's explicitly selected profile. Personal owns GitHub records; Infonetica owns
 Azure Boards records and native type policy. Core publishes the shared SQLite registry as Agent Store and the reusable engineering lifecycles as
@@ -36,7 +35,7 @@ interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `
 current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or
 changed plugin hooks until they are reviewed and trusted in `/hooks`; a fresh missing-marketplace write
 probe is required before claiming enforcement. The host coverage limit is tracked in
-`.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents a generated native-instruction
+[core#402](https://github.com/tj-agents/core/issues/402). The `base:agent-files` skill documents a generated native-instruction
 fallback.
 Codex hook commands use a per-session temporary snapshot preseeded for the running session's hooks.
 This lets those hooks keep running after a plugin update replaces an inactive package cache entry.
@@ -146,7 +145,8 @@ establish installed-host trust or acceptance.
   selected host adapter. Nothing under it is an authored source.
 - `shell/` owns the PowerShell profile, one concern per file.
 - `cli-session-recovery/` owns save/restore scripts and their regression suite.
-- install.ps1 installs the PowerShell profile; cli-session-recovery provides its own installer.
+- `setup.ps1` and `setup.sh` wrap `.agents/machine/scripts/setup_machine.py`, which installs the profile,
+  the hidden Git Bash proxy and everything else this machine needs.
 
 ### Windows CLI hook windows
 
@@ -161,14 +161,13 @@ codex plugin marketplace add https://github.com/tj-agents/marketplace.git
 codex plugin add machine@tj-agents
 ```
 
-Claude Code can open a visible Git Bash window for each hook. On Windows, run
-`pwsh shell/install-hidden-bash.ps1` once from this checkout. The installer builds the included
-GUI-subsystem Bash proxy using Clang or GCC, configures `CLAUDE_CODE_GIT_BASH_PATH` for the user, and
-loads it in new PowerShell sessions. Check it with `pwsh shell/install-hidden-bash.ps1 -VerifyOnly`.
-The proxy forwards standard handles and the exit code to the real Git Bash. If Git Bash lives outside
-`C:\Program Files\Git\bin\bash.exe`, set the user-level `TJ_AGENTS_REAL_GIT_BASH` environment variable
-to its absolute path before running the installer. Claude processes that launch `git.exe` directly
-bypass this Git Bash workaround and require an upstream host fix.
+Claude Code can open a visible Git Bash window for each hook. On Windows, setup builds the included
+GUI-subsystem Bash proxy in the main checkout's `shell/` with Clang or GCC when it is missing or older
+than its source, and sets the user `CLAUDE_CODE_GIT_BASH_PATH` and `TJ_AGENTS_REAL_GIT_BASH` variables.
+The profile loads it in new PowerShell sessions. The proxy forwards standard handles and the exit code
+to the real Git Bash. If Git Bash lives outside `C:\Program Files\Git\bin\bash.exe`, set the user-level
+`TJ_AGENTS_REAL_GIT_BASH` environment variable to its absolute path before running setup. Claude
+processes that launch `git.exe` directly bypass this Git Bash workaround and require an upstream host fix.
 
 A PR carries authored sources only. CI's guard job rejects generated paths, PR CI regenerates its own
 workspace before testing, and the post-merge `regenerate` job commits the refreshed `plugins/*`,
@@ -206,24 +205,37 @@ resources remain covered.
 
 ## Machine setup and updates
 
-Run once per machine. Rerunning setup converges on the same channel and launch configuration:
+Run setup from any checkout or worktree of this repository. Rerunning it converges: each step checks
+first and writes only on drift, so a current machine is left untouched. `--check` reports drift, writes
+nothing and exits 1 when something would change:
 
 ```text
 ./setup.ps1          # Windows (PowerShell)
 ./setup.sh           # Linux (bash and python3)
+./setup.ps1 --check  # report drift only
 ```
 
-It enables Claude's native auto-update, copies the launch-check runtime to `~/.agents-state/bin` and
-adds `claude` and `codex` functions to the PowerShell profiles (and `~/.bashrc` or `~/.zshrc` on
-Linux) inside one marked block, keeping a `.pre-launch-check.bak` copy. It removes the retired CLI
-launchers, the machine event listener task or systemd service, and the former hourly plugin-autoupdate
-and merge-gates tasks or cron entries. Nothing runs in the background.
+Installed paths always point at the main checkout (the parent of `git rev-parse --git-common-dir`),
+never the worktree that ran setup. In order, setup verifies the saved `gh` login, configures the event
+channel and publishers, and enables Claude's native auto-update. It removes the retired machine event
+listener task or systemd service and the former hourly plugin-autoupdate and merge-gates tasks or cron
+entries, then copies the launch-check runtime to `~/.agents-state/bin`. It writes one
+`# >>> tj-agents >>>` block into both PowerShell profiles on Windows, and into `~/.bashrc`, `~/.zshrc` or
+the PowerShell profile that exists on Linux. The block defines the `claude` and `codex` functions and, on
+Windows, loads the main checkout's `shell/profile.ps1`. It replaces older profile and launcher blocks in
+place, keeps other lines, encoding and BOM, and keeps one `.pre-tj-agents.bak` copy of a changed profile.
+On Windows setup then builds the hidden Git Bash proxy. On both
+platforms it delivers Codex profile agents with `pwsh` when Codex is set up, catches up plugins and merge
+policies for repositories whose default branch moved since the last catch-up, converges installed
+packages' declared harness permissions (removing owned rules that are no longer declared), removes
+retired Codex configuration and migrates the old agent delivery manifest. Nothing runs in the background.
 
 Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: one non-blocking ntfy.sh
 poll for events since the saved cursor. With none it starts the CLI immediately; offline it starts anyway.
 With events it updates, on both hosts in parallel, only the marketplaces and enabled plugins that list or
 publish the named repositories, and advances the cursor once both hosts succeed. A failed host retries on
-a later launch, at most hourly. `machine:reload-plugins` runs the same check in a running session.
+a later launch, at most hourly. `machine:sync-plugins`, or `./sync.ps1` / `./sync.sh` here, runs the same
+check in a running session.
 
 Main-branch callers publish events through the shared
 `tj-agents/github-actions/.github/actions/machine-events` publisher. Setup reuses or creates the
@@ -233,7 +245,7 @@ The same value is stored as an Actions secret for callers, so public run logs ma
 The topic is an untrusted public hint channel; it contains only repository names and change categories.
 No administrative GitHub credential is stored in Actions.
 
-Setup ends with one catch-up through `machine_events.py`, which re-reads GitHub and invokes the
+Setup's catch-up runs `machine_events.py` once, which re-reads GitHub and invokes the
 installed github-actions plugin's `merge-policy reconcile` for committed policy changes as Tommy's saved
 `gh` account. Install that plugin before setup. Launches do not reconcile merge policy; run
 `machine_events.py --repo <owner/name>` after a policy change.
@@ -249,7 +261,7 @@ The generic service scaffold does not generate it. GitHub Free's repository rule
 apply to private repositories.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
-loaded; new sessions pick up the update. `install.ps1` still wires the Windows `shell/` profile.
+loaded; new sessions pick up the update.
 
 ### Refresh and repository boundaries
 
@@ -313,11 +325,12 @@ Its native `plugin add` commands maintain the host's required user installation 
 repository settings remain the authored selection. Codex currently provides no cache-only install scope.
 Nothing updates packages in the launch path.
 
-For an explicit native refresh use `machine:reload-plugins`. Its default performs native marketplace
-and plugin updates; remote revision verification is opt-in and prints progress. `/reload-plugins`
-adopts updates in an open Claude session; start a new Codex session to load updated packages.
+For an explicit native refresh use `machine:sync-plugins`. Its default performs native marketplace
+and plugin updates; remote revision verification is opt-in and prints progress. In a Claude session it
+closes the session at the end of the turn and resumes it in a fresh process when the session runs an older
+plugin copy; start a new Codex session to load updated packages.
 
-Codex does not load agent definitions directly from plugins. Its engineering package supplies
-`scripts/install-codex-agents.ps1` for explicit profile delivery; launcher startup no longer copies
+Codex does not load agent definitions directly from plugins. Setup delivers them to the Codex profile
+with the engineering package's `scripts/install-codex-agents.ps1`; launcher startup no longer copies
 agents or records hook trust. Native hook trust review still applies. Claude loads the package's
 `agents/` payload directly.
