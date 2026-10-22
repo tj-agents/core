@@ -37,7 +37,7 @@ Agent Workboard is outside scope and is not a dependency.
 - Worktree: `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Refactor-WorkflowLifecycle`.
 - Branch: `Refactor/WorkflowLifecycle`.
 - Base/parent: `Refactor/WorkflowStatus` at `995f5e45caf269ca71ffd7235b4b1e520b9cc940` (S2b1; PR #354 reviewed and green).
-- PR: not opened for S2b2. Parent [Core #354](https://github.com/tj-agents/core/pull/354), [Core #353](https://github.com/tj-agents/core/pull/353), and [Core #352](https://github.com/tj-agents/core/pull/352) have completed source review and Windows/Linux CI. All retain `human-gate`; architecture merge authority is absent.
+- PR: [Core #355](https://github.com/tj-agents/core/pull/355), draft with human-gate. Parent [Core #354](https://github.com/tj-agents/core/pull/354), [Core #353](https://github.com/tj-agents/core/pull/353), and [Core #352](https://github.com/tj-agents/core/pull/352) have completed source review and Windows/Linux CI. All retain `human-gate`; architecture merge authority is absent.
 - Pickup: exact native identity and first read-only action recorded in the dispatched pickup file.
 
 Native history, the supported store status command, registered branches/worktrees, current plans and
@@ -425,6 +425,19 @@ Keep the remaining cutover atomic, freeze its scope, and require independent con
 deleted-test/receipt-boundary review plus native review and Windows/Linux CI. No S3 declarations, profile
 changes, publisher or unrelated cleanup enters this layer.
 
+## Lifecycle CI correction - 22 October 2026
+
+Core PR355 is a pushed draft at the initial candidate c1f0a8f5. CI39755570544 ran1232 source/package
+cases on both platforms and found the same two startup-context expectation failures. The parent run
+39705151778 actually executed and passed that step on Windows and Linux. The new routing emitter is
+intentional; its missing expected hook entry is the regression. Restore that entry while retaining the
+full command, context aggregation and timeout assertions. Both focused startup tests pass against regenerated packages in5.007 seconds. No timeout or runtime
+behavior changes.
+The generated-path guard also caught four catalog digests accidentally committed with authored catalog
+changes. Restore only those digest values to the immediate parent; post-merge generation owns them.
+The unstarted c1f0a8f5 review preparation is superseded without approval. Freeze the corrected full source
+candidate after focused tests pass. Review, exact-head CI, merge and activation remain separate gates.
+
 ## Coordinated source preparation - 22 October 2026
 
 Personal's isolated Fix/WorkflowSelectionClosure at0af44a12 contains only the dependency closure and
@@ -477,7 +490,7 @@ this sole implementation goal. Pin lifecycle evidence and link the shared decisi
 
 ## Next Steps
 
-Finish the bounded test restoration and focused checks; commit and freeze Lifecycle for independent
+Finish the focused CI correction and freeze the corrected Lifecycle candidate for independent
 review and exact-head CI. Then pin and publish the shared standing decision and prepare Core's three
 project declarations. Preserve the six checked consumer commits without retrying their denied publication.
 Complete every independent source/review action before presenting the concrete publication/activation gates.
