@@ -6,8 +6,8 @@ profile on a repository's behalf.
 
 ## Repository selection
 
-Selecting `personal@tj-agents` from the `tj-agents/marketplace` marketplace in the source repository's
-`.agents/plugins.json` selects `personal:work-item`. Any other profile is selected by a committed `.problem-records.json` naming its
+Selecting `personal@tj-agents`, with the `tj-agents` marketplace at `tj-agents/marketplace`, in the source
+repository's `.agents/plugins.json` selects `personal:work-item`. Any other profile is selected by a committed `.problem-records.json` naming its
 qualified read operation, for example `{"schema_version":1,"provider":"infonetica:work-item"}`; it takes
 precedence. Both are read from the primary checkout, the first non-bare entry of `git worktree list
 --porcelain`, resolved from any worktree or subdirectory; a feature worktree's copy never overrides it.
