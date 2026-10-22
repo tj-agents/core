@@ -67,7 +67,7 @@ def configuration_reader():
     for path in candidates:
         if path.is_file():
             spec = importlib.util.spec_from_file_location(
-                "base_agents_repository_configuration", path
+                "tj_agents_repository_configuration", path
             )
             if spec is None or spec.loader is None:
                 break
