@@ -34,6 +34,9 @@ class RequiredPluginsTests(unittest.TestCase):
         name, marketplace = identity.split("@")
         root = self.profile / "plugins/cache" / marketplace / name / "version"
         root.mkdir(parents=True, exist_ok=True)
+        manifest = root / f".{host}-plugin" / "plugin.json"
+        manifest.parent.mkdir(exist_ok=True)
+        manifest.write_text(json.dumps({"name": name}), encoding="utf-8")
         if host == "codex":
             entry = {"name": name, "marketplaceName": marketplace, "version": "version", "enabled": True}
         else:
@@ -123,6 +126,32 @@ class RequiredPluginsTests(unittest.TestCase):
         with mock.patch.object(required, "check") as check:
             required.check_launch(self.project, "codex", "native-cli", ["--cd", "another", "exec", "work"])
             check.assert_called_once_with(self.project / "another", "codex", "native-cli")
+
+    def test_maintenance_after_global_options_can_repair_missing_plugins(self):
+        for arguments in (["--cd", "another", "plugin", "add", "x@y"],
+                          ["--cd=another", "-m", "plugin", "plugin", "list"]):
+            with mock.patch.object(required, "check") as check:
+                required.check_launch(self.project, "codex", "native-cli", arguments)
+                check.assert_not_called()
+        with mock.patch.object(required, "check") as check:
+            required.check_launch(self.project, "codex", "native-cli", ["exec", "--cd=prompt"])
+            check.assert_called_once_with(self.project, "codex", "native-cli")
+
+    def test_incomplete_corrupt_and_missing_declared_payloads_are_rejected(self):
+        self.select("arbitrary-stack@arbitrary-publisher")
+        for host in ("codex", "claude"):
+            entry = self.entry(host)
+            root = self.profile / "plugins/cache/arbitrary-publisher/arbitrary-stack/version"
+            manifest = root / f".{host}-plugin/plugin.json"
+            for content in (None, "{", '{"name":"wrong"}',
+                            '{"name":"arbitrary-stack", "skills":"./missing"}'):
+                with self.subTest(host=host, content=content):
+                    if content is None:
+                        manifest.unlink(missing_ok=True)
+                    else:
+                        manifest.write_text(content, encoding="utf-8")
+                    with self.assertRaises(required.RequiredPluginsError):
+                        self.check(host, [entry])
 
 
 if __name__ == "__main__":
