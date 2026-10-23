@@ -219,6 +219,20 @@ and merge-gates tasks or cron entries. Nothing runs in the background.
 
 Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: one non-blocking ntfy.sh
 poll for events since the saved cursor; offline it starts anyway. Events name the publishing repositories.
+
+Repository-required standards are a separate, blocking check. Before starting the native host,
+the shell and handoff launchers compare every identity in `.agents/plugins.json` with that host's
+enabled native installations for the exact project. A missing, disabled, broken or wrong-project
+installation refuses the launch with the required identities. An unavailable verifier also refuses
+the launch. This does not depend on a Python, .NET or other stack-specific route, and another host's
+cached files are insufficient. The write router repeats admission before discovering plugin routes,
+so a missing plugin cannot silently remove its own standards from enforcement. Read-only diagnosis
+remains available. Offline optional update polling does not invalidate already verified installations.
+
+For example, selecting `example@tj-agents` while it is absent from Codex's inventory prevents a
+Codex launch and file writes even if its `tier.json` and routes are entirely missing. Repair the
+selection/install and start a fresh session; copying a Claude cache directory does not satisfy it.
+
 A GitHub query per repository reads its head and each plugin directory's tree into `~/.agents-state/plugin-heads.json`,
 both hosts update in parallel, and the cursor advances once both succeed. A failed host retries on the next
 launch; a cursor older than ntfy's retention compares every publisher instead. Every launch then compares

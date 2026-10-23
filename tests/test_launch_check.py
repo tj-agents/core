@@ -252,6 +252,16 @@ class TerminalFunctionTests(unittest.TestCase):
                     self.assertEqual(7, result.returncode, result.stderr)
                     self.assertEqual(["check", json.dumps(["two words", "--flag"])],
                                      log.read_text(encoding="utf-8").splitlines())
+                    previous = log.read_text(encoding="utf-8")
+                    check.write_text("raise SystemExit(2)\n", encoding="utf-8")
+                    blocked = subprocess.run(
+                        ["pwsh", "-NoProfile", "-NonInteractive", "-Command",
+                         f". '{profile}'; {name} 'two words' --flag; exit $LASTEXITCODE"],
+                        env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
+                        capture_output=True, text=True, timeout=60)
+                    self.assertEqual(2, blocked.returncode, blocked.stderr)
+                    self.assertEqual(previous, log.read_text(encoding="utf-8"))
+                    check.write_text(f"open({str(log)!r}, 'a').write('check\\n')\n", encoding="utf-8")
 
 
 @unittest.skipIf(os.name == "nt" or not shutil.which("bash"), "POSIX bash is required")
@@ -274,6 +284,13 @@ class PosixFunctionTests(unittest.TestCase):
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(7, result.returncode, result.stderr)
             self.assertEqual("check\ntwo words|--flag|", log.read_text(encoding="utf-8"))
+            previous = log.read_text(encoding="utf-8")
+            check.write_text("raise SystemExit(2)\n", encoding="utf-8")
+            blocked = subprocess.run(["bash", "-c", f". '{rc}'; claude 'two words' --flag"],
+                                     env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
+                                     capture_output=True, text=True, timeout=60)
+            self.assertEqual(2, blocked.returncode, blocked.stderr)
+            self.assertEqual(previous, log.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
