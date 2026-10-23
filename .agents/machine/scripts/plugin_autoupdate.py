@@ -23,11 +23,14 @@ import tempfile
 import threading
 import time
 
+import marketplace_identity
+
+
 GIT_TIMEOUT_SECONDS = 30
 SWEEP_TIMEOUT_SECONDS = 1800
 SCRIPT_NAME = "plugin_autoupdate.py"
 RUNTIME = ("plugin_autoupdate.py", "machine_events.py", "launch_check.py", "reload_plugins.py", "agent_cli.py",
-           "codex_hook_trust.py")
+           "codex_hook_trust.py", "marketplace_identity.py")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 CLI_TIMEOUT_SECONDS = 60
 STILL_ACTIVE = 259
@@ -138,6 +141,7 @@ def section(config: dict, name: str) -> dict:
 def declared_targets(config: dict) -> tuple[dict[str, dict], list[str]]:
     user = section(config, "marketplaces")
     candidates: dict[str, dict[tuple, dict]] = {}
+    ignored = []
     for rank, (directory, declared) in enumerate(declarations(config)):
         marketplaces = section(declared, "marketplaces")
         for identity, settings in sorted(section(declared, "plugins").items()):
@@ -147,10 +151,14 @@ def declared_targets(config: dict) -> tuple[dict[str, dict], list[str]]:
             source = git_marketplace(marketplaces[name] if name in marketplaces else user.get(name))
             if source is None:
                 continue
+            error = marketplace_identity.marketplace_error(name, github_repository(source["source"]))
+            if error:
+                ignored.append(f"{name} declared by {directory}: {error}")
+                continue
             option = candidates.setdefault(name, {}).setdefault(
                 (source["source"], source["ref"]), {**source, "project": directory, "rank": rank, "plugins": set()})
             option["plugins"].add(identity)
-    targets, ignored = {}, []
+    targets = {}
     for name, options in sorted(candidates.items()):
         chosen = min(options.values(), key=lambda option: (option["rank"] > 0, is_pinned(option["ref"]),
                                                             option["rank"]))

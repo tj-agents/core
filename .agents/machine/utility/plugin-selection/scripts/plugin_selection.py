@@ -3,18 +3,33 @@
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 import re
 
 import lock_io
 
 
+def identity_rules():
+    for parent in Path(__file__).resolve().parents:
+        for relative in ("scripts/marketplace_identity.py", "resources/machine/scripts/marketplace_identity.py"):
+            candidate = parent / relative
+            if candidate.is_file():
+                spec = importlib.util.spec_from_file_location("selection_marketplace_identity", candidate)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                return module
+    raise RuntimeError("The shipped marketplace_identity.py helper was not found")
+
+
+IDENTITY_RULES = identity_rules()
+MARKETPLACE_NAME = IDENTITY_RULES.MARKETPLACE_NAME
+MARKETPLACE_REPOSITORY = IDENTITY_RULES.MARKETPLACE_REPOSITORY
+
+
 SELECTION_NAME = "plugins.json"
 SCHEMA_VERSION = 1
-MARKETPLACE_NAME = "tj-agents"
-MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
 ALLOWED_OWNERS = ("tj-agents", "Concertable")
-CORE_REPOSITORY = "tj-agents/core"
 CORE_PLUGINS = ("agent-store", "base", "engineering", "machine", "workflow")
 NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
 REPOSITORY = re.compile(r"(?P<owner>[A-Za-z0-9-]+)/(?P<name>[A-Za-z0-9_][A-Za-z0-9_.-]*)\Z")
@@ -61,10 +76,9 @@ def validate_marketplace(name: str, value: object) -> dict:
         raise lock_io.LockError(
             f"marketplaces.{name}.repository must be <owner>/<repository> without .git, owned by " + " or ".join(ALLOWED_OWNERS)
         )
-    if (name == MARKETPLACE_NAME) != (repository == MARKETPLACE_REPOSITORY):
-        raise lock_io.LockError(f"The {MARKETPLACE_NAME} marketplace must be {MARKETPLACE_REPOSITORY} and nothing else may use that name")
-    if repository == CORE_REPOSITORY:
-        raise lock_io.LockError(f"{CORE_REPOSITORY} is published through the {MARKETPLACE_NAME} marketplace; select {MARKETPLACE_REPOSITORY}")
+    error = IDENTITY_RULES.marketplace_error(name, repository)
+    if error:
+        raise lock_io.LockError(error)
     return value
 
 
@@ -96,15 +110,16 @@ def validate(lock: dict) -> tuple[dict, list[str]]:
     return dict(sorted(marketplaces.items())), sorted(identities)
 
 
-def without_retired_core_marketplace(sources: dict, identities: list) -> tuple[dict, list]:
-    retired = {name for name, value in sources.items() if value["repository"] == CORE_REPOSITORY}
+def without_producer_marketplaces(sources: dict, identities: list) -> tuple[dict, list]:
+    retired = {name for name, value in sources.items() if IDENTITY_RULES.producer_repository(value["repository"])}
     if not retired or not isinstance(identities, list):
         return sources, identities
+    known = lock_io.load_json(Path(__file__).with_name("plugin_roster.json"))["plugins"]
     migrated = []
     for identity in identities:
         name, marketplace = split(identity) if isinstance(identity, str) else ("", "")
         if marketplace in retired:
-            if name not in CORE_PLUGINS:
+            if name not in known:
                 raise lock_io.LockError(f"Legacy plugin {identity} has no {MARKETPLACE_NAME} replacement")
             identity = plugin_id(name)
         if identity not in migrated:
@@ -136,7 +151,7 @@ def migrate(lock: dict) -> dict:
         if not isinstance(value, dict) or set(value) != {"repository", "revision"} or not isinstance(value["revision"], str) or not value["revision"]:
             raise lock_io.LockError(f"Legacy marketplace {name} has invalid fields")
         sources[name] = {"repository": value["repository"]}
-    sources, identities = without_retired_core_marketplace(sources, identities)
+    sources, identities = without_producer_marketplaces(sources, identities)
     document = {"schema_version": SCHEMA_VERSION, "marketplaces": sources, "plugins": identities}
     validate(document)
     return document
