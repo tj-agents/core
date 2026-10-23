@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "machine" / "utility" / "plugin-selection" / "scripts"
@@ -26,6 +27,10 @@ LockError = adopt_plugins.lock_io.LockError
 
 class AdoptPluginsTests(unittest.TestCase):
     def test_retired_tj_publishers_migrate_generically_without_adding_profiles(self):
+        roster = {"schema_version": 1, "plugins": {"python": [], "react": []}, "stacks": {}}
+        fixture = patch.object(adopt_plugins, "load_roster", return_value=roster)
+        fixture.start()
+        self.addCleanup(fixture.stop)
         self.selection.parent.mkdir()
         self.selection.write_text(json.dumps({
             "schema_version": 1,
