@@ -294,6 +294,40 @@ class RefreshTests(unittest.TestCase):
         self.assertEqual({'base': (CORE, 'HEAD', 'plugins/base'), 'machine': (CORE, 'HEAD', 'plugins/machine')},
                          UPDATE.plugin_sources('direct-core', target()['direct-core']))
 
+    def test_codex_reads_github_only_for_contents_it_has_not_cached(self):
+        recorded = {'codex:direct-core': OLD, 'codex-plugin:base@direct-core': OLD}
+        UPDATE.record_contents({'tj-agents/core@main': OLD}, {f'tj-agents/core@{OLD}:plugins/base': PINNED,
+                                                               f'tj-agents/core@{NEW}:plugins/base': PINNED}, {OLD, NEW})
+        sources = lambda name, target: {'base': (CORE, 'main', 'plugins/base')}
+        with mock.patch.object(UPDATE, 'github_query', side_effect=AssertionError('queried')):
+            UPDATE.refresh_codex('codex', target(plugins=['base@direct-core'], publishers=[{'source': CORE, 'ref': 'main'}]),
+                                 recorded, revision=lambda *_: NEW, run=mock.Mock(return_value=True), busy=idle,
+                                 sources=sources)
+        self.assertEqual(NEW, recorded['codex-plugin:base@direct-core'])
+        self.assertEqual(NEW, UPDATE.read_contents()['heads']['tj-agents/core@main'])
+
+    def test_content_writes_wait_for_another_process_and_give_up_after_the_limit(self):
+        held = UPDATE.acquire_lock(UPDATE.state_directory() / 'plugin-heads.lock')
+        self.addCleanup(held.close)
+        with mock.patch.object(UPDATE, 'CONTENTS_WAIT_SECONDS', 0.2), self.assertRaises(TimeoutError):
+            UPDATE.record_contents({'tj-agents/core@main': NEW})
+        held.close()
+        UPDATE.record_contents({'tj-agents/core@main': NEW})
+        self.assertEqual({'tj-agents/core@main': NEW}, UPDATE.read_contents()['heads'])
+
+    def test_a_locked_content_record_does_not_lose_the_codex_run(self):
+        held = UPDATE.acquire_lock(UPDATE.state_directory() / 'plugin-heads.lock')
+        self.addCleanup(held.close)
+        recorded = {'codex:direct-core': OLD}
+        sources = lambda name, target: {'base': (CORE, 'main', 'plugins/base')}
+        with mock.patch.object(UPDATE, 'CONTENTS_WAIT_SECONDS', 0.1), mock.patch('sys.stderr'):
+            outcomes = UPDATE.refresh_codex('codex', target(plugins=['base@direct-core'],
+                                                            publishers=[{'source': CORE, 'ref': 'main'}]), recorded,
+                                            revision=lambda *_: NEW, run=mock.Mock(return_value=True), busy=idle,
+                                            sources=sources, query=lambda arguments: {'data': {}})
+        self.assertEqual({'direct-core': 'updated'}, outcomes)
+        self.assertEqual(NEW, recorded['codex-plugin:base@direct-core'])
+
     def test_a_running_codex_session_never_defers_an_upgrade(self):
         run = mock.Mock(return_value=True)
         preserve = mock.Mock()
@@ -339,7 +373,11 @@ class RefreshTests(unittest.TestCase):
         (cache / 'hooks' / 'codex_hook_snapshot.py').write_text("raise SystemExit('new loader')\n", encoding='utf-8')
         (cache / 'hooks' / 'hook_runtime.py').write_text("raise SystemExit('new hooks')\n", encoding='utf-8')
         data = Path(os.environ['CODEX_HOME']) / 'plugins' / 'data' / 'base-tj-agents'
-        result = subprocess.run(command, shell=True, cwd=ROOT, env=dict(os.environ, PLUGIN_DATA=str(data)),
+        environment = dict(os.environ, PLUGIN_DATA=str(data), TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY="",
+                           HOME=os.environ['CODEX_HOME'], USERPROFILE=os.environ['CODEX_HOME'],
+                           PLUGIN_ROOT=str(cache), CODEX_PLUGIN_ROOT=str(cache), CLAUDE_PLUGIN_ROOT="")
+        result = subprocess.run(command, shell=True, cwd=Path(os.environ['CODEX_HOME']),
+                                env=environment,
                                 stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
 
         self.assertEqual(0, result.returncode, result.stderr)

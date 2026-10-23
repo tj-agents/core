@@ -1,0 +1,174 @@
+# Unfinished delivery returned without continuation
+
+Canonical record: `tj-agents/core#364`, recurrence comment `6365095127` and verified-cause comment `6365370676`.
+Related records: `tj-agents/core#415` and `tj-agents/core#400`.
+Native conversation: `codex:01a16053-d03d-7753-8ad9-3174781fba89`.
+
+## Observed failure
+
+At 12:05:55.505 UTC on 23 October 2026, the owner returned a final response with
+authorized work unfinished, no necessary question, and no verified continuation.
+PR355 remained open at `c6778af225a897afdeeac1d78062b8bcc3a15990`; its exact-head
+CI39942526220 had passed. Review, merge and installed activation remained pending.
+Tommy had to return to request the merge and call out the missing listener.
+
+The immediate trigger was repeated automatic permission-review timeouts, including
+read-only commands. The tool explicitly said the timeout did not establish that
+the action was unsafe. The owner treated that temporary execution failure as the
+end of task ownership instead of preserving a monitored continuation.
+
+The native transcript
+`rollout-2026-10-21T22-17-48-01a16053-d03d-7753-8ad9-3174781fba89.jsonl`
+records the final response at line13620 and `task_complete` at line13623,
+12:07:34.248 UTC. No Stop decision was observed in the filtered interval.
+
+## Why Core did not prevent it
+
+Commit `40cab46184b379c0588403b892bf564670f9a8bc`, 19 October 2026 at
+20:13:59 UTC, deliberately removed `continuation_stop` and `workflow_route` from
+both host manifests. Its message, "Remove procedural hooks and the pre-launch
+standards refresh", describes them as procedural enforcement and notes eight
+follow-up fixes to `continuation_stop`.
+
+Published parent `23da17c6`, current main `4925ad43`, and candidate `c6778af2`
+all have Engineering hooks containing only `PreToolUse` in
+`.agents/plugins/manifests/codex/engineering-hooks.json`. The installed generated
+manifest matches published main, normalized SHA256
+`045b8557f6927ed36074d4cc1a1b5cc1bfe0dcc8053974b299f03c4e8d7254ed`.
+Base supplies SessionStart context. Machine's Stop hook records session state;
+it does not enforce continuation. Workflow's manifest also has no such hook.
+
+The source gate and its tests still exist, but they are unwired. Their presence
+does not establish live enforcement. This incident is not a regression introduced
+by PR355, an isolated CI fixture leaking into the user profile, or evidence that
+the scheduler itself failed. The owner failed to activate the supported
+continuation required by the current prose contract; automatic Stop prevention
+had intentionally been retired.
+
+## Evidence limits and existing ownership
+
+Before recovery changes, primary Core had no continuation owner, scheduler receipt
+or delivery binding. Selection and Lifecycle also lacked owner/scheduler receipts
+and retained older human-gate bindings. Standard route and Stop-marker receipts
+for both raw and qualified native identities were absent after resumption. These
+observations do not prove the exact filesystem state at the earlier Stop event.
+The historical active Engineering hook digest is not retained in this transcript.
+
+Current resumed process1964 started at12:33:44UTC using the native Codex executable
+and the same conversation ID. Its identity is not the earlier process identity.
+
+Dormant `once_per_stop` retry suppression, the weak `documented_blocker` check and
+informal resume parsing are separate source concerns; none is established as this
+incident's causal path. Do not restore the retired gate implicitly. Reconcile the
+existing continuation repair owners recorded in#364 and the now-stale wired-hook
+assumption in#400 before choosing an enforcement mechanism.
+
+## Recovery and acceptance
+
+Continue the same authorized goal and preserve the original checkout and native
+conversation. Record this recurrence through Personal's existing-item operation.
+Runtime owner `7eeb7b98f1145de79d2c8708` now binds PR355 at `d2c122f8` to verified native PID1964. Scheduler registration succeeded; an observed wake recorded `foreground-owned`, retained the live lease and launched no competing child. Foreground heartbeats and one exact-head CI listener remain active. This demonstrates recovery ownership, not unattended behavior after every failure mode. Yield the foreground lease explicitly before an unattended handoff; a stale lease on a live process does not authorize takeover.
+
+The prevention acceptance scenario is an unfinished authorized goal encountering
+temporary command or approval failures. On both supported hosts, verify continued
+foreground ownership or a real registered wake through recovery, including
+repeated final/Stop attempts. A final status paragraph, another prose instruction,
+passing dormant unit tests or green source CI does not satisfy that condition.
+This incident remains open until that behavioral acceptance is observed.
+
+PR355 subsequently merged the reviewed polling-repair head `2952750d` at
+`b1fa5c68a1c532cc2190832828dfdcdca82664e5`, 23 October 2026 at 13:59:24 UTC.
+Exact-head CI39963544250 and causal publication39965800923 passed on Windows and
+Linux, including actual native startup/discovery. Publication completed at
+14:15:35 UTC; regeneration job120455230985 published
+`f03d360482343de2231ca634afed18c87c15d5d9`. This completes Core355 delivery;
+continuation-prevention acceptance remains open.
+
+## Intermediate owner retirement gap
+
+During the next-stage transition, inspection established another limitation:
+installed `continuation_runtime.py` lines216-272 accepts only waiting, blocked or
+complete, and complete always invokes the whole canonical goal completion check.
+The owner's descriptive completion condition does not scope that check to its
+finished PR. The persistent-delivery policy nevertheless prescribes retiring an
+intermediate owner before initializing the next slice against the same goal.
+
+The supported fail-closed path was exercised: checkpoint the PR355 runtime owner
+as blocked on this product-capability limitation, release its merged delivery
+binding, then remove its receipt-owned scheduled task. All commands succeeded;
+the original scheduler receipt is preserved in Git-private resumption evidence.
+This terminal runtime state does not mark the canonical goal blocked or complete.
+The same foreground PID1964 continues the existing Marketplace and selection
+stages. No competing scheduled writer or fabricated completion record was added.
+Core364 comment6367164179 records this additional gap and delivery evidence.
+
+Resolver: reconcile intermediate retirement with whole-goal completion in the
+runtime's owning repair. Acceptance must demonstrate a completed slice retiring
+its exact scheduler and transferring the unchanged unfinished goal to its next
+existing slice, with one writer and no false whole-goal completion.
+
+## Activation defects observed during continued delivery
+
+These are separate from the premature-stop cause. The supported sync operation
+included primary Core ancestor registrations and globally inherited Codex plugins
+while refreshing the prepared selection. All six exact prepared Claude rows
+updated, but stale primary-project rows caused a persistence failure. Codex
+stopped on inherited Kit, which is absent from the central catalog, and the global
+legacy audit reported the unrelated primary CarHunter Python declaration. No Kit
+removal or CarHunter identity migration was performed.
+
+Claude review_rules.py also treats multiple native installation rows for one
+selected identity as conflicting namespaces, without selecting the effective
+scope. This is a resolver defect, not evidence of two selected marketplaces.
+The Codex resolver passes all six declared identities with no diagnostics after
+native `codex plugin add workflow@tj-agents` installed the package skipped by the
+broader sync failure.
+
+The Codex hook-trust helper accepts only native local source provenance. Current
+inventory reports git-subdir. source_package returns None and trust_updates
+misreports that unsupported format as an installed-byte mismatch before comparing
+files. Actual comparisons against authenticated published Core main40c5ef88 found
+zero differing paths: Base42 files, Engineering300 and Machine186.
+
+Native recovery used config/batchWrite with upsert for only six changed hook
+hashes after verifying the exact marketplace, publisher URL, main revision,
+package subtree and every installed byte against that Git publication. A fresh
+hooks/list then reported no untrusted selected hooks. No cache edits, fabricated
+inventory, broader trust or removal of unrelated configuration was used. Evidence
+is retained in selection-codex-inventory.json, selection-codex-native-admission.json
+and selection-codex-native-trust.json under Git-private resumption state.
+
+Actual Claude initialization passed startup, qualified discovery, Base context
+and matching Machine receipt verification for session
+aaac0249-26f9-4c54-b664-5907bd56f6fa. Actual Codex project config has no disabledReason,
+enables all six identities and discovers workflow:run, engineering:commit and
+agent-store:inspect from their installed packages. No model prompt was used in
+these native observers; the originating PID1964 remains unchanged. The source
+utility defects remain unresolved; these observations establish only the stated
+native recovery and acceptance evidence.
+
+## Registered continuation made no delivery progress
+
+On 23 October the registered Selection owner launched three native Codex children.
+All ended without result receipts. Events record two host exits with code -1 and
+one interrupted writer without a checkpoint; failure intervals were approximately
+904, 1200 and 908 seconds. The second interval does not establish a uniform
+900-second timeout cause. The owner exhausted its three-failure budget and became
+blocked. Scheduler registration and an observed wake therefore did not establish
+successful continuation through the next delivery decision.
+
+After Tommy reported the missing progress, native process inspection found no
+surviving continuation or review writer. Original PID1964 reclaimed the same owner
+without resetting its launches, failures or deadline. A foreground Python stack
+trace of the exact review-prepare invocation repeatedly found
+cleanup_review_bundles resolving repository metadata and all worktree roots through
+review_bundle_locations. The common Git state held 534 historical descriptors and
+the repository had 68 worktrees. This is direct evidence of repeated preparation
+work, separate from the unproven termination mechanism of the second child.
+
+The repair shares repository context, protected worktree roots and repository slug
+within one cleanup operation while retaining per-descriptor redirect, containment,
+identity and ownership checks. Regression coverage checks that multiple expired
+owned bundles are removed, a recent bundle remains and repository-wide discovery
+runs once. End-to-end continuation acceptance remains open until a real delayed
+delivery advances and reports its terminal state; registration alone is insufficient.

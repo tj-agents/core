@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import launch_check
 import launch_status
+import required_plugins
 from terminal_command import command_for_target, without_binding_state
 
 ACK_DIRECTORY_ENV = "TJ_AGENTS_STARTUP_ACK_DIRECTORY"
@@ -147,7 +148,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     phase("checking-plugins")
     try:
-        launch_check.check(parsed.project.resolve())
+        required_plugins.check_launch(parsed.project.resolve(), parsed.host, parsed.target, arguments)
+    except required_plugins.RequiredPluginsError as error:
+        message = f"launch: {error}"
+        print(message, file=sys.stderr)
+        report("failed", error=message)
+        return 1
+    try:
+        launch_check.check(parsed.project.resolve(), host=parsed.host)
     except Exception as error:
         print(f"plugins: update check failed: {error}", file=sys.stderr)
 
