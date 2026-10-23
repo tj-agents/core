@@ -742,6 +742,18 @@ class SkillRouterTests(unittest.TestCase):
         result = self.run_router(("--harness", "claude"), dict(subagent, tool_use_id=str(uuid.uuid4())))
         self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_absolute_write_into_a_sibling_worktree_is_gated_by_that_worktree(self):
+        self.install_stack_tier()
+        sibling = self.base / "repo.worktrees" / "feature"
+        (sibling / "src").mkdir(parents=True)
+        (sibling / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
+        (sibling / "stack.marker").write_text("", encoding="utf-8")
+        payload = self.write_payload(str(uuid.uuid4()))
+        payload["tool_input"]["file_path"] = str(sibling / "src" / "item.sx")
+        result = self.run_router(("--harness", "claude"), payload)
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("stackx:style", result.stderr)
+
     def test_main_session_read_of_a_skill_file_is_not_an_invocation(self):
         skill_file = self.install_stack_tier()
         (self.repo / "stack.marker").write_text("", encoding="utf-8")

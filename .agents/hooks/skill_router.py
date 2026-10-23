@@ -878,6 +878,20 @@ def find_repo_root(cwd):
     return None
 
 
+def write_scope(targets, cwd):
+    """The repository the targets live in when they are all absolute and in one other repository.
+
+    A session started in a main checkout routinely edits a sibling worktree by absolute path.
+    """
+    if not targets or not all(Path(target).is_absolute() for target in targets):
+        return cwd
+    roots = {find_repo_root(Path(target).parent) for target in targets}
+    if len(roots) != 1 or None in roots:
+        return cwd
+    (root,) = roots
+    return str(root) if root != find_repo_root(cwd) else cwd
+
+
 def git_common_dir(root):
     """The real .git directory, following the `gitdir:` pointer a worktree checkout carries instead."""
     marker = root / ".git"
@@ -1417,7 +1431,7 @@ def main():
     else:
         shell_writes = []
         targets = written_targets(tool_input)
-    cwd = data.get("cwd") or os.getcwd()
+    cwd = write_scope(targets, data.get("cwd") or os.getcwd())
     root = find_repo_root(cwd)
     if root is None:
         sys.exit(0)
