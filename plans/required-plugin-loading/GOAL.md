@@ -46,10 +46,10 @@ Linux, Codex and Claude verification separately and retain any unresolved gate.
 
 ## Next action
 
-Review and publish the tested source candidate, complete Linux CI, then install through
-the supported setup/update path and verify fresh native hosts. Publication currently
-requires resolving the Personal bot-identity policy: its supported wrapper reports
-zero App records on this machine. Do not substitute Tommy's credentials silently.
+Complete exact-head CI and follow-up review for draft PR #445, then resolve landing
+and supported machine deployment. The primary source checkout has unrelated changes
+and must remain intact. The machine has no GitHub App record; Tommy explicitly granted
+an exception to use his existing login for this repair's push and PR only.
 
 ## Implementation checkpoint
 
@@ -111,3 +111,25 @@ snapshot and real home/plugin roots. Its subprocess now uses a disposable home,
 project and plugin roots and its own preserved snapshot; all 43 updater tests pass.
 Actual Codex and Claude admission passes with host manifest/payload validation enabled.
 No shared runtime has been deployed yet.
+
+## Publication checkpoint
+
+Published and verified head `457ad350c49ffd02760b7f19443628d3d6a38556` at
+https://github.com/tj-agents/core/pull/445 (draft). Body validation passed and delivery
+binding records this exact identity. Windows and Linux CI run `39986038049` is active;
+the generated-output guard and guidance checks passed. Native follow-up review is
+active. Router recheck passed 52 cases with one 20-second fixture timeout; that exact
+case passed unchanged on focused rerun. Do not call the full rerun green.
+
+The publication exception does not install a GitHub App or change the standing
+identity policy. App-policy-compliant merge, shared rollout, supported machine
+installation and fresh launcher failure/success checks remain open.
+
+Follow-up native review found two further admission gaps: an unknown global flag
+could stop directory resolution before `--cd`, and malformed non-list declarations
+were skipped. Directory scanning now continues across native options and subcommands,
+stops at the explicit `--` delimiter, and never interprets a later positional word as
+a maintenance command. Known option values cannot become maintenance commands.
+Malformed skills/agents/commands declarations are rejected; valid inline hook objects
+remain supported. All 12 required-plugin tests and 13 startup tests pass (one POSIX
+skip). The correction is substantive and will refresh the existing PR head and CI.

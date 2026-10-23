@@ -35,12 +35,20 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
     value_options = {
         "-C", "--cd", "-c", "--config", "-m", "--model", "-p", "--profile",
         "-s", "--sandbox", "-a", "--ask-for-approval", "--add-dir", "--enable", "--disable",
+        "--remote", "--remote-auth-token-env", "-i", "--image", "--local-provider",
     } if host == "codex" else {"--model", "--permission-mode", "--settings", "--plugin-dir"}
-    flag_options = {"--no-alt-screen", "--search", "--full-auto", "--dangerously-bypass-approvals-and-sandbox"}
+    flag_options = {
+        "--no-alt-screen", "--search", "--full-auto", "--dangerously-bypass-approvals-and-sandbox",
+        "--no-daemon", "--strict-config", "--oss", "--approve-for-me",
+        "--dangerously-bypass-hook-trust", "--worktree",
+    }
+    command_seen = False
     index = 0
     while index < len(arguments):
         argument = arguments[index]
-        if argument in MAINTENANCE_COMMANDS:
+        if argument == "--":
+            break
+        if not command_seen and argument in MAINTENANCE_COMMANDS:
             return
         option, separator, value = argument.partition("=")
         if option in value_options:
@@ -49,10 +57,10 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
                 if index >= len(arguments):
                     raise RequiredPluginsError(f"{option} requires a value")
                 value = arguments[index]
-            if option in ("-C", "--cd"):
+            if host == "codex" and option in ("-C", "--cd"):
                 project = original_project / value
         elif argument not in flag_options:
-            break
+            command_seen = True
         index += 1
     check(project, host, executable)
 
@@ -67,8 +75,10 @@ def readable_payload(path: Path, host: str, name: str) -> bool:
             values = document.get(field, [])
             if isinstance(values, str):
                 values = [values]
-            if not isinstance(values, list):
+            if field == "hooks" and isinstance(values, dict):
                 continue
+            if not isinstance(values, list):
+                return False
             for value in values:
                 if not isinstance(value, str):
                     return False
