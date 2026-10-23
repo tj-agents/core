@@ -43,18 +43,18 @@ A tab takes seconds to appear and a process listing is trivially misread — an 
 repository, which is worse than no handoff at all: they collide on the same files with neither aware of
 the other.
 
-If the launcher printed its confirmation, one handoff tab was submitted. For a bounded side-workstream
-handoff, retain the originating goal and foreground writer lease, then continue its next action in the
-same turn: the successful side handoff does not satisfy the originating goal's completion condition. A
-full-goal transfer follows `engineering:handoff`'s checkpoint, release and verified-pickup contract. An
-ordinary launcher-only request may report the submitted handoff as complete. If it exited non-zero, say
-so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a second tab for
-the same request.
+If the launcher printed its confirmation, one handoff tab was submitted. Accept an already authorized
+prepared dispatch; do not call a higher-level workflow to prepare it again. The caller owns the checkpoint,
+release and pickup rules for a full-goal transfer. For a bounded side-workstream handoff, retain the
+originating goal and foreground writer lease, then continue its next action in the same turn: successful
+submission is not pickup and does not satisfy the originating goal's completion condition. A launcher-only
+request can finish at verified submission. If it exited non-zero, say so; do not retry blind — and never
+retry on exit code 3 specifically, where a retry risks a second tab for the same request.
 
 ## Model selection
 
 Pass `--lane L1`–`L6` and the launcher resolves the model *and its reasoning effort* from the canonical
-lane tables it ships under `resources/lanes` — the `engineering:lanes` ladder, and the repo's only
+lane tables it ships under `resources/lanes` — the `machine:lanes` ladder, and the repo's only
 model-name owner, so no caller has to know a model id and a retiering is one edit in one authored file.
 The pair matters here: a Codex model is priced and paced by both. An explicit `--model` or
 `--reasoning-effort` still wins for whichever half the user named outright. Supply none and the CLI keeps
@@ -78,10 +78,6 @@ delivery gates govern:
 
 Choose the launch lane for the work assigned to this independent session. If the successor later reaches
 a different phase, it can route bounded work to an appropriate lane agent while retaining ownership.
-After a small or medium plan, the current owner normally continues directly or with a bounded lane agent;
-planning alone does not call for this launcher. After a massive plan that was a substantial design phase,
-`engineering:plans` normally transfers execution to one fresh harness from a durable phased plan, even in
-the same checkout. Apply its context criteria and judgment to cases between those sizes.
 
 `--frontier` selects the tier above the ladder from the same table, model and effort together. **Pass it
 only when the user explicitly asked for that tier or its model by name.** No lane resolves to the tier —
