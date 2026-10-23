@@ -717,6 +717,8 @@ class RunStepsTests(Machine):
     def test_cli_step_selection_preserves_defaults_preconditions_and_declared_order(self):
         cases = (
             ([], [item.name for item in setup.STEPS]),
+            (["--step", "shell profiles"],
+             ["preconditions", "launch-check runtime", "shell profiles"]),
             (["--check", "--step", "shell profiles", "--step", "launch-check runtime"],
              ["preconditions", "launch-check runtime", "shell profiles"]),
         )
