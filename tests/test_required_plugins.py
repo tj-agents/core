@@ -139,6 +139,7 @@ class RequiredPluginsTests(unittest.TestCase):
 
     def test_native_flags_and_subcommand_directory_cannot_bypass_target_selection(self):
         for arguments in (["--no-daemon", "--cd", "another"],
+                          ["-Canother"], ["-C=another"],
                           ["--strict-config", "--no-daemon", "exec", "--cd=another"],
                           ["--model", "plugin", "exec", "--cd", "another"]):
             with mock.patch.object(required, "check") as check:
@@ -171,6 +172,51 @@ class RequiredPluginsTests(unittest.TestCase):
             with mock.patch.object(required, "check") as check:
                 required.check_launch(self.project, host, "native-cli", arguments)
                 check.assert_called_once_with(self.project, host, "native-cli")
+
+    def test_launch_inventory_uses_the_effective_native_configuration(self):
+        for host, arguments, options in (
+            ("codex", ["--no-daemon", "-c", 'plugins."base@tj-agents".enabled=false', "exec"],
+             ("-c", 'plugins."base@tj-agents".enabled=false')),
+            ("codex", ["--profile=alternate", "--cd", "another", "review"], ("--profile", "alternate")),
+            ("claude", ["--settings", "settings with spaces.json", "--print", "prompt"],
+             ("--settings", "settings with spaces.json")),
+        ):
+            with mock.patch.object(required, "check") as check:
+                required.check_launch(self.project, host, "native-cli", arguments)
+                project = self.project / "another" if "--cd" in arguments else self.project
+                check.assert_called_once_with(project, host, "native-cli", inventory_options=options)
+
+    def test_configuration_override_reaches_inventory_and_disabled_plugin_is_rejected(self):
+        self.select("arbitrary-stack@arbitrary-publisher")
+        for host, options in (("claude", ("--settings", '{"enabledPlugins":{"arbitrary-stack@arbitrary-publisher":false}}')),
+                              ("claude", ("--setting-sources", "user", "--settings", "override.json"))):
+            entry = self.entry(host, enabled=False)
+            data = {"installed": [entry]} if host == "codex" else [entry]
+            response = subprocess.CompletedProcess([], 0, json.dumps(data), "")
+            with mock.patch.object(required.subprocess, "run", return_value=response) as run:
+                with self.assertRaises(required.RequiredPluginsError):
+                    required.check_launch(self.project, host, "native-cli", [*options, "prompt"])
+                self.assertEqual(["native-cli", *options, "plugin", "list", "--json"], run.call_args.args[0])
+
+    def test_codex_unverifiable_activation_overrides_refuse_before_native_inventory(self):
+        self.select("arbitrary-stack@arbitrary-publisher")
+        for arguments in (["-c", 'plugins."arbitrary-stack@arbitrary-publisher".enabled=false'],
+                          ["--config=features.plugins=false"], ["-cplugins={}"],
+                          ["--profile", "alternate"], ["-palternate"],
+                          ["--enable", "plugins"], ["--disable=plugins,hooks"]):
+            with mock.patch.object(required.subprocess, "run") as run:
+                with self.assertRaisesRegex(required.RequiredPluginsError, "native plugin inventory does not apply"):
+                    required.check_launch(self.project, "codex", "native-cli", arguments)
+                run.assert_not_called()
+
+    def test_codex_model_configuration_overrides_remain_available(self):
+        self.select("arbitrary-stack@arbitrary-publisher")
+        entry = self.entry("codex")
+        response = subprocess.CompletedProcess([], 0, json.dumps({"installed": [entry]}), "")
+        with mock.patch.object(required.subprocess, "run", return_value=response) as run:
+            required.check_launch(self.project, "codex", "native-cli", ["-cmodel_reasoning_effort=high"])
+            self.assertEqual(["native-cli", "-c", "model_reasoning_effort=high", "plugin", "list", "--json"],
+                             run.call_args.args[0])
 
     def test_incomplete_corrupt_and_missing_declared_payloads_are_rejected(self):
         self.select("arbitrary-stack@arbitrary-publisher")
