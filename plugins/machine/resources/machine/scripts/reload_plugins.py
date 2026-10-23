@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import functools
 import json
 import os
 from pathlib import Path
@@ -84,15 +86,20 @@ def run(command: list[str], project: Path) -> str:
     return result.stdout
 
 
+@functools.lru_cache(maxsize=None)
+def resolved(path: object) -> Path:
+    return Path(path).resolve()
+
+
 def applies(entry: dict, project: Path) -> bool:
     if entry.get("scope") in {"user", "managed"}:
         return True
     owner = entry.get("projectPath")
-    return bool(owner) and project.resolve().is_relative_to(Path(owner).resolve())
+    return bool(owner) and resolved(project).is_relative_to(resolved(owner))
 
 
 def path_key(path: object) -> str:
-    return os.path.normcase(str(Path(path).resolve()))
+    return os.path.normcase(str(resolved(path)))
 
 
 def declared_scopes(identity: str, project: Path) -> list[str]:
@@ -133,12 +140,16 @@ def plugin_errors(installations: list, project: Path) -> list[str]:
             if entry.get("enabled") is True and applies(entry, project) for error in entry.get("errors") or []]
 
 
+def entry_for(installations: list, identity: str, scope: str, owner: Path) -> dict | None:
+    return next((entry for entry in installations if entry.get("id") == identity and entry.get("scope") == scope
+                 and (scope == "user" or entry.get("projectPath") and path_key(entry["projectPath"]) == path_key(owner))),
+                None)
+
+
 def persistence_problems(expected: list[tuple[str, str, Path, str]], installations: list) -> list[str]:
     problems = []
     for identity, scope, owner, version in expected:
-        entry = next((entry for entry in installations if entry.get("id") == identity and entry.get("scope") == scope
-                      and (scope == "user" or entry.get("projectPath") and path_key(entry["projectPath"]) == path_key(owner))),
-                     None)
+        entry = entry_for(installations, identity, scope, owner)
         if entry is None or entry.get("version") != version:
             found = entry.get("version") if entry else "nothing"
             problems.append(f"{identity} ({scope}) update did not persist: installed_plugins.json has {found}, "
@@ -146,37 +157,19 @@ def persistence_problems(expected: list[tuple[str, str, Path, str]], installatio
     return problems
 
 
-def plugin_revision(identity: str) -> str | None:
-    plugin, name = identity.rsplit("@", 1)
-    known = read_json(configuration_root("claude") / "plugins/known_marketplaces.json")
-    location = known.get(name, {}).get("installLocation")
-    if not location:
-        return None
-    catalog = read_json(Path(location) / ".claude-plugin/marketplace.json")
-    source = next((entry.get("source") for entry in catalog.get("plugins", [])
-                   if isinstance(entry, dict) and entry.get("name") == plugin), None)
-    path = (source.get("path") if isinstance(source, dict) and source.get("source") == "local"
-           else source if isinstance(source, str) else None)
-    return plugin_autoupdate.subtree_revision(Path(location), path.lstrip("./")) if isinstance(path, str) else None
-
-
-def refresh_claude(executable: str, project: Path, plugins: list[str], recorded: dict | None = None) -> list[str]:
-    installations = json.loads(run([executable, "plugin", "list", "--json"], project))
+def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]],
+                 updates: list[tuple[str, str, Path]], done: list | None = None) -> list[str]:
+    for identity, scope in installs:
+        run([executable, "plugin", "install", identity, "--scope", scope], project)
     expected, updated = [], []
-    for identity in plugins:
-        for scope in declared_scopes(identity, project):
-            run([executable, "plugin", "install", identity, "--scope", scope], project)
-        revision = plugin_revision(identity) if recorded is not None else None
-        if revision is not None and recorded.get(identity) == revision:
-            continue
-        for scope, owner in update_targets(identity, project, installations):
-            result = update_result(run([executable, "plugin", "update", identity, "--scope", scope, "--json"], owner),
-                                   identity, scope)
-            expected.append((identity, scope, owner, result["newVersion"]))
-            if result["updateOutcome"] == "updated" and identity not in updated:
-                updated.append(identity)
-        if revision is not None:
-            recorded[identity] = revision
+    for identity, scope, owner in updates:
+        result = update_result(run([executable, "plugin", "update", identity, "--scope", scope, "--json"], owner),
+                               identity, scope)
+        expected.append((identity, scope, owner, result["newVersion"]))
+        if done is not None:
+            done.append((identity, scope, owner))
+        if result["updateOutcome"] == "updated" and identity not in updated:
+            updated.append(identity)
     after = json.loads(run([executable, "plugin", "list", "--json"], project))
     problems = persistence_problems(expected, after) + plugin_errors(after, project)
     if problems:
@@ -184,15 +177,26 @@ def refresh_claude(executable: str, project: Path, plugins: list[str], recorded:
     return updated
 
 
-def refresh(host: str, executable: str, project: Path, marketplaces: dict, plugins: list[str],
-           recorded: dict | None = None) -> list[str]:
+def refresh_claude(executable: str, project: Path, plugins: list[str]) -> list[str]:
+    installations = json.loads(run([executable, "plugin", "list", "--json"], project))
+    installs = [(identity, scope) for identity in plugins for scope in declared_scopes(identity, project)]
+    updates = [(identity, scope, owner) for identity in plugins
+               for scope, owner in update_targets(identity, project, installations)]
+    return apply_claude(executable, project, installs, updates)
+
+
+def refresh_marketplaces(host: str, executable: str, project: Path, marketplaces: dict) -> None:
     known = read_json(configuration_root(host) / "plugins/known_marketplaces.json") if host == "claude" else {}
     for name in marketplaces:
         if host == "claude" and name not in known:
             run([executable, "plugin", "marketplace", "add", marketplaces[name]], project)
         run([executable, "plugin", "marketplace", "update" if host == "claude" else "upgrade", name], project)
+
+
+def refresh(host: str, executable: str, project: Path, marketplaces: dict, plugins: list[str]) -> list[str]:
+    refresh_marketplaces(host, executable, project, marketplaces)
     if host == "claude":
-        return refresh_claude(executable, project, plugins, recorded) if plugins else []
+        return refresh_claude(executable, project, plugins) if plugins else []
     user_config = configuration_root(host) / "config.toml"
     user_enabled = plugin_autoupdate.enabled_identities(plugin_autoupdate.load_toml(user_config))
     for identity in plugins:
@@ -201,27 +205,118 @@ def refresh(host: str, executable: str, project: Path, marketplaces: dict, plugi
     return []
 
 
-def publishers(name: str, plugins: list[str]) -> set[str]:
-    location = read_json(configuration_root("claude") / "plugins/known_marketplaces.json").get(name, {}).get("installLocation")
-    catalog = read_json(Path(location) / ".claude-plugin/marketplace.json") if location else {}
-    wanted = {identity.rsplit("@", 1)[0] for identity in plugins if identity.rsplit("@", 1)[1] == name}
-    return {repository(entry["source"].get("url")) for entry in catalog.get("plugins", [])
-            if isinstance(entry, dict) and entry.get("name") in wanted and isinstance(entry.get("source"), dict)}
+def installed_entries() -> list[dict]:
+    plugins = read_json(configuration_root("claude") / "plugins/installed_plugins.json").get("plugins")
+    if not isinstance(plugins, dict):
+        return []
+    return [{**entry, "id": identity} for identity, entries in plugins.items() if isinstance(entries, list)
+            for entry in entries if isinstance(entry, dict)]
 
 
-def refresh_repositories(project: Path, repositories: set[str] | None, updated: set[str] | None = None) -> bool:
+def tj_agents_marketplaces() -> dict[str, tuple[str, Path]]:
+    found = {}
+    for name, entry in read_json(configuration_root("claude") / "plugins/known_marketplaces.json").items():
+        source = entry.get("source") if isinstance(entry, dict) else None
+        if not isinstance(source, dict) or not isinstance(entry.get("installLocation"), str):
+            continue
+        repo = repository(source.get("repo")) if source.get("source") == "github" else repository(source.get("url"))
+        if repo and repo.split("/", 1)[0] == "tj-agents":
+            found[name] = (repo, Path(entry["installLocation"]))
+    return found
+
+
+def catalog_publishers(marketplaces: dict[str, tuple[str, Path]]) -> dict[str, dict[str, tuple[str, str]]]:
+    result = {}
+    for name, (_, location) in marketplaces.items():
+        result[name] = {}
+        for entry in read_json(location / ".claude-plugin/marketplace.json").get("plugins", []):
+            source = entry.get("source") if isinstance(entry, dict) else None
+            if isinstance(source, dict) and source.get("source") == "git-subdir":
+                key = plugin_autoupdate.publisher_key(source.get("url"), source.get("sha") or source.get("ref"))
+                if key:
+                    result[name][entry.get("name")] = (key, plugin_autoupdate.plugin_path(source))
+    return result
+
+
+def refresh_heads(repositories: set[str] | None, revision=plugin_autoupdate.remote_revision, query=None) -> set[str]:
+    marketplaces = tj_agents_marketplaces()
+    owners = {f"{plugin}@{name}": source for name, plugins in catalog_publishers(marketplaces).items()
+              for plugin, source in plugins.items()}
+    everything = (repositories is None or not plugin_autoupdate.read_contents()["heads"]
+                  or any(repo in repositories for repo, _ in marketplaces.values()))
+    wanted = {}
+    for key, path in owners.values():
+        if everything or key.rsplit("@", 1)[0] in repositories:
+            wanted.setdefault(key, set()).add(path)
+    if not wanted:
+        return set()
+    installed = {}
+    for entry in installed_entries():
+        sha = entry.get("gitCommitSha")
+        if isinstance(sha, str) and plugin_autoupdate.SHA.fullmatch(sha) and entry["id"] in owners:
+            installed.setdefault(owners[entry["id"]][0], set()).add(sha)
+    heads = plugin_autoupdate.refresh_contents(wanted, installed, query, revision)
+    return {key for key in wanted if key not in heads}
+
+
+def attempt_key(identity: str, scope: str, owner: Path) -> str:
+    return f"{identity}|{scope}|{'user' if scope == 'user' else path_key(owner)}"
+
+
+def reconcile_claude(project: Path, event: bool = False, repositories: set[str] | None = None,
+                     fresh: frozenset[str] = frozenset()) -> list[str]:
     marketplaces, plugins = selection("claude", "", project)
-    chosen = {name: repo for name, repo in marketplaces.items()
-              if repositories is None or repo in repositories or publishers(name, plugins) & repositories}
-    if chosen:
-        versions_path = configuration_root("claude") / "plugins" / "tj-agents-plugin-versions.json"
-        recorded = read_json(versions_path)
-        changed = refresh("claude", agent_cli.resolve_claude_executable(), project, chosen,
-                          [identity for identity in plugins if identity.rsplit("@", 1)[1] in chosen], recorded)
-        plugin_autoupdate.write_json(versions_path, recorded)
-        if updated is not None:
-            updated.update(changed)
-    return True
+    installations = installed_entries()
+    contents = plugin_autoupdate.read_contents()
+    publishers = catalog_publishers(tj_agents_marketplaces())
+    installs, updates, attempts = [], [], {}
+    for identity in plugins:
+        plugin, name = identity.rsplit("@", 1)
+        key, path = publishers.get(name, {}).get(plugin, (None, None))
+        head = contents["heads"].get(key) if key else None
+        forced = event and key is None and (repositories is None or marketplaces.get(name) in repositories)
+        if event:
+            installs += [(identity, scope) for scope in declared_scopes(identity, project)
+                         if entry_for(installations, identity, scope, project) is None]
+        for scope, owner in update_targets(identity, project, installations):
+            entry = entry_for(installations, identity, scope, owner)
+            if entry is None:
+                continue
+            same = (plugin_autoupdate.same_content(contents, key.rsplit("@", 1)[0], path, entry.get("gitCommitSha"), head)
+                    if head is not None else True)
+            attempted = contents["attempts"].get(attempt_key(identity, scope, owner)) == head
+            if forced or event and same is not True or not event and same is False and not attempted:
+                updates.append((identity, scope, owner))
+                if head is not None:
+                    attempts[attempt_key(identity, scope, owner)] = head
+    if not installs and not updates:
+        return []
+    touched = {work[0].rsplit("@", 1)[1] for work in installs + updates}
+    executable = agent_cli.resolve_claude_executable()
+    refresh_marketplaces("claude", executable, project,
+                         {name: repo for name, repo in marketplaces.items() if name in touched - fresh})
+    done = []
+    try:
+        return apply_claude(executable, project, installs, updates, done)
+    finally:
+        ran = {attempt_key(*target) for target in done}
+        with contextlib.suppress(OSError):
+            plugin_autoupdate.record_contents(attempts={key: head for key, head in attempts.items() if key in ran})
+
+
+def refresh_repositories(project: Path, repositories: set[str] | None, updated: set[str] | None = None,
+                         revision=plugin_autoupdate.remote_revision, query=None) -> bool:
+    marketplaces, _ = selection("claude", "", project)
+    fresh = {name: repo for name, repo in marketplaces.items() if repositories is None or repo in repositories}
+    if fresh:
+        refresh_marketplaces("claude", agent_cli.resolve_claude_executable(), project, fresh)
+    unresolved = refresh_heads(repositories, revision, query)
+    if unresolved:
+        print(f"plugins: could not read the published head of {', '.join(sorted(unresolved))}", file=sys.stderr)
+    changed = reconcile_claude(project, event=True, repositories=repositories, fresh=frozenset(fresh))
+    if updated is not None:
+        updated.update(changed)
+    return repositories is None or not any(key.rsplit("@", 1)[0] in repositories for key in unresolved)
 
 
 def package_tree(root: Path) -> dict[str, bytes]:
@@ -391,7 +486,8 @@ def main(argv: list[str] | None = None) -> int:
     relaunch_allowed = "claude" in hosts and not arguments.no_relaunch and not arguments.verify_only
     if not (arguments.all or arguments.verify or arguments.verify_only):
         result = launch_check.check(project, update=lambda host, repositories, root:
-                                    launch_check.update_host(host, repositories, root, updated))
+                                    launch_check.update_host(host, repositories, root, updated),
+                                    reconcile=lambda root: launch_check.reconcile_installs(root, updated))
         if result != "unconfigured":
             summary = {"check": result}
             if removed:
