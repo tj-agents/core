@@ -94,8 +94,10 @@ class SourceLayoutTests(unittest.TestCase):
             "address-bug": "workflow/address-bug",
             "address-mistake": "workflow/address-mistake",
         }
-        resource = "plugins/engineering/.agents/engineering/resources/problem-records.md"
+        resource = "plugins/engineering/.agents/workflow/resources/problem-records.md"
+        workflow_resource = "plugins/workflow/.agents/workflow/resources/problem-records.md"
         self.assertIn(resource, output)
+        self.assertIn(workflow_resource, output)
         for name, relative in canonical.items():
             with self.subTest(skill=name):
                 self.assertEqual("engineering", skills[name]["plugin"])
@@ -104,7 +106,7 @@ class SourceLayoutTests(unittest.TestCase):
                     self.assertIn(f"](../../.agents/engineering/{relative}/SKILL.md)", adapter)
                 canonical_path = f"plugins/engineering/.agents/engineering/{relative}/SKILL.md"
                 canonical_body = output[canonical_path].decode("utf-8")
-                link = "../../resources/problem-records.md"
+                link = "../../../workflow/resources/problem-records.md"
                 self.assertIn(f"]({link})", canonical_body)
                 resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
                 self.assertEqual(resource, resolved)
@@ -113,11 +115,11 @@ class SourceLayoutTests(unittest.TestCase):
         _, output, _, _ = SYNC.build(self.root)
         catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
         engineering = next(package for package in catalog["packages"] if package["id"] == "tj-agents/engineering")
-        self.assertEqual(["tj-agents/base", "tj-agents/agent-store", "tj-agents/machine"], engineering["dependencies"]["required"])
+        self.assertEqual(["tj-agents/base", "tj-agents/workflow", "tj-agents/agent-store", "tj-agents/machine"], engineering["dependencies"]["required"])
         self.assertEqual([], engineering["external_dependencies"]["required"])
         harness = json.loads(output["plugins/engineering/harness.json"].decode("utf-8"))
         self.assertEqual([{"id": "tj-agents", "repository": "tj-agents/marketplace"}], harness["requires"]["marketplaces"])
-        self.assertEqual(["tj-agents/agent-store", "tj-agents/base", "tj-agents/engineering", "tj-agents/machine"], harness["requires"]["plugins"])
+        self.assertEqual(["tj-agents/agent-store", "tj-agents/base", "tj-agents/engineering", "tj-agents/machine", "tj-agents/workflow"], harness["requires"]["plugins"])
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertEqual([], selection["external_prerequisites"])
 
@@ -193,6 +195,7 @@ class SourceLayoutTests(unittest.TestCase):
         for host in ("codex", "claude"):
             manifest_root = self.root / f".agents/plugins/manifests/{host}"
             self.assertTrue((manifest_root / "engineering.json").is_file())
+            self.assertTrue((manifest_root / "workflow.json").is_file())
             self.assertTrue((manifest_root / "engineering-hooks.json").is_file())
             self.assertFalse((self.root / f".{host}/plugins").exists())
             self.assertFalse((self.root / f".{host}/hooks").exists())
@@ -214,6 +217,8 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/machine/codex-skills/hook-control/scripts/hook_control.py",
             "plugins/machine/catalog/catalog.json",
             "plugins/machine/catalog/plugins.schema.json",
+            "plugins/workflow/skills/status/scripts/status.py",
+            "plugins/workflow/codex-skills/status/scripts/status.py",
             "CAPABILITIES.md",
         ):
             self.assertIn(relative, output)
@@ -227,24 +232,24 @@ class SourceLayoutTests(unittest.TestCase):
     def test_agent_store_inspection_runs_from_each_isolated_host_package(self):
         _, output, _, _ = SYNC.build(self.root)
         runtime = ".agents/agent-store/runtime"
-        for plugin in ("agent-store", "machine", "engineering"):
+        for plugin in ("agent-store", "machine", "workflow", "engineering"):
             for name in ("session_store.py", "repository_identity.py", "reader.py"):
                 self.assertEqual(
                     SYNC.canonical_output_bytes((self.root / runtime / name).read_bytes()),
                     output[f"plugins/{plugin}/{runtime}/{name}"],
                 )
-        isolated = self.root / "isolated package é"
-        for relative, value in output.items():
+        isolated = self.root / "isolated package \u00e9"
+        for relative, body in output.items():
             if relative.startswith("plugins/agent-store/"):
                 destination = isolated / relative.removeprefix("plugins/agent-store/")
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                destination.write_bytes(value)
+                destination.write_bytes(body)
         spec = importlib.util.spec_from_file_location(
             "isolated_agent_store", isolated / runtime / "session_store.py"
         )
         store = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(store)
-        database = self.root / "fixture state é" / "sessions.db"
+        database = self.root / "fixture state \u00e9" / "sessions.db"
         connection = store.connect(database)
         try:
             store.upsert_work_item(
@@ -302,7 +307,7 @@ class SourceLayoutTests(unittest.TestCase):
             for entry in compatibility["fresh_selection"]
         ]
 
-        self.assertEqual(["base", "agent-store", "engineering", "machine"], fresh_plugins)
+        self.assertEqual(["base", "agent-store", "machine", "workflow", "engineering"], fresh_plugins)
         self.assertEqual(fresh_plugins, default_plugins)
         self.assertEqual(
             fresh_plugins,
@@ -325,6 +330,12 @@ class SourceLayoutTests(unittest.TestCase):
                 set(catalog["prerequisites"]), set(fresh_plugins)
             )
             catalog_skills.update(catalog["skills"])
+
+        workflow_selection = json.loads(output["plugins/workflow/selection.json"].decode("utf-8"))
+        self.assertEqual(["base", "agent-store", "machine"], workflow_selection["prerequisites"])
+        self.assertNotIn("engineering", workflow_selection["prerequisites"])
+        engineering_selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
+        self.assertIn("workflow", engineering_selection["prerequisites"])
 
         required = set(compatibility["fresh_required_skills"])
         owners = {name: skill["plugin"] for name, skill in skills.items()}

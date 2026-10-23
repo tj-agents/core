@@ -4,6 +4,7 @@
     "base": [],
     "engineering": [
       "base",
+      "workflow",
       "agent-store",
       "machine"
     ],
@@ -45,7 +46,12 @@
       "engineering",
       "work"
     ],
-    "agent-store": []
+    "agent-store": [],
+    "workflow": [
+      "base",
+      "agent-store",
+      "machine"
+    ]
   },
   "stacks": {
     "dotnet": [
