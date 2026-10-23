@@ -158,11 +158,13 @@ def persistence_problems(expected: list[tuple[str, str, Path, str]], installatio
 
 
 def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]],
-                 updates: list[tuple[str, str, Path]]) -> list[str]:
+                 updates: list[tuple[str, str, Path]], starting=None) -> list[str]:
     for identity, scope in installs:
         run([executable, "plugin", "install", identity, "--scope", scope], project)
     expected, updated = [], []
     for identity, scope, owner in updates:
+        if starting is not None:
+            starting(identity, scope, owner)
         result = update_result(run([executable, "plugin", "update", identity, "--scope", scope, "--json"], owner),
                                identity, scope)
         expected.append((identity, scope, owner, result["newVersion"]))
@@ -293,9 +295,12 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
     executable = agent_cli.resolve_claude_executable()
     refresh_marketplaces("claude", executable, project,
                          {name: repo for name, repo in marketplaces.items() if name in touched - fresh})
-    with contextlib.suppress(OSError):
-        plugin_autoupdate.record_contents(attempts=attempts)
-    return apply_claude(executable, project, installs, updates)
+    def starting(identity: str, scope: str, owner: Path) -> None:
+        if (key := attempt_key(identity, scope, owner)) in attempts:
+            with contextlib.suppress(OSError):
+                plugin_autoupdate.record_contents(attempts={key: attempts[key]})
+
+    return apply_claude(executable, project, installs, updates, starting)
 
 
 def refresh_repositories(project: Path, repositories: set[str] | None, updated: set[str] | None = None,
