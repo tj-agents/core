@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 import importlib.util
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import sqlite3
@@ -33,6 +33,7 @@ STILL_ACTIVE = 259
 FAILURE_BACKOFF_SECONDS = 24 * 60 * 60
 RETIRED = "retired"
 HOOK_DIGEST = re.compile(r'"(sha256:[0-9a-f]{64})"')
+SHA = re.compile(r"[0-9a-f]{40}")
 SNAPSHOT_FIRST = "(Path(s) if s else d/'hook-snapshots')/k/"
 
 
@@ -156,12 +157,8 @@ def declared_targets(config: dict) -> tuple[dict[str, dict], list[str]]:
     return targets, ignored
 
 
-def marketplace_checkout(name: str) -> Path:
-    return codex_home() / ".tmp" / "marketplaces" / name
-
-
 def marketplace_manifest(name: str) -> dict:
-    root = marketplace_checkout(name)
+    root = codex_home() / ".tmp" / "marketplaces" / name
     for relative in (Path(".agents", "plugins", "marketplace.json"), Path(".claude-plugin", "marketplace.json")):
         manifest = read_json(root / relative)
         if manifest:
@@ -169,29 +166,54 @@ def marketplace_manifest(name: str) -> dict:
     return {}
 
 
-def plugin_sources(name: str) -> dict[str, str]:
-    """Each locally sourced cataloged plugin's name, mapped to its path within the marketplace checkout."""
-    sources = {}
+def plugin_path(source: dict) -> str:
+    path = source.get("path")
+    return str(PurePosixPath(path)) if isinstance(path, str) and path else "."
+
+
+def plugin_publishers(name: str) -> dict[str, tuple[str, str, str]]:
+    publishers = {}
     for entry in marketplace_manifest(name).get("plugins", []):
-        if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
-            continue
-        source = entry.get("source")
-        path = (source.get("path") if isinstance(source, dict) and source.get("source") == "local"
-               else source if isinstance(source, str) else None)
-        if isinstance(path, str):
-            sources[entry["name"]] = path.lstrip("./")
-    return sources
+        source = entry.get("source") if isinstance(entry, dict) else None
+        if isinstance(source, dict) and source.get("source") == "git-subdir" and isinstance(source.get("url"), str):
+            ref = source.get("sha") or source.get("ref") or "HEAD"
+            if isinstance(ref, str):
+                publishers[entry.get("name")] = (source["url"], ref, plugin_path(source))
+    return publishers
 
 
-def subtree_revision(checkout: Path, path: str) -> str | None:
-    try:
-        result = subprocess.run(["git", "-C", str(checkout), "rev-parse", f"HEAD:{path}"], capture_output=True,
-                                text=True, encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT_SECONDS,
-                                check=False, creationflags=NO_WINDOW)
-    except (OSError, subprocess.TimeoutExpired):
+def publisher_key(url: object, ref: object = None) -> str | None:
+    repository = github_repository(url)
+    return f"{repository}@{ref if isinstance(ref, str) and ref else 'HEAD'}" if repository else None
+
+
+def tree_key(repository: str, sha: str, path: str) -> str:
+    return f"{repository}@{sha}:{path}"
+
+
+def read_contents() -> dict[str, dict[str, str]]:
+    saved = read_json(state_directory() / "plugin-heads.json")
+    return {name: {key: sha for key, sha in saved.get(name, {}).items() if isinstance(sha, str) and SHA.fullmatch(sha)}
+            if isinstance(saved.get(name), dict) else {} for name in ("heads", "trees")}
+
+
+def record_contents(heads: dict[str, str], trees: dict[str, str], keep: set[str]) -> None:
+    contents = read_contents()
+    contents["heads"].update(heads)
+    live = keep | set(contents["heads"].values())
+    contents["trees"] = {key: oid for key, oid in {**contents["trees"], **trees}.items()
+                         if key.split("@", 1)[1].split(":", 1)[0] in live}
+    write_json(state_directory() / "plugin-heads.json", contents)
+
+
+def same_content(contents: dict, repository: str, path: str, old: object, new: str) -> bool | None:
+    if old == new:
+        return True
+    if not isinstance(old, str):
         return None
-    revision = result.stdout.strip()
-    return revision if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", revision) else None
+    before = contents["trees"].get(tree_key(repository, old, path))
+    after = contents["trees"].get(tree_key(repository, new, path))
+    return None if before is None or after is None else before == after
 
 
 def inspect_installation(name: str, target: dict) -> None:
@@ -199,17 +221,9 @@ def inspect_installation(name: str, target: dict) -> None:
     selected = {identity.rsplit("@", 1)[0] for identity in target["plugins"]}
     target["missing"] = [identity for identity in target["plugins"]
                          if not (cache / identity.rsplit("@", 1)[0]).is_dir()]
-    publishers = {}
-    entries = marketplace_manifest(name).get("plugins")
-    for entry in entries if isinstance(entries, list) else []:
-        if not isinstance(entry, dict) or entry.get("name") not in selected:
-            continue
-        source = entry.get("source")
-        if isinstance(source, dict) and source.get("source") == "git-subdir" and isinstance(source.get("url"), str):
-            ref = source.get("sha") or source.get("ref") or "HEAD"
-            if isinstance(ref, str):
-                publishers[(source["url"], ref)] = {"source": source["url"], "ref": ref}
-    target["publishers"] = [publishers[key] for key in sorted(publishers)]
+    published = plugin_publishers(name)
+    target["publishers"] = [{"source": url, "ref": ref}
+                            for url, ref in sorted({published[plugin][:2] for plugin in selected if plugin in published})]
 
 
 def process_alive(pid: object) -> bool:
@@ -316,8 +330,7 @@ def run_cli(command: list[str], *, cwd: Path) -> bool | str:
 
 def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, revision=remote_revision,
                   run=run_cli, now: float | None = None, busy=codex_session_running, packages=hook_packages,
-                  preserve=preserve_hook_snapshots, sources=plugin_sources,
-                  content=subtree_revision) -> dict[str, str]:
+                  preserve=preserve_hook_snapshots, publishers=plugin_publishers) -> dict[str, str]:
     now = time.time() if now is None else now
     outcomes: dict[str, str] = {}
     references = sorted({(source["source"], source.get("ref") or "HEAD")
@@ -350,14 +363,16 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
         preserve(marketplace, hooks)
         refreshed = run([executable, "plugin", "marketplace", "upgrade", marketplace],
                         cwd=target["project"]) is True
-        local_sources = sources(marketplace) if refreshed else {}
-        checkout = marketplace_checkout(marketplace)
+        sources = publishers(marketplace) if refreshed else {}
+        contents = read_contents()
         retired = []
         for plugin in target["plugins"] if refreshed else []:
             plugin_key = "codex-plugin:" + plugin
-            path = local_sources.get(plugin.rsplit("@", 1)[0])
-            local_content = content(checkout, path) if path else None
-            if local_content is not None and plugin not in missing and recorded.get(plugin_key) == local_content:
+            source = sources.get(plugin.rsplit("@", 1)[0])
+            plugin_head = heads.get(source[:2]) if source else None
+            if (plugin_head is not None and plugin not in missing and same_content(
+                    contents, github_repository(source[0]), source[2], recorded.get(plugin_key), plugin_head)):
+                recorded[plugin_key] = plugin_head
                 continue
             added = run([executable, "plugin", "add", plugin], cwd=target["project"])
             if added == RETIRED:
@@ -365,8 +380,8 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
             elif added is not True:
                 refreshed = False
                 break
-            elif local_content is not None:
-                recorded[plugin_key] = local_content
+            elif plugin_head is not None:
+                recorded[plugin_key] = plugin_head
         if retired:
             recorded["retired:" + key] = sorted(retired)
         retired = f" (no longer published, not installed: {', '.join(retired)})" if retired else ""
