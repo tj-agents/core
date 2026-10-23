@@ -675,6 +675,48 @@ class ReviewTests(RepositoryFixture):
 
         locations.assert_not_called()
 
+    def test_cleanup_resolves_repository_once_for_multiple_expired_bundles(self):
+        descriptors = [
+            ops.review_prepare(self.root, name, "origin/main", "HEAD", False)
+            for name in ("expired-one", "expired-two", "recent")
+        ]
+        for descriptor in descriptors[:2]:
+            path = Path(descriptor["artifact"])
+            value = json.loads(path.read_text(encoding="utf-8"))
+            value["bundle"]["last_validated_at"] = "2000-01-01T00:00:00+00:00"
+            ops.atomic_json(path, value)
+
+        with mock.patch.object(ops, "repository_root", wraps=ops.repository_root) as roots, mock.patch.object(
+            ops, "common_git_directory", wraps=ops.common_git_directory
+        ) as common, mock.patch.object(
+            ops, "worktree_roots", wraps=ops.worktree_roots
+        ) as worktrees, mock.patch.object(ops, "repository_slug", wraps=ops.repository_slug) as repository:
+            ops.cleanup_review_bundles(self.root)
+
+        roots.assert_called_once()
+        common.assert_called_once()
+        self.assertEqual(3, worktrees.call_count)
+        repository.assert_called_once()
+        for descriptor in descriptors[:2]:
+            self.assertFalse(Path(descriptor["bundle"]["directory"]).exists())
+        self.assertTrue(Path(descriptors[2]["bundle"]["directory"]).is_dir())
+
+    def test_cleanup_preserves_worktree_registered_after_initial_discovery(self):
+        expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
+        path = Path(expired["artifact"])
+        value = json.loads(path.read_text(encoding="utf-8"))
+        value["bundle"]["last_validated_at"] = "2000-01-01T00:00:00+00:00"
+        ops.atomic_json(path, value)
+        directory = Path(expired["bundle"]["directory"])
+        initial = ops.worktree_roots(self.root)
+
+        with mock.patch.object(ops, "worktree_roots", side_effect=[initial, [*initial, directory]]) as roots:
+            ops.cleanup_review_bundles(self.root)
+
+        self.assertTrue(directory.is_dir())
+        self.assertTrue(path.is_file())
+        self.assertEqual(2, roots.call_count)
+
     def test_cleanup_validates_existing_expired_bundle_before_removal(self):
         expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
         descriptor_path = Path(expired["artifact"])
