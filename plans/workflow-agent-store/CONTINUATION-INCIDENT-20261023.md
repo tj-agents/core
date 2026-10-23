@@ -106,3 +106,69 @@ Resolver: reconcile intermediate retirement with whole-goal completion in the
 runtime's owning repair. Acceptance must demonstrate a completed slice retiring
 its exact scheduler and transferring the unchanged unfinished goal to its next
 existing slice, with one writer and no false whole-goal completion.
+
+## Activation defects observed during continued delivery
+
+These are separate from the premature-stop cause. The supported sync operation
+included primary Core ancestor registrations and globally inherited Codex plugins
+while refreshing the prepared selection. All six exact prepared Claude rows
+updated, but stale primary-project rows caused a persistence failure. Codex
+stopped on inherited Kit, which is absent from the central catalog, and the global
+legacy audit reported the unrelated primary CarHunter Python declaration. No Kit
+removal or CarHunter identity migration was performed.
+
+Claude review_rules.py also treats multiple native installation rows for one
+selected identity as conflicting namespaces, without selecting the effective
+scope. This is a resolver defect, not evidence of two selected marketplaces.
+The Codex resolver passes all six declared identities with no diagnostics after
+native `codex plugin add workflow@tj-agents` installed the package skipped by the
+broader sync failure.
+
+The Codex hook-trust helper accepts only native local source provenance. Current
+inventory reports git-subdir. source_package returns None and trust_updates
+misreports that unsupported format as an installed-byte mismatch before comparing
+files. Actual comparisons against authenticated published Core main40c5ef88 found
+zero differing paths: Base42 files, Engineering300 and Machine186.
+
+Native recovery used config/batchWrite with upsert for only six changed hook
+hashes after verifying the exact marketplace, publisher URL, main revision,
+package subtree and every installed byte against that Git publication. A fresh
+hooks/list then reported no untrusted selected hooks. No cache edits, fabricated
+inventory, broader trust or removal of unrelated configuration was used. Evidence
+is retained in selection-codex-inventory.json, selection-codex-native-admission.json
+and selection-codex-native-trust.json under Git-private resumption state.
+
+Actual Claude initialization passed startup, qualified discovery, Base context
+and matching Machine receipt verification for session
+aaac0249-26f9-4c54-b664-5907bd56f6fa. Actual Codex project config has no disabledReason,
+enables all six identities and discovers workflow:run, engineering:commit and
+agent-store:inspect from their installed packages. No model prompt was used in
+these native observers; the originating PID1964 remains unchanged. The source
+utility defects remain unresolved; these observations establish only the stated
+native recovery and acceptance evidence.
+
+## Registered continuation made no delivery progress
+
+On 23 October the registered Selection owner launched three native Codex children.
+All ended without result receipts. Events record two host exits with code -1 and
+one interrupted writer without a checkpoint; failure intervals were approximately
+904, 1200 and 908 seconds. The second interval does not establish a uniform
+900-second timeout cause. The owner exhausted its three-failure budget and became
+blocked. Scheduler registration and an observed wake therefore did not establish
+successful continuation through the next delivery decision.
+
+After Tommy reported the missing progress, native process inspection found no
+surviving continuation or review writer. Original PID1964 reclaimed the same owner
+without resetting its launches, failures or deadline. A foreground Python stack
+trace of the exact review-prepare invocation repeatedly found
+cleanup_review_bundles resolving repository metadata and all worktree roots through
+review_bundle_locations. The common Git state held 534 historical descriptors and
+the repository had 68 worktrees. This is direct evidence of repeated preparation
+work, separate from the unproven termination mechanism of the second child.
+
+The repair shares repository context, protected worktree roots and repository slug
+within one cleanup operation while retaining per-descriptor redirect, containment,
+identity and ownership checks. Regression coverage checks that multiple expired
+owned bundles are removed, a recent bundle remains and repository-wide discovery
+runs once. End-to-end continuation acceptance remains open until a real delayed
+delivery advances and reports its terminal state; registration alone is insufficient.

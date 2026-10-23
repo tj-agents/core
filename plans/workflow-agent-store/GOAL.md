@@ -869,3 +869,51 @@ Status354 merged reviewed899db3c0 at034bdeaec482b081555634ef22e83aaf7b5df5b5 at0
 The retained isolated Claude debug log at native-claude-isolated-diagnostic-state/artifacts/claude-debug.jsonl proves80 plugin skills loaded from candidate working-tree directories. Earlier zero-count interpretation was a different stage. Actual qualified discovery must be established through native command inventory, not Base context substrings. Official pinned Claude Python SDK evidence establishes a streaming initialize control request before a user query; successful credential-free initialization is still to be verified.
 
 Supported installed reload_plugins.py reads the exact supplied project native settings (Claude files or Codex config/read), so sync-plugins --project <prepared-checkout> --verify --no-relaunch can refresh after central publication while preserving protected primary source and the original CLI. Exact native trust/admission and fresh observed loading remain gates. Setup is not needed to point machine bindings at unpublished worktree content.
+
+## Active selection continuation - 23 October 2026
+
+Core356 is retargeted to main and publishes d2ad741d99e4401cd88ab63ee0bb8bc6b9eecf53.
+Its source delta remains only three selection declarations; the incident and goal
+documentation ride the same draft. Declaration check and six selection tests pass.
+CI39970650169 owns this exact head and has one supported listener. Keep draft and
+human-gate until final independent review, current-head CI and acceptance pass.
+
+The installed Codex review resolver now returns the exact six identities,
+selection hash9ecf54310b175d43171e60cf4cb9455725ac0303dd9cba7c0f305de652508165,
+and diagnostics[]. Actual native config/read admits this exact checkout;
+skills/list discovers workflow:run, engineering:commit and agent-store:inspect
+with matching plugin IDs. All selected hooks are trusted after native upsert of
+six hashes authenticated against complete package content at published40c5ef88.
+Claude initialize-only acceptance passes startup, qualified discovery, Base
+context and matching Machine receipt for aaac0249-26f9-4c54-b664-5907bd56f6fa.
+The Claude review resolver's duplicate-installation error and the sync/trust
+utility scope/provenance defects remain documented in the incident. Use the
+actually admitted Codex reviewing host; do not claim the Claude resolver is fixed.
+Native Codex startup/receipt loading by a fresh execution owner remains observable
+when the scheduled continuation starts. Preserve original PID1964.
+
+Next: read the current ten Codex-resolved convention bodies whose hashes changed,
+freeze the full existing Core356 candidate against actual main, obtain native and
+required independent review, reconcile exact-head CI39970650169, then deliver
+under recorded authorization. Refresh its PR body to the final source and
+acceptance facts before merge. Do not reuse prior parent review watermarks.
+Continue the remaining recorded Marketplace24/profile/consumer slices afterward
+in dependency order. Native source helper defects are not silently repaired by
+installed activation; retain their diagnosis and concrete resolver.
+
+Runtime owner6383add5316ebfb3f97eef5c binds this existing worktree and head to the
+same canonical goal. Scheduled task
+AgentStandards-Continuation-712eff5c2adaa040f6900a1983cc696be08e62560718185bd61235fc8b6dac47
+registered successfully; an observed wake retained foreground ownership without
+a competing writer. Explicitly yield the foreground token before unattended
+transfer, observe the next wake, and preserve both owners' receipts. The previous
+Lifecycle scheduler is removed. This is the same goal's delivery continuation,
+not a new independent architecture successor. The whole goal remains incomplete.
+
+## Foreground recovery after failed continuation - 23 October 2026
+
+The three Selection child launches produced no checkpoint and exhausted the recorded failure budget. No child writer survived native inspection. Original PID1964 reclaimed owner6383add5316ebfb3f97eef5c without resetting counters or deadline. The whole goal is incomplete; no unattended progress is claimed.
+
+The current slice now includes the causal review cleanup repair and its regression: reuse repository context and worktree roots within each cleanup, retain per-descriptor ownership and path checks, and avoid resolving the same cache directory once per worktree. A trace of the old review gate found repeated discovery across 534 descriptors and 68 worktrees. After the repair it reached the correctly rejected partial-bundle state left by an interrupted attempt. The new regression passes. Wider validation and final exact-head review remain open. The incident document retains chronology and acceptance limits.
+
+Next: resolve the wider fixture Git failures, commit this repair, freeze a fresh bundle at that commit, obtain independent review and Windows/Linux CI, refresh delivery identity and body, and deliver Core356 under the existing authorization. Then continue the existing dependent slices. End-to-end continuation acceptance must prove progress through a delayed decision and terminal reporting; scheduler registration alone is insufficient.
