@@ -47,6 +47,8 @@ FAKE_GH = textwrap.dedent("""
                 done(out=pr)
         done(1, err="no pull requests found for branch " + target)
     if args[:2] == ["pr", "merge"]:
+        if state.get("merge_fails"):
+            done(1, err="Pull request is not mergeable")
         state.setdefault("merges", []).append(args)
         for pr in state.get("prs", []):
             if str(pr["number"]) == args[2]:
@@ -307,6 +309,38 @@ class OrchestrateTests(unittest.TestCase):
         self.assertEqual(reopened["status"], "open")
         self.assertEqual(reopened["head"], "2" * 40)
         self.assertIn("new commits", reopened["note"])
+
+    def test_failed_or_dropped_merge_returns_to_the_user_without_retrying(self):
+        f = self.fixture
+        f.add("a")
+        f.json("tick")
+        f.pr("a", 51)
+        f.call("report", "--worker", "a", "--status", "done")
+        f.stop("a")
+        decision = f.json("tick")["decisions"][0]
+        value = f.gh()
+        value["merge_fails"] = True
+        f.write_gh(value)
+        f.call("answer", decision["id"])
+        reopened = f.json("tick")["decisions"][0]
+        self.assertEqual(reopened["status"], "open")
+        self.assertIn("not mergeable", reopened["note"])
+        f.json("tick")
+        self.assertEqual(len([call for call in f.gh()["calls"] if call[:2] == ["pr", "merge"]]), 1)
+
+        value = f.gh()
+        value["merge_fails"] = False
+        f.write_gh(value)
+        f.call("answer", decision["id"])
+        f.json("tick")
+        self.assertEqual(len(f.gh()["merges"]), 1)
+        f.pr("a", 51)
+        state = f.state_value()
+        state["decisions"][decision["id"]]["requested_at"] -= orchestrate.DROPPED_MERGE_SECONDS + 1
+        f.file.write_text(json.dumps(state), encoding="utf-8")
+        dropped = f.json("tick")["decisions"][0]
+        self.assertIn("dropped", dropped["note"])
+        self.assertEqual(len(f.gh()["merges"]), 1)
 
     def test_close_out_waits_for_idle_clean_pushed_worker(self):
         f = self.fixture
