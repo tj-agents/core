@@ -51,7 +51,7 @@ gh pr list --state open --json number,headRefName,title,isDraft \
 
 4. **Recently-touched plans/docs** — working docs signal what was being designed:
 ```bash
-git log --all --since="$SINCE" --name-only --pretty=format: -- 'plans/**' '**/TECH_DEBT.md' '**/*.md' 2>/dev/null \
+git log --all --since="$SINCE" --name-only --pretty=format: -- 'plans/**' '**/*.md' 2>/dev/null \
   | grep -v '^$' | sort -u | head -25
 ```
 

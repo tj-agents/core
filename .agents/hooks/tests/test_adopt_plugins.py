@@ -168,7 +168,7 @@ class AdoptPluginsTests(unittest.TestCase):
         with self.assertRaisesRegex(LockError, "Unknown plugin: cobol"):
             adopt_plugins.run(self.root, [], ["cobol"], "write")
 
-    def test_producer_lock_migration_preserves_identities_and_discards_pins(self):
+    def test_producer_lock_migration_moves_core_to_the_marketplace_and_discards_pins(self):
         legacy = self.root / ".agents" / "plugins.lock.json"
         legacy.parent.mkdir()
         legacy.write_text(json.dumps({
@@ -177,21 +177,24 @@ class AdoptPluginsTests(unittest.TestCase):
                 "base-agents": {"repository": "tj-agents/core", "revision": "v2.1.18"},
                 "agents": {"repository": "Concertable/agents", "revision": "a" * 40},
             },
-            "plugins": ["base@base-agents", "engineering@base-agents", "machine@base-agents", "concertable@agents"],
+            "plugins": ["agent-store@base-agents", "base@base-agents", "engineering@base-agents", "machine@base-agents", "workflow@base-agents", "concertable@agents"],
         }), encoding="utf-8")
         adopt_plugins.run(self.root, [], [], "write")
         self.assertFalse(legacy.exists())
         document = json.loads(self.selection.read_text(encoding="utf-8"))
-        self.assertEqual({"base-agents", "agents"}, set(document["marketplaces"]))
+        self.assertEqual({"tj-agents": {"repository": "tj-agents/marketplace"}, "agents": {"repository": "Concertable/agents"}},
+                         document["marketplaces"])
         self.assertNotIn("revision", json.dumps(document))
-        self.assertNotIn("base@tj-agents", self.plugins())
+        self.assertNotIn("tj-agents/core", json.dumps(document))
+        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "concertable@agents", "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents"], self.plugins())
         claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
-        self.assertTrue(claude["enabledPlugins"]["base@base-agents"])
-        self.assertIn('[plugins."machine@base-agents"]', (self.root / ".codex/config.toml").read_text(encoding="utf-8"))
+        self.assertTrue(claude["enabledPlugins"]["base@tj-agents"])
+        codex = (self.root / ".codex/config.toml").read_text(encoding="utf-8")
+        self.assertIn('[plugins."machine@tj-agents"]', codex)
+        self.assertNotIn("tj-agents/core", codex)
         adopt_plugins.run(self.root, [], ["react"], "write")
         self.assertIn("react@tj-agents", self.plugins())
-        self.assertIn("base@base-agents", self.plugins())
-        self.assertNotIn("base@tj-agents", self.plugins())
+        self.assertIn("base@tj-agents", self.plugins())
         self.assertEqual([], adopt_plugins.run(self.root, [], [], "check"))
 
     def test_cli_reports_drift(self):

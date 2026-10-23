@@ -84,7 +84,7 @@ def poll(topic: str, since: str, fetch=https_get) -> list[dict]:
     return envelopes
 
 
-def update_host(host: str, repositories: set[str], project: Path) -> bool:
+def update_host(host: str, repositories: set[str], project: Path, updated: set[str] | None = None) -> bool:
     try:
         if host == "codex":
             import plugin_autoupdate
@@ -95,7 +95,7 @@ def update_host(host: str, repositories: set[str], project: Path) -> bool:
             return plugin_autoupdate.main(arguments) == 0
         import reload_plugins
 
-        return reload_plugins.refresh_repositories(project, repositories)
+        return reload_plugins.refresh_repositories(project, repositories, updated)
     except Exception as error:
         print(f"plugins: {host} update failed: {error}", file=sys.stderr)
         return False

@@ -642,9 +642,8 @@ class CopyPosixTests(unittest.TestCase):
 
 
 class LinuxSingleFlavourTechDebtTests(unittest.TestCase):
-    """Pins the TECH_DEBT.md entry "clip offers one clipboard flavour per copy on Linux" -- see there for
-    why. If copy_posix ever grows a second copy call, this test must change, and that entry should be
-    deleted in the same change.
+    """Pins https://github.com/tj-agents/core/issues/389 -- see there for why. If copy_posix ever grows a
+    second copy call, this test must change, and that issue should be closed in the same change.
     """
 
     def test_default_mode_issues_exactly_one_copy_call_and_it_is_html_only(self):
