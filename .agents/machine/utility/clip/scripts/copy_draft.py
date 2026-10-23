@@ -11,8 +11,8 @@ CF_UNICODETEXT, and that is still verified by reading it back.
 
 On Linux, default mode copies a `text/html` flavour built from the same escaped-and-code-spanned fragment
 Windows uses, via `wl-copy`/`xclip`, so a paste into Teams still renders backtick spans as monospace (see
-`.agents/machine/TECH_DEBT.md`, "clip offers one clipboard flavour per copy on Linux"). `--plain-only`
-copies the literal text as plain instead, everywhere. `xsel` cannot set an explicit MIME type, so with
+https://github.com/tj-agents/core/issues/389). `--plain-only` copies the literal text as plain instead,
+everywhere. `xsel` cannot set an explicit MIME type, so with
 only `xsel` available (no `xclip`, no Wayland) default mode falls back to plain text with the markdown
 left intact and says so. macOS's `pbcopy` has no HTML flavour either, so macOS always copies plain text
 with the markdown intact, and says so.
@@ -404,8 +404,7 @@ def copy_posix(text, plain_only, environ=None, which=shutil.which, run=subproces
     Default mode copies an HTML flavour (so Teams renders backtick spans as monospace) when the selected
     tool supports setting one; otherwise -- xsel, or macOS's pbcopy -- it falls back to the plain flavour
     with the markdown left intact, and the returned message says so. `--plain-only` always copies the
-    literal text as plain, on every tool. See `.agents/machine/TECH_DEBT.md`, "clip offers one clipboard
-    flavour per copy on Linux".
+    literal text as plain, on every tool. See https://github.com/tj-agents/core/issues/389.
     """
     environ = os.environ if environ is None else environ
     tool = posix_clipboard_tool(environ, which)
