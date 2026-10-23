@@ -1,0 +1,20 @@
+{
+  "plugin": "workflow",
+  "payloads": [
+    "process"
+  ],
+  "prerequisites": [
+    "base",
+    "agent-store",
+    "machine"
+  ],
+  "external_prerequisites": [],
+  "skills": [
+    "handoff",
+    "plan",
+    "plan-artifacts",
+    "resume",
+    "run",
+    "status"
+  ]
+}

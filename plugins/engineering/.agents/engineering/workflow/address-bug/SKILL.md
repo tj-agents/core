@@ -8,7 +8,7 @@ domain: process
 
 # Address a recorded bug
 
-Read [the shared problem-record contract](../../resources/problem-records.md). This workflow selects and
+Read [the shared problem-record contract](../../../workflow/resources/problem-records.md). This workflow selects and
 tracks repair; it does not replace `engineering:bugfix`, `engineering:failing-tests`, or an existing plan
 owner.
 
@@ -19,9 +19,11 @@ owner.
 2. Reconcile an existing goal, session, branch, PR, or writer before writing or dispatching. If another
    owner already has the causal repair, update the record with the link and evidence instead of starting a
    second writer. Update blocked records with their real reason and resume condition.
-3. Re-enter an existing authorized goal through `engineering:plan-execution`. When an active failing test
-   already bounds the work, use the narrower `engineering:failing-tests` loop. Otherwise use
-   `engineering:bugfix` for diagnosis and repair. These lifecycles own implementation and verification.
+3. Re-enter an existing authorized goal through `workflow:run` only when this work is not already
+   executing under that goal owner. Inside a bounded Workflow assignment, retain its owner and scope, use
+   the narrower `engineering:failing-tests` loop when an active failing test already bounds the work, or
+   use `engineering:bugfix` for diagnosis and repair, then return verification and record evidence to the
+   Workflow owner. These lifecycles own implementation and verification.
 4. Link related mistake or debt incidents to the repair. Keep cause unknown until evidence confirms it;
    do not merge records merely because symptoms resemble each other.
 5. Set `resolved` only when the record's objective causal resolution condition has been tested and attach

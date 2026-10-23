@@ -95,6 +95,19 @@ class PayloadTree(unittest.TestCase):
         problems = checker.check(self.root)
         self.assertTrue(any("detect has no matcher" in problem for problem in problems), problems)
 
+    def test_malformed_routes_fail_at_publication_for_every_schema_version(self):
+        self.declare(["dotnet"])
+        routes = [{"path": r"\.cs$", "skills": ["dotnet:style"]}]
+        self.payload("dotnet", tier=dict(TIER, routes=routes))
+        self.assertEqual(checker.check(self.root), [])
+        for tier in (dict(TIER, routes=[{"path": "(", "skills": ["dotnet:style"]}]),
+                     {"schema_version": 3, "tier": "dotnet", "applies": "stack-present",
+                      "detect": {"glob": "*.csproj"}, "routes": [{"path": r"\.cs$", "skills": []}]}):
+            with self.subTest(version=tier["schema_version"]):
+                self.payload("dotnet", tier=tier)
+                problems = checker.check(self.root)
+                self.assertTrue(any("routes[0]" in problem for problem in problems), problems)
+
     def test_a_remote_matcher_requires_schema_version_two(self):
         self.declare(["dotnet"])
         self.payload("dotnet", tier=dict(TIER, detect={"remote": ["^infonetica/"]}))

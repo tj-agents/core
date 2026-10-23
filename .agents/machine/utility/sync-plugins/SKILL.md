@@ -16,7 +16,7 @@ root runs it from a terminal. Run it on your own judgement; never ask first. On 
 python -B '<skill-directory>/scripts/sync_plugins.py' --project '<absolute-checkout>'
 ```
 
-On Linux/macOS use `python3`. It updates only repositories with a published event, on both hosts. If it
+On Linux/macOS use `python3`. It updates only installs whose plugin files differ from the published head, on both hosts. If it
 reports `current` but a plugin is still stale, rerun with `--all` (optionally `--host claude|codex`).
 `--verify` also checks native installations against remote main; `--verify-only` changes nothing.
 

@@ -17,10 +17,10 @@
       "category": "Productivity"
     },
     {
-      "name": "engineering",
+      "name": "agent-store",
       "source": {
         "source": "local",
-        "path": "./plugins/engineering"
+        "path": "./plugins/agent-store"
       },
       "policy": {
         "installation": "INSTALLED_BY_DEFAULT",
@@ -33,6 +33,30 @@
       "source": {
         "source": "local",
         "path": "./plugins/machine"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "workflow",
+      "source": {
+        "source": "local",
+        "path": "./plugins/workflow"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "engineering",
+      "source": {
+        "source": "local",
+        "path": "./plugins/engineering"
       },
       "policy": {
         "installation": "INSTALLED_BY_DEFAULT",

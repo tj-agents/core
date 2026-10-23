@@ -11,6 +11,19 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/skill_router.py\" --harness codex",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 27 \"${PLUGIN_ROOT}/hooks/skill_router.py\" --harness codex",
+            "timeout": 30
+          }
+        ],
+        "matcher": "Bash|apply_patch|edit_file|write_file|multi_edit|exec_command|unified_exec|local_shell|shell"
+      }
     ]
   }
 }

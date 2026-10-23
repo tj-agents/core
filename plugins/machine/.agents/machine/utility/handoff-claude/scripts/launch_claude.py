@@ -91,8 +91,8 @@ def resolve_model(args, agent_cli):
         route = agent_cli.resolve_lane('claude', lane=args.lane).get('handoff')
         if route:
             raise agent_cli.LaunchError(
-                f"--lane {args.lane} routes to Codex {route['lane']}; use engineering:handoff "
-                "with machine:handoff-codex, or omit --lane for an explicit user-named model."
+                f"--lane {args.lane} routes to Codex {route['lane']}; use machine:handoff-codex, "
+                "or omit --lane for an explicit user-named model."
             )
     if args.frontier:
         model, effort = agent_cli.resolve_lane_model('claude', frontier=True)

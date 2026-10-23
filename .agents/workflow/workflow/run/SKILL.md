@@ -25,8 +25,12 @@ identity.
 For software, load `engineering:plans` for technical delivery slicing and select `engineering:feature`,
 `engineering:bugfix`, or the supplied selected technical operation for a bounded slice. A profile may supply an
 `address-*` operation; Workflow uses that selection without depending on a profile or tracker. Those operations
-return evidence to this owner. `engineering:review` remains the source review owner. A missing discipline
-capability is a concrete gate while independent authorized work continues.
+return evidence to this owner. `engineering:review` remains the source review owner. Route an unmet
+acceptance condition to an available suitable execution environment. A local OS or missing runtime alone is not
+a blocker: within existing authority, assess supported provisioning that makes validation repeatable before
+declaring a capability missing or asking the user for a machine. When a selected discipline supplies that path,
+use it while retaining its authentication, trust, and authority constraints; independent authorized work
+continues.
 
 Use only a supported host continuation. Do not claim unattended execution before owner, foreground lease, and
 wake are initialized and observed. `engineering:persistent-workflow` is only a software remote-delivery

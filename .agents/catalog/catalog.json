@@ -31,7 +31,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:f8f5f5707645f5b3c9b81ec2e336bd7de80fdf211e85f6937921ac9b0aa5c2c5",
+      "digest": "sha256:3f4704c1622c186edd8afa9c5f158b070468819142c0cfa91efd278b62d2ca88",
       "harness": {
         "marketplaces": [
           {
@@ -66,6 +66,19 @@
           },
           {
             "path": "hooks/hook_dispatch.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/pre_tool_use_adapter.py",
+            "hosts": [
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/skill_router.py",
             "hosts": [
               "claude",
               "codex"
@@ -215,7 +228,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:8a6c7448d248aeb2992600818f489d709c7eff43a23d0d2c48ebafe8224e95c4",
+      "digest": "sha256:46faaf6df05de438ff0e25cdac838e29043e4b76dc5749ef4b803f5ab606cbe5",
       "harness": {
         "marketplaces": [
           {
@@ -378,7 +391,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:8dcfc5f19af1f0b0860a3ab7cadcd01baa32d592321526785a9202a45f4d8360",
+      "digest": "sha256:1a53ab1d6504de4ad03c7897e32e9d06f6d4840cf74223add0d422497989bb25",
       "harness": {
         "marketplaces": [
           {
@@ -675,7 +688,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:7e6b51cd04f262cb51f023b77a38db7cce0fa087da527dfd9d6ca5af9cc85923",
+      "digest": "sha256:f9d594750918f5c16ed80aa39d0f973e38f486605fe1d518d2695d5708cd8d02",
       "digest_excludes": [
         "catalog/catalog.json"
       ],

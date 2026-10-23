@@ -51,7 +51,7 @@ Before changing a shared lifecycle, use `machine:recover-agents` to check for a 
 same repair. Reconcile that owner and contribute the evidence without creating a duplicate writer.
 Keep the original task's owner and writer lease.
 
-Use [the recording contract](../../resources/problem-records.md) for authorized records. Creating a
+Use [the recording contract](../../../workflow/resources/problem-records.md) for authorized records. Creating a
 record, fixing the active task and repairing a source are separate decisions. Preserve employer-owned
 facts within the authorized employer task; do not redirect them into a personal tracker. Missing
 recording consent does not require a substitute record or prevent unaffected authorized work.

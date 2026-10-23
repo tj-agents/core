@@ -22,6 +22,16 @@ validation plane.** Do not turn every worktree into an independent CI runner.
 | Complete unit and integration matrices | Draft-PR CI |
 | Selected API and UI E2E | Merge queue |
 
+Supported-platform and native-host acceptance belongs in CI: invoke the real platform executable and observe
+its behavior. If the repeatable gate is missing, add the smallest one within the task scope; fixtures, source
+inspection, and version checks do not substitute.
+
+```text
+A Windows author validates a changed native path on Windows and Linux in CI: each job invokes its real
+executable and observes the result. A Linux author makes the same decision; a local runtime does not remove
+the other platform gate.
+```
+
 ## Compact executable boundary
 
 Run every test, build, migration, generator, package, and remote-log command through the shared executable,
@@ -46,7 +56,8 @@ full E2E regress" step is not a reason to duplicate what the queue will run on t
 by the tier that runs last — a seeder that runs in dev and E2E but not in integration, a host startup path,
 a migration only a real database applies. There, "let the queue own it" means every defect costs a full
 queue cycle, and each fix can only reveal the next one behind it. When a change touches a path no cheaper
-gate executes, run that path locally once before enqueueing.
+gate executes, run that path locally once before enqueueing only when a suitable local environment is
+available. When the local OS or runtime is absent, route the path to a supported CI gate.
 
 This does not restore a full-local-gate default and does not license running suites that *do* have cheaper
 coverage. Identify the specific uncovered path, run the narrowest thing that executes it, and read that
@@ -70,9 +81,10 @@ out, every test in a suite failing at once) rather than as the defect itself.
    for nothing else. **Establish which event runs which tier before trusting a green head** — read the
    workflow, not the PR's check list. A tier gated on a merge-queue or post-merge event is genuinely absent
    from a pull request's checks, so a green PR is silent about it and enumerating the PR's checks will
-   "prove" it does not exist. That silence cuts both ways: an ungated tier can only ever be verified locally,
-   and a queue-gated one re-spends the entire cycle when it fails, so run it locally before enqueuing.
-6. On failure, read the remote log first, reproduce only the failing scope locally, fix it, run its focused
+   "prove" it does not exist. That silence cuts both ways: establish a suitable repeatable gate for an
+   ungated tier rather than assuming local-only verification. A queue-gated tier re-spends the entire cycle
+   when it fails, so run it in a suitable environment before enqueuing.
+6. On failure, read the remote log first, reproduce only the failing scope in a suitable environment, fix it, run its focused
    regression, and push once. Do not run every local suite before pushing the fix.
 7. Mark the PR ready only once review is clean and exact-head CI is green. Enqueue or merge only on an
    explicit instruction.

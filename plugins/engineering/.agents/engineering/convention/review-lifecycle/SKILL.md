@@ -44,7 +44,7 @@ for independent native, specialist and security checks. Validate bounded `review
 Workflow v2; an unavailable or invalid dispatch returns the same check to the parent after one focused
 recovery. The parent verifies evidence, assigns severity and writes the one work order.
 
-For an agent-surface candidate, add the moving coverage record defined by `base:plan-artifacts`, then run
+For an agent-surface candidate, add the moving coverage record defined by `workflow:plan-artifacts`, then run
 `<engineering>/workflows/workflow_ops.py review-host-check --descriptor <descriptor-path>
 --work-order <canonical-work-order>` with the same root and run id. Failure leaves the pass incomplete.
 
@@ -163,7 +163,7 @@ Use one status vocabulary:
 
 Do not introduce a second deferred status. Any postponed work is `[wontfix]` here and must use
 the selected profile to record debt in the same stroke, linking its record and objective resolution
-condition under [the recording contract](../../resources/problem-records.md). Keep
+condition under [the recording contract](../../../workflow/resources/problem-records.md). Keep
 review evidence in the work order; ordinary findings do not each require a tracker record.
 
 Use one severity vocabulary. `CRITICAL` is an immediately exploitable security, data-loss, or catastrophic

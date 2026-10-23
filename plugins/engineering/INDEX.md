@@ -11,7 +11,6 @@ Generated from canonical `.agents/` definitions.
 - `commit-all` — operation — `.agents/engineering/operation/commit-all/SKILL.md`
 - `commit-push` — utility — `.agents/engineering/utility/commit-push/SKILL.md`
 - `committing` — contract — `.agents/engineering/contract/committing/SKILL.md`
-- `continue-roadmap` — workflow — `.agents/engineering/workflow/continue-roadmap/SKILL.md`
 - `docs` — convention — `.agents/engineering/convention/docs/SKILL.md`
 - `docs-review` — workflow — `.agents/engineering/workflow/docs-review/SKILL.md`
 - `failing-tests` — workflow — `.agents/engineering/workflow/failing-tests/SKILL.md`
@@ -21,11 +20,7 @@ Generated from canonical `.agents/` definitions.
 - `git-branching` — policy — `.agents/engineering/policy/git-branching/SKILL.md`
 - `guide` — convention — `.agents/engineering/convention/guide/SKILL.md`
 - `guide-build` — utility — `.agents/engineering/utility/guide-build/SKILL.md`
-- `handoff` — workflow — `.agents/engineering/workflow/handoff/SKILL.md`
-- `handoff-format` — convention — `.agents/engineering/convention/handoff-format/SKILL.md`
 - `incremental-review` — workflow — `.agents/engineering/workflow/incremental-review/SKILL.md`
-- `lanes` — policy — `.agents/engineering/policy/lanes/SKILL.md`
-- `list-work` — utility — `.agents/engineering/utility/list-work/SKILL.md`
 - `merge` — workflow — `.agents/engineering/workflow/merge/SKILL.md`
 - `merge-docs` — workflow — `.agents/engineering/workflow/merge-docs/SKILL.md`
 - `merging` — policy — `.agents/engineering/policy/merging/SKILL.md`
@@ -33,9 +28,6 @@ Generated from canonical `.agents/` definitions.
 - `open-worktree` — operation — `.agents/engineering/operation/open-worktree/SKILL.md`
 - `persistent-delivery` — policy — `.agents/engineering/policy/persistent-delivery/SKILL.md`
 - `persistent-workflow` — workflow — `.agents/engineering/workflow/persistent-workflow/SKILL.md`
-- `plan-authoring` — workflow — `.agents/engineering/workflow/plan-authoring/SKILL.md`
-- `plan-checkpoint` — contract — `.agents/engineering/contract/plan-checkpoint/SKILL.md`
-- `plan-execution` — workflow — `.agents/engineering/workflow/plan-execution/SKILL.md`
 - `plans` — convention — `.agents/engineering/convention/plans/SKILL.md`
 - `pr-preflight` — operation — `.agents/engineering/operation/pr-preflight/SKILL.md`
 - `pr-screenshots` — contract — `.agents/engineering/contract/pr-screenshots/SKILL.md`
@@ -45,7 +37,6 @@ Generated from canonical `.agents/` definitions.
 - `push` — operation — `.agents/engineering/operation/push/SKILL.md`
 - `recents` — utility — `.agents/engineering/utility/recents/SKILL.md`
 - `remote-validation` — policy — `.agents/engineering/policy/remote-validation/SKILL.md`
-- `resume-plan` — workflow — `.agents/engineering/workflow/resume-plan/SKILL.md`
 - `review` — utility — `.agents/engineering/utility/review/SKILL.md`
 - `review-lifecycle` — convention — `.agents/engineering/convention/review-lifecycle/SKILL.md`
 - `self-repair` — workflow — `.agents/engineering/workflow/self-repair/SKILL.md`

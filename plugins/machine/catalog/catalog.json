@@ -18,9 +18,8 @@
       "skills": [
         "agent-files",
         "cd",
-        "goal-continuation",
         "idea-initialization",
-        "plan-artifacts"
+        "task-routing"
       ],
       "dependencies": {
         "required": [],
@@ -32,7 +31,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:68e973a171c4ec22199d79e5934090f67ff03e521930c4208c7bcd24160327d5",
+      "digest": "sha256:3f4704c1622c186edd8afa9c5f158b070468819142c0cfa91efd278b62d2ca88",
       "harness": {
         "marketplaces": [
           {
@@ -59,7 +58,27 @@
             ]
           },
           {
+            "path": ".agents/base/policy/task-routing/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
             "path": "hooks/hook_dispatch.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/pre_tool_use_adapter.py",
+            "hosts": [
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/skill_router.py",
             "hosts": [
               "claude",
               "codex"
@@ -76,6 +95,214 @@
         "permissions": {
           "claude_allow": [],
           "codex_prefix_rules": []
+        }
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/agent-store",
+      "name": "agent-store",
+      "package_path": "plugins/agent-store",
+      "description": "Recorded agent executions, sessions, ownership and references.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "inspect"
+      ],
+      "dependencies": {
+        "required": [],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "python>=3.9"
+        ],
+        "optional": []
+      },
+      "digest": "sha256:96624176d1f4eb56d1e77f04f77672e2f255ba1af5494fd7d32b12fd51c88505",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/agent-store"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py",
+                  "${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py",
+                  "${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py"
+                ]
+              ],
+              "justification": "Read recorded agent execution and session metadata without creating or modifying its database or observing native processes.",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py",
+                  "--repository",
+                  "github.com/owner/repo"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/writer.py"
+                ]
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/workflow",
+      "name": "workflow",
+      "package_path": "plugins/workflow",
+      "description": "Goal lifecycle and recorded work status.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "handoff",
+        "plan",
+        "plan-artifacts",
+        "resume",
+        "run",
+        "status"
+      ],
+      "dependencies": {
+        "required": [
+          "tj-agents/base",
+          "tj-agents/agent-store",
+          "tj-agents/machine"
+        ],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "exe:git",
+          "python>=3.9"
+        ],
+        "optional": []
+      },
+      "digest": "sha256:46faaf6df05de438ff0e25cdac838e29043e4b76dc5749ef4b803f5ab606cbe5",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/agent-store",
+          "tj-agents/base",
+          "tj-agents/machine",
+          "tj-agents/workflow"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
+                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
+                ]
+              ],
+              "justification": "Read selected work-item state and supporting plans without creating or changing agent-store records.",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py",
+                  "payments"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+                  "payments",
+                  "20",
+                  "all"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/writer.py"
+                ],
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
+                  "payments"
+                ]
+              ]
+            }
+          ]
         }
       }
     },
@@ -102,7 +329,6 @@
         "commit-all",
         "commit-push",
         "committing",
-        "continue-roadmap",
         "docs",
         "docs-review",
         "failing-tests",
@@ -112,11 +338,7 @@
         "git-branching",
         "guide",
         "guide-build",
-        "handoff",
-        "handoff-format",
         "incremental-review",
-        "lanes",
-        "list-work",
         "merge",
         "merge-docs",
         "merging",
@@ -124,9 +346,6 @@
         "open-worktree",
         "persistent-delivery",
         "persistent-workflow",
-        "plan-authoring",
-        "plan-checkpoint",
-        "plan-execution",
         "plans",
         "pr-preflight",
         "pr-screenshots",
@@ -136,7 +355,6 @@
         "push",
         "recents",
         "remote-validation",
-        "resume-plan",
         "review",
         "review-lifecycle",
         "self-repair",
@@ -156,6 +374,8 @@
       "dependencies": {
         "required": [
           "tj-agents/base",
+          "tj-agents/workflow",
+          "tj-agents/agent-store",
           "tj-agents/machine"
         ],
         "optional": []
@@ -171,7 +391,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:d883cccbca7c96ea44d97022d71cf93aa7b78f52100b435c40a1638ba5c23fe1",
+      "digest": "sha256:1a53ab1d6504de4ad03c7897e32e9d06f6d4840cf74223add0d422497989bb25",
       "harness": {
         "marketplaces": [
           {
@@ -180,9 +400,11 @@
           }
         ],
         "plugins": [
+          "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/engineering",
-          "tj-agents/machine"
+          "tj-agents/machine",
+          "tj-agents/workflow"
         ],
         "hooks": [
           {
@@ -217,14 +439,6 @@
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
             "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
             "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
@@ -347,47 +561,6 @@
                 ],
                 "-B",
                 [
-                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
-                  "${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py",
-                  "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
-                ]
-              ],
-              "justification": "Reads plans and local execution status, labels a selected repository's plans as supporting context and names its provider; an invalid current-repository selection stops the scan. It writes no repository or session state",
-              "match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
-                  "postgres"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/other.py"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                [
                   "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py",
                   "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
                   "${PLUGIN_ROOT}/codex-skills/merge/scripts/worktree_sweep.py"
@@ -483,6 +656,7 @@
         "handoff-claude",
         "handoff-codex",
         "hook-control",
+        "lanes",
         "last-conversation",
         "open-claude",
         "open-cli",
@@ -497,7 +671,8 @@
       ],
       "dependencies": {
         "required": [
-          "tj-agents/base"
+          "tj-agents/base",
+          "tj-agents/agent-store"
         ],
         "optional": []
       },
@@ -513,7 +688,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:508848962ed38258bdc758da88ae379fdb8d92504dd4b786de1c544c9c2798e7",
+      "digest": "sha256:f9d594750918f5c16ed80aa39d0f973e38f486605fe1d518d2695d5708cd8d02",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -525,10 +700,18 @@
           }
         ],
         "plugins": [
+          "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/machine"
         ],
         "hooks": [
+          {
+            "path": ".agents/agent-store/runtime/session_store.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
           {
             "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
             "hosts": [
@@ -545,13 +728,6 @@
           },
           {
             "path": "resources/machine/scripts/reap_orphans.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "resources/machine/scripts/session_store.py",
             "hosts": [
               "claude",
               "codex"

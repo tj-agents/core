@@ -8,8 +8,7 @@
   "skills": [
     "agent-files",
     "cd",
-    "goal-continuation",
     "idea-initialization",
-    "plan-artifacts"
+    "task-routing"
   ]
 }

@@ -18,7 +18,7 @@ owns required skill content and layout validation. Other owners supply the rest;
 than restating them here:
 
 - **Kind**: [`SKILL_KINDS.md`](https://github.com/tj-agents/core/blob/main/SKILL_KINDS.md).
-- **Lane**, and whether the skill may declare one: `engineering:lanes`.
+- **Lane**, and whether the skill may declare one: `machine:lanes`.
 - **Where the files live and what is generated**: the repository's layout owner —
   [`SOURCE_LAYOUT.md`](https://github.com/tj-agents/core/blob/main/SOURCE_LAYOUT.md) in core,
   `template:check` in a Template-layout repository.
@@ -93,7 +93,7 @@ says which entry points do which, and what generation checks.
 
 Generation copies every file beside a canonical `SKILL.md` into each package that contains the skill. Keep
 plans, reviews, working notes and debt records out of a skill folder. Record a skill's debt with
-the selected profile under [the recording contract](../../resources/problem-records.md).
+the selected profile under [the recording contract](../../../workflow/resources/problem-records.md).
 
 ## Replace names cleanly
 
