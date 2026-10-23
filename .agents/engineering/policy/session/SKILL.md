@@ -74,7 +74,7 @@ continuation preserves its relevant instructions. Read again only for changed in
 ## Record noticed problems
 
 When a bug, mistake or deliberate debt is noticed or reported, preserve the facts in the active task and
-follow [the recording contract](../../resources/problem-records.md) for the selected profile's recording
+follow [the recording contract](../../../workflow/resources/problem-records.md) for the selected profile's recording
 decision. Never record in a Markdown file. Reconcile an existing record and repair owner first. Record or update only when that profile
 and the user's authority permit it; a provider selection does not itself authorize creation. Preserve
 the original task while a recording decision is pending or declined. Recording grants no separate
@@ -133,7 +133,7 @@ engineering:self-repair's source and authority boundary before starting a standa
 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
 out-of-scope defects with an objective resolution condition through the relevant shared writer. Plans
-link the canonical record under [the shared recording contract](../../resources/problem-records.md).
+link the canonical record under [the shared recording contract](../../../workflow/resources/problem-records.md).
 A defect in a consumed agent standard or tool is diagnosed at its source. Use `engineering:self-repair`
 to establish causal evidence and whether its internal repair authority applies. Follow that decision
 before starting a source change; outside automatic scope, explain the proposed repair and continue
