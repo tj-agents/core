@@ -339,6 +339,7 @@ class SessionStatement(TemporaryProject):
 
         self.assertIn("Ubiquitous, always applies: base", text)
         self.assertIn("Applies here: `dotnet:*`", text)
+        self.assertIn("Codebase conventions: an applicable tier's conventions are defaults.", text)
         self.assertIn("Does not apply here: `react:*`", text)
         self.assertNotIn("Does not apply here: `dotnet", text)
 
