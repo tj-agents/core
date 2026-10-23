@@ -22,6 +22,7 @@ LOCK_SECONDS = 120
 STALE_LOCK_SECONDS = 3600
 COMMAND_SECONDS = 120
 LAUNCH_SECONDS = 600
+DROPPED_MERGE_SECONDS = 300
 
 
 class OrchestrationError(RuntimeError):
@@ -384,7 +385,12 @@ def sync_decisions(state, worker, observation):
         return
     if decision and decision["status"] == "approved" and decision.get("head") != pr.get("headRefOid"):
         decision.update(status="open", note="new commits since approval; approve the new head",
-                        head=pr.get("headRefOid"))
+                        head=pr.get("headRefOid"), requested_head=None)
+    elif (decision and decision["status"] == "approved" and decision.get("requested_head") == pr.get("headRefOid")
+          and pr.get("state") == "OPEN" and not pr.get("autoMergeRequest")
+          and now() - decision.get("requested_at", now()) > DROPPED_MERGE_SECONDS):
+        decision.update(status="open", requested_head=None,
+                        note="the merge request was dropped (queue ejection or conflict); approve again after checking")
     if not ready:
         if decision and decision["status"] == "open":
             decision["status"] = "withdrawn"
@@ -416,9 +422,12 @@ def merge_approved(state, worker, observation):
         code, output, error = run(tool(state, "gh") + [
             "pr", "merge", str(pr["number"]), "--repo", worker["slug"], f"--{method}", "--auto",
             "--match-head-commit", decision["head"]])
-        decision["requested_head"] = decision["head"] if code == 0 else None
         decision["merge_output"] = (output or error)[-2000:]
-        decision["note"] = "merge requested" if code == 0 else "merge command failed"
+        if code == 0:
+            decision.update(requested_head=decision["head"], requested_at=now(), note="merge requested")
+        else:
+            decision.update(status="open", requested_head=None,
+                            note="merge command failed: " + decision["merge_output"][-300:])
         return {"worker": worker["id"], "pr": pr["number"], "ok": code == 0, "output": decision["merge_output"]}
     return None
 
@@ -453,7 +462,7 @@ def describe(state, worker, observation, observations):
         return "unknown", "session missing from registry", "adopt or relaunch"
     if decisions:
         first = decisions[0]
-        return ("waiting", f"Tommy: {first['question']}", f"{first['where']}: say \"{first['say']}\"")
+        return ("waiting", f"decision: {first['question']}", f"{first['where']}: say \"{first['say']}\"")
     if done:
         return "done", "", "close-out" if worker["host"] != "subagent" else ""
     if pr.get("state") == "OPEN":
@@ -560,7 +569,7 @@ def make_worktree(state, worker):
 def brief(path, state, worker):
     body = Path(worker["prompt_path"]).read_text(encoding="utf-8").rstrip()
     script = Path(__file__).resolve()
-    report = f'python -B "{script}" report --file "{Path(path).resolve()}" --worker {worker["id"]}'
+    report = f'"{sys.executable}" -B "{script}" report --file "{Path(path).resolve()}" --worker {worker["id"]}'
     if worker["done_when"] == "merged":
         finish = ("Open or update the PR, run the repository's review gates, and wait for its checks "
                   "before reporting done. Do not merge: the orchestrator merges after Tommy approves.")
