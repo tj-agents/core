@@ -4,9 +4,13 @@
 Enumerates every installed package from a marketplace owned by `tj-agents` across Claude's plugin scopes
 (`installed_plugins.json` and `known_marketplaces.json`) and the Codex plugin cache and configuration,
 renders each root's `harness.json` `requires.permissions` templates against that root, and converges
-`~/.claude/settings.json` `permissions.allow` and `~/.codex/rules/tj-agents.rules`. Ownership is tracked
-in a `~/.agents-state/harness-permissions.json` sidecar, so user-authored allow rules are never touched
-and owned rules that are no longer declared are removed. A legacy generated rules file is removed.
+`~/.claude/settings.json` `permissions.allow` and `~/.codex/rules/tj-agents.rules`. Only the current
+installed version of each package is rendered: Claude picks the most recently updated
+`installPath` per identity from `installed_plugins.json`, Codex picks the most recently modified
+version directory per cached plugin. Ownership is tracked in a `~/.agents-state/harness-permissions.json`
+sidecar, so user-authored allow rules are never touched and owned rules that are no longer declared
+(including rules for versions that are no longer current) are removed. A legacy generated rules file is
+removed.
 `--apply` writes only on drift; `--check` reports drift with exit 1 and writes nothing. An unreadable
 host registry leaves that host's target untouched with a warning. `--print <script>` prints the exact
 resolved invocation for a declared script (by filename) on this machine, one line per installed root,
@@ -132,6 +136,14 @@ def is_trusted_marketplace(source: object) -> bool:
     return repository is not None and repository[0] == TRUSTED_OWNER
 
 
+def _entry_recency(entry: dict) -> str:
+    for key in ("lastUpdated", "installedAt"):
+        value = entry.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
 def claude_plugin_roots(environ: dict, warnings: list[str]) -> tuple[set[Path], bool]:
     plugins_directory = claude_config_root(environ) / "plugins"
     path = plugins_directory / "installed_plugins.json"
@@ -158,12 +170,18 @@ def claude_plugin_roots(environ: dict, warnings: list[str]) -> tuple[set[Path], 
             continue
         if not isinstance(entries, list):
             continue
+        current: tuple[str, str] | None = None
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
             install_path = entry.get("installPath")
-            if isinstance(install_path, str) and install_path:
-                roots.add(Path(install_path))
+            if not (isinstance(install_path, str) and install_path):
+                continue
+            candidate = (_entry_recency(entry), install_path)
+            if current is None or candidate > current:
+                current = candidate
+        if current is not None:
+            roots.add(Path(current[1]))
     return roots, True
 
 
@@ -230,9 +248,19 @@ def codex_plugin_roots(environ: dict, warnings: list[str]) -> tuple[set[Path], b
                 version_dirs = list(plugin_dir.iterdir())
             except OSError:
                 continue
+            current: tuple[float, str, Path] | None = None
             for version_dir in version_dirs:
-                if version_dir.is_dir() and (version_dir / "harness.json").is_file():
-                    roots.add(version_dir)
+                if not (version_dir.is_dir() and (version_dir / "harness.json").is_file()):
+                    continue
+                try:
+                    modified = version_dir.stat().st_mtime
+                except OSError:
+                    modified = 0.0
+                candidate = (modified, version_dir.name, version_dir)
+                if current is None or candidate > current:
+                    current = candidate
+            if current is not None:
+                roots.add(current[2])
     return roots, True
 
 
