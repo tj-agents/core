@@ -278,3 +278,12 @@ launcher18 (one POSIX skip), required20, startup14 (one POSIX skip), setup50,
 updater46 and reload34 tests pass. The first sandbox launcher run could not start
 pwsh; the unchanged suite passed under normal machine execution. New exact-head
 review and CI are required before landing. Machine installation remains outstanding.
+
+
+Combined-candidate Linux CI run40028521900 completed1396 source tests with one
+failure: the POSIX wrapper fixture expected an absolute command path, although
+Bash command-v resolves the enclosing wrapper function name. Actual Bash confirms
+that resolution. Corrected only the expectation; refusal-before-native assertions
+remain intact. Windows launcher18 passes (one POSIX skip). The independent frozen
+integration review found no source defect. Final native review and corrected-head
+CI remain required. This is fixture correction, not a validation bypass.
