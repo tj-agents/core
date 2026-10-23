@@ -218,6 +218,18 @@ class RequiredPluginsTests(unittest.TestCase):
             self.assertEqual(["native-cli", "-c", "model_reasoning_effort=high", "plugin", "list", "--json"],
                              run.call_args.args[0])
 
+    def test_relative_claude_settings_and_project_scope_use_the_actual_launch_directory(self):
+        self.select("arbitrary-stack@arbitrary-publisher")
+        directory = self.project / "subdirectory with spaces"
+        directory.mkdir()
+        entry = self.entry("claude", scope="project", projectPath=str(directory))
+        response = subprocess.CompletedProcess([], 0, json.dumps([entry]), "")
+        with mock.patch.object(required.subprocess, "run", return_value=response) as run:
+            required.check_launch(directory, "claude", "native-cli", ["--settings", "override.json", "prompt"])
+            self.assertEqual(directory, run.call_args.kwargs["cwd"])
+            self.assertEqual(["native-cli", "--settings", "override.json", "plugin", "list", "--json"],
+                             run.call_args.args[0])
+
     def test_incomplete_corrupt_and_missing_declared_payloads_are_rejected(self):
         self.select("arbitrary-stack@arbitrary-publisher")
         for host in ("codex", "claude"):
