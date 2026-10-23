@@ -10,6 +10,11 @@
   ],
   "external_prerequisites": [],
   "skills": [
+    "handoff",
+    "plan",
+    "plan-artifacts",
+    "resume",
+    "run",
     "status"
   ]
 }

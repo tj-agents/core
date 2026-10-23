@@ -213,7 +213,7 @@ unchanged observations remain silent and never create a model turn or user-facin
 
 Before removing persistent state, inspect the completed delivery binding. A standalone PR removes its
 continuation. A plan-managed binding with a workflow handoff keeps the one existing continuation, closes only
-the merged PR binding, checkpoints the merge, and transfers to the recorded `plan-execution` stage. That
+the merged PR binding, checkpoints the merge, and transfers to the recorded `workflow:run` stage. That
 stage reconciles an existing successor layer or starts the next branch in a checkout selected under
 `engineering:git-branching`, before rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
 watermark or delivery binding into the successor; the successor re-resolves merge authorization from the

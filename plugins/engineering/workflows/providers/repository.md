@@ -14,6 +14,6 @@ Handoffs update the worktree and branch while retaining that review. Delivery pr
 current forge state and routes corrections back to its branch before publication.
 
 `discover`, `resolve-task`, `read-state`, `checkpoint-state`, and `bind-worktree` are available. A
-checkpoint is still applied through the existing `plan-checkpoint` contract as an edit to the owning plan,
+checkpoint is still applied through the existing `workflow:plan-artifacts` contract as an edit to the owning plan,
 ledger, or review artifact; the runtime validates and re-reads that state instead of creating another store.
 Session launch, transfer, cancellation, and worktree mutation remain with their existing repository tools.

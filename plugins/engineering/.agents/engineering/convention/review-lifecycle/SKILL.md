@@ -44,7 +44,7 @@ for independent native, specialist and security checks. Validate bounded `review
 Workflow v2; an unavailable or invalid dispatch returns the same check to the parent after one focused
 recovery. The parent verifies evidence, assigns severity and writes the one work order.
 
-For an agent-surface candidate, add the moving coverage record defined by `base:plan-artifacts`, then run
+For an agent-surface candidate, add the moving coverage record defined by `workflow:plan-artifacts`, then run
 `<engineering>/workflows/workflow_ops.py review-host-check --descriptor <descriptor-path>
 --work-order <canonical-work-order>` with the same root and run id. Failure leaves the pass incomplete.
 

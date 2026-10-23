@@ -58,8 +58,6 @@ selection or semantics. Deck recovery defects belong to the deck's own plan, not
 
 | Entry | Kind | Status | Replacement |
 |---|---|---|---|
-| `resume-plan` | compatibility entry | supported | `plan-execution` |
-| `continue-roadmap` | compatibility entry | supported | `plan-authoring` |
 | `staged-review-all` | driver | retained | drives `staged-review`; no removal gate |
 
 The release letter in `compatibility.json` is the contraction gate. Release **A** publishes the new workflows
