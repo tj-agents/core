@@ -73,6 +73,16 @@
   "resources": [
     {
       "plugin": "base",
+      "source": ".agents/machine/scripts/required_plugins.py",
+      "destination": "hooks/required_plugins.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/machine/scripts/required_plugins.py",
+      "destination": "hooks/required_plugins.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/hooks/skill_router.py",
       "destination": "hooks/skill_router.py"
     },

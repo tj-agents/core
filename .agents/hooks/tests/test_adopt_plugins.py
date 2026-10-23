@@ -25,6 +25,24 @@ LockError = adopt_plugins.lock_io.LockError
 
 
 class AdoptPluginsTests(unittest.TestCase):
+    def test_retired_tj_publishers_migrate_generically_without_adding_profiles(self):
+        self.selection.parent.mkdir()
+        self.selection.write_text(json.dumps({
+            "schema_version": 1,
+            "marketplaces": {"python-agents": {"repository": "tj-agents/python"},
+                             "react-agents": {"repository": "tj-agents/react"},
+                             "foreign": {"repository": "Concertable/agents"}},
+            "plugins": ["python@python-agents", "react@react-agents", "concertable@foreign"],
+        }), encoding="utf-8")
+        adopt_plugins.run(self.root, [], [], "write")
+        self.assertEqual(["concertable@foreign", "python@tj-agents", "react@tj-agents"], self.plugins())
+        selected = json.loads(self.selection.read_text(encoding="utf-8"))
+        self.assertEqual({"foreign", "tj-agents"}, set(selected["marketplaces"]))
+        for path in (self.root / ".codex/config.toml", self.root / ".claude/settings.json"):
+            self.assertNotIn("python-agents", path.read_text(encoding="utf-8"))
+            self.assertNotIn("react-agents", path.read_text(encoding="utf-8"))
+        self.assertEqual([], adopt_plugins.run(self.root, [], [], "check"))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
