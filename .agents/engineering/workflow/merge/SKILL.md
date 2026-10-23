@@ -301,7 +301,7 @@ merge caused, and a causally linked red one is never left behind. The mechanics:
   deleting the goal, run the fresh completion check above. A missing, invalid, or failing record leaves the
   plan and its owned actions in place. Once
   publication and sync are terminal, reconcile the linked selected item through
-  [the shared recording contract](../../resources/problem-records.md) before deleting recovery artifacts.
+  [the shared recording contract](../../../workflow/resources/problem-records.md) before deleting recovery artifacts.
   Resolve it only after its own acceptance is verified; a delivered PR alone does not close it. Record
   the final transition, delete the plan and ledger, and update the curated roadmap summary from the
   selected item's state, or tick the unselected owning roadmap item, in one docs-only

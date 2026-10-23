@@ -1,4 +1,4 @@
-"""Drive the list-work script exactly as shipped, under a synthetic HOME."""
+"""Drive the Workflow status script exactly as shipped, under a synthetic HOME."""
 
 import json
 import os
@@ -13,7 +13,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / '.agents/engineering/utility/list-work/scripts/list-work.py'
+SCRIPT = ROOT / '.agents/workflow/utility/status/scripts/status.py'
 ROW = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2} .*$', re.M)
 
 
@@ -21,11 +21,11 @@ def rows(output):
     return {line.split()[-1] for line in ROW.findall(output)}
 
 
-class ListWorkHarness(unittest.TestCase):
+class WorkflowStatusHarness(unittest.TestCase):
     """Synthetic home, plan corpus and repo layout. Holds no tests of its own."""
 
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix='synthetic list-work ')
+        self.temp = tempfile.TemporaryDirectory(prefix='synthetic workflow status ')
         self.addCleanup(self.temp.cleanup)
         # resolve() expands the 8.3 short name mkdtemp returns under C:\Users\TOMMYS~1. The script
         # compares Path.cwd() against a path built from Path.home(); a short name makes every run
@@ -40,13 +40,15 @@ class ListWorkHarness(unittest.TestCase):
 
     def repo(self, *parts):
         path = self.repos.joinpath(*parts)
-        subprocess.run(['git', 'init', '-q', str(path)], check=True, capture_output=True, text=True)
+        subprocess.run(['git', 'init', '-q', str(path)], check=True, capture_output=True, text=True,
+                       env=self.disposable_environment())
         subprocess.run(
             ['git', '-C', str(path), 'remote', 'add', 'origin',
              'https://github.com/example/%s.git' % path.name],
             check=True,
             capture_output=True,
             text=True,
+            env=self.disposable_environment(),
         )
         return path
 
@@ -69,10 +71,17 @@ class ListWorkHarness(unittest.TestCase):
             repo=repo,
         )
 
-    def board(self, needle='', limit='20', scope='auto', cwd=None, script=None):
+    def disposable_environment(self):
         environment = dict(os.environ, HOME=str(self.home), USERPROFILE=str(self.home))
+        for name in tuple(environment):
+            if name == 'GIT_CONFIG_COUNT' or re.fullmatch(r'GIT_CONFIG_(?:KEY|VALUE)_\d+', name):
+                environment.pop(name)
         if hasattr(self, 'state_directory'):
             environment['AGENT_STATE_DIRECTORY'] = str(self.state_directory)
+        return environment
+
+    def board(self, needle='', limit='20', scope='auto', cwd=None, script=None):
+        environment = self.disposable_environment()
         result = subprocess.run(
             [sys.executable, '-B', str(script or self.script), needle, limit, scope],
             cwd=str(cwd or self.here), capture_output=True, text=True, env=environment)
@@ -108,15 +117,23 @@ class ListWorkHarness(unittest.TestCase):
         connection.close()
         return database
 
-    def runtime_skill_directory(self, runtime_text):
+    def status_skill_directory(self, reader_text=None):
         root = self.home / 'runtime-fixture'
-        skill = root / '.agents' / 'engineering' / 'utility' / 'list-work'
-        workflows = root / '.agents' / 'workflows'
-        script = skill / 'scripts' / 'list-work.py'
+        skill = root / '.agents' / 'workflow' / 'utility' / 'status'
+        script = skill / 'scripts' / 'status.py'
         script.parent.mkdir(parents=True)
-        workflows.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
-        (workflows / 'workflow_runtime.py').write_text(runtime_text, encoding='utf-8')
+        runtime = root / '.agents' / 'agent-store' / 'runtime'
+        runtime.mkdir(parents=True)
+        (runtime / 'reader.py').write_text(reader_text or (
+            'class StoreReadError(ValueError):\n    pass\n\n'
+            'class ReadOnlyWorkItemStore:\n    def work_item(self, key):\n        return {"status": "active"}\n'
+        ), encoding='utf-8')
+        (runtime / 'repository_identity.py').write_text(
+            'def repository_identity(directory, git):\n    return "github.com/example/demo"\n', encoding='utf-8')
+        hooks = root / '.agents' / 'hooks'
+        hooks.mkdir(parents=True)
+        shutil.copy2(ROOT / '.agents/hooks/problem_records.py', hooks / 'problem_records.py')
         return script
 
     def capability_result(self, script):
@@ -125,11 +142,11 @@ class ListWorkHarness(unittest.TestCase):
             cwd=str(self.here),
             capture_output=True,
             text=True,
-            env=dict(os.environ, HOME=str(self.home), USERPROFILE=str(self.home), PYTHONPATH=''),
+            env=dict(self.disposable_environment(), PYTHONPATH=''),
         )
 
 
-class NeedleMatchingTests(ListWorkHarness):
+class NeedleMatchingTests(WorkflowStatusHarness):
     def test_punctuated_needle_finds_its_plan(self):
         self.plan('demo/AB-28884-country-risk-domain-split.md')
         self.assertIn('AB-28884-country-risk-domain-split.md', self.listed('AB-28884'))
@@ -178,7 +195,7 @@ class NeedleMatchingTests(ListWorkHarness):
         self.assertEqual({'ONE.md', 'TWO.md'}, self.listed(''))
 
 
-class ReportingTests(ListWorkHarness):
+class ReportingTests(WorkflowStatusHarness):
     def test_a_title_hit_is_a_name_hit(self):
         self.plan('demo/OPAQUE_FILENAME.md', '# the payments split\n')
         self.assertIn('OPAQUE_FILENAME.md', self.listed('payments'))
@@ -216,7 +233,7 @@ class ReportingTests(ListWorkHarness):
             self.assertIn('25 open, showing 20', output, limit)
 
 
-class CorpusSelectionTests(ListWorkHarness):
+class CorpusSelectionTests(WorkflowStatusHarness):
     def test_a_flat_subfolder_is_read(self):
         self.plan('demo/Post Launch Scalability/SHARDING.md')
         self.assertIn('SHARDING.md', self.listed(''))
@@ -237,7 +254,7 @@ class CorpusSelectionTests(ListWorkHarness):
         self.assertEqual({'KEPT.md'}, self.listed(''))
 
 
-class ScopingTests(ListWorkHarness):
+class ScopingTests(WorkflowStatusHarness):
     def setUp(self):
         super().setUp()
         self.repo('other-group', 'other-repo')
@@ -279,7 +296,7 @@ class ScopingTests(ListWorkHarness):
         self.assertIn('LOOSE_PAYMENTS.md', self.listed('payments', scope='all'))
 
 
-class RepoResidentPlanTests(ListWorkHarness):
+class RepoResidentPlanTests(WorkflowStatusHarness):
     """A plan filed beside the code it concerns, which is where they are supposed to live."""
 
     def test_a_plan_in_the_invoking_repo_is_read(self):
@@ -347,7 +364,7 @@ class RepoResidentPlanTests(ListWorkHarness):
         self.assertEqual({'LOCAL_PAYMENTS.md'}, self.listed('payments'))
 
 
-class WorkItemStatusTests(ListWorkHarness):
+class WorkItemStatusTests(WorkflowStatusHarness):
     def test_all_sqlite_statuses_are_reported_and_done_is_hidden(self):
         for status in ('proposed', 'active', 'delivery-gated', 'blocked', 'paused', 'done'):
             with self.subTest(status=status):
@@ -435,16 +452,15 @@ class WorkItemStatusTests(ListWorkHarness):
         self.write_work_item_status('reader-bridge', 'status-reader', 'active')
         copies = [SCRIPT]
         layouts = (
-            '.agents/engineering/utility/list-work',
-            'skills/list-work',
-            'codex-skills/list-work',
+            '.agents/workflow/utility/status',
+            'skills/status',
+            'codex-skills/status',
         )
         for layout in layouts:
             package = self.home / layout.replace('/', '-')
-            script = package / layout / 'scripts/list-work.py'
+            script = package / layout / 'scripts/status.py'
             script.parent.mkdir(parents=True)
             shutil.copy2(SCRIPT, script)
-            shutil.copytree(ROOT / '.agents/workflows', package / 'workflows')
             (package / 'hooks').mkdir()
             shutil.copy2(ROOT / '.agents/hooks/problem_records.py', package / 'hooks/problem_records.py')
             shutil.copytree(
@@ -457,12 +473,12 @@ class WorkItemStatusTests(ListWorkHarness):
                 self.assertIn('active', self.board(script=script))
 
     def test_missing_own_runtime_is_a_capability_failure(self):
-        script = self.home / 'missing-runtime/.agents/engineering/utility/list-work/scripts/list-work.py'
+        script = self.home / 'missing-runtime/.agents/workflow/utility/status/scripts/status.py'
         script.parent.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
         result = self.capability_result(script)
         self.assertEqual(2, result.returncode)
-        self.assertIn('list-work capability failure', result.stderr)
+        self.assertIn('status capability failure', result.stderr)
 
     def select(self, repo, text=None):
         (repo / '.problem-records.json').write_text(
@@ -528,36 +544,46 @@ class WorkItemStatusTests(ListWorkHarness):
         self.assertEqual('', result.stdout)
 
     def test_unsupported_script_anchor_is_a_capability_failure(self):
-        script = self.home / 'unknown/list-work.py'
+        script = self.home / 'unknown/status.py'
         script.parent.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
         result = self.capability_result(script)
         self.assertEqual(2, result.returncode)
         self.assertIn('no supported runtime anchor', result.stderr)
 
-    def test_runtime_without_work_item_status_is_a_capability_failure(self):
-        skill = self.runtime_skill_directory(
-            'class ContractViolation(ValueError):\n    pass\n\n'
-            'class WorkflowContract:\n    def __init__(self, source):\n        pass\n\n'
-            'class RepositoryStateProvider:\n    pass\n'
+    def test_reader_without_read_only_store_is_a_capability_failure(self):
+        skill = self.status_skill_directory(
+            'class StoreReadError(ValueError):\n    pass\n'
         )
         result = self.capability_result(skill)
         self.assertEqual(2, result.returncode)
-        self.assertIn('own workflow runtime lacks work-item status support', result.stderr)
+        self.assertIn('own Agent Store reader lacks work-item support', result.stderr)
 
-    def test_runtime_without_its_own_contract_is_a_capability_failure(self):
-        skill = self.runtime_skill_directory(
-            'class ContractViolation(ValueError):\n    pass\n\n'
-            'class WorkflowContract:\n'
-            '    def __init__(self, source):\n'
-            "        raise FileNotFoundError('missing own contract')\n\n"
-            'class RepositoryStateProvider:\n'
-            '    def work_item_status(self, ledger):\n'
-            '        return None\n'
+    def test_reader_without_work_item_is_a_capability_failure(self):
+        skill = self.status_skill_directory(
+            'class StoreReadError(ValueError):\n    pass\n\n'
+            'class ReadOnlyWorkItemStore:\n    pass\n'
         )
         result = self.capability_result(skill)
         self.assertEqual(2, result.returncode)
-        self.assertIn('own workflow contract is unavailable', result.stderr)
+        self.assertIn('own Agent Store reader lacks work-item support', result.stderr)
+
+    def test_repository_identity_decodes_non_ascii_git_output_as_utf8(self):
+        self.work_item()
+        subprocess.run(['git', '-C', str(self.here), 'remote', 'set-url', 'origin',
+                        'https://github.com/example/résumé.git'], check=True, capture_output=True,
+                       text=True, encoding='utf-8')
+        self.write_work_item_status('reader-bridge', 'status-reader', 'active')
+        database = self.state_directory / 'sessions.db'
+        connection = sqlite3.connect(database)
+        connection.execute('DELETE FROM work_items')
+        connection.execute('INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                           ('github.com/example/résumé:reader-bridge/status-reader',
+                            'github.com/example/résumé', 'reader-bridge', 'status-reader',
+                            'active', None, None, 0))
+        connection.commit()
+        connection.close()
+        self.assertIn('active', self.board())
 
 
 if __name__ == '__main__':
