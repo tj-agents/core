@@ -11,7 +11,7 @@ import subprocess
 
 
 IDENTITY = re.compile(r"[a-z][a-z0-9-]*@[a-z][a-z0-9-]*\Z")
-INVENTORY_TIMEOUT_SECONDS = 3
+INVENTORY_TIMEOUT_SECONDS = 5
 MAINTENANCE_COMMANDS = frozenset({
     "plugin", "plugins", "login", "logout", "doctor", "help", "completion", "update",
     "mcp", "features", "--help", "-h", "--version", "-V",
@@ -31,18 +31,57 @@ def project_root(project: Path) -> Path:
 
 
 def check_launch(project: Path, host: str, executable: str | None, arguments) -> None:
-    if arguments and arguments[0] in MAINTENANCE_COMMANDS:
-        return
-    for index, argument in enumerate(arguments):
-        if argument == "--":
+    original_project = project
+    value_options = {
+        "-C", "--cd", "-c", "--config", "-m", "--model", "-p", "--profile",
+        "-s", "--sandbox", "-a", "--ask-for-approval", "--add-dir", "--enable", "--disable",
+    } if host == "codex" else {"--model", "--permission-mode", "--settings", "--plugin-dir"}
+    flag_options = {"--no-alt-screen", "--search", "--full-auto", "--dangerously-bypass-approvals-and-sandbox"}
+    index = 0
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument in MAINTENANCE_COMMANDS:
+            return
+        option, separator, value = argument.partition("=")
+        if option in value_options:
+            if not separator:
+                index += 1
+                if index >= len(arguments):
+                    raise RequiredPluginsError(f"{option} requires a value")
+                value = arguments[index]
+            if option in ("-C", "--cd"):
+                project = original_project / value
+        elif argument not in flag_options:
             break
-        if argument in ("-C", "--cd"):
-            if index + 1 >= len(arguments):
-                raise RequiredPluginsError(f"{argument} requires a project directory")
-            project = project / arguments[index + 1]
-        elif argument.startswith("--cd="):
-            project = project / argument.partition("=")[2]
+        index += 1
     check(project, host, executable)
+
+
+def readable_payload(path: Path, host: str, name: str) -> bool:
+    manifest = path / f".{host}-plugin" / "plugin.json"
+    try:
+        document = json.loads(manifest.read_text(encoding="utf-8-sig"))
+        if not isinstance(document, dict) or document.get("name") != name:
+            return False
+        for field in ("skills", "hooks", "agents", "commands"):
+            values = document.get(field, [])
+            if isinstance(values, str):
+                values = [values]
+            if not isinstance(values, list):
+                continue
+            for value in values:
+                if not isinstance(value, str):
+                    return False
+                target = (path / value).resolve()
+                if not target.is_relative_to(path.resolve()) or not target.exists():
+                    return False
+                if target.is_file():
+                    target.read_bytes()
+                else:
+                    next(target.iterdir(), None)
+        return True
+    except (OSError, ValueError):
+        return False
 
 
 def selected(project: Path) -> tuple[str, ...]:
@@ -90,7 +129,7 @@ def enabled_roots(host: str, project: Path, entries: list) -> dict[str, Path]:
             if not isinstance(identity, str) or not IDENTITY.fullmatch(identity) or not isinstance(location, str):
                 continue
             path = Path(location)
-        if path.is_dir():
+        if readable_payload(path, host, identity.split("@", 1)[0]):
             roots[identity] = path
     return roots
 
