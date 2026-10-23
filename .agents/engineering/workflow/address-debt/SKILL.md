@@ -13,7 +13,7 @@ in-flight branches. This is the *resolution* workflow; the selected profile owns
 retention, and verified closure. A single item is the default shape; bundling more than one into the same
 PR is the exception below, not a second workflow.
 
-Read [the shared problem-record contract](../../resources/problem-records.md) first. In each repository,
+Read [the shared problem-record contract](../../../workflow/resources/problem-records.md) first. In each repository,
 use the selected profile provider to list, read, update and close debt. Provider failure blocks that
 repository's record operation; retain unsent facts under the shared guidance.
 

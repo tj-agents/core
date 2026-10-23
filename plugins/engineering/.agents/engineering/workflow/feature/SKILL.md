@@ -41,7 +41,7 @@ Promotion changes persistence, not the requested outcome.
 
 ## Execute the lifecycle
 
-Read [the shared recording contract](../../resources/problem-records.md). Reconcile the canonical item
+Read [the shared recording contract](../../../workflow/resources/problem-records.md). Reconcile the canonical item
 through the selected profile, preserving its requirements and acceptance
 criteria. Update its progress and verified acceptance through that contract before reporting it resolved; a
 delivered PR alone does not close the item.
