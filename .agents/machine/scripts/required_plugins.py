@@ -165,7 +165,8 @@ def enabled_roots(host: str, project: Path, entries: list) -> dict[str, Path]:
 
 def check(project: Path, host: str, executable: str | None = None,
           inventory_options: tuple[str, ...] = ()) -> tuple[Path, ...] | None:
-    project = project_root(project)
+    launch_directory = project.resolve()
+    project = project_root(launch_directory)
     required = selected(project)
     if not required:
         return None
@@ -187,7 +188,7 @@ def check(project: Path, host: str, executable: str | None = None,
         if os.name == "nt" and Path(binary).suffix.casefold() == ".ps1":
             command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-File", *command]
         result = subprocess.run(
-            command, cwd=project, capture_output=True,
+            command, cwd=launch_directory, capture_output=True,
             text=True, encoding="utf-8", errors="replace", timeout=INVENTORY_TIMEOUT_SECONDS,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
@@ -204,7 +205,7 @@ def check(project: Path, host: str, executable: str | None = None,
     entries = data.get("installed") if host == "codex" and isinstance(data, dict) else data
     if not isinstance(entries, list):
         raise RequiredPluginsError(f"Required {host} plugin inventory returned an invalid roster")
-    roots = enabled_roots(host, project, entries)
+    roots = enabled_roots(host, launch_directory, entries)
     missing = sorted(set(required) - roots.keys())
     if missing:
         raise RequiredPluginsError(

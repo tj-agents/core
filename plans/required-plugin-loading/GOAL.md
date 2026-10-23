@@ -183,6 +183,16 @@ real verifier is exercised through shell and handoff admission tests. Required-p
 tests pass (19), startup (14; one POSIX skip), launcher (17; one POSIX skip).
 Source remediation still needs an incremental frozen review and exact-head CI.
 
+Incremental review of `20a54197d61859dc2a46d3eed43c071370b14241` confirmed the
+two fixes and found R3: native inventory cwd had been normalized to the selection
+root, changing the meaning of relative Claude settings/plugin paths. Preserve the
+actual launch directory for native inventory and registration scope, while selecting
+required identities at the repository root. The new regression passes, including a
+subdirectory-scoped install. A real Claude CLI probe from a subdirectory with a
+relative disabling settings file now refuses admission. Required-plugin tests20,
+startup14 and shell17 pass (one POSIX skip in each latter suite). Full review history
+and dispositions are retained in the canonical Git-private work order and receipts.
+
 ```agent-host-coverage
 {
   "schema_version": 1,
