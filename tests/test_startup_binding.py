@@ -34,8 +34,8 @@ class StartupBindingTests(unittest.TestCase):
     def test_plugin_check_runs_after_the_claim_and_before_the_native_cli_and_never_blocks_it(self):
         status = self.project / "launch.status.json"
         order = []
-        self.check.side_effect = lambda project: order.append(
-            ("check", project, json.loads(status.read_text(encoding="utf-8"))["phase"]))
+        self.check.side_effect = lambda project, host: order.append(
+            ("check", project, host, json.loads(status.read_text(encoding="utf-8"))["phase"]))
 
         def run(*_args, **_kwargs):
             order.append("native")
@@ -45,7 +45,7 @@ class StartupBindingTests(unittest.TestCase):
                      str(status), "--", "resume", "id"]
         with mock.patch.object(BINDING, "run_session", side_effect=run), mock.patch("sys.stdout"):
             self.assertEqual(0, BINDING.main(arguments))
-            self.assertEqual([("check", self.project.resolve(), "checking-plugins"), "native"], order)
+            self.assertEqual([("check", self.project.resolve(), "codex", "checking-plugins"), "native"], order)
             status.unlink()
             self.check.side_effect = RuntimeError("broken check")
             with mock.patch("sys.stderr"):
