@@ -22,14 +22,11 @@ import sys
 import tempfile
 import time
 
-import marketplace_identity
-
-
 GIT_TIMEOUT_SECONDS = 30
 SWEEP_TIMEOUT_SECONDS = 1800
 SCRIPT_NAME = "plugin_autoupdate.py"
 RUNTIME = ("plugin_autoupdate.py", "machine_events.py", "launch_check.py", "reload_plugins.py", "agent_cli.py",
-           "codex_hook_trust.py", "required_plugins.py", "marketplace_identity.py")
+           "codex_hook_trust.py", "required_plugins.py")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 CLI_TIMEOUT_SECONDS = 60
 STILL_ACTIVE = 259
@@ -41,6 +38,21 @@ NAME = re.compile(r"[A-Za-z0-9_.-]+")
 REVISION_PATH = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*")
 CONTENTS_WAIT_SECONDS = 10
 SNAPSHOT_FIRST = "(Path(s) if s else d/'hook-snapshots')/k/"
+MARKETPLACE_NAME = "tj-agents"
+MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
+
+
+def producer_repository(repository: object) -> bool:
+    return (isinstance(repository, str) and repository.casefold().startswith("tj-agents/")
+            and repository.casefold() != MARKETPLACE_REPOSITORY)
+
+
+def marketplace_error(name: str, repository: object) -> str | None:
+    if (name == MARKETPLACE_NAME) != (repository == MARKETPLACE_REPOSITORY):
+        return f"The {MARKETPLACE_NAME} marketplace must be {MARKETPLACE_REPOSITORY} and nothing else may use that name"
+    if producer_repository(repository):
+        return f"{repository} is published through the {MARKETPLACE_NAME} marketplace; select {MARKETPLACE_REPOSITORY}"
+    return None
 
 
 def state_directory() -> Path:
@@ -150,7 +162,7 @@ def declared_targets(config: dict) -> tuple[dict[str, dict], list[str]]:
             source = git_marketplace(marketplaces[name] if name in marketplaces else user.get(name))
             if source is None:
                 continue
-            error = marketplace_identity.marketplace_error(name, github_repository(source["source"]))
+            error = marketplace_error(name, github_repository(source["source"]))
             if error:
                 ignored.append(f"{name} declared by {directory}: {error}")
                 continue

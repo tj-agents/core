@@ -75,9 +75,8 @@ def selection(host: str, executable: str, project: Path) -> tuple[dict, list[str
     enabled = sorted(name for name in enabled if name.rsplit("@", 1)[-1] in sources)
     used = {name.rsplit("@", 1)[-1] for name in enabled}
     selected = {name: repo for name, repo in sorted(sources.items()) if name in used}
-    identity_rules = plugin_autoupdate.marketplace_identity
     for name, repo in selected.items():
-        error = identity_rules.marketplace_error(name, repo)
+        error = plugin_autoupdate.marketplace_error(name, repo)
         if error:
             raise RefreshError(error)
     return selected, enabled
