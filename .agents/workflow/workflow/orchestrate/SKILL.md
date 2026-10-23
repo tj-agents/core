@@ -9,7 +9,7 @@ domain: process
 
 One orchestrator session owns timing for work split across several workers: it writes each worker's prompt,
 waits however long the work takes, and starts each worker the moment the work it depends on finishes.
-A single transfer is `workflow:handoff`. Run the orchestrator in its own session, never inside unrelated work.
+A single transfer is `engineering:handoff`. Run the orchestrator in its own session, never inside unrelated work.
 
 `scripts/orchestrate.py` (Python 3.9+; `python` on Windows, `python3` on Linux/macOS) owns every piece of
 bookkeeping: the orchestration file, status collection, dispatch, merges and close-out. Status always comes
