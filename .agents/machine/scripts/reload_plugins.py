@@ -157,7 +157,7 @@ def persistence_problems(expected: list[tuple[str, str, Path, str]], installatio
 
 
 def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]],
-                 updates: list[tuple[str, str, Path]]) -> list[str]:
+                 updates: list[tuple[str, str, Path]], done: list | None = None) -> list[str]:
     for identity, scope in installs:
         run([executable, "plugin", "install", identity, "--scope", scope], project)
     expected, updated = [], []
@@ -165,6 +165,8 @@ def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]]
         result = update_result(run([executable, "plugin", "update", identity, "--scope", scope, "--json"], owner),
                                identity, scope)
         expected.append((identity, scope, owner, result["newVersion"]))
+        if done is not None:
+            done.append((identity, scope, owner))
         if result["updateOutcome"] == "updated" and identity not in updated:
             updated.append(identity)
     after = json.loads(run([executable, "plugin", "list", "--json"], project))
@@ -288,12 +290,16 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
                     attempts[attempt_key(identity, scope, owner)] = head
     if not installs and not updates:
         return []
-    plugin_autoupdate.record_contents(attempts=attempts)
     touched = {work[0].rsplit("@", 1)[1] for work in installs + updates}
     executable = agent_cli.resolve_claude_executable()
     refresh_marketplaces("claude", executable, project,
                          {name: repo for name, repo in marketplaces.items() if name in touched - fresh})
-    return apply_claude(executable, project, installs, updates)
+    done = []
+    try:
+        return apply_claude(executable, project, installs, updates, done)
+    finally:
+        ran = {attempt_key(*target) for target in done}
+        plugin_autoupdate.record_contents(attempts={key: head for key, head in attempts.items() if key in ran})
 
 
 def refresh_repositories(project: Path, repositories: set[str] | None, updated: set[str] | None = None,
@@ -304,13 +310,11 @@ def refresh_repositories(project: Path, repositories: set[str] | None, updated: 
         refresh_marketplaces("claude", agent_cli.resolve_claude_executable(), project, fresh)
     unresolved = refresh_heads(repositories, revision, query)
     if unresolved:
-        print(f"plugins: could not read the published head of {', '.join(sorted(unresolved))}; "
-              "an expired cursor compares it again", file=sys.stderr)
+        print(f"plugins: could not read the published head of {', '.join(sorted(unresolved))}", file=sys.stderr)
     changed = reconcile_claude(project, event=True, repositories=repositories, fresh=frozenset(fresh))
     if updated is not None:
         updated.update(changed)
-    (configuration_root("claude") / "plugins" / "tj-agents-plugin-versions.json").unlink(missing_ok=True)
-    return True
+    return not any(repositories is None or key.rsplit("@", 1)[0] in repositories for key in unresolved)
 
 
 def package_tree(root: Path) -> dict[str, bytes]:

@@ -258,7 +258,7 @@ def repository_contents(key: str, paths: set[str], installed: set[str], known: d
         return {}, {}
     parts, fields = [f'h: object(expression: "{ref}") {{ oid }}'], {}
     for path in sorted(path for path in paths if path == "." or REVISION_PATH.fullmatch(path)):
-        for revision in [ref, *sorted(installed)]:
+        for revision in [ref, *sorted(sha for sha in installed if SHA.fullmatch(sha))]:
             if revision != ref and tree_key(repo, revision, path) in known:
                 continue
             alias = f"t{len(fields)}"
@@ -275,12 +275,13 @@ def repository_contents(key: str, paths: set[str], installed: set[str], known: d
 
 def github_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]], known: dict[str, str],
                     query) -> tuple[dict[str, str], dict[str, str]]:
+    failures = []
+
     def read(key: str) -> tuple[dict[str, str], dict[str, str]]:
         try:
             return repository_contents(key, wanted[key], installed.get(key, set()), known, query)
         except Exception as error:
-            print(f"plugins: could not read {key.rsplit('@', 1)[0]} contents, comparing commits ({error})",
-                  file=sys.stderr)
+            failures.append(f"{key.rsplit('@', 1)[0]} ({error})")
             return {}, {}
 
     heads, trees = {}, {}
@@ -288,6 +289,8 @@ def github_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]],
         for found_heads, found_trees in pool.map(read, sorted(wanted)):
             heads.update(found_heads)
             trees.update(found_trees)
+    if failures:
+        print(f"plugins: comparing commits for {', '.join(sorted(failures))}", file=sys.stderr)
     return heads, trees
 
 
@@ -461,7 +464,7 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
             previous = recorded.get("codex-plugin:" + plugin)
             if (publisher := publisher_key(url, ref)) and previous != heads.get((url, ref)):
                 wanted.setdefault(publisher, set()).add(path)
-                if isinstance(previous, str):
+                if isinstance(previous, str) and SHA.fullmatch(previous):
                     installed.setdefault(publisher, set()).add(previous)
         if wanted:
             refresh_contents(wanted, installed, query)

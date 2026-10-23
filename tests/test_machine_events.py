@@ -239,6 +239,17 @@ class SetupTests(unittest.TestCase):
                                     text=True, timeout=30)
             self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_the_retired_plugin_version_record_is_reported_and_removed(self):
+        with tempfile.TemporaryDirectory() as directory, mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": directory}):
+            record = Path(directory) / "plugins/tj-agents-plugin-versions.json"
+            record.parent.mkdir()
+            record.write_text("{}", encoding="utf-8")
+            context = mock.Mock(windows=True)
+            with mock.patch.object(setup, "task_exists", return_value=False),                     mock.patch.object(setup, "remove_retired_windows"):
+                self.assertEqual([f"remove retired {record}"], setup.check_retired(context))
+                setup.apply_retired(context)
+                self.assertEqual([], setup.check_retired(context))
+
     def test_the_listener_service_and_task_are_retired_and_never_scheduled(self):
         self.assertIn("tj-agents machine events", setup.RETIRED_TASKS)
         for name in ("schedule_windows", "schedule_systemd", "windows_task_xml"):
