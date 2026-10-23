@@ -324,7 +324,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 result_path = results[0]
                 host.wait(timeout=session_close.DEFAULT_TIMEOUTS["AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS"])
                 for _ in range(300):
-                    result = json.loads(result_path.read_text(encoding="utf-8"))
+                    result = session_close.read_json(result_path) or {}
                     if result.get("status") == "session-closed":
                         break
                     time.sleep(.05)
@@ -459,7 +459,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 self.assertTrue(results)
                 result_path = results[0]
                 for _ in range(300):
-                    result = json.loads(result_path.read_text(encoding="utf-8"))
+                    result = session_close.read_json(result_path) or {}
                     if result.get("status") in {"succeeded", "branch-preserved", "failed"}:
                         break
                     time.sleep(.05)
