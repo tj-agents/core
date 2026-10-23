@@ -507,7 +507,7 @@ class HeadReconcileTests(unittest.TestCase):
         self.assertEqual({"tj-agents/core@main": CORE_HEAD, "tj-agents/dotnet@main": DOTNET_HEAD}, contents["heads"])
         self.assertIn(f"tj-agents/dotnet@{DOTNET_HEAD}:plugins/dotnet", contents["trees"])
 
-    def test_a_publish_installs_only_a_missing_declared_scope_and_tolerates_an_unreadable_head(self):
+    def test_a_publish_installs_a_missing_declared_scope_and_retries_an_unreadable_named_head(self):
         project = self.home.project("preaward", "settings.local.json", "base@tj-agents", "dotnet@tj-agents")
         fake = FakeClaude(self.home.installed(("base@tj-agents", "local", project, CORE_HEAD)))
 
@@ -517,8 +517,8 @@ class HeadReconcileTests(unittest.TestCase):
                                            "enabled": True, "version": "v2"})
             return fake(command, cwd)
         with mock.patch.object(REFRESH, "run", side_effect=install), mock.patch("sys.stderr"):
-            self.assertTrue(REFRESH.refresh_repositories(project, {"tj-agents/dotnet"}, revision=lambda url, ref: None,
-                                                         query=lambda arguments: {"data": {}}))
+            self.assertFalse(REFRESH.refresh_repositories(project, {"tj-agents/dotnet"}, revision=lambda url, ref: None,
+                                                          query=lambda arguments: {"data": {}}))
         installs = [command[3] for command, _ in fake.commands if command[2] == "install"]
         self.assertEqual(["dotnet@tj-agents"], installs)
         self.assertNotIn("update", [command[2] for command, _ in fake.commands])
@@ -546,13 +546,31 @@ class HeadReconcileTests(unittest.TestCase):
             REFRESH.reconcile_claude(project, event=True, repositories={"tj-agents/core"})
         self.assertGreater(len(fake.commands), first)
 
+    def test_an_update_that_failed_to_run_is_retried_by_the_next_launch(self):
+        project = self.home.project("preaward", "settings.local.json", "base@tj-agents")
+        installations = self.home.installed(("base@tj-agents", "local", project, OLD_HEAD))
+        self.record({"tj-agents/core@main": CORE_HEAD}, {f"tj-agents/core@{OLD_HEAD}:plugins/base": "1" * 40,
+                                                       f"tj-agents/core@{CORE_HEAD}:plugins/base": "2" * 40})
+        fake = FakeClaude(installations)
+
+        def failing(command, cwd):
+            if command[2] == "update":
+                raise REFRESH.RefreshError("network")
+            return fake(command, cwd)
+        with mock.patch.object(REFRESH, "run", side_effect=failing), self.assertRaises(REFRESH.RefreshError):
+            REFRESH.reconcile_claude(project)
+        with mock.patch.object(REFRESH, "run", side_effect=fake):
+            self.assertEqual(["base@tj-agents"], REFRESH.reconcile_claude(project))
+
     def test_content_query_names_only_validated_revisions_and_paths(self):
         wanted = {"tj-agents/core@main": {"plugins/base", 'plugins/x") { oid } evil: object(expression: "y'}}
         captured = []
         heads, trees = REFRESH.plugin_autoupdate.github_contents(
-            wanted, {"tj-agents/core@main": {OLD_HEAD}}, {}, lambda arguments: captured.append(arguments[-1]) or {})
+            wanted, {"tj-agents/core@main": {OLD_HEAD, 'main") { oid } worse: object(expression: "z'}}, {},
+            lambda arguments: captured.append(arguments[-1]) or {})
         self.assertEqual(({}, {}), (heads, trees))
         self.assertNotIn("evil", captured[0])
+        self.assertNotIn("worse", captured[0])
         self.assertIn(f'"{OLD_HEAD}:plugins/base"', captured[0])
 
 
