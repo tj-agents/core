@@ -184,7 +184,8 @@ def settle(project: Path, reconcile=None) -> str:
     return "updated"
 
 
-def check(project: Path, fetch=https_get, update=update_host, now: float | None = None, reconcile=None) -> str:
+def check(project: Path, fetch=https_get, update=update_host, now: float | None = None, reconcile=None,
+          host: str | None = None) -> str:
     directory = state_directory()
     topic = read_json(directory / "machine-events.json").get("topic")
     if not isinstance(topic, str) or not TOPIC.fullmatch(topic):
@@ -203,7 +204,7 @@ def check(project: Path, fetch=https_get, update=update_host, now: float | None 
         print(f"plugins: update check skipped ({type(error).__name__})", file=sys.stderr)
         return "offline"
     result = apply(envelopes, cursor, path, project, update, now, expired) if envelopes else "current"
-    return settle(project, reconcile) if result == "current" else result
+    return settle(project, reconcile) if result == "current" and host != "codex" else result
 
 
 def mark_current(fetch=https_get, now: float | None = None) -> bool:
@@ -225,9 +226,10 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=Path.cwd())
+    parser.add_argument("--host", choices=HOSTS)
     arguments = parser.parse_args(argv)
     try:
-        check(arguments.project.resolve())
+        check(arguments.project.resolve(), host=arguments.host)
     except Exception as error:
         print(f"plugins: update check failed: {error}", file=sys.stderr)
     return 0
