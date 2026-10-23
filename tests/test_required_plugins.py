@@ -134,8 +134,19 @@ class RequiredPluginsTests(unittest.TestCase):
                 required.check_launch(self.project, "codex", "native-cli", arguments)
                 check.assert_not_called()
         with mock.patch.object(required, "check") as check:
-            required.check_launch(self.project, "codex", "native-cli", ["exec", "--cd=prompt"])
+            required.check_launch(self.project, "codex", "native-cli", ["exec", "--", "--cd=prompt"])
             check.assert_called_once_with(self.project, "codex", "native-cli")
+
+    def test_native_flags_and_subcommand_directory_cannot_bypass_target_selection(self):
+        for arguments in (["--no-daemon", "--cd", "another"],
+                          ["--strict-config", "--no-daemon", "exec", "--cd=another"],
+                          ["--model", "plugin", "exec", "--cd", "another"]):
+            with mock.patch.object(required, "check") as check:
+                required.check_launch(self.project, "codex", "native-cli", arguments)
+                check.assert_called_once_with(self.project / "another", "codex", "native-cli")
+        with mock.patch.object(required, "check") as check:
+            required.check_launch(self.project, "codex", "native-cli", ["--future-option", "--cd", "another"])
+            check.assert_called_once_with(self.project / "another", "codex", "native-cli")
 
     def test_incomplete_corrupt_and_missing_declared_payloads_are_rejected(self):
         self.select("arbitrary-stack@arbitrary-publisher")
@@ -144,6 +155,8 @@ class RequiredPluginsTests(unittest.TestCase):
             root = self.profile / "plugins/cache/arbitrary-publisher/arbitrary-stack/version"
             manifest = root / f".{host}-plugin/plugin.json"
             for content in (None, "{", '{"name":"wrong"}',
+                            '{"name":"arbitrary-stack", "skills":{}}',
+                            '{"name":"arbitrary-stack", "agents":42}',
                             '{"name":"arbitrary-stack", "skills":"./missing"}'):
                 with self.subTest(host=host, content=content):
                     if content is None:
