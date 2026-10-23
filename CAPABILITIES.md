@@ -9,6 +9,12 @@ Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
 
 Maintained plans and common agent behavior.
 
+## tj-agents/agent-store
+
+Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
+
+Recorded agent executions, sessions, ownership and references.
+
 ## tj-agents/engineering
 
 Owner: [`tj-agents/core`](https://github.com/tj-agents/core)

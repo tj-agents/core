@@ -3,10 +3,13 @@
   "plugins": {
     "base": [],
     "engineering": [
-      "base"
+      "base",
+      "agent-store",
+      "machine"
     ],
     "machine": [
-      "base"
+      "base",
+      "agent-store"
     ],
     "cpp": [],
     "gpp": [
@@ -42,7 +45,8 @@
     "infonetica": [
       "engineering",
       "work"
-    ]
+    ],
+    "agent-store": []
   },
   "stacks": {
     "dotnet": [

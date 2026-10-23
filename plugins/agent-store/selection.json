@@ -1,0 +1,11 @@
+{
+  "plugin": "agent-store",
+  "payloads": [
+    "process"
+  ],
+  "prerequisites": [],
+  "external_prerequisites": [],
+  "skills": [
+    "inspect"
+  ]
+}
