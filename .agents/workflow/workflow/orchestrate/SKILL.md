@@ -60,6 +60,8 @@ worker's behalf (`report --worker <id> --status done`) only after reading its ac
 4. Start `wait` as a background command whose exit notifies this session, then `tick` again.
 
 A restarted orchestrator runs `tick` on the same file and continues; the file holds everything it needs.
+A relaunched successor session is accepted automatically. Any other new session runs `claim` once the
+recorded orchestrator has ended.
 
 ## Decisions
 
