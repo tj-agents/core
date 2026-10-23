@@ -6,11 +6,13 @@ and record policy. Core never installs or selects a profile on a repository's be
 
 ## Repository selection
 
-A committed `.problem-records.json` in the source repository's primary checkout selects the profile's
-qualified read operation, for example `{"schema_version":1,"provider":"personal:work-item"}`.
-The primary checkout is the first non-bare entry of `git worktree list --porcelain`, resolved from any
-worktree or subdirectory; a feature worktree's copy never overrides it. Read the declaration before any
-tracker operation. Selection requires repository authorization; installing Core never adopts a provider.
+Selecting `personal@tj-agents`, with the `tj-agents` marketplace at `tj-agents/marketplace`, in the source
+repository's `.agents/plugins.json` selects `personal:work-item`. Any other profile is selected by a committed `.problem-records.json` naming its
+qualified read operation, for example `{"schema_version":1,"provider":"infonetica:work-item"}`; it takes
+precedence. Both are read from the primary checkout, the first non-bare entry of `git worktree list
+--porcelain`, resolved from any worktree or subdirectory; a feature worktree's copy never overrides it.
+Read the selection before any tracker operation. Selection requires repository authorization; installing
+Core never adopts a provider.
 
 ## Selected profile operations
 
@@ -20,8 +22,21 @@ tracker operation. Selection requires repository authorization; installing Core 
 | Record a new item | `personal:create-work-item` | `infonetica:create-work-item` |
 | Reconcile and carry out existing work | `personal:address-work-item` | `infonetica:address-work-item` |
 
+A session lists only the skills of the project it started in. When the needed operation is not listed,
+run `python -B <hooks>/problem_records.py --root <repository> --operation create|read|address --harness
+claude|codex` (`python3` on Linux/macOS) and follow the printed `skill`. `<hooks>` is the installed
+engineering plugin's `hooks` directory, beside the `skills` directory that holds its skill base directories,
+or `.agents/hooks` in a Core checkout. A failure, including a directory outside any repository, blocks the operation.
+
 Use only the selected profile's qualified operation. It owns deterministic scripts, factual validation,
-request reconciliation, remote persistence, native type mapping, retention and verified closure. Preserve
+request reconciliation, remote persistence, native type mapping, retention and verified closure. It also
+owns when recording is permitted and any required user decision. Selecting a provider, observing a
+problem or authorizing a repair does not itself authorize creating a remote item. Apply the selected
+profile's decision before creation; keep personal recording autonomy with the personal profile.
+
+While a recording decision is pending or declined, retain relevant facts in the existing authorized task
+and continue unaffected work. Do not create a substitute item, switch providers or treat withheld
+recording consent as permission to publish elsewhere. Preserve
 the request's intent: a software defect, observed agent/process mistake, deliberate debt, feature, story
 or concrete task. The profile maps that intent to its actual tracker types; Core does not impose a shared
 remote schema. Recording never starts implementation. An explicit addressing request reuses the item's
@@ -38,9 +53,9 @@ another profile, redirect employer evidence, create a Markdown register or selec
 
 ## Repositories without a provider
 
-Without a valid declaration, tracker operations block. Retain unsent facts in the active task or goal with
-the resolver and observable resume condition. Existing `BUGS.md`, `MISTAKES.md` and `TECH_DEBT.md` files
-remain historical evidence that may be read and linked; do not update them as an active backlog.
+Without a valid selection, tracker operations block. Retain unsent facts in the active task or goal with
+the resolver and observable resume condition. Markdown registers (`BUGS.md`, `MISTAKES.md`, `TECH_DEBT.md`)
+are retired; never create or update one.
 
 Plans, review artifacts and roadmaps retain design and recovery evidence and link canonical record
 identities. Preserve existing remote identities and history. Repository and employer policy controls
@@ -50,4 +65,6 @@ where evidence may go; employer-owned facts stay within the selected employer pr
 The primary checkout selects personal:work-item. A new defect uses personal:create-work-item with bug
 intent; a repeated observation updates its existing GitHub identity. An explicit repair request uses
 personal:address-work-item and keeps the existing repair owner. Reading the item creates no execution.
+An employer profile requires a creation decision: retain the observation in the current task until that
+decision is supplied; selecting the profile does not satisfy it.
 ```

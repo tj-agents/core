@@ -23,8 +23,7 @@ stay here; shared plans link to their source owners.
 assessment of existing capabilities and solutions; [`workflow:run`](.agents/workflow/workflow/run/SKILL.md)
 owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
-Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
-Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
+Known bugs, mistakes and debt follow the selected problem-record profile.
 The [recording contract](.agents/workflow/resources/problem-records.md) routes remote work-item
 operations to the repository's explicitly selected profile. Personal owns GitHub records; Infonetica owns
 Azure Boards records and native type policy. Core publishes the shared SQLite registry as Agent Store, generic work status as Workflow, and reusable
@@ -35,9 +34,8 @@ Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed wri
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
 current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or
 changed plugin hooks until they are reviewed and trusted in `/hooks`; a fresh missing-marketplace write
-probe is required before claiming enforcement. The host coverage limit is tracked in
-`.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents a generated native-instruction
-fallback.
+probe is required before claiming enforcement. The `base:agent-files` skill documents a generated
+native-instruction fallback.
 Codex hook commands use a per-session temporary snapshot preseeded for the running session's hooks.
 This lets those hooks keep running after a plugin update replaces an inactive package cache entry.
 New sessions create a fresh snapshot from the verified package; snapshots outside the plugin cache are
@@ -223,7 +221,7 @@ Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: on
 poll for events since the saved cursor. With none it starts the CLI immediately; offline it starts anyway.
 With events it updates, on both hosts in parallel, only the marketplaces and enabled plugins that list or
 publish the named repositories, and advances the cursor once both hosts succeed. A failed host retries on
-a later launch, at most hourly. `machine:reload-plugins` runs the same check in a running session.
+a later launch, at most hourly. `machine:sync-plugins` runs the same check in a running session.
 
 Main-branch callers publish events through the shared
 `tj-agents/github-actions/.github/actions/machine-events` publisher. Setup reuses or creates the
@@ -313,8 +311,8 @@ Its native `plugin add` commands maintain the host's required user installation 
 repository settings remain the authored selection. Codex currently provides no cache-only install scope.
 Nothing updates packages in the launch path.
 
-For an explicit native refresh use `machine:reload-plugins`. Its default performs native marketplace
-and plugin updates; remote revision verification is opt-in and prints progress. `/reload-plugins`
+For an explicit native refresh use `machine:sync-plugins`. Its default performs native marketplace
+and plugin updates; remote revision verification is opt-in and prints progress. `/sync-plugins`
 adopts updates in an open Claude session; start a new Codex session to load updated packages.
 
 Codex does not load agent definitions directly from plugins. Its engineering package supplies

@@ -50,7 +50,7 @@ def inert_document(path):
     return (
         value.suffix == ".md"
         and value.name not in {"AGENTS.md", "CLAUDE.md", "SKILL.md"}
-        and (path in {"README.md", "BUGS.md", "MISTAKES.md", "TECH_DEBT.md", "CHANGELOG.md"}
+        and (path in {"README.md", "CHANGELOG.md"}
              or value.parts[0] in {"docs", "plans", "reviews"})
     )
 

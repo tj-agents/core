@@ -5,8 +5,8 @@
     {
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "base-agents",
-      "id": "base-agents/base",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/base",
       "name": "base",
       "package_path": "plugins/base",
       "description": "Maintained plans and common agent behavior.",
@@ -31,16 +31,16 @@
         ],
         "optional": []
       },
-      "digest": "sha256:86675ed72944f9082813fb4fda5f4f335027c95046ce27d52a0e77006f5431d6",
+      "digest": "sha256:f8f5f5707645f5b3c9b81ec2e336bd7de80fdf211e85f6937921ac9b0aa5c2c5",
       "harness": {
         "marketplaces": [
           {
-            "id": "base-agents",
-            "repository": "tj-agents/core"
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
           }
         ],
         "plugins": [
-          "base-agents/base"
+          "tj-agents/base"
         ],
         "hooks": [
           {
@@ -88,8 +88,8 @@
     {
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "base-agents",
-      "id": "base-agents/agent-store",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/agent-store",
       "name": "agent-store",
       "package_path": "plugins/agent-store",
       "description": "Recorded agent executions, sessions, ownership and references.",
@@ -111,16 +111,16 @@
         ],
         "optional": []
       },
-      "digest": "sha256:506bbb97896024ecc5f3f0631d82339635e69711011a27c0db41b1c65007a2b8",
+      "digest": "sha256:96624176d1f4eb56d1e77f04f77672e2f255ba1af5494fd7d32b12fd51c88505",
       "harness": {
         "marketplaces": [
           {
-            "id": "base-agents",
-            "repository": "tj-agents/core"
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
           }
         ],
         "plugins": [
-          "base-agents/agent-store"
+          "tj-agents/agent-store"
         ],
         "hooks": [],
         "permissions": {
@@ -182,8 +182,122 @@
     {
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "base-agents",
-      "id": "base-agents/engineering",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/workflow",
+      "name": "workflow",
+      "package_path": "plugins/workflow",
+      "description": "Goal lifecycle and recorded work status.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "handoff",
+        "plan",
+        "plan-artifacts",
+        "resume",
+        "run",
+        "status"
+      ],
+      "dependencies": {
+        "required": [
+          "tj-agents/base",
+          "tj-agents/agent-store",
+          "tj-agents/machine"
+        ],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "exe:git",
+          "python>=3.9"
+        ],
+        "optional": []
+      },
+      "digest": "sha256:8a6c7448d248aeb2992600818f489d709c7eff43a23d0d2c48ebafe8224e95c4",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/agent-store",
+          "tj-agents/base",
+          "tj-agents/machine",
+          "tj-agents/workflow"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
+                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
+                ]
+              ],
+              "justification": "Read selected work-item state and supporting plans without creating or changing agent-store records.",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py",
+                  "payments"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+                  "payments",
+                  "20",
+                  "all"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/writer.py"
+                ],
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
+                  "payments"
+                ]
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/engineering",
       "name": "engineering",
       "package_path": "plugins/engineering",
       "description": "Selected engineering workflows, reviews and Git operations.",
@@ -246,10 +360,10 @@
       ],
       "dependencies": {
         "required": [
-          "base-agents/base",
-          "base-agents/workflow",
-          "base-agents/agent-store",
-          "base-agents/machine"
+          "tj-agents/base",
+          "tj-agents/workflow",
+          "tj-agents/agent-store",
+          "tj-agents/machine"
         ],
         "optional": []
       },
@@ -264,20 +378,20 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:d21f95b6a7ff4eefd9367f6684474da9d35385ed3d52bc629784762e20db4eac",
+      "digest": "sha256:8dcfc5f19af1f0b0860a3ab7cadcd01baa32d592321526785a9202a45f4d8360",
       "harness": {
         "marketplaces": [
           {
-            "id": "base-agents",
-            "repository": "tj-agents/core"
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
           }
         ],
         "plugins": [
-          "base-agents/agent-store",
-          "base-agents/base",
-          "base-agents/engineering",
-          "base-agents/machine",
-          "base-agents/workflow"
+          "tj-agents/agent-store",
+          "tj-agents/base",
+          "tj-agents/engineering",
+          "tj-agents/machine",
+          "tj-agents/workflow"
         ],
         "hooks": [
           {
@@ -511,8 +625,8 @@
     {
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "base-agents",
-      "id": "base-agents/machine",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/machine",
       "name": "machine",
       "package_path": "plugins/machine",
       "description": "Explicit harness, history and clipboard utilities.",
@@ -537,15 +651,15 @@
         "peer-cli",
         "plugin-selection",
         "recover-agents",
-        "reload-plugins",
         "search",
         "search-claude",
-        "search-codex"
+        "search-codex",
+        "sync-plugins"
       ],
       "dependencies": {
         "required": [
-          "base-agents/base",
-          "base-agents/agent-store"
+          "tj-agents/base",
+          "tj-agents/agent-store"
         ],
         "optional": []
       },
@@ -561,21 +675,21 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:bc96bc7c64815271374f651c7fd95f4bd28130bdcd741d9baf3ed43a3f9180d2",
+      "digest": "sha256:64ab0ff9e1db424225f23f540ae5cc67ad05dc3554b6470a141d590942770ecc",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
       "harness": {
         "marketplaces": [
           {
-            "id": "base-agents",
-            "repository": "tj-agents/core"
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
           }
         ],
         "plugins": [
-          "base-agents/agent-store",
-          "base-agents/base",
-          "base-agents/machine"
+          "tj-agents/agent-store",
+          "tj-agents/base",
+          "tj-agents/machine"
         ],
         "hooks": [
           {
@@ -689,18 +803,18 @@
             "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py:*)"
+            "Bash(python -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)"
           ],
           "codex_prefix_rules": [
             {
@@ -1207,9 +1321,9 @@
                 [
                   "${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py",
                   "${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py",
-                  "${PLUGIN_ROOT}/skills/reload-plugins/scripts/reload_plugins.py",
-                  "${PLUGIN_ROOT}/codex-skills/reload-plugins/scripts/reload_plugins.py",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/reload-plugins/scripts/reload_plugins.py"
+                  "${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py",
+                  "${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py"
                 ]
               ],
               "justification": "Refresh selected tj-agents plugins through native host commands, with optional remote verification.",
@@ -1235,120 +1349,6 @@
                   "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
                   "--project",
                   "C:/repo"
-                ]
-              ]
-            }
-          ]
-        }
-      }
-    },
-    {
-      "owner_repository": "tj-agents/core",
-      "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "base-agents",
-      "id": "base-agents/workflow",
-      "name": "workflow",
-      "package_path": "plugins/workflow",
-      "description": "Goal lifecycle and recorded work status.",
-      "platforms": [
-        "windows",
-        "linux",
-        "macos"
-      ],
-      "skills": [
-        "handoff",
-        "plan",
-        "plan-artifacts",
-        "resume",
-        "run",
-        "status"
-      ],
-      "dependencies": {
-        "required": [
-          "base-agents/base",
-          "base-agents/agent-store",
-          "base-agents/machine"
-        ],
-        "optional": []
-      },
-      "external_prerequisites": {
-        "required": [
-          "exe:git",
-          "python>=3.9"
-        ],
-        "optional": []
-      },
-      "digest": "sha256:dbe8ab00c70956807045e4d4182c50cc886a7c517a400d6424585a78f6bd51a0",
-      "harness": {
-        "marketplaces": [
-          {
-            "id": "base-agents",
-            "repository": "tj-agents/core"
-          }
-        ],
-        "plugins": [
-          "base-agents/agent-store",
-          "base-agents/base",
-          "base-agents/machine",
-          "base-agents/workflow"
-        ],
-        "hooks": [],
-        "permissions": {
-          "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)"
-          ],
-          "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
-                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
-                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
-                ]
-              ],
-              "justification": "Read selected work-item state and supporting plans without creating or changing agent-store records.",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py",
-                  "payments"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
-                  "payments",
-                  "20",
-                  "all"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/writer.py"
-                ],
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
-                  "payments"
                 ]
               ]
             }

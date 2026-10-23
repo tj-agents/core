@@ -1,74 +1,99 @@
 ---
 name: self-repair
-description: Repair, in the current session, the consumed Core standard that caused or failed to prevent an agent mistake the user called out. Use when a user identifies an agent mistake and the governing standard, skill, hook, workflow, or host enforcement may have caused or failed to prevent it.
+description: Repair a demonstrated defect in explicitly authorized tj-agents standards or agent tooling. Use when a mistake exposes a reusable instruction, routing, hook or lifecycle defect, before any host product feedback; establish source and task scope before applying automatic repair authority.
 
 kind: workflow
 domain: process
 ---
 
-# Repair a Core-caused agent mistake
+# Repair internal agent standards and tooling
 
-Own the standards-repair response when a user identifies an agent mistake and a consumed Core standard,
-skill, hook, workflow, or host enforcement may have caused or failed to prevent it. This workflow does
-not replace the active user task: answer the user's direct question first, keep that task's owner and
-writer lease, then repair the standard in this session.
+Own a bounded repair of reusable agent instructions or tooling. Answer the user's direct question first
+and correct the active task within its existing authority. Establish a causal source defect before
+changing a standard; a mistake alone does not prove the standard is defective. Do this before any
+host product feedback, which is only for a genuine host defect no tj-agents source can fix.
 
-## Shared agent-lifecycle failures
+## Establish source and authority
 
-A shared agent-lifecycle failure that makes ownership, completion, handoff, or cleanup untrustworthy is
-P1 by default. Before repairing, use `machine:recover-agents` to check for a verified live owner of the
-same repair; reconcile with that owner rather than duplicating it. Until the causal correction is
-verified or the user explicitly defers it, the originating session pauses unrelated work and new
-launches; repair and preservation actions may continue.
+Read the governing source and its repository's README.md and AGENTS.md. Automatic repair requires all
+of these conditions:
 
-## Establish the repair boundary
+- The cause is a demonstrated defect in a reusable agent standard, skill, route, hook or lifecycle tool.
+- Its owning source is an explicitly authorized `tj-agents` standards or tooling repository.
+- Both the originating task and the source repository have explicitly adopted personal scope, and the
+  repair remains within the user's existing limits.
 
-1. Identify the governing Core behavior and the observed mistake. Read the directly governing source and
-   distinguish a missing rule, an ambiguous rule, absent host enforcement, or an ignored but enforceable
-   rule. A user callout is evidence to investigate, not permission to blame the user or close the issue
-   with an apology.
-2. Respect explicit user limits. Do not create a repair for an explicitly rejected change, and do not
-   silently widen the repair into product work, profile installation, destructive cleanup, or unrelated
-   standards redesign.
-3. Use the selected profile under [the recording contract](../../../workflow/resources/problem-records.md) to
-   preserve the observed problem intent and update its canonical record. If the same source repair has a live canonical owner,
-   reconcile that owner and contribute the new evidence without creating a duplicate writer.
+An organization name, publisher account or checkout location does not establish these conditions.
+`tj-agents/infonetica` is employer tooling and remains outside automatic repair. An employer task does
+not grant automatic repair authority even when the proposed destination is personal tooling. Explain
+the defect and propose a separate source repair within the employer's evidence boundaries.
 
-## Repair it here
+Other standards owners, including Concertable, require explicit source-repair authorization; they do not
+inherit this standing authority. Product defects and proactive personal application maintenance use the
+existing bugfix, feature or plan workflow within the authorized goal.
 
-Fix the standard in the current session. When the current checkout belongs to unrelated work, make the
-repair in its own worktree of the source repository from its current default branch; otherwise continue in
-the current checkout. Hand the repair off only when the user asks. A blocker that stops the repair is
-recorded with its resolver and resume condition. Then resume the original task.
+If the existing rule is adequate and the agent overlooked it, correct the task and explain the evidence.
+Conclude with no standards change when no reusable source defect is established. Do not invent a rule,
+hook, work item or blocker to satisfy this workflow.
 
-This standing authorization covers the bounded Core repair through implementation, tests, review, pull
-request, merge, and publication once the source repository's gates pass. It does not authorize installing
-into a consuming repository, publishing outside the source repository, destructive operations, or work
-excluded by an explicit user limit.
+```text
+Personal task exposes a reproducible Core handoff defect; Core is explicitly adopted personal tooling:
+repair the Core source under this workflow.
+Infonetica task exposes the same defect: correct the active task where authorized and propose a separate
+source repair; no employer tracker item or cross-repository repair follows automatically.
+Agent skipped a clear testing instruction: run the required checks and correct the task; an adequate
+instruction needs no source edit.
+```
+
+## Preserve ownership and recording decisions
+
+Before changing a shared lifecycle, use `machine:recover-agents` to check for a verified live owner of the
+same repair. Reconcile that owner and contribute the evidence without creating a duplicate writer.
+Keep the original task's owner and writer lease.
+
+Use [the recording contract](../../../workflow/resources/problem-records.md) for authorized records. Creating a
+record, fixing the active task and repairing a source are separate decisions. Preserve employer-owned
+facts within the authorized employer task; do not redirect them into a personal tracker. Missing
+recording consent does not require a substitute record or prevent unaffected authorized work.
+
+A shared lifecycle defect that makes ownership, completion, handoff or cleanup untrustworthy is P1 by
+default. Suspend the affected operations while their safety or correctness is unresolved; preserve
+recovery state. Priority alone does not pause unrelated tasks or authorize new launches or repairs.
+
+## Repair the eligible source
+
+Fix the standard or tool in the current session. When the current checkout belongs to unrelated work,
+use a separate worktree of the source repository from its current default branch. Hand the repair off
+only when the user asks. Respect exclusions on product work, installation, destructive cleanup and
+unrelated redesign.
+
+For an eligible automatic repair, standing authorization covers implementation, tests, review, pull
+request, merge and publication in that source repository once its gates pass. It does not authorize
+installation into a consuming repository or publication elsewhere. Outside automatic scope, use the
+specific source-repair authority the user granted and that source's normal engineering lifecycle.
+
+```text
+The eligible Core repair already has a live owner and pending PR: append evidence to its authorized
+record and reconcile with that owner. Do not start a second writer or take over its delivery.
+```
 
 ## Preserve existing delivery ownership
 
 When the user asks to wait for or monitor an existing pull request or delivery, treat that request as
-monitoring-only. Resolve and observe the existing delivery identity without changing its worktree, branch,
-binding, head, review, queue state, or merge state. Do not take it over, rebase it, push to it, arm or
-cancel auto-merge, or merge it merely because its work overlaps the source repair.
+monitoring-only. Resolve and observe the existing delivery identity without changing its worktree,
+branch, binding, head, review, queue state or merge state.
 
-Monitoring does not grant delivery authority. A change of delivery owner or merge state requires explicit
-delivery authority for that exact delivery plus its existing ownership transfer procedure. Standing
-auto-merge authorization applies only after the resolved delivery owner has reached its own review and
-check gates; it never authorizes taking over an unrelated pending delivery.
+Monitoring does not grant delivery authority. A transfer or merge-state change requires authority for
+that exact delivery plus its ownership-transfer procedure. Standing auto-merge authorization never
+authorizes taking over an unrelated pending delivery.
 
-## Completion
+## Complete truthfully
 
-The callout response is complete when the standard is repaired, tested and committed, or its blocker is
-recorded, and the original task has resumed. A source change does not alter instructions already loaded in
-the originating session.
+Resume the original task after the authorized source repair is tested and committed, or after explaining
+the no-source-change outcome, proposed repair awaiting a decision, or genuine blocker. Retain unsent
+facts in the existing task when recording is not authorized. A proposal is not a completed repair.
 
-## Example
-
-```text
-The user reports that an agent created a second bug record after a repair already had an owner. Inspect the
-governing recording guidance, reconcile the existing Work Items record, and repair the source rule that
-failed to require that reconciliation. Test the guidance change in Core, record the evidence on the selected
-mistake item, and resume the user's original task without taking over an unrelated pending PR.
-```
+When delivery is authorized, own it through the source repository's gates. Report source correction,
+publication and installed-host verification separately; a source commit does not update instructions
+already loaded in the originating session. Verify the affected supported entry points before claiming
+installed behavior is repaired, or name the unverified entry point and its observable acceptance.
