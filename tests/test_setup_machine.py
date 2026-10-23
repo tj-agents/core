@@ -714,6 +714,52 @@ class ChannelTests(Machine):
 
 
 class RunStepsTests(Machine):
+    def test_cli_step_selection_preserves_defaults_preconditions_and_declared_order(self):
+        cases = (
+            ([], [item.name for item in setup.STEPS]),
+            (["--step", "shell profiles"],
+             ["preconditions", "launch-check runtime", "shell profiles"]),
+            (["--check", "--step", "shell profiles", "--step", "launch-check runtime"],
+             ["preconditions", "launch-check runtime", "shell profiles"]),
+        )
+        for arguments, expected in cases:
+            with mock.patch.object(setup, "main_checkout", return_value=self.checkout), \
+                    mock.patch.object(setup, "reexec_if_not_main_checkout", return_value=None), \
+                    mock.patch.object(setup, "machine_context", return_value=self.context()), \
+                    mock.patch.object(setup, "run_steps", return_value=0) as run:
+                self.assertEqual(0, setup.main(arguments))
+                self.assertEqual(expected, [item.name for item in run.call_args.args[0]])
+                self.assertEqual("--check" in arguments, run.call_args.args[2])
+
+    def test_scoped_install_never_checks_or_applies_unselected_publisher_settings(self):
+        prerequisite = mock.Mock(return_value=[])
+        installed = mock.Mock(return_value=["runtime installed"])
+        unrelated = mock.Mock(side_effect=AssertionError("unselected remote operation"))
+        steps = (
+            setup.Step("preconditions", prerequisite, unrelated, required=True),
+            setup.Step("event channel and publishers", unrelated, unrelated),
+            setup.Step("launch-check runtime", lambda context: ["runtime missing"], installed),
+        )
+        context = self.context()
+        with mock.patch.object(setup, "STEPS", steps), \
+                mock.patch.object(setup, "main_checkout", return_value=self.checkout), \
+                mock.patch.object(setup, "reexec_if_not_main_checkout", return_value=None), \
+                mock.patch.object(setup, "machine_context", return_value=context), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, setup.main(["--step", "launch-check runtime"]))
+        prerequisite.assert_called_once_with(context)
+        installed.assert_called_once_with(context)
+        unrelated.assert_not_called()
+
+    def test_unknown_step_fails_before_any_machine_operation(self):
+        with mock.patch.object(setup, "main_checkout", return_value=self.checkout), \
+                mock.patch.object(setup, "reexec_if_not_main_checkout", return_value=None), \
+                mock.patch.object(setup, "machine_context") as context, \
+                contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+            setup.main(["--step", "not a setup step"])
+        self.assertEqual(2, error.exception.code)
+        context.assert_not_called()
+
     def legacy_machine(self):
         path = self.documents / "PowerShell" / "Microsoft.PowerShell_profile.ps1"
         path.parent.mkdir(parents=True)

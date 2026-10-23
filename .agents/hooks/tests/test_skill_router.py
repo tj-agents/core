@@ -31,6 +31,7 @@ class SkillRouterTests(unittest.TestCase):
         hooks.mkdir(parents=True)
         for name in ("skill_router.py", "tier_gate.py", "hook_runtime.py"):
             shutil.copy2(HOOKS / name, hooks / name)
+        shutil.copy2(HOOKS.parent / "machine/scripts/required_plugins.py", hooks / "required_plugins.py")
         self.router = hooks / "skill_router.py"
         skill = self.plugin / "skills" / "feature"
         skill.mkdir(parents=True)
@@ -99,6 +100,22 @@ class SkillRouterTests(unittest.TestCase):
         inventory = json.loads(self.inventory.read_text(encoding="utf-8"))
         inventory[harness] = value
         self.inventory.write_text(json.dumps(inventory), encoding="utf-8")
+
+    def test_missing_selected_plugin_blocks_writes_even_without_routes(self):
+        (self.repo / ".agents/skill-routes.json").unlink()
+        (self.repo / ".agents/plugins.json").write_text(json.dumps({
+            "schema_version": 1, "plugins": ["missing-stack@publisher"],
+        }), encoding="utf-8")
+        for harness, tool in (("codex", "apply_patch"), ("claude", "Write")):
+            payload = {"cwd": str(self.repo), "tool_name": tool, "tool_input": (
+                {"input": "*** Begin Patch\n*** Add File: src/new.py\n+value = 1\n*** End Patch"}
+                if harness == "codex" else {"file_path": str(self.repo / "src/new.py"), "content": "value = 1"}
+            )}
+            result = subprocess.run([sys.executable, str(self.router), "--harness", harness],
+                                    input=json.dumps(payload), capture_output=True, text=True,
+                                    encoding="utf-8", env=self.environment(), cwd=self.repo)
+            self.assertEqual(2, result.returncode, result.stderr)
+            self.assertIn("missing-stack@publisher", result.stderr)
 
     def test_skill_proof_keeps_company_and_stack_qualifiers_distinct(self):
         transcript = self.base / "transcript.jsonl"
