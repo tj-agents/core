@@ -65,7 +65,7 @@ def overlay_id(identity: str) -> str:
     return f"{marketplace}/{name}"
 
 
-def validate_marketplace(name: str, value: object) -> dict:
+def validate_marketplace_source(name: str, value: object) -> dict:
     if not isinstance(name, str) or not NAME.fullmatch(name):
         raise lock_io.LockError(f"Invalid marketplace name: {name!r}")
     if not isinstance(value, dict) or set(value) != {"repository"}:
@@ -76,7 +76,12 @@ def validate_marketplace(name: str, value: object) -> dict:
         raise lock_io.LockError(
             f"marketplaces.{name}.repository must be <owner>/<repository> without .git, owned by " + " or ".join(ALLOWED_OWNERS)
         )
-    error = IDENTITY_RULES.marketplace_error(name, repository)
+    return value
+
+
+def validate_marketplace(name: str, value: object) -> dict:
+    validate_marketplace_source(name, value)
+    error = IDENTITY_RULES.marketplace_error(name, value["repository"])
     if error:
         raise lock_io.LockError(error)
     return value
@@ -111,6 +116,10 @@ def validate(lock: dict) -> tuple[dict, list[str]]:
 
 
 def without_producer_marketplaces(sources: dict, identities: list) -> tuple[dict, list]:
+    if not isinstance(sources, dict):
+        raise lock_io.LockError("Migration marketplaces must be an object")
+    for name, value in sources.items():
+        validate_marketplace_source(name, value)
     retired = {name for name, value in sources.items() if IDENTITY_RULES.producer_repository(value["repository"])}
     if not retired or not isinstance(identities, list):
         return sources, identities
@@ -130,6 +139,13 @@ def without_producer_marketplaces(sources: dict, identities: list) -> tuple[dict
 
 
 def migrate(lock: dict) -> dict:
+    if is_current(lock):
+        if set(lock) != {"schema_version", "marketplaces", "plugins"}:
+            raise lock_io.LockError("Current selection has invalid fields")
+        sources, identities = without_producer_marketplaces(lock["marketplaces"], lock["plugins"])
+        document = {"schema_version": SCHEMA_VERSION, "marketplaces": sources, "plugins": identities}
+        validate(document)
+        return document
     if not isinstance(lock, dict) or lock.get("schema_version") not in {2, 3}:
         raise lock_io.LockError("Migration accepts only schema_version 2 or 3 plugin locks")
     if lock["schema_version"] == 2:
