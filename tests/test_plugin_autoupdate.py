@@ -217,6 +217,22 @@ class RefreshTests(unittest.TestCase):
             mock.call(['codex', 'plugin', 'add', 'machine@direct-core'], cwd=ROOT),
         ], run.call_args_list)
 
+    def test_only_a_plugin_whose_subtree_actually_changed_is_re_added(self):
+        run = mock.Mock(return_value=True)
+        recorded = {'codex:direct-core': OLD, 'codex-plugin:base@direct-core': 'unchanged'}
+        sources = lambda name: {'base': 'plugins/base', 'machine': 'plugins/machine'}
+        content = lambda checkout, path: 'unchanged' if path == 'plugins/base' else 'changed'
+
+        outcomes = UPDATE.refresh_codex('codex', target(), recorded, revision=lambda *_: NEW, run=run, busy=idle,
+                                        sources=sources, content=content)
+
+        self.assertEqual({'direct-core': 'updated'}, outcomes)
+        self.assertEqual([
+            mock.call(['codex', 'plugin', 'marketplace', 'upgrade', 'direct-core'], cwd=ROOT),
+            mock.call(['codex', 'plugin', 'add', 'machine@direct-core'], cwd=ROOT),
+        ], run.call_args_list)
+        self.assertEqual('changed', recorded['codex-plugin:machine@direct-core'])
+
     def test_a_running_codex_session_never_defers_an_upgrade(self):
         run = mock.Mock(return_value=True)
         preserve = mock.Mock()
@@ -377,6 +393,19 @@ class DeclaredRefreshTests(unittest.TestCase):
         popen.assert_not_called()
         self.assertLess(elapsed, 5)
         self.assertEqual({'codex:direct-core', 'codex:tj-agents'}, set(recorded))
+
+    def test_cleanup_keeps_per_plugin_hashes_for_still_declared_plugins(self):
+        machine = Machine(self)
+        docs = machine.project('docs', tj_agents(None, 'base'))
+        machine.installed('direct-core', 'base', 'machine')
+        machine.installed('tj-agents', 'base')
+        recorded = {'codex-plugin:base@direct-core': OLD, 'codex-plugin:retired@direct-core': OLD}
+        run = mock.Mock(return_value=True)
+
+        UPDATE.refresh_declared('codex', user_config([docs]), recorded, run=run, busy=idle, revision=lambda *_: OLD)
+
+        self.assertIn('codex-plugin:base@direct-core', recorded)
+        self.assertNotIn('codex-plugin:retired@direct-core', recorded)
 
     def test_a_repository_filter_refreshes_only_marketplaces_that_list_or_publish_it(self):
         machine = Machine(self)

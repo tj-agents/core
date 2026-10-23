@@ -156,13 +156,42 @@ def declared_targets(config: dict) -> tuple[dict[str, dict], list[str]]:
     return targets, ignored
 
 
+def marketplace_checkout(name: str) -> Path:
+    return codex_home() / ".tmp" / "marketplaces" / name
+
+
 def marketplace_manifest(name: str) -> dict:
-    root = codex_home() / ".tmp" / "marketplaces" / name
+    root = marketplace_checkout(name)
     for relative in (Path(".agents", "plugins", "marketplace.json"), Path(".claude-plugin", "marketplace.json")):
         manifest = read_json(root / relative)
         if manifest:
             return manifest
     return {}
+
+
+def plugin_sources(name: str) -> dict[str, str]:
+    """Each locally sourced cataloged plugin's name, mapped to its path within the marketplace checkout."""
+    sources = {}
+    for entry in marketplace_manifest(name).get("plugins", []):
+        if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
+            continue
+        source = entry.get("source")
+        path = (source.get("path") if isinstance(source, dict) and source.get("source") == "local"
+               else source if isinstance(source, str) else None)
+        if isinstance(path, str):
+            sources[entry["name"]] = path.lstrip("./")
+    return sources
+
+
+def subtree_revision(checkout: Path, path: str) -> str | None:
+    try:
+        result = subprocess.run(["git", "-C", str(checkout), "rev-parse", f"HEAD:{path}"], capture_output=True,
+                                text=True, encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT_SECONDS,
+                                check=False, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    revision = result.stdout.strip()
+    return revision if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", revision) else None
 
 
 def inspect_installation(name: str, target: dict) -> None:
@@ -287,7 +316,8 @@ def run_cli(command: list[str], *, cwd: Path) -> bool | str:
 
 def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, revision=remote_revision,
                   run=run_cli, now: float | None = None, busy=codex_session_running, packages=hook_packages,
-                  preserve=preserve_hook_snapshots) -> dict[str, str]:
+                  preserve=preserve_hook_snapshots, sources=plugin_sources,
+                  content=subtree_revision) -> dict[str, str]:
     now = time.time() if now is None else now
     outcomes: dict[str, str] = {}
     references = sorted({(source["source"], source.get("ref") or "HEAD")
@@ -320,14 +350,23 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
         preserve(marketplace, hooks)
         refreshed = run([executable, "plugin", "marketplace", "upgrade", marketplace],
                         cwd=target["project"]) is True
+        local_sources = sources(marketplace) if refreshed else {}
+        checkout = marketplace_checkout(marketplace)
         retired = []
         for plugin in target["plugins"] if refreshed else []:
+            plugin_key = "codex-plugin:" + plugin
+            path = local_sources.get(plugin.rsplit("@", 1)[0])
+            local_content = content(checkout, path) if path else None
+            if local_content is not None and plugin not in missing and recorded.get(plugin_key) == local_content:
+                continue
             added = run([executable, "plugin", "add", plugin], cwd=target["project"])
             if added == RETIRED:
                 retired.append(plugin)
             elif added is not True:
                 refreshed = False
                 break
+            elif local_content is not None:
+                recorded[plugin_key] = local_content
         if retired:
             recorded["retired:" + key] = sorted(retired)
         retired = f" (no longer published, not installed: {', '.join(retired)})" if retired else ""
@@ -380,6 +419,7 @@ def refresh_declared(executable: str, config: dict, recorded: dict, previous: li
     outcomes = refresh_codex(executable, selected, recorded, **options)
     remove_user_plugins(codex_home() / "config.toml", project_only)
     kept = {prefix + "codex:" + name for name in targets for prefix in ("", "retired:", "failed:")}
+    kept |= {"codex-plugin:" + identity for target in targets.values() for identity in target["plugins"]}
     for key in [key for key in recorded if key not in kept]:
         del recorded[key]
     return {"marketplaces": outcomes, "ignored": ignored, "project_only": sorted(project_only)}

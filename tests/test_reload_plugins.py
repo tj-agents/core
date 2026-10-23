@@ -113,7 +113,8 @@ class RefreshCliTests(unittest.TestCase):
             (root / "settings.json").write_text(json.dumps({"enabledPlugins": {
                 "base@tj-agents": True, "kit@other": True}}), encoding="utf-8")
             for repositories, chosen in (({"tj-agents/core"}, {"tj-agents"}), ({"tj-agents/marketplace"}, {"tj-agents"}),
-                                         ({"tj-agents/other"}, {"other"}), ({"tj-agents/none"}, None)):
+                                         ({"tj-agents/other"}, {"other"}), ({"tj-agents/none"}, None),
+                                         (None, {"tj-agents", "other"})):
                 with self.subTest(repositories=repositories), \
                         mock.patch.object(REFRESH, "configuration_root", return_value=root), \
                         mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude"), \
@@ -141,6 +142,39 @@ class RefreshCliTests(unittest.TestCase):
             (["claude", "plugin", "list", "--json"], ROOT),
         ])
         self.assertEqual("v1", fake.installations[1]["version"])
+
+    def test_recorded_revisions_skip_update_calls_for_unchanged_plugins(self):
+        fake = FakeClaude([
+            {"id": "base@tj-agents", "scope": "user", "enabled": True, "version": "v1"},
+            {"id": "machine@tj-agents", "scope": "user", "enabled": True, "version": "v1"}])
+        recorded = {"base@tj-agents": "same"}
+        revisions = {"base@tj-agents": "same", "machine@tj-agents": "changed"}
+        with mock.patch.object(REFRESH, "read_json", return_value={}), mock.patch.object(REFRESH, "run", side_effect=fake), \
+                mock.patch.object(REFRESH, "plugin_revision", side_effect=lambda identity: revisions[identity]):
+            updated = REFRESH.refresh("claude", "claude", ROOT, {}, ["base@tj-agents", "machine@tj-agents"], recorded)
+        self.assertEqual(["machine@tj-agents"], updated)
+        self.assertEqual([command for command, _ in fake.commands], [
+            ["claude", "plugin", "list", "--json"],
+            ["claude", "plugin", "update", "machine@tj-agents", "--scope", "user", "--json"],
+            ["claude", "plugin", "list", "--json"],
+        ])
+        self.assertEqual("changed", recorded["machine@tj-agents"])
+
+    def test_plugin_revision_ignores_a_git_subdir_sourced_plugin(self):
+        catalog = {"plugins": [{"name": "base", "source": {
+            "source": "git-subdir", "url": "https://github.com/tj-agents/core.git", "path": "plugins/base"}}]}
+
+        def fake_read_json(path):
+            if path.name == "known_marketplaces.json":
+                return {"tj-agents": {"installLocation": str(ROOT)}}
+            if path.name == "marketplace.json":
+                return catalog
+            return {}
+
+        with mock.patch.object(REFRESH, "read_json", side_effect=fake_read_json), \
+                mock.patch.object(REFRESH.plugin_autoupdate, "subtree_revision") as subtree_revision:
+            self.assertIsNone(REFRESH.plugin_revision("base@tj-agents"))
+        subtree_revision.assert_not_called()
 
     def test_claude_installs_only_at_the_scope_the_repository_declares(self):
         for declared, scope in (("settings.local.json", "local"), ("settings.json", "project")):
