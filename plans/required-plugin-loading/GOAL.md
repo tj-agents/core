@@ -78,3 +78,36 @@ No source change is claimed published or installed machine-wide yet. The origina
 running session cannot retroactively acquire a new native catalog. Fresh-host
 activation, shared launcher deployment, Linux acceptance and broader installed-host
 verification remain required; source tests and native inventory are distinct evidence.
+
+## Native activation checkpoint
+
+Car Hunter migration committed locally as `e8c80a7`; product changes remain unpublished.
+Actual required-selection admission passes for both Codex (25 enabled roots, all seven
+required identities present) and Claude (seven enabled roots). A fresh ephemeral Codex
+session listed `python:style`, `python:testing`, `workflow:run`, `agent-store:inspect`
+and read the canonical Python style definition successfully. Evidence is retained in
+the originating project's `.local/fresh-codex-standards-proof.log` and `.txt`.
+One admission attempt timed out under concurrent refresh/review load; it correctly
+refused admission, and subsequent native inventory took 1.93 seconds and passed.
+
+Claude's supported refresh installed/updated the seven required plugins but reported
+legacy registrations for C++, .NET and React still referenced elsewhere; it refused
+to remove those registrations. Do not conflate current-project admission with global
+retirement of those registrations. Shared source review remains in progress. Requested
+an explicit one-time publishing identity exception; no answer means no authorization.
+
+## Review corrections
+
+Native review of `43620f9f` found two actionable P2 gaps: cache directories alone
+did not prove readable host manifests/payloads, and global CLI options could prevent
+maintenance-command recovery. Both are corrected with regression coverage (11 required
+plugin tests now pass). Directory overrides are parsed only before the command, so
+prompt arguments cannot change the checked project. Repeated inventory timeouts under
+load justified raising the bounded native admission budget from three to five seconds,
+still below the seven-second dispatch deadline.
+
+The updater suite exposed a synthetic recovery test inheriting the running session's
+snapshot and real home/plugin roots. Its subprocess now uses a disposable home,
+project and plugin roots and its own preserved snapshot; all 43 updater tests pass.
+Actual Codex and Claude admission passes with host manifest/payload validation enabled.
+No shared runtime has been deployed yet.
