@@ -95,38 +95,6 @@ class RefreshCliTests(unittest.TestCase):
             self.assertEqual(0, REFRESH.main(["--host", "claude"]))
         refresh.assert_called_once()
 
-    def test_a_published_repository_refreshes_only_the_claude_marketplaces_that_list_or_publish_it(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            for name, plugins in (("tj-agents", [{"name": "base", "source": {
-                    "source": "git-subdir", "url": "https://github.com/tj-agents/core.git", "path": "plugins/base"}}]),
-                                  ("other", [{"name": "kit", "source": "./plugins/kit"}])):
-                catalog = root / name / ".claude-plugin/marketplace.json"
-                catalog.parent.mkdir(parents=True)
-                catalog.write_text(json.dumps({"plugins": plugins}), encoding="utf-8")
-            (root / "plugins").mkdir()
-            (root / "plugins/known_marketplaces.json").write_text(json.dumps({
-                "tj-agents": {"source": {"source": "github", "repo": "tj-agents/marketplace"},
-                              "installLocation": str(root / "tj-agents")},
-                "other": {"source": {"source": "github", "repo": "tj-agents/other"},
-                          "installLocation": str(root / "other")}}), encoding="utf-8")
-            (root / "settings.json").write_text(json.dumps({"enabledPlugins": {
-                "base@tj-agents": True, "kit@other": True}}), encoding="utf-8")
-            for repositories, chosen in (({"tj-agents/core"}, {"tj-agents"}), ({"tj-agents/marketplace"}, {"tj-agents"}),
-                                         ({"tj-agents/other"}, {"other"}), ({"tj-agents/none"}, None),
-                                         (None, {"tj-agents", "other"})):
-                with self.subTest(repositories=repositories), \
-                        mock.patch.object(REFRESH, "configuration_root", return_value=root), \
-                        mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude"), \
-                        mock.patch.object(REFRESH, "refresh") as refresh:
-                    self.assertTrue(REFRESH.refresh_repositories(root / "project", repositories))
-                    if chosen is None:
-                        refresh.assert_not_called()
-                    else:
-                        self.assertEqual(chosen, set(refresh.call_args.args[3]))
-                        self.assertEqual([identity for identity in ("base@tj-agents", "kit@other")
-                                          if identity.rsplit("@", 1)[1] in chosen], refresh.call_args.args[4])
-
     def test_refresh_updates_applicable_claude_local_installations(self):
         fake = FakeClaude([
             {"id": "machine@tj-agents", "scope": "local", "projectPath": str(ROOT), "enabled": True, "version": "v1"},
@@ -143,38 +111,14 @@ class RefreshCliTests(unittest.TestCase):
         ])
         self.assertEqual("v1", fake.installations[1]["version"])
 
-    def test_recorded_revisions_skip_update_calls_for_unchanged_plugins(self):
-        fake = FakeClaude([
-            {"id": "base@tj-agents", "scope": "user", "enabled": True, "version": "v1"},
-            {"id": "machine@tj-agents", "scope": "user", "enabled": True, "version": "v1"}])
-        recorded = {"base@tj-agents": "same"}
-        revisions = {"base@tj-agents": "same", "machine@tj-agents": "changed"}
-        with mock.patch.object(REFRESH, "read_json", return_value={}), mock.patch.object(REFRESH, "run", side_effect=fake), \
-                mock.patch.object(REFRESH, "plugin_revision", side_effect=lambda identity: revisions[identity]):
-            updated = REFRESH.refresh("claude", "claude", ROOT, {}, ["base@tj-agents", "machine@tj-agents"], recorded)
-        self.assertEqual(["machine@tj-agents"], updated)
-        self.assertEqual([command for command, _ in fake.commands], [
-            ["claude", "plugin", "list", "--json"],
-            ["claude", "plugin", "update", "machine@tj-agents", "--scope", "user", "--json"],
-            ["claude", "plugin", "list", "--json"],
-        ])
-        self.assertEqual("changed", recorded["machine@tj-agents"])
-
-    def test_plugin_revision_ignores_a_git_subdir_sourced_plugin(self):
-        catalog = {"plugins": [{"name": "base", "source": {
-            "source": "git-subdir", "url": "https://github.com/tj-agents/core.git", "path": "plugins/base"}}]}
-
-        def fake_read_json(path):
-            if path.name == "known_marketplaces.json":
-                return {"tj-agents": {"installLocation": str(ROOT)}}
-            if path.name == "marketplace.json":
-                return catalog
-            return {}
-
-        with mock.patch.object(REFRESH, "read_json", side_effect=fake_read_json), \
-                mock.patch.object(REFRESH.plugin_autoupdate, "subtree_revision") as subtree_revision:
-            self.assertIsNone(REFRESH.plugin_revision("base@tj-agents"))
-        subtree_revision.assert_not_called()
+    def test_a_scope_that_already_has_an_installation_is_not_reinstalled(self):
+        def settings(path):
+            return {"enabledPlugins": {"machine@tj-agents": True}} if path.name == "settings.local.json" else {}
+        fake = FakeClaude([{"id": "machine@tj-agents", "scope": "local", "projectPath": str(ROOT), "enabled": True,
+                            "version": "v1"}])
+        with mock.patch.object(REFRESH, "read_json", side_effect=settings), mock.patch.object(REFRESH, "run", side_effect=fake):
+            REFRESH.refresh("claude", "claude", ROOT, {}, ["machine@tj-agents"])
+        self.assertNotIn("install", [command[2] for command, _ in fake.commands])
 
     def test_claude_installs_only_at_the_scope_the_repository_declares(self):
         for declared, scope in (("settings.local.json", "local"), ("settings.json", "project")):
@@ -418,6 +362,185 @@ class RefreshCliTests(unittest.TestCase):
                 mock.patch.object(REFRESH, "refresh") as refresh, mock.patch("sys.stdout"), mock.patch("sys.stderr"):
             self.assertEqual(1, REFRESH.main([]))
         refresh.assert_called_once_with("codex", "codex", Path.cwd().resolve(), {}, [])
+
+
+CORE_HEAD = "c" * 40
+OLD_HEAD = "a" * 40
+DOTNET_HEAD = "d" * 40
+CATALOG = {"plugins": [
+    {"name": "base", "source": {"source": "git-subdir", "url": "https://github.com/tj-agents/core.git",
+                                "path": "./plugins/base", "ref": "main"}},
+    {"name": "dotnet", "source": {"source": "git-subdir", "url": "https://github.com/tj-agents/dotnet.git",
+                                  "path": "./plugins/dotnet", "ref": "main"}}]}
+
+
+def write(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value), encoding="utf-8")
+
+
+class ClaudeHome:
+    """A CLAUDE_CONFIG_DIR with the tj-agents marketplace, its git-subdir catalog and recorded installs."""
+
+    def __init__(self, test):
+        temp = tempfile.TemporaryDirectory(prefix="claude home ")
+        test.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        self.config = self.root / "claude"
+        patcher = mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.config),
+                                               "AGENT_STATE_DIRECTORY": str(self.root / "state")})
+        patcher.start()
+        test.addCleanup(patcher.stop)
+        write(self.config / "plugins/known_marketplaces.json", {"tj-agents": {
+            "source": {"source": "github", "repo": "tj-agents/marketplace"}, "installLocation": str(self.root / "market")}})
+        write(self.root / "market/.claude-plugin/marketplace.json", CATALOG)
+
+    def project(self, name, settings="settings.local.json", *identities):
+        directory = self.root / name
+        write(directory / ".claude" / settings, {"enabledPlugins": {identity: True for identity in identities}})
+        return directory
+
+    def installed(self, *entries):
+        plugins = {}
+        for identity, scope, owner, sha in entries:
+            entry = {"scope": scope, "version": "v1", "gitCommitSha": sha}
+            if owner:
+                entry["projectPath"] = str(owner)
+            plugins.setdefault(identity, []).append(entry)
+        write(self.config / "plugins/installed_plugins.json", {"version": 2, "plugins": plugins})
+        return [{**entry, "id": identity, "enabled": True} for identity, entries in plugins.items() for entry in entries]
+
+
+class HeadReconcileTests(unittest.TestCase):
+    def setUp(self):
+        self.home = ClaudeHome(self)
+        patcher = mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def record(self, heads, trees=()):
+        trees = dict(trees)
+        REFRESH.plugin_autoupdate.record_contents(heads, trees, {key.split("@")[1].split(":")[0] for key in trees})
+
+    def test_installs_at_their_publisher_heads_start_no_process(self):
+        project = self.home.project("preaward", "settings.local.json", "base@tj-agents", "dotnet@tj-agents")
+        self.home.installed(("base@tj-agents", "local", project, CORE_HEAD),
+                            ("dotnet@tj-agents", "local", project, DOTNET_HEAD))
+        self.record({"tj-agents/core@main": CORE_HEAD, "tj-agents/dotnet@main": DOTNET_HEAD})
+        with mock.patch.object(REFRESH, "run", side_effect=AssertionError("process started")):
+            self.assertEqual([], REFRESH.reconcile_claude(project))
+
+    def test_an_install_whose_files_are_unchanged_at_the_new_head_is_left_alone(self):
+        project = self.home.project("preaward", "settings.local.json", "base@tj-agents", "dotnet@tj-agents")
+        fake = FakeClaude(self.home.installed(("base@tj-agents", "local", project, OLD_HEAD),
+                                              ("dotnet@tj-agents", "local", project, OLD_HEAD)))
+        self.record({"tj-agents/core@main": CORE_HEAD, "tj-agents/dotnet@main": DOTNET_HEAD},
+                    {f"tj-agents/core@{OLD_HEAD}:plugins/base": "1" * 40,
+                     f"tj-agents/core@{CORE_HEAD}:plugins/base": "1" * 40,
+                     f"tj-agents/dotnet@{OLD_HEAD}:plugins/dotnet": "2" * 40,
+                     f"tj-agents/dotnet@{DOTNET_HEAD}:plugins/dotnet": "3" * 40})
+        with mock.patch.object(REFRESH, "run", side_effect=fake):
+            self.assertEqual(["dotnet@tj-agents"], REFRESH.reconcile_claude(project))
+        self.assertEqual([
+            ["claude", "plugin", "marketplace", "update", "tj-agents"],
+            ["claude", "plugin", "update", "dotnet@tj-agents", "--scope", "local", "--json"],
+            ["claude", "plugin", "list", "--json"],
+        ], [command for command, _ in fake.commands])
+
+    def test_an_install_at_an_unrecorded_commit_waits_for_a_publish_to_be_compared(self):
+        project = self.home.project("preaward", "settings.local.json", "base@tj-agents")
+        fake = FakeClaude(self.home.installed(("base@tj-agents", "local", project, OLD_HEAD)))
+        self.record({"tj-agents/core@main": CORE_HEAD})
+        with mock.patch.object(REFRESH, "run", side_effect=fake):
+            self.assertEqual([], REFRESH.reconcile_claude(project))
+            self.assertEqual([], fake.commands)
+            REFRESH.reconcile_claude(project, event=True, repositories={"tj-agents/core"})
+        self.assertIn(["claude", "plugin", "update", "base@tj-agents", "--scope", "local", "--json"],
+                      [command for command, _ in fake.commands])
+
+    def test_a_project_updates_only_its_own_stale_copy(self):
+        current = self.home.project("authz", "settings.local.json", "base@tj-agents")
+        stale = self.home.project("erm", "settings.local.json", "base@tj-agents")
+        fake = FakeClaude(self.home.installed(("base@tj-agents", "local", current, CORE_HEAD),
+                                              ("base@tj-agents", "local", stale, OLD_HEAD)))
+        self.record({"tj-agents/core@main": CORE_HEAD}, {f"tj-agents/core@{OLD_HEAD}:plugins/base": "1" * 40,
+                                                       f"tj-agents/core@{CORE_HEAD}:plugins/base": "2" * 40})
+        with mock.patch.object(REFRESH, "run", side_effect=fake):
+            self.assertEqual([], REFRESH.reconcile_claude(current))
+            REFRESH.reconcile_claude(stale)
+        self.assertEqual([(["claude", "plugin", "update", "base@tj-agents", "--scope", "local", "--json"], stale)],
+                         [(command, cwd) for command, cwd in fake.commands if command[2] == "update"])
+
+    def test_an_unknown_publisher_head_is_never_guessed_without_an_event(self):
+        project = self.home.project("preaward", "settings.local.json", "base@tj-agents")
+        self.home.installed(("base@tj-agents", "local", project, OLD_HEAD))
+        with mock.patch.object(REFRESH, "run", side_effect=AssertionError("process started")):
+            self.assertEqual([], REFRESH.reconcile_claude(project))
+
+    def test_a_publish_reads_only_the_contents_it_can_have_changed_in_one_query(self):
+        project = self.home.project("preaward", "settings.local.json", "base@tj-agents", "dotnet@tj-agents")
+        self.home.installed(("dotnet@tj-agents", "local", project, OLD_HEAD))
+        cases = (({"tj-agents/dotnet"}, True, ["tj-agents/dotnet"]),
+                 ({"tj-agents/marketplace"}, True, ["tj-agents/core", "tj-agents/dotnet"]),
+                 (None, True, ["tj-agents/core", "tj-agents/dotnet"]),
+                 ({"tj-agents/dotnet"}, False, ["tj-agents/core", "tj-agents/dotnet"]))
+        for repositories, seeded, expected in cases:
+            with self.subTest(repositories=repositories, seeded=seeded):
+                (self.home.root / "state/plugin-heads.json").unlink(missing_ok=True)
+                if seeded:
+                    self.record({"tj-agents/core@main": OLD_HEAD})
+                queries = []
+
+                def query(arguments):
+                    text = arguments[-1]
+                    queries.append(text)
+                    data = {}
+                    for alias, repo, head in (("r0", "core", CORE_HEAD), ("r1", "dotnet", DOTNET_HEAD)):
+                        if f'name: "{repo}"' in text:
+                            index = sorted(expected).index(f"tj-agents/{repo}")
+                            data[f"r{index}"] = {"h": {"oid": head}, "t0": {"oid": "4" * 40}, "t1": {"oid": "5" * 40}}
+                    return {"data": data}
+                self.assertEqual(set(), REFRESH.refresh_heads(repositories, revision=self.fail, query=query))
+                self.assertEqual(1, len(queries))
+                self.assertEqual(expected, sorted(f"tj-agents/{name}" for name in ("core", "dotnet")
+                                                  if f'name: "{name}"' in queries[0]))
+                contents = REFRESH.plugin_autoupdate.read_contents()
+                self.assertEqual(DOTNET_HEAD, contents["heads"]["tj-agents/dotnet@main"])
+                self.assertIn(f"tj-agents/dotnet@{DOTNET_HEAD}:plugins/dotnet", contents["trees"])
+                self.assertIn(f'"{OLD_HEAD}:plugins/dotnet"', queries[0])
+
+    def test_without_the_content_query_heads_still_come_from_ls_remote(self):
+        def query(arguments):
+            raise RuntimeError("gh is not signed in")
+        with mock.patch("sys.stderr"):
+            self.assertEqual(set(), REFRESH.refresh_heads(None, revision=lambda url, ref: DOTNET_HEAD, query=query))
+        self.assertEqual({"tj-agents/core@main": DOTNET_HEAD, "tj-agents/dotnet@main": DOTNET_HEAD},
+                         REFRESH.plugin_autoupdate.read_contents()["heads"])
+
+    def test_a_publish_installs_a_missing_declared_scope_and_reports_an_unreadable_head(self):
+        project = self.home.project("preaward", "settings.local.json", "base@tj-agents", "dotnet@tj-agents")
+        fake = FakeClaude(self.home.installed(("base@tj-agents", "local", project, CORE_HEAD)))
+
+        def install(command, cwd):
+            if command[2] == "install":
+                fake.installations.append({"id": command[3], "scope": command[5], "projectPath": str(cwd),
+                                           "enabled": True, "version": "v2"})
+            return fake(command, cwd)
+        with mock.patch.object(REFRESH, "run", side_effect=install), mock.patch("sys.stderr"):
+            self.assertFalse(REFRESH.refresh_repositories(project, {"tj-agents/dotnet"}, revision=lambda url, ref: None,
+                                                          query=lambda arguments: {"data": {}}))
+        self.assertIn(["claude", "plugin", "install", "dotnet@tj-agents", "--scope", "local"],
+                      [command for command, _ in fake.commands])
+        self.assertNotIn("update", [command[2] for command, _ in fake.commands])
+
+    def test_content_query_names_only_validated_revisions_and_paths(self):
+        wanted = {"tj-agents/core@main": {"plugins/base", 'plugins/x") { oid } evil: object(expression: "y'}}
+        captured = []
+        heads, trees = REFRESH.github_contents(wanted, {"tj-agents/core@main": {OLD_HEAD}}, {},
+                                               query=lambda arguments: captured.append(arguments[-1]) or {"data": {}})
+        self.assertEqual(({}, {}), (heads, trees))
+        self.assertNotIn("evil", captured[0])
+        self.assertIn(f'"{OLD_HEAD}:plugins/base"', captured[0])
 
 
 if __name__ == "__main__":

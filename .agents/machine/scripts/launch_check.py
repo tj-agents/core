@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Apply plugin updates published since the last check, then return (Python 3.11+).
 
-One non-blocking poll of the machine event topic. Nothing else runs unless an event arrived.
+One non-blocking poll of the machine event topic, then a file-only comparison of this project's Claude
+installs with the recorded publisher heads. A process starts only for an install that is behind.
 """
 
 from __future__ import annotations
@@ -155,7 +156,35 @@ def apply(envelopes: list[dict], cursor: dict, path: Path, project: Path, update
     return "updated"
 
 
-def check(project: Path, fetch=https_get, update=update_host, now: float | None = None) -> str:
+def reconcile_installs(project: Path, updated: set[str] | None = None) -> list[str]:
+    import reload_plugins
+
+    changed = reload_plugins.reconcile_claude(project)
+    if updated is not None:
+        updated.update(changed)
+    return changed
+
+
+def settle(project: Path, reconcile=None) -> str:
+    import plugin_autoupdate
+
+    lock = plugin_autoupdate.acquire_lock(state_directory() / "launch-check.lock")
+    if lock is None:
+        return "current"
+    try:
+        changed = (reconcile or reconcile_installs)(project)
+    except Exception as error:
+        print(f"plugins: claude install check failed: {error}", file=sys.stderr)
+        return "failed"
+    finally:
+        lock.close()
+    if not changed:
+        return "current"
+    print(f"plugins: updated {', '.join(sorted(changed))}", file=sys.stderr)
+    return "updated"
+
+
+def check(project: Path, fetch=https_get, update=update_host, now: float | None = None, reconcile=None) -> str:
     directory = state_directory()
     topic = read_json(directory / "machine-events.json").get("topic")
     if not isinstance(topic, str) or not TOPIC.fullmatch(topic):
@@ -173,9 +202,8 @@ def check(project: Path, fetch=https_get, update=update_host, now: float | None 
     except (OSError, ValueError) as error:
         print(f"plugins: update check skipped ({type(error).__name__})", file=sys.stderr)
         return "offline"
-    if not envelopes:
-        return "current"
-    return apply(envelopes, cursor, path, project, update, now, expired)
+    result = apply(envelopes, cursor, path, project, update, now, expired) if envelopes else "current"
+    return settle(project, reconcile) if result == "current" else result
 
 
 def mark_current(fetch=https_get, now: float | None = None) -> bool:

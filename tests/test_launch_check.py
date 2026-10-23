@@ -56,7 +56,8 @@ class LaunchCheckTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory(prefix="launch check ")
         self.addCleanup(temp.cleanup)
         self.state = Path(temp.name)
-        patcher = mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state)})
+        patcher = mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state),
+                                               "CLAUDE_CONFIG_DIR": str(self.state / "claude")})
         patcher.start()
         self.addCleanup(patcher.stop)
         (self.state / "machine-events.json").write_text(json.dumps({"topic": TOPIC}), encoding="utf-8")
@@ -82,6 +83,29 @@ class LaunchCheckTests(unittest.TestCase):
         popen.assert_not_called()
         self.assertEqual([], self.updates)
         self.assertEqual({"since": "abc"}, self.saved())
+
+    def test_a_launch_without_events_updates_only_what_the_install_check_finds_behind(self):
+        self.cursor.write_text(json.dumps({"since": "abc"}), encoding="utf-8")
+        for outcome, expected in ((["dotnet@tj-agents"], "updated"), ([], "current"), (RuntimeError("cli"), "failed")):
+            seen = []
+
+            def reconcile(project, outcome=outcome):
+                seen.append(project)
+                if isinstance(outcome, Exception):
+                    raise outcome
+                return outcome
+            with self.subTest(outcome=outcome), mock.patch.object(sys, "stderr", io.StringIO()):
+                self.assertEqual(expected, CHECK.check(ROOT, fetch=Server(), update=self.update(), reconcile=reconcile))
+                self.assertEqual([ROOT], seen)
+        self.assertEqual({"since": "abc"}, self.saved())
+
+    def test_the_install_check_waits_for_a_launch_already_applying_events(self):
+        import plugin_autoupdate
+
+        held = plugin_autoupdate.acquire_lock(self.state / "launch-check.lock")
+        self.addCleanup(held.close)
+        self.assertEqual("current", CHECK.check(ROOT, fetch=Server(), update=self.update(),
+                                                reconcile=lambda project: self.fail("ran while locked")))
 
     def test_an_unconfigured_machine_never_polls(self):
         (self.state / "machine-events.json").unlink()
