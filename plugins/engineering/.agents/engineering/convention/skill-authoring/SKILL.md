@@ -18,7 +18,7 @@ owns required skill content and layout validation. Other owners supply the rest;
 than restating them here:
 
 - **Kind**: [`SKILL_KINDS.md`](https://github.com/tj-agents/core/blob/main/SKILL_KINDS.md).
-- **Lane**, and whether the skill may declare one: `engineering:lanes`.
+- **Lane**, and whether the skill may declare one: `machine:lanes`.
 - **Where the files live and what is generated**: the repository's layout owner —
   [`SOURCE_LAYOUT.md`](https://github.com/tj-agents/core/blob/main/SOURCE_LAYOUT.md) in core,
   `template:check` in a Template-layout repository.
