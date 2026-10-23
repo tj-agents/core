@@ -164,6 +164,14 @@ class RequiredPluginsTests(unittest.TestCase):
                 required.check_launch(self.project, host, "native-cli", arguments)
                 check.assert_not_called()
 
+    def test_maintenance_words_from_another_host_are_checked_as_prompts(self):
+        for host, arguments in (("claude", ["features"]), ("claude", ["login"]),
+                                ("claude", ["completion"]), ("codex", ["plugins"]),
+                                ("codex", ["auth"])):
+            with mock.patch.object(required, "check") as check:
+                required.check_launch(self.project, host, "native-cli", arguments)
+                check.assert_called_once_with(self.project, host, "native-cli")
+
     def test_incomplete_corrupt_and_missing_declared_payloads_are_rejected(self):
         self.select("arbitrary-stack@arbitrary-publisher")
         for host in ("codex", "claude"):
