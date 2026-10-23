@@ -33,7 +33,7 @@ class PolicyViolation(ValueError):
 
 def _configuration_reader():
     path = Path(__file__).resolve().with_name("repository_configuration.py")
-    spec = importlib.util.spec_from_file_location("base_agents_repository_configuration", path)
+    spec = importlib.util.spec_from_file_location("tj_agents_repository_configuration", path)
     if spec is None or spec.loader is None:
         raise PolicyViolation("repository settings reader is unavailable")
     module = importlib.util.module_from_spec(spec)
