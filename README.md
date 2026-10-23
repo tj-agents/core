@@ -211,7 +211,15 @@ Run once per machine. Rerunning setup converges on the same channel and launch c
 ./setup.sh           # Linux (bash and python3)
 ```
 
-It enables Claude's native auto-update, copies the launch-check runtime to `~/.agents-state/bin` and
+Repeat `--step` to select existing setup steps for a scoped repair. They retain their declared order
+and always include required preconditions. `--check` inspects that same selection without applying it:
+
+```text
+./setup.ps1 --check --step "launch-check runtime" --step "shell profiles"  # Windows
+./setup.sh --check --step "launch-check runtime" --step "shell profiles"   # Linux
+```
+
+The full setup enables Claude's native auto-update, copies the launch-check runtime to `~/.agents-state/bin` and
 adds `claude` and `codex` functions to the PowerShell profiles (and `~/.bashrc` or `~/.zshrc` on
 Linux) inside one marked block, keeping a `.pre-launch-check.bak` copy. It removes the retired CLI
 launchers, the machine event listener task or systemd service, and the former hourly plugin-autoupdate
