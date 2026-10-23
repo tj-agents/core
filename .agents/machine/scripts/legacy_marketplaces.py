@@ -13,7 +13,6 @@ import plugin_autoupdate
 import reload_plugins
 
 CANONICAL = "tj-agents"
-OWNERS = {"tj-agents", "tomjseery", "concertable"}
 
 
 def owned(source: object) -> bool:
@@ -24,7 +23,7 @@ def owned(source: object) -> bool:
     else:
         location = source.get("repo") or source.get("url")
     repository = reload_plugins.repository(location)
-    return bool(repository) and repository.split("/", 1)[0] in OWNERS
+    return bool(repository) and repository.split("/", 1)[0] == CANONICAL
 
 
 def catalog_names(catalog: dict) -> set[str]:

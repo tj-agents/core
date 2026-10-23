@@ -58,10 +58,7 @@
             "not": {
               "properties": {
                 "repository": {
-                  "enum": [
-                    "tj-agents/marketplace",
-                    "tj-agents/core"
-                  ]
+                  "pattern": "^tj-agents/"
                 }
               },
               "required": [

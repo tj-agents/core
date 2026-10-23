@@ -30,6 +30,7 @@ UPDATE = load('plugin_autoupdate')
 import setup_machine as SETUP  # noqa: E402
 CORE = 'https://github.com/tj-agents/core.git'
 MARKET = 'https://github.com/tj-agents/marketplace.git'
+FOREIGN = 'https://github.com/Concertable/agents.git'
 OLD = 'a' * 40
 NEW = 'b' * 40
 PINNED = 'c' * 40
@@ -38,7 +39,7 @@ PINNED = 'c' * 40
 def user_config(projects=()):
     return {
         'marketplaces': {
-            'direct-core': {'source_type': 'git', 'source': CORE},
+            'direct-core': {'source_type': 'git', 'source': FOREIGN},
             'local-only': {'source_type': 'local', 'source': 'C:/somewhere'},
             'unused': {'source_type': 'git', 'source': 'https://github.com/tj-agents/unused.git'},
         },
@@ -93,6 +94,22 @@ def tj_agents(ref=None, *plugins):
 
 
 class DeclaredTargetTests(unittest.TestCase):
+    def test_refresh_rejects_producer_aliases_without_installing_them(self):
+        machine = Machine(self)
+        for plugin in ('python', 'react'):
+            with self.subTest(plugin=plugin):
+                alias = plugin + '-agents'
+                config = {'marketplaces': {alias: {'source_type': 'git',
+                                                   'source': f'https://github.com/tj-agents/{plugin}.git'}},
+                          'plugins': {f'{plugin}@{alias}': {'enabled': True}}}
+                targets, ignored = UPDATE.declared_targets(config)
+                self.assertEqual({}, targets)
+                self.assertIn('published through the tj-agents marketplace', ignored[0])
+                run = mock.Mock()
+                result = UPDATE.refresh_declared('codex', config, {}, run=run)
+                self.assertEqual({}, result['marketplaces'])
+                run.assert_not_called()
+
     def test_user_and_project_declarations_form_one_union_without_starting_codex(self):
         machine = Machine(self)
         docs = machine.project('docs', tj_agents(None, 'base'))
@@ -116,7 +133,7 @@ class DeclaredTargetTests(unittest.TestCase):
         stale = machine.project('stale', tj_agents(PINNED, 'base', 'kit'))
         current = machine.project('current', tj_agents(None, 'base', 'python'))
         sandbox = machine.project('sandbox', '[marketplaces.direct-core]\nsource_type = "git"\n'
-                                             f'source = "{CORE}"\nref = "{PINNED}"\n'
+                                             f'source = "{FOREIGN}"\nref = "{PINNED}"\n'
                                              '[plugins."base@direct-core"]\nenabled = true\n')
 
         targets, ignored = UPDATE.declared_targets(user_config([stale, current, sandbox]))
@@ -461,7 +478,7 @@ class DeclaredRefreshTests(unittest.TestCase):
         run = mock.Mock(return_value=True)
         recorded = {'codex:direct-core': OLD, 'codex:tj-agents': OLD}
 
-        for repositories, refreshed in (({'tj-agents/kit'}, {'tj-agents'}), ({'tj-agents/core'}, {'direct-core'}),
+        for repositories, refreshed in (({'tj-agents/kit'}, {'tj-agents'}), ({'concertable/agents'}, {'direct-core'}),
                                         ({'tj-agents/elsewhere'}, set())):
             with self.subTest(repositories=repositories):
                 outcomes = UPDATE.refresh_declared('codex', user_config([project]), dict(recorded), run=run, busy=idle,

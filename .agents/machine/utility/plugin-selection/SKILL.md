@@ -42,8 +42,12 @@ The selection lists every required package explicitly as `<plugin>@<marketplace>
 match its published identity, and its repository must belong to `tj-agents` or `Concertable`. The `tj-agents`
 name belongs only to `tj-agents/marketplace`. Each declared marketplace supplies a selected plugin, and
 two marketplace names cannot refer to the same repository. The schema is `catalog/plugins.schema.json`.
-Schema 2 and 3 locks migrate only through the adoption command; it preserves their source repositories
-and plugin identities, writes the schema 1 selection, and removes the old lock and all revision pins.
+TJ Agents producer repositories are package sources, not selectable marketplaces. Follow the
+[shared catalog naming rule](https://github.com/tj-agents/marketplace#readme); ordinary validation rejects
+producer registrations, including Python and React, before either host's settings are written.
+Schema 2 and 3 locks migrate only through the adoption command. Migration replaces producer identities
+with their known shared-roster identities, collapses duplicates, preserves foreign publishers, writes
+the schema 1 selection, and removes the old lock and all revision pins.
 
 ## Adopt a stack
 

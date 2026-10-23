@@ -49,6 +49,15 @@ class Profiles:
 
 
 class ClaudeTests(unittest.TestCase):
+    def test_overlapping_plugin_names_do_not_make_other_publishers_superseded(self):
+        profiles = Profiles(self)
+        profiles.claude_marketplace("tj-agents", "tj-agents/marketplace", ["python"])
+        profiles.claude_marketplace("agents", "Concertable/agents", ["python"])
+        profiles.claude_marketplace("other-agents", "tomjseery/other-agents", ["python"])
+        run = mock.Mock()
+        self.assertEqual(([], []), LEGACY.review("claude", profiles.project, lambda: "claude", run))
+        run.assert_not_called()
+
     def test_unused_superseded_registrations_are_removed_and_used_ones_reported(self):
         profiles = Profiles(self)
         profiles.claude_marketplace("tj-agents", "tj-agents/marketplace", ["base", "python", "infonetica", "azure"])
