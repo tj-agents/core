@@ -52,6 +52,16 @@ class ReconcileTests(unittest.TestCase):
         self.refresh.assert_called_once_with()
         self.assertEqual("b", self.reconciler.state["tj-agents/core"]["revision"])
 
+    def test_catalog_comparison_survives_a_json_round_trip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state_file = Path(directory) / "state.json"
+            self.reconciler.repository(current())
+            self.refresh.assert_called_once_with()
+            events.plugins.write_json(state_file, self.reconciler.state)
+            reloaded = events.Reconciler(events.plugins.read_json(state_file), refresh=self.refresh, policy=self.policy)
+            reloaded.repository(current(revision="b"))
+        self.refresh.assert_called_once_with()
+
     def test_a_changed_catalog_oid_refreshes_again(self):
         self.reconciler.repository(current())
         self.refresh.assert_called_once_with()

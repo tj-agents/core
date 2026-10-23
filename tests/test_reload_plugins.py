@@ -160,6 +160,22 @@ class RefreshCliTests(unittest.TestCase):
         ])
         self.assertEqual("changed", recorded["machine@tj-agents"])
 
+    def test_plugin_revision_ignores_a_git_subdir_sourced_plugin(self):
+        catalog = {"plugins": [{"name": "base", "source": {
+            "source": "git-subdir", "url": "https://github.com/tj-agents/core.git", "path": "plugins/base"}}]}
+
+        def fake_read_json(path):
+            if path.name == "known_marketplaces.json":
+                return {"tj-agents": {"installLocation": str(ROOT)}}
+            if path.name == "marketplace.json":
+                return catalog
+            return {}
+
+        with mock.patch.object(REFRESH, "read_json", side_effect=fake_read_json), \
+                mock.patch.object(REFRESH.plugin_autoupdate, "subtree_revision") as subtree_revision:
+            self.assertIsNone(REFRESH.plugin_revision("base@tj-agents"))
+        subtree_revision.assert_not_called()
+
     def test_claude_installs_only_at_the_scope_the_repository_declares(self):
         for declared, scope in (("settings.local.json", "local"), ("settings.json", "project")):
             def settings(path, declared=declared):

@@ -150,8 +150,8 @@ class Reconciler:
         revision = current["defaultBranchRef"]["target"]["oid"]
         old = self.state.get(repository, {})
         policy = (current.get("policy") or {}).get("oid")
-        catalog = tuple(sorted(oid for name in ("marketplace", "catalog", "plugin", "codexPlugin")
-                               if (oid := (current.get(name) or {}).get("oid"))))
+        catalog = sorted(oid for name in ("marketplace", "catalog", "plugin", "codexPlugin")
+                        if (oid := (current.get(name) or {}).get("oid")))
         if old.get("revision") == revision:
             return
         if policy and policy != old.get("policy"):
