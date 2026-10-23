@@ -754,6 +754,68 @@ class SkillRouterTests(unittest.TestCase):
         self.assertEqual(2, result.returncode, result.stderr)
         self.assertIn("stackx:style", result.stderr)
 
+    def test_malformed_routes_on_a_v3_tier_still_fail_closed(self):
+        self.install_stack_tier()
+        (self.repo / "stack.marker").write_text("", encoding="utf-8")
+        (self.base / "home" / ".claude" / "plugins" / "cache" / "market" / "stackx" / "1" / "tier.json").write_text(
+            json.dumps({"schema_version": 3, "tier": "stackx", "applies": "stack-present",
+                        "detect": {"file": "stack.marker"},
+                        "routes": [{"path": r"\.sx$", "skills": ["stackx:style"], "content_requires": ["x"]}]}),
+            encoding="utf-8")
+        result = self.run_router(("--harness", "claude"), self.write_payload(str(uuid.uuid4())))
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("tier.json routes are unusable", result.stderr)
+
+    def test_a_repo_table_adds_to_tier_routes_instead_of_replacing_them(self):
+        self.install_stack_tier()
+        (self.repo / "stack.marker").write_text("", encoding="utf-8")
+        self.routes({"routes": [{"path": "^docs/", "skills": ["feature"]}]})
+        result = self.run_router(("--harness", "claude"), self.write_payload(str(uuid.uuid4())))
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("stackx:style", result.stderr)
+
+    def test_an_always_applicable_tier_enforces_its_routes(self):
+        self.install_stack_tier()
+        (self.base / "home" / ".claude" / "plugins" / "cache" / "market" / "stackx" / "1" / "tier.json").write_text(
+            json.dumps({"schema_version": 1, "tier": "stackx", "applies": "always",
+                        "routes": [{"path": r"\.sx$", "skills": ["stackx:style"]}]}),
+            encoding="utf-8")
+        result = self.run_router(("--harness", "claude"), self.write_payload(str(uuid.uuid4())))
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("stackx:style", result.stderr)
+
+    def test_one_write_into_two_routed_repositories_must_be_split(self):
+        self.install_stack_tier()
+        (self.repo / "stack.marker").write_text("", encoding="utf-8")
+        sibling = self.base / "repo.worktrees" / "feature"
+        (sibling / "src").mkdir(parents=True)
+        (sibling / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
+        (sibling / "stack.marker").write_text("", encoding="utf-8")
+        payload = self.write_payload(str(uuid.uuid4()), tool_name="Bash", tool_input={
+            "command": f"echo a > {(self.repo / 'src' / 'a.sx').as_posix()} && echo b > {(sibling / 'src' / 'b.sx').as_posix()}"})
+        result = self.run_router(("--harness", "claude"), payload)
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("more than one routed repository", result.stderr)
+
+    def test_git_bash_drive_paths_resolve_to_windows_paths_only_on_windows(self):
+        module = self.load_router()
+        with patch.object(module.os, "name", "nt"):
+            self.assertEqual("C:/Users/me/repo/a.cs", module.native_path("/c/Users/me/repo/a.cs"))
+            self.assertEqual("src/a.cs", module.native_path("src/a.cs"))
+        with patch.object(module.os, "name", "posix"):
+            self.assertEqual("/c/Users/me/repo/a.cs", module.native_path("/c/Users/me/repo/a.cs"))
+
+    def test_route_validation_rejects_rows_that_would_crash_at_match_time(self):
+        module = self.load_router()
+        validate = module.tier_gate.route_diagnostics
+        self.assertEqual([], validate([{"path": r"\.cs$", "skills": ["dotnet:style"], "content_requires": "//"}]))
+        for row in ({"path": r"\.cs$", "skills": ["dotnet:style"], "content_requires": ["//"]},
+                    {"path": r"\.cs$", "skills": ["style"]},
+                    {"path": r"\.cs$", "skills": ["dotnet:style"], "deny": ["x"]},
+                    {"path": "(", "skills": ["dotnet:style"]}):
+            with self.subTest(row=row):
+                self.assertEqual(1, len(validate([row])))
+
     def test_main_session_read_of_a_skill_file_is_not_an_invocation(self):
         skill_file = self.install_stack_tier()
         (self.repo / "stack.marker").write_text("", encoding="utf-8")

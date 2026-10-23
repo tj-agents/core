@@ -87,10 +87,13 @@ def check_tier_declaration(payload, problems):
             problems.append(f"{payload.name}: tier.json owner_repository entry {name!r} is not owner/name")
 
     detect = data.get("detect")
-    if data.get("schema_version") == 3:
-        validator = runpy.run_path(str(Path(__file__).with_name("tier_gate.py")))["v3_declaration_diagnostics"]
+    gate = runpy.run_path(str(Path(__file__).with_name("tier_gate.py")))
+    if "routes" in data:
         problems.extend(f"{payload.name}: {item['path']}: {item['message']}"
-                        for item in validator(data, payload_dir=payload))
+                        for item in gate["route_diagnostics"](data["routes"]))
+    if data.get("schema_version") == 3:
+        problems.extend(f"{payload.name}: {item['path']}: {item['message']}"
+                        for item in gate["v3_declaration_diagnostics"](data, payload_dir=payload))
         return
     for field in ("employer", "session_context"):
         if field in data:
