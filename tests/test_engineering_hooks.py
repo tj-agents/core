@@ -66,6 +66,40 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertIn("auto_approve_design=false", context)
         self.assertEqual([], list(self.cwd.iterdir()))
 
+    def test_session_start_context_carries_only_the_finish_section(self):
+        script = ".agents/engineering/policy/session/scripts/session-context.py"
+        contract = self.package / ".agents/engineering/policy/session/SKILL.md"
+        result = self.run_hook(
+            script, {"hook_event_name": "SessionStart"}, arguments=("--session-start-context",)
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        output = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual("SessionStart", output["hookEventName"])
+        context = output["additionalContext"]
+        self.assertIn(str(contract), context)
+        self.assertIn("machine:close", context)
+        self.assertIn("Before returning a completed outcome", context)
+        self.assertNotIn("## Finish the session", context)
+        self.assertNotIn("## Keep large changes reviewable", context)
+        self.assertNotIn("A task has an owning lifecycle", context)
+        self.assertLess(len(context), 1000)
+        self.assertEqual([], list(self.cwd.iterdir()))
+
+    def test_manifest_dispatches_session_start_context_to_claude(self):
+        manifest = json.loads(
+            (ROOT / ".agents/plugins/manifests/claude/engineering-hooks.json").read_text(encoding="utf-8")
+        )
+        registrations = manifest["hooks"]["SessionStart"]
+        self.assertEqual(1, len(registrations))
+        self.assertEqual(1, len(registrations[0]["hooks"]))
+        hook = registrations[0]["hooks"][0]
+        self.assertEqual(
+            ["-B", "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py", "--deadline", "10", "--hook",
+             "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py",
+             "--session-start-context"],
+            hook["args"],
+        )
+
     def test_missing_context_contract_is_an_actionable_error(self):
         contract = self.package / ".agents/engineering/policy/session/SKILL.md"
         contract.unlink()
