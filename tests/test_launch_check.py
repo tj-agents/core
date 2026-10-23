@@ -56,7 +56,8 @@ class LaunchCheckTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory(prefix="launch check ")
         self.addCleanup(temp.cleanup)
         self.state = Path(temp.name)
-        patcher = mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state)})
+        patcher = mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state),
+                                               "CLAUDE_CONFIG_DIR": str(self.state / "claude")})
         patcher.start()
         self.addCleanup(patcher.stop)
         (self.state / "machine-events.json").write_text(json.dumps({"topic": TOPIC}), encoding="utf-8")
@@ -65,7 +66,7 @@ class LaunchCheckTests(unittest.TestCase):
 
     def update(self, outcomes=None):
         def run(host, repositories, project):
-            self.updates.append((host, frozenset(repositories)))
+            self.updates.append((host, frozenset(repositories) if repositories is not None else None))
             return (outcomes or {}).get(host, True)
         return run
 
@@ -82,6 +83,29 @@ class LaunchCheckTests(unittest.TestCase):
         popen.assert_not_called()
         self.assertEqual([], self.updates)
         self.assertEqual({"since": "abc"}, self.saved())
+
+    def test_a_launch_without_events_updates_only_what_the_install_check_finds_behind(self):
+        self.cursor.write_text(json.dumps({"since": "abc"}), encoding="utf-8")
+        for outcome, expected in ((["dotnet@tj-agents"], "updated"), ([], "current"), (RuntimeError("cli"), "failed")):
+            seen = []
+
+            def reconcile(project, outcome=outcome):
+                seen.append(project)
+                if isinstance(outcome, Exception):
+                    raise outcome
+                return outcome
+            with self.subTest(outcome=outcome), mock.patch.object(sys, "stderr", io.StringIO()):
+                self.assertEqual(expected, CHECK.check(ROOT, fetch=Server(), update=self.update(), reconcile=reconcile))
+                self.assertEqual([ROOT], seen)
+        self.assertEqual({"since": "abc"}, self.saved())
+
+    def test_the_install_check_waits_for_a_launch_already_applying_events(self):
+        import plugin_autoupdate
+
+        held = plugin_autoupdate.acquire_lock(self.state / "launch-check.lock")
+        self.addCleanup(held.close)
+        self.assertEqual("busy", CHECK.check(ROOT, fetch=Server(), update=self.update(),
+                                             reconcile=lambda project: self.fail("ran while locked")))
 
     def test_an_unconfigured_machine_never_polls(self):
         (self.state / "machine-events.json").unlink()
@@ -103,17 +127,17 @@ class LaunchCheckTests(unittest.TestCase):
         server = Server([hint("m1", "tj-agents/core"), {"id": "m2", "event": "message", "message": "noise"},
                          hint("m3", "Concertable/Agents"), hint("m4", "other/repo")])
         with mock.patch.object(sys, "stderr", io.StringIO()):
-            self.assertEqual("updated", CHECK.check(ROOT, fetch=server, update=self.update()))
+            self.assertEqual("updated", CHECK.check(ROOT, fetch=server, update=self.update(), now=1234))
         named = frozenset({"tj-agents/core", "concertable/agents"})
         self.assertEqual({("claude", named), ("codex", named)}, set(self.updates))
-        self.assertEqual({"since": "m4"}, self.saved())
+        self.assertEqual({"since": "m4", "since_at": 1234}, self.saved())
         self.assertIn("since=all", server.paths[0])
 
     def test_events_for_repositories_without_plugins_only_advance_the_cursor(self):
         server = Server([{"id": "m1", "event": "message", "message": "{}"}])
-        self.assertEqual("current", CHECK.check(ROOT, fetch=server, update=self.update()))
+        self.assertEqual("current", CHECK.check(ROOT, fetch=server, update=self.update(), now=1234))
         self.assertEqual([], self.updates)
-        self.assertEqual({"since": "m1"}, self.saved())
+        self.assertEqual({"since": "m1", "since_at": 1234}, self.saved())
 
     def test_the_cursor_advances_only_after_every_host_succeeds(self):
         server = Server([hint("m1", "tj-agents/core")])
@@ -122,27 +146,50 @@ class LaunchCheckTests(unittest.TestCase):
                                                    now=1000))
         self.assertEqual("all", self.saved()["since"])
         self.assertEqual({"applied": "m1"}, self.saved()["hosts"]["claude"])
+        self.assertEqual({"applied": None}, self.saved()["hosts"]["codex"])
 
         self.updates.clear()
-        self.assertEqual("current", CHECK.check(ROOT, fetch=server, update=self.update(), now=1100))
-        self.assertEqual([], self.updates)
+        with mock.patch.object(sys, "stderr", io.StringIO()):
+            self.assertEqual("updated", CHECK.check(ROOT, fetch=server, update=self.update(), now=1001))
+        self.assertEqual([("codex", frozenset({"tj-agents/core"}))], self.updates)
+        self.assertEqual({"since": "m1", "since_at": 1001}, self.saved())
 
+        self.updates.clear()
         server.messages.append(hint("m2", "tj-agents/kit"))
         with mock.patch.object(sys, "stderr", io.StringIO()):
             self.assertEqual("updated", CHECK.check(ROOT, fetch=server, update=self.update(), now=1200))
         self.assertEqual({("claude", frozenset({"tj-agents/kit"})),
-                          ("codex", frozenset({"tj-agents/core", "tj-agents/kit"}))}, set(self.updates))
-        self.assertEqual({"since": "m2"}, self.saved())
+                          ("codex", frozenset({"tj-agents/kit"}))}, set(self.updates))
+        self.assertEqual({"since": "m2", "since_at": 1200}, self.saved())
 
-    def test_a_failed_host_is_retried_after_the_backoff_without_new_events(self):
+    def test_a_failed_host_is_retried_on_the_very_next_check(self):
         server = Server([hint("m1", "tj-agents/core")])
         with mock.patch.object(sys, "stderr", io.StringIO()):
             CHECK.check(ROOT, fetch=server, update=self.update({"claude": False}), now=1000)
             self.updates.clear()
-            self.assertEqual("updated", CHECK.check(ROOT, fetch=server, update=self.update(),
-                                                    now=1000 + CHECK.RETRY_SECONDS))
+            self.assertEqual("updated", CHECK.check(ROOT, fetch=server, update=self.update(), now=1000))
         self.assertEqual([("claude", frozenset({"tj-agents/core"}))], self.updates)
-        self.assertEqual({"since": "m1"}, self.saved())
+        self.assertEqual({"since": "m1", "since_at": 1000}, self.saved())
+
+    def test_an_expired_cursor_falls_back_to_a_full_comparison_on_both_hosts(self):
+        self.cursor.write_text(json.dumps({"since": "old", "since_at": 0}), encoding="utf-8")
+        server = Server([hint("old", "tj-agents/kit"), hint("new", "tj-agents/core")])
+        with mock.patch.object(sys, "stderr", io.StringIO()):
+            self.assertEqual("updated", CHECK.check(ROOT, fetch=server, update=self.update(),
+                                                    now=CHECK.EXPIRY_SECONDS + 1))
+        self.assertEqual({("claude", None), ("codex", None)}, set(self.updates))
+        self.assertIn("since=all", server.paths[0])
+        self.assertEqual({"since": "new", "since_at": CHECK.EXPIRY_SECONDS + 1}, self.saved())
+
+    def test_a_cursor_within_the_expiry_window_polls_only_since_the_recorded_event(self):
+        self.cursor.write_text(json.dumps({"since": "old", "since_at": 1000}), encoding="utf-8")
+        server = Server([hint("old", "tj-agents/kit"), hint("new", "tj-agents/core")])
+        with mock.patch.object(sys, "stderr", io.StringIO()):
+            self.assertEqual("updated", CHECK.check(ROOT, fetch=server, update=self.update(),
+                                                    now=1000 + CHECK.EXPIRY_SECONDS))
+        self.assertEqual({("claude", frozenset({"tj-agents/core"})),
+                          ("codex", frozenset({"tj-agents/core"}))}, set(self.updates))
+        self.assertIn("since=old", server.paths[0])
 
     def test_a_concurrent_check_leaves_the_events_to_the_one_holding_the_lock(self):
         import plugin_autoupdate
@@ -167,8 +214,8 @@ class LaunchCheckTests(unittest.TestCase):
 
     def test_setup_marks_the_newest_event_current(self):
         server = Server([hint("m1", "tj-agents/core"), hint("m2", "tj-agents/kit")])
-        self.assertTrue(CHECK.mark_current(fetch=server))
-        self.assertEqual({"since": "m2"}, self.saved())
+        self.assertTrue(CHECK.mark_current(fetch=server, now=1234))
+        self.assertEqual({"since": "m2", "since_at": 1234}, self.saved())
 
 
 @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is not installed")

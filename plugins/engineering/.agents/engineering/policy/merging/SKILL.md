@@ -111,6 +111,26 @@ An adjacent queue entry, a similarly named branch or a newer PR never silently b
 The executable monitor is `.agents/workflows/workflow_ops.py`; `engineering:merge` supplies its exact
 PR and head identity.
 
+## Transferred checkout cleanup
+
+Use `engineering:merge` Step 5's `finish` when the current owner can release its checkout itself. When
+that capability is unavailable and an authorized `workflow:handoff` transfers cleanup, the successor owns
+the exact removal, rename or move and final filesystem verification recorded in `## Next Steps`.
+The predecessor ends repository-scoped activity and emits a recorded release marker; it never performs
+the operation after launch. The successor waits for that marker before releasing the predecessor through
+`machine:peer-cli`. Resolve the registry entry by the old checkout and any recorded session or terminal
+identity. The native close operation must verify the recorded PID and start time; tab closure uses its
+exact native terminal identity. An unverifiable entry stays open with the user named as resolver.
+
+Run the filesystem operation from a verified surviving checkout after the predecessor no longer holds
+the old directory. Treat a command error or residual path as incomplete cleanup. Launcher submission or
+partial Git cleanup does not establish release of the host or removal of the directory.
+
+```text
+Next Steps: wait for the predecessor's recorded release, verify and close that exact native session,
+then remove the named old checkout from the surviving checkout and verify the old path is absent.
+```
+
 ## Whoever merges owns only the generated downstream PR that merge caused
 
 Where a merge triggers a package republish and an automated version-bump PR across consumers, that causally

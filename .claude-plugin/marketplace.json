@@ -16,14 +16,14 @@
       ]
     },
     {
-      "name": "engineering",
-      "source": "./plugins/engineering",
-      "description": "Selected engineering workflows, reviews and Git operations.",
+      "name": "agent-store",
+      "source": "./plugins/agent-store",
+      "description": "Recorded agent executions, sessions, ownership and references.",
       "category": "Productivity",
       "keywords": [
-        "engineering",
-        "workflow",
-        "git"
+        "agents",
+        "executions",
+        "registry"
       ]
     },
     {
@@ -35,6 +35,28 @@
         "machine",
         "sessions",
         "handoff"
+      ]
+    },
+    {
+      "name": "workflow",
+      "source": "./plugins/workflow",
+      "description": "Goal lifecycle and recorded work status.",
+      "category": "Productivity",
+      "keywords": [
+        "workflow",
+        "status",
+        "plans"
+      ]
+    },
+    {
+      "name": "engineering",
+      "source": "./plugins/engineering",
+      "description": "Selected engineering workflows, reviews and Git operations.",
+      "category": "Productivity",
+      "keywords": [
+        "engineering",
+        "workflow",
+        "git"
       ]
     }
   ]

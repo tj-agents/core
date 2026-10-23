@@ -3,7 +3,6 @@
   "plugin": "tj-agents/base",
   "source_roots": [
     ".agents/base",
-    ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
     ".agents/hooks/hook_dispatch.py",
     ".agents/hooks/hook_runtime.py"
   ],
@@ -33,7 +32,27 @@
         ]
       },
       {
+        "path": ".agents/base/policy/task-routing/scripts/session-context.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
         "path": "hooks/hook_dispatch.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/pre_tool_use_adapter.py",
+        "hosts": [
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/skill_router.py",
         "hosts": [
           "claude",
           "codex"

@@ -20,6 +20,7 @@
       "Bash(python -B .agents/workflows/workflow_ops.py *)",
       "Bash(python -B .template/.agents/template/utility/check/scripts/check_skill_references.py --root . --root .template --root .react --root .dotnet --source-root .)",
       "Bash(python -B scripts/check_generated_paths.py --base origin/main)",
+      "Bash(python -B scripts/ci_native_acceptance.py)",
       "Bash(python -B scripts/ci_selection.py run --group runtime)",
       "Bash(python -B scripts/ci_selection.py run --group source)",
       "Bash(python -B scripts/sync_harness_manifests.py --check)",
@@ -27,6 +28,7 @@
       "Bash(python -B scripts/update_catalog_digests.py --check)",
       "Bash(python -B scripts/update_catalog_digests.py)",
       "Bash(python .agents/workflows/workflow_ops.py *)",
+      "Bash(python3 -B scripts/ci_native_acceptance.py)",
       "Edit(/.agents/**)",
       "Edit(/.claude/skills/**)",
       "Edit(/.codex/**)",
@@ -72,13 +74,15 @@
       "PowerShell(python -B .agents/workflows/workflow_ops.py *)",
       "PowerShell(python -B .template/.agents/template/utility/check/scripts/check_skill_references.py --root . --root .template --root .react --root .dotnet --source-root .)",
       "PowerShell(python -B scripts/check_generated_paths.py --base origin/main)",
+      "PowerShell(python -B scripts/ci_native_acceptance.py)",
       "PowerShell(python -B scripts/ci_selection.py run --group runtime)",
       "PowerShell(python -B scripts/ci_selection.py run --group source)",
       "PowerShell(python -B scripts/sync_harness_manifests.py --check)",
       "PowerShell(python -B scripts/sync_harness_manifests.py)",
       "PowerShell(python -B scripts/update_catalog_digests.py --check)",
       "PowerShell(python -B scripts/update_catalog_digests.py)",
-      "PowerShell(python .agents/workflows/workflow_ops.py *)"
+      "PowerShell(python .agents/workflows/workflow_ops.py *)",
+      "PowerShell(python3 -B scripts/ci_native_acceptance.py)"
     ],
     "deny": [
       "Edit(/.agents/plugins/marketplace.json)"

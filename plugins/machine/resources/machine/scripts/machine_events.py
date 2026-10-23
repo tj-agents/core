@@ -150,15 +150,16 @@ class Reconciler:
         revision = current["defaultBranchRef"]["target"]["oid"]
         old = self.state.get(repository, {})
         policy = (current.get("policy") or {}).get("oid")
-        marketplace = any(current.get(name) for name in ("marketplace", "catalog", "plugin", "codexPlugin"))
+        catalog = sorted(oid for name in ("marketplace", "catalog", "plugin", "codexPlugin")
+                        if (oid := (current.get(name) or {}).get("oid")))
         if old.get("revision") == revision:
             return
         if policy and policy != old.get("policy"):
             self.policy(repository)
-        if marketplace and refresh_plugins:
+        if catalog and catalog != old.get("catalog") and refresh_plugins:
             if self.refresh() != 0:
                 raise RuntimeError("plugin refresh failed")
-        self.state[repository] = {"revision": revision, "policy": policy}
+        self.state[repository] = {"revision": revision, "policy": policy, "catalog": catalog}
 
     def catch_up(self, states):
         if self.refresh() != 0:

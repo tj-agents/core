@@ -13,12 +13,7 @@ plan owns the defect, use that plan's execution workflow. If the request starts 
 integration/E2E tier, use its narrower debug workflow; return here only when that workflow identifies a
 product defect whose repair is not already owned.
 
-Resolve one owning lifecycle skill and only the technical skills directly routed by the changed paths. Run
-the command as `python` on Windows or `python3` on Linux/macOS. Use
-`python .agents/workflows/workflow_ops.py --root . --workflow-run-id <id> skills --lifecycle bugfix --changed-path <path>` to record
-their identities and content hashes, and reuse that record while those hashes remain unchanged. Use the
-shared `inspect` operation once for routine repository state instead of reconstructing it through separate
-shell calls.
+When a Workflow owner delegates a bounded technical slice, perform that slice and return diagnosis, repair, regression and review evidence to the same owner. Do not claim the whole goal or redirect the operation back to `workflow:run`. Resolve technical rules through selected native discovery and use the shared `inspect` operation once for routine repository state.
 
 ## Classify before dispatching
 
@@ -40,7 +35,7 @@ diagnoses the cause, and chooses the repair.
 
 ## Execute the repair lifecycle
 
-Read [the shared recording contract](../../resources/problem-records.md) and reconcile the canonical
+Read [the shared recording contract](../../../workflow/resources/problem-records.md) and reconcile the canonical
 defect record through the selected profile as evidence becomes available. Update that record through the
 same contract after verifying its resolution condition; a delivered PR alone does not resolve it.
 
@@ -71,7 +66,7 @@ same contract after verifying its resolution condition; a delivered PR alone doe
 The quick path creates no plan, ledger, workflow sidecar, or automatic checkpoint. If investigation or repair
 grows across phases, worktrees, external gates, or context/restart boundaries, resolve and validate Workflow
 v2 repository state. Then promote through `engineering:plans`, checkpoint the durable artifacts under
-`engineering:plan-checkpoint`, and continue under the durable owner without a routine
+`engineering:plans`, and continue under the durable owner without a routine
 continuation prompt. A Kandev-managed task owns only the outer worktree and host-session association.
 
 ## Dispatch and failure recovery
