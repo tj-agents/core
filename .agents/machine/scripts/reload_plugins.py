@@ -107,6 +107,14 @@ def declared_scopes(identity: str, project: Path) -> list[str]:
             if read_json(project / ".claude" / name).get("enabledPlugins", {}).get(identity) is True]
 
 
+def shadowed(installations: list, identity: str, scope: str, owner: Path) -> bool:
+    own = entry_for(installations, identity, scope, owner) if scope != "user" else None
+    first = next((entry for entry in installations if entry.get("id") == identity and entry.get("scope") == scope
+                  and entry.get("projectPath") and resolved(entry["projectPath"]).is_relative_to(resolved(owner))),
+                 None) if own is not None else None
+    return first is not own
+
+
 def update_targets(identity: str, project: Path, installations: list) -> list[tuple[str, Path]]:
     declared = declared_scopes(identity, project)
     targets = {(scope, path_key(project)): (scope, project) for scope in declared or ["user"]}
@@ -116,7 +124,7 @@ def update_targets(identity: str, project: Path, installations: list) -> list[tu
             continue
         owner = project if scope == "user" else Path(entry["projectPath"])
         targets.setdefault((scope, path_key(owner)), (scope, owner))
-    return [targets[key] for key in sorted(targets)]
+    return [targets[key] for key in sorted(targets) if not shadowed(installations, identity, *targets[key])]
 
 
 def update_result(output: str, identity: str, scope: str) -> dict:
@@ -259,13 +267,6 @@ def refresh_heads(repositories: set[str] | None, revision=plugin_autoupdate.remo
     return {key for key in wanted if key not in heads}
 
 
-def cli_target(installations: list, identity: str, scope: str, owner: Path) -> dict | None:
-    if scope == "user":
-        return entry_for(installations, identity, scope, owner)
-    return next((entry for entry in installations if entry.get("id") == identity and entry.get("scope") == scope
-                 and entry.get("projectPath") and resolved(entry["projectPath"]).is_relative_to(resolved(owner))), None)
-
-
 def attempt_key(identity: str, scope: str, owner: Path) -> str:
     return f"{identity}|{scope}|{'user' if scope == 'user' else path_key(owner)}"
 
@@ -287,7 +288,7 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
                          if entry_for(installations, identity, scope, project) is None]
         for scope, owner in update_targets(identity, project, installations):
             entry = entry_for(installations, identity, scope, owner)
-            if entry is None or cli_target(installations, identity, scope, owner) is not entry:
+            if entry is None:
                 continue
             same = (plugin_autoupdate.same_content(contents, key.rsplit("@", 1)[0], path, entry.get("gitCommitSha"), head)
                     if head is not None else True)

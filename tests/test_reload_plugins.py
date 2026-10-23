@@ -619,6 +619,15 @@ class HeadReconcileTests(unittest.TestCase):
         with mock.patch.object(REFRESH, "run", side_effect=fake):
             self.assertEqual(["base@tj-agents"], REFRESH.reconcile_claude(project))
 
+    def test_a_full_refresh_also_skips_a_shadowed_project_install(self):
+        project = self.home.project("core", "settings.json", "base@tj-agents")
+        nested = project / ".worktrees" / "Feature"
+        fake = FakeClaude(self.home.installed(("base@tj-agents", "project", nested, OLD_HEAD),
+                                              ("base@tj-agents", "project", project, OLD_HEAD)))
+        with mock.patch.object(REFRESH, "run", side_effect=fake):
+            REFRESH.refresh("claude", "claude", project, {}, ["base@tj-agents"])
+        self.assertNotIn("update", [command[2] for command, _ in fake.commands])
+
     def test_content_query_names_only_validated_revisions_and_paths(self):
         wanted = {"tj-agents/core@main": {"plugins/base", 'plugins/x") { oid } evil: object(expression: "y'}}
         captured = []
