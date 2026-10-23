@@ -32,8 +32,9 @@ Resolve each tool path through native discovery, never from a guessed cache or c
 (`machine:followup-codex`), and `worktree-sweep` (`engineering:merge`'s `worktree_sweep.py`, when selected).
 Re-run `configure` after a plugin refresh moves them; its `missing` list names stale paths.
 `init` records this session as the orchestrator through `peer-cli self`. Every command except `status`,
-`wait` and a worker's `report` then refuses any other session. This stops a worker misusing the commands;
-workers share the user's account, so it does not stop a hostile process.
+`wait` and `report` then refuses any other session, and a report sent from another worker's session is
+ignored. This stops a worker misusing the commands; workers share the user's account, so it does not stop a
+hostile process.
 
 Add one worker per independent piece of work:
 
@@ -63,7 +64,7 @@ worker's behalf (`report --worker <id> --status done`) only after reading its ac
 
 A restarted orchestrator runs `tick` on the same file and continues; the file holds everything it needs.
 A relaunched successor session is accepted automatically. Any other new session runs `claim` once the
-recorded orchestrator has ended.
+recorded orchestrator has ended; add `--confirm-ended` only when the user confirms its tab is gone.
 
 ## Decisions
 
