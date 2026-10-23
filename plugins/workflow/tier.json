@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "tier": "workflow",
+  "stack": "any project",
+  "applies": "always"
+}
