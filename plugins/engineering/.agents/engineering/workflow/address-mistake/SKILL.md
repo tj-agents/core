@@ -8,7 +8,7 @@ domain: process
 
 # Address a recorded mistake
 
-Read [the shared problem-record contract](../../resources/problem-records.md). This workflow preserves an
+Read [the shared problem-record contract](../../../workflow/resources/problem-records.md). This workflow preserves an
 incident's history while returning the correction to its existing owner; it does not create another repair
 engine.
 

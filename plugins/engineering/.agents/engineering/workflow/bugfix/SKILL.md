@@ -40,7 +40,7 @@ diagnoses the cause, and chooses the repair.
 
 ## Execute the repair lifecycle
 
-Read [the shared recording contract](../../resources/problem-records.md) and reconcile the canonical
+Read [the shared recording contract](../../../workflow/resources/problem-records.md) and reconcile the canonical
 defect record through the selected profile as evidence becomes available. Update that record through the
 same contract after verifying its resolution condition; a delivered PR alone does not resolve it.
 
