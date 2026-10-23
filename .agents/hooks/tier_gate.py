@@ -187,7 +187,7 @@ def employer_context_path(payload_dir, slug):
 def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
     problems = []
     unknown = set(data) - {"schema_version", "tier", "applies", "stack", "owner_repository", "detect",
-                           "fact_definitions", "employer", "session_context"}
+                           "fact_definitions", "employer", "session_context", "routes"}
     if unknown:
         problems.append(diagnostic("malformed-declaration", path, "Unknown declaration fields: " + ", ".join(sorted(unknown))))
     if not isinstance(data.get("tier"), str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", data["tier"]):
@@ -210,6 +210,8 @@ def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
         context = data["session_context"]
         if not isinstance(context, str) or not context.strip() or any(char in context for char in "\r\n\u0085\u2028\u2029"):
             problems.append(diagnostic("malformed-declaration", path + ".session_context", "Session context requires one non-empty line"))
+    if "routes" in data:
+        problems.extend(route_diagnostics(data["routes"], path + ".routes"))
     if "employer" in data:
         employer = data["employer"]
         if not isinstance(employer, dict) or set(employer) != {"context_skill"} or not isinstance(
@@ -221,6 +223,25 @@ def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
             problems.append(diagnostic("malformed-employer", path + ".applies", "Employer declarations require stack-present"))
         if predicate_uses_fact(data.get("detect"), "employer"):
             problems.append(diagnostic("employer-self-dependency", path + ".detect", "Employer declarations cannot depend on the employer fact"))
+    return problems
+
+
+def route_diagnostics(routes, path="tier.json.routes"):
+    if not isinstance(routes, list):
+        return [diagnostic("malformed-routes", path, "Routes require a list of rows")]
+    problems = []
+    for index, row in enumerate(routes):
+        where = path + "[" + str(index) + "]"
+        if not isinstance(row, dict) or not _text(row.get("path")) or not isinstance(row.get("skills"), list)                 or not row["skills"] or not all(re.fullmatch(r"[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*", _text(skill))
+                                                for skill in row["skills"]):
+            problems.append(diagnostic("malformed-routes", where, "A route requires a path and qualified skills"))
+            continue
+        for field in ("path", "content_requires"):
+            if field in row:
+                try:
+                    re.compile(_text(row[field]))
+                except re.error as error:
+                    problems.append(diagnostic("malformed-routes", where + "." + field, "Invalid pattern: " + str(error)))
     return problems
 
 
@@ -829,7 +850,10 @@ def statement(root, found=None):
         names = ", ".join(declaration.tier for declaration in ubiquitous)
         lines.append("Ubiquitous, always applies: " + names + ".")
     for declaration, reason in applicable:
-        lines.append("Applies here: `" + declaration.plugin + ":*` - " + reason + ".")
+        line = "Applies here: `" + declaration.plugin + ":*` - " + reason + "."
+        if declaration.data.get("routes"):
+            line += " Load its skills before writing its files; the write gate blocks them until you do."
+        lines.append(line)
     for declaration, _ in result.employers:
         path = employer_context_path(declaration.payload_dir, declaration.employer["context_skill"])
         lines.append("Employer context: `" + declaration.plugin + ":" + declaration.employer["context_skill"]

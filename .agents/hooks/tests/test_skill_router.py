@@ -644,6 +644,175 @@ class SkillRouterTests(unittest.TestCase):
 
         self.assertEqual({}, aliases)
 
+    def install_stack_tier(self):
+        (self.repo / ".agents" / "skill-routes.json").unlink()
+        payload = self.base / "home" / ".claude" / "plugins" / "cache" / "market" / "stackx" / "1"
+        skill = payload / "skills" / "style"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text(
+            "---\nname: style\ndescription: Stack style for every source file.\nkind: contract\n---\n",
+            encoding="utf-8",
+        )
+        self.declare_stack_tier([{"path": r"\.sx$", "skills": ["stackx:style"]}])
+        return skill / "SKILL.md"
+
+    def declare_stack_tier(self, routes=None):
+        tier = {
+            "schema_version": 1, "tier": "stackx", "stack": "StackX", "applies": "stack-present",
+            "detect": {"files": ["stack.marker"]},
+        }
+        if routes is not None:
+            tier["routes"] = routes
+        (self.base / "home" / ".claude" / "plugins" / "cache" / "market" / "stackx" / "1" / "tier.json").write_text(
+            json.dumps(tier), encoding="utf-8")
+
+    def write_payload(self, session, transcript=None, **extra):
+        payload = {
+            "hook_event_name": "PreToolUse", "tool_use_id": str(uuid.uuid4()), "session_id": session,
+            "cwd": str(self.repo), "tool_name": "Write",
+            "tool_input": {"file_path": "src/item.sx", "content": "value\n"}, **extra,
+        }
+        if transcript is not None:
+            payload["transcript_path"] = str(transcript)
+        return payload
+
+    def transcript(self, path, *blocks):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(json.dumps({"message": {"content": [block]}}) for block in blocks),
+                        encoding="utf-8")
+        return path
+
+    def test_applicable_tier_routes_gate_a_repository_without_its_own_table(self):
+        self.install_stack_tier()
+        session = str(uuid.uuid4())
+        transcript = self.base / "sessions" / f"{session}.jsonl"
+        self.transcript(transcript, {"type": "text", "text": "no skills"})
+
+        result = self.run_router(("--harness", "claude"), self.write_payload(session, transcript))
+        self.assertEqual(0, result.returncode, result.stderr)
+
+        (self.repo / "stack.marker").write_text("", encoding="utf-8")
+        result = self.run_router(("--harness", "claude"), self.write_payload(session, transcript))
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("stackx:style", result.stderr)
+        self.assertIn("Stack style for every source file", result.stderr)
+
+        self.transcript(
+            transcript,
+            {"type": "tool_use", "name": "Skill", "id": "load", "input": {"skill": "stackx:style"}},
+            {"type": "tool_result", "tool_use_id": "load", "content": "loaded"},
+        )
+        result = self.run_router(("--harness", "claude"), self.write_payload(session, transcript))
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_subagent_proves_its_own_load_and_a_whole_file_read_counts(self):
+        skill_file = self.install_stack_tier()
+        (self.repo / "stack.marker").write_text("", encoding="utf-8")
+        session = str(uuid.uuid4())
+        parent = self.transcript(
+            self.base / "sessions" / f"{session}.jsonl",
+            {"type": "tool_use", "name": "Skill", "id": "load", "input": {"skill": "stackx:style"}},
+            {"type": "tool_result", "tool_use_id": "load", "content": "loaded"},
+        )
+        result = self.run_router(("--harness", "claude"), self.write_payload(session, parent))
+        self.assertEqual(0, result.returncode, result.stderr)
+
+        agent = "a0123456789abcdef"
+        subagent = self.write_payload(session, parent, agent_id=agent, agent_type="engineering:lane-l4")
+        result = self.run_router(("--harness", "claude"), dict(subagent, tool_use_id=str(uuid.uuid4())))
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("READ THIS WHOLE FILE", result.stderr)
+        self.assertIn("parent loaded", result.stderr)
+
+        own = self.base / "sessions" / session / "subagents" / f"agent-{agent}.jsonl"
+        self.transcript(
+            own,
+            {"type": "tool_use", "name": "Read", "id": "part",
+             "input": {"file_path": str(skill_file), "offset": 20, "limit": 5}},
+            {"type": "tool_result", "tool_use_id": "part", "content": "partial"},
+        )
+        result = self.run_router(("--harness", "claude"), dict(subagent, tool_use_id=str(uuid.uuid4())))
+        self.assertEqual(2, result.returncode, result.stderr)
+
+        self.transcript(
+            own,
+            {"type": "tool_use", "name": "Read", "id": "whole", "input": {"file_path": str(skill_file)}},
+            {"type": "tool_result", "tool_use_id": "whole", "content": "body"},
+        )
+        result = self.run_router(("--harness", "claude"), dict(subagent, tool_use_id=str(uuid.uuid4())))
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_main_session_read_of_a_skill_file_is_not_an_invocation(self):
+        skill_file = self.install_stack_tier()
+        (self.repo / "stack.marker").write_text("", encoding="utf-8")
+        session = str(uuid.uuid4())
+        transcript = self.transcript(
+            self.base / "sessions" / f"{session}.jsonl",
+            {"type": "tool_use", "name": "Read", "id": "whole", "input": {"file_path": str(skill_file)}},
+            {"type": "tool_result", "tool_use_id": "whole", "content": "body"},
+        )
+        result = self.run_router(("--harness", "claude"), self.write_payload(session, transcript))
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("Invoke the skill(s)", result.stderr)
+
+    def test_malformed_tier_routes_fail_closed(self):
+        self.install_stack_tier()
+        (self.repo / "stack.marker").write_text("", encoding="utf-8")
+        self.declare_stack_tier([{"path": "(", "skills": ["stackx:style"]}])
+        result = self.run_router(("--harness", "claude"), self.write_payload(str(uuid.uuid4())))
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("tier.json routes are unusable", result.stderr)
+
+    def test_tier_statement_names_the_write_gate_only_for_a_routed_tier(self):
+        self.install_stack_tier()
+        (self.repo / "stack.marker").write_text("", encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, "-B", str(self.plugin / "hooks" / "tier_gate.py"), "--session-context"],
+            cwd=self.repo, capture_output=True, text=True, encoding="utf-8", env=self.environment(), timeout=20,
+        )
+        context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("`stackx:*` - StackX detected (stack.marker). Load its skills before writing", context)
+        self.declare_stack_tier()
+        result = subprocess.run(
+            [sys.executable, "-B", str(self.plugin / "hooks" / "tier_gate.py"), "--session-context"],
+            cwd=self.repo, capture_output=True, text=True, encoding="utf-8", env=self.environment(), timeout=20,
+        )
+        self.assertNotIn("write gate", json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"])
+
+    def test_claude_manifest_dispatches_router_for_every_write_tool_and_blocks_on_failure(self):
+        manifest = json.loads((HOOKS.parent / "plugins" / "manifests" / "claude" / "base-hooks.json").read_text(
+            encoding="utf-8"
+        ))
+        group = manifest["hooks"]["PreToolUse"][0]
+        self.assertEqual("Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell", group["matcher"])
+        hook = group["hooks"][0]
+        self.assertEqual("block", hook["onFailure"])
+        arguments = hook["args"]
+        self.assertEqual(["--deny-on-timeout", "--hook", "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py",
+                          "--harness", "claude"], arguments[4:])
+        local_arguments = [str(self.router) if value.endswith("/skill_router.py") else
+                           str(HOOKS / Path(value).name) if value.startswith("${CLAUDE_PLUGIN_ROOT}/hooks/") else value
+                           for value in arguments]
+        result = subprocess.run(
+            [sys.executable, *local_arguments], cwd=self.repo,
+            input=json.dumps(self.bash_payload()), capture_output=True,
+            text=True, encoding="utf-8", env=self.environment(), timeout=30,
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        verdict = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual("deny", verdict["permissionDecision"])
+        self.assertIn("Invoke the skill(s)", verdict["permissionDecisionReason"])
+
+    def test_codex_manifest_pins_host_in_unix_and_windows_commands(self):
+        manifest = json.loads((HOOKS.parent / "plugins" / "manifests" / "codex" / "base-hooks.json").read_text(
+            encoding="utf-8"
+        ))
+        group = manifest["hooks"]["PreToolUse"][0]
+        self.assertIn("apply_patch", group["matcher"].split("|"))
+        router = group["hooks"][0]
+        self.assertTrue(router["command"].endswith('"${PLUGIN_ROOT}/hooks/skill_router.py" --harness codex'))
+        self.assertTrue(router["commandWindows"].endswith('"${PLUGIN_ROOT}/hooks/skill_router.py" --harness codex'))
+
 
 
 if __name__ == "__main__":
