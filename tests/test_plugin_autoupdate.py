@@ -190,7 +190,8 @@ class RefreshTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix='codex home ')
         self.addCleanup(temp.cleanup)
-        patcher = mock.patch.dict(os.environ, {'CODEX_HOME': temp.name})
+        patcher = mock.patch.dict(os.environ, {'CODEX_HOME': temp.name,
+                                               'AGENT_STATE_DIRECTORY': str(Path(temp.name) / 'state')})
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -217,21 +218,40 @@ class RefreshTests(unittest.TestCase):
             mock.call(['codex', 'plugin', 'add', 'machine@direct-core'], cwd=ROOT),
         ], run.call_args_list)
 
-    def test_only_a_plugin_whose_subtree_actually_changed_is_re_added(self):
+    def test_only_plugins_whose_publisher_moved_are_re_added(self):
+        machine_source = 'https://github.com/tj-agents/machine-source.git'
         run = mock.Mock(return_value=True)
-        recorded = {'codex:direct-core': OLD, 'codex-plugin:base@direct-core': 'unchanged'}
-        sources = lambda name: {'base': 'plugins/base', 'machine': 'plugins/machine'}
-        content = lambda checkout, path: 'unchanged' if path == 'plugins/base' else 'changed'
+        recorded = {'codex:direct-core': OLD, 'codex-plugin:base@direct-core': OLD}
+        publishers = lambda name: {'base': (CORE, 'main', 'plugins/base'),
+                                   'machine': (machine_source, 'main', 'plugins/machine')}
+        targets = target(publishers=[{'source': CORE, 'ref': 'main'}, {'source': machine_source, 'ref': 'main'}])
 
-        outcomes = UPDATE.refresh_codex('codex', target(), recorded, revision=lambda *_: NEW, run=run, busy=idle,
-                                        sources=sources, content=content)
+        outcomes = UPDATE.refresh_codex('codex', targets, recorded, revision=lambda source, ref: OLD if source == CORE else NEW,
+                                        run=run, busy=idle, publishers=publishers)
 
         self.assertEqual({'direct-core': 'updated'}, outcomes)
         self.assertEqual([
             mock.call(['codex', 'plugin', 'marketplace', 'upgrade', 'direct-core'], cwd=ROOT),
             mock.call(['codex', 'plugin', 'add', 'machine@direct-core'], cwd=ROOT),
         ], run.call_args_list)
-        self.assertEqual('changed', recorded['codex-plugin:machine@direct-core'])
+        self.assertEqual(NEW, recorded['codex-plugin:machine@direct-core'])
+
+    def test_a_plugin_whose_files_did_not_change_at_the_new_head_is_not_re_added(self):
+        run = mock.Mock(return_value=True)
+        recorded = {'codex:direct-core': OLD, 'codex-plugin:base@direct-core': OLD,
+                    'codex-plugin:machine@direct-core': OLD}
+        UPDATE.record_contents({}, {f'tj-agents/core@{OLD}:plugins/base': PINNED,
+                                    f'tj-agents/core@{NEW}:plugins/base': PINNED}, {OLD, NEW})
+        publishers = lambda name: {'base': (CORE, 'main', 'plugins/base'), 'machine': (CORE, 'main', 'plugins/machine')}
+
+        UPDATE.refresh_codex('codex', target(publishers=[{'source': CORE, 'ref': 'main'}]), recorded,
+                             revision=lambda *_: NEW, run=run, busy=idle, publishers=publishers)
+
+        self.assertEqual([
+            mock.call(['codex', 'plugin', 'marketplace', 'upgrade', 'direct-core'], cwd=ROOT),
+            mock.call(['codex', 'plugin', 'add', 'machine@direct-core'], cwd=ROOT),
+        ], run.call_args_list)
+        self.assertEqual(NEW, recorded['codex-plugin:base@direct-core'])
 
     def test_a_running_codex_session_never_defers_an_upgrade(self):
         run = mock.Mock(return_value=True)

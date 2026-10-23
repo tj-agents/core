@@ -220,10 +220,13 @@ launchers, the machine event listener task or systemd service, and the former ho
 and merge-gates tasks or cron entries. Nothing runs in the background.
 
 Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: one non-blocking ntfy.sh
-poll for events since the saved cursor. With none it starts the CLI immediately; offline it starts anyway.
-With events it updates, on both hosts in parallel, only the marketplaces and enabled plugins that list or
-publish the named repositories, and advances the cursor once both hosts succeed. A failed host retries on
-a later launch, at most hourly. `machine:sync-plugins` runs the same check in a running session.
+poll for events since the saved cursor; offline it starts anyway. Events name the publishing repositories.
+One GitHub query reads their heads and each plugin directory's tree into `~/.agents-state/plugin-heads.json`,
+both hosts update in parallel, and the cursor advances once both succeed. A failed host retries on the next
+launch; a cursor older than ntfy's retention compares every publisher instead. Every launch then compares
+this project's Claude installs with the recorded heads from local files only, and updates an install only
+when its plugin directory differs at the head. Codex re-adds a plugin only when its directory changed.
+`machine:sync-plugins` runs the same check in a running session.
 
 Main-branch callers publish events through the shared
 `tj-agents/github-actions/.github/actions/machine-events` publisher. Setup reuses or creates the
