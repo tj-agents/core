@@ -32,7 +32,8 @@ Resolve each tool path through native discovery, never from a guessed cache or c
 (`machine:followup-codex`), and `worktree-sweep` (`engineering:merge`'s `worktree_sweep.py`, when selected).
 Re-run `configure` after a plugin refresh moves them; its `missing` list names stale paths.
 `init` records this session as the orchestrator through `peer-cli self`. Every command except `status`,
-`wait` and a worker's `report` then refuses any other session, so run them from this session's directory.
+`wait` and a worker's `report` then refuses any other session. This stops a worker misusing the commands;
+workers share the user's account, so it does not stop a hostile process.
 
 Add one worker per independent piece of work:
 
@@ -45,7 +46,8 @@ Add one worker per independent piece of work:
   the repository's current conventions, the no-merge rule and the worker's `report` commands.
 
 `adopt --session <handle or tab title>` takes over an existing session; with `--prompt` it is sent that
-prompt when its dependencies finish, otherwise it is tracked as already running. Report on an adopted
+prompt when its dependencies finish, otherwise it is tracked as already running. Pass `--pr` when its PR
+already exists; the branch lookup only accepts open PRs and PRs created after it was added. Report on an adopted
 worker's behalf (`report --worker <id> --status done`) only after reading its actual result.
 
 ## Run the loop

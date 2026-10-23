@@ -601,18 +601,6 @@ class OrchestratorRecoveryTests(OrchestrateCase):
             connection.commit()
         connection.close()
 
-    def test_a_report_from_another_session_is_ignored(self):
-        f = self.fixture
-        f.add("a", done_when="reported")
-        f.add("b", depends="a", done_when="reported")
-        f.json("tick")
-        self.as_session("intruder")
-        f.call("report", "--worker", "a", "--status", "done")
-        self.as_session("orchestrator-1")
-        rows = self.rows(f.json("tick"))
-        self.assertEqual(rows["b"]["state"], "pending")
-        self.assertEqual(len(f.log("launches.jsonl")), 1)
-
     def test_claim_waits_for_the_recorded_orchestrator_to_end(self):
         f = self.fixture
         self.register("orchestrator-1")
@@ -622,6 +610,17 @@ class OrchestratorRecoveryTests(OrchestrateCase):
         self.register("orchestrator-1", ended=True)
         self.assertEqual(f.json("claim")["orchestrator"], "claude:replacement")
         f.add("a")
+
+    def test_unknown_liveness_allows_claim_but_a_worker_cannot_claim(self):
+        f = self.fixture
+        f.add("a")
+        f.json("tick")
+        worker = f.session_of("a").split(":", 1)[1]
+        self.register("orchestrator-1")
+        self.as_session(worker)
+        self.assertIn("worker session cannot claim", f.call("claim", expect=2))
+        self.as_session("replacement")
+        self.assertEqual(f.json("claim")["orchestrator"], "claude:replacement")
 
     def test_a_relaunched_orchestrator_is_followed_through_the_registry(self):
         f = self.fixture
@@ -667,7 +666,9 @@ class OrchestratorRecoveryTests(OrchestrateCase):
 
     def test_report_paths_with_shell_characters_are_quoted(self):
         self.assertEqual(orchestrate.shell_path("C:/plain/path.py"), "C:/plain/path.py")
-        self.assertEqual(orchestrate.shell_path("/a b/$x;y"), "'/a b/$x;y'")
+        self.assertEqual(orchestrate.shell_path("/a b/x;y"), "'/a b/x;y'")
+        with self.assertRaises(orchestrate.OrchestrationError):
+            orchestrate.shell_path("/home/o'neil/x.json")
 
 
 class ChecksSummaryTests(unittest.TestCase):

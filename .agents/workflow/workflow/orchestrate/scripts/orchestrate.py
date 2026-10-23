@@ -27,6 +27,7 @@ CHECKS_REGISTER_SECONDS = 120
 SWEEP_RETRY_SECONDS = 600
 SWEEP_ATTEMPTS = 6
 SAFE_PATH = re.compile(r"[A-Za-z0-9_./:\\-]+")
+QUOTABLE_PATH = re.compile(r"[^'\"$`]+")
 TEXT_LIMIT = 300
 PR_FIELDS = ("number,state,isDraft,headRefOid,mergedAt,createdAt,url,reviewDecision,statusCheckRollup,"
              "autoMergeRequest")
@@ -106,11 +107,17 @@ def handle_of(identity):
     return f"{identity['host']}:{identity['session_id']}"
 
 
+def orchestrator_directory(state):
+    row = Observer(None, state, forge=False).session(state["orchestrator"])
+    location = row.get("cwd")
+    return location if location and Path(location).is_dir() else None
+
+
 def require_orchestrator(state, tools=None):
     if not state.get("orchestrator"):
         raise OrchestrationError("this orchestration has no recorded orchestrator session")
     try:
-        identity = caller({"tools": tools or state["tools"]})
+        identity = caller({"tools": tools or state["tools"]}, cwd=orchestrator_directory(state))
     except OrchestrationError as error:
         raise OrchestrationError(f"only the orchestrator session may change this orchestration; {error}; "
                                  "run it from the orchestrator session's directory")
@@ -354,7 +361,7 @@ class Observer:
                                     "--state", "all", "--limit", "20", "--json", PR_FIELDS)
             if values is None:
                 return {"error": error}
-            since = 0 if worker.get("adopted") else (worker.get("added_at") or 0) - 60
+            since = (worker.get("added_at") or 0) - 60
             current = [item for item in values if item.get("state") == "OPEN"
                        or (timestamp(item.get("createdAt")) or 0) >= since]
             if not current:
@@ -362,11 +369,15 @@ class Observer:
             value = max(current, key=lambda item: timestamp(item.get("createdAt")) or 0)
         worker["pr"] = value["number"]
         rollup = value.pop("statusCheckRollup", None)
-        if rollup:
-            worker["seen_checks"] = True
         value["checks"] = checks_summary(rollup, value.get("createdAt"))
-        if not rollup and worker.get("seen_checks") and value.get("state") == "OPEN":
-            value["checks"] = {"state": "pending", "names": ["checks not registered for this head yet"]}
+        if rollup:
+            worker["checks_seen_on"] = value["number"]
+        elif worker.get("checks_seen_on") == value["number"] and value.get("state") == "OPEN":
+            empty = worker.get("empty_rollup") or {}
+            if empty.get("head") != value.get("headRefOid"):
+                empty = worker["empty_rollup"] = {"head": value.get("headRefOid"), "since": now()}
+            if now() - empty["since"] < CHECKS_REGISTER_SECONDS:
+                value["checks"] = {"state": "pending", "names": ["checks not registered for this head yet"]}
         value["queued"] = bool(value.get("autoMergeRequest")) or self.queued(worker, value)
         return value
 
@@ -407,7 +418,7 @@ class Observer:
         pr = self.pull_request(worker)
         checkout = self.checkout(worker, pr)
         return {"session": row, "alive": self.alive(row), "pr": pr, "checkout": checkout,
-                "reports": accepted_reports(self.state, worker, row, reports(self.path, worker))}
+                "reports": reports(self.path, worker)}
 
 
 def latest_report(observation):
@@ -415,11 +426,6 @@ def latest_report(observation):
     return found[-1] if found else None
 
 
-def accepted_reports(state, worker, row, entries):
-    reporters = {state.get("orchestrator")}
-    if worker["host"] != "subagent":
-        reporters.update(value for value in (worker.get("session"), (row or {}).get("handle")) if value)
-    return [entry for entry in entries if entry.get("reporter") in reporters]
 
 
 def idle(observation):
@@ -699,7 +705,11 @@ def make_worktree(state, worker):
 
 def shell_path(value):
     text = str(value)
-    return text if SAFE_PATH.fullmatch(text) else "'" + text.replace("'", "''") + "'"
+    if SAFE_PATH.fullmatch(text):
+        return text
+    if QUOTABLE_PATH.fullmatch(text):
+        return f"'{text}'"
+    raise OrchestrationError(f"{text} contains quote or expansion characters; use a plainer path")
 
 
 def brief(path, state, worker):
@@ -922,8 +932,7 @@ def wait(path, poll, slow_poll, timeout):
                     continue
             else:
                 row = observer.session(worker["session"]) if worker.get("session") else None
-                observation = {"session": row,
-                               "reports": accepted_reports(state, worker, row, reports(path, worker))}
+                observation = {"session": row, "reports": reports(path, worker)}
                 if (worker.get("worktree") and not worker.get("session") and worker["phase"] == "dispatched"
                         and worker["host"] != "subagent"):
                     bound = observer.bind_launch(worker)
@@ -1008,14 +1017,18 @@ def command_claim(args):
     path = resolve_file(args)
     with locked(path):
         state = load(path)
-        identity = caller(state)
-        handle = handle_of(identity)
+        handle = handle_of(caller(state))
         recorded = state.get("orchestrator")
-        if handle != recorded:
+        if any(handle in (worker.get("session"), (Observer(path, state, forge=False).session(worker["session"])
+                                                  or {}).get("handle"))
+               for worker in state["workers"].values() if worker.get("session")):
+            raise OrchestrationError("a worker session cannot claim the orchestration")
+        if handle != recorded and recorded:
             observer = Observer(path, state, forge=False)
-            row = observer.session(recorded) if recorded else {}
-            if row.get("handle") != handle and not row.get("ended_at") and observer.alive(row) is not False:
+            row = observer.session(recorded)
+            if row.get("handle") != handle and not row.get("ended_at") and observer.alive(row) is True:
                 raise OrchestrationError(f"the recorded orchestrator {recorded} is still running; close it first")
+        state.setdefault("previous_orchestrators", []).append(recorded)
         state["orchestrator"] = handle
         save(path, state)
     return {"orchestrator": handle}
@@ -1051,7 +1064,7 @@ def command_adopt(args):
         args.title = args.title or row.get("title") or row["handle"]
         args.branch = args.branch or row.get("branch")
         worker = add_worker(state, args)
-        worker.update(session=row["handle"], worktree=row.get("cwd"), cwd=row.get("cwd"), adopted=True)
+        worker.update(session=row["handle"], worktree=row.get("cwd"), cwd=row.get("cwd"))
         worker["phase"] = "pending" if worker["prompt_path"] else "dispatched"
         state["workers"][args.id] = worker
         save(path, state)
@@ -1063,11 +1076,9 @@ def command_report(args):
     state = load(path)
     if args.worker not in state["workers"]:
         raise OrchestrationError(f"unknown worker {args.worker}")
-    reporter = handle_of(caller(state))
     file = side_directory(path) / "reports" / f"{args.worker}.jsonl"
     file.parent.mkdir(parents=True, exist_ok=True)
-    entry = {"status": args.status, "text": args.text, "reply": args.reply, "where": args.where, "at": now(),
-             "reporter": reporter}
+    entry = {"status": args.status, "text": args.text, "reply": args.reply, "where": args.where, "at": now()}
     with open(file, "a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, sort_keys=True) + "\n")
     return {"worker": args.worker, "status": args.status}
