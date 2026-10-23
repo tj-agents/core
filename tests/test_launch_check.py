@@ -52,6 +52,17 @@ class Server:
 
 
 class LaunchCheckTests(unittest.TestCase):
+    def test_shell_admission_refuses_unverifiable_codex_override_before_optional_updates(self):
+        selection = self.state / ".agents/plugins.json"
+        selection.parent.mkdir()
+        selection.write_text('{"schema_version":1,"plugins":["base@tj-agents"]}', encoding="utf-8")
+        with mock.patch.object(CHECK, "check") as optional, mock.patch.object(sys, "stderr", io.StringIO()):
+            self.assertEqual(1, CHECK.main([
+                "--host", "codex", "--project", str(self.state), "--target", "native-cli",
+                "--", "--profile=alternate",
+            ]))
+        optional.assert_not_called()
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix="launch check ")
         self.addCleanup(temp.cleanup)
@@ -106,6 +117,17 @@ class LaunchCheckTests(unittest.TestCase):
         self.addCleanup(held.close)
         self.assertEqual("busy", CHECK.check(ROOT, fetch=Server(), update=self.update(),
                                              reconcile=lambda project: self.fail("ran while locked")))
+
+    def test_a_codex_launch_leaves_claude_installs_alone(self):
+        self.cursor.write_text(json.dumps({"since": "abc"}), encoding="utf-8")
+        for value, host in (("codex", "codex"), (" Codex ", "codex"), ("cursor", None)):
+            with self.subTest(value=value), mock.patch.object(CHECK, "check") as check,                     mock.patch.dict(os.environ, {CHECK.HOST_VARIABLE: value}):
+                self.assertEqual(0, CHECK.main(["--project", str(ROOT)]))
+                self.assertEqual(host, check.call_args.kwargs["host"])
+        self.assertEqual("current", CHECK.check(ROOT, fetch=Server(), update=self.update(), host="codex",
+                                                reconcile=lambda project: self.fail("checked Claude installs")))
+        self.assertEqual("updated", CHECK.check(ROOT, fetch=Server(), update=self.update(), host="claude",
+                                                reconcile=lambda project: ["base@tj-agents"]))
 
     def test_an_unconfigured_machine_never_polls(self):
         (self.state / "machine-events.json").unlink()
@@ -225,7 +247,8 @@ class TerminalFunctionTests(unittest.TestCase):
             directory = Path(temp)
             log = directory / "log.jsonl"
             check = directory / "launch_check.py"
-            check.write_text(f"open({str(log)!r}, 'a').write('check\\n')\n", encoding="utf-8")
+            check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
+                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
             echo = directory / "echo.py"
             echo.write_text(f"import json, sys\nopen({str(log)!r}, 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
                             "raise SystemExit(7)\n", encoding="utf-8")
@@ -250,8 +273,20 @@ class TerminalFunctionTests(unittest.TestCase):
                         env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
                         capture_output=True, text=True, timeout=60)
                     self.assertEqual(7, result.returncode, result.stderr)
-                    self.assertEqual(["check", json.dumps(["two words", "--flag"])],
+                    target = bin_directory / (f"{name}.cmd" if os.name == "nt" else name)
+                    self.assertEqual([f"check --host {name} --target {target} -- two words --flag {name}", json.dumps(["two words", "--flag"])],
                                      log.read_text(encoding="utf-8").splitlines())
+                    previous = log.read_text(encoding="utf-8")
+                    check.write_text("raise SystemExit(2)\n", encoding="utf-8")
+                    blocked = subprocess.run(
+                        ["pwsh", "-NoProfile", "-NonInteractive", "-Command",
+                         f". '{profile}'; {name} 'two words' --flag; exit $LASTEXITCODE"],
+                        env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
+                        capture_output=True, text=True, timeout=60)
+                    self.assertEqual(2, blocked.returncode, blocked.stderr)
+                    self.assertEqual(previous, log.read_text(encoding="utf-8"))
+                    check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
+                                     f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
 
 
 @unittest.skipIf(os.name == "nt" or not shutil.which("bash"), "POSIX bash is required")
@@ -261,7 +296,8 @@ class PosixFunctionTests(unittest.TestCase):
             directory = Path(temp)
             log = directory / "log"
             check = directory / "launch_check.py"
-            check.write_text(f"open({str(log)!r}, 'a').write('check\\n')\n", encoding="utf-8")
+            check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
+                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
             bin_directory = directory / "bin"
             bin_directory.mkdir()
             target = bin_directory / "claude"
@@ -273,7 +309,14 @@ class PosixFunctionTests(unittest.TestCase):
                                     env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(7, result.returncode, result.stderr)
-            self.assertEqual("check\ntwo words|--flag|", log.read_text(encoding="utf-8"))
+            self.assertEqual("check --host claude --target claude -- two words --flag claude\ntwo words|--flag|", log.read_text(encoding="utf-8"))
+            previous = log.read_text(encoding="utf-8")
+            check.write_text("raise SystemExit(2)\n", encoding="utf-8")
+            blocked = subprocess.run(["bash", "-c", f". '{rc}'; claude 'two words' --flag"],
+                                     env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
+                                     capture_output=True, text=True, timeout=60)
+            self.assertEqual(2, blocked.returncode, blocked.stderr)
+            self.assertEqual(previous, log.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
