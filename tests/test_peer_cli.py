@@ -29,6 +29,14 @@ class PeerCliTests(unittest.TestCase):
         self.assertEqual([item["session_id"] for item in found], ["b"])
         liveness.assert_called_once()
 
+    def test_self_prints_the_calling_sessions_identity(self):
+        entry = {"session_id": "me", "host": "claude", "title": "core #435", "cwd": "/w", "pid": 3}
+        out = io.StringIO()
+        with mock.patch.object(peer_cli.session_close, "own_host_and_entry", return_value=entry),                 contextlib.redirect_stdout(out):
+            self.assertEqual(peer_cli.main(["self"]), 0)
+        self.assertEqual(json.loads(out.getvalue()),
+                         {"session_id": "me", "host": "claude", "title": "core #435", "cwd": "/w"})
+
     def test_ambiguous_prefix_refuses(self):
         entries = [
             {"title": "one", "session_id": "a"},
