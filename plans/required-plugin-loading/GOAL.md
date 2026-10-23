@@ -142,3 +142,36 @@ runtime tests pass (20; one platform skip). The final native review also found
 Claude's optional worktree name could look like a maintenance subcommand. Boolean
 global flags are now classified only for Codex; Claude optional argument forms stay
 subject to admission. All 13 required-plugin and 13 startup tests pass (one POSIX skip).
+
+Final delta review found help/version after Claude global options needed an independent
+diagnostic bypass. Native diagnostic flags now bypass admission before maintenance
+subcommand classification, but only outside `--` and outside consumed option values.
+All 14 required-plugin tests, 13 startup tests and 16 launcher tests pass (the latter
+two each have one POSIX skip). Existing agent-mode optional-value cases stay blocked.
+
+```completion
+{
+  "outcome": "Every repository-selected standards plugin is verified for its native host, and missing imports cannot silently permit agent startup or routed writes.",
+  "acceptance": [
+    {
+      "id": "consumer-activation",
+      "criterion": "Car Hunter uses canonical plugin selections and a fresh Codex session can read its Python standards.",
+      "evidence": [{"source": "Car Hunter commit e8c80a7 and .local/fresh-codex-standards-proof.log", "result": "Both native inventories pass all seven requirements; fresh Codex lists Python, Workflow and Agent Store skills and reads Python style."}],
+      "owner": "current execution session",
+      "next_action": "Preserve the verified migration."
+    },
+    {
+      "id": "shared-rollout",
+      "criterion": "The shared guard passes Windows and Linux CI, lands and is installed through supported setup, with fresh launcher success and missing-plugin failure verified.",
+      "evidence": [],
+      "owner": "current execution session; GitHub App identity setup owned by Tommy",
+      "next_action": "Complete PR 445 validation, resolve policy-compliant landing and preserve unrelated primary-checkout edits during supported installation."
+    }
+  ],
+  "deliveries": [{"repository": "tj-agents/core", "pr": 445, "head": "755a87ea8834345360e6195b2d9e43da475f09d5"}],
+  "open_tasks": [
+    {"repository": "tj-agents/core", "pr": 445, "head": "755a87ea8834345360e6195b2d9e43da475f09d5", "text": "Complete exact-head CI and final delta review.", "owner": "current execution session", "next_action": "Observe run 39987754655 and final native review; repair demonstrated failures."},
+    {"repository": "tj-agents/core", "pr": 445, "head": "755a87ea8834345360e6195b2d9e43da475f09d5", "text": "Land and deploy the shared runtime through supported machine setup.", "owner": "current execution session; GitHub App setup owned by Tommy", "next_action": "Resolve identity policy beyond the push-and-PR exception, land the verified source, install without overwriting the dirty primary source checkout, and verify fresh hosts."}
+  ]
+}
+```

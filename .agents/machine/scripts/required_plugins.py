@@ -48,6 +48,8 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
         argument = arguments[index]
         if argument == "--":
             break
+        if argument in ("--help", "-h", "--version", "-V" if host == "codex" else "-v"):
+            return
         if not command_seen and argument in MAINTENANCE_COMMANDS:
             return
         option, separator, value = argument.partition("=")

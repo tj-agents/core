@@ -155,6 +155,15 @@ class RequiredPluginsTests(unittest.TestCase):
                 required.check_launch(self.project, "claude", "native-cli", arguments)
                 check.assert_called_once_with(self.project, "claude", "native-cli")
 
+    def test_help_and_version_remain_available_after_global_flags(self):
+        for host, arguments in (("claude", ["--worktree", "--help"]),
+                                ("claude", ["--debug", "--help"]),
+                                ("claude", ["--worktree", "-v"]),
+                                ("codex", ["--no-daemon", "--help"])):
+            with mock.patch.object(required, "check") as check:
+                required.check_launch(self.project, host, "native-cli", arguments)
+                check.assert_not_called()
+
     def test_incomplete_corrupt_and_missing_declared_payloads_are_rejected(self):
         self.select("arbitrary-stack@arbitrary-publisher")
         for host in ("codex", "claude"):
