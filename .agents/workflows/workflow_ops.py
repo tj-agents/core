@@ -607,6 +607,28 @@ def review_candidate_key(value):
     )
 
 
+def disposable_review_bundle_locations(common, run, candidate_key):
+    temporary = Path(tempfile.gettempdir()).resolve()
+    cache = temporary / "review"
+    repository_cache = cache / compact_cache_key(os.path.normcase(str(common)))
+    run_cache = repository_cache / compact_cache_key(os.path.normcase(str(run)))
+    directory = run_cache / compact_candidate_key(candidate_key)
+    private = run / "review" / candidate_key
+    return {
+        "cache": cache,
+        "repository_cache": repository_cache,
+        "run_cache": run_cache,
+        "private": private,
+        "descriptor": private / "descriptor.json",
+        "directory": directory,
+        "patch": directory / "candidate.patch",
+        "paths": directory / "paths.nul",
+        "tree": directory / "tree",
+        "tree_archive": directory / "tree.tar",
+        "identity": directory / "identity.json",
+    }
+
+
 def review_bundle_locations(root, workflow_run_id, candidate_key):
     root = repository_root(root)
     common = common_git_directory(root)
@@ -619,10 +641,11 @@ def review_bundle_locations(root, workflow_run_id, candidate_key):
             continue
         raise WorkflowOperationError("review bundle cache cannot be inside the checkout or common Git directory")
     run = run_root(root, workflow_run_id).resolve()
-    cache = temporary / "review"
-    repository_cache = cache / compact_cache_key(os.path.normcase(str(common)))
-    run_cache = repository_cache / compact_cache_key(os.path.normcase(str(run)))
-    directory = run_cache / compact_candidate_key(candidate_key)
+    locations = disposable_review_bundle_locations(common, run, candidate_key)
+    cache = locations["cache"]
+    repository_cache = locations["repository_cache"]
+    run_cache = locations["run_cache"]
+    directory = locations["directory"]
     for candidate in (cache, repository_cache, run_cache, directory):
         if is_redirect(candidate) or (candidate.exists() and not candidate.is_dir()):
             raise WorkflowOperationError("review bundle cache contains a redirected or invalid owned directory")
@@ -632,20 +655,11 @@ def review_bundle_locations(root, workflow_run_id, candidate_key):
         except ValueError:
             continue
         raise WorkflowOperationError("review bundle cache cannot be inside the checkout or common Git directory")
-    private = run / "review" / candidate_key
+    private = locations["private"]
     for candidate in (run, run / "review", private):
-        if candidate.exists() and (is_redirect(candidate) or not candidate.is_dir()):
+        if is_redirect(candidate) or (candidate.exists() and not candidate.is_dir()):
             raise WorkflowOperationError("review descriptor namespace contains a redirected or invalid owned directory")
-    return {
-        "private": private,
-        "descriptor": private / "descriptor.json",
-        "directory": directory,
-        "patch": directory / "candidate.patch",
-        "paths": directory / "paths.nul",
-        "tree": directory / "tree",
-        "tree_archive": directory / "tree.tar",
-        "identity": directory / "identity.json",
-    }
+    return locations
 
 
 def compact_cache_key(value):
@@ -839,6 +853,7 @@ def review_descriptor_paths(runs):
 def cleanup_review_bundles(root, now=None):
     root = repository_root(root)
     runs = state_root(root) / "runs"
+    common = common_git_directory(root)
     current = now or datetime.now(timezone.utc)
     for descriptor_path in review_descriptor_paths(runs):
         try:
@@ -854,8 +869,21 @@ def cleanup_review_bundles(root, now=None):
             if current - timestamp.astimezone(timezone.utc) < timedelta(seconds=REVIEW_BUNDLE_RETENTION_SECONDS):
                 continue
             candidate_key = review_candidate_key(value)
-            locations = review_bundle_locations(root, run_id, candidate_key)
+            run = descriptor_path.parent.parent.parent.resolve()
+            disposable = disposable_review_bundle_locations(common, run, candidate_key)
             expected = ("directory", "patch", "paths", "tree", "tree_archive", "identity")
+            redirected = any(is_redirect(disposable[name]) for name in (
+                "cache", "repository_cache", "run_cache", "directory",
+                "patch", "paths", "tree", "tree_archive", "identity",
+            ))
+            if (
+                not redirected
+                and descriptor_path == disposable["descriptor"]
+                and all(bundle.get(name) == str(disposable[name]) for name in expected)
+                and not disposable["directory"].exists()
+            ):
+                continue
+            locations = review_bundle_locations(root, run_id, candidate_key)
             owned = (
                 value.get("repository") == repository_slug(root)
                 and value.get("descriptor_id") == descriptor_identity(value)
