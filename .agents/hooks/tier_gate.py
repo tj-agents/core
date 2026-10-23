@@ -210,8 +210,6 @@ def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
         context = data["session_context"]
         if not isinstance(context, str) or not context.strip() or any(char in context for char in "\r\n\u0085\u2028\u2029"):
             problems.append(diagnostic("malformed-declaration", path + ".session_context", "Session context requires one non-empty line"))
-    if "routes" in data:
-        problems.extend(route_diagnostics(data["routes"], path + ".routes"))
     if "employer" in data:
         employer = data["employer"]
         if not isinstance(employer, dict) or set(employer) != {"context_skill"} or not isinstance(
@@ -226,23 +224,40 @@ def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
     return problems
 
 
+QUALIFIED_SKILL = re.compile(r"[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*")
+
+
+def route_problem(row):
+    if not isinstance(row, dict):
+        return "A route must be an object"
+    if not _text(row.get("path")):
+        return "A route requires a path pattern"
+    skills = row.get("skills")
+    if not isinstance(skills, list) or not skills or not all(
+            isinstance(skill, str) and QUALIFIED_SKILL.fullmatch(skill) for skill in skills):
+        return "A route requires a non-empty list of plugin-qualified skills"
+    for field in ("content_requires", "note"):
+        if field in row and not _text(row[field]):
+            return "A route " + field + " must be a non-empty string"
+    if "deny" in row and (not isinstance(row["deny"], list) or not all(
+            isinstance(rule, dict) and _text(rule.get("pattern")) for rule in row["deny"])):
+        return "A route deny must be a list of objects with a pattern"
+    patterns = [row["path"], row.get("content_requires")] + [rule["pattern"] for rule in row.get("deny") or []]
+    for pattern in patterns:
+        if pattern is None:
+            continue
+        try:
+            re.compile(pattern)
+        except re.error as error:
+            return "Invalid pattern " + repr(pattern) + ": " + str(error)
+    return ""
+
+
 def route_diagnostics(routes, path="tier.json.routes"):
     if not isinstance(routes, list):
         return [diagnostic("malformed-routes", path, "Routes require a list of rows")]
-    problems = []
-    for index, row in enumerate(routes):
-        where = path + "[" + str(index) + "]"
-        if not isinstance(row, dict) or not _text(row.get("path")) or not isinstance(row.get("skills"), list)                 or not row["skills"] or not all(re.fullmatch(r"[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*", _text(skill))
-                                                for skill in row["skills"]):
-            problems.append(diagnostic("malformed-routes", where, "A route requires a path and qualified skills"))
-            continue
-        for field in ("path", "content_requires"):
-            if field in row:
-                try:
-                    re.compile(_text(row[field]))
-                except re.error as error:
-                    problems.append(diagnostic("malformed-routes", where + "." + field, "Invalid pattern: " + str(error)))
-    return problems
+    return [diagnostic("malformed-routes", path + "[" + str(index) + "]", problem)
+            for index, row in enumerate(routes) if (problem := route_problem(row))]
 
 
 def fact_references(node):

@@ -97,6 +97,7 @@ SHIPPED_ROUTES_DIR = Path(__file__).resolve().parent.parent / "routes"
 REGISTRY_FILE = "registry.json"
 TIER_SKILL_DIRS = []
 SUBAGENT_ID = re.compile(r"[A-Za-z0-9_-]+")
+GIT_BASH_DRIVE = re.compile(r"^/([A-Za-z])/(.*)$")
 # A rename moves a skill between plugins; the qualified name in a route, a plan or a habit does not move
 # with it. `.agents/plugins/compatibility.json` already records every such move - it simply had no
 # reader, which is how the base: -> engineering: reorganisation made `base:review-lifecycle` resolve
@@ -268,7 +269,7 @@ def repo_relative(path, cwd):
     relative to the session, and `Path.resolve()` alone would anchor them wherever python started.
     """
     try:
-        p = Path(path)
+        p = Path(native_path(path))
         if not p.is_absolute():
             p = Path(cwd) / p
         p = p.resolve()
@@ -748,16 +749,12 @@ def transcript_skill_outcomes(transcript_path, codex_skills=(), read_skills=()):
         span = min(len(normalized), PROOF_ANCHOR_BYTES)
         return normalized[:span], normalized[-span:] if span else ""
 
-    codex_proofs = [
-        (name, "/skills/%s/skill.md" % name.rpartition(":")[2].lower(),
-         "/" + name.partition(":")[0].lower() + "/" if ":" in name else "", anchors(body))
-        for name, _, body in codex_skills
-    ]
-    read_proofs = [
-        (name, "/skills/%s/skill.md" % name.rpartition(":")[2].lower(),
-         "/" + name.partition(":")[0].lower() + "/" if ":" in name else "")
-        for name in read_skills
-    ]
+    def segments(name):
+        return ("/skills/%s/skill.md" % name.rpartition(":")[2].lower(),
+                "/" + name.partition(":")[0].lower() + "/" if ":" in name else "")
+
+    codex_proofs = [(name, *segments(name), anchors(body)) for name, _, body in codex_skills]
+    read_proofs = [(name, *segments(name)) for name in read_skills]
     pending_reads = {}
     try:
         with open(transcript_path, encoding="utf-8", errors="replace") as handle:
@@ -833,6 +830,10 @@ def transcript_skill_outcomes(transcript_path, codex_skills=(), read_skills=()):
     return outcomes
 
 
+def route_key(route):
+    return json.dumps([route.get("path"), route.get("content_requires"), sorted(route.get("skills") or [])])
+
+
 def subagent_id(data, harness):
     agent = data.get("agent_id")
     if harness != "claude" or not isinstance(agent, str) or not SUBAGENT_ID.fullmatch(agent):
@@ -878,18 +879,48 @@ def find_repo_root(cwd):
     return None
 
 
-def write_scope(targets, cwd):
-    """The repository the targets live in when they are all absolute and in one other repository.
+def native_path(path):
+    text = str(path)
+    if os.name == "nt":
+        match = GIT_BASH_DRIVE.match(text)
+        if match:
+            return match.group(1).upper() + ":/" + match.group(2)
+    return text
 
-    A session started in a main checkout routinely edits a sibling worktree by absolute path.
-    """
-    if not targets or not all(Path(target).is_absolute() for target in targets):
-        return cwd
-    roots = {find_repo_root(Path(target).parent) for target in targets}
-    if len(roots) != 1 or None in roots:
-        return cwd
-    (root,) = roots
-    return str(root) if root != find_repo_root(cwd) else cwd
+
+def target_roots(targets, cwd):
+    roots = set()
+    for target in targets:
+        path = Path(native_path(target))
+        if not path.is_absolute():
+            path = Path(cwd) / path
+        root = find_repo_root(path.parent)
+        if root is not None:
+            roots.add(root)
+    return roots
+
+
+def routed(root):
+    try:
+        return bool(load_routes(root))
+    except RoutesUnusable:
+        return True
+
+
+def write_scope(targets, cwd):
+    roots = target_roots(targets, cwd)
+    if len(roots) > 1:
+        roots = {root for root in roots if routed(root)}
+        if len(roots) > 1:
+            raise SplitWrite()
+    if len(roots) == 1 and (find_repo_root(cwd) not in roots
+                            or all(Path(native_path(target)).is_absolute() for target in targets)):
+        return str(next(iter(roots)))
+    return cwd
+
+
+class SplitWrite(Exception):
+    pass
 
 
 def git_common_dir(root):
@@ -974,9 +1005,10 @@ def registry_routes(root):
 
 
 def tier_routes(root):
-    """The `routes` rows in the `tier.json` of every tier that applies to this project."""
+    if not any("routes" in declaration.data for declaration in tier_gate.declarations(project=root)):
+        return []
     selection = selection_for(root)
-    declarations = [declaration for declaration, _ in selection.applicable]
+    declarations = [*selection.ubiquitous, *(declaration for declaration, _ in selection.applicable)]
     declarations += [declaration for declaration, _ in selection.employers if declaration not in declarations]
     rows = []
     for declaration in declarations:
@@ -989,21 +1021,26 @@ def tier_routes(root):
         payload = Path(declaration.payload_dir)
         if payload / "skills" not in TIER_SKILL_DIRS:
             TIER_SKILL_DIRS.append(payload / "skills")
-    return rows or None
+    return rows
 
 
 def load_routes(root):
-    """The repo's table, else its registry table, else the applicable tiers' tables; None when none exist.
+    """The repo's or registry table plus every applying tier's rows. None when there are none.
 
-    Present but unusable -> raises.
+    Present but unusable, any source -> raises.
 
     Failing open on a malformed table is the ENF1 failure exactly: enforcement that is inert while
     looking wired. A repo that created this file asked for routing, so a typo in it is a loud stop.
     """
+    own = own_routes(root)
+    combined = [*(own or []), *tier_routes(root)]
+    return combined if own is not None or combined else None
+
+
+def own_routes(root):
     path = root / ROUTES_FILE
     if not path.is_file():
-        routes = registry_routes(root)
-        return routes if routes is not None else tier_routes(root)
+        return registry_routes(root)
     try:
         parsed = json.loads(path.read_text(encoding="utf-8"))
     except OSError as error:
@@ -1431,7 +1468,14 @@ def main():
     else:
         shell_writes = []
         targets = written_targets(tool_input)
-    cwd = write_scope(targets, data.get("cwd") or os.getcwd())
+    try:
+        cwd = write_scope(targets, data.get("cwd") or os.getcwd())
+    except SplitWrite:
+        sys.stderr.write(
+            "SKILL ROUTER - blocked, this call writes into more than one routed repository. Split it "
+            "into one call per repository so each one's standards can be checked. Nothing was written.\n"
+        )
+        sys.exit(2)
     root = find_repo_root(cwd)
     if root is None:
         sys.exit(0)
@@ -1572,7 +1616,7 @@ def main():
     selection = selection_for(root)
     pending = []
     for rel, route in matched:
-        key = route.get("path")
+        key = route_key(route)
         if key in seen:
             continue
         pending.append((rel, dict(route, skills=[routed_name(selection, root, name, harness)
@@ -1604,7 +1648,7 @@ def main():
 
     outcomes = None if missing else transcript_skill_outcomes(
         proof_transcript(data, agent), codex_skills,
-        [proof_names[name] for name in proof_names] if agent else (),
+        list(proof_names.values()) if agent else (),
     )
     rejected, unproven = set(), set()
     if not missing and outcomes is not None:
@@ -1618,8 +1662,7 @@ def main():
         unproven.update(descriptions)
 
     if not missing and not rejected and not unproven:
-        for _, route in pending:
-            seen.add(route.get("path"))
+        seen.update(route_key(route) for _, route in matched)
         save_seen(session, seen)
         sys.exit(0)
 
