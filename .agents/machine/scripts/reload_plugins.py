@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import functools
 import json
 import os
@@ -299,7 +300,8 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
         return apply_claude(executable, project, installs, updates, done)
     finally:
         ran = {attempt_key(*target) for target in done}
-        plugin_autoupdate.record_contents(attempts={key: head for key, head in attempts.items() if key in ran})
+        with contextlib.suppress(OSError):
+            plugin_autoupdate.record_contents(attempts={key: head for key, head in attempts.items() if key in ran})
 
 
 def refresh_repositories(project: Path, repositories: set[str] | None, updated: set[str] | None = None,
@@ -314,7 +316,7 @@ def refresh_repositories(project: Path, repositories: set[str] | None, updated: 
     changed = reconcile_claude(project, event=True, repositories=repositories, fresh=frozenset(fresh))
     if updated is not None:
         updated.update(changed)
-    return not any(repositories is None or key.rsplit("@", 1)[0] in repositories for key in unresolved)
+    return repositories is None or not any(key.rsplit("@", 1)[0] in repositories for key in unresolved)
 
 
 def package_tree(root: Path) -> dict[str, bytes]:
