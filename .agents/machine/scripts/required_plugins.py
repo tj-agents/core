@@ -12,10 +12,10 @@ import subprocess
 
 IDENTITY = re.compile(r"[a-z][a-z0-9-]*@[a-z][a-z0-9-]*\Z")
 INVENTORY_TIMEOUT_SECONDS = 5
-MAINTENANCE_COMMANDS = frozenset({
-    "plugin", "plugins", "login", "logout", "doctor", "help", "completion", "update",
-    "mcp", "features", "--help", "-h", "--version", "-V",
-})
+MAINTENANCE_COMMANDS = {
+    "codex": frozenset({"plugin", "login", "logout", "doctor", "help", "completion", "update", "mcp", "features"}),
+    "claude": frozenset({"plugin", "plugins", "auth", "doctor", "install", "setup-token", "update", "upgrade", "mcp"}),
+}
 
 
 class RequiredPluginsError(RuntimeError):
@@ -50,7 +50,7 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
             break
         if argument in ("--help", "-h", "--version", "-V" if host == "codex" else "-v"):
             return
-        if not command_seen and argument in MAINTENANCE_COMMANDS:
+        if not command_seen and argument in MAINTENANCE_COMMANDS[host]:
             return
         option, separator, value = argument.partition("=")
         if option in value_options:

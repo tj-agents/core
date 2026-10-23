@@ -156,6 +156,13 @@ dependencies, while the workstation's isolated source tree does not. The migrati
 test now supplies an explicit two-plugin roster, isolating the behavior it asserts;
 all 17 adoption tests pass. Production dependency expansion remains unchanged.
 
+The diagnostic delta passed native review. A parent audit against both installed
+CLIs found shared maintenance words could be ordinary prompts on the other host.
+Maintenance exemptions now use separate native command sets; cross-host words such
+as Claude `features` and Codex `plugins` require admission. All 15 required-plugin
+tests and 13 startup tests pass (one POSIX skip). This is the final runtime correction
+identified by the current audit; exact-head CI and rollout remain open.
+
 ```completion
 {
   "outcome": "Every repository-selected standards plugin is verified for its native host, and missing imports cannot silently permit agent startup or routed writes.",
