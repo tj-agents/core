@@ -255,7 +255,9 @@ def powershell_block(python: str, script: Path, loader: Path | None, newline: st
             " -ErrorAction SilentlyContinue | Select-Object -First 1",
             f"    if (-not $tjAgentsTarget) {{ Write-Error '{name} was not found on PATH'; return }}",
             f"    if (-not (Test-Path -LiteralPath {quoted(python)})) {{ Write-Error 'Standards verifier Python is unavailable'; $global:LASTEXITCODE = 1; return }}",
-            f"    & {quoted(python)} -I -B {quoted(script)} --host {name} --target $tjAgentsTarget.Source -- @args",
+            f"    try {{ $env:{launch_check.HOST_VARIABLE} = '{name}';"
+            f" & {quoted(python)} -I -B {quoted(script)} --host {name} --target $tjAgentsTarget.Source -- @args }}"
+            f" finally {{ Remove-Item Env:{launch_check.HOST_VARIABLE} -ErrorAction SilentlyContinue }}",
             "    if ($LASTEXITCODE -ne 0) { return }",
             "    & $tjAgentsTarget.Source @args",
             "}",
@@ -269,7 +271,7 @@ def posix_block(python: str, script: Path) -> str:
 
     return "\n".join([PROFILE_START, *(
         f'{name}() {{ [ -x {quoted(python)} ] || {{ printf "%s\\n" "Standards verifier Python is unavailable" >&2; return 1; }}; '
-        f'{quoted(python)} -I -B {quoted(script)} --host {name} --target "$(command -v {name})" -- "$@" || return $?; command {name} "$@"; }}'
+        f'{launch_check.HOST_VARIABLE}={name} {quoted(python)} -I -B {quoted(script)} --host {name} --target "$(command -v {name})" -- "$@" || return $?; command {name} "$@"; }}'
         for name in HOSTS), PROFILE_END])
 
 

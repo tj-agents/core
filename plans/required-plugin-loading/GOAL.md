@@ -213,8 +213,10 @@ real CLI entry point, including unknown-step rejection. All 50 setup tests pass.
 Frozen incremental review found R4: profiles selected alone could omit their runtime.
 The correction automatically includes the runtime for shell profiles, preserves order,
 and adds the isolated selection to the CLI regression. All 50 setup tests pass.
-The supported Windows scoped preflight applied no settings. Exact-head review and CI
-for this correction remain pending. Both Windows and Linux CI passed the earlier
+The supported Windows profiles-only scoped preflight applied no settings and
+automatically included the runtime. Final exact-head native and independent review
+approved8503ed96, with R4 resolved and all50 setup tests passing. Linux CI passed;
+Windows shared-runtime CI is still running. Both Windows and Linux CI passed the earlier
 53b8649e guard candidate.
 
 Handoff launchers resolve agent_cli from packaged machine resources, which contain
@@ -252,10 +254,27 @@ directory; startup_binding is not required in the shell-only runtime file set.
       "next_action": "Complete PR 445 validation, resolve policy-compliant landing and preserve unrelated primary-checkout edits during supported installation."
     }
   ],
-  "deliveries": [{"repository": "tj-agents/core", "pr": 445, "head": "53b8649eb51e73d29ace697a67fc0be64c43bbbf"}],
+  "deliveries": [{"repository": "tj-agents/core", "pr": 445, "head": "8503ed9682259beac1b6a769bc00e809fe4757aa"}],
   "open_tasks": [
-    {"repository": "tj-agents/core", "pr": 445, "head": "53b8649eb51e73d29ace697a67fc0be64c43bbbf", "text": "Complete final scoped installer review and exact-head CI.", "owner": "current execution session", "next_action": "Review the runtime dependency correction, then observe its Windows and Linux CI. Earlier guard CI passed both platforms."},
-    {"repository": "tj-agents/core", "pr": 445, "head": "53b8649eb51e73d29ace697a67fc0be64c43bbbf", "text": "Land and deploy the shared runtime through supported machine setup.", "owner": "current execution session; GitHub App setup owned by Tommy", "next_action": "Resolve identity policy beyond the push-and-PR exception, land the verified source, apply the prepared supported installation without overwriting the dirty development checkout, and verify fresh hosts."}
+    {"repository": "tj-agents/core", "pr": 445, "head": "8503ed9682259beac1b6a769bc00e809fe4757aa", "text": "Complete Windows exact-head CI.", "owner": "current execution session", "next_action": "Final source review and Linux CI passed; observe run39997465752 for Windows completion. Earlier guard CI passed both platforms."},
+    {"repository": "tj-agents/core", "pr": 445, "head": "8503ed9682259beac1b6a769bc00e809fe4757aa", "text": "Land and deploy the shared runtime through supported machine setup.", "owner": "current execution session; GitHub App setup owned by Tommy", "next_action": "Await the pending explicit landing identity exception (existing exception covers push/PR only), land after all checks pass, then run supported setup from the prepared managed clone and verify fresh hosts. No settings have been applied."}
   ]
 }
 ```
+
+
+## Launcher integration after main moved
+
+Tommy explicitly authorized review and merge, including the existing-login identity
+exception for this repair's merge, and accepted existing hook integration provided
+core remains generic. Required plugin names come from repository selection, with
+no hard-coded Python, .NET or React inventory in the shared verifier.
+
+Candidate8503ed96 passed complete Windows and Linux CI. Main then landed PR446,
+which scopes optional refresh by launch host and preserves running Codex sessions.
+Conflict resolution retains that scoping/environment cleanup together with required
+plugin admission, argument forwarding and refusal on verifier failure. Focused
+launcher18 (one POSIX skip), required20, startup14 (one POSIX skip), setup50,
+updater46 and reload34 tests pass. The first sandbox launcher run could not start
+pwsh; the unchanged suite passed under normal machine execution. New exact-head
+review and CI are required before landing. Machine installation remains outstanding.
