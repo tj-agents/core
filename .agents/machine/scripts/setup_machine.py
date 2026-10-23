@@ -254,7 +254,8 @@ def powershell_block(python: str, script: Path, loader: Path | None, newline: st
             f"    $tjAgentsTarget = Get-Command {name} -CommandType Application, ExternalScript"
             " -ErrorAction SilentlyContinue | Select-Object -First 1",
             f"    if (-not $tjAgentsTarget) {{ Write-Error '{name} was not found on PATH'; return }}",
-            f"    if (Test-Path -LiteralPath {quoted(python)}) {{ & {quoted(python)} -I -B {quoted(script)} --host {name} }}",
+            f"    if (Test-Path -LiteralPath {quoted(python)}) {{ $env:{launch_check.HOST_VARIABLE} = '{name}';"
+            f" & {quoted(python)} -I -B {quoted(script)}; Remove-Item Env:{launch_check.HOST_VARIABLE} }}",
             "    & $tjAgentsTarget.Source @args",
             "}",
         ]
@@ -266,7 +267,8 @@ def posix_block(python: str, script: Path) -> str:
         return "'" + str(value).replace("'", "'\\''") + "'"
 
     return "\n".join([PROFILE_START, *(
-        f'{name}() {{ [ -x {quoted(python)} ] && {quoted(python)} -I -B {quoted(script)} --host {name}; command {name} "$@"; }}'
+        f'{name}() {{ [ -x {quoted(python)} ] && {launch_check.HOST_VARIABLE}={name} {quoted(python)} -I -B {quoted(script)};'
+        f' command {name} "$@"; }}'
         for name in HOSTS), PROFILE_END])
 
 
