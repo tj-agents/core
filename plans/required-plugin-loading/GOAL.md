@@ -163,6 +163,37 @@ as Claude `features` and Codex `plugins` require admission. All 15 required-plug
 tests and 13 startup tests pass (one POSIX skip). This is the final runtime correction
 identified by the current audit; exact-head CI and rollout remain open.
 
+## Complete-candidate review checkpoint
+
+Integrated current main through merge `c24d6fa86fca5e920b5cf14b349c6074609941c2`,
+preserving the unrelated dirty primary checkout. Frozen review descriptor and bundle
+were generated against base `3f109a3e1ea9470ea7e68b6e7b82df0cb8637dd3`;
+the full native review ran in a clean detached checkout. Canonical work order and
+private receipt record a completed changes-requested pass with R1 (attached `-C`)
+and R2 (effective launch configuration). The packaged review-lens model was unavailable;
+one fresh default read-only workflow specialist supplied the independent check.
+
+Both findings are corrected in source. Attached short option values retain native
+directory/config boundaries. Claude receives settings, setting sources and plugin
+paths in inventory. Actual native probes proved Codex ignores disabling activation
+overrides in plugin inventory, so the supported guard refuses unverifiable Codex
+profile, feature and non-model config overrides in selected repositories; bounded
+model/reasoning overrides and maintenance diagnostics remain available. The same
+real verifier is exercised through shell and handoff admission tests. Required-plugin
+tests pass (19), startup (14; one POSIX skip), launcher (17; one POSIX skip).
+Source remediation still needs an incremental frozen review and exact-head CI.
+
+```agent-host-coverage
+{
+  "schema_version": 1,
+  "shared_source": ".agents/machine/scripts/required_plugins.py",
+  "hosts": [
+    {"host":"claude","behavior":"Require selected native standards before agent work.","source":".agents/machine/scripts/required_plugins.py","mapping":".agents/plugins/sources.json and plugin_autoupdate.RUNTIME","verification":{"level":"source","result":"passed","evidence":"Shared admission, shell and handoff tests pass; native settings override probe refuses disabled requirements. Shared installed launcher deployment remains open."}},
+    {"host":"codex","behavior":"Require selected native standards before agent work.","source":".agents/machine/scripts/required_plugins.py","mapping":".agents/plugins/sources.json and plugin_autoupdate.RUNTIME","verification":{"level":"source","result":"passed","evidence":"Shared admission, shell and handoff tests pass; native override limitation is guarded explicitly. Fresh consumer catalog and standards read passed. Shared installed launcher deployment remains open."}}
+  ]
+}
+```
+
 ```completion
 {
   "outcome": "Every repository-selected standards plugin is verified for its native host, and missing imports cannot silently permit agent startup or routed writes.",

@@ -16,6 +16,10 @@ MAINTENANCE_COMMANDS = {
     "codex": frozenset({"plugin", "login", "logout", "doctor", "help", "completion", "update", "mcp", "features"}),
     "claude": frozenset({"plugin", "plugins", "auth", "doctor", "install", "setup-token", "update", "upgrade", "mcp"}),
 }
+MODEL_CONFIG_KEYS = frozenset({
+    "model", "model_provider", "model_reasoning_effort", "model_reasoning_summary",
+    "model_verbosity", "service_tier", "personality",
+})
 
 
 class RequiredPluginsError(RuntimeError):
@@ -36,7 +40,13 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
         "-C", "--cd", "-c", "--config", "-m", "--model", "-p", "--profile",
         "-s", "--sandbox", "-a", "--ask-for-approval", "--add-dir", "--enable", "--disable",
         "--remote", "--remote-auth-token-env", "-i", "--image", "--local-provider",
-    } if host == "codex" else {"--model", "--permission-mode", "--settings", "--plugin-dir"}
+    } if host == "codex" else {
+        "--model", "--permission-mode", "--settings", "--setting-sources", "--plugin-dir", "--plugin-url",
+    }
+    configuration_options = {"-c", "--config", "-p", "--profile", "--enable", "--disable"} if host == "codex" else {
+        "--settings", "--setting-sources", "--plugin-dir", "--plugin-url",
+    }
+    inventory_options = []
     flag_options = {
         "--no-alt-screen", "--search", "--full-auto", "--dangerously-bypass-approvals-and-sandbox",
         "--no-daemon", "--strict-config", "--oss", "--approve-for-me",
@@ -53,6 +63,8 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
         if not command_seen and argument in MAINTENANCE_COMMANDS[host]:
             return
         option, separator, value = argument.partition("=")
+        if host == "codex" and len(argument) > 2 and argument[:2] in value_options:
+            option, separator, value = argument[:2], "=", argument[2:].removeprefix("=")
         if option in value_options:
             if not separator:
                 index += 1
@@ -61,10 +73,15 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
                 value = arguments[index]
             if host == "codex" and option in ("-C", "--cd"):
                 project = original_project / value
+            if option in configuration_options:
+                inventory_options.extend((option, value))
         elif argument not in flag_options:
             command_seen = True
         index += 1
-    check(project, host, executable)
+    if inventory_options:
+        check(project, host, executable, inventory_options=tuple(inventory_options))
+    else:
+        check(project, host, executable)
 
 
 def readable_payload(path: Path, host: str, name: str) -> bool:
@@ -146,16 +163,27 @@ def enabled_roots(host: str, project: Path, entries: list) -> dict[str, Path]:
     return roots
 
 
-def check(project: Path, host: str, executable: str | None = None) -> tuple[Path, ...] | None:
+def check(project: Path, host: str, executable: str | None = None,
+          inventory_options: tuple[str, ...] = ()) -> tuple[Path, ...] | None:
     project = project_root(project)
     required = selected(project)
     if not required:
         return None
+    if host == "codex":
+        for option, value in zip(inventory_options[::2], inventory_options[1::2]):
+            key = value.partition("=")[0].strip().strip("\"'")
+            if option not in ("-c", "--config") or key not in MODEL_CONFIG_KEYS:
+                raise RequiredPluginsError(
+                    f"Cannot verify required Codex plugins with launch override {option}: native plugin "
+                    "inventory does not apply session activation overrides. Use the persisted repository "
+                    "configuration for plugin, profile and feature settings, then relaunch. "
+                    "Model and reasoning overrides remain available."
+                )
     binary = executable or shutil.which(host)
     if not binary:
         raise RequiredPluginsError(f"Required standards cannot be verified: {host} executable is unavailable")
     try:
-        command = [binary, "plugin", "list", "--json"]
+        command = [binary, *inventory_options, "plugin", "list", "--json"]
         if os.name == "nt" and Path(binary).suffix.casefold() == ".ps1":
             command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-File", *command]
         result = subprocess.run(
