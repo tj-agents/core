@@ -47,7 +47,7 @@ condition.
 
 ## Select the execution lane
 
-Use `engineering:lanes` for substantive capability selection and fallback. Reuse its loaded contract and
+Use `machine:lanes` for substantive capability selection and fallback. Reuse its loaded contract and
 avoid written lane rationales for routine work. Cheap leaf lanes and bounded clerical workers remain
 available without changing the task owner. Approval supplies execution authority; capability selection
 alone supplies none. These rules
@@ -175,7 +175,7 @@ updates the owning dependency ledger with the return condition before stopping.
 Use Workflow v2 semantic capabilities rather than agent or model names. Validate every result and give one
 focused follow-up to a correctable incomplete result. On another invalid result, timeout, unavailable
 role/model, unsupported host capability, or cancellation, close the dispatch and reselect the phase lane
-under `engineering:lanes` before performing the same bounded objective in the parent. Parent fallback must
+under `machine:lanes` before performing the same bounded objective in the parent. Parent fallback must
 satisfy the same lane and capability-limit rules as direct execution; a missing worker does not promote
 implementation to the design lane. Reconcile a failed or cancelled writer's observed paths against Git
 before reusing its lease; never overlap writers or let a subordinate choose a phase, fix, severity, or
