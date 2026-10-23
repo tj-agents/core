@@ -43,11 +43,19 @@ def primary_checkout(shared):
 
 
 def sweep_script(shared):
-    store = shared.register_session.session_store_path()
-    if store is None or not store.with_name('plugin_autoupdate.py').is_file():
+    here = Path(__file__).resolve()
+    if here.parents[2].name in {'skills', 'codex-skills'}:
+        candidates = [here.parents[3] / 'resources/machine/scripts/plugin_autoupdate.py']
+    else:
+        candidates = [
+            here.parents[4] / 'machine/scripts/plugin_autoupdate.py',
+            here.parents[5] / 'resources/machine/scripts/plugin_autoupdate.py',
+        ]
+    script = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if script is None:
         return None
     try:
-        spec = importlib.util.spec_from_file_location('close_plugin_autoupdate', store.with_name('plugin_autoupdate.py'))
+        spec = importlib.util.spec_from_file_location('close_plugin_autoupdate', script)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module.sweep_script(module.load_codex_config())

@@ -4,7 +4,8 @@
     "machine"
   ],
   "prerequisites": [
-    "base"
+    "base",
+    "agent-store"
   ],
   "external_prerequisites": [],
   "skills": [
@@ -15,6 +16,7 @@
     "handoff-claude",
     "handoff-codex",
     "hook-control",
+    "lanes",
     "last-conversation",
     "open-claude",
     "open-cli",
