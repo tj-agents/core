@@ -170,7 +170,7 @@ def settle(project: Path, reconcile=None) -> str:
 
     lock = plugin_autoupdate.acquire_lock(state_directory() / "launch-check.lock")
     if lock is None:
-        return "current"
+        return "busy"
     try:
         changed = (reconcile or reconcile_installs)(project)
     except Exception as error:

@@ -104,8 +104,8 @@ class LaunchCheckTests(unittest.TestCase):
 
         held = plugin_autoupdate.acquire_lock(self.state / "launch-check.lock")
         self.addCleanup(held.close)
-        self.assertEqual("current", CHECK.check(ROOT, fetch=Server(), update=self.update(),
-                                                reconcile=lambda project: self.fail("ran while locked")))
+        self.assertEqual("busy", CHECK.check(ROOT, fetch=Server(), update=self.update(),
+                                             reconcile=lambda project: self.fail("ran while locked")))
 
     def test_an_unconfigured_machine_never_polls(self):
         (self.state / "machine-events.json").unlink()
