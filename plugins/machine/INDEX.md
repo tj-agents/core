@@ -9,6 +9,7 @@ Generated from canonical `.agents/` definitions.
 - `handoff-claude` — utility — `.agents/machine/utility/handoff-claude/SKILL.md`
 - `handoff-codex` — utility — `.agents/machine/utility/handoff-codex/SKILL.md`
 - `hook-control` — utility — `.agents/machine/utility/hook-control/SKILL.md`
+- `lanes` — policy — `.agents/machine/policy/lanes/SKILL.md`
 - `last-conversation` — utility — `.agents/machine/utility/last-conversation/SKILL.md`
 - `open-claude` — utility — `.agents/machine/utility/open-claude/SKILL.md`
 - `open-cli` — utility — `.agents/machine/utility/open-cli/SKILL.md`

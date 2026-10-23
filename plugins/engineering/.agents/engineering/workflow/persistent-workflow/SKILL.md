@@ -16,7 +16,7 @@ recorded, merged at its full head, has no unchecked tasks, and the outcome evide
 keeps the current owner and leaves the returned actions open.
 
 Before retiring recovery artifacts, reconcile and update any linked selected item through
-[the shared recording contract](../../resources/problem-records.md). Resolve it only after its own
+[the shared recording contract](../../../workflow/resources/problem-records.md). Resolve it only after its own
 acceptance is verified; the PR completion check alone does not close it. Preserve unresolved item
 ownership and next action.
 
@@ -74,7 +74,7 @@ authority; this workflow does not create a competing plan or permission.
 Honor the user's limits on additional sessions, schedulers and child processes before choosing a
 continuation capability. When a required wake cannot be established within those limits, continue all
 authorized unblocked work in the foreground. Use the supported foreground remote monitor for an owned
-delivery wait; it does not establish durable unattended continuation. Apply `base:goal-continuation`
+delivery wait; it does not establish durable unattended continuation. Apply `workflow:run`
 before ending at a genuine boundary for the remaining whole goal. A completed slice or unavailable
 scheduler does not establish goal completion or a whole-goal blocker.
 

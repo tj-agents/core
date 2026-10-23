@@ -213,7 +213,7 @@ unchanged observations remain silent and never create a model turn or user-facin
 
 Before removing persistent state, inspect the completed delivery binding. A standalone PR removes its
 continuation. A plan-managed binding with a workflow handoff keeps the one existing continuation, closes only
-the merged PR binding, checkpoints the merge, and transfers to the recorded `plan-execution` stage. That
+the merged PR binding, checkpoints the merge, and transfers to the recorded `workflow:run` stage. That
 stage reconciles an existing successor layer or starts the next branch in a checkout selected under
 `engineering:git-branching`, before rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
 watermark or delivery binding into the successor; the successor re-resolves merge authorization from the
@@ -301,7 +301,7 @@ merge caused, and a causally linked red one is never left behind. The mechanics:
   deleting the goal, run the fresh completion check above. A missing, invalid, or failing record leaves the
   plan and its owned actions in place. Once
   publication and sync are terminal, reconcile the linked selected item through
-  [the shared recording contract](../../resources/problem-records.md) before deleting recovery artifacts.
+  [the shared recording contract](../../../workflow/resources/problem-records.md) before deleting recovery artifacts.
   Resolve it only after its own acceptance is verified; a delivered PR alone does not close it. Record
   the final transition, delete the plan and ledger, and update the curated roadmap summary from the
   selected item's state, or tick the unselected owning roadmap item, in one docs-only

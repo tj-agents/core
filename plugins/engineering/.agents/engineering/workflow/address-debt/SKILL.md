@@ -13,14 +13,16 @@ in-flight branches. This is the *resolution* workflow; the selected profile owns
 retention, and verified closure. A single item is the default shape; bundling more than one into the same
 PR is the exception below, not a second workflow.
 
-Read [the shared problem-record contract](../../resources/problem-records.md) first. In each repository,
+Read [the shared problem-record contract](../../../workflow/resources/problem-records.md) first. In each repository,
 use the selected profile provider to list, read, update and close debt. Provider failure blocks that
 repository's record operation; retain unsent facts under the shared guidance.
 
 ## Steps
 
-1. **Determine scope, then isolate.** First tell single-repo mode (the working directory, or an ancestor, is
-   itself a git repository) from polyrepo-root mode (the working directory is *not* a git repository, but
+1. **Determine scope, then isolate.** When a parent Workflow run supplies the current goal, delivery slice,
+   and checkout, retain them and do not create another goal, branch, or checkout. Otherwise first tell
+   single-repo mode (the working directory, or an ancestor, is itself a git repository) from polyrepo-root
+   mode (the working directory is *not* a git repository, but
    multiple of its immediate children are each their own git repository — e.g. a `Concertable/` folder
    holding `auth/`, `b2b/`, `customer/`, `payment/`, `search/`, `docs/`, `agents/` as separate
    checkouts, alongside whatever non-repo files or folders — a README, a shared script, IDE metadata — also
@@ -95,7 +97,7 @@ Git.
 
 Each delivery slice keeps its branch, selected checkout, commits and PR through these stages. When the
 work needs multiple PRs, resolve and validate Workflow v2 repository state, promote it through
-`engineering:plans`, and checkpoint under `engineering:plan-checkpoint`. Deliver the remaining slices
+`engineering:plans`, and checkpoint under `engineering:plans`. Deliver the remaining slices
 under `engineering:git-branching`, resuming from the entry and ledger rather than this session.
 
 ## Example

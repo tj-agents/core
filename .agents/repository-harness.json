@@ -83,7 +83,11 @@
         "PowerShell(python -B -m unittest discover -s .agents/hooks/tests)",
         "PowerShell(python -B -m unittest discover -s .agents/hooks/tests *)",
         "PowerShell(python .agents/workflows/workflow_ops.py *)",
-        "PowerShell(python -B .agents/workflows/workflow_ops.py *)"
+        "PowerShell(python -B .agents/workflows/workflow_ops.py *)",
+        "Bash(python -B scripts/ci_native_acceptance.py)",
+        "Bash(python3 -B scripts/ci_native_acceptance.py)",
+        "PowerShell(python -B scripts/ci_native_acceptance.py)",
+        "PowerShell(python3 -B scripts/ci_native_acceptance.py)"
       ],
       "codex_prefix_rules": []
     }

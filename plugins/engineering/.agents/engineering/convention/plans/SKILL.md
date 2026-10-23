@@ -1,6 +1,6 @@
 ---
 name: plans
-description: Supporting contract for plan, roadmap, and progress-ledger structure, ownership, dependency states, phase gates, closeout, and context-transfer criteria. Load while a task workflow authors, executes, reconciles, checkpoints, or closes durable plan state; it does not own natural-language planning or implementation requests, which select plan-authoring, plan-execution, continue-roadmap, or update-roadmap.
+description: Supporting contract for plan, roadmap, and progress-ledger structure, ownership, dependency states, phase gates, closeout, and context-transfer criteria. Load while a task workflow authors, executes, reconciles, checkpoints, or closes durable plan state; it does not own natural-language planning or implementation requests, which select workflow:plan, workflow:run, or update-roadmap.
 
 kind: convention
 domain: process
@@ -10,7 +10,7 @@ domain: process
 
 ## Applicability
 
-Read `base:plan-artifacts` for the common maintained-plan contract.
+Read `workflow:plan-artifacts` for the common maintained-plan contract.
 The engineering lifecycle below applies only when selected by the project or user. For standalone
 planning, correction, or resume, follow that common contract and stop here; do not require a roadmap,
 ledger, provider, review pipeline, or publication. Installing base or invoking planning alone does not
@@ -22,7 +22,7 @@ reference" is rot that misleads the next reader into thinking the work is still 
 
 ## Roadmap → plan → progress
 
-Read [repository selection](../../resources/problem-records.md#repository-selection). In a selected
+Read [repository selection](../../../workflow/resources/problem-records.md#repository-selection). In a selected
 repository, the provider owns the live queue and item status. Keep substantive design files and the file
 graph below, including its stable keys, and link the canonical selected item from its plan and ledger.
 Roadmap status summaries follow that item; plans and roadmaps do not create a second live backlog.
@@ -196,11 +196,55 @@ a restriction. Carry the whole authorized goal through review, delivery, and any
 reconcile stale handoff restrictions with the current user request before acting.
 
 The retention test for every entry is: **could removing this fact cause a fresh agent to take the wrong
-action or repeat a costly failed approach?** If not, remove it. The checkpoint standard owns the mechanical
-size warning and safe compaction procedure.
+action or repeat a costly failed approach?** If not, remove it. The durable checkpoint rules below own the mechanical size warning and safe compaction procedure.
 
-`engineering:plan-checkpoint` owns the small set of transitions that require a durable update.
+`engineering:plans` owns the small set of transitions that require a durable update.
 Ordinary reports, commits, pushes, review stages, preflights, polls, and remote observations do not.
+
+## Durable checkpoint and selected runtime
+
+For a selected Engineering plan or ledger, update its compact recovery snapshot only at a material
+implementation milestone, a genuine blocker or ownership handoff, a completed full review or important
+finding, a terminal delivery transition, or an unsafe context ending with unreconstructable partial state.
+Routine reports, polls, ordinary commits, pushes, preflights, and unchanged blockers do not create a
+checkpoint. Reconcile affected ownership, partial work, `## Next Steps`, latest valid verification, and the
+current `## Reviews` gate only. The review artifact owns ranges, coverage, findings, dispositions, and review
+watermark; the ledger links it and records its current gate.
+
+Keep the progress ledger within 200 lines and 16,000 UTF-8 bytes. When either limit is exceeded, compact it
+at the next material checkpoint: retain current ownership, partial work, one next action, active blocker or
+handoff, review gate, valid verification, and consequential decisions; replace chronology and copied evidence
+with commit, PR, run, package, and review links. `plan_graph.py` warns on these limits.
+
+For a deliberate transfer, `## Next Steps` retains `Transfer:`, `Transfer to:`, `Resume stage:`, and `Resume
+when:` before its existing scope fields. The exact absolute plan and owning ledger pointer follows
+`workflow:handoff`. For selected Engineering software handoff, retain the effective
+`configuration.core.auto_approve` value or legacy alias, its settings provenance, and user-reserved decisions.
+
+Update a material ledger transition before the substantive commit that carries it and record that commit as
+`this commit`; never create a bookkeeping follow-up merely to add its SHA. A plan-managed push chooses one
+stable candidate, records local `HEAD`, upstream, remote tip, outgoing range, branch, and PR head, pushes once,
+then requires the remote-tracking reference and any PR `headRefOid` to equal that recorded local head. This is
+transport equality, not a new checkpoint. Do not create observation-only, review-only, or checkpoint-transport
+commits.
+
+For selected Engineering plan or ledger changes, resolve the repository provider once and validate the plan,
+ledger, checkout, branch, and next action. Record actual loaded advertised lifecycle and technical-skill identities and hashes, reusing unchanged
+evidence. For repository-local bodies, use the existing `workflow_ops.py` grammar such as
+`--lifecycle workflow:run=.agents/workflow/workflow/run/SKILL.md`. Installed bodies retain their native
+discovery and load evidence with their actual body hashes; do not present an installed body to the
+repository-local helper or copy a host body into the project. Do not introduce another resolver or a generic
+Workflow runtime dependency. Run `plan_graph.py` for every selected Engineering plan or ledger change and
+before trusting recovery state. A Concertable profile may impose its additional pre-launch adapter rule; other
+repositories do not select that profile implicitly.
+
+Before foreground or meta closeout, reporting done, or deleting recovery artifacts, invoke the existing
+completion-record contract when the canonical goal contains a fenced `completion` record. This applies
+independently of scheduling. `engineering:persistent-workflow` owns its completion contract and fields.
+
+Terminal selected Engineering evidence names implementation, validation, review, PR, merge commit, remaining
+durable state, and implementation authority. A commit, pushed branch, or open PR is not terminal while
+authorized delivery remains.
 
 ## Verification gate per phase
 
@@ -278,7 +322,7 @@ guess from memory. Then, for an edge that genuinely blocks *implementation*:
 
 ## Hard blockers — hand off the resolver, never the blocked plan
 
-Apply `base:goal-continuation` before ending at a blocker: exhaust all authorized unblocked work across
+Apply `workflow:run` before ending at a blocker: exhaust all authorized unblocked work across
 the remaining goal. A blocker on one slice does not justify stopping while another authorized action
 can proceed. When the remaining goal has a genuine dependency gate, `## Next Steps` must begin with
 four single-line fields, reported verbatim in the final response:
@@ -383,8 +427,8 @@ resumes that plan as its owner. Judge plans between these cases by the size and 
 execution, how much planning context is useful, and whether a fresh owner can act from the checkpoint.
 Record the reason when choosing the less usual path; plan length alone is not a mechanical threshold.
 
-`engineering:plan-authoring` owns the critical-plan readiness decision and compact execution goalpost.
-Apply it before a substantial-design transfer. `engineering:handoff` owns the matching acknowledgement
+`workflow:plan` owns the critical-plan readiness decision and compact execution goalpost.
+Apply it before a substantial-design transfer. `workflow:handoff` owns the matching acknowledgement
 and first-action evidence; launcher submission alone does not establish an accountable executor.
 
 Transfer to a fresh context only when at least one of these conditions is true:
@@ -402,7 +446,7 @@ Transfer to a fresh context only when at least one of these conditions is true:
 
 Age, transcript length, an actionable ledger, or a phase boundary by itself is not evidence that context is
 degraded. When a transfer condition does apply, make the checkpoint durable and execute the `handoff` workflow.
-It prepares the exact `handoff-format` pointer and invokes one selected launcher; a pointer in the response alone
+It prepares the exact `workflow:handoff` pointer and invokes one selected launcher; a pointer in the response alone
 does not transfer ownership. Do not select a handoff as routine phase-ending ceremony.
 
 ## Finishing, superseding, abandoning

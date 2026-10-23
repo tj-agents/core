@@ -8,7 +8,7 @@ domain: process
 
 # Address a recorded mistake
 
-Read [the shared problem-record contract](../../resources/problem-records.md). This workflow preserves an
+Read [the shared problem-record contract](../../../workflow/resources/problem-records.md). This workflow preserves an
 incident's history while returning the correction to its existing owner; it does not create another repair
 engine.
 
@@ -21,11 +21,12 @@ engine.
    and deferred incidents current with their real reason, resolver, and observable resume condition.
 3. For a defect in a consumed standard, follow the shipped `engineering:session` rule for the
    source-owner repair. For an authorized local governing correction with no existing repair owner,
-   establish its governing source and evidence first, then enter the appropriate shipped lifecycle: an
-   existing goal uses `engineering:plan-execution`, an existing behavior defect uses `engineering:bugfix`,
-   and new prevention behavior uses `engineering:feature`. An unknown cause stays an investigation action.
-   Do not copy those engines, authorize new product scope, or rely on a correction that exists only on an
-   unmerged branch as though it were shipped.
+   establish its governing source and evidence first, then enter `workflow:run` only when this correction
+   is not already executing under that goal owner. Inside a bounded Workflow assignment, retain its owner
+   and scope: use `engineering:bugfix` for an existing behavior defect or `engineering:feature` for new
+   prevention behavior, then return verification and record evidence to the Workflow owner. An unknown
+   cause stays an investigation action. Do not copy those engines, authorize new product scope, or rely on
+   a correction that exists only on an unmerged branch as though it were shipped.
 4. Link a related bug or debt repair where it owns the causal correction. Unknown cause remains unknown;
    merge incidents only after evidence confirms a common cause.
 5. Set `resolved` only after the repair's objective causal resolution condition has been tested and record

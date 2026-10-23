@@ -154,7 +154,7 @@ task. Preserve that owner's receipts and results. Before reusing the same checko
 the next initialization needs the canonical owner path available. Remove the old scheduler before
 archiving its receipt. Completing the slice owner does not complete the broader canonical goal.
 
-With a workflow handoff, the foreground parent resumes the recorded stage through `plan-execution` and
+With a workflow handoff, the foreground parent resumes the recorded stage through `workflow:run` and
 reconciles the next slice's existing branch, worktree and PR, including its actual base and head. Create
 those only when absent. After retiring the old owner, initialize and claim the next worktree's canonical
 owner against the same goal, then register its continuation when needed. Keep one active writer. The
