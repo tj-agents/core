@@ -315,6 +315,8 @@ def require_base_evidence(evidence, package_root, label):
 def transcript_entries(path):
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return None
     except OSError as error:
         raise AcceptanceError("Codex did not write a session transcript") from error
     entries = []
@@ -334,10 +336,18 @@ def snapshot_transcript(path, artifacts):
         pass
 
 
+def snapshot_diagnostic(artifacts, name, value):
+    artifacts.mkdir(parents=True, exist_ok=True)
+    (artifacts / name).write_text(value, encoding="utf-8")
+
+
 def require_failed_turn(path, package_root, timeout):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         entries = transcript_entries(path)
+        if entries is None:
+            time.sleep(0.05)
+            continue
         evidence = json.dumps(entries, sort_keys=True)
         try:
             require_base_evidence(evidence, package_root, "Codex session transcript")
@@ -368,24 +378,53 @@ def strings_at_keys(value, keys):
 
 
 def require_discovery(value, label):
-    names = set(strings_at_keys(value, {"id", "name", "skill", "qualifiedName", "command"}))
-    required = {
-        "workflow": {"run", "workflow:run", "workflow/run", "workflow@tj-agents:run"},
-        "engineering": {"commit", "engineering:commit", "engineering/commit", "engineering@tj-agents:commit"},
-    }
-    for package, expected in required.items():
-        if not names.intersection(expected):
+    required = {"workflow": "run", "engineering": "commit"}
+    records = []
+
+    def collect(item):
+        if isinstance(item, dict):
+            records.append(item)
+            for child in item.values():
+                collect(child)
+        elif isinstance(item, list):
+            for child in item:
+                collect(child)
+
+    collect(value)
+    for package, skill in required.items():
+        qualified = f"{package}:{skill}"
+        found = False
+        for record in records:
+            values = {
+                item for key, item in record.items()
+                if key in {"id", "name", "skill", "qualifiedName", "command"} and isinstance(item, str)
+            }
+            if qualified in values:
+                found = True
+                break
+            if skill not in values:
+                continue
+            sources = {
+                item.replace("\\", "/").casefold() for key, item in record.items()
+                if key in {"pluginId", "plugin", "source", "path", "root", "location"} and isinstance(item, str)
+            }
+            if any(source in {package, f"{package}@tj-agents"} or f"/plugins/{package}/" in source for source in sources):
+                found = True
+                break
+        if not found:
             raise AcceptanceError(f"{label} did not discover the required {package} skill")
 
 
-def require_claude_discovery(trace):
-    required = {
-        "workflow": ("workflow:run", "workflow/run", "workflow@tj-agents:run"),
-        "engineering": ("engineering:commit", "engineering/commit", "engineering@tj-agents:commit"),
+def require_claude_discovery(response):
+    if not isinstance(response, dict) or not isinstance(response.get("commands"), list):
+        raise AcceptanceError("Claude initialize response has no command inventory")
+    names = {
+        command.get("name") for command in response["commands"]
+        if isinstance(command, dict) and isinstance(command.get("name"), str)
     }
-    for package, names in required.items():
-        if not any(name in trace for name in names):
-            raise AcceptanceError(f"Claude debug artifact did not discover the required {package} skill")
+    for name in ("workflow:run", "engineering:commit"):
+        if name not in names:
+            raise AcceptanceError(f"Claude initialize response did not discover {name}")
 
 
 def is_descendant(process, root_pid, lookup):
@@ -488,25 +527,64 @@ def receipt_ids(state, host):
     return values
 
 
-def accept_claude_init(root, executable, project, environment, artifacts, timeout):
+def accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout):
     artifacts.mkdir(parents=True, exist_ok=True)
     debug = artifacts / "claude-debug.jsonl"
     state = Path(environment["AGENT_STATE_DIRECTORY"])
     before = receipt_ids(state, "claude")
+    claude_environment = dict(environment)
+    claude_environment["CLAUDE_CODE_ENTRYPOINT"] = "sdk-py"
+    claude_environment.pop("CLAUDECODE", None)
     process = subprocess.Popen(
-        [*native_command(executable), "--debug-file", str(debug), "--init-only"],
-        cwd=project, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        [
+            *native_command(executable), "--output-format", "stream-json", "--verbose",
+            "--input-format", "stream-json", "--debug-file", str(debug),
+        ],
+        cwd=project, env=claude_environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, encoding="utf-8", bufsize=1,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     try:
-        output = []
+        messages = queue.Queue()
+        completed = queue.Queue()
         errors = []
-        start_line_reader(process.stdout, output)
+        start_line_reader(process.stdout, messages, parse_json=True, completion=completed)
         start_line_reader(process.stderr, errors)
         store = load_module("native_acceptance_claude_store", root / ".agents" / "agent-store" / "runtime" / "session_store.py")
         register = load_module("native_acceptance_claude_register", root / ".agents" / "machine" / "utility" / "peer-cli" / "scripts" / "register_session.py")
         deadline = time.monotonic() + timeout
+        request_id = "native-acceptance-1"
+        process.stdin.write(json.dumps({
+            "type": "control_request", "request_id": request_id,
+            "request": {"subtype": "initialize", "hooks": None},
+        }) + "\n")
+        process.stdin.flush()
+        initialized = None
+        while time.monotonic() < deadline:
+            try:
+                message = messages.get(timeout=max(0.01, deadline - time.monotonic()))
+            except queue.Empty:
+                if process.poll() is not None:
+                    break
+                continue
+            if isinstance(message, Exception):
+                raise AcceptanceError(f"Claude startup emitted invalid JSON: {message}")
+            if not isinstance(message, dict) or message.get("type") != "control_response":
+                continue
+            response = message.get("response")
+            if not isinstance(response, dict) or response.get("request_id") != request_id:
+                continue
+            if response.get("subtype") != "success":
+                raise AcceptanceError("Claude initialize request was not accepted")
+            require_claude_discovery(response.get("response"))
+            initialized = response
+            break
+        if initialized is None:
+            detail = diagnostic(errors)
+            message = "Claude startup did not return the initialize response"
+            if detail:
+                message = f"{message}: {detail}"
+            raise AcceptanceError(message)
         session_id = None
         receipt_error = None
         while time.monotonic() < deadline:
@@ -521,23 +599,24 @@ def accept_claude_init(root, executable, project, environment, artifacts, timeou
                     session_id = candidate
                     break
             elif len(candidates) > 1:
-                raise AcceptanceError("Claude init-only startup created multiple session receipts")
+                raise AcceptanceError("Claude startup created multiple session receipts")
             if process.poll() is not None:
                 break
             time.sleep(0.05)
         if session_id is None:
-            detail = diagnostic(errors) or diagnostic(output) or str(receipt_error or "")
-            message = "Claude init-only startup did not create a live session receipt"
+            detail = diagnostic(errors) or str(receipt_error or "")
+            message = "Claude startup did not create a live session receipt"
             if detail:
                 message = f"{message}: {detail}"
             raise AcceptanceError(message)
+        process.stdin.close()
         try:
             process.wait(timeout=max(0.01, deadline - time.monotonic()))
         except subprocess.TimeoutExpired as error:
-            raise AcceptanceError("Claude init-only startup did not finish") from error
+            raise AcceptanceError("Claude startup did not finish") from error
         if process.returncode:
-            detail = diagnostic(errors) or diagnostic(output)
-            message = f"Claude init-only startup failed with exit code {process.returncode}"
+            detail = diagnostic(errors)
+            message = f"Claude startup failed with exit code {process.returncode}"
             if detail:
                 message = f"{message}: {detail}"
             raise AcceptanceError(message)
@@ -547,7 +626,8 @@ def accept_claude_init(root, executable, project, environment, artifacts, timeou
             raise AcceptanceError("Claude did not create its debug artifact") from error
         if "SessionStart" not in trace:
             raise AcceptanceError("Claude debug artifact has no SessionStart marker")
-        return trace, session_id
+        require_base_evidence(trace, marketplace / "plugins" / "base", "Claude debug artifact")
+        return session_id
     finally:
         if process.poll() is None:
             process.terminate()
@@ -588,6 +668,7 @@ def accept_codex(root, marketplace, executable, project, environment, artifacts,
             require_failed_turn(transcript, marketplace / "plugins" / "base", timeout)
         finally:
             snapshot_transcript(transcript, artifacts)
+            snapshot_diagnostic(artifacts, "codex-app-server.stderr.log", diagnostic(server.stderr))
         require_receipt(
             Path(environment["AGENT_STATE_DIRECTORY"]), store, register, "codex", session_id,
             project, server.process.pid,
@@ -599,10 +680,7 @@ def accept_codex(root, marketplace, executable, project, environment, artifacts,
 
 def accept_claude(root, marketplace, executable, project, environment, artifacts, timeout):
     install_claude_plugins(executable, marketplace, project, environment, timeout)
-    trace, session_id = accept_claude_init(root, executable, project, environment, artifacts, timeout)
-    require_base_evidence(trace, marketplace / "plugins" / "base", "Claude debug artifact")
-    require_claude_discovery(trace)
-    return session_id
+    return accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout)
 
 
 def isolated_environment(temporary_root, codex, claude):
@@ -690,6 +768,7 @@ def main(argv=None):
             arguments.artifacts, arguments.timeout,
         )
     except (AcceptanceError, OSError, ValueError, subprocess.SubprocessError) as error:
+        snapshot_diagnostic(arguments.artifacts, "native-host-acceptance.failure.log", f"{error}\n")
         print(f"native-host-acceptance: {error}", file=sys.stderr)
         return 1
     print(json.dumps(result, sort_keys=True))
