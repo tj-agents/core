@@ -41,7 +41,8 @@ adoption and local exclusions follow [machine:plugin-selection](.agents/machine/
 
 This repository owns common agent behavior, selected engineering process and machine utilities.
 `plan-artifacts` supplies maintained plans without requiring an engineering lifecycle. Stack standards,
-product profiles and product-specific enforcement remain with their scope owners. Shared runtime recovery
+product profiles and product-specific enforcement remain with their scope owners, including their adoption
+shortcuts and scaffolders. Other packages depend on core; core never names them. Shared runtime recovery
 and host acceptance remain part of P2; source generation alone does not establish adoption.
 
 <!-- BEGIN personal:current-solution sha256:2e091b5f18f67fb2302024e817c71d4a0f5234c1ca63ca1c9af5c4eef3b6a128 -->
