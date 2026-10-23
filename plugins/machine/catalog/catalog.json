@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:68e973a171c4ec22199d79e5934090f67ff03e521930c4208c7bcd24160327d5",
+      "digest": "sha256:118ee7c49744e58a6531407a1b9e1e61488a347f1181fa49e035d22c43647685",
       "harness": {
         "marketplaces": [
           {
@@ -76,6 +76,100 @@
         "permissions": {
           "claude_allow": [],
           "codex_prefix_rules": []
+        }
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/agent-store",
+      "name": "agent-store",
+      "package_path": "plugins/agent-store",
+      "description": "Recorded agent executions, sessions, ownership and references.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "inspect"
+      ],
+      "dependencies": {
+        "required": [],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "python>=3.9"
+        ],
+        "optional": []
+      },
+      "digest": "sha256:96624176d1f4eb56d1e77f04f77672e2f255ba1af5494fd7d32b12fd51c88505",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/agent-store"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py",
+                  "${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py",
+                  "${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py"
+                ]
+              ],
+              "justification": "Read recorded agent execution and session metadata without creating or modifying its database or observing native processes.",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py",
+                  "--repository",
+                  "github.com/owner/repo"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/writer.py"
+                ]
+              ]
+            }
+          ]
         }
       }
     },
@@ -156,6 +250,7 @@
       "dependencies": {
         "required": [
           "tj-agents/base",
+          "tj-agents/agent-store",
           "tj-agents/machine"
         ],
         "optional": []
@@ -171,7 +266,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:d883cccbca7c96ea44d97022d71cf93aa7b78f52100b435c40a1638ba5c23fe1",
+      "digest": "sha256:2e8119f956d0651a6e127fc78d5097c775a9207955309f813e57f97bdad316bb",
       "harness": {
         "marketplaces": [
           {
@@ -180,6 +275,7 @@
           }
         ],
         "plugins": [
+          "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/engineering",
           "tj-agents/machine"
@@ -497,7 +593,8 @@
       ],
       "dependencies": {
         "required": [
-          "tj-agents/base"
+          "tj-agents/base",
+          "tj-agents/agent-store"
         ],
         "optional": []
       },
@@ -513,7 +610,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:508848962ed38258bdc758da88ae379fdb8d92504dd4b786de1c544c9c2798e7",
+      "digest": "sha256:9ae2eb2345739eb371815277768475cc326cc054ae0460c63198d0463df4b8ba",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -525,10 +622,18 @@
           }
         ],
         "plugins": [
+          "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/machine"
         ],
         "hooks": [
+          {
+            "path": ".agents/agent-store/runtime/session_store.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
           {
             "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
             "hosts": [
@@ -545,13 +650,6 @@
           },
           {
             "path": "resources/machine/scripts/reap_orphans.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "resources/machine/scripts/session_store.py",
             "hosts": [
               "claude",
               "codex"
