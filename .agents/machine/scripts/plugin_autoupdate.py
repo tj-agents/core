@@ -20,7 +20,6 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 
 GIT_TIMEOUT_SECONDS = 30
@@ -37,7 +36,7 @@ HOOK_DIGEST = re.compile(r'"(sha256:[0-9a-f]{64})"')
 SHA = re.compile(r"[0-9a-f]{40}")
 NAME = re.compile(r"[A-Za-z0-9_.-]+")
 REVISION_PATH = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*")
-CONTENTS_LOCK = threading.Lock()
+CONTENTS_WAIT_SECONDS = 10
 SNAPSHOT_FIRST = "(Path(s) if s else d/'hook-snapshots')/k/"
 
 
@@ -220,9 +219,18 @@ def installed_revisions() -> set[str]:
     return {sha for sha in claude | codex if isinstance(sha, str)}
 
 
+def contents_lock():
+    deadline = time.monotonic() + CONTENTS_WAIT_SECONDS
+    while (lock := acquire_lock(state_directory() / "plugin-heads.lock")) is None:
+        if time.monotonic() > deadline:
+            raise TimeoutError("plugin-heads.json stayed locked")
+        time.sleep(0.05)
+    return lock
+
+
 def record_contents(heads: dict[str, str] = None, trees: dict[str, str] = None, keep: set[str] = frozenset(),
                     attempts: dict[str, str] = None) -> None:
-    with CONTENTS_LOCK:
+    with contents_lock():
         contents = read_contents()
         contents["heads"].update(heads or {})
         contents["attempts"].update(attempts or {})
@@ -460,13 +468,18 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
         listed = sources(marketplace, target) if refreshed else {}
         selected = {plugin: listed[plugin.rsplit("@", 1)[0]] for plugin in target["plugins"]
                     if plugin.rsplit("@", 1)[0] in listed}
+        known = read_contents()["trees"]
         wanted, installed = {}, {}
         for plugin, (url, ref, path) in selected.items():
-            previous = recorded.get("codex-plugin:" + plugin)
-            if (publisher := publisher_key(url, ref)) and previous != heads.get((url, ref)):
-                wanted.setdefault(publisher, set()).add(path)
-                if isinstance(previous, str):
-                    installed.setdefault(publisher, set()).add(previous)
+            previous, plugin_head = recorded.get("codex-plugin:" + plugin), heads.get((url, ref))
+            publisher, repository = publisher_key(url, ref), github_repository(url)
+            if not publisher or previous == plugin_head or plugin_head and all(
+                    tree_key(repository, revision, path) in known
+                    for revision in (plugin_head, previous) if isinstance(revision, str)):
+                continue
+            wanted.setdefault(publisher, set()).add(path)
+            if isinstance(previous, str):
+                installed.setdefault(publisher, set()).add(previous)
         if wanted:
             refresh_contents(wanted, installed, query)
         contents = read_contents()

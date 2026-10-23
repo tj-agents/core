@@ -221,7 +221,7 @@ Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: on
 poll for events since the saved cursor; offline it starts anyway. Events name the publishing repositories.
 A GitHub query per repository reads its head and each plugin directory's tree into `~/.agents-state/plugin-heads.json`,
 both hosts update in parallel, and the cursor advances once both succeed. A failed host retries on the next
-launch; a cursor older than ntfy's retention compares every publisher instead. Every launch then compares
+launch; a cursor older than ntfy's retention compares every publisher instead. Every launch except `codex` then compares
 this project's Claude installs with the recorded heads from local files only, and updates an install only
 when its plugin directory differs at the head; a plain launch does not retry an update that did not reach
 the head. Codex re-adds a plugin only when its directory changed. Without GitHub content, both compare commits.
