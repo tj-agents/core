@@ -250,9 +250,11 @@ class GeneratedLaneAgentTests(unittest.TestCase):
     def test_claude_l1_agent_only_returns_the_codex_handoff(self):
         path = ROOT / "plugins" / "engineering" / "agents" / "lane-l1.md"
         body = path.read_text(encoding="utf-8-sig")
-        self.assertIn("required `engineering:handoff` request", body)
+        self.assertIn("required native handoff request to your parent", body)
+        self.assertIn("The parent owns authorization and context preparation.", body)
         self.assertIn("Codex L1", body)
         self.assertIn("Do not inspect, execute, delegate", body)
+        self.assertNotIn("engineering:handoff", body)
 
     def test_claude_lane_agents_and_workflow_pins_never_select_fable(self):
         forbidden = table("claude")["frontier"]["model"]
@@ -351,13 +353,16 @@ class PluginDeliveryTests(unittest.TestCase):
         self.assertFalse((ROOT / ".claude" / "agents").exists())
 
     def test_the_shipped_skill_names_locations_that_exist_in_each_layout(self):
-        canonical = self.PLUGIN / ".agents/engineering/policy/lanes/SKILL.md"
+        source = ROOT / ".agents/machine/policy/lanes/SKILL.md"
+        canonical = ROOT / "plugins/machine/.agents/machine/policy/lanes/SKILL.md"
         body = canonical.read_text(encoding="utf-8-sig")
-        self.assertIn(".agents/lanes/", body)
-        self.assertIn("../../.agents/lanes/", body)
         self.assertIn("../../../lanes/", body)
-        self.assertTrue((self.PLUGIN / ".agents/lanes").is_dir())
-        self.assertTrue((canonical.parent / "../../../lanes").resolve().is_dir())
+        self.assertIn("../../../../resources/lanes/", body)
+        self.assertTrue((source.parent / "../../../lanes").resolve().is_dir())
+        self.assertTrue((canonical.parent / "../../../../resources/lanes").resolve().is_dir())
+        for tree in ("skills", "codex-skills"):
+            adapter = ROOT / "plugins/machine" / tree / "lanes/SKILL.md"
+            self.assertTrue((adapter.parent / "../../resources/lanes").resolve().is_dir())
 
 
 

@@ -46,7 +46,7 @@ Planning-only work selects `engineering:plan-authoring` and does not authorize i
 A question or review request alone grants no implementation authority. A status question during already
 authorized execution should be answered before that execution continues.
 
-Use `engineering:lanes` to match substantive work to suitable capability. Reuse its loaded contract;
+Use `machine:lanes` to match substantive work to suitable capability. Reuse its loaded contract;
 routine commands and phase labels do not require another read or lane rationale. Keep cheap leaf lanes
 for clerical work and delegate useful batches under that contract. Reconsider the
 selection when the work's judgment or capability requirements change. The lane contract owns execution

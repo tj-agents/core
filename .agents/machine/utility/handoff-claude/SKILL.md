@@ -44,20 +44,20 @@ A tab takes seconds to appear and a process listing is trivially misread — an 
 repository, which is worse than no handoff at all: they collide on the same files with neither aware of
 the other.
 
-If the launcher printed its confirmation, one handoff tab was submitted. For a bounded side-workstream
-handoff, retain the originating goal and foreground writer lease, then continue its next action in the
-same turn: the successful side handoff does not satisfy the originating goal's completion condition. A
-full-goal transfer follows `engineering:handoff`'s checkpoint, release and verified-pickup contract. An
-ordinary launcher-only request may report the submitted handoff as complete. If it exited non-zero, say
-so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a second tab for
-the same handoff.
+If the launcher printed its confirmation, one handoff tab was submitted. Accept an already authorized
+prepared dispatch; do not call a higher-level workflow to prepare it again. The caller owns the checkpoint,
+release and pickup rules for a full-goal transfer. For a bounded side-workstream handoff, retain the
+originating goal and foreground writer lease, then continue its next action in the same turn: successful
+submission is not pickup and does not satisfy the originating goal's completion condition. A launcher-only
+request can finish at verified submission. If it exited non-zero, say so; do not retry blind — and never
+retry on exit code 3 specifically, where a retry risks a second tab for the same handoff.
 
 ## Model selection
 
 Configurable family aliases are rejected for handoffs; pass a full non-Haiku model ID or a supported lane.
 
 Pass `--lane L2`–`L6` and the launcher resolves the model from the canonical lane tables it ships under
-`resources/lanes` — the `engineering:lanes` ladder, and the repo's only model-name owner, so no caller has
+`resources/lanes` — the `machine:lanes` ladder, and the repo's only model-name owner, so no caller has
 to know a model id and a retiering is one edit in one authored file. For local lanes, `--model` wins for a model the
 user named outright. `--lane L1` always routes to Codex; omit that lane for an explicit Claude model. Handoff never uses the CLI default: choose L2–L6, frontier, or an explicit
 non-Haiku model.
@@ -80,10 +80,6 @@ delivery gates govern:
 
 Choose the launch lane for the work assigned to this independent session. If the successor later reaches
 a different phase, it can route bounded work to an appropriate lane agent while retaining ownership.
-After a small or medium plan, the current owner normally continues directly or with a bounded lane agent;
-planning alone does not call for this launcher. After a massive plan that was a substantial design phase,
-`engineering:plans` normally transfers execution to one fresh harness from a durable phased plan, even in
-the same checkout. Apply its context criteria and judgment to cases between those sizes.
 
 `--frontier` selects the tier above the ladder from the same table. **Pass it only when the user
 explicitly asked for that tier or its model by name.** No lane resolves to the tier, and frontier spend is
@@ -100,8 +96,8 @@ calling skill or workflow (or a user) that already knows the exact pace it wants
 outright — passing `--effort` alone, or beside `--lane`/`--frontier`, is rejected, because a lane or the
 frontier tier already carries its own effort for whichever model it resolves, and an effort picked
 without reference to a specific model is exactly the caller's-guess defect this restriction exists to
-prevent. `engineering:handoff`'s obligation to preserve a user-selected model, effort or frontier request
-is why this flag exists at all, not a general invitation to invent one.
+prevent. Preserve an explicit user-selected model, effort or frontier request; this flag is not a
+general invitation to invent one.
 
 A calling skill or workflow that ships its own resolved selection may still pass `--model` directly;
 that wins over a local lane `L2`–`L6`. What is no longer acceptable is inventing a model id (or, per
