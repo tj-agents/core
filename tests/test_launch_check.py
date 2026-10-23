@@ -309,7 +309,7 @@ class PosixFunctionTests(unittest.TestCase):
                                     env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(7, result.returncode, result.stderr)
-            self.assertEqual(f"check --host claude --target {target} -- two words --flag claude\ntwo words|--flag|", log.read_text(encoding="utf-8"))
+            self.assertEqual("check --host claude --target claude -- two words --flag claude\ntwo words|--flag|", log.read_text(encoding="utf-8"))
             previous = log.read_text(encoding="utf-8")
             check.write_text("raise SystemExit(2)\n", encoding="utf-8")
             blocked = subprocess.run(["bash", "-c", f". '{rc}'; claude 'two words' --flag"],
