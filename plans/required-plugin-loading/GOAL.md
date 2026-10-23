@@ -133,3 +133,12 @@ a maintenance command. Known option values cannot become maintenance commands.
 Malformed skills/agents/commands declarations are rejected; valid inline hook objects
 remain supported. All 12 required-plugin tests and 13 startup tests pass (one POSIX
 skip). The correction is substantive and will refresh the existing PR head and CI.
+
+CI run `39986038049` exposed fixture-only regressions: red-run and duplicate-router
+fixtures copied the router without its new verifier dependency, and Windows short
+temporary paths differed from the runtime's resolved paths. Fixtures now include the
+shipped helper and normalize their temporary root. Red-run tests pass (12), hook
+runtime tests pass (20; one platform skip). The final native review also found
+Claude's optional worktree name could look like a maintenance subcommand. Boolean
+global flags are now classified only for Codex; Claude optional argument forms stay
+subject to admission. All 13 required-plugin and 13 startup tests pass (one POSIX skip).

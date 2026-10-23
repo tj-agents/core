@@ -19,10 +19,10 @@ class RequiredPluginsTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="required standards ")
         self.addCleanup(self.temporary.cleanup)
-        self.project = Path(self.temporary.name) / "project with spaces"
+        self.project = Path(self.temporary.name).resolve() / "project with spaces"
         (self.project / ".agents").mkdir(parents=True)
         self.selection = self.project / ".agents/plugins.json"
-        self.profile = Path(self.temporary.name) / "profile"
+        self.profile = Path(self.temporary.name).resolve() / "profile"
         self.environment = mock.patch.dict(os.environ, {"CODEX_HOME": str(self.profile)})
         self.environment.start()
         self.addCleanup(self.environment.stop)
@@ -147,6 +147,13 @@ class RequiredPluginsTests(unittest.TestCase):
         with mock.patch.object(required, "check") as check:
             required.check_launch(self.project, "codex", "native-cli", ["--future-option", "--cd", "another"])
             check.assert_called_once_with(self.project / "another", "codex", "native-cli")
+
+    def test_claude_optional_values_cannot_be_mistaken_for_maintenance_commands(self):
+        for arguments in (["--worktree", "plugin"], ["-w", "plugin"],
+                          ["--debug", "plugin"], ["--resume", "plugin"], ["--print", "plugin"]):
+            with mock.patch.object(required, "check") as check:
+                required.check_launch(self.project, "claude", "native-cli", arguments)
+                check.assert_called_once_with(self.project, "claude", "native-cli")
 
     def test_incomplete_corrupt_and_missing_declared_payloads_are_rejected(self):
         self.select("arbitrary-stack@arbitrary-publisher")

@@ -41,7 +41,7 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
         "--no-alt-screen", "--search", "--full-auto", "--dangerously-bypass-approvals-and-sandbox",
         "--no-daemon", "--strict-config", "--oss", "--approve-for-me",
         "--dangerously-bypass-hook-trust", "--worktree",
-    }
+    } if host == "codex" else set()
     command_seen = False
     index = 0
     while index < len(arguments):
