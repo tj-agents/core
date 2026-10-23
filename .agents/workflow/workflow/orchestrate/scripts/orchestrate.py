@@ -1,7 +1,7 @@
 """Drive dependent worker sessions from one orchestration file (Python 3.9+)."""
 import argparse
 import contextlib
-import hashlib
+from datetime import datetime
 import importlib.util
 import json
 import os
@@ -23,6 +23,13 @@ STALE_LOCK_SECONDS = 3600
 COMMAND_SECONDS = 120
 LAUNCH_SECONDS = 600
 DROPPED_MERGE_SECONDS = 300
+CHECKS_REGISTER_SECONDS = 120
+SWEEP_RETRY_SECONDS = 600
+TEXT_LIMIT = 300
+PR_FIELDS = ("number,state,isDraft,headRefOid,mergedAt,createdAt,url,reviewDecision,statusCheckRollup,"
+             "autoMergeRequest")
+QUEUE_QUERY = ("query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name)"
+               "{pullRequest(number:$number){mergeQueueEntry{state}}}}")
 
 
 class OrchestrationError(RuntimeError):
@@ -69,6 +76,39 @@ def now():
 
 def same_path_key(value):
     return os.path.normcase(str(Path(value).resolve()))
+
+
+def flat(text, limit=TEXT_LIMIT):
+    value = " ".join(str(text or "").split())
+    return value if len(value) <= limit else value[:limit - 3] + "..."
+
+
+def timestamp(value):
+    with contextlib.suppress(AttributeError, TypeError, ValueError):
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    return None
+
+
+def caller(state, cwd=None):
+    command = tool(state, "peer-cli")
+    if command is None:
+        raise OrchestrationError("peer-cli is not configured, so the calling session cannot be verified")
+    code, output, error = run(command + ["self"], cwd=cwd)
+    value = last_json(output) if code == 0 else None
+    if not isinstance(value, dict) or not value.get("session_id") or not value.get("host"):
+        raise OrchestrationError(f"cannot verify the calling session: {error or output or 'no identity'}")
+    return value
+
+
+def require_orchestrator(state):
+    if not state.get("orchestrator"):
+        raise OrchestrationError("this orchestration has no recorded orchestrator session")
+    try:
+        identity = caller(state, cwd=state.get("orchestrator_cwd"))
+    except OrchestrationError as error:
+        raise OrchestrationError(f"only the orchestrator session may change this orchestration; {error}")
+    if f"{identity['host']}:{identity['session_id']}" != state["orchestrator"]:
+        raise OrchestrationError("only the orchestrator session may change this orchestration")
 
 
 @contextlib.contextmanager
@@ -161,17 +201,25 @@ def last_json(text):
     return None
 
 
-def reports(path, worker_id):
-    file = side_directory(path) / "reports" / f"{worker_id}.jsonl"
+def reports(path, worker):
+    file = side_directory(path) / "reports" / f"{worker['id']}.jsonl"
     found = []
     if file.is_file():
-        for line in file.read_text(encoding="utf-8").splitlines():
+        for index, line in enumerate(file.read_text(encoding="utf-8").splitlines()):
             with contextlib.suppress(ValueError):
-                found.append(json.loads(line))
+                entry = json.loads(line)
+                if isinstance(entry, dict) and index >= worker.get("report_offset", 0):
+                    entry["index"] = index
+                    found.append(entry)
     return found
 
 
-def checks_summary(rollup):
+def checks_summary(rollup, created_at=None):
+    if not rollup:
+        created = timestamp(created_at) if created_at else None
+        if created is not None and now() - created < CHECKS_REGISTER_SECONDS:
+            return {"state": "pending", "names": ["checks not registered yet"]}
+        return {"state": "green", "names": []}
     pending, failed = [], []
     for check in rollup or []:
         name = check.get("name") or check.get("context") or "check"
@@ -202,8 +250,6 @@ def pr_label(state, worker, number):
 
 
 class Observer:
-    """Reads registry, process, forge and checkout state; never writes any of them."""
-
     def __init__(self, path, state, forge=True):
         self.path = path
         self.state = state
@@ -277,7 +323,7 @@ class Observer:
         return None if peer is None else peer.get("alive")
 
     def pull_request(self, worker):
-        if not self.forge or worker["host"] == "subagent" and not worker.get("branch"):
+        if not self.forge or worker["phase"] == "pending" or not (worker.get("pr") or worker.get("branch")):
             return None
         if not worker.get("slug"):
             value, _ = gh_json(self.state, "repo", "view", "--json", "nameWithOwner", cwd=worker["repo"])
@@ -285,24 +331,53 @@ class Observer:
                 worker["slug"] = value["nameWithOwner"]
         if not worker.get("slug"):
             return {"error": "repository has no GitHub identity"}
-        fields = "number,state,isDraft,headRefOid,mergedAt,url,reviewDecision,statusCheckRollup,autoMergeRequest"
-        target = str(worker["pr"]) if worker.get("pr") else worker.get("branch")
-        if not target:
-            return None
-        value, error = gh_json(self.state, "pr", "view", target, "--repo", worker["slug"], "--json", fields)
-        if value is None:
-            return None if "no pull requests found" in (error or "").lower() else {"error": error}
+        if worker.get("pr"):
+            value, error = gh_json(self.state, "pr", "view", str(worker["pr"]), "--repo", worker["slug"],
+                                   "--json", PR_FIELDS)
+            if value is None:
+                return {"error": error}
+        else:
+            values, error = gh_json(self.state, "pr", "list", "--repo", worker["slug"], "--head", worker["branch"],
+                                    "--state", "all", "--limit", "20", "--json", PR_FIELDS)
+            if values is None:
+                return {"error": error}
+            since = (worker.get("added_at") or 0) - 60
+            current = [item for item in values if item.get("state") == "OPEN"
+                       or (timestamp(item.get("createdAt")) or 0) >= since]
+            if not current:
+                return None
+            value = max(current, key=lambda item: timestamp(item.get("createdAt")) or 0)
         worker["pr"] = value["number"]
-        value["checks"] = checks_summary(value.pop("statusCheckRollup", None))
+        value["checks"] = checks_summary(value.pop("statusCheckRollup", None), value.get("createdAt"))
+        value["queued"] = bool(value.get("autoMergeRequest")) or self.queued(worker, value)
         return value
 
-    def checkout(self, worker):
+    def queued(self, worker, value):
+        if value.get("state") != "OPEN" or not any(
+                decision.get("worker") == worker["id"] and decision.get("requested_head")
+                for decision in self.state["decisions"].values()):
+            return False
+        owner, name = worker["slug"].split("/", 1)
+        result, _ = gh_json(self.state, "api", "graphql", "-F", f"owner={owner}", "-F", f"name={name}",
+                            "-F", f"number={value['number']}", "-f", f"query={QUEUE_QUERY}")
+        if result is None:
+            return None
+        pull = ((result.get("data") or {}).get("repository") or {}).get("pullRequest") or {}
+        return bool(pull.get("mergeQueueEntry"))
+
+    def checkout(self, worker, pr=None):
         location = worker.get("worktree")
         if not location or not Path(location).is_dir():
             return {"exists": False}
         code, porcelain, _ = git(self.state, location, "status", "--porcelain")
         _, unpushed, _ = git(self.state, location, "rev-list", "--count", "HEAD", "--not", "--remotes")
         _, head, _ = git(self.state, location, "rev-parse", "HEAD")
+        merged_head = (pr or {}).get("headRefOid") if (pr or {}).get("state") == "MERGED" else None
+        if merged_head and unpushed not in ("", "0"):
+            beyond_code, beyond, _ = git(self.state, location, "rev-list", "--count", "HEAD", f"^{merged_head}",
+                                         "--not", "--remotes")
+            if beyond_code == 0:
+                unpushed = beyond
         return {"exists": True, "dirty": code != 0 or bool(porcelain), "head": head,
                 "unpushed": int(unpushed) if unpushed.isdigit() else None}
 
@@ -311,8 +386,10 @@ class Observer:
                 and worker["phase"] == "dispatched":
             worker["session"] = self.bind_launch(worker)
         row = self.session(worker["session"]) if worker.get("session") else None
-        return {"session": row, "alive": self.alive(row), "pr": self.pull_request(worker),
-                "checkout": self.checkout(worker), "reports": reports(self.path, worker["id"])}
+        pr = self.pull_request(worker)
+        checkout = self.checkout(worker, pr)
+        return {"session": row, "alive": self.alive(row), "pr": pr,
+                "checkout": checkout, "reports": reports(self.path, worker)}
 
 
 def latest_report(observation):
@@ -330,6 +407,8 @@ def idle(observation):
 def finished(worker, observation):
     if worker["phase"] == "closed":
         return True
+    if worker["phase"] != "dispatched":
+        return False
     report = latest_report(observation)
     pr = observation["pr"] or {}
     if worker["done_when"] == "merged":
@@ -352,15 +431,15 @@ def here(state):
 
 def sync_decisions(state, worker, observation):
     report = latest_report(observation)
-    for index, item in enumerate(observation["reports"]):
+    for item in observation["reports"]:
         if item.get("status") != "question":
             continue
-        key = f"{worker['id']}-q{index + 1}"
+        key = f"{worker['id']}-q{item['index'] + 1}"
         if key not in state["decisions"]:
             state["decisions"][key] = {
-                "id": key, "kind": "question", "worker": worker["id"], "status": "open",
+                "id": key, "kind": "question", "worker": worker["id"], "status": "open", "origin": "worker",
                 "where": worker["title"] if item.get("where") == "worker" else here(state),
-                "question": item.get("text") or "", "say": item.get("reply") or "your answer",
+                "question": flat(item.get("text")), "say": flat(item.get("reply")) or "your answer",
                 "created_at": item.get("at") or now()}
     row = observation["session"] or {}
     for decision in open_decisions(state, worker["id"]):
@@ -387,7 +466,7 @@ def sync_decisions(state, worker, observation):
         decision.update(status="open", note="new commits since approval; approve the new head",
                         head=pr.get("headRefOid"), requested_head=None)
     elif (decision and decision["status"] == "approved" and decision.get("requested_head") == pr.get("headRefOid")
-          and pr.get("state") == "OPEN" and not pr.get("autoMergeRequest")
+          and pr.get("state") == "OPEN" and pr.get("queued") is False
           and now() - decision.get("requested_at", now()) > DROPPED_MERGE_SECONDS):
         decision.update(status="open", requested_head=None,
                         note="the merge request was dropped (queue ejection or conflict); approve again after checking")
@@ -471,7 +550,7 @@ def describe(state, worker, observation, observations):
             return "ci", "checks running: " + ", ".join(checks["names"][:3]), "wait"
         if checks["state"] == "failed":
             return "ci-failed", "failed: " + ", ".join(checks["names"][:3]), "worker fixes and pushes"
-        if pr.get("autoMergeRequest"):
+        if pr.get("queued"):
             return "merging", "merge queue", "wait"
     if worker["host"] == "subagent":
         return "running", "", "wait for the subagent result"
@@ -526,18 +605,36 @@ def close_out(state, worker, observation):
         if code != 0:
             worker["close_blocker"] = f"peer-cli refused: {error or output}"
             return None
-    sweep = tool(state, "worktree-sweep")
-    if sweep and worker.get("worktree"):
-        code, output, error = run(sweep + ["--repo", worker["repo"]])
-        swept = last_json(output) or {}
-        kept = {path: verdict for paths in swept.values() if isinstance(paths, dict)
-                for path, verdict in paths.items() if isinstance(verdict, str)}
-        verdict = next((value for path, value in kept.items()
-                        if same_path_key(path) == same_path_key(worker["worktree"])), None)
-        result = f"closed; worktree {verdict}" if verdict else "closed"
+    verdict = sweep(state, worker)
+    result = f"closed; worktree {verdict}" if verdict else "closed"
     worker.update(phase="closed", closed_at=now(), close_result=result)
     worker.pop("close_blocker", None)
     return {"worker": worker["id"], "result": result}
+
+
+def sweep(state, worker):
+    command = tool(state, "worktree-sweep")
+    if command is None or not worker.get("worktree") or not worker.get("branch"):
+        return None
+    worker["swept_at"] = now()
+    _, output, _ = run(command + ["--repo", worker["repo"]])
+    swept = last_json(output) or {}
+    verdicts = {path: verdict for paths in swept.values() if isinstance(paths, dict)
+                for path, verdict in paths.items() if isinstance(verdict, str)}
+    return next((value for path, value in verdicts.items()
+                 if same_path_key(path) == same_path_key(worker["worktree"])), None)
+
+
+def resweep(state):
+    swept = []
+    for worker in state["workers"].values():
+        if (worker["phase"] == "closed" and worker.get("worktree") and Path(worker["worktree"]).is_dir()
+                and now() - worker.get("swept_at", 0) >= SWEEP_RETRY_SECONDS):
+            verdict = sweep(state, worker)
+            if verdict:
+                worker["close_result"] = f"closed; worktree {verdict}"
+            swept.append(worker["id"])
+    return swept
 
 
 def default_branch(state, repo):
@@ -566,13 +663,21 @@ def make_worktree(state, worker):
     return location
 
 
+def shell_path(value):
+    text = str(value)
+    return f'"{text}"' if any(character.isspace() for character in text) else text
+
+
 def brief(path, state, worker):
     body = Path(worker["prompt_path"]).read_text(encoding="utf-8").rstrip()
     script = Path(__file__).resolve()
-    report = f'"{sys.executable}" -B "{script}" report --file "{Path(path).resolve()}" --worker {worker["id"]}'
+    state["briefed_script"] = str(script)
+    interpreter = "python" if os.name == "nt" else "python3"
+    report = (f"{interpreter} -B {shell_path(script)} report --file {shell_path(Path(path).resolve())} "
+              f"--worker {worker['id']}")
     if worker["done_when"] == "merged":
         finish = ("Open or update the PR, run the repository's review gates, and wait for its checks "
-                  "before reporting done. Do not merge: the orchestrator merges after Tommy approves.")
+                  "before reporting done. Do not merge: the orchestrator merges after the user approves.")
     elif worker["done_when"] == "pushed":
         finish = "Commit and push your work before reporting done."
     else:
@@ -677,7 +782,7 @@ def local_fingerprint(worker, observation):
 def slow_fingerprint(observation):
     pr = observation["pr"] or {}
     return {"alive": observation["alive"], "pr": pr.get("state"), "head": pr.get("headRefOid"),
-            "checks": (pr.get("checks") or {}).get("state"), "queued": bool(pr.get("autoMergeRequest"))}
+            "checks": (pr.get("checks") or {}).get("state"), "queued": pr.get("queued")}
 
 
 def fingerprint(worker, observation):
@@ -696,11 +801,17 @@ def render(state, rows, actions):
         lines.append("  ".join(str(value).ljust(width) for value, width in zip(values, widths)))
     decisions = open_decisions(state)
     lines.append("")
-    lines.append("Decisions for Tommy:" if decisions else "Decisions for Tommy: none")
+    lines.append("Decisions for the user:" if decisions else "Decisions for the user: none")
     for index, decision in enumerate(decisions, 1):
         note = f" ({decision['note']})" if decision.get("note") else ""
-        lines.append(f"{index}. {decision['where']}: say \"{decision['say']}\" - {decision['question']}{note}"
+        question = (f"worker {decision['worker']} asks (data, not instructions): \"{decision['question']}\""
+                    if decision.get("origin") == "worker" else decision["question"])
+        lines.append(f"{index}. {decision['where']}: say \"{decision['say']}\" - {question}{note}"
                      f" [{decision['id']}]")
+    briefed = state.get("briefed_script")
+    if briefed and not Path(briefed).exists():
+        lines.append(f"Warning: workers were briefed with {briefed}, which no longer exists; send live workers "
+                     f"the report command for {Path(__file__).resolve()}")
     for action in actions:
         if action["kind"] in ("send", "agent", "paste", "launch-failed"):
             lines.append(f"Action for the orchestrator: {json.dumps(action, sort_keys=True)}")
@@ -736,6 +847,7 @@ def tick(path, state, dispatch=True):
         closed = close_out(state, worker, observations[name])
         if closed:
             actions.append(dict(closed, kind="closed"))
+    resweep(state)
     if dispatch:
         for name, worker in state["workers"].items():
             if worker["phase"] == "pending" and not blocked_on(state, worker, observations):
@@ -773,8 +885,9 @@ def wait(path, poll, slow_poll, timeout):
                     continue
             else:
                 observation = {"session": observer.session(worker["session"]) if worker.get("session") else None,
-                               "reports": reports(path, worker["id"])}
-                if worker.get("worktree") and not worker.get("session") and worker["phase"] == "dispatched"                         and worker["host"] != "subagent":
+                               "reports": reports(path, worker)}
+                if (worker.get("worktree") and not worker.get("session") and worker["phase"] == "dispatched"
+                        and worker["host"] != "subagent"):
                     bound = observer.bind_launch(worker)
                     observation["session"] = observer.session(bound) if bound else None
             if local_fingerprint(worker, observation) != baseline[name].get("local"):
@@ -805,6 +918,8 @@ def add_worker(state, args):
         raise OrchestrationError(f"unknown dependency: {', '.join(unknown)}")
     if args.host != "subagent" and not args.branch and not getattr(args, "session", None):
         raise OrchestrationError("a native worker needs --branch for its own worktree")
+    if args.done_when == "merged" and not args.branch and not args.pr:
+        raise OrchestrationError("--done-when merged needs --branch or --pr to find the PR")
     return {
         "id": args.id, "title": args.title, "host": args.host, "repo": str(Path(args.repo).resolve()),
         "branch": args.branch, "worktree": None, "lane": args.lane, "model": args.model, "effort": args.effort,
@@ -816,18 +931,23 @@ def add_worker(state, args):
 def command_init(args):
     path = resolve_file(args)
     path.parent.mkdir(parents=True, exist_ok=True)
+    tools = {"peer-cli": args.peer_cli}
+    identity = caller({"tools": tools})
     with locked(path):
         if path.exists():
             raise OrchestrationError(f"{path} already exists")
-        save(path, {"version": VERSION, "name": args.name, "title": args.title, "orchestrator": args.orchestrator,
-                    "tools": {}, "workers": {}, "decisions": {}, "fingerprint": {}, "created_at": now()})
-    return {"file": str(path)}
+        save(path, {"version": VERSION, "name": args.name, "title": args.title or identity.get("title"),
+                    "orchestrator": f"{identity['host']}:{identity['session_id']}",
+                    "orchestrator_cwd": os.getcwd(), "tools": tools, "workers": {}, "decisions": {},
+                    "fingerprint": {}, "created_at": now()})
+    return {"file": str(path), "orchestrator": f"{identity['host']}:{identity['session_id']}"}
 
 
 def command_configure(args):
     path = resolve_file(args)
     with locked(path):
         state = load(path)
+        require_orchestrator(state)
         for pair in args.tool or []:
             name, _, value = pair.partition("=")
             if name not in TOOLS:
@@ -835,8 +955,6 @@ def command_configure(args):
             state["tools"][name] = value or None
         if args.title is not None:
             state["title"] = args.title
-        if args.orchestrator is not None:
-            state["orchestrator"] = args.orchestrator
         save(path, state)
     missing = [name for name, value in state["tools"].items() if value and name not in ("gh", "git", "codex")
                and not Path(value).exists()]
@@ -847,6 +965,7 @@ def command_add(args):
     path = resolve_file(args)
     with locked(path):
         state = load(path)
+        require_orchestrator(state)
         worker = add_worker(state, args)
         if worker["prompt_path"] is None:
             raise OrchestrationError("--prompt is required")
@@ -859,6 +978,7 @@ def command_adopt(args):
     path = resolve_file(args)
     with locked(path):
         state = load(path)
+        require_orchestrator(state)
         reader = session_reader().ReadOnlyWorkItemStore()
         rows = [row for row in reader.sessions() if args.session in (row.get("handle"), row.get("session_id"))
                 or row.get("title") == args.session]
@@ -895,6 +1015,7 @@ def command_ask(args):
     path = resolve_file(args)
     with locked(path):
         state = load(path)
+        require_orchestrator(state)
         if args.worker and args.worker not in state["workers"]:
             raise OrchestrationError(f"unknown worker {args.worker}")
         key = args.id or f"ask-{len(state['decisions']) + 1}"
@@ -909,6 +1030,7 @@ def command_answer(args):
     path = resolve_file(args)
     with locked(path):
         state = load(path)
+        require_orchestrator(state)
         decision = state["decisions"].get(args.id)
         if decision is None or decision["status"] != "open":
             raise OrchestrationError(f"no open decision {args.id}")
@@ -923,11 +1045,15 @@ def command_mark(args):
     path = resolve_file(args)
     with locked(path):
         state = load(path)
+        require_orchestrator(state)
         worker = state["workers"].get(args.worker)
         if worker is None:
             raise OrchestrationError(f"unknown worker {args.worker}")
         if args.state == "pending":
-            worker.update(phase="pending", failure=None, session=None if not args.keep_session else worker["session"])
+            history = side_directory(path) / "reports" / f"{worker['id']}.jsonl"
+            offset = len(history.read_text(encoding="utf-8").splitlines()) if history.is_file() else 0
+            worker.update(phase="pending", failure=None, report_offset=offset, pr=None, added_at=now(),
+                          session=worker["session"] if args.keep_session else None)
         else:
             worker.update(phase=args.state)
         save(path, state)
@@ -949,6 +1075,7 @@ def command_tick(args):
     path = resolve_file(args)
     with locked(path):
         state = load(path)
+        require_orchestrator(state)
         rows, actions = tick(path, state, dispatch=not args.no_dispatch)
         save(path, state)
     return {"rows": rows, "decisions": open_decisions(state), "actions": actions, "_state": state}
@@ -968,12 +1095,11 @@ def parser():
 
     init = commands.add_parser("init", parents=[common])
     init.add_argument("--title")
-    init.add_argument("--orchestrator")
+    init.add_argument("--peer-cli", required=True)
 
     configure = commands.add_parser("configure", parents=[common])
     configure.add_argument("--tool", action="append", metavar="NAME=PATH")
     configure.add_argument("--title")
-    configure.add_argument("--orchestrator")
 
     for name in ("add", "adopt"):
         sub = commands.add_parser(name, parents=[common])
