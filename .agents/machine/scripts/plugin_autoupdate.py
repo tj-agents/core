@@ -207,7 +207,7 @@ def tree_key(repository: str, sha: str, path: str) -> str:
 def read_contents() -> dict[str, dict[str, str]]:
     saved = read_json(state_directory() / "plugin-heads.json")
     return {name: {key: sha for key, sha in saved.get(name, {}).items() if isinstance(sha, str) and SHA.fullmatch(sha)}
-            if isinstance(saved.get(name), dict) else {} for name in ("heads", "trees", "attempts")}
+            if isinstance(saved.get(name), dict) else {} for name in ("heads", "trees", "attempts", "stuck")}
 
 
 def installed_revisions() -> set[str]:
@@ -230,11 +230,13 @@ def contents_lock():
 
 
 def record_contents(heads: dict[str, str] = None, trees: dict[str, str] = None, keep: set[str] = frozenset(),
-                    attempts: dict[str, str] = None) -> None:
+                    attempts: dict[str, str] = None, stuck: dict[str, str] = None,
+                    unstuck: set[str] = frozenset()) -> None:
     with contents_lock():
         contents = read_contents()
         contents["heads"].update(heads or {})
         contents["attempts"].update(attempts or {})
+        contents["stuck"] = {key: sha for key, sha in {**contents["stuck"], **(stuck or {})}.items() if key not in unstuck}
         current = set(contents["heads"].values())
         live = current | set(keep) | installed_revisions()
         contents["trees"] = {key: oid for key, oid in {**contents["trees"], **(trees or {})}.items()
