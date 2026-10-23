@@ -109,9 +109,10 @@ class LaunchCheckTests(unittest.TestCase):
 
     def test_a_codex_launch_leaves_claude_installs_alone(self):
         self.cursor.write_text(json.dumps({"since": "abc"}), encoding="utf-8")
-        with mock.patch.object(CHECK, "check") as check, mock.patch.dict(os.environ, {CHECK.HOST_VARIABLE: "codex"}):
-            self.assertEqual(0, CHECK.main(["--project", str(ROOT)]))
-        self.assertEqual("codex", check.call_args.kwargs["host"])
+        for value, host in (("codex", "codex"), (" Codex ", "codex"), ("cursor", None)):
+            with self.subTest(value=value), mock.patch.object(CHECK, "check") as check,                     mock.patch.dict(os.environ, {CHECK.HOST_VARIABLE: value}):
+                self.assertEqual(0, CHECK.main(["--project", str(ROOT)]))
+                self.assertEqual(host, check.call_args.kwargs["host"])
         self.assertEqual("current", CHECK.check(ROOT, fetch=Server(), update=self.update(), host="codex",
                                                 reconcile=lambda project: self.fail("checked Claude installs")))
         self.assertEqual("updated", CHECK.check(ROOT, fetch=Server(), update=self.update(), host="claude",

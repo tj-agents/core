@@ -229,7 +229,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--project", type=Path, default=Path.cwd())
     arguments = parser.parse_args(argv)
     try:
-        check(arguments.project.resolve(), host=os.environ.get(HOST_VARIABLE))
+        host = os.environ.get(HOST_VARIABLE, "").strip().casefold()
+        check(arguments.project.resolve(), host=host if host in HOSTS else None)
     except Exception as error:
         print(f"plugins: update check failed: {error}", file=sys.stderr)
     return 0

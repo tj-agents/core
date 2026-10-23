@@ -220,7 +220,8 @@ def installed_revisions() -> set[str]:
 
 
 def contents_lock():
-    path, deadline = state_directory() / "plugin-heads.lock", time.monotonic() + CONTENTS_WAIT_SECONDS
+    path = state_directory() / "plugin-heads.lock"
+    deadline = time.monotonic() + CONTENTS_WAIT_SECONDS
     while (lock := acquire_lock(path)) is None:
         if time.monotonic() > deadline:
             raise TimeoutError("plugin-heads.json stayed locked")
@@ -304,8 +305,9 @@ def github_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]],
 
 
 def refresh_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]], query=None,
-                     revision=None, keep: set[str] = frozenset()) -> dict[str, str]:
+                     revision=None, keep: set[str] = frozenset(), known: dict[str, str] = None) -> dict[str, str]:
     heads, trees = github_contents(wanted, installed, read_contents()["trees"], query or github_query)
+    heads = {**(known or {}), **heads}
     unread = sorted(key for key in wanted if key not in heads)
     if unread and revision is not None:
         def resolve(key: str) -> str | None:
@@ -314,10 +316,7 @@ def refresh_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]]
 
         with ThreadPoolExecutor(max_workers=min(8, len(unread))) as pool:
             heads.update({key: sha for key, sha in zip(unread, pool.map(resolve, unread)) if sha})
-    try:
-        record_contents(heads, trees, {sha for shas in installed.values() for sha in shas} | set(keep))
-    except OSError as error:
-        print(f"plugins: could not record plugin contents ({error})", file=sys.stderr)
+    record_contents(heads, trees, {sha for shas in installed.values() for sha in shas} | set(keep))
     return heads
 
 
@@ -486,13 +485,11 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
             wanted.setdefault(publisher, set()).add(path)
             if isinstance(previous, str):
                 installed.setdefault(publisher, set()).add(previous)
-        if cached:
+        if wanted or cached:
             try:
-                record_contents(heads=cached, keep=own)
+                refresh_contents(wanted, installed, query, keep=own, known=cached)
             except OSError as error:
-                print(f"plugins: could not record plugin heads ({error})", file=sys.stderr)
-        if wanted:
-            refresh_contents(wanted, installed, query, keep=own)
+                print(f"plugins: could not record plugin contents ({error})", file=sys.stderr)
             contents = read_contents()
         retired = []
         for plugin in target["plugins"] if refreshed else []:
