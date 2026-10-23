@@ -629,18 +629,23 @@ def disposable_review_bundle_locations(common, run, candidate_key):
     }
 
 
-def review_bundle_locations(root, workflow_run_id, candidate_key):
-    root = repository_root(root)
-    common = common_git_directory(root)
+def review_bundle_locations(root, workflow_run_id, candidate_key, *, context=None, protected_roots=None):
+    if context is None:
+        root = repository_root(root)
+        context = _DeliveryBindContext(root, common_git_directory(root))
+    else:
+        _matching_delivery_bind_context(root, context)
+    common = context.common_git_directory
     temporary = Path(tempfile.gettempdir()).resolve()
-    protected_roots = (*worktree_roots(root), common)
+    if protected_roots is None:
+        protected_roots = (*worktree_roots(root), common)
     for protected in protected_roots:
         try:
             temporary.relative_to(protected)
         except ValueError:
             continue
         raise WorkflowOperationError("review bundle cache cannot be inside the checkout or common Git directory")
-    run = run_root(root, workflow_run_id).resolve()
+    run = run_root(root, workflow_run_id, context=context).resolve()
     locations = disposable_review_bundle_locations(common, run, candidate_key)
     cache = locations["cache"]
     repository_cache = locations["repository_cache"]
@@ -649,9 +654,10 @@ def review_bundle_locations(root, workflow_run_id, candidate_key):
     for candidate in (cache, repository_cache, run_cache, directory):
         if is_redirect(candidate) or (candidate.exists() and not candidate.is_dir()):
             raise WorkflowOperationError("review bundle cache contains a redirected or invalid owned directory")
+    resolved_directory = directory.resolve()
     for protected in protected_roots:
         try:
-            directory.resolve().relative_to(protected)
+            resolved_directory.relative_to(protected)
         except ValueError:
             continue
         raise WorkflowOperationError("review bundle cache cannot be inside the checkout or common Git directory")
@@ -852,8 +858,11 @@ def review_descriptor_paths(runs):
 
 def cleanup_review_bundles(root, now=None):
     root = repository_root(root)
-    runs = state_root(root) / "runs"
     common = common_git_directory(root)
+    context = _DeliveryBindContext(root, common)
+    runs = state_root(root, context=context) / "runs"
+    protected_roots = None
+    repository = None
     current = now or datetime.now(timezone.utc)
     for descriptor_path in review_descriptor_paths(runs):
         try:
@@ -883,9 +892,14 @@ def cleanup_review_bundles(root, now=None):
                 and not disposable["directory"].exists()
             ):
                 continue
-            locations = review_bundle_locations(root, run_id, candidate_key)
+            if protected_roots is None:
+                protected_roots = (*worktree_roots(root), common)
+                repository = repository_slug(root)
+            locations = review_bundle_locations(
+                root, run_id, candidate_key, context=context, protected_roots=protected_roots
+            )
             owned = (
-                value.get("repository") == repository_slug(root)
+                value.get("repository") == repository
                 and value.get("descriptor_id") == descriptor_identity(value)
                 and descriptor_path.resolve() == locations["descriptor"].resolve()
                 and not is_redirect(descriptor_path)
@@ -896,7 +910,15 @@ def cleanup_review_bundles(root, now=None):
             directory = locations["directory"]
             artifacts = [locations[name] for name in expected if name != "directory"]
             if directory.exists() and not is_redirect(directory) and not any(is_redirect(path) for path in artifacts):
-                shutil.rmtree(directory)
+                resolved_directory = directory.resolve()
+                for protected in worktree_roots(root):
+                    try:
+                        resolved_directory.relative_to(protected)
+                    except ValueError:
+                        continue
+                    break
+                else:
+                    shutil.rmtree(directory)
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, WorkflowOperationError):
             continue
 

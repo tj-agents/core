@@ -20,7 +20,6 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 
 import marketplace_identity
@@ -30,7 +29,7 @@ GIT_TIMEOUT_SECONDS = 30
 SWEEP_TIMEOUT_SECONDS = 1800
 SCRIPT_NAME = "plugin_autoupdate.py"
 RUNTIME = ("plugin_autoupdate.py", "machine_events.py", "launch_check.py", "reload_plugins.py", "agent_cli.py",
-           "codex_hook_trust.py", "marketplace_identity.py")
+           "codex_hook_trust.py", "required_plugins.py", "marketplace_identity.py")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 CLI_TIMEOUT_SECONDS = 60
 STILL_ACTIVE = 259
@@ -40,7 +39,7 @@ HOOK_DIGEST = re.compile(r'"(sha256:[0-9a-f]{64})"')
 SHA = re.compile(r"[0-9a-f]{40}")
 NAME = re.compile(r"[A-Za-z0-9_.-]+")
 REVISION_PATH = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*")
-CONTENTS_LOCK = threading.Lock()
+CONTENTS_WAIT_SECONDS = 10
 SNAPSHOT_FIRST = "(Path(s) if s else d/'hook-snapshots')/k/"
 
 
@@ -228,9 +227,19 @@ def installed_revisions() -> set[str]:
     return {sha for sha in claude | codex if isinstance(sha, str)}
 
 
+def contents_lock():
+    path = state_directory() / "plugin-heads.lock"
+    deadline = time.monotonic() + CONTENTS_WAIT_SECONDS
+    while (lock := acquire_lock(path)) is None:
+        if time.monotonic() > deadline:
+            raise TimeoutError("plugin-heads.json stayed locked")
+        time.sleep(0.05)
+    return lock
+
+
 def record_contents(heads: dict[str, str] = None, trees: dict[str, str] = None, keep: set[str] = frozenset(),
                     attempts: dict[str, str] = None) -> None:
-    with CONTENTS_LOCK:
+    with contents_lock():
         contents = read_contents()
         contents["heads"].update(heads or {})
         contents["attempts"].update(attempts or {})
@@ -304,8 +313,9 @@ def github_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]],
 
 
 def refresh_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]], query=None,
-                     revision=None) -> dict[str, str]:
+                     revision=None, keep: set[str] = frozenset(), known: dict[str, str] = None) -> dict[str, str]:
     heads, trees = github_contents(wanted, installed, read_contents()["trees"], query or github_query)
+    heads = {**(known or {}), **heads}
     unread = sorted(key for key in wanted if key not in heads)
     if unread and revision is not None:
         def resolve(key: str) -> str | None:
@@ -314,7 +324,7 @@ def refresh_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]]
 
         with ThreadPoolExecutor(max_workers=min(8, len(unread))) as pool:
             heads.update({key: sha for key, sha in zip(unread, pool.map(resolve, unread)) if sha})
-    record_contents(heads, trees, {sha for shas in installed.values() for sha in shas})
+    record_contents(heads, trees, {sha for shas in installed.values() for sha in shas} | set(keep))
     return heads
 
 
@@ -468,16 +478,27 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
         listed = sources(marketplace, target) if refreshed else {}
         selected = {plugin: listed[plugin.rsplit("@", 1)[0]] for plugin in target["plugins"]
                     if plugin.rsplit("@", 1)[0] in listed}
-        wanted, installed = {}, {}
-        for plugin, (url, ref, path) in selected.items():
-            previous = recorded.get("codex-plugin:" + plugin)
-            if (publisher := publisher_key(url, ref)) and previous != heads.get((url, ref)):
-                wanted.setdefault(publisher, set()).add(path)
-                if isinstance(previous, str):
-                    installed.setdefault(publisher, set()).add(previous)
-        if wanted:
-            refresh_contents(wanted, installed, query)
         contents = read_contents()
+        own = {sha for name, sha in recorded.items() if name.startswith("codex-plugin:") and isinstance(sha, str)}
+        wanted, installed, cached = {}, {}, {}
+        for plugin, (url, ref, path) in selected.items():
+            previous, plugin_head = recorded.get("codex-plugin:" + plugin), heads.get((url, ref))
+            publisher, repository = publisher_key(url, ref), github_repository(url)
+            if not publisher or previous == plugin_head:
+                continue
+            if plugin_head and all(tree_key(repository, revision, path) in contents["trees"]
+                                   for revision in (plugin_head, previous) if isinstance(revision, str)):
+                cached[publisher] = plugin_head
+                continue
+            wanted.setdefault(publisher, set()).add(path)
+            if isinstance(previous, str):
+                installed.setdefault(publisher, set()).add(previous)
+        if wanted or cached:
+            try:
+                refresh_contents(wanted, installed, query, keep=own, known=cached)
+            except OSError as error:
+                print(f"plugins: could not record plugin contents ({error})", file=sys.stderr)
+            contents = read_contents()
         retired = []
         for plugin in target["plugins"] if refreshed else []:
             plugin_key = "codex-plugin:" + plugin
