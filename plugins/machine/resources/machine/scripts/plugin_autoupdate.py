@@ -13,13 +13,14 @@ from concurrent.futures import ThreadPoolExecutor
 import importlib.util
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 GIT_TIMEOUT_SECONDS = 30
@@ -33,6 +34,10 @@ STILL_ACTIVE = 259
 FAILURE_BACKOFF_SECONDS = 24 * 60 * 60
 RETIRED = "retired"
 HOOK_DIGEST = re.compile(r'"(sha256:[0-9a-f]{64})"')
+SHA = re.compile(r"[0-9a-f]{40}")
+NAME = re.compile(r"[A-Za-z0-9_.-]+")
+REVISION_PATH = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*")
+CONTENTS_LOCK = threading.Lock()
 SNAPSHOT_FIRST = "(Path(s) if s else d/'hook-snapshots')/k/"
 
 
@@ -156,12 +161,8 @@ def declared_targets(config: dict) -> tuple[dict[str, dict], list[str]]:
     return targets, ignored
 
 
-def marketplace_checkout(name: str) -> Path:
-    return codex_home() / ".tmp" / "marketplaces" / name
-
-
 def marketplace_manifest(name: str) -> dict:
-    root = marketplace_checkout(name)
+    root = codex_home() / ".tmp" / "marketplaces" / name
     for relative in (Path(".agents", "plugins", "marketplace.json"), Path(".claude-plugin", "marketplace.json")):
         manifest = read_json(root / relative)
         if manifest:
@@ -169,29 +170,144 @@ def marketplace_manifest(name: str) -> dict:
     return {}
 
 
-def plugin_sources(name: str) -> dict[str, str]:
-    """Each locally sourced cataloged plugin's name, mapped to its path within the marketplace checkout."""
-    sources = {}
+def plugin_path(source: dict) -> str:
+    path = source.get("path")
+    return str(PurePosixPath(path)) if isinstance(path, str) and path else "."
+
+
+def plugin_publishers(name: str) -> dict[str, tuple[str, str, str]]:
+    publishers = {}
     for entry in marketplace_manifest(name).get("plugins", []):
-        if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
-            continue
-        source = entry.get("source")
-        path = (source.get("path") if isinstance(source, dict) and source.get("source") == "local"
-               else source if isinstance(source, str) else None)
-        if isinstance(path, str):
-            sources[entry["name"]] = path.lstrip("./")
+        source = entry.get("source") if isinstance(entry, dict) else None
+        if isinstance(source, dict) and source.get("source") == "git-subdir" and isinstance(source.get("url"), str):
+            ref = source.get("sha") or source.get("ref") or "HEAD"
+            if isinstance(ref, str):
+                publishers[entry.get("name")] = (source["url"], ref, plugin_path(source))
+    return publishers
+
+
+def plugin_sources(name: str, target: dict) -> dict[str, tuple[str, str, str]]:
+    sources = plugin_publishers(name)
+    for entry in marketplace_manifest(name).get("plugins", []):
+        source = entry.get("source") if isinstance(entry, dict) else None
+        if isinstance(source, str) or isinstance(source, dict) and source.get("source") == "local":
+            path = source if isinstance(source, str) else source.get("path")
+            sources[entry.get("name")] = (target["source"], target.get("ref") or "HEAD", plugin_path({"path": path}))
     return sources
 
 
-def subtree_revision(checkout: Path, path: str) -> str | None:
-    try:
-        result = subprocess.run(["git", "-C", str(checkout), "rev-parse", f"HEAD:{path}"], capture_output=True,
-                                text=True, encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT_SECONDS,
-                                check=False, creationflags=NO_WINDOW)
-    except (OSError, subprocess.TimeoutExpired):
+def publisher_key(url: object, ref: object = None) -> str | None:
+    repository = github_repository(url)
+    return f"{repository}@{ref if isinstance(ref, str) and ref else 'HEAD'}" if repository else None
+
+
+def tree_key(repository: str, sha: str, path: str) -> str:
+    return f"{repository}@{sha}:{path}"
+
+
+def read_contents() -> dict[str, dict[str, str]]:
+    saved = read_json(state_directory() / "plugin-heads.json")
+    return {name: {key: sha for key, sha in saved.get(name, {}).items() if isinstance(sha, str) and SHA.fullmatch(sha)}
+            if isinstance(saved.get(name), dict) else {} for name in ("heads", "trees", "attempts")}
+
+
+def installed_revisions() -> set[str]:
+    installed = read_json(claude_home() / "plugins" / "installed_plugins.json").get("plugins")
+    claude = {entry.get("gitCommitSha") for entries in installed.values() if isinstance(entries, list)
+              for entry in entries if isinstance(entry, dict)} if isinstance(installed, dict) else set()
+    recorded = read_json(state_directory() / "plugin-autoupdate.json").get("revisions")
+    codex = {sha for key, sha in recorded.items() if key.startswith("codex-plugin:")} if isinstance(recorded, dict) else set()
+    return {sha for sha in claude | codex if isinstance(sha, str)}
+
+
+def record_contents(heads: dict[str, str] = None, trees: dict[str, str] = None, keep: set[str] = frozenset(),
+                    attempts: dict[str, str] = None) -> None:
+    with CONTENTS_LOCK:
+        contents = read_contents()
+        contents["heads"].update(heads or {})
+        contents["attempts"].update(attempts or {})
+        current = set(contents["heads"].values())
+        live = current | set(keep) | installed_revisions()
+        contents["trees"] = {key: oid for key, oid in {**contents["trees"], **(trees or {})}.items()
+                             if key.split("@", 1)[1].split(":", 1)[0] in live}
+        contents["attempts"] = {key: sha for key, sha in contents["attempts"].items() if sha in current}
+        write_json(state_directory() / "plugin-heads.json", contents)
+
+
+def same_content(contents: dict, repository: str, path: str, old: object, new: str) -> bool | None:
+    if old == new:
+        return True
+    if not isinstance(old, str):
         return None
-    revision = result.stdout.strip()
-    return revision if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", revision) else None
+    before = contents["trees"].get(tree_key(repository, old, path))
+    after = contents["trees"].get(tree_key(repository, new, path))
+    return None if before is None or after is None else before == after
+
+
+def github_query(arguments: list[str]) -> dict:
+    import machine_events
+
+    return machine_events.gh(arguments) or {}
+
+
+def repository_contents(key: str, paths: set[str], installed: set[str], known: dict[str, str],
+                        query) -> tuple[dict[str, str], dict[str, str]]:
+    repo, ref = key.rsplit("@", 1)
+    owner, name = repo.split("/", 1)
+    if not (NAME.fullmatch(owner) and NAME.fullmatch(name) and REVISION_PATH.fullmatch(ref)):
+        return {}, {}
+    parts, fields = [f'h: object(expression: "{ref}") {{ oid }}'], {}
+    for path in sorted(path for path in paths if path == "." or REVISION_PATH.fullmatch(path)):
+        for revision in [ref, *sorted(sha for sha in installed if SHA.fullmatch(sha))]:
+            if revision != ref and tree_key(repo, revision, path) in known:
+                continue
+            alias = f"t{len(fields)}"
+            parts.append(f'{alias}: object(expression: "{revision}:{"" if path == "." else path}") {{ oid }}')
+            fields[alias] = (revision, path)
+    response = query(["graphql", "-f", f'query={{r: repository(owner: "{owner}", name: "{name}") {{ {" ".join(parts)} }}}}'])
+    found = ((response or {}).get("data") or {}).get("r") or {}
+    head = (found.get("h") or {}).get("oid")
+    if not head:
+        return {}, {}
+    return {key: head}, {tree_key(repo, head if revision == ref else revision, path): oid
+                         for alias, (revision, path) in fields.items() if (oid := (found.get(alias) or {}).get("oid"))}
+
+
+def github_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]], known: dict[str, str],
+                    query) -> tuple[dict[str, str], dict[str, str]]:
+    failures = []
+
+    def read(key: str) -> tuple[dict[str, str], dict[str, str]]:
+        try:
+            return repository_contents(key, wanted[key], installed.get(key, set()), known, query)
+        except Exception as error:
+            failures.append(f"{key.rsplit('@', 1)[0]} ({error})")
+            return {}, {}
+
+    heads, trees = {}, {}
+    with ThreadPoolExecutor(max_workers=max(1, min(8, len(wanted)))) as pool:
+        for found_heads, found_trees in pool.map(read, sorted(wanted)):
+            heads.update(found_heads)
+            trees.update(found_trees)
+    if failures:
+        print(f"plugins: could not read plugin contents of {', '.join(sorted(failures))}; comparing commits instead",
+              file=sys.stderr)
+    return heads, trees
+
+
+def refresh_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]], query=None,
+                     revision=None) -> dict[str, str]:
+    heads, trees = github_contents(wanted, installed, read_contents()["trees"], query or github_query)
+    unread = sorted(key for key in wanted if key not in heads)
+    if unread and revision is not None:
+        def resolve(key: str) -> str | None:
+            repo, ref = key.rsplit("@", 1)
+            return revision(f"https://github.com/{repo}.git", ref)
+
+        with ThreadPoolExecutor(max_workers=min(8, len(unread))) as pool:
+            heads.update({key: sha for key, sha in zip(unread, pool.map(resolve, unread)) if sha})
+    record_contents(heads, trees, {sha for shas in installed.values() for sha in shas})
+    return heads
 
 
 def inspect_installation(name: str, target: dict) -> None:
@@ -199,17 +315,9 @@ def inspect_installation(name: str, target: dict) -> None:
     selected = {identity.rsplit("@", 1)[0] for identity in target["plugins"]}
     target["missing"] = [identity for identity in target["plugins"]
                          if not (cache / identity.rsplit("@", 1)[0]).is_dir()]
-    publishers = {}
-    entries = marketplace_manifest(name).get("plugins")
-    for entry in entries if isinstance(entries, list) else []:
-        if not isinstance(entry, dict) or entry.get("name") not in selected:
-            continue
-        source = entry.get("source")
-        if isinstance(source, dict) and source.get("source") == "git-subdir" and isinstance(source.get("url"), str):
-            ref = source.get("sha") or source.get("ref") or "HEAD"
-            if isinstance(ref, str):
-                publishers[(source["url"], ref)] = {"source": source["url"], "ref": ref}
-    target["publishers"] = [publishers[key] for key in sorted(publishers)]
+    published = plugin_publishers(name)
+    target["publishers"] = [{"source": url, "ref": ref}
+                            for url, ref in sorted({published[plugin][:2] for plugin in selected if plugin in published})]
 
 
 def process_alive(pid: object) -> bool:
@@ -316,8 +424,7 @@ def run_cli(command: list[str], *, cwd: Path) -> bool | str:
 
 def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, revision=remote_revision,
                   run=run_cli, now: float | None = None, busy=codex_session_running, packages=hook_packages,
-                  preserve=preserve_hook_snapshots, sources=plugin_sources,
-                  content=subtree_revision) -> dict[str, str]:
+                  preserve=preserve_hook_snapshots, sources=plugin_sources, query=None) -> dict[str, str]:
     now = time.time() if now is None else now
     outcomes: dict[str, str] = {}
     references = sorted({(source["source"], source.get("ref") or "HEAD")
@@ -350,14 +457,27 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
         preserve(marketplace, hooks)
         refreshed = run([executable, "plugin", "marketplace", "upgrade", marketplace],
                         cwd=target["project"]) is True
-        local_sources = sources(marketplace) if refreshed else {}
-        checkout = marketplace_checkout(marketplace)
+        listed = sources(marketplace, target) if refreshed else {}
+        selected = {plugin: listed[plugin.rsplit("@", 1)[0]] for plugin in target["plugins"]
+                    if plugin.rsplit("@", 1)[0] in listed}
+        wanted, installed = {}, {}
+        for plugin, (url, ref, path) in selected.items():
+            previous = recorded.get("codex-plugin:" + plugin)
+            if (publisher := publisher_key(url, ref)) and previous != heads.get((url, ref)):
+                wanted.setdefault(publisher, set()).add(path)
+                if isinstance(previous, str):
+                    installed.setdefault(publisher, set()).add(previous)
+        if wanted:
+            refresh_contents(wanted, installed, query)
+        contents = read_contents()
         retired = []
         for plugin in target["plugins"] if refreshed else []:
             plugin_key = "codex-plugin:" + plugin
-            path = local_sources.get(plugin.rsplit("@", 1)[0])
-            local_content = content(checkout, path) if path else None
-            if local_content is not None and plugin not in missing and recorded.get(plugin_key) == local_content:
+            source = selected.get(plugin)
+            plugin_head = heads.get(source[:2]) if source else None
+            if (plugin_head is not None and plugin not in missing and same_content(
+                    contents, github_repository(source[0]), source[2], recorded.get(plugin_key), plugin_head)):
+                recorded[plugin_key] = plugin_head
                 continue
             added = run([executable, "plugin", "add", plugin], cwd=target["project"])
             if added == RETIRED:
@@ -365,8 +485,8 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
             elif added is not True:
                 refreshed = False
                 break
-            elif local_content is not None:
-                recorded[plugin_key] = local_content
+            elif plugin_head is not None:
+                recorded[plugin_key] = plugin_head
         if retired:
             recorded["retired:" + key] = sorted(retired)
         retired = f" (no longer published, not installed: {', '.join(retired)})" if retired else ""
