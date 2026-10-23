@@ -147,7 +147,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     phase("checking-plugins")
     try:
-        launch_check.check(parsed.project.resolve())
+        launch_check.check(parsed.project.resolve(), host=parsed.host)
     except Exception as error:
         print(f"plugins: update check failed: {error}", file=sys.stderr)
 

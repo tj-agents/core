@@ -487,7 +487,8 @@ def main(argv: list[str] | None = None) -> int:
     if not (arguments.all or arguments.verify or arguments.verify_only):
         result = launch_check.check(project, update=lambda host, repositories, root:
                                     launch_check.update_host(host, repositories, root, updated),
-                                    reconcile=lambda root: launch_check.reconcile_installs(root, updated))
+                                    reconcile=lambda root: launch_check.reconcile_installs(root, updated),
+                                    host=None if arguments.host == "both" else arguments.host)
         if result != "unconfigured":
             summary = {"check": result}
             if removed:
