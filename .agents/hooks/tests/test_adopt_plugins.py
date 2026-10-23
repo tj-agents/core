@@ -250,7 +250,7 @@ class AdoptPluginsTests(unittest.TestCase):
             "plugins": ["python@python-agents", "python@tj-agents", "react@react-agents", "concertable@agents"],
         }), encoding="utf-8")
         adopt_plugins.run(self.root, [], [], "write")
-        self.assertEqual(["concertable@agents", "python@tj-agents", "react@tj-agents"], self.plugins())
+        self.assertEqual(with_core("concertable@agents", "python@tj-agents", "react@tj-agents"), self.plugins())
         self.assertFalse(legacy.exists())
         self.assertEqual([], adopt_plugins.run(self.root, [], [], "check"))
         for path in (self.selection, self.root / ".claude/settings.json", self.root / ".codex/config.toml"):
