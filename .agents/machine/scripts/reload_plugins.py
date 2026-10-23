@@ -158,7 +158,7 @@ def persistence_problems(expected: list[tuple[str, str, Path, str]], installatio
 
 
 def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]],
-                 updates: list[tuple[str, str, Path]], done: list | None = None) -> list[str]:
+                 updates: list[tuple[str, str, Path]]) -> list[str]:
     for identity, scope in installs:
         run([executable, "plugin", "install", identity, "--scope", scope], project)
     expected, updated = [], []
@@ -166,8 +166,6 @@ def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]]
         result = update_result(run([executable, "plugin", "update", identity, "--scope", scope, "--json"], owner),
                                identity, scope)
         expected.append((identity, scope, owner, result["newVersion"]))
-        if done is not None:
-            done.append((identity, scope, owner))
         if result["updateOutcome"] == "updated" and identity not in updated:
             updated.append(identity)
     after = json.loads(run([executable, "plugin", "list", "--json"], project))
@@ -295,13 +293,9 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
     executable = agent_cli.resolve_claude_executable()
     refresh_marketplaces("claude", executable, project,
                          {name: repo for name, repo in marketplaces.items() if name in touched - fresh})
-    done = []
-    try:
-        return apply_claude(executable, project, installs, updates, done)
-    finally:
-        ran = {attempt_key(*target) for target in done}
-        with contextlib.suppress(OSError):
-            plugin_autoupdate.record_contents(attempts={key: head for key, head in attempts.items() if key in ran})
+    with contextlib.suppress(OSError):
+        plugin_autoupdate.record_contents(attempts=attempts)
+    return apply_claude(executable, project, installs, updates)
 
 
 def refresh_repositories(project: Path, repositories: set[str] | None, updated: set[str] | None = None,
