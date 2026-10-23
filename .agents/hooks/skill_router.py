@@ -51,7 +51,12 @@ it for review-time queries. They share the exit-2 block
 contract but NOT the payload: Claude sends a PascalCase tool name and one path under `file_path`,
 while Codex sends `apply_patch` with the paths named inside the patch body. Matching only Claude's
 shape is not a partial rollout - it is a hook that allows every Codex write while looking wired. A
-repo opts in by carrying `.agents/skill-routes.json`; without one the hook exits 0 and does nothing.
+repo opts in by carrying `.agents/skill-routes.json`. Without one, a stack tier that applies to the
+project and declares `routes` in its own `tier.json` routes it, so every .NET repo is gated with no
+per-repo step; with neither, the hook exits 0 and does nothing.
+
+A subagent starts with none of its parent's loaded skills, so it proves its own loads in its own
+transcript, and its seen-state is its own.
 
 A Bash/PowerShell/Codex-shell call is also a candidate write - `cat >>`, `sed -i`, `tee` and a
 heredoc all reach a routed path exactly like `Write`/`Edit` do, and matching only the edit-tool
@@ -90,6 +95,8 @@ ROUTES_FILE = ".agents/skill-routes.json"
 # generated table committed into that repo and drifting there.
 SHIPPED_ROUTES_DIR = Path(__file__).resolve().parent.parent / "routes"
 REGISTRY_FILE = "registry.json"
+TIER_SKILL_DIRS = []
+SUBAGENT_ID = re.compile(r"[A-Za-z0-9_-]+")
 # A rename moves a skill between plugins; the qualified name in a route, a plan or a habit does not move
 # with it. `.agents/plugins/compatibility.json` already records every such move - it simply had no
 # reader, which is how the base: -> engineering: reorganisation made `base:review-lifecycle` resolve
@@ -242,6 +249,7 @@ def skill_search_dirs(harness):
     # The hook's own payload is independent of the harness variable vocabulary. Codex injects
     # PLUGIN_ROOT; Claude injects CLAUDE_PLUGIN_ROOT; a vendored copy resolves beside itself.
     yield own_payload_root(__file__) / "skills"
+    yield from TIER_SKILL_DIRS
 
     configured = os.environ.get("CLAUDE_CONFIG_DIR")
     linked_base = Path(configured) if configured and harness == "claude" else (
@@ -675,13 +683,22 @@ def skill_description(name, harness):
     return None if resolved is None else description_of(resolved[1])
 
 
+@functools.lru_cache(maxsize=4)
+def _selection(key):
+    return tier_gate.assess(Path(key))
+
+
+def selection_for(root):
+    return _selection(str(root))
+
+
 def routed_name(selection, root, name, harness=None):
     return tier_gate.replacement_skill(
         selection, name, lambda candidate: tier_gate.installed_replacement(root, candidate, harness)
     )
 
 
-def transcript_skill_outcomes(transcript_path, codex_skills=()):
+def transcript_skill_outcomes(transcript_path, codex_skills=(), read_skills=()):
     """Selected skill name -> whether the transcript proves it resolved this session, or None if unreadable.
 
     Scans the session's own JSONL transcript for `Skill` tool_use blocks and the `tool_result` each
@@ -706,6 +723,9 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
     - **The whole body verbatim.** Codex truncates `exec` output (`max_output_tokens`), and the biggest
       bodies are the most-loaded skills. So the head OR the tail of the body is the anchor, plus enough
       matched bytes that a two-line excerpt cannot pass.
+
+    A Claude subagent may have no `Skill` tool, so for the names in `read_skills` a successful whole-file
+    `Read` of that skill's `SKILL.md` under its plugin is the same proof.
 
     Returns `None` - not `{}` - when the transcript itself could not be read at all, so the caller can
     tell "proof is unavailable, fall back" apart from "proof was checked and found nothing yet".
@@ -733,6 +753,12 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
          "/" + name.partition(":")[0].lower() + "/" if ":" in name else "", anchors(body))
         for name, _, body in codex_skills
     ]
+    read_proofs = [
+        (name, "/skills/%s/skill.md" % name.rpartition(":")[2].lower(),
+         "/" + name.partition(":")[0].lower() + "/" if ":" in name else "")
+        for name in read_skills
+    ]
+    pending_reads = {}
     try:
         with open(transcript_path, encoding="utf-8", errors="replace") as handle:
             for line in handle:
@@ -779,8 +805,23 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
                         name = (block.get("input") or {}).get("skill")
                         if tool_id and isinstance(name, str) and name:
                             pending[tool_id] = name
+                    elif block_type == "tool_use" and block.get("name") == "Read" and read_proofs:
+                        tool_id = block.get("id")
+                        read_input = block.get("input") or {}
+                        target = read_input.get("file_path")
+                        if not tool_id or not isinstance(target, str):
+                            continue
+                        if read_input.get("offset") not in (None, 0, 1) or read_input.get("limit") is not None:
+                            continue
+                        target = normalized_path(target)
+                        for name, segment, plugin_segment in read_proofs:
+                            if target.endswith(segment) and plugin_segment in target:
+                                pending_reads[tool_id] = name
                     elif block_type == "tool_result":
                         tool_id = block.get("tool_use_id")
+                        read_name = pending_reads.pop(tool_id, None) if tool_id else None
+                        if read_name is not None and not block.get("is_error"):
+                            outcomes[read_name] = True
                         name = pending.pop(tool_id, None) if tool_id else None
                         if name is None:
                             continue
@@ -790,6 +831,20 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
     except OSError:
         return None
     return outcomes
+
+
+def subagent_id(data, harness):
+    agent = data.get("agent_id")
+    if harness != "claude" or not isinstance(agent, str) or not SUBAGENT_ID.fullmatch(agent):
+        return ""
+    return agent
+
+
+def proof_transcript(data, agent):
+    transcript = data.get("transcript_path")
+    if not agent or not transcript:
+        return transcript
+    return str(Path(transcript).with_suffix("") / "subagents" / f"agent-{agent}.jsonl")
 
 
 def state_path(session_id):
@@ -904,15 +959,37 @@ def registry_routes(root):
     return routes
 
 
+def tier_routes(root):
+    """The `routes` rows in the `tier.json` of every tier that applies to this project."""
+    selection = selection_for(root)
+    declarations = [declaration for declaration, _ in selection.applicable]
+    declarations += [declaration for declaration, _ in selection.employers if declaration not in declarations]
+    rows = []
+    for declaration in declarations:
+        if declaration.payload_dir is None or "routes" not in declaration.data:
+            continue
+        problems = tier_gate.route_diagnostics(declaration.data["routes"])
+        if problems:
+            raise RoutesUnusable(f"the {declaration.id} tier.json routes are unusable: {problems[0]['message']}")
+        rows.extend(declaration.data["routes"])
+        payload = Path(declaration.payload_dir)
+        if payload / "skills" not in TIER_SKILL_DIRS:
+            TIER_SKILL_DIRS.append(payload / "skills")
+    return rows or None
+
+
 def load_routes(root):
-    """No table and not registered -> None. Present but unusable, either tier -> raises.
+    """The repo's table, else its registry table, else the applicable tiers' tables; None when none exist.
+
+    Present but unusable -> raises.
 
     Failing open on a malformed table is the ENF1 failure exactly: enforcement that is inert while
     looking wired. A repo that created this file asked for routing, so a typo in it is a loud stop.
     """
     path = root / ROUTES_FILE
     if not path.is_file():
-        return registry_routes(root)
+        routes = registry_routes(root)
+        return routes if routes is not None else tier_routes(root)
     try:
         parsed = json.loads(path.read_text(encoding="utf-8"))
     except OSError as error:
@@ -1220,7 +1297,7 @@ def query(argv):
         print(f"no readable {ROUTES_FILE} above {cwd} - no skill is owed")
         return 0
 
-    selection = tier_gate.assess(project or root)
+    selection = selection_for(project or root)
     harness = tier_gate.active_host()
     owed, violations = {}, []
     for given in paths:
@@ -1259,7 +1336,7 @@ def query(argv):
 
 
 def missing_routed_skills(routes, harness, root):
-    selection = tier_gate.assess(root)
+    selection = selection_for(root)
     names = {routed_name(selection, root, name, harness)
              for route in routes for name in route.get("skills") or []}
     return sorted(name for name in names if skill_description(name, harness) is None)
@@ -1283,7 +1360,7 @@ def verify_install(argv):
         print(f"no readable {ROUTES_FILE} above {cwd} - no installation to verify")
         return 2
 
-    selection = tier_gate.assess(root)
+    selection = selection_for(root)
     names = sorted({routed_name(selection, root, name, harness)
                     for route in routes for name in route.get("skills") or []})
     try:
@@ -1472,9 +1549,13 @@ def main():
             )
             sys.exit(2)
 
+    agent = subagent_id(data, harness)
     session = data.get("session_id")
+    if agent:
+        session = f"{session}:{agent}"
+    reads_prove = harness == "codex" or bool(agent)
     seen = load_seen(session)
-    selection = tier_gate.assess(root)
+    selection = selection_for(root)
     pending = []
     for rel, route in matched:
         key = route.get("path")
@@ -1508,7 +1589,8 @@ def main():
                 missing.add(name)
 
     outcomes = None if missing else transcript_skill_outcomes(
-        data.get("transcript_path"), codex_skills
+        proof_transcript(data, agent), codex_skills,
+        [proof_names[name] for name in proof_names] if agent else (),
     )
     rejected, unproven = set(), set()
     if not missing and outcomes is not None:
@@ -1553,9 +1635,9 @@ def main():
                 )
             elif desc:
                 lines.append(f"      {desc}")
-                # Codex exposes no `Skill` tool, so "invoke it" names an action it cannot take. Its
-                # contract is a completed read of the file, which it can only do if told which one.
-                if harness == "codex" and name in resolved_paths:
+                # Codex and a Claude subagent may expose no `Skill` tool, so "invoke it" names an action
+                # they cannot take. Their contract is a completed read of the file they are told about.
+                if reads_prove and name in resolved_paths:
                     lines.append(f"      READ THIS WHOLE FILE: {resolved_paths[name]}")
         if route.get("note"):
             lines.append(f"      NOTE: {route['note']}")
@@ -1580,6 +1662,10 @@ def main():
                 "write. The file was NOT written. This route stays blocked until a readable session "
                 "transcript records that read for every owning skill."
                 if harness == "codex" else
+                "Invoke the skill(s) above, or Read each file named above whole (no offset or limit), "
+                "then repeat this write. The file was NOT written. This subagent's own transcript must "
+                "record that load: skills its parent loaded are not in this subagent's context."
+                if agent else
                 "Invoke the skill(s) above, then repeat this write. The file was NOT written. This route "
                 "stays blocked until a readable session transcript records a successful invocation of "
                 "every owning skill."
