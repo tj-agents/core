@@ -96,6 +96,15 @@ class RefreshCliTests(unittest.TestCase):
             self.assertEqual(0, REFRESH.main(["--host", "claude"]))
         refresh.assert_called_once()
 
+    def test_a_codex_only_sync_passes_its_host_to_the_launch_check(self):
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="current") as check, \
+                mock.patch.object(REFRESH, "review_legacy", return_value=([], {})), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(0, REFRESH.main(["--host", "codex"]))
+            self.assertEqual("codex", check.call_args.kwargs["host"])
+            REFRESH.main([])
+            self.assertIsNone(check.call_args.kwargs["host"])
+
     def test_refresh_updates_applicable_claude_local_installations(self):
         fake = FakeClaude([
             {"id": "machine@tj-agents", "scope": "local", "projectPath": str(ROOT), "enabled": True, "version": "v1"},
