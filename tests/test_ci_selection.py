@@ -22,7 +22,7 @@ class ClassificationTests(unittest.TestCase):
         for path in ("README.md", "docs/usage.md", "plans/work/GOAL.md", "reviews/topic.md"):
             with self.subTest(path=path):
                 self.assertEqual(CI.classify([path])["mode"], "docs")
-        for path in ("AGENTS.md", "CLAUDE.md", ".agents/base/policy/plan-artifacts/SKILL.md",
+        for path in ("AGENTS.md", "CLAUDE.md", ".agents/workflow/contract/plan-artifacts/SKILL.md",
                      ".codex/agents/lane-l4.md", ".github/workflows/ci.yml", "scripts/ci_selection.py",
                      "tests/test_ci_selection.py", "scripts/new_tool.py", "CODE_CONVENTIONS.md"):
             with self.subTest(path=path):
@@ -37,6 +37,12 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(value["mode"], "focused")
         self.assertTrue({".agents/hooks/tests/test_problem_records.py",
                          ".agents/hooks/tests/test_adopt_plugins.py"}.issubset(value["tests"]))
+        CI.required_results(value, self.results(), "pull_request")
+
+    def test_relocated_handoff_helper_keeps_focused_transfer_coverage(self):
+        value = CI.classify([".agents/workflow/workflow/handoff/scripts/transfer.py"])
+        self.assertEqual("focused", value["mode"])
+        self.assertEqual([".agents/hooks/tests/test_handoff_transfer.py"], value["tests"])
         CI.required_results(value, self.results(), "pull_request")
 
     @staticmethod

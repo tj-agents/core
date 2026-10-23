@@ -7,5 +7,5 @@ domain: process
 
 # Transfer a context or bounded side workstream
 
-Read and follow the [canonical shared definition](../../../.agents/engineering/workflow/handoff/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../../.agents/workflow/workflow/handoff/SKILL.md) in full.
 This entry point supplies only Claude discovery metadata; the shared procedure is authored once under `.agents/`.

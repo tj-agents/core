@@ -56,16 +56,6 @@
   },
   "release": "A",
   "compatibility_entries": {
-    "resume-plan": {
-      "kind": "compatibility-entry",
-      "status": "supported",
-      "replacement": "plan-execution"
-    },
-    "continue-roadmap": {
-      "kind": "compatibility-entry",
-      "status": "supported",
-      "replacement": "plan-authoring"
-    },
     "staged-review-all": {
       "kind": "driver",
       "status": "retained",
