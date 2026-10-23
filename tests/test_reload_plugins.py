@@ -548,7 +548,7 @@ class HeadReconcileTests(unittest.TestCase):
         self.assertEqual([["claude", "plugin", "marketplace", "update", "tj-agents"]],
                          [command for command, _ in fake.commands])
 
-    def test_neither_a_plain_launch_nor_a_replayed_publish_retries_an_update_at_the_same_head(self):
+    def test_no_launch_retries_an_update_at_the_same_head(self):
         project = self.home.project("preaward", "settings.local.json", "base@tj-agents")
         installations = self.home.installed(("base@tj-agents", "local", project, OLD_HEAD))
         self.record({"tj-agents/core@main": CORE_HEAD}, {f"tj-agents/core@{OLD_HEAD}:plugins/base": "1" * 40,
@@ -560,9 +560,8 @@ class HeadReconcileTests(unittest.TestCase):
             self.assertEqual([], REFRESH.reconcile_claude(project))
             self.assertEqual(first, len(fake.commands))
             self.assertEqual([], REFRESH.reconcile_claude(project, event=True, repositories={"tj-agents/core"}))
-            self.assertEqual(first, len(fake.commands))
-            REFRESH.reconcile_claude(project, event=True, repositories=None)
-        self.assertGreater(len(fake.commands), first)
+            self.assertEqual([], REFRESH.reconcile_claude(project, event=True, repositories=None))
+        self.assertEqual(first, len(fake.commands))
 
     def test_a_failing_update_is_tried_once_per_head(self):
         project = self.home.project("preaward", "settings.local.json", "base@tj-agents")
@@ -606,22 +605,19 @@ class HeadReconcileTests(unittest.TestCase):
         with mock.patch.object(REFRESH, "run", side_effect=fake):
             self.assertEqual(["dotnet@tj-agents"], REFRESH.reconcile_claude(project))
 
-    def test_an_update_claude_does_not_persist_waits_for_the_full_compare(self):
-        project = self.home.project("preaward", "settings.local.json", "base@tj-agents")
-        installations = self.home.installed(("base@tj-agents", "local", project, OLD_HEAD))
+    def test_a_project_install_shadowed_by_a_nested_worktree_install_is_skipped(self):
+        project = self.home.project("core", "settings.json", "base@tj-agents")
+        nested = project / ".worktrees" / "Feature"
+        self.home.installed(("base@tj-agents", "project", nested, OLD_HEAD), ("base@tj-agents", "project", project, OLD_HEAD))
         self.record({"tj-agents/core@main": CORE_HEAD}, {f"tj-agents/core@{OLD_HEAD}:plugins/base": "1" * 40,
                                                        f"tj-agents/core@{CORE_HEAD}:plugins/base": "2" * 40})
-        unpersisting = FakeClaude(installations, persist=False)
-        with mock.patch.object(REFRESH, "run", side_effect=unpersisting), self.assertRaises(REFRESH.RefreshError):
-            REFRESH.reconcile_claude(project)
-        self.assertEqual(1, len(REFRESH.plugin_autoupdate.read_contents()["stuck"]))
-        self.record({"tj-agents/core@main": DOTNET_HEAD}, {f"tj-agents/core@{DOTNET_HEAD}:plugins/base": "5" * 40})
-        with mock.patch.object(REFRESH, "run", side_effect=AssertionError("retried a stuck install")):
+        with mock.patch.object(REFRESH, "run", side_effect=AssertionError("updated a shadowed install")):
             self.assertEqual([], REFRESH.reconcile_claude(project))
-            self.assertEqual([], REFRESH.reconcile_claude(project, event=True, repositories={"tj-agents/core"}))
-        with mock.patch.object(REFRESH, "run", side_effect=FakeClaude(installations)):
-            self.assertEqual(["base@tj-agents"], REFRESH.reconcile_claude(project, event=True, repositories=None))
-        self.assertEqual({}, REFRESH.plugin_autoupdate.read_contents()["stuck"])
+            self.assertEqual([], REFRESH.reconcile_claude(project, event=True, repositories=None))
+        fake = FakeClaude(self.home.installed(("base@tj-agents", "project", project, OLD_HEAD),
+                                              ("base@tj-agents", "project", nested, OLD_HEAD)))
+        with mock.patch.object(REFRESH, "run", side_effect=fake):
+            self.assertEqual(["base@tj-agents"], REFRESH.reconcile_claude(project))
 
     def test_content_query_names_only_validated_revisions_and_paths(self):
         wanted = {"tj-agents/core@main": {"plugins/base", 'plugins/x") { oid } evil: object(expression: "y'}}
