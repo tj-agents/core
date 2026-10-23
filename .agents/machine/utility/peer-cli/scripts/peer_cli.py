@@ -70,7 +70,7 @@ def close_terminal_or_host(target, force):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("list", "resolve", "close"))
+    parser.add_argument("action", choices=("list", "resolve", "close", "self"))
     parser.add_argument("session", nargs="?")
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--under")
@@ -81,6 +81,10 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.id and args.action != "list":
         parser.error("--id filters list only")
+    if args.action == "self":
+        entry = session_close.own_host_and_entry()
+        print(json.dumps({key: entry.get(key) for key in ("session_id", "host", "title", "cwd")}))
+        return 0
     items = records(set(args.id)) if args.id else records()
     if args.include_unrecorded:
         items += unrecorded(items)

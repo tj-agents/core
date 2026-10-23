@@ -86,9 +86,21 @@ A restarted orchestrator runs `tick` and continues.
   Its follow-up endpoint was unavailable, so the boundary check was never delivered.
 - #354 put the Workflow package on main, so this branch is based on main, not stacked on #355.
 - Slice 1 committed (`908ebdd4`): runtime, Agent Store `sessions()`, `peer-cli list --json`, 12 tests.
-- Slice 2 in progress: canonical SKILL.md, host entry points, catalog skill, harness permissions.
+- Slice 2 committed (`294af0f6`, `1a4d979d`, `88091ea1`): skill, entry points, catalog, harness, merge
+  failure handling, `peer-cli --id`. PR [#439](https://github.com/tj-agents/core/pull/439) is open.
+- The review standards resolver fails with "Selected marketplaces provide conflicting plugin namespaces",
+  so injected-standards scope is unresolved. CODE_CONVENTIONS.md was applied directly.
+- Docs#20 is still open and owned by `01a16053`. Its `orchestrate` line waits for that PR to merge.
+
+- Review of `23da17c6..88091ea1`. Native `code-review high` found 10 findings and the security lens found 5.
+  Fixed: worker self-approval and reconfiguration (privileged commands now require the orchestrator
+  identity from `peer-cli self`), unquoted worker text, merge-queue false drop (`mergeQueueEntry`),
+  squash/rebase close-out, a stale PR on a reused branch, relaunch inheriting reports, branchless merged
+  subagents, a single sweep, empty-rollup green, and the PowerShell-hostile report command. Rejected:
+  reusing `workflow_ops.parse_status_checks`, because Workflow must not depend on the Engineering runtime.
 
 ## Next Steps
 
-Finish slice 2's generation and layout checks, commit, push and open the PR. Then add the Docs#20 line after
-#355 lands, and run slice 3's live acceptance.
+Commit the review fixes, run incremental review on the delta, push. Merge
+main after #355 and resolve the catalog/harness overlap. Run a live three-worker acceptance with real tabs
+when Tommy picks the work. Merge #439 after Tommy says "merge #439".
