@@ -11,8 +11,13 @@ retain their distinct GitHub and Azure item operations.
 
 Tommy's 21 October 2026 dispatch explicitly assigns this session architecture decisions, the canonical
 follow-up plan and execution of the coherent reviewed PR after readiness. It supersedes the older brief's
-requirement for another launch. Its merge authority applies only to the separately owned narrow handoff
-wording repair; this architecture work must preserve its own normal merge and installation gates.
+requirement for another launch. The dispatch initially reserved architecture merge and installation authority. Tommy's explicit
+22 October 2026 answer, `Authorize all listed delivery actions`, clears that hold for the goal's reviewed
+PRs and supported activation after their gates pass, including the six named consumer draft publications.
+Normal exact-head review, CI, dependency and native-admission gates remain required.
+Tommy separately authorized removing only Marketplace's retired generated Personal-policy caller.
+On 23 October he directed generic acceptance-environment routing and Core CI coverage across supported
+platforms; the solution must work from any authoring OS rather than depend on a separate local machine.
 No new independent successor is needed to decide this same architecture. Bounded evidence readers,
 implementation workers and independent reviewers remain subordinate to this owner.
 
@@ -36,14 +41,28 @@ Agent Workboard is outside scope and is not a dependency.
 - Execution: `github.com/tj-agents/core:workflow/agent-store-architecture`.
 - Canonical execution checkout: `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-WorkflowSelectionClosure`.
 - Branch: `Fix/WorkflowSelectionClosure`.
-- Base/parent: `Refactor/WorkflowLifecycle` at `a6123ed93061b9c8d816691ac69f71f711ca2c8a` (S2b2; PR #355 reviewed and green).
-- PR: [Core #356](https://github.com/tj-agents/core/pull/356), draft with human-gate. Parents [Core #355](https://github.com/tj-agents/core/pull/355), [Core #354](https://github.com/tj-agents/core/pull/354), [Core #353](https://github.com/tj-agents/core/pull/353), and [Core #352](https://github.com/tj-agents/core/pull/352) have completed source review and Windows/Linux CI. All retain `human-gate`; architecture merge authority is absent.
+- Integrated parent: `Refactor/WorkflowLifecycle` at `0a4ef4cece96eebf3fd39b2c8fb0be23e280be9f`; selection HEAD is `6182680b2ea8edd3958dc9ab7781ca70d2ae6d4b`. Lifecycle has since advanced locally and needs final integration after its CI acceptance repair.
+- PR: Core#356 remains draft pending current parent integration, native admission and final review. Source parents are delivered bottom-up under the existing conditional authority. Current source facts are below; historical checkpoints retain their original evidence.
 - Pickup: exact native identity and first read-only action recorded in the dispatched pickup file.
 
 Native history, the supported store status command, registered branches/worktrees, current plans and
 open Core PRs were reconciled before checkout creation. No existing owner of this follow-up was found.
 The supported atomic claim registered this owner after checkout identity was verified. No open red
 generated-sync PR was present. Other open PRs retain their owners.
+
+## Current checkpoint - 23 October 2026
+
+- Continuation diagnosis is documented in [CONTINUATION-INCIDENT-20261023.md](CONTINUATION-INCIDENT-20261023.md) and existing Core#364 comment6365095127. Commit40cab461 deliberately retired procedural Stop enforcement on19October; current published/installed manifests match. The observed error was failure to establish supported continuation; no PR355 regression, scheduler defect or isolated-CI leakage is established. Preserve the prior design decision while reconciling#364/#400/#415. Recovery now binds PR355 atd2c122f8 to runtime owner7eeb7b98f1145de79d2c8708 and verified nativePID1964; scheduler registration and a real wake succeeded; the wake retained the live foreground owner without launching a competing child. Follow-up cause evidence is recorded in Core#364 comment6365370676. CI39956014290 has one active monitor.
+- At12:05:55UTC this owner ended after automatic permission-review timeouts with the goal unfinished and no verified continuation. Tommy explicitly requested recording and investigating that failure and completing PR355. The recurrence belongs to existing Core#364; retain its repair identity and related acceptance gaps#400/#415. After native resumption, primary/Selection/Lifecycle had no continuation owner or scheduler receipt; the two worktrees retained older delivery bindings. These post-resumption observations do not identify which Stop-hook path ran earlier. Local command access recovered; source repair/review/delivery and bounded read-only incident diagnosis are active under this owner. Reporting this recurrence is now explicitly authorized. Do not treat the prior final response as completion or claim unattended ownership before registration and an observed wake.
+- S1 Core#352 merged reviewed head0adefbdca5e8954113cadd81c6489e6b6ca41180 at24fb40fcac70fe0b4ae888138ff7fb6c48fbcc61 on23 October2026 at01:10:10UTC. Both CI39878376238 and hold-removal recheck39880445862 passed; fresh body/preflight and exact-head normal merge succeeded. Causal post-merge CI39882455597 passed Windows/Linux, regeneration and aggregate; its regeneratejob120182780336 published21649d4aa59eceee04070d94de87eb80cb159c8c. Machine-events39882456058 passed. No admin bypass.
+- S2a Core#353 merged reviewed23dea0cc51a83c43dd47c5157c90c3b045db5666 atc45ad9a8bc7c51f4bc800339a28f1a8d4c4d5b9b on23 October2026 at02:07:20UTC. Review receipt, CI39883570681 and hold-removal recheck39885726532 passed; fresh body/preflight and normal exact-head merge succeeded. Causal CI39887836573 passed Windows/Linux, regeneration and aggregate; regeneratejob120200089411 passed and published7fc8901adfe81374b98135f741baccf611753d88. Machine-events39887836632 passed. Delivery binding released to the same owner for causal publication/children.
+- Status Core#354 merged reviewed899db3c074e35ed4f76284c09c5ed046f5dad0de at034bdeaec482b081555634ef22e83aaf7b5df5b5 on23 October2026 at09:39:52UTC. Native and independent integration review/receipt pass, CI39888281520 and hold-removal recheck39931658521 pass, and fresh preflight/body/checks succeeded. Normal exact-head merge, no admin bypass. Causal CI39933499187 passed Windows/Linux, regeneration and aggregate; regeneratejob120347292610 published23da17c6755c4585ab1116d557143fb3f39ecb98. Machine-events39933499214 passes. Delivery binding released to the same goal owner.
+- Lifecycle Core#355 merged reviewed2952750d0ce74c83321a0547b1623255f14fa44b atb1fa5c68a1c532cc2190832828dfdcdca82664e5 on23October2026 at13:59:24UTC. Native, independent integration/security and final two-line polling review receipts are complete. Exact-head CI39963544250 passed Windows120447465747, Linux120447465679, real native startup/discovery, full selected suites and aggregate120453151710. Fresh body/preflight passed; six disjoint base commits preserved the reviewed head under review-reconcile. Normal exact-head merge succeeded without admin bypass. Causal post-merge CI/publication39965800923 has one active listener; machine-events39965800806 passed. Installed user activation remains incomplete.
+- Hold-removal CI39961057419 failed at unchanged d2c122: Windows job120438915517 raised PermissionError reading the finish-reaper result in test_finish.py:462; 1349 tests ran, one error. Linux and both native startup checks passed. Bounded diagnosis established an unguarded read during asynchronous result publication. Repair2952750d0ce74c83321a0547b1623255f14fa44b is committed and pushed, changing only the two polling reads to existing session_close.read_json; all deadlines and assertions remain. Deterministic temporary-denial/incomplete/final-record checks and compilation pass. Local process execution was blocked before publication by Task Scheduler; actual Windows/Linux process validation belongs to CI39963544250. Incremental review preparation runs against completed d2c122, retaining prior evidence. The same registered continuation owner is rebound to2952750d and foreground-claimed by verified PID1964. Merge remains gated on incremental review and green exact-head checks.
+- Native final review also retained four upstream Machine observations: Claude relaunch can drop explicit tool restrictions; close.arm can race restart with worktree cleanup; verify-only can call mutating legacy cleanup; permission roots choose one globally newest installation instead of each active scope. The three source files are byte-identical to published main4925ad43 (session_relaunch blob13d331096a64968dd17285e0b1919c55470ec028, reload_plugins blobb3b4fcd0e0743daaceff8a0fb0b8c79798f812d7, harness_permissions_sync blob6e3193775140ed8d4a49b86672765f08bfd6e38d). These are not PR355 regressions or verified repairs. Machine source owners should reconcile existing records and reproduce each concern before repair; no new remote record or unrelated source change is authorized by this checkpoint. Full original comments remain in lifecycle-nativeacceptance-native-review.log and the canonical work-order synthesis. Preserve the originating CLI and use no-relaunch for later activation.
+- Marketplace#21 at33b32016 has source/security review and green CI for the explicitly authorized caller removal. Child#24 at48deda3b has green CI. They still depend on Core package publication and native admission.
+- The six requested consumer drafts are published. Personal, Infonetica, Docs and selection closures retain their recorded gates. WorkItems remains local-only and its originating worktree/CLI are preserved.
+- Agent Store source is merged; dependent source layers, central Marketplace and activation remain incomplete. No user packages are activated. The primary Core checkout and unrelated work are preserved.
 
 ## Acceptance
 
@@ -350,7 +369,7 @@ packages. The standing shared decision is published in draft Docs20 and passed o
 before the declaration delta. No source result establishes installed acceptance.
 Execution authorization: architecture and implementation through coherent reviewed PR preparation.
 Transfer: none; this same native owner remains responsible. Earlier worktree goals are frozen snapshots.
-Unresolved: final Core declaration CI, native-admission reviews, six denied consumer publications,
+Unresolved: native-admission reviews, six denied consumer publications,
 coordinated architecture merges and native activation, Marketplace's independent policy gate, and actual
 supported Linux host acceptance.
 Resolver: this owner finishes independent checks; Tommy supplies reserved publication, merge and activation
@@ -553,11 +572,11 @@ Agent Store/Workflow admission. The final canonical-plan link will identify this
 | Core353 Machine boundary | 7c77e7d5 | Source review and Windows/Linux CI pass; human merge hold |
 | Core354 Workflow status | 995f5e45 | Source review and Windows/Linux CI pass; human merge hold |
 | Core355 Lifecycle | a6123ed9 | Source review and Windows/Linux CI pass; human merge hold |
-| Core356 declarations | this branch over a6123ed9 | Source generation/preservation pass; native admission and final CI/review held |
+| Core356 declarations | d258b964 over a6123ed9 | Windows/Linux/required CI39768073830 and source checks pass; native admission and final review held |
 | Marketplace21 | 7cf51be5 | Native catalog CI passes; new-package admission and independent existing policy failure held |
 | Personal17 | 0af44a12 | Windows/Linux/hosts CI passes; native admission and final review held |
 | Infonetica18 | e76d8d66 | Local48 tests/one skip and source checks pass; native admission held; hosted CI is manual |
-| Docs20 | 86f7969f plus plan-link refresh | Standing decision source review and declaration checks pass; incremental native admission held |
+| Docs20 | ec40e457 | Standing decision source review and declaration checks pass; incremental native admission held |
 
 All nine PRs remain open with human-gate and no forge auto-merge request. No merge or installation occurred.
 The six declaration-only consumer commits remain local; exact draft titles, bodies, branches, bases and
@@ -567,20 +586,266 @@ pushing those exact branches and creating draft PRs/labels for tomjseery/cpp, ma
 onsite-sealants, Reunion, termboard and tj-agents/work. Existing profile scope and unrelated settings remain.
 Retired WorkItems stays local-only, with its old completed goal and protected originating checkout intact.
 
+## Resumption and base reconciliation - 22 October 2026
+
+Tommy reopened this original conversation for context, then instructed this same owner to keep going.
+The exact native owner remains live. Reversible source reconciliation resumes; the separately reserved
+merge/native-activation authority and the explicitly rejected six-consumer publication action have a
+concrete approval request was pending at resumption. The later explicit answer below now governs delivery.
+
+Fresh forge reads confirm Core352-355 remain open at their recorded reviewed heads. Fetched Core main is
+8c2d9f77ab085387df4b588482029217c6b97559, including the problem-record routing and agentic sync changes.
+The supported S1 review-reconcile reports base-changed-relevant-evidence and requires another review.
+A read-only merge-tree check identifies five conflicts: catalog, compatibility, Engineering/Machine
+harnesses and source-layout tests. S1 is being reconciled in its existing isolated checkout with its
+prior source review retained. Validate and incrementally review the combined candidate before delivery;
+carry the reconciled parent upward in dependency order and preserve newly landed upstream behavior.
+The primary checkout and all consumer branches remain untouched. All six consumer heads and their exact
+three-file declaration scope were reverified; their earlier temporary draft-body file is no longer present.
+A bounded source reader identified later-layer obligations: carry primary-checkout Personal selection and
+explicit record-provider precedence into the Workflow-owned recording contract/status reader; preserve
+upstream's demonstrated-defect, personal-scope repair limits and explicit independent-successor authority;
+retain the host-only Machine boundary, current sync-plugins/relaunch behavior and deletion of retired
+lanes/handoff debt files. These are integration repairs, not a reopened architecture assessment.
+Fresh fetches show all six consumer bases unchanged. Personal main moved to a2ddbf5460e121c5d9758d38db28315638d69f97
+with relevant tracker/address guidance; its existing isolated candidate is being reconciled separately.
+Infonetica main moved to 0b98ea0a03f18523769bbd0d2c28f4d327e5c3fe; assess the generated/test-only
+base delta without adopting Personal. Docs base movement only changes record metadata; Marketplace base
+is unchanged. Preserve the two old local delivery-binding files and their absent merge authority.
+The combined Marketplace candidate has a real admission cycle: its new selection requires native
+Agent Store/Workflow before final review, but native installation requires its catalog to be published.
+The supported selection source reserves tj-agents for the central marketplace; producer registration,
+cache injection and candidate-rule substitution are not alternatives. Separate catalog publication from
+project-declaration activation in the coordinated source plan. Preserve M1's original finding and its
+actual declaration repair in a dependent slice; source scope/review and final activation stay distinct.
+Before changing the publication candidate, reconcile the existing work order and stage ownership explicitly.
+The pre-existing Marketplace policy failure remains an independent, unchanged delivery gate.
+
+## Delivery authorization - 22 October 2026
+
+Tommy explicitly answered "Authorize all listed delivery actions" to the request covering coordinated
+merges of reviewed PRs and native activation once their gates pass, plus pushing Fix/WorkflowSelectionClosure
+and opening human-gate drafts in tomjseery/cpp, marketplace-car-hunter, onsite-sealants, Reunion, termboard
+and tj-agents/work. This clears the former reserved merge/installation hold and the six-publication
+automatic-review rejection for those exact actions. Re-record this authority in each applicable exact-head
+binding. Required review, CI, native admission and dependency ordering still apply; remove an applicable
+human-gate only when its reviewed delivery is ready. No waiver, force push, unrelated workflow deletion,
+Azure write, remote issue creation, or retired WorkItems publication was granted.
+
+Personal b36772f9 is pushed to existing draft17. Its repository tests and host validation pass, but
+CI39866415432 fails current Template conformance on old personal-agents producer identities. Fresh
+main fc76273445cc3cc971de215d096800f269d84d78 already contains the separately owned merged identity
+repair (PR20), with that conformance step green on both platforms in39865524131. Reconcile that landed
+fix instead of duplicating its ownership, then validate and publish one stable updated candidate.
+
 ## Next Steps
 
-Observe the reconciled Core356 exact-head checks, refresh its body/binding, finish the Docs plan pointer
-and record the final external gates. Then present concrete approval requests for the prepared consumer
-publication and coordinated source merges/native activation. Do not merge, enqueue or install under the
-original dispatch. Native admission enables the held incremental reviews; those must complete before their
+Reconcile the relevant new Core base in S1, validate and review that delta, then propagate the parent
+through the existing stack. Prior checkpoints below remain historical evidence. Core356 at d258b964 passed Windows/Linux/ci-required39768073830;
+its authoritative body and exact-head binding are refreshed. Docs20 at ec40e457 points to this canonical
+plan and reviewed Lifecycle a6123ed9. Both retain incomplete native-admission reviews. Complete the now-authorized six consumer publications and coordinated source delivery using the
+explicit authorization below; do not rely on the original dispatch alone. Native admission enables the held incremental reviews; those must complete before their
 own delivery gates can pass. Marketplace's separate policy failure remains with its authorized owner.
 
 Scope: whole plan through remaining authorized preparation and evidence, with reserved delivery gates.
-Current slice: S3 declaration reconciliation and final source checkpoint.
-Remaining scope: exact-head declaration CI, held native-admission reviews, explicit publication/merge/
+Current slice: source base reconciliation and authorized draft publication; review/CI/admission gates remain.
+Remaining scope: held native-admission reviews, explicit publication/merge/
 installation authority, Marketplace policy resolution and actual Windows/Linux installed acceptance.
 Done when: full acceptance is demonstrated; source preparation alone does not complete this cutover.
+
+Final gate checkpoint:22 October2026,11:25UTC. No architecture PR merged, no package installed, no six-consumer
+publication retried. Keep this exact native owner live for the user response. The original primary and
+protected originating WorkItems checkout remain untouched. The goal is delivery-gated, not done or paused.
 
 ```agent-host-coverage
 {"schema_version":1,"shared_source":".agents/agent-store/runtime/","hosts":[{"host":"claude","behavior":"Use the canonical registry through package-local native adapters and expose read-only inspection without process-liveness claims.","source":".agents/plugins/manifests/claude/machine-hooks.json","mapping":"sources.json embeds the canonical store runtime in the consuming Machine and Engineering packages and publishes Agent Store inspection.","verification":{"level":"source","result":"passed","evidence":"Inspection 5, registration 21, recovery 48, close-loader 9, session commands 64, store 59, status-reader 51, repository provider 22; generated package checks and both isolated host inspector entry points pass. Installed activation remains an S3 gate."}},{"host":"codex","behavior":"Use the same registry and atomic ownership semantics through Codex lifecycle hooks, with separately labelled recorded-state inspection.","source":".agents/plugins/manifests/codex/machine-hooks.json","mapping":"The same canonical store bytes are embedded locally; Codex hooks retain package fingerprint and snapshot integrity.","verification":{"level":"source","result":"passed","evidence":"Inspection 5, registration 21, recovery 48, close-loader 9, session commands 64, store 59, status-reader 51, repository provider 22; generated package checks and both isolated host inspector entry points pass. Installed activation remains an S3 gate."}}]}
 ```
+
+
+## Authorized publication checkpoint - 23 October 2026
+
+Five unchanged consumer candidates are now published as draft PRs with human-gate and passing authoritative
+body checks: cpp #7 at b5684fafdf19a912c101f6f49ebe4330fcacba36; marketplace-car-hunter #3 at
+8da517de889735f64d30fcf2989630f0553bde00; onsite-sealants #13 at b8668391d7f1f5130f6cd8a19f727766aa4c7081;
+Reunion #27 at 6a48c286cf0e6aef59fe282ab7a0ff41e7a56681; termboard #12 at
+647893b3b1b67655657519c0383884b5fe9a52c9. Their native selection admission and final review remain pending.
+Work main advanced to 815720c8 after its PR #14 landed; the bounded worker is reconciling that base before
+publishing the sixth approved draft. No employer project receives Personal.
+
+Personal #17 now contains the separately landed producer identity repair from main fc762734. Current pushed
+head is 161478e2982d3bd708410c4625b559b6306c8c0a. The exact Template revision used by the earlier failing
+CI now passes conformance locally; generation check and packaging tests (5 tests plus 2 subtests) pass.
+The replacement CI monitor is active. Earlier b36772f9 CI passed repository tests and native-host validation
+but failed Template conformance; those failures are not represented as passing. Native Workflow/Agent Store
+admission still awaits publication and supported activation.
+
+Marketplace parent is locally 9cb25273176d2c6fb67980d013b653f81c526906; dependent declaration child is
+8715a875901b1ce6da7bf6006586422ea0a34a2e. Parent actual selection admission succeeds. The original M1 remains
+with its original work order; its prepared three-file fix is preserved in the child, whose admission/review
+remain incomplete. The superseded 7cf51be5 pending pass is explicitly cancelled without approval. A fresh
+parent incremental native and independent sequencing review uses frozen 4aeaa7d8..9cb25273. The configured
+specialist model was unavailable; one fresh supported lens is executing the same validated V2 contract.
+Marketplace #22 separately confirms the unchanged policy-workflow failure and does not repair it. This
+workstream still has no authority for that unrelated workflow deletion.
+
+
+## Reviewed publication and Core reconciliation - 23 October 2026
+
+All six authorized consumer drafts are open. Work #16 is draft with human-gate at
+31015b1ed3c85a37a40e990ba5809871463336c8 after clean integration of main 815720c8; exact delta is still the
+three selection files. Supported adoption checks, 45-file generation check and 6 packaging tests pass;
+Template remains selected and Personal is absent. Authoritative body check passed. Initial CI run39869576835
+was active; no native-admission or final-review approval is implied.
+
+Personal #17 replacement CI run39867419553 passed Windows, Linux and native-host jobs at161478e2. The
+monitor had started after checks were already green and consequently awaited a later PR transition; root
+read its persisted green observation, confirmed the complete exact-head check set once from GitHub, and
+stopped that now-unneeded monitor. Final review remains admission-gated.
+
+Marketplace parent #21 is pushed at9cb25273176d2c6fb67980d013b653f81c526906. Fresh native review, independent
+sequencing lens (validated V2 after one citation-format correction), frozen docs reachability and parent
+synthesis passed; review-record wrote the exact-head private receipt. Earlier pass identities and original
+M1 finding are preserved. Supported preflight and authoritative updated PR-body check pass. Its dependent
+selection branch has a separate source-coverage work order, actual admission still fails only for unpublished
+Agent Store/Workflow, and draft publication is underway. Source review does not clear the independent retired
+Personal-policy CI failure. Automatic approval review rejected even preparation of its deletion patch because
+the original dispatch excludes unrelated workflow deletion; a specific user exception is pending. No deletion
+or workaround was performed. Unaffected work continues.
+
+S1 #352 is pushed atfa8b1610c3d2bb683967ed3fca2cac5a3d428ebe, merging reviewed5e815d06 withmain8c2d9f77.
+Focused checks passed including the restored isolated-host package inspection test; its 44-path authored
+delta contains no generated plugins output. Actual selected-standard admission passes with the same
+selection/rule identities; supported preflight is green. Exact-head CI and new frozen incremental review
+are in progress. The bounded writer now integrates this parent into S2a #353; it owns no review approval.
+
+
+## Corrected Core candidates and activation boundaries - 23 October 2026
+
+S1 #352 now publishes ac787c7c5ccc42c728aa09acf601c1250083be15. Its preceding integrated candidate
+fa8b1610 failed exactly the same producer-lock fixture on Windows and Linux: 1,212 tests per platform,
+one failure, with 11 Windows and six Linux skips. The fresh bounded repair confirmed the actual authored
+Agent Store dependency and changed only that expected list; all 16 adoption tests pass locally. Replacement
+CI is run 39871577624. The earlier fa8b1610 preparation was cancelled before creating a descriptor, and
+its exact owned process was stopped. The corrected head is being frozen from completed watermark 5e815d06
+through the supported helper, with diagnostics retained for its slow existing-cache cleanup.
+
+S2a #353 now publishes f5a61173271d64883db7b75eade8e7e0d50aa248, incorporating corrected S1. Its layer remains
+17 authored paths and no generated distribution changes. Lane, source-layout, harness, recovery/relaunch,
+reload, launcher and adoption checks pass; temporary generation reports 590 files/83 definitions and zero
+drift. Base, exact-head source coverage, preflight and PR-body checks pass. Fresh incremental review is being
+prepared; CI run 39871834403 owns the current platform gates. The worker now owns S2b1 base reconciliation.
+
+Marketplace #24 is the published dependent selection slice at 8715a875, targeting reviewed parent #21 at
+9cb25273. It is draft with human-gate; authoritative body validation and supported selection checks pass.
+Actual Store/Workflow admission remains unavailable; no final review or activation is claimed. Its inherited
+Personal-policy check fails with the same excluded generated caller. The specific removal exception remains
+pending; neither the deletion nor its rejected patch preparation was performed.
+
+The four consumer CI runs (Car Hunter 39867883601, Reunion 39868198773, Termboard 39868356605, Work 39869576835)
+completed successfully and were confirmed by one direct exact-head read after their monitors woke. Onsite
+Cloudflare Pages also reports success; cpp #7 reports no checks. All remain draft pending native admission
+and final selected-standard review. Evidence: private resumption/consumer-checks-20261023.json.
+
+Read-only activation investigation confirms publication order: Core source and generated main, central
+Marketplace roster, then supported sync-plugins refresh for an exact prepared checkout and actual native
+admission. Use --no-relaunch to preserve the existing CLI. Codex has no supported in-process reload; the
+Claude-only relaunch API must not be used for Codex reassociation. Source CI and hook listings do not establish
+fresh native loading. Setup resolves bindings to the primary checkout, so candidate setup cannot be used to
+bind unpublished worktree content or alter the protected primary source. The only installed WSL distribution
+is docker-desktop; no supported Linux native-host acceptance environment was established. Keep Windows
+actual-hook/trust evidence, Linux actual-host acceptance and live-owner association as named remaining gates.
+Do not fabricate a resolver by changing SQLite rows, copying caches or spawning an unadmitted successor.
+
+
+## Review repair and specific Marketplace authority - 23 October 2026
+
+Tommy explicitly authorized removal of only Marketplace's retired generated Personal-policy caller.
+Parent#21 now publishes33b32016303da9925d024646cdbd44f7159e6d27; native incremental review, validated independent
+security review and Windows/Linux CI39874448543 pass. The exact-head private review receipt is recorded.
+This specific exception clears the earlier automatic-review rejection; no other workflow deletion is authorized.
+Child#24 normally merges that parent at48deda3b2d52f0157410706a5cbffa970522fd52; it remains a three-declaration
+slice and its Windows/Linux CI39874958378 passes. Core payload publication and native admission remain dependencies.
+
+Core S1 integration review completed at ac787c7c with one MEDIUM finding MIG1: migration excluded Agent Store
+from the Core package roster. The fixture reproduced it;69c3f09f fixes the roster and existing integration test,
+with22 adoption/selection tests passing. S2a's f5a61173 source review approved its layer and deduplicated MIG1
+to S1. Both exact-head CI runs passed before the repair. Workflow status991067 adds the corresponding Workflow
+migration coverage and passes22 tests. Reload verification/setup observations are unchanged from main and
+outside this slice; no unrelated repair was undertaken.
+
+Main then advanced to9578ca3d through separate permission-sync#437 and generated publication, creating a
+catalog conflict on S1 and preventing CI for69c3f09f. Pending undispatched review preparations were cancelled,
+with their prior completed watermarks preserved. Root integrated main normally, retained upstream permission
+logic, resolved the digest-only catalog conflict, recomputed authored digests and passed19 permission tests.
+Current local candidates are S1e8f6ef57156b44ca7c8def13e7901608ad605f46, S2aa434ea4370b0c00c5152dc729316fa823d23f781, Status5241eed5e39185453c3568402128d22c1002f215.
+Fresh exact-head reviews and CI are required. The existing bounded writer owns Lifecycle integration from
+that Status parent, retaining consent, same-owner repair and explicit-successor authority. No source PR has
+merged, and no packages have been installed or activated. Primary Core and originating WorkItems remain untouched.
+
+
+## Generated-digest gate repair and runtime environment - 23 October 2026
+
+CI39876472306 passed S1 Windows/Linux checks but failed the generated-digest guard. CI39876513525
+also reported Status README references to retired machine:reload-plugins. The cause is the current
+integration recomputing generated catalog digests; previous S1 run39871577624 actually passed the guard.
+Root restored common package digests from main9578ca3d in0adefbdca5e8954113cadd81c6489e6b6ca41180;
+local generated-path guard passes. This corrects the earlier checkpoint's inappropriate digest recomputation.
+Undispatched e8f6/a434/5241 review bundles were cancelled with completed watermarks preserved.
+The bounded writer propagates this correction through S2a, Status and Lifecycle, preserving parent digests,
+and fixes the two README command references. Fresh review and exact-head CI remain required.
+
+Core selection was normally integrated locally at6182680b2ea8edd3958dc9ab7781ca70d2ae6d4b from Lifecycle0a4.
+Only the three declarations differ; all select the same six packages from tj-agents/marketplace.
+Generator check, six selection tests and four source-layout tests pass. The dirty GOAL was preserved byte
+for byte during that merge. Selection still needs final parent integration, native admission and review.
+
+A read-only Linux capability check found Docker installed but neither existing local engine pipe reachable.
+Existing ubuntu-latest CI verifies source/packages, not native startup. No Linux Codex/Claude environment or
+authenticated remote target was established. Asked Tommy for an already provisioned hostname/alias; no
+credentials, installs, VM/container starts or native sessions were requested or performed. Remaining Linux
+acceptance requires supported install/update, native inventory, normal hook trust, fresh host SessionStart
+routing and matching Machine session/PID/start-time/checkout receipts. Listing or --version is insufficient.
+No source PR has merged and no package activation has occurred.
+
+
+## Generic acceptance environment routing - 23 October 2026
+
+Tommy directs acceptance to CI and explicitly requires a generic skill correction that works from any
+authoring platform. The request for a separate Linux machine is superseded. Workflow run will select an
+appropriate execution environment and assess supported provisioning before declaring missing capability.
+Engineering remote-validation will route repeatable native-host/platform acceptance to CI and correct its
+local-only assumptions. Core will exercise the policy through one portable native-host acceptance path in
+its existing Windows/Linux jobs, using actual startup routing and Machine receipts. Source/package checks
+and fake inventory cannot substitute for native loading. Any credentials must use supported provisioned
+CI mechanisms without copying local secrets or weakening trust. No new skill or environment framework is needed.
+
+Digest reconciliation now completes locally at S2a ac5c40aa92132b798d6499376db34a4e462fdd14,
+Status1bd3b0a4215bb627cc78539d61883c45ff2aa395 and Lifecycle8ba9fd2e5a58b53337048d3b7a0cd5ff97db6c0d.
+Each passes the generated-path guard against its exact immediate parent; Status README uses sync-plugins.
+The source writer did not modify selection or GOAL. Current review/CI gates remain pending.
+
+
+## Current source review and general validation repair - 23 October 2026
+
+S1 0adefbdca5e8954113cadd81c6489e6b6ca41180 completes native and independent migration review;
+private exact-head review-record succeeds. Both reviewers observed upstream permission-selection behavior,
+but comparison against actual PR base9578ca3d is empty for that source; this slice neither changes nor
+worsens it, so no unrelated repair was added. Migration/adoption and catalog ownership checks pass.
+S1 CI39878376238, S2a CI39879153399 and Status CI39879274526 are bound to their exact heads with monitors.
+S2a/Status final candidates are frozen and native reviews run; Status has a fresh integration lens.
+
+Lifecycle12ed816001c564be4b3278ab2c9929f1db17c9bb commits the generic environment-routing guidance in
+workflow:run and engineering:remote-validation. This applies from any authoring OS. The bounded writer now
+adds portable real Codex/Claude startup and native discovery acceptance to existing Windows/Linux CI jobs,
+using disposable host/state roots, native installation and verified hook trust without model prompts.
+Expected evidence includes Base task-routing context/digest and actual Machine JSON/SQLite session receipts.
+User package activation and published-package acceptance remain distinct from candidate CI execution.
+
+
+## Status delivered and portable acceptance repair - 23 October 2026
+
+Status354 merged reviewed899db3c0 at034bdeaec482b081555634ef22e83aaf7b5df5b5 at09:39:52UTC after source CI39888281520 and hold-removal recheck39931658521, native/independent review receipt and fresh preflight/body/checks. Causal publication CI39933499187 is monitored; Machine-events39933499214 passed. Lifecycle355 candidate19f60e74 is pushed; new native step CI39933183833 fails on Linux during native executable discovery after npm and on Windows on immediate transcript absence. Fresh bounded worker repair_native_acceptance_ci owns the three acceptance/CI paths and their focused tests; root retains parent integration, review, push and delivery. No source review is frozen on the failed candidate.
+
+The retained isolated Claude debug log at native-claude-isolated-diagnostic-state/artifacts/claude-debug.jsonl proves80 plugin skills loaded from candidate working-tree directories. Earlier zero-count interpretation was a different stage. Actual qualified discovery must be established through native command inventory, not Base context substrings. Official pinned Claude Python SDK evidence establishes a streaming initialize control request before a user query; successful credential-free initialization is still to be verified.
+
+Supported installed reload_plugins.py reads the exact supplied project native settings (Claude files or Codex config/read), so sync-plugins --project <prepared-checkout> --verify --no-relaunch can refresh after central publication while preserving protected primary source and the original CLI. Exact native trust/admission and fresh observed loading remain gates. Setup is not needed to point machine bindings at unpublished worktree content.
