@@ -77,7 +77,32 @@ passing dormant unit tests or green source CI does not satisfy that condition.
 This incident remains open until that behavioral acceptance is observed.
 
 PR355 subsequently merged the reviewed polling-repair head `2952750d` at
-`b1fa5c68a1c532cc2190832828dfdcdca82664e5`, 23 October 2026 at 13:59:24 UTC,
-after exact-head CI39963544250 passed on Windows and Linux. The same registered
-continuation remains active through causal publication39965800923. Delivery of
-this PR does not close the separate continuation-prevention acceptance above.
+`b1fa5c68a1c532cc2190832828dfdcdca82664e5`, 23 October 2026 at 13:59:24 UTC.
+Exact-head CI39963544250 and causal publication39965800923 passed on Windows and
+Linux, including actual native startup/discovery. Publication completed at
+14:15:35 UTC; regeneration job120455230985 published
+`f03d360482343de2231ca634afed18c87c15d5d9`. This completes Core355 delivery;
+continuation-prevention acceptance remains open.
+
+## Intermediate owner retirement gap
+
+During the next-stage transition, inspection established another limitation:
+installed `continuation_runtime.py` lines216-272 accepts only waiting, blocked or
+complete, and complete always invokes the whole canonical goal completion check.
+The owner's descriptive completion condition does not scope that check to its
+finished PR. The persistent-delivery policy nevertheless prescribes retiring an
+intermediate owner before initializing the next slice against the same goal.
+
+The supported fail-closed path was exercised: checkpoint the PR355 runtime owner
+as blocked on this product-capability limitation, release its merged delivery
+binding, then remove its receipt-owned scheduled task. All commands succeeded;
+the original scheduler receipt is preserved in Git-private resumption evidence.
+This terminal runtime state does not mark the canonical goal blocked or complete.
+The same foreground PID1964 continues the existing Marketplace and selection
+stages. No competing scheduled writer or fabricated completion record was added.
+Core364 comment6367164179 records this additional gap and delivery evidence.
+
+Resolver: reconcile intermediate retirement with whole-goal completion in the
+runtime's owning repair. Acceptance must demonstrate a completed slice retiring
+its exact scheduler and transferring the unchanged unfinished goal to its next
+existing slice, with one writer and no false whole-goal completion.
