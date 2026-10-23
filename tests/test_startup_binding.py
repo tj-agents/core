@@ -23,6 +23,33 @@ SPEC.loader.exec_module(BINDING)
 
 
 class StartupBindingTests(unittest.TestCase):
+    def test_unverifiable_codex_override_never_reaches_optional_refresh_or_native_start(self):
+        selection = self.project / ".agents/plugins.json"
+        selection.parent.mkdir()
+        selection.write_text('{"schema_version":1,"plugins":["base@tj-agents"]}', encoding="utf-8")
+        status = self.project / "override.status.json"
+        with mock.patch.object(BINDING, "run_session") as native, mock.patch("sys.stderr"):
+            self.assertEqual(1, BINDING.main([
+                "--host", "codex", "--project", str(self.project), "--target", "native-cli",
+                "--status-file", str(status), "--", "-cplugins={}",
+            ]))
+        native.assert_not_called()
+        self.check.assert_not_called()
+        self.assertEqual("failed", json.loads(status.read_text(encoding="utf-8"))["state"])
+
+    def test_missing_required_standards_never_start_the_native_cli(self):
+        for host in ("codex", "claude"):
+            with self.subTest(host=host):
+                status = self.project / (host + ".status.json")
+                with mock.patch.object(BINDING.required_plugins, "check", side_effect=BINDING.required_plugins.RequiredPluginsError("missing arbitrary@publisher")), \
+                        mock.patch.object(BINDING, "run_session") as native, mock.patch("sys.stderr"):
+                    self.assertEqual(1, BINDING.main([
+                        "--host", host, "--project", str(self.project), "--target", host,
+                        "--status-file", str(status),
+                    ]))
+                native.assert_not_called()
+                self.assertEqual("failed", json.loads(status.read_text(encoding="utf-8"))["state"])
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="startup binding ")
         self.addCleanup(self.temp.cleanup)

@@ -227,9 +227,21 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=Path.cwd())
+    parser.add_argument("--host", choices=HOSTS)
+    parser.add_argument("--target")
+    parser.add_argument("arguments", nargs=argparse.REMAINDER)
     arguments = parser.parse_args(argv)
+    if arguments.host:
+        import required_plugins
+
+        try:
+            native_arguments = arguments.arguments[1:] if arguments.arguments[:1] == ["--"] else arguments.arguments
+            required_plugins.check_launch(arguments.project.resolve(), arguments.host, arguments.target, native_arguments)
+        except required_plugins.RequiredPluginsError as error:
+            print(f"plugins: {error}", file=sys.stderr)
+            return 1
     try:
-        host = os.environ.get(HOST_VARIABLE, "").strip().casefold()
+        host = arguments.host or os.environ.get(HOST_VARIABLE, "").strip().casefold()
         check(arguments.project.resolve(), host=host if host in HOSTS else None)
     except Exception as error:
         print(f"plugins: update check failed: {error}", file=sys.stderr)
