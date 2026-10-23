@@ -149,6 +149,13 @@ subcommand classification, but only outside `--` and outside consumed option val
 All 14 required-plugin tests, 13 startup tests and 16 launcher tests pass (the latter
 two each have one POSIX skip). Existing agent-mode optional-value cases stay blocked.
 
+The Linux full runtime suite reached 1,196 tests with one failure: the migration
+regression's expected plugin list implicitly depended on the generated roster.
+CI's sibling publisher checkouts enrich that roster with real Python/React
+dependencies, while the workstation's isolated source tree does not. The migration
+test now supplies an explicit two-plugin roster, isolating the behavior it asserts;
+all 17 adoption tests pass. Production dependency expansion remains unchanged.
+
 ```completion
 {
   "outcome": "Every repository-selected standards plugin is verified for its native host, and missing imports cannot silently permit agent startup or routed writes.",
