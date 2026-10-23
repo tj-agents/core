@@ -158,7 +158,7 @@ def persistence_problems(expected: list[tuple[str, str, Path, str]], installatio
 
 
 def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]],
-                 updates: list[tuple[str, str, Path]], starting=None) -> list[str]:
+                 updates: list[tuple[str, str, Path]], starting=None, unpersisted=None) -> list[str]:
     for identity, scope in installs:
         run([executable, "plugin", "install", identity, "--scope", scope], project)
     expected, updated = [], []
@@ -171,6 +171,10 @@ def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]]
         if result["updateOutcome"] == "updated" and identity not in updated:
             updated.append(identity)
     after = json.loads(run([executable, "plugin", "list", "--json"], project))
+    if unpersisted is not None:
+        for identity, scope, owner, version in expected:
+            if (entry_for(after, identity, scope, owner) or {}).get("version") != version:
+                unpersisted(identity, scope, owner)
     problems = persistence_problems(expected, after) + plugin_errors(after, project)
     if problems:
         raise RefreshError("; ".join(problems))
@@ -270,6 +274,7 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
     contents = plugin_autoupdate.read_contents()
     publishers = catalog_publishers(tj_agents_marketplaces())
     installs, updates, attempts = [], [], {}
+    full = event and repositories is None
     for identity in plugins:
         plugin, name = identity.rsplit("@", 1)
         key, path = publishers.get(name, {}).get(plugin, (None, None))
@@ -284,8 +289,9 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
                 continue
             same = (plugin_autoupdate.same_content(contents, key.rsplit("@", 1)[0], path, entry.get("gitCommitSha"), head)
                     if head is not None else True)
-            attempted = contents["attempts"].get(attempt_key(identity, scope, owner)) == head
-            if forced or event and same is not True or not event and same is False and not attempted:
+            target = attempt_key(identity, scope, owner)
+            blocked = contents["attempts"].get(target) == head or target in contents["stuck"]
+            if forced or (same is not True if event else same is False) and (full or not blocked):
                 updates.append((identity, scope, owner))
                 if head is not None:
                     attempts[attempt_key(identity, scope, owner)] = head
@@ -300,7 +306,24 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
             with contextlib.suppress(OSError):
                 plugin_autoupdate.record_contents(attempts={key: attempts[key]})
 
-    return apply_claude(executable, project, installs, updates, starting)
+    stuck = {}
+
+    def unpersisted(identity: str, scope: str, owner: Path) -> None:
+        if (key := attempt_key(identity, scope, owner)) in attempts:
+            stuck[key] = attempts[key]
+
+    try:
+        changed = apply_claude(executable, project, installs, updates, starting, unpersisted)
+    except RefreshError:
+        if stuck:
+            with contextlib.suppress(OSError):
+                plugin_autoupdate.record_contents(stuck=stuck)
+        raise
+    cleared = {attempt_key(*target) for target in updates} & set(contents["stuck"])
+    if cleared:
+        with contextlib.suppress(OSError):
+            plugin_autoupdate.record_contents(unstuck=cleared)
+    return changed
 
 
 def refresh_repositories(project: Path, repositories: set[str] | None, updated: set[str] | None = None,
