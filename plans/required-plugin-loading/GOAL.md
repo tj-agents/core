@@ -46,10 +46,13 @@ Linux, Codex and Claude verification separately and retain any unresolved gate.
 
 ## Next action
 
-Complete exact-head CI and follow-up review for draft PR #445, then resolve landing
-and supported machine deployment. The primary source checkout has unrelated changes
-and must remain intact. The machine has no GitHub App record; Tommy explicitly granted
-an exception to use his existing login for this repair's push and PR only.
+Finish Windows exact-head CI for PR #445 at `53b8649eb51e73d29ace697a67fc0be64c43bbbf`;
+Linux and full/incremental source review pass, with no open findings. Then resolve the
+remaining landing identity gate and supported machine deployment. The machine has no
+GitHub App record; Tommy explicitly granted his login exception for push and PR only.
+A clean persistent installer clone is prepared at `C:/Users/tommy/.agents-state/sources/core`;
+its supported read-only setup check is running. No machine settings have been applied.
+The unrelated dirty development checkout remains intact.
 
 ## Implementation checkpoint
 
@@ -193,6 +196,22 @@ relative disabling settings file now refuses admission. Required-plugin tests20,
 startup14 and shell17 pass (one POSIX skip in each latter suite). Full review history
 and dispositions are retained in the canonical Git-private work order and receipts.
 
+## Supported installation scope
+
+The standalone managed source clone is prepared at
+`C:/Users/tommy/.agents-state/sources/core`, preserving the dirty development
+checkout. Its full read-only setup check demonstrated drift in unrelated remote
+event/publisher and merge-policy settings across many repositories, as well as the
+required runtime and shell bindings. Applying the whole installer would exceed this
+repair's current publication identity exception and mix unrelated machine changes.
+
+The supported setup entry now accepts repeated `--step` names, preserves declared
+order and required preconditions, and leaves default full-setup behavior unchanged.
+It can therefore install the admission runtime and shell bindings without checking
+or applying unrelated publisher settings. Tests exercise that boundary through the
+real CLI entry point, including unknown-step rejection. All 50 setup tests pass.
+The change still needs frozen incremental review and exact-head CI before deployment.
+
 ```agent-host-coverage
 {
   "schema_version": 1,
@@ -223,10 +242,10 @@ and dispositions are retained in the canonical Git-private work order and receip
       "next_action": "Complete PR 445 validation, resolve policy-compliant landing and preserve unrelated primary-checkout edits during supported installation."
     }
   ],
-  "deliveries": [{"repository": "tj-agents/core", "pr": 445, "head": "755a87ea8834345360e6195b2d9e43da475f09d5"}],
+  "deliveries": [{"repository": "tj-agents/core", "pr": 445, "head": "53b8649eb51e73d29ace697a67fc0be64c43bbbf"}],
   "open_tasks": [
-    {"repository": "tj-agents/core", "pr": 445, "head": "755a87ea8834345360e6195b2d9e43da475f09d5", "text": "Complete exact-head CI and final delta review.", "owner": "current execution session", "next_action": "Observe run 39987754655 and final native review; repair demonstrated failures."},
-    {"repository": "tj-agents/core", "pr": 445, "head": "755a87ea8834345360e6195b2d9e43da475f09d5", "text": "Land and deploy the shared runtime through supported machine setup.", "owner": "current execution session; GitHub App setup owned by Tommy", "next_action": "Resolve identity policy beyond the push-and-PR exception, land the verified source, install without overwriting the dirty primary source checkout, and verify fresh hosts."}
+    {"repository": "tj-agents/core", "pr": 445, "head": "53b8649eb51e73d29ace697a67fc0be64c43bbbf", "text": "Complete Windows exact-head CI.", "owner": "current execution session", "next_action": "Observe run 39993713483; Linux and final source review passed, and all findings are resolved."},
+    {"repository": "tj-agents/core", "pr": 445, "head": "53b8649eb51e73d29ace697a67fc0be64c43bbbf", "text": "Land and deploy the shared runtime through supported machine setup.", "owner": "current execution session; GitHub App setup owned by Tommy", "next_action": "Resolve identity policy beyond the push-and-PR exception, land the verified source, apply the prepared supported installation without overwriting the dirty development checkout, and verify fresh hosts."}
   ]
 }
 ```

@@ -1114,8 +1114,11 @@ def main(argv: list[str] | None = None) -> int:
         return delegated
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="report drift, write nothing, exit 1 on drift")
+    parser.add_argument("--step", action="append", choices=[step.name for step in STEPS],
+                        help="run only named steps plus required preconditions; repeat to select several")
     parsed = parser.parse_args(arguments)
-    return run_steps(STEPS, machine_context(checkout), parsed.check)
+    steps = tuple(step for step in STEPS if not parsed.step or step.required or step.name in parsed.step)
+    return run_steps(steps, machine_context(checkout), parsed.check)
 
 
 if __name__ == "__main__":
