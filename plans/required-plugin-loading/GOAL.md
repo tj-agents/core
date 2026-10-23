@@ -210,7 +210,17 @@ order and required preconditions, and leaves default full-setup behavior unchang
 It can therefore install the admission runtime and shell bindings without checking
 or applying unrelated publisher settings. Tests exercise that boundary through the
 real CLI entry point, including unknown-step rejection. All 50 setup tests pass.
-The change still needs frozen incremental review and exact-head CI before deployment.
+Frozen incremental review found R4: profiles selected alone could omit their runtime.
+The correction automatically includes the runtime for shell profiles, preserves order,
+and adds the isolated selection to the CLI regression. All 50 setup tests pass.
+The supported Windows scoped preflight applied no settings. Exact-head review and CI
+for this correction remain pending. Both Windows and Linux CI passed the earlier
+53b8649e guard candidate.
+
+Handoff launchers resolve agent_cli from packaged machine resources, which contain
+startup_binding, launch_status and required_plugins together. The installed shell
+runtime uses launch_check directly. The package mapping ships the complete scripts
+directory; startup_binding is not required in the shell-only runtime file set.
 
 ```agent-host-coverage
 {
@@ -244,7 +254,7 @@ The change still needs frozen incremental review and exact-head CI before deploy
   ],
   "deliveries": [{"repository": "tj-agents/core", "pr": 445, "head": "53b8649eb51e73d29ace697a67fc0be64c43bbbf"}],
   "open_tasks": [
-    {"repository": "tj-agents/core", "pr": 445, "head": "53b8649eb51e73d29ace697a67fc0be64c43bbbf", "text": "Complete Windows exact-head CI.", "owner": "current execution session", "next_action": "Observe run 39993713483; Linux and final source review passed, and all findings are resolved."},
+    {"repository": "tj-agents/core", "pr": 445, "head": "53b8649eb51e73d29ace697a67fc0be64c43bbbf", "text": "Complete final scoped installer review and exact-head CI.", "owner": "current execution session", "next_action": "Review the runtime dependency correction, then observe its Windows and Linux CI. Earlier guard CI passed both platforms."},
     {"repository": "tj-agents/core", "pr": 445, "head": "53b8649eb51e73d29ace697a67fc0be64c43bbbf", "text": "Land and deploy the shared runtime through supported machine setup.", "owner": "current execution session; GitHub App setup owned by Tommy", "next_action": "Resolve identity policy beyond the push-and-PR exception, land the verified source, apply the prepared supported installation without overwriting the dirty development checkout, and verify fresh hosts."}
   ]
 }
