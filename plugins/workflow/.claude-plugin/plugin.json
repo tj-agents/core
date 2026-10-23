@@ -1,0 +1,15 @@
+{
+  "name": "workflow",
+  "description": "Goal lifecycle and recorded work status.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tj-agents/core",
+  "keywords": [
+    "workflow",
+    "status",
+    "plans"
+  ],
+  "displayName": "Workflow status",
+  "skills": "./skills/"
+}

@@ -5,6 +5,7 @@
   ],
   "prerequisites": [
     "base",
+    "workflow",
     "agent-store",
     "machine"
   ],
@@ -32,7 +33,6 @@
     "handoff",
     "handoff-format",
     "incremental-review",
-    "list-work",
     "merge",
     "merge-docs",
     "merging",

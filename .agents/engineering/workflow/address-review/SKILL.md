@@ -36,7 +36,7 @@ pass judgment are immutable. Remediation may only:
 - move a finding from `[ ]` to `[~]` to `[x]`;
 - append a concise disposition and fix evidence; or
 - mark `[wontfix]` with a final reason and, when work is postponed, record debt through the selected
-  profile under [the recording contract](../../resources/problem-records.md) in the same stroke and link
+  profile under [the recording contract](../../../workflow/resources/problem-records.md) in the same stroke and link
   its canonical record with an objective resolution condition.
 
 Do not reassess a high-confidence review finding as subjective and silently defer it. When part is fixable,

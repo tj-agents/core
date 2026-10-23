@@ -34,10 +34,10 @@ Agent Workboard is outside scope and is not a dependency.
 
 - Native owner: `codex:01a16053-d03d-7753-8ad9-3174781fba89`.
 - Execution: `github.com/tj-agents/core:workflow/agent-store-architecture`.
-- Worktree: `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Refactor-MachineWorkflowBoundary`.
-- Branch: `Refactor/MachineWorkflowBoundary`.
-- Base/parent: `Refactor/WorkflowAgentStore` at `5e815d0658597f031c332e9d2a3e3bb35d886e8a` (PR #352).
-- PR: not opened for S2a. Parent: [Core #352](https://github.com/tj-agents/core/pull/352), S1 with `human-gate`; full and incremental source reviews complete, Windows CI pending.
+- Worktree: `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Refactor-WorkflowStatus`.
+- Branch: `Refactor/WorkflowStatus`.
+- Base/parent: `Refactor/MachineWorkflowBoundary` at `7c77e7d5b1dc6c419b5096431018079e7c530026` (PR #353).
+- PR: not opened for S2b1. Parent [Core #353](https://github.com/tj-agents/core/pull/353) is reviewed, green and ready; [S1 #352](https://github.com/tj-agents/core/pull/352) is ready with review and Windows/Linux CI passed. Both retain `human-gate`.
 - Pickup: exact native identity and first read-only action recorded in the dispatched pickup file.
 
 Native history, the supported store status command, registered branches/worktrees, current plans and
@@ -167,145 +167,36 @@ operation their task actually needs. No ownership-based profile adoption occurs.
 
 ### S1: canonical store package and shared readers
 
-Active branch/base are recorded above. This independently useful slice moves `session_store.py` and
-`repository_identity.py` from Machine's authored scripts into `.agents/agent-store/runtime/`, publishes
-the inspect capability, updates every current Machine/Engineering loader, and consolidates the existing
-read-only schema reader. Native recovery behavior and all writer transaction semantics remain unchanged.
-There is no old-path shim. The store remains `~/.agents-state/sessions.db` with its existing override and
-schema version 4. Existing schema-2/3 read-only support remains an unchanged data-reader contract, not
-a namespace alias or a newly introduced fallback.
+PR #352 at `5e815d0658597f031c332e9d2a3e3bb35d886e8a` has completed full and incremental private
+review and passing Windows/Linux CI (`39695061838`). It is ready with human-gate; merge authority is absent.
+The canonical runtime, schema-4 unchanged writer/identity moves, read-only snapshot inspector, source/
+packaged/staged loaders and package declarations are implemented. Their exact contract is in that PR's
+source and tests. No old-path shim exists. Reader schema2/3 support remains its existing data contract.
+Native installed acceptance remains S3. The frozen S1 checkout is preserved and no longer owns the goal.
 
-S1's intermediate selection graph contains no Workflow package yet: Agent Store requires nothing,
-Base requires nothing, Machine requires Base and Agent Store, and Engineering requires Base, Agent Store
-and Machine. Declare those exact ordered prerequisites in sources/catalog and their transitive closure
-in the plugin-selection roster. Agent Store's scope is `name/plugin: agent-store`, root
-`.agents/agent-store`, kind layout, process domain. Its only skill is `utility/inspect`, kind utility,
-domain process; its tier applies always when selected and its payload is `process`. Add both host adapters,
-both package manifests (no hooks), both local marketplace entries, the catalog package and harness.
-Add `agent-store@base-agents` to fresh selection after Base, preserving the other entries' order, and
-match both local marketplace rosters. This existing publisher identifier is not being retired in S1;
-the separate CanonicalSetup PR owns that work. Source declarations must not claim the external
-`tj-agents` marketplace or native caches already contain the new package.
-
-The harness declares Python/Python3 `-B` inspection commands for its canonical and generated skill paths
-using the current precise `PLUGIN_ROOT` permission format on both hosts; it grants no writer, recovery
-or launch command. Map the Agent Store tier file to `tier.json`, add its generated package root, and
-update the existing Machine hook paths and harness inventory to the embedded canonical store path.
-Core source package discovery and isolated generated invocation are S1 gates. Cross-repository selection
-and real native activation remain explicitly owned by S3, with no source-only completion claim.
-
-Consumer contract: Machine's host adapters invoke the same store functions using their captured native
-identity; Engineering's repository provider uses the canonical read-only reader and translates its
-errors to the existing provider error type. Inspection emits JSON to stdout, synchronously, with
-recorded state clearly labelled and process liveness explicitly unobserved. It opens SQLite with
-`mode=ro` and `query_only`; inspection must never create a database or run schema migration. Missing,
-unsupported or invalid stores return actionable failures. No connection is held between commands.
-
-Add these runtime mappings while retaining the existing .agents/machine/scripts directory mapping
-for its remaining Machine utilities. Remove only the separate Engineering repository_identity.py
-copy mapping; both moved source files leave Machine with no shim. Concrete new mapping:
-
-```json
-{"plugin":"machine","source":".agents/agent-store/runtime","destination":".agents/agent-store/runtime"}
-```
-
-The same source/destination mapping is declared for Agent Store and Engineering. A Machine shared-script
-loader resolves identically from source `.agents/machine/scripts` and packaged `resources/machine/scripts`:
-
-```python
-HERE = Path(__file__).resolve().parent
-store_path = HERE.parents[2] / ".agents" / "agent-store" / "runtime" / "session_store.py"
-```
-
-Skill adapters use explicit source/package layouts derived from their own location. They do not scan
-the user's home, installed plugin inventories or the current directory for runtime code. Move the
-existing `ReadOnlyWorkItemStore` implementation into `runtime/reader.py`, with a store-owned exception;
-the Engineering provider catches that exception and raises `ContractViolation` with the same message.
-Inspection and provider reads consume that one reader. Keep writer and reader opening separate:
-
-```python
-connection = sqlite3.connect(f"{database.resolve().as_uri()}?mode=ro", uri=True)
-connection.row_factory = sqlite3.Row
-connection.execute("PRAGMA query_only = ON")
-```
-
-The inspection CLI is `inspect.py [--database PATH] [--execution-key KEY | --repository REPO]`.
-With no selector it lists the registry. Its stdout envelope has exactly `schema_version` (the observed
-SQLite version), `state_kind: "recorded"`, `liveness: "not-observed"`, `work_items`, `sessions` and
-`references`. Collections are sorted by key, handle and provider/scope/native-id respectively. Work items
-and sessions expose the existing stored columns as JSON objects; no inferred liveness field is added to
-individual rows. References expose provider, scope, native_id and work_item. An execution selector scopes
-all three arrays to the same existing key; a repository selector scopes items by their repo and includes
-sessions recorded in that repo or attached to those items. An absent execution, missing database,
-unsupported schema or invalid store exits 1 with `{"error":"<concrete diagnostic>"}` on stderr and no
-success stdout; invalid arguments exit 2. Older accepted reader schemas have an empty references array.
-The operation never imports Machine, opens a writer, launches processes or consults native histories.
-
-The detached close observer remains a supported self-contained staged payload. `start_detached`
-copies the canonical store and repository-identity bytes next to its staged registration module;
-`session_store_path` explicitly supports that staging layout alongside current source/package layouts.
-This is delivery of the same implementation, not an old-path shim. `close_session.sweep_script` must
-resolve Machine's `plugin_autoupdate.py` from its own source/package root, independently of the store
-location; it must not derive a Machine utility path from `session_store_path().with_name(...)`.
-Add a focused fixture that proves both sweep discovery and staged store use after the source move.
-
-Expected scope: two mechanical source moves, roughly 200-400 substantive added/deleted lines plus
-package declarations, loaders and existing-test path updates. Reassess at 1,000 substantive lines or
-40 substantive files; measure moves and generated output separately. Verify transactional claims,
-reader non-mutation during a writer transaction, native resume refusal rules, package isolation and
-both host hook paths with deterministic fixtures. Run generation/harness checks and independent review
-against the frozen candidate, then prepare its focused PR. Its merge remains within the dispatch gate.
-
-S1 measured scope before review: 43 changed paths, 1,593 added/deleted lines. The two runtime
-modules are byte-identical mechanical moves (931 existing lines); eight documentation/adapter/plan
-files account for 490 diff lines. Runtime and tests account for 763 diff lines across 19 files, including
-the extracted read-only reader; the remaining 340 lines across 14 files declare packages, permissions,
-hook paths and dependency closure. Generated output and common generated catalog digests are excluded.
-
-The approximately 1,000-line warning therefore triggers an explicit split assessment. Keep this bounded
-slice atomic: the canonical runtime move, source/packaged/staged consumers and hook/resource declarations
-must agree on the same path, while the selectable package and its read-only entry point must agree on
-both host manifests, selection closure and harness permissions. A private extraction followed by a public
-package would need two intermediate consumer/declaration/fixture configurations without an additional
-behavior boundary; separating the declarations from their consumers would break shipped resolution.
-The retained candidate has 763 runtime/test lines and no schema or writer algorithm change. Its review
-covers source ownership, isolated packaging, detached staging, SQLite read isolation and exact-head CI.
-No Workflow lifecycle changes may expand this frozen S1 scope.
+The measured S1 atomic exception covered 763 runtime/test lines plus declarations and mechanical moves;
+consumer paths and self-contained packages had to change together. No lifecycle work entered that slice.
+Both reviews found no actionable defect. A two-line fixed tier inventory correction followed CI and passed
+incremental review. Local process cleanup passed in candidate/base Temp exports and both CI platforms;
+workspace-only timeouts were environment evidence, not a weakened runtime timeout. Disposable review
+bundles were removed after successful private review receipts; proofs and logs remain in private state.
 
 ### S2a: Machine capability boundary
 
-S1 source review passed. The current parent includes its focused tier-fixture correction; independent
-incremental review and exact-head CI remain with PR #352. The architecture merge hold prevents landing
-that parent now, while the dispatch requires completing all authorized dependent preparation before a
-final approval request. S2a therefore branches from its verified tip and must target that parent in its PR.
-A second checkout is actively required because S1's frozen review and CI still own its existing checkout.
-This child is now the canonical goal's current execution location; the parent plan is a frozen slice snapshot.
-No other checkout may write this current goal.
+PR #353 at `8bcb82244a635b69f26b25b4f60e02f03e105459` is stacked on #352. The bounded L4 writer
+moved lane-selection policy to Machine, corrected all active callers and resource anchors, and made
+native launchers consume prepared dispatches with caller-owned authorization/checkpoint/pickup. Side-goal
+ownership, explicit model selection and exit3 duplicate protection remain. Machine close preserves the
+unresolved repair outcome; Engineering session retains discipline repair policy. Existing debt moved intact.
+The 17-file source delta was 60 added/64 removed lines plus the current goal checkpoint. Focused lane,
+launcher, startup, harness, tier, source-layout and transfer tests passed, as did generation/catalog checks.
+Full and ordinary incremental private review passed at exact head `7c77e7d5b1dc6c419b5096431018079e7c530026`, including the six-line concrete lane example required by CI. Native review, parent synthesis of the workflow lens, full-pass security and frozen docs reachability passed. Windows/Linux CI and ci-required passed in run `39698190685`. PR #353 is ready with human-gate and merge authorization absent; completed bundles were removed after review-record. This status child has reconciled the exact parent by fast-forward.
 
-A bounded independent source reader checked this prerequisite against `ce9b3966`. The parent resolved
-its only remaining ownership decision: host capability/cost selection belongs to Machine, domain machine.
-The slice is roughly 15 substantive paths and fewer than 300 substantive lines beyond a mechanical policy
-move; it stays separate from the broader lifecycle replacement. No launch algorithm, model value, stored
-identity or writer behavior changes. Personal, Infonetica and Marketplace fetched-main scans contain no
-current `engineering:lanes` caller, so this slice needs no external profile mutation.
-
-
-1. Move .agents/engineering/policy/lanes/ to .agents/machine/policy/lanes/ (including TECH_DEBT.md if present, preserving existing unfinished debt). Set domain: machine; kind remains policy. This is host capability/cost selection, so Machine is its logical owner. Keep bare name lanes, public namespace machine:lanes; no engineering alias. Remove the sentence directing large-plan execution transfer through engineering:plans; Engineering's plans already owns that policy. Existing lane data stays under .agents/lanes and its resource maps to both consuming packages stay unchanged.
-2. Correct relative resource locators inside the moved canonical policy: from .agents/machine/policy/lanes, ../../../lanes still resolves shared .agents/lanes in source but Machine package uses resources/lanes. Use explicit source and generated paths consistent with PACKAGING; the host entry located <package>/skills/lanes uses ../../resources/lanes. Do not point into Engineering or author checkout. Give concrete commands only for paths that ship.
-3. Update all current engineering:lanes calls to machine:lanes, both thin lane adapters' canonical path/domain, and catalog skill membership. New source scope is already declared for Machine. Update current source references to engineering/policy/lanes and package assertions. Preserve historical observed evidence rather than rewriting history; list any remaining matches and justification.
-4. Machine handoff-codex and handoff-claude are transport adapters. Replace the paragraph beginning 'If the launcher printed its confirmation' with equivalent launch evidence and duplicate-attempt safeguards while making the already selected caller own full-goal/side-workstream checkpoint, release and pickup rules. Add the clear contract: accept an already authorized prepared dispatch; do not call a higher-level workflow to prepare it again. Preserve the originating goal for a side transfer and distinguish submission from pickup. A launcher-only request can finish at verified submission. Retain exact exit-code3 no-retry rule.
-5. Remove the last four lines of the launch-lane paragraph that prescribe small/large plan transfers through engineering:plans. Keep the concrete lane-selection/launch behavior and references to machine:lanes. In Claude's effort paragraph, state directly that explicit user-selected model/effort/frontier is preserved; drop the upward engineering:handoff reference.
-6. Change only launch_claude.py's error string at resolve_model for redirected L1: '--lane {args.lane} routes to Codex {route["lane"]}; use machine:handoff-codex, or omit --lane for an explicit user-named model.' Keep existing rejection and route behavior; no new comment.
-7. Shared .agents/lanes/handoff-agent-body.md becomes a native routing proxy request without naming an upper-level workflow: 'You are a routing proxy. Return a required native handoff request to your parent for {host} {lane}. The parent owns authorization and context preparation. Do not inspect, execute, delegate, or otherwise advance the delegated task.' Keep placeholders and proxy behavior. Generated agent tests should assert the prepared-parent boundary rather than the removed Engineering invocation.
-8. Machine close keeps a user-called-out mistake unresolved: answer the direct question and preserve the repair outcome until its current owner resolves it; a missed-close question does not instruct immediate closure. Remove calls to engineering:self-repair from this Machine skill. Engineering session keeps that selected-discipline instruction unchanged. Do not add another repair workflow or weaken close preconditions.
-
-
-S2a verification: lane-table and process-standard checks; targeted handoff argument/model-resolution
-fixtures; generation, catalog, harness and tier checks; source/packaged Machine lane resource resolution;
-old active namespace/path grep; native routing proxy still returning only the parent request. Review the
-child delta against its exact parent and validate the cumulative tree on Windows and Linux. Keep generated
-output uncommitted. Bounded L4 implementation owns only this specified transformation; parent retains
-architecture, acceptance, review synthesis and delivery. No native model session is a test fixture.
+A separate child checkout is actively needed because S2a is frozen for review while its merge remains
+held. The dispatch requires completing authorized dependent preparation before the final approval request.
+This status child is now the canonical goal owner; earlier checkout copies are frozen slice snapshots.
+No other checkout writes this goal. Current owner was reconciled and re-claimed through Machine's supported
+installed facade; this remains the same execution and native session, not a new goal or successor.
 
 ### S2b: Workflow owner and caller cutover
 
@@ -333,32 +224,168 @@ it must not revive the retired procedural enforcement hooks. Machine's handoff s
 currently instruct callers to invoke Engineering handoff/plans/lanes; close also calls self-repair.
 Replace preparation calls in native adapters with consumption of an already authorized prepared dispatch.
 
+### S2b1: Workflow status and recording ownership
+
+The isolated status slice is complete and locally verified against parent 7c77e7d5. It publishes the
+hookless Workflow package, moves list-work to workflow:status, reads the owned Agent Store API directly,
+preserves read-only selected tracker behavior, and moves the recording contract with all active links.
+The source and regression tests own the detailed implementation. No old active list-work name/path or
+Engineering recording-resource path remains in the bounded authored inventory.
+
+The rename-aware source delta is 46 paths, 565 additions and 310 deletions. Twenty-two guidance edits
+are mechanical href/caller updates; moved runtime and tests contain 221 changed lines. The remainder is
+the minimum package/manifests/harness/tier/selection graph needed for a self-contained new package.
+Atomicity assessment: this is one status/recording ownership cutover, below 1000 changed source lines;
+its new namespace, resource embedding, permissions, manifests and callers must change together without
+aliases. Generic lifecycle is already separated as S2b2. Existing catalog order and fingerprints were
+preserved to avoid unrelated generation churn. The goal checkpoint is separate documentation.
+
+Validation passed: 52 status cases, 25 source-layout cases, 21 focused harness/tier-source cases,
+harness drift, generation/digest/tier payload checks, in-memory 610-file/83-skill build, and exact Template
+examples for all 22 changed canonical guidance paths. The absent reader-class case now returns the
+normal unavailable-store result rather than an AttributeError. Both retired runtime text and obsolete
+Codex permission entries are removed. Generated distribution output is excluded. Full frozen review
+and Windows/Linux CI follow the local commit; native activation remains S3.
+
+### S2b2: one generic lifecycle owner
+
+This dependent slice follows the independent status package. The parent retains architecture and approval decisions; bounded implementation begins only after S2b1 returns its lease and is committed.
+
+#### Public source mapping
+
+- Engineering workflow/plan-authoring -> Workflow workflow/plan, name plan, kind workflow, domain process.
+- Engineering workflow/plan-execution -> Workflow workflow/run, name run, kind workflow, domain process.
+- Engineering workflow/resume-plan -> Workflow operation/resume, name resume, kind operation, domain process, a substantive reconstruction operation rather than compatibility wrapper.
+- Engineering workflow/handoff (including transfer.py) -> Workflow workflow/handoff, same bare name/kind/process. Preserve dispatch-first repair #344. No second handoff-format skill.
+- Base policy/plan-artifacts -> Workflow contract/plan-artifacts, kind contract/process, retaining templates/PLAN.md and scripts/host_coverage.py. Remove its unused session-context emitter. Consolidate generic checkpoint rules here.
+- Retire Base goal-continuation and its unused emitter, Engineering continue-roadmap, plan-checkpoint and handoff-format folders and both host adapters. Fold their distinct responsibilities into the owners specified below; no forwarding instructions or aliases.
+- Add Base policy/task-routing with thin adapters and one SessionStart context emitter. This is the universal dispatch guidance; Workflow remains hookless.
+- Move host_coverage source mapping out of Base into Workflow's resources/plan-artifacts/host_coverage.py and keep Engineering workflows/host_coverage.py embedding the same new canonical source. In workflow_ops.host_coverage_module replace only source fallback path `.agents/base/policy/plan-artifacts/scripts/host_coverage.py` with `.agents/workflow/contract/plan-artifacts/scripts/host_coverage.py`; packaged runtime lookup stays unchanged.
+- Update Workflow/Engineering/Base catalog memberships, sources/resources, harnesses, selection descriptions and both host adapters together. S2b1 already establishes package/dependencies. No new package, external profile edit or publisher rename here.
+
+#### Canonical subjects and required content
+
+Workflow plan selects substantive planning and implementation-ready design requests. It owns outcome, constraints, evidence, scope, acceptance, unresolved decisions/resolvers, reviewable dependency ordering and readiness. Read workflow:plan-artifacts, resolve exactly one existing owner before writing, and use the selected discipline's planning contract conditionally (engineering:plans for software). Do not require a roadmap/ledger/repository for standalone work. Planning-only work ends at its authorized artifact outcome, not execution; discipline-specific delivery authority still applies when selected. Preserve explicit publication/installation limits. A ready verdict permits the already-authorized next action; it supplies no authority itself. Consolidate the current authoring readiness fields, mechanism/code/example requirement under the discipline extension, bounded independent evidence reader and parent decision. A successor must not decide unresolved architecture that the current owner claims is implementation-ready. The separate explicit unresolved-architecture handoff remains valid and goes immediately through handoff without a readiness receipt.
+
+Fold continue-roadmap's chooser into plan when the request asks what to plan next: selected profile list/read, reconcile live owners/dependencies, report existing work, present implementable choices with recommendation and obtain a missing product choice. Do not infer priority from list order or turn a status/planning request into implementation. engineering:update-roadmap retains software roadmap fact reconciliation. After selection, complete authorized planning rather than stopping at selection.
+
+Workflow run selects substantive authorized sustained/multiphase work, with or without an existing plan. It owns the whole goal through actual acceptance and authorized delivery, reconciling user scope versus agent-authored slice limits. It reads one existing canonical goal, uses plan-artifacts for recovery, retains one next action, continues independent authorized work across local commits/PR boundaries, and stops only at an evidenced external/human/destructive/ownership gate after all independent work is exhausted. Read machine:lanes for bounded phase capability; parent retains design/acceptance/diagnosis/severity. Delegate specified implementation or independent evidence under exact disjoint leases; reconcile Git before reusing failed/cancelled leases. No model names in policy. Direct short requests remain their selected operation without a ceremonial plan.
+
+For repository ownership, invoke machine:recover-agents and its published work-item-sessions.md command contract via native discovery. Reconcile stored execution/owner with actual native observation. Claim the same execution only after verifying the exact native identity and permitted predecessor; no age-based takeover. For standalone non-Git work, keep its existing task goal and do not invent a Git provider, SQLite identity or repository. Do not duplicate Machine path resolution or embed the Machine runtime in Workflow just to issue commands.
+
+For software, load engineering:plans for technical delivery slicing and select engineering:feature or engineering:bugfix for a bounded technical operation. They own implementation, tests, code review and delivery inside the passed slice. Return evidence to the same whole-goal run owner and continue. Source review remains engineering:review; no workflow:review. Selected nonengineering domains use their own available operation. Missing discipline capability is a concrete dependency gate, while independent authorized work continues.
+
+Move Base continuation's authority/completion/one-writer obligations into run. Select only an actually supported host continuation. Do not claim unattended execution before owner, foreground lease and wake are initialized and observed. Engineering:persistent-workflow is only the software remote-delivery adapter; do not require it for generic goals. Foreground execution remains valid when unattended capability is absent. Persist exact blocker/resolver/unblock/resume condition only after exhausting independent authorized work. No new unattended service or host-enforcement hook.
+
+Workflow resume selects reconstruction of named work after interruption, relocation or loss of owner context. Resolve exact goal/ledger/worktree/native identity from the supplied pointer, Git/provider evidence and Machine recovery inventory. Read-only stored rows are not live-process proof. Refuse ambiguous or observed-live takeover and reuse the existing owner. Reconstruct missing recovery facts from evidence and preserve partial writes. A verified compact continuation with goal/absolute checkout/branch/state/next-action needs Git confirmation, not full corpus rereads; contradictions trigger targeted reconstruction. After reconstruction, preserve authority: planning-only -> workflow:plan; already-authorized execution -> workflow:run. Resolve a missing product choice rather than guessing among goals. Do not create a second executor or goal.
+
+Workflow plan-artifacts owns one canonical Markdown artifact, absolute path response link, placement/promotion from host scratch, material progress, authority fields, one next action, host coverage, checkpoint timing and generic transfer criteria. Preserve the existing no-ceremonial-plan behavior. Consolidate only generic plan-checkpoint behavior: material milestones, changed blocker/owner, completed important review, terminal transition or unsafe context ending; repeated polls/ordinary commits are not checkpoints. Keep partial work, valid verification, open decisions, scope/current slice/remaining scope/done condition, and typed gate/transfer fields. Remove chronological detail that cannot change the next action. Detailed software ledger graph/template, 200line/16000byte ledger budget, PR/review watermark and commit/push mechanics belong only in engineering:plans. Artifacts supplies no duplicate execution loop and no SessionStart claim; task-routing owns actual context delivery. Preserve host_coverage.py semantics/data shape and template link.
+
+Transfer criteria move from Engineering plans into the common artifact owner: explicit user request, actual owner/workstream change or independent context requirement, materially separate next work, substantial critical design with ready phased execution, or evidenced context degradation. Phase/commit/transcript age alone is not a transfer. Small/medium tasks continue in current parent; no new independent successor for this architecture. Engineering plans references the common criteria and retains only technical extensions.
+
+Workflow handoff retains the existing source behavior, including immediate unresolved architecture dispatch after identity/authority/capability checks from a verified existing checkout; successor owns design/isolation before writes. Preserve bounded side-workstream original goal/writer, launch submission != pickup, no duplicate launch after ambiguity, explicit host/model choice, and critical prepared receipt ack/first-action observation. Move transfer.py byte-for-byte unless it contains a public old-name reference (none found in the bounded source scan); its receipt fields, identity hashes, locks and literal `Execution authorization: implementation` stay unchanged. Do not make prepared-critical receipt mandatory for unresolved architecture dispatch.
+
+Fold handoff-format's pointer rules into this same handoff skill. Plan/ledger pointers use absolute owning paths, optional why line and opener; instructions stay in canonical goal. Non-plan dispatches include objective/context/constraints/authority/known questions and next responsibility. Existing selected-record repair instruction (address-bug/mistake/debt) moves to Engineering plans/addressing policy, which handoff consults only when that discipline is selected. Generic handoff must not require engineering:git-branching/open-worktree/review/merge; those apply conditionally to software transfers. Generic source references recorded selected profile through Workflow's recording document. Move the transferred cleanup-obligation subsection to engineering:merging and reference it conditionally from handoff, since its subject is that skill's owned finish obligation.
+
+#### Base routing text and emitter
+
+New policy front matter name task-routing, kind policy, domain behavior. Description: "Choose the selected task operation while preserving authority and the existing goal. Use when receiving a substantive planning, execution, status, recovery or transfer request."
+
+Body must express this exact routing contract concisely:
+1. Planning/design-only -> workflow:plan; no implementation authority.
+2. Authorized sustained/multiphase work -> workflow:run, with or without a named plan; retain the goal across commits, phases and context changes.
+3. Explicit reconstruction/resumption after interruption -> workflow:resume; ordinary ongoing execution stays with run.
+4. Open-work/progress queries -> workflow:status; explicit handoff -> workflow:handoff. Prompt-only asks do not launch a process.
+5. Quick answers and one-step tasks use the appropriate selected operation directly. Software implementation/diagnosis/review/delivery remains Engineering when selected; generic workflow review is not added.
+6. Resolve and load the qualified advertised skill. If required Workflow is unavailable, report the concrete missing capability/selection and keep the existing goal; continue independent authorized work. Do not silently fall back to retired Engineering lifecycle names, invent installed capability, auto-install or claim that a package selection proves activation.
+7. Context only, no enforcement/scheduler/authority. Include a concrete fenced example distinguishing "plan the migration" from "implement the migration through completion" without model names.
+
+Create scripts/session-context.py from idea-initialization's existing emitter with IDENTITY='base:task-routing', matching diagnostic label, and the same file-relative SKILL.md validation, SHA256 marker, --instruction-fragment and SessionStart JSON. Do not add comments/docstrings merely to narrate the rename. Wire one additional --hook ${PLUGIN_ROOT}/.agents/base/policy/task-routing/scripts/session-context.py into both Base SessionStart manifests (both Codex platform commands; Claude's existing portable dispatcher form). Update Base harness source roots/required hook permissions as its actual schema requires. No PromptSubmit, PreToolUse or Stop enforcement wiring is added.
+
+#### Retire obsolete routing, preserve receipts
+
+The only production importer of workflow_route.py is continuation_stop.py, for direct_control/read_receipt. Both old route and stop are packaged but unwired. Keep unrelated Stop ownership/binding/scheduler/supervisor checks unchanged.
+
+New `.agents/hooks/continuation_receipts.py` retains `from __future__ import annotations` for Python3.9 and the exact existing imports hashlib/json/Path/re/tempfile, RECEIPTS='agents-workflow-route', DIRECT_CONTROL regex, and only direct_control, receipt_path and read_receipt copied unchanged from workflow_route. This keeps existing stored receipt paths/keys and direct-control parsing. Change continuation_stop's import to this module. Replace the Engineering resource map workflow_route.py -> continuation_receipts.py. Remove workflow_route.py and its now-obsolete routing/recovery/receipt-writer tests. No production caller writes those receipts once the already-unwired router is retired; no new writer is invented. Active continuation ownership remains in its unchanged runtime, and existing receipts remain readable.
+
+Keep meaningful continuation tests for read-only receipt parsing, malformed/missing JSON, direct pause/cancel/stop versus quoted text, exact-worktree isolation, execution_suspended, execution_obligation and freshness comparisons, and source/generated Stop loading. Replace old router-created test setup with direct literal receipt fixtures; do not test new fake classification/writer logic. Remove tests whose subject is retired intent routing or receipt-writing, rather than pretending fixture construction verifies them. Update torn-install import failure case in test_hook_dispatch to require continuation_receipts. Existing Stop owner tests remain intact.
+
+#### Active callers, durable IDs and Engineering extension
+
+Apply public-name mapping only to current callers/adapters/catalogs/examples/test expectations: engineering:plan-authoring -> workflow:plan; engineering:plan-execution -> workflow:run; engineering:resume-plan -> workflow:resume; engineering:continue-roadmap -> workflow:plan chooser; engineering:handoff -> workflow:handoff; engineering:handoff-format -> workflow:handoff pointer section; base:plan-artifacts / engineering:plan-checkpoint -> workflow:plan-artifacts (technical ledger-specific references -> engineering:plans); base:goal-continuation -> workflow:run.
+
+Engineering feature/bugfix must explicitly accept a bounded technical slice from the Workflow owner, perform it and return evidence without redirecting back to run or claiming the whole goal. Their direct short-task behavior remains. Promotion of a larger direct task goes through workflow:plan under existing execution authority then workflow:run. Preserve their existing review/repair/delivery gates. Remove their mandatory whole-goal `skills --lifecycle` instruction for a delegated operation; resolve technical rules via selected native discovery. If a repository actually uses workflow_ops skills, specify its existing accepted repo-relative `name=path` interface; do not invent automatic namespace resolution, absolute installed paths, or a new compatibility wrapper. Generic Workflow never requires the full Engineering runtime.
+
+Engineering plans becomes the software planning extension. Preserve roadmap/plan/ledger file graph and stable keys, technical implementation examples/standards, green consumption contracts, PR slicing/stacks, profile-specific conditional gates, compact ledger template/budget and validation, review watermark, substantive commit/push/remote evidence policy, software delivery/closeout and rename grep. Refer to common artifact owner for generic placement/authority/checkpoint timing/context transfer; do not duplicate whole-goal execution or readiness. Move software-specific checkpoint and recorded-repair transfer fields here. Retain every typed dependency gate/return path needed by software delivery.
+
+Remove resume-plan and continue-roadmap entries from contract/v2/compatibility.json and their support-matrix rows/release-window prose; user clean replacement supersedes that compatibility window. Keep staged-review-all retained driver. Do not change contract version or its semantic stages. V2 workflow_id, persisted state IDs, roadmap item keys, continuation owner_id/nonce and historical review/dispatch identifiers remain byte-stable. They are not public skill discovery names.
+
+New active delivery handoff next_stage values must use qualified current names (workflow:run when returning to generic execution; engineering:incremental-review for that actual software operation). Existing workflow_id bytes stay unchanged. Do not mutate persisted binding files in this source change or add an old-name resolver alias. S3 reconciles affected already-bound readers/owners before activation. Core worktree binding inventory on22Oct found only Feature/CrashRecovery carrying next_stage incremental-review (not a retired lifecycle name); no current old lifecycle next_stage binding was found. This is bounded inventory, not global native acceptance.
+
+#### Tests, historical allowlist and scope
+
+Update actual behavior fixtures, not only sentence assertions: plan_workflow_scenarios/harness, plan_authoring_harness and task_workflow scenarios for new public entry/owner values; remove compatibility scenario while preserving persisted workflow_id and stage IDs that are data contracts. Update authored_skill fixture to search Workflow, package coverage tests to use the owning package, host coverage source/mapping fixtures, CI transfer helper path, engine hook delivery tests and Base context tests. Remove obsolete route tests; add actual Source/Claude/Codex SessionStart payload and missing-contract behavior tests using deterministic subprocesses. Keep transfer receipt tests against moved exact helper, including dispatch-first no-ready-receipt path through guidance fixtures. Verify generic Workflow package has no Engineering dependency/runtime and both hosts resolve all new names.
+
+Retired active names/paths must have zero hits after an explicit survivor allowlist: completed historical plans/observed acceptance records, this goal's migration mapping, and opaque stored v2 workflow/stage identifiers. .agents/plugins/runtime-assertion-ownership.json verified_acceptance is historical observed native behavior; do not rename it into a false observation. Do not edit the old completed routing/store migration goal. No automatic rewrite of every plan or every registry row.
+
+Run focused lifecycle/transfer/continuation/context/host-coverage/package/selection tests, generation/digest/harness/tier checks, exact guidance-example validator and instruction-file pairing. Add concrete fenced examples to newly moved/changed guidance. Check catalog common generated fingerprints separately and exclude generated plugins output from commits. Windows/Linux exact-head CI and frozen native+targeted independent review follow. Installation is S3, never inferred from source tests.
+
+Expected scope includes substantial deletion/consolidation of old guidance and ~950 obsolete unwired router/test lines. Separate mechanical caller/path updates from substantive policy/runtime lines. At >1000 substantive lines or40 substantive paths explicitly assess atomicity: public entry names, contextual routing, artifact owner, package resources and caller fixtures must switch together with no temporary aliases. The independently usable status package was already split out; do not grow S2b1. Parent must record measured assessment before review. No other unrelated cleanup.
+
+Readiness: bounded independent reader /root/s1_readiness completed the exact source-contract check against 7c77e7d5. Its sole concrete correction, retaining future annotations in the receipt reader for Python 3.9, is included above. Parent verdict: ready for the specified implementation after the actual completed S2b1 parent is reconciled. No write lease is granted before that parent exists. Native activation remains S3.
+
 ### S3: coordinated selection and native acceptance
 
-Prepare only necessary caller/dependency changes in the actual owning repositories after reading their
-instructions and reconciling their owners. External primary checkouts inspected during initial discovery
-may be stale; their contents are leads, not current-main evidence. Publish namespaces from Core only.
-Hold breaking publication until the known callers and marketplace selection are ready together.
-Use supported native installation/update paths only when authorized. Preserve running snapshots;
-validate fresh activation and affected bound readers with deterministic fixtures. Linux installed-host
-acceptance needs a supported Linux host; CI source execution is separately labelled evidence.
+Core publishes both namespaces. Personal at `09ab438d644552831f9fb9f49162c02798a6a838`
+and Infonetica at `59644f172c08e2f1afb49138db0db7d6907d1069` have no authored retired
+lifecycle/lane calls; their selected GitHub/Azure record operations remain distinct. Personal's actual
+producer requires Engineering and Machine; Infonetica requires Work, Base and Engineering. No lifecycle caller changes in either profile are needed by the demonstrated inventory. Their own source-project declarations still need coordinated required closure: exact fetched Personal origin/main selects Base, Engineering, GitHub Actions, Machine, Personal, Python and Template, so expansion adds Agent Store and Workflow; exact fetched Infonetica origin/main selects only Base and Machine, so expansion adds Agent Store only. Producer dependencies do not establish profile adoption. Prepare only these required additions through the candidate generator in separate isolated S3 source layers, with native review admission/activation explicitly gated.
 
-Current-main consumer inventory was refreshed on 21 October 2026. Personal at `09ab438d` and
-Infonetica at `59644f17` have no authored calls to the lifecycle names being retired. Their current
-Engineering feature, addressing and PR operations remain valid. Personal explicitly depends on Engineering
-and Machine; Infonetica explicitly depends on Work, Base and Engineering under the tj-agents marketplace.
-Do not add Personal or change either profile's tracker semantics. Marketplace at `063a604c` still has its
-older Base/Engineering/Machine dependency declarations in `catalog.json`; S3 needs the namespace entries
-and correct closure there. Its old CoreCatalogAdoption goal/checkout is an ownership lead, not observed
-liveness. Resolve that overlap through current native ownership and review evidence before its writes.
+Marketplace's exact source base is `063a604c86051388cc3889eefe8734a22f19010d`. Its old
+CoreCatalogAdoption goal explicitly records delivery on 8 October 2026 (PR #4); supported native recovery
+found its Claude owner closed and a current supported worktree find returned no matching owner. The old
+checkout and goal remain untouched. The absent older parent identity is not itself liveness proof.
+Open Marketplace #20 touches only record-selection files, not the catalog. The new branch/check-out names
+below were absent and the primary checkout's unrelated untracked files are preserved.
+
+The bounded catalog slice uses new branch `Feature/WorkflowAgentStoreCatalog` in
+`C:/Users/TommySeery/source/repos/tj-agents/marketplace/.worktrees/Feature-WorkflowAgentStoreCatalog`.
+This Core GOAL remains the only whole-goal owner; the catalog slice creates no competing lifecycle goal.
+AGENTS and README were read. `catalog.json` is the only authored roster; unlike Core distribution output,
+both generated native marketplace JSON files belong in this repository's source PR.
+
+Exact changes: order Core entries Base, Agent Store, Machine, Workflow, Engineering. Agent Store has no
+requirements; Machine requires Base and Agent Store; Workflow requires Base, Agent Store and Machine;
+Engineering requires Base, Workflow, Agent Store and Machine. Keep repository `core` and current-main
+producer references. Reconcile the demonstrated stale profile edges: Personal requires Engineering and
+Machine; Infonetica requires Work, Base and Engineering. Keep all other entries unchanged. Update only
+affected README roster/minimum-selection prose: generic sustained work selects Workflow and its closure,
+software work selects Engineering and its closure, profile adoption remains explicit. Native discovery
+still installs/selects nothing automatically. No aliases, account changes or profile adoption are added.
+
+The catalog slice is committed and pushed as `4aeaa7d82cfa299aa9fad51ec1ec63727623ba8a`, [Marketplace #21](https://github.com/tj-agents/marketplace/pull/21), draft with human-gate. The five-file source delta is 75 added/22 removed lines. Generator/drift checks, all 14 existing tests and the native Claude validator passed. Full frozen review completed with M1 changes requested; native catalog CI passed on Windows and Linux. M1 remediation and its fresh review remain pending. The body check passed and binding records absent merge authority.
+
+The workstation PowerShell claude function unexpectedly ran its prelaunch refresh before validation. Parent identified that helper, verified it had ended, and removed exactly its four new project-scoped registrations using native uninstall with keep-data. Other registration rows and all native user sessions were preserved; checkout settings were restored with exact semantic/hash guards. Direct native validation then passed without settings changes. Use the native executable for deterministic validation here; do not rerun the refresh wrapper. This event supplies no new-namespace activation evidence.
+
+A completed Marketplace source review records M1 (P2): its own explicit selection must acquire the new required closure. Candidate Machine adopt_plugins.py, with --root and --mode preview/write/check and no requested plugin/profile, preserves the existing selection and expands its required dependencies. Read-only previews passed for Core and Marketplace with exactly .agents/plugins.json, .claude/settings.json and .codex/config.toml changing; no installed payload or native installation is involved. Use the canonical candidate script because generated Machine output is intentionally stale until refreshed. Marketplace repairs these three files in #21; Core prepares its own same three declarations in a final S3 activation-declaration layer after the lifecycle source. This separates review of publishable source under the existing admitted selection from the later native-admission gate; it does not waive that gate. This preserves existing Personal adoption, not a new scope decision. The actual required closure is Agent Store, Base, Engineering, Machine, Personal and Workflow. Later launch refresh reads current enabled identities and does not expand the declaration, so this source correction cannot be replaced by a claim about eventual refresh. Native activation remains separate. Review of the newly declared packages must account explicitly for candidate-source contracts and currently absent installed namespaces before claiming scope resolved.
+
+Marketplace native catalog CI passed on Windows and Linux. Separate policy jobs demand removal of the unchanged .github/workflows/check-personal-policy.yml. Establish exact baseline failure provenance; the dispatch excludes unrelated workflow deletion. Preserve that workflow unless its authorized owner or Tommy supplies the missing scope authority.
+
+Publication order is Core source stack, successful generated-package publication, then the coordinated
+marketplace roster. Hold breaking publication until the known callers and selection are ready together.
+Use supported native installation/update paths only when authorized. Preserve running snapshots and
+reconcile affected already-bound readers separately from fresh activation. Source generation and CI are
+not installed acceptance. Windows native acceptance needs fresh selected Workflow/Engineering entry
+points; Linux installed-host acceptance needs an actual supported Linux host. Resolve these named gates
+after all independent implementation/review/PR preparation is complete.
 
 ## Execution readiness
 
-Verdict: S2a implementation and focused verification are complete; its immutable candidate is ready for independent review. S1 Windows CI and S2b/S3 readiness remain separate gates.
+Verdict: S2b1 implementation and targeted verification are complete; commit and frozen review are next. S2b2 passed the bounded source-contract readiness check and awaits the reconciled S2b1 parent. The isolated Marketplace catalog slice is ready for the specified edits above; source review, platform CI, merge and installation remain distinct gates.
 Execution authorization: architecture and implementation through reviewed PR preparation.
 Transfer: none; retain this owner under the explicit dispatch.
-Unresolved: S1 Windows exact-head CI; S2a independent review/CI; S2b exact source/route mapping and S3 coordinated publication/native acceptance. None blocks independent preparation.
-Resolver: current owner and a bounded independent readiness reader. No new architecture successor.
+Unresolved: dependent S2b implementation/reviews, Marketplace review/CI, and S3 coordinated publication/native acceptance.
+Resolver: current owner, bounded readers and independent reviewers. None blocks S2b1 implementation.
 
 ## Verification
 
@@ -418,7 +445,7 @@ checks and retired active namespace checks passed; generated output was restored
 The parent reconciled the actual diff against the approved source boundary. This commit is the S2a candidate.
 
 S1 full and incremental private review receipts approve exact head `5e815d06`; no actionable findings.
-Linux CI run `39695061838` passed; Windows remains running. The small reviewer test wrote only a bytecode
+Windows and Linux CI run `39695061838` passed; PR #352 is ready with human-gate. The small reviewer test wrote only a bytecode
 cache in its disposable bundle; archive comparison proved all source bytes unchanged and that cache was
 removed before the successful review-record. Review approval does not grant architecture merge authority.
 
@@ -426,23 +453,22 @@ S2b evidence found one production consumer of the unwired prompt router: `contin
 control/receipt helpers. Retire the obsolete prompt router with the old lifecycle names while preserving
 those readers, the existing temp receipt path/keys and unrelated continuation owner checks. Do not enable
 any retired enforcement hook. New Base SessionStart context supplies the canonical routing guidance.
-The exact smaller status-package and subsequent lifecycle specifications remain under readiness assessment.
+The status package is under its bounded implementation lease. The exact lifecycle specification above passed independent readiness, with Python 3.9 future annotations retained in the extracted receipt reader.
 
 ## Next Steps
 
-Review this committed S2a candidate against `5e815d0658597f031c332e9d2a3e3bb35d886e8a`, then open
-its draft against `Refactor/WorkflowAgentStore` with `human-gate` and obtain exact-head platform CI.
-The parent continues S1 Windows CI in its preserved checkout. Continue S2b readiness under the same goal:
-first publish Workflow status with direct Agent Store access, then perform the lifecycle/artifact/entry
-routing cutover. This separates the independently usable read operation from authority/continuation policy.
-The architecture merge hold and S3 native installation gate remain explicit.
+Commit the verified S2b1 source and checkpoint, open the child draft with human-gate, and run its full
+frozen review and exact-head CI. Start the independently ready S2b2 implementation from that exact
+committed parent in its own child while S2b1 validation proceeds. Remediate Marketplace M1 through the
+source-only generator; preserve the explicit native-admission gate. Establish policy failure provenance
+against exact base without deleting the unrelated workflow.
 
 Scope: whole plan through all remaining phases and terminal delivery within the dispatched authority.
-Current slice: S2a review and platform verification, stacked on S1.
-Remaining scope: implementation, caller migration, both-host verification, review, coherent PR delivery,
-and explicit merge/installation gates when reached.
-Done when: the requested namespace cutover satisfies acceptance, or only an evidenced external gate
-remains after every independent authorized action is complete.
+Current slice: S2b1 commit/review; next S2b2 lifecycle implementation; Marketplace source correction.
+Remaining scope: lifecycle implementation, caller migration, both-host source verification, review,
+coherent PR preparation, required project declarations, and explicit publication/installation gates.
+Done when: the requested namespace cutover satisfies acceptance, or only evidenced external gates
+remain after every independent authorized action is complete.
 
 ```agent-host-coverage
 {"schema_version":1,"shared_source":".agents/agent-store/runtime/","hosts":[{"host":"claude","behavior":"Use the canonical registry through package-local native adapters and expose read-only inspection without process-liveness claims.","source":".agents/plugins/manifests/claude/machine-hooks.json","mapping":"sources.json embeds the canonical store runtime in the consuming Machine and Engineering packages and publishes Agent Store inspection.","verification":{"level":"source","result":"passed","evidence":"Inspection 5, registration 21, recovery 48, close-loader 9, session commands 64, store 59, status-reader 51, repository provider 22; generated package checks and both isolated host inspector entry points pass. Installed activation remains an S3 gate."}},{"host":"codex","behavior":"Use the same registry and atomic ownership semantics through Codex lifecycle hooks, with separately labelled recorded-state inspection.","source":".agents/plugins/manifests/codex/machine-hooks.json","mapping":"The same canonical store bytes are embedded locally; Codex hooks retain package fingerprint and snapshot integrity.","verification":{"level":"source","result":"passed","evidence":"Inspection 5, registration 21, recovery 48, close-loader 9, session commands 64, store 59, status-reader 51, repository provider 22; generated package checks and both isolated host inspector entry points pass. Installed activation remains an S3 gate."}}]}

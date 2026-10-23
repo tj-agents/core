@@ -12,7 +12,7 @@ Own one authoritative plan identity until the requested work completes or reache
 A phase boundary, subordinate return, diagnosable failure, local commit, or resolved next action is not a
 stopping condition.
 
-Read [the shared recording contract](../../resources/problem-records.md) for repository work. Reconcile
+Read [the shared recording contract](../../../workflow/resources/problem-records.md) for repository work. Reconcile
 the linked selected item's identity and live state when resolving ownership, and update its progress
 through that contract. Keep design and recovery state in the existing plan and ledger.
 

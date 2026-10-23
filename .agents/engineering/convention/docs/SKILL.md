@@ -42,7 +42,7 @@ maintained.
   beside it is the second copy.
 - **Never name violation sites in a rule doc.** They get fixed and the citation rots — silently, because
   nothing checks it. Record violations as debt through the selected profile under
-  [the shared recording contract](../../resources/problem-records.md).
+  [the shared recording contract](../../../workflow/resources/problem-records.md).
 - **Never cite a transient artifact** — a plan filename, a phase number, a ticket — from a durable doc. The
   reference is engineered to dangle.
 - **Check the code before writing the rule down.** Rules that teach what the codebase has already moved past
