@@ -290,7 +290,8 @@ def github_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]],
             heads.update(found_heads)
             trees.update(found_trees)
     if failures:
-        print(f"plugins: comparing commits for {', '.join(sorted(failures))}", file=sys.stderr)
+        print(f"plugins: could not read plugin contents of {', '.join(sorted(failures))}; comparing commits instead",
+              file=sys.stderr)
     return heads, trees
 
 
@@ -464,7 +465,7 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
             previous = recorded.get("codex-plugin:" + plugin)
             if (publisher := publisher_key(url, ref)) and previous != heads.get((url, ref)):
                 wanted.setdefault(publisher, set()).add(path)
-                if isinstance(previous, str) and SHA.fullmatch(previous):
+                if isinstance(previous, str):
                     installed.setdefault(publisher, set()).add(previous)
         if wanted:
             refresh_contents(wanted, installed, query)
