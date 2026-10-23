@@ -9,6 +9,13 @@
       "domain": "behavior"
     },
     {
+      "name": "agent-store",
+      "root": ".agents/agent-store",
+      "layout": "kind",
+      "plugin": "agent-store",
+      "domain": "process"
+    },
+    {
       "name": "engineering",
       "root": ".agents/engineering",
       "layout": "kind",
@@ -52,7 +59,8 @@
     "plugins/publication.json",
     ".agents/plugins/marketplace.json",
     ".claude-plugin/marketplace.json",
-    "CAPABILITIES.md"
+    "CAPABILITIES.md",
+    "plugins/agent-store"
   ],
   "resources": [
     {
@@ -277,11 +285,6 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/machine/scripts/repository_identity.py",
-      "destination": "workflows/repository_identity.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/hooks/worktree_cleanup_gate.py",
       "destination": "hooks/worktree_cleanup_gate.py"
     },
@@ -369,22 +372,46 @@
       "plugin": "engineering",
       "source": ".agents/schemas/standards-context.schema.json",
       "destination": "schemas/standards-context.schema.json"
+    },
+    {
+      "plugin": "agent-store",
+      "source": ".agents/agent-store/runtime",
+      "destination": ".agents/agent-store/runtime"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/agent-store/runtime",
+      "destination": ".agents/agent-store/runtime"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/agent-store/runtime",
+      "destination": ".agents/agent-store/runtime"
+    },
+    {
+      "plugin": "agent-store",
+      "source": ".agents/tiers/agent-store.json",
+      "destination": "tier.json"
     }
   ],
   "prerequisites": {
     "base": [],
     "engineering": [
       "base",
+      "agent-store",
       "machine"
     ],
     "machine": [
-      "base"
-    ]
+      "base",
+      "agent-store"
+    ],
+    "agent-store": []
   },
   "external_prerequisites": {
     "base": [],
     "engineering": [],
-    "machine": []
+    "machine": [],
+    "agent-store": []
   },
   "extended_host_adapters": [
     "persistent-workflow",

@@ -27,6 +27,14 @@ register_session = load_module()
 ProcessInfo = register_session.ProcessInfo
 
 
+def _git_environment():
+    environment = os.environ.copy()
+    for name in tuple(environment):
+        if name == "GIT_CONFIG_COUNT" or name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")):
+            environment.pop(name)
+    return environment
+
+
 class ResolveRecordedPidTests(unittest.TestCase):
     def test_nearest_host_ancestor_wins(self):
         table = {
@@ -188,7 +196,6 @@ class MainTests(unittest.TestCase):
 
 
 class LoadSessionStoreTests(unittest.TestCase):
-    """R9: the loader must find session_store.py in source and every packaged layout."""
 
     def _write_store_stub(self, path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -206,11 +213,15 @@ class LoadSessionStoreTests(unittest.TestCase):
             script = root / ".agents/machine/utility/peer-cli/scripts/register_session.py"
             script.parent.mkdir(parents=True, exist_ok=True)
             script.write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
-            self._write_store_stub(root / ".agents/machine/scripts/session_store.py")
+            self._write_store_stub(root / ".agents/agent-store/runtime/session_store.py")
             module = self._load_from(script)
             store = module._load_session_store()
             self.assertIsNotNone(store)
             self.assertEqual("session-store-stub", store.MARKER)
+
+    def test_shallow_staging_path_without_a_store_does_not_index_package_ancestors(self):
+        with mock.patch.object(register_session, "HERE", Path("staging")):
+            self.assertIsNone(register_session.session_store_path())
 
     def test_finds_the_store_in_the_agents_machine_utility_packaged_layout(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -218,7 +229,7 @@ class LoadSessionStoreTests(unittest.TestCase):
             script = plugin_root / ".agents/machine/utility/peer-cli/scripts/register_session.py"
             script.parent.mkdir(parents=True, exist_ok=True)
             script.write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
-            self._write_store_stub(plugin_root / "resources/machine/scripts/session_store.py")
+            self._write_store_stub(plugin_root / ".agents/agent-store/runtime/session_store.py")
             module = self._load_from(script)
             store = module._load_session_store()
             self.assertIsNotNone(store)
@@ -232,7 +243,7 @@ class LoadSessionStoreTests(unittest.TestCase):
                     script = plugin_root / layout / "peer-cli/scripts/register_session.py"
                     script.parent.mkdir(parents=True, exist_ok=True)
                     script.write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
-                    self._write_store_stub(plugin_root / "resources/machine/scripts/session_store.py")
+                    self._write_store_stub(plugin_root / ".agents/agent-store/runtime/session_store.py")
                     module = self._load_from(script)
                     store = module._load_session_store()
                     self.assertIsNotNone(store)
@@ -250,7 +261,7 @@ class SessionStartStoreIntegrationTests(unittest.TestCase):
     def _run_git(self, cwd, *args):
         result = subprocess.run(
             ["git", "-C", str(cwd), *args], capture_output=True, text=True,
-            encoding="utf-8", errors="replace", timeout=15, check=True,
+            encoding="utf-8", errors="replace", timeout=15, check=True, env=_git_environment(),
         )
         return result.stdout.strip()
 
@@ -270,18 +281,18 @@ class SessionStartStoreIntegrationTests(unittest.TestCase):
     def _copy_layout(self, root, layout):
         if layout == "source":
             script = root / ".agents/machine/utility/peer-cli/scripts/register_session.py"
-            store = root / ".agents/machine/scripts/session_store.py"
+            store = root / ".agents/agent-store/runtime/session_store.py"
         elif layout == "agents-utility":
             script = root / ".agents/machine/utility/peer-cli/scripts/register_session.py"
-            store = root / "resources/machine/scripts/session_store.py"
+            store = root / ".agents/agent-store/runtime/session_store.py"
         else:
             script = root / layout / "peer-cli/scripts/register_session.py"
-            store = root / "resources/machine/scripts/session_store.py"
+            store = root / ".agents/agent-store/runtime/session_store.py"
         script.parent.mkdir(parents=True)
         store.parent.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
-        shutil.copy2(ROOT / ".agents/machine/scripts/session_store.py", store)
-        shutil.copy2(ROOT / ".agents/machine/scripts/repository_identity.py", store.with_name("repository_identity.py"))
+        shutil.copy2(ROOT / ".agents/agent-store/runtime/session_store.py", store)
+        shutil.copy2(ROOT / ".agents/agent-store/runtime/repository_identity.py", store.with_name("repository_identity.py"))
         return script
 
     def test_session_start_records_real_store_from_source_and_packaged_layouts(self):
@@ -311,15 +322,16 @@ class SessionStartStoreIntegrationTests(unittest.TestCase):
                         host_pid: module.ProcessInfo(pid=host_pid, ppid=None, name=f"{host}.exe", started_at=pid_started_at),
                     }
                     payload = json.dumps({"session_id": session_id, "cwd": str(repo)})
-                    environment = {
+                    environment = _git_environment()
+                    environment.update({
                         module.STATE_DIRECTORY_ENV: str(state),
                         module.TITLE_ENV: f"{host} session é",
                         module.HOST_NAMES_ENV: host,
                         "CODEX_HOME": str(profile / "codex"),
                         "CLAUDE_CONFIG_DIR": str(profile / "claude"),
-                    }
+                    })
                     with (
-                        mock.patch.dict(os.environ, environment),
+                        mock.patch.dict(os.environ, environment, clear=True),
                         mock.patch.object(module, "build_process_lookup", return_value=process_table.get),
                         mock.patch.object(sys, "stdin", io.StringIO(payload)),
                     ):
