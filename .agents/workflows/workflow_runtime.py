@@ -1,7 +1,5 @@
 import json
-import os
 import re
-import sqlite3
 import subprocess
 import importlib.util
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -552,12 +550,10 @@ def _read_only_git(root, *arguments):
 
 
 def _repository_identity(root):
-    paths = (
-        Path(__file__).resolve().with_name("repository_identity.py"),
-        Path(__file__).resolve().parents[1] / "machine" / "scripts" / "repository_identity.py",
-    )
-    path = next((candidate for candidate in paths if candidate.is_file()), None)
-    if path is None:
+    package = Path(__file__).resolve().parent.parent
+    runtime = package / "agent-store" / "runtime" if package.name == ".agents" else package / ".agents" / "agent-store" / "runtime"
+    path = runtime / "repository_identity.py"
+    if not path.is_file():
         raise ContractViolation("work-item resolution requires the shipped repository identity helper")
     spec = importlib.util.spec_from_file_location("workflow_repository_identity", path)
     if spec is None or spec.loader is None:
@@ -565,6 +561,20 @@ def _repository_identity(root):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.repository_identity(root, _read_only_git)
+
+
+def _read_only_store_module():
+    package = Path(__file__).resolve().parent.parent
+    runtime = package / "agent-store" / "runtime" if package.name == ".agents" else package / ".agents" / "agent-store" / "runtime"
+    path = runtime / "reader.py"
+    if not path.is_file():
+        raise ContractViolation("work-item resolution requires the shipped read-only store")
+    spec = importlib.util.spec_from_file_location("workflow_agent_store_reader", path)
+    if spec is None or spec.loader is None:
+        raise ContractViolation("work-item resolution cannot load the shipped read-only store")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _section(text, heading):
@@ -641,93 +651,6 @@ def _work_item_document(root, ledger):
     return path, f"{parts[2]}/{parts[4]}", PurePosixPath(*parts[:3], "README.md").as_posix()
 
 
-class ReadOnlyWorkItemStore:
-    def __init__(self, database=None):
-        root = Path(os.environ.get("AGENT_STATE_DIRECTORY", Path.home() / ".agents-state"))
-        self.database = Path(database) if database is not None else root / "sessions.db"
-
-    def _connection(self):
-        if not self.database.is_file():
-            raise ContractViolation(f"work-item session store does not exist: {self.database}")
-        connection = None
-        try:
-            connection = sqlite3.connect(f"{self.database.resolve().as_uri()}?mode=ro", uri=True)
-            connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA query_only = ON")
-            version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version not in {2, 3, 4}:
-                raise ContractViolation(f"work-item session store has unsupported schema version {version}")
-            tables = {
-                row[0]
-                for row in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type = 'table'"
-                ).fetchall()
-            }
-            if not {"work_items", "sessions"}.issubset(tables):
-                raise ContractViolation("work-item session store is missing required tables")
-            required = {
-                "work_items": {"key", "status", "pr"},
-                "sessions": {"handle", "repo", "branch", "cwd", "work_item", "role", "ended_at"},
-            }
-            if version == 4:
-                required["work_item_references"] = {"provider", "scope", "native_id", "work_item"}
-            for table, columns in required.items():
-                available = {
-                    row[1]
-                    for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
-                }
-                missing = columns - available
-                if missing:
-                    raise ContractViolation(
-                        f"work-item session store table {table} is missing required columns {sorted(missing)!r}"
-                    )
-            return connection
-        except ContractViolation:
-            if connection is not None:
-                connection.close()
-            raise
-        except sqlite3.DatabaseError as error:
-            if connection is not None:
-                connection.close()
-            raise ContractViolation(f"work-item session store cannot be read: {error}") from error
-
-    def work_item(self, key):
-        connection = self._connection()
-        try:
-            rows = connection.execute(
-                "SELECT key, status, pr FROM work_items WHERE key = ?", (key,)
-            ).fetchall()
-            if not rows:
-                raise ContractViolation(f"work item {key} is not registered in the session store")
-            if len(rows) > 1:
-                raise ContractViolation(f"work item {key} has conflicting registered rows")
-            row = rows[0]
-            value = dict(row)
-            if value.get("status") not in WORK_ITEM_STATUSES:
-                raise ContractViolation(f"work item {key} has unsupported status {value.get('status')!r}")
-            return value
-        except sqlite3.DatabaseError as error:
-            raise ContractViolation(f"work-item session store query failed: {error}") from error
-        finally:
-            connection.close()
-
-    def owner(self, key):
-        connection = self._connection()
-        try:
-            rows = connection.execute(
-                "SELECT handle, repo, branch, cwd FROM sessions "
-                "WHERE work_item = ? AND role = 'owner' AND ended_at IS NULL",
-                (key,),
-            ).fetchall()
-            if len(rows) > 1:
-                raise ContractViolation(f"work item {key} has multiple active session owners")
-            return dict(rows[0]) if rows else None
-        except sqlite3.DatabaseError as error:
-            raise ContractViolation(f"work-item session store query failed: {error}") from error
-        finally:
-            connection.close()
-
-
 class RepositoryStateProvider:
     provider_id = "repository"
 
@@ -768,7 +691,11 @@ class RepositoryStateProvider:
         repository = _repository_identity(self.root)
         if not repository:
             raise ContractViolation("work-item resolution requires a repository identity")
-        row = ReadOnlyWorkItemStore().work_item(f"{repository}:{identifier}")
+        reader = _read_only_store_module()
+        try:
+            row = reader.ReadOnlyWorkItemStore().work_item(f"{repository}:{identifier}")
+        except reader.StoreReadError as error:
+            raise ContractViolation(str(error)) from error
         return row["status"]
 
     def _resolve_work_item(self, ledger, workflow_run_id, stage_id, document):
@@ -818,9 +745,13 @@ class RepositoryStateProvider:
         if not repository:
             raise ContractViolation("work-item resolution requires a repository identity")
         key = f"{repository}:{identifier}"
-        store = ReadOnlyWorkItemStore()
-        item = store.work_item(key)
-        owner_record = store.owner(key)
+        reader = _read_only_store_module()
+        try:
+            store = reader.ReadOnlyWorkItemStore()
+            item = store.work_item(key)
+            owner_record = store.owner(key)
+        except reader.StoreReadError as error:
+            raise ContractViolation(str(error)) from error
         if owner_record:
             if owner_record.get("repo") and owner_record["repo"].casefold() != repository.casefold():
                 raise ContractViolation("session owner repository does not match the work-item repository")

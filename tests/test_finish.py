@@ -1,5 +1,6 @@
 from contextlib import ExitStack
 import io
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -16,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REAPER = ROOT / ".agents/machine/utility/peer-cli/scripts/finish_reaper.py"
 CLOSE = ROOT / ".agents/machine/utility/peer-cli/scripts/close.py"
 FINISH = ROOT / ".agents/machine/utility/peer-cli/scripts/finish.py"
+CLOSE_SESSION = ROOT / ".agents/machine/utility/close/scripts/close_session.py"
 sys.path.insert(0, str(REAPER.parent))
 import session_close
 import finish
@@ -23,7 +25,52 @@ import finish_reaper
 import close as own_close
 
 
+def load_close_session(path):
+    spec = importlib.util.spec_from_file_location("close_session_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class HostFallbackTests(unittest.TestCase):
+    def assert_sweep_script(self, script_path, updater_path, expected):
+        script_path.parent.mkdir(parents=True)
+        updater_path.parent.mkdir(parents=True)
+        script_path.write_text(CLOSE_SESSION.read_text(encoding="utf-8"), encoding="utf-8")
+        updater_path.write_text(
+            "def load_codex_config():\n    return None\n"
+            f"def sweep_script(config):\n    return {expected!r}\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(expected, load_close_session(script_path).sweep_script(None))
+
+    def test_sweep_script_uses_the_source_machine_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assert_sweep_script(
+                root / ".agents/machine/utility/close/scripts/close_session.py",
+                root / ".agents/machine/scripts/plugin_autoupdate.py",
+                "source",
+            )
+
+    def test_sweep_script_uses_the_packaged_machine_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assert_sweep_script(
+                root / ".agents/machine/utility/close/scripts/close_session.py",
+                root / "resources/machine/scripts/plugin_autoupdate.py",
+                "canonical",
+            )
+
+    def test_sweep_script_uses_the_skills_machine_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assert_sweep_script(
+                root / "skills/close/scripts/close_session.py",
+                root / "resources/machine/scripts/plugin_autoupdate.py",
+                "skills",
+            )
+
     def test_unregistered_attachment_refuses_an_unsafe_close(self):
         host = session_close.register_session.ProcessInfo(10, 1, "codex.exe", 20.0)
         with mock.patch.object(session_close.os, "getppid", return_value=10), \

@@ -48,7 +48,7 @@ foreach ($document in $documents) {{
 class HarnessManifestTests(unittest.TestCase):
     def test_core_manifests_are_current_and_catalog_is_core_only(self):
         manifests = HARNESS.synchronize(ROOT, check=True)
-        self.assertEqual({"base", "engineering", "machine"}, set(manifests))
+        self.assertEqual({"agent-store", "base", "engineering", "machine"}, set(manifests))
         catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
         self.assertEqual({"tj-agents/core"}, {package["owner_repository"] for package in catalog["packages"]})
         for package in catalog["packages"]:

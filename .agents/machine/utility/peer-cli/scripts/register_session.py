@@ -340,13 +340,19 @@ def terminal_identity(environ=None):
 
 
 def session_store_path():
-    candidates = []
-    if len(HERE.parents) > 2:
-        candidates.append(HERE.parents[2] / "scripts" / "session_store.py")
-        candidates.append(HERE.parents[2] / "resources/machine/scripts/session_store.py")
-    if len(HERE.parents) > 4:
-        candidates.append(HERE.parents[4] / "resources/machine/scripts/session_store.py")
-    candidates.append(HERE / "session_store.py")
+    staged = HERE / "session_store.py"
+    if staged.is_file():
+        return staged
+    if len(HERE.parents) <= 1:
+        return None
+    if HERE.parents[1].name in {"skills", "codex-skills"}:
+        runtime = HERE.parents[2] / ".agents" / "agent-store" / "runtime"
+    else:
+        if len(HERE.parents) <= 3:
+            return None
+        anchor = HERE.parents[3]
+        runtime = anchor / "agent-store" / "runtime" if anchor.name == ".agents" else anchor / ".agents" / "agent-store" / "runtime"
+    candidates = [runtime / "session_store.py"]
     return next((path for path in candidates if path.is_file()), None)
 
 
