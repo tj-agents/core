@@ -54,7 +54,7 @@ For machine setup, event handling or repository adoption, read the
 [refresh and repository boundaries](README.md#refresh-and-repository-boundaries) before changing them.
 Preserve the separation with the [machine event fixtures](tests/test_machine_events.py); repository
 adoption and local exclusions follow [machine:plugin-selection](.agents/machine/utility/plugin-selection/SKILL.md).
-Consumer validation and native refresh share `.agents/machine/scripts/marketplace_identity.py`.
+Consumer validation and native refresh share `.agents/machine/scripts/plugin_autoupdate.py`.
 Follow the [shared catalog's identity policy](https://github.com/tj-agents/marketplace#readme)
 when changing marketplace declarations or installed-registration cleanup.
 
