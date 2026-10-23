@@ -81,6 +81,8 @@ from pathlib import Path
 
 from hook_runtime import claim_invocation, own_payload_root
 import tier_gate
+sys.path.append(str(Path(__file__).resolve().parents[1] / "machine" / "scripts"))
+import required_plugins
 
 # Skill descriptions carry non-ASCII punctuation, and this text is what the agent acts on.
 # Windows defaults these streams to cp1252, which renders it as mojibake.
@@ -96,6 +98,7 @@ ROUTES_FILE = ".agents/skill-routes.json"
 SHIPPED_ROUTES_DIR = Path(__file__).resolve().parent.parent / "routes"
 REGISTRY_FILE = "registry.json"
 TIER_SKILL_DIRS = []
+VERIFIED_PLUGIN_ROOTS = {}
 SUBAGENT_ID = re.compile(r"[A-Za-z0-9_-]+")
 GIT_BASH_DRIVE = re.compile(r"^/([A-Za-z])/(.*)$")
 # A rename moves a skill between plugins; the qualified name in a route, a plan or a habit does not move
@@ -212,6 +215,8 @@ def _native_install_roots(harness):
 
 
 def native_install_roots(harness):
+    if harness in VERIFIED_PLUGIN_ROOTS:
+        return VERIFIED_PLUGIN_ROOTS[harness]
     roots = _native_install_roots(harness)
     if isinstance(roots, NativePluginDiscoveryError):
         raise roots
@@ -1486,6 +1491,13 @@ def main():
     ]
     if not relative_targets:
         sys.exit(0)
+    try:
+        verified = required_plugins.check(root, harness)
+    except required_plugins.RequiredPluginsError as error:
+        sys.stderr.write(f"SKILL ROUTER - {error}\nThis tool call was NOT run.\n")
+        sys.exit(2)
+    if verified is not None:
+        VERIFIED_PLUGIN_ROOTS[harness] = verified
     try:
         routes = load_routes(root)
     except RoutesUnusable as error:
