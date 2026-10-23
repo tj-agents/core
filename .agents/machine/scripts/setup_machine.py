@@ -1115,9 +1115,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="report drift, write nothing, exit 1 on drift")
     parser.add_argument("--step", action="append", choices=[step.name for step in STEPS],
-                        help="run only named steps plus required preconditions; repeat to select several")
+                        help="run named steps with their dependencies and required preconditions; repeat to select several")
     parsed = parser.parse_args(arguments)
-    steps = tuple(step for step in STEPS if not parsed.step or step.required or step.name in parsed.step)
+    selected = set(parsed.step or ())
+    if "shell profiles" in selected:
+        selected.add("launch-check runtime")
+    steps = tuple(step for step in STEPS if not selected or step.required or step.name in selected)
     return run_steps(steps, machine_context(checkout), parsed.check)
 
 

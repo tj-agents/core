@@ -212,7 +212,8 @@ Run once per machine. Rerunning setup converges on the same channel and launch c
 ```
 
 Repeat `--step` to select existing setup steps for a scoped repair. They retain their declared order
-and always include required preconditions. `--check` inspects that same selection without applying it:
+and always include required preconditions. Selecting shell profiles also includes their launch-check
+runtime dependency. `--check` inspects that same selection without applying it:
 
 ```text
 ./setup.ps1 --check --step "launch-check runtime" --step "shell profiles"  # Windows
