@@ -109,8 +109,8 @@ class LaunchCheckTests(unittest.TestCase):
 
     def test_a_codex_launch_leaves_claude_installs_alone(self):
         self.cursor.write_text(json.dumps({"since": "abc"}), encoding="utf-8")
-        with mock.patch.object(CHECK, "check", wraps=CHECK.check) as check:
-            self.assertEqual(0, CHECK.main(["--project", str(ROOT), "--host", "codex"]))
+        with mock.patch.object(CHECK, "check") as check, mock.patch.dict(os.environ, {CHECK.HOST_VARIABLE: "codex"}):
+            self.assertEqual(0, CHECK.main(["--project", str(ROOT)]))
         self.assertEqual("codex", check.call_args.kwargs["host"])
         self.assertEqual("current", CHECK.check(ROOT, fetch=Server(), update=self.update(), host="codex",
                                                 reconcile=lambda project: self.fail("checked Claude installs")))
@@ -235,8 +235,8 @@ class TerminalFunctionTests(unittest.TestCase):
             directory = Path(temp)
             log = directory / "log.jsonl"
             check = directory / "launch_check.py"
-            check.write_text(f"import sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:]]) + '\\n')\n",
-                             encoding="utf-8")
+            check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
+                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
             echo = directory / "echo.py"
             echo.write_text(f"import json, sys\nopen({str(log)!r}, 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
                             "raise SystemExit(7)\n", encoding="utf-8")
@@ -261,7 +261,7 @@ class TerminalFunctionTests(unittest.TestCase):
                         env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
                         capture_output=True, text=True, timeout=60)
                     self.assertEqual(7, result.returncode, result.stderr)
-                    self.assertEqual([f"check --host {name}", json.dumps(["two words", "--flag"])],
+                    self.assertEqual([f"check {name}", json.dumps(["two words", "--flag"])],
                                      log.read_text(encoding="utf-8").splitlines())
 
 
@@ -272,8 +272,8 @@ class PosixFunctionTests(unittest.TestCase):
             directory = Path(temp)
             log = directory / "log"
             check = directory / "launch_check.py"
-            check.write_text(f"import sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:]]) + '\\n')\n",
-                             encoding="utf-8")
+            check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
+                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
             bin_directory = directory / "bin"
             bin_directory.mkdir()
             target = bin_directory / "claude"
@@ -285,7 +285,7 @@ class PosixFunctionTests(unittest.TestCase):
                                     env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(7, result.returncode, result.stderr)
-            self.assertEqual("check --host claude\ntwo words|--flag|", log.read_text(encoding="utf-8"))
+            self.assertEqual("check claude\ntwo words|--flag|", log.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

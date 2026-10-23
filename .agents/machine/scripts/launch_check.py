@@ -23,6 +23,7 @@ POLL_TIMEOUT_SECONDS = 3
 MAX_RESPONSE = 1 << 20
 EXPIRY_SECONDS = 11 * 60 * 60
 HOSTS = ("claude", "codex")
+HOST_VARIABLE = "TJ_AGENTS_LAUNCH_HOST"
 TOPIC = re.compile(r"[A-Za-z0-9_-]{32,128}")
 MESSAGE_ID = re.compile(r"[A-Za-z0-9]{1,64}")
 
@@ -226,10 +227,9 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=Path.cwd())
-    parser.add_argument("--host", choices=HOSTS)
     arguments = parser.parse_args(argv)
     try:
-        check(arguments.project.resolve(), host=arguments.host)
+        check(arguments.project.resolve(), host=os.environ.get(HOST_VARIABLE))
     except Exception as error:
         print(f"plugins: update check failed: {error}", file=sys.stderr)
     return 0

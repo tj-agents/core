@@ -220,8 +220,8 @@ def installed_revisions() -> set[str]:
 
 
 def contents_lock():
-    deadline = time.monotonic() + CONTENTS_WAIT_SECONDS
-    while (lock := acquire_lock(state_directory() / "plugin-heads.lock")) is None:
+    path, deadline = state_directory() / "plugin-heads.lock", time.monotonic() + CONTENTS_WAIT_SECONDS
+    while (lock := acquire_lock(path)) is None:
         if time.monotonic() > deadline:
             raise TimeoutError("plugin-heads.json stayed locked")
         time.sleep(0.05)
@@ -304,7 +304,7 @@ def github_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]],
 
 
 def refresh_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]], query=None,
-                     revision=None) -> dict[str, str]:
+                     revision=None, keep: set[str] = frozenset()) -> dict[str, str]:
     heads, trees = github_contents(wanted, installed, read_contents()["trees"], query or github_query)
     unread = sorted(key for key in wanted if key not in heads)
     if unread and revision is not None:
@@ -314,7 +314,10 @@ def refresh_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]]
 
         with ThreadPoolExecutor(max_workers=min(8, len(unread))) as pool:
             heads.update({key: sha for key, sha in zip(unread, pool.map(resolve, unread)) if sha})
-    record_contents(heads, trees, {sha for shas in installed.values() for sha in shas})
+    try:
+        record_contents(heads, trees, {sha for shas in installed.values() for sha in shas} | set(keep))
+    except OSError as error:
+        print(f"plugins: could not record plugin contents ({error})", file=sys.stderr)
     return heads
 
 
@@ -468,21 +471,29 @@ def refresh_codex(executable: str, targets: dict[str, dict], recorded: dict, rev
         listed = sources(marketplace, target) if refreshed else {}
         selected = {plugin: listed[plugin.rsplit("@", 1)[0]] for plugin in target["plugins"]
                     if plugin.rsplit("@", 1)[0] in listed}
-        known = read_contents()["trees"]
-        wanted, installed = {}, {}
+        contents = read_contents()
+        own = {sha for name, sha in recorded.items() if name.startswith("codex-plugin:") and isinstance(sha, str)}
+        wanted, installed, cached = {}, {}, {}
         for plugin, (url, ref, path) in selected.items():
             previous, plugin_head = recorded.get("codex-plugin:" + plugin), heads.get((url, ref))
             publisher, repository = publisher_key(url, ref), github_repository(url)
-            if not publisher or previous == plugin_head or plugin_head and all(
-                    tree_key(repository, revision, path) in known
-                    for revision in (plugin_head, previous) if isinstance(revision, str)):
+            if not publisher or previous == plugin_head:
+                continue
+            if plugin_head and all(tree_key(repository, revision, path) in contents["trees"]
+                                   for revision in (plugin_head, previous) if isinstance(revision, str)):
+                cached[publisher] = plugin_head
                 continue
             wanted.setdefault(publisher, set()).add(path)
             if isinstance(previous, str):
                 installed.setdefault(publisher, set()).add(previous)
+        if cached:
+            try:
+                record_contents(heads=cached, keep=own)
+            except OSError as error:
+                print(f"plugins: could not record plugin heads ({error})", file=sys.stderr)
         if wanted:
-            refresh_contents(wanted, installed, query)
-        contents = read_contents()
+            refresh_contents(wanted, installed, query, keep=own)
+            contents = read_contents()
         retired = []
         for plugin in target["plugins"] if refreshed else []:
             plugin_key = "codex-plugin:" + plugin
