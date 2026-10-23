@@ -360,6 +360,8 @@ def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set
     bootstrap = codex_snapshot_bootstrap(loader)
     for plugin in sorted(plugins):
         hook_path = f"plugins/{plugin}/hooks/codex.json"
+        if hook_path not in output:
+            continue
         excluded = ["hooks/codex.json"]
         if plugin == "machine":
             excluded.append("catalog/catalog.json")

@@ -2,9 +2,10 @@
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
 The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core).
-Select `base@tj-agents`, `engineering@tj-agents` and `machine@tj-agents` from
+Select `base@tj-agents`, `agent-store@tj-agents`, `engineering@tj-agents` and `machine@tj-agents` from
 [`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
-The repository publishes a minimal `base` package and optional `engineering` and `machine` packages.
+The repository publishes Base, Agent Store, Engineering and Machine packages. Agent Store owns recorded
+execution/session state; Machine observes and operates native hosts; Engineering owns code work and delivery.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns machine setup: `./setup.ps1` or `./setup.sh` is the one entry point.
 
@@ -25,8 +26,8 @@ The richer planning workflows are selected engineering conventions, not prerequi
 Known bugs, mistakes and debt are [GitHub issues](https://github.com/tj-agents/core/issues).
 The [recording contract](.agents/engineering/resources/problem-records.md) routes remote work-item
 operations to the repository's explicitly selected profile. Personal owns GitHub records; Infonetica owns
-Azure Boards records and native type policy. Core owns the shared SQLite agent execution/session registry
-and reusable engineering lifecycles. Installing Engineering does not select or install a recording
+Azure Boards records and native type policy. Core publishes the shared SQLite registry as Agent Store and the reusable engineering lifecycles as
+Engineering. Installing Engineering does not select or install a recording
 profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
 registers remain evidence only.
 Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.9+
@@ -64,6 +65,27 @@ Internal host cleanup hooks and the separate legacy `notify` command are outside
 The packages have no release line or compatibility promise: machines follow each publisher's `main`
 through automatic updates (see [Machine setup and updates](#machine-setup-and-updates)). Selection stays an
 independent user and repository setting; adding a marketplace does not select its full roster.
+
+## Agent Store ownership
+
+[Agent Store inspection](.agents/agent-store/utility/inspect/SKILL.md) reads recorded work items,
+sessions, owners and external references without creating or migrating the database. Its JSON labels
+process liveness as unobserved. Machine's native recovery checks processes and worktrees before opening
+a session; the store serializes ownership changes and preserves the existing schema and identities.
+
+The store runtime is authored once under `.agents/agent-store/runtime/`. Agent Store, Machine and
+Engineering receive generated package-local copies through the [resource contract](PACKAGING.md).
+A package never imports a sibling plugin installation. Machine's hooks remain the native event adapters.
+
+```text
+Machine -> Base + Agent Store
+Engineering -> Base + Agent Store + Machine
+Agent Store inspection -> existing sessions.db, read-only JSON
+```
+
+These are source package relationships. The central marketplace roster and native installation must
+also contain a package before a selected host can discover it; successful source generation is not
+installed activation.
 
 ## Repository auto-merge
 
@@ -107,7 +129,7 @@ establish installed-host trust or acceptance.
 
 ## Layout
 
-- `.agents/` is the canonical host-neutral source. Base, engineering and machine ownership is expressed
+- `.agents/` is the canonical host-neutral source. Base, Agent Store, Engineering and Machine ownership is expressed
   below it alongside shared workflows, hooks, schemas, tests and resources.
 - `.codex/` contains only Codex entry points and host configuration. `.claude/` contains only Claude
   entry points and host configuration. Their skills reference canonical `.agents/` definitions rather

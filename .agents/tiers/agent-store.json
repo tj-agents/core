@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "tier": "agent-store",
+  "stack": "any project",
+  "applies": "always"
+}
