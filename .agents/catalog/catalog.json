@@ -66,6 +66,19 @@
             ]
           },
           {
+            "path": "hooks/pre_tool_use_adapter.py",
+            "hosts": [
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/skill_router.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
             "path": "hooks/tier_gate.py",
             "hosts": [
               "claude",
