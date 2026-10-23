@@ -155,7 +155,8 @@ def plugin_revision(identity: str) -> str | None:
     catalog = read_json(Path(location) / ".claude-plugin/marketplace.json")
     source = next((entry.get("source") for entry in catalog.get("plugins", [])
                    if isinstance(entry, dict) and entry.get("name") == plugin), None)
-    path = source if isinstance(source, str) else (source.get("path") if isinstance(source, dict) else None)
+    path = (source.get("path") if isinstance(source, dict) and source.get("source") == "local"
+           else source if isinstance(source, str) else None)
     return plugin_autoupdate.subtree_revision(Path(location), path.lstrip("./")) if isinstance(path, str) else None
 
 
