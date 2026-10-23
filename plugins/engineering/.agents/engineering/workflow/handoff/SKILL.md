@@ -28,11 +28,11 @@ Predecessor: Launch one successor with the objective, constraints and unresolved
 Successor: Decide the architecture and establish isolated execution before deliverable writes.
 ```
 
-When an active task surfaces a distinct, independently actionable side workstream whose authorization is
-separate — granted by the user, or standing, as with `engineering:session`'s standards-defect
-default — select this workflow in **bounded side-workstream** mode immediately. Give the side workstream
-one successor and isolate its deliverable writes; the originating session retains its active goal and
-remains its only writer.
+When the user authorizes an independent successor for a distinct side workstream, select this workflow
+in **bounded side-workstream** mode. Give that workstream one successor and isolate its deliverable
+writes; the originating session retains its active goal and remains its only writer.
+`engineering:self-repair` owns whether an internal source repair is eligible and keeps it in the
+originating session unless the user requests a handoff.
 This is not a full-goal transfer. Do not offload a step that is inseparable from the original task's next
 action, create duplicate writers, or hand off work that overlaps the original checkout's owned paths.
 

@@ -14,7 +14,6 @@ SCHEMA_VERSION = 1
 MARKETPLACE_NAME = "tj-agents"
 MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
 ALLOWED_OWNERS = ("tj-agents", "Concertable")
-CORE_MARKETPLACE = "base-agents"
 CORE_REPOSITORY = "tj-agents/core"
 CORE_PLUGINS = ("base", "engineering", "machine")
 NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
@@ -64,8 +63,8 @@ def validate_marketplace(name: str, value: object) -> dict:
         )
     if (name == MARKETPLACE_NAME) != (repository == MARKETPLACE_REPOSITORY):
         raise lock_io.LockError(f"The {MARKETPLACE_NAME} marketplace must be {MARKETPLACE_REPOSITORY} and nothing else may use that name")
-    if (name == CORE_MARKETPLACE) != (repository == CORE_REPOSITORY):
-        raise lock_io.LockError(f"The {CORE_MARKETPLACE} marketplace must be {CORE_REPOSITORY} and nothing else may use that name")
+    if repository == CORE_REPOSITORY:
+        raise lock_io.LockError(f"{CORE_REPOSITORY} is published through the {MARKETPLACE_NAME} marketplace; select {MARKETPLACE_REPOSITORY}")
     return value
 
 
@@ -97,6 +96,24 @@ def validate(lock: dict) -> tuple[dict, list[str]]:
     return dict(sorted(marketplaces.items())), sorted(identities)
 
 
+def without_retired_core_marketplace(sources: dict, identities: list) -> tuple[dict, list]:
+    retired = {name for name, value in sources.items() if value["repository"] == CORE_REPOSITORY}
+    if not retired or not isinstance(identities, list):
+        return sources, identities
+    migrated = []
+    for identity in identities:
+        name, marketplace = split(identity) if isinstance(identity, str) else ("", "")
+        if marketplace in retired:
+            if name not in CORE_PLUGINS:
+                raise lock_io.LockError(f"Legacy plugin {identity} has no {MARKETPLACE_NAME} replacement")
+            identity = plugin_id(name)
+        if identity not in migrated:
+            migrated.append(identity)
+    sources = {name: value for name, value in sources.items() if name not in retired}
+    sources.setdefault(MARKETPLACE_NAME, {"repository": MARKETPLACE_REPOSITORY})
+    return sources, migrated
+
+
 def migrate(lock: dict) -> dict:
     if not isinstance(lock, dict) or lock.get("schema_version") not in {2, 3}:
         raise lock_io.LockError("Migration accepts only schema_version 2 or 3 plugin locks")
@@ -119,6 +136,7 @@ def migrate(lock: dict) -> dict:
         if not isinstance(value, dict) or set(value) != {"repository", "revision"} or not isinstance(value["revision"], str) or not value["revision"]:
             raise lock_io.LockError(f"Legacy marketplace {name} has invalid fields")
         sources[name] = {"repository": value["repository"]}
+    sources, identities = without_retired_core_marketplace(sources, identities)
     document = {"schema_version": SCHEMA_VERSION, "marketplaces": sources, "plugins": identities}
     validate(document)
     return document

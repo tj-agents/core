@@ -20,7 +20,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='engineering package with spaces ')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
-        self.package = self.root / 'cache' / 'base-agents' / 'engineering' / '2.1.16'
+        self.package = self.root / 'cache' / 'tj-agents' / 'engineering' / '2.1.16'
         shutil.copytree(ROOT / 'plugins/engineering', self.package)
         self.cwd = self.root / 'unrelated caller'
         self.cwd.mkdir()
@@ -207,8 +207,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
 
         before = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
         contract.write_text(contract.read_text(encoding="utf-8").replace(
-            "Established standards defects still require immediate repair.",
-            "Established standards defects still require immediate repair. Canonical source changed.",
+            "Established standards defects follow",
+            "Canonical source changed. Established standards defects follow",
         ), encoding="utf-8")
         after = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertNotEqual(before, after)
