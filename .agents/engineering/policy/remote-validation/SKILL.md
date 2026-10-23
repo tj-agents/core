@@ -84,7 +84,7 @@ out, every test in a suite failing at once) rather than as the defect itself.
    "prove" it does not exist. That silence cuts both ways: establish a suitable repeatable gate for an
    ungated tier rather than assuming local-only verification. A queue-gated tier re-spends the entire cycle
    when it fails, so run it in a suitable environment before enqueuing.
-6. On failure, read the remote log first, reproduce only the failing scope locally, fix it, run its focused
+6. On failure, read the remote log first, reproduce only the failing scope in a suitable environment, fix it, run its focused
    regression, and push once. Do not run every local suite before pushing the fix.
 7. Mark the PR ready only once review is clean and exact-head CI is green. Enqueue or merge only on an
    explicit instruction.

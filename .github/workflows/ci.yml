@@ -6,6 +6,9 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
+permissions:
+  contents: read
+
 env:
   PYTHONUTF8: '1'
 
@@ -115,6 +118,36 @@ jobs:
         shell: pwsh
         run: python -B scripts/sync_harness_manifests.py --check
 
+      - name: native host startup and discovery acceptance
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $native = Join-Path $env:RUNNER_TEMP 'tj-agents-native-acceptance'
+          $codexRoot = Join-Path $native 'codex'
+          $archive = Join-Path $native 'codex.zip'
+          $claudeRoot = Join-Path $native 'claude'
+          $tools = Join-Path $native 'tools'
+          New-Item -ItemType Directory -Force -Path $native, $codexRoot, $claudeRoot, $tools | Out-Null
+          $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/openai/codex/releases/tags/rust-v0.163.0-alpha.1'
+          $asset = @($release.assets | Where-Object { $_.name -eq 'codex-x86_64-pc-windows-msvc.exe.zip' })
+          if ($asset.Count -ne 1 -or -not $asset[0].digest) { throw 'Codex release asset metadata is incomplete.' }
+          Invoke-WebRequest -Uri $asset[0].browser_download_url -OutFile $archive
+          $actual = 'sha256:' + (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $asset[0].digest) { throw 'Codex release asset digest does not match metadata.' }
+          Expand-Archive -LiteralPath $archive -DestinationPath $codexRoot
+          $codexSource = Get-ChildItem -LiteralPath $codexRoot -Filter 'codex-x86_64-pc-windows-msvc.exe' -File -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $codexSource) { throw 'Codex release did not contain its Windows executable.' }
+          $codex = Join-Path $tools 'codex.exe'
+          Copy-Item -LiteralPath $codexSource -Destination $codex
+          npm install --prefix $claudeRoot --no-audit --no-fund '@anthropic-ai/claude-code@2.1.282'
+          $claudeSource = Get-ChildItem -LiteralPath (Join-Path $claudeRoot 'node_modules/@anthropic-ai/claude-code/bin') -Filter claude.exe -File -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $claudeSource) { throw 'Claude package did not contain claude.exe.' }
+          $claude = Join-Path $tools 'claude.exe'
+          Copy-Item -LiteralPath $claudeSource -Destination $claude
+          python -B scripts/native_host_acceptance.py --root . --marketplace . --codex $codex --claude $claude --artifacts (Join-Path $native 'artifacts')
+
       - name: authored skill references resolve in the public corpus
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
@@ -196,6 +229,48 @@ jobs:
 
       - name: harness declarations cover authored sources
         run: python -B scripts/sync_harness_manifests.py --check
+
+      - name: native host startup and discovery acceptance
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
+        shell: bash
+        run: |
+          set -euo pipefail
+          native="$RUNNER_TEMP/tj-agents-native-acceptance"
+          codex_root="$native/codex"
+          archive="$native/codex.tar.gz"
+          claude_root="$native/claude"
+          tools="$native/tools"
+          mkdir -p "$codex_root" "$claude_root" "$tools"
+          python3 - "$archive" <<'PY'
+          import hashlib
+          import json
+          import sys
+          import urllib.request
+
+          metadata = urllib.request.urlopen('https://api.github.com/repos/openai/codex/releases/tags/rust-v0.163.0-alpha.1', timeout=30)
+          release = json.load(metadata)
+          assets = [asset for asset in release.get('assets', []) if asset.get('name') == 'codex-x86_64-unknown-linux-musl.tar.gz']
+          if len(assets) != 1 or not isinstance(assets[0].get('digest'), str):
+              raise SystemExit('Codex release asset metadata is incomplete.')
+          with urllib.request.urlopen(assets[0]['browser_download_url'], timeout=60) as response:
+              payload = response.read()
+          expected = assets[0]['digest']
+          actual = 'sha256:' + hashlib.sha256(payload).hexdigest()
+          if actual != expected:
+              raise SystemExit('Codex release asset digest does not match metadata.')
+          open(sys.argv[1], 'wb').write(payload)
+          PY
+          tar -xzf "$archive" -C "$codex_root"
+          codex_source="$(find "$codex_root" -type f -name codex-x86_64-unknown-linux-musl -perm -u+x -print -quit)"
+          test -n "$codex_source"
+          codex="$tools/codex"
+          install -m 755 "$codex_source" "$codex"
+          npm install --prefix "$claude_root" --no-audit --no-fund '@anthropic-ai/claude-code@2.1.282'
+          claude_source="$(find "$claude_root/node_modules/@anthropic-ai/claude-code/bin" -type f -name claude -perm -u+x -print -quit)"
+          test -n "$claude_source"
+          claude="$tools/claude"
+          install -m 755 "$claude_source" "$claude"
+          python3 -B scripts/native_host_acceptance.py --root . --marketplace . --codex "$codex" --claude "$claude" --artifacts "$native/artifacts"
 
       - name: skill packaging tests
         shell: pwsh
