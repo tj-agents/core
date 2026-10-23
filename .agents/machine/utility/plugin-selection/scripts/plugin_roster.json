@@ -12,9 +12,7 @@
       "base",
       "agent-store"
     ],
-    "cpp": [
-      "engineering"
-    ],
+    "cpp": [],
     "gpp": [
       "cpp"
     ],
@@ -24,40 +22,26 @@
     "win32": [
       "cpp"
     ],
-    "dotnet": [
-      "engineering"
-    ],
+    "dotnet": [],
     "efcore": [
       "dotnet"
     ],
     "azure": [
       "dotnet"
     ],
-    "react": [
-      "engineering"
-    ],
-    "nvim": [
-      "engineering"
-    ],
-    "rust": [
-      "engineering"
-    ],
-    "python": [
-      "engineering"
-    ],
-    "github-actions": [
-      "engineering"
-    ],
-    "template": [
-      "engineering"
-    ],
+    "react": [],
+    "nvim": [],
+    "rust": [],
+    "python": [],
+    "github-actions": [],
+    "template": [],
     "personal": [
       "base",
       "engineering",
       "machine"
     ],
     "work": [
-      "engineering"
+      "base"
     ],
     "infonetica": [
       "engineering",
