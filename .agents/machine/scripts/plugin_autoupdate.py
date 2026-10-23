@@ -48,7 +48,9 @@ def producer_repository(repository: object) -> bool:
 
 
 def marketplace_error(name: str, repository: object) -> str | None:
-    if (name == MARKETPLACE_NAME) != (repository == MARKETPLACE_REPOSITORY):
+    canonical_repository = isinstance(repository, str) and repository.casefold() == MARKETPLACE_REPOSITORY
+    if ((name == MARKETPLACE_NAME and repository != MARKETPLACE_REPOSITORY)
+            or (name != MARKETPLACE_NAME and canonical_repository)):
         return f"The {MARKETPLACE_NAME} marketplace must be {MARKETPLACE_REPOSITORY} and nothing else may use that name"
     if producer_repository(repository):
         return f"{repository} is published through the {MARKETPLACE_NAME} marketplace; select {MARKETPLACE_REPOSITORY}"

@@ -80,6 +80,8 @@ class PluginSelectionTests(unittest.TestCase):
             ({"agents": {"repository": "Concertable/agents"}}, ["project@agents", "project@agents"]),
             ({"agents": {"repository": "Concertable/agents"}}, ["project"]),
             ({"alias": {"repository": "tj-agents/marketplace"}}, ["base@alias"]),
+            ({"alias": {"repository": "tj-agents/Marketplace"}}, ["base@alias"]),
+            ({"tj-agents": {"repository": "tj-agents/Marketplace"}}, ["base@tj-agents"]),
             ({"alias": {"repository": "tj-agents/core"}}, ["base@alias"]),
             ({"core": {"repository": "tj-agents/core"}}, ["base@core"]),
         )
