@@ -221,7 +221,7 @@ and merge-gates tasks or cron entries. Nothing runs in the background.
 
 Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: one non-blocking ntfy.sh
 poll for events since the saved cursor; offline it starts anyway. Events name the publishing repositories.
-One GitHub query reads their heads and each plugin directory's tree into `~/.agents-state/plugin-heads.json`,
+A GitHub query per repository reads its head and each plugin directory's tree into `~/.agents-state/plugin-heads.json`,
 both hosts update in parallel, and the cursor advances once both succeed. A failed host retries on the next
 launch; a cursor older than ntfy's retention compares every publisher instead. Every launch then compares
 this project's Claude installs with the recorded heads from local files only, and updates an install only
