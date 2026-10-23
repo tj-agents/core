@@ -606,21 +606,35 @@ class OrchestratorRecoveryTests(OrchestrateCase):
         self.register("orchestrator-1")
         f.write_peers([{"session_id": "orchestrator-1", "alive": True}])
         self.as_session("replacement")
-        self.assertIn("still running", f.call("claim", expect=2))
+        self.assertIn("may still be running", f.call("claim", expect=2))
         self.register("orchestrator-1", ended=True)
         self.assertEqual(f.json("claim")["orchestrator"], "claude:replacement")
         f.add("a")
 
-    def test_unknown_liveness_allows_claim_but_a_worker_cannot_claim(self):
+    def test_unknown_liveness_needs_confirmation_and_a_worker_cannot_claim(self):
         f = self.fixture
         f.add("a")
         f.json("tick")
         worker = f.session_of("a").split(":", 1)[1]
         self.register("orchestrator-1")
         self.as_session(worker)
-        self.assertIn("worker session cannot claim", f.call("claim", expect=2))
+        self.assertIn("worker session cannot claim", f.call("claim", "--confirm-ended", expect=2))
         self.as_session("replacement")
-        self.assertEqual(f.json("claim")["orchestrator"], "claude:replacement")
+        self.assertIn("--confirm-ended", f.call("claim", expect=2))
+        self.assertEqual(f.json("claim", "--confirm-ended")["orchestrator"], "claude:replacement")
+
+    def test_a_report_from_another_workers_session_is_ignored(self):
+        f = self.fixture
+        f.add("a", done_when="reported")
+        f.add("b", done_when="reported")
+        f.add("c", depends="a", done_when="reported")
+        f.json("tick")
+        self.as_session(f.session_of("b").split(":", 1)[1])
+        f.call("report", "--worker", "a", "--status", "done")
+        self.as_session("orchestrator-1")
+        self.assertEqual(self.rows(f.json("tick"))["c"]["state"], "pending")
+        f.call("report", "--worker", "a", "--status", "done")
+        self.assertEqual(self.rows(f.json("tick"))["c"]["state"], "working")
 
     def test_a_relaunched_orchestrator_is_followed_through_the_registry(self):
         f = self.fixture
@@ -666,7 +680,7 @@ class OrchestratorRecoveryTests(OrchestrateCase):
 
     def test_report_paths_with_shell_characters_are_quoted(self):
         self.assertEqual(orchestrate.shell_path("C:/plain/path.py"), "C:/plain/path.py")
-        self.assertEqual(orchestrate.shell_path("/a b/x;y"), "'/a b/x;y'")
+        self.assertEqual(orchestrate.shell_path("/a b/$x;y"), "'/a b/$x;y'")
         with self.assertRaises(orchestrate.OrchestrationError):
             orchestrate.shell_path("/home/o'neil/x.json")
 
