@@ -677,6 +677,31 @@ class LockAndSelfUpdateTests(unittest.TestCase):
             for name in UPDATE.RUNTIME[1:]:
                 self.assertEqual('new ' + name, stable.with_name(name).read_text(encoding='utf-8'))
 
+    def test_base_installed_copier_upgrades_to_a_runnable_runtime(self):
+        fixture = ROOT / 'tests/fixtures/plugin_autoupdate_208cc302.py'
+        spec = importlib.util.spec_from_file_location('base_installed_updater', fixture)
+        previous = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(previous)
+        with tempfile.TemporaryDirectory(prefix='updater upgrade é ') as temp:
+            directory = Path(temp)
+            stable = directory / 'bin' / UPDATE.SCRIPT_NAME
+            stable.parent.mkdir()
+            shutil.copyfile(fixture, stable)
+            with mock.patch.object(previous, 'packaged_copies', return_value=[SCRIPTS / UPDATE.SCRIPT_NAME]):
+                self.assertTrue(previous.self_update(stable, {}))
+
+            environment = {**os.environ, 'PATH': '', 'CODEX_HOME': str(directory / 'codex'),
+                           'CLAUDE_CONFIG_DIR': str(directory / 'claude'),
+                           'AGENT_STATE_DIRECTORY': str(directory / 'state')}
+            result = subprocess.run([sys.executable, '-B', str(stable), '--no-self-update', '--no-sweep'],
+                                    env=environment, capture_output=True, text=True, encoding='utf-8', timeout=30)
+            self.assertEqual(0, result.returncode, result.stderr)
+            state = json.loads((directory / 'state/plugin-autoupdate.json').read_text(encoding='utf-8'))
+            self.assertEqual({}, state['outcomes'])
+            result = subprocess.run([sys.executable, '-B', str(stable.with_name('reload_plugins.py')), '--help'],
+                                    env=environment, capture_output=True, text=True, encoding='utf-8', timeout=30)
+            self.assertEqual(0, result.returncode, result.stderr)
+
 
     def test_only_enabled_installed_machine_packages_are_self_update_sources(self):
         with tempfile.TemporaryDirectory(prefix='plugin homes ') as temp:

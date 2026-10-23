@@ -12,14 +12,14 @@ import lock_io
 
 def identity_rules():
     for parent in Path(__file__).resolve().parents:
-        for relative in ("scripts/marketplace_identity.py", "resources/machine/scripts/marketplace_identity.py"):
+        for relative in ("scripts/plugin_autoupdate.py", "resources/machine/scripts/plugin_autoupdate.py"):
             candidate = parent / relative
             if candidate.is_file():
-                spec = importlib.util.spec_from_file_location("selection_marketplace_identity", candidate)
+                spec = importlib.util.spec_from_file_location("selection_plugin_autoupdate", candidate)
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 return module
-    raise RuntimeError("The shipped marketplace_identity.py helper was not found")
+    raise RuntimeError("The shipped plugin_autoupdate.py runtime was not found")
 
 
 IDENTITY_RULES = identity_rules()
