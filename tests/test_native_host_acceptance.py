@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest import mock
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "native_host_acceptance.py"
@@ -130,15 +131,35 @@ class NativeHostAcceptanceTests(unittest.TestCase):
         with self.assertRaisesRegex(NATIVE.AcceptanceError, "Base context"):
             NATIVE.require_failed_turn(transcript, package, 0.1)
 
-    def test_claude_debug_requires_qualified_skill_discovery(self):
-        NATIVE.require_claude_discovery("workflow:run engineering:commit")
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "workflow skill"):
-            NATIVE.require_claude_discovery("workflow engineering:commit")
+    def test_transcript_waits_for_initial_appearance(self):
+        package = self.root / "base"
+        contract = package / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
+        contract.parent.mkdir(parents=True)
+        contract.write_text("task routing", encoding="utf-8")
+        digest = hashlib.sha256(b"task routing").hexdigest()
+        entries = [
+            {"type": "response_item", "payload": {"content": f"base:task-routing {digest}"}},
+            {"type": "event_msg", "payload": {"type": "task_complete", "error": {"message": "401 Unauthorized"}}},
+        ]
+        with mock.patch.object(NATIVE, "transcript_entries", side_effect=[None, entries]):
+            NATIVE.require_failed_turn(self.root / "session.jsonl", package, 0.2)
+
+    def test_claude_initialize_requires_qualified_command_inventory(self):
+        NATIVE.require_claude_discovery({"commands": [
+            {"name": "workflow:run"}, {"name": "engineering:commit"},
+        ]})
+        with self.assertRaisesRegex(NATIVE.AcceptanceError, "workflow:run"):
+            NATIVE.require_claude_discovery({"commands": [{"name": "run"}, {"name": "engineering:commit"}]})
 
     def test_discovery_rejects_substrings_without_exact_skill_names(self):
         with self.assertRaisesRegex(NATIVE.AcceptanceError, "workflow skill"):
             NATIVE.require_discovery({"description": "workflow run engineering commit"}, "native")
-        NATIVE.require_discovery({"commands": [{"name": "run"}, {"name": "commit"}]}, "native")
+        with self.assertRaisesRegex(NATIVE.AcceptanceError, "workflow skill"):
+            NATIVE.require_discovery({"commands": [{"name": "run"}, {"name": "commit"}]}, "native")
+        NATIVE.require_discovery({"commands": [
+            {"name": "run", "pluginId": "workflow@tj-agents"},
+            {"name": "commit", "path": "/cache/plugins/engineering/skills/commit/SKILL.md"},
+        ]}, "native")
 
     def test_restarted_startup_hooks_require_trusted_current_hashes(self):
         hooks = {"data": [{"hooks": [
