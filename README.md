@@ -223,8 +223,8 @@ A GitHub query per repository reads its head and each plugin directory's tree in
 both hosts update in parallel, and the cursor advances once both succeed. A failed host retries on the next
 launch; a cursor older than ntfy's retention compares every publisher instead. Every launch except `codex` then compares
 this project's Claude installs with the recorded heads from local files only, and updates an install only
-when its plugin directory differs at the head; a plain launch does not retry an update that did not reach
-the head. Codex re-adds a plugin only when its directory changed. Without GitHub content, both compare commits.
+when its plugin directory differs at the head; a plain launch tries each install at most once per head,
+and any publish retries it. Codex re-adds a plugin only when its directory changed. Without GitHub content, both compare commits.
 `machine:sync-plugins` runs the same check in a running session.
 
 Main-branch callers publish events through the shared
