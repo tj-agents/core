@@ -23,9 +23,11 @@ def scoped(items, all_items, under):
     return items if root is None else [item for item in items if not item.get("cwd") or session_close.under_or_equal(item["cwd"], root)]
 
 
-def records():
+def records(ids=None):
     result = []
     for _path, entry in session_close.entries():
+        if ids and entry.get("session_id") not in ids:
+            continue
         value = dict(entry)
         value["alive"] = session_close.liveness(value)
         result.append(value)
@@ -75,8 +77,11 @@ def main(argv=None):
     parser.add_argument("--include-unrecorded", action="store_true")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--id", action="append", help="list only these session ids")
     args = parser.parse_args(argv)
-    items = records()
+    if args.id and args.action != "list":
+        parser.error("--id filters list only")
+    items = records(set(args.id)) if args.id else records()
     if args.include_unrecorded:
         items += unrecorded(items)
     if args.action == "list" and args.json:
