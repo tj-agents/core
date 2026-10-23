@@ -205,5 +205,29 @@ class AdoptPluginsTests(unittest.TestCase):
         self.assertIn(".agents/plugins.json", output.getvalue())
 
 
+    def test_producer_migration_rewrites_python_and_react_and_deduplicates(self):
+        legacy = self.root / ".agents/plugins.lock.json"
+        legacy.parent.mkdir()
+        legacy.write_text(json.dumps({
+            "schema_version": 3,
+            "marketplaces": {
+                "python-agents": {"repository": "tj-agents/python", "revision": "old"},
+                "react-agents": {"repository": "tj-agents/react", "revision": "old"},
+                "tj-agents": {"repository": "tj-agents/marketplace", "revision": "old"},
+                "agents": {"repository": "Concertable/agents", "revision": "old"},
+            },
+            "plugins": ["python@python-agents", "python@tj-agents", "react@react-agents", "concertable@agents"],
+        }), encoding="utf-8")
+        adopt_plugins.run(self.root, [], [], "write")
+        self.assertEqual(["concertable@agents", "python@tj-agents", "react@tj-agents"], self.plugins())
+        self.assertFalse(legacy.exists())
+        self.assertEqual([], adopt_plugins.run(self.root, [], [], "check"))
+        for path in (self.selection, self.root / ".claude/settings.json", self.root / ".codex/config.toml"):
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn("python-agents", text)
+            self.assertNotIn("react-agents", text)
+            self.assertIn("concertable@agents", text)
+
+
 if __name__ == "__main__":
     unittest.main()

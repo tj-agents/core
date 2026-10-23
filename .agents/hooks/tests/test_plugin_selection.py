@@ -84,6 +84,26 @@ class PluginSelectionTests(unittest.TestCase):
         self.assertTrue(claude["extraKnownMarketplaces"]["tj-agents"]["autoUpdate"])
         self.assertEqual([], self.run_mode("check", "local"))
 
+    def test_producer_aliases_cannot_be_adopted_or_generated(self):
+        adopt_plugins = load("adopt_plugins")
+        for name in ("python", "react"):
+            for marketplace in (f"{name}-agents", "producer-alias"):
+                repository = f"tj-agents/{name}"
+                with self.subTest(name=name, marketplace=marketplace):
+                    document = {"schema_version": 1,
+                                "marketplaces": {marketplace: {"repository": repository}},
+                                "plugins": [f"{name}@{marketplace}"]}
+                    self.selection.write_text(json.dumps(document), encoding="utf-8")
+                    for mode in ("preview", "check", "write"):
+                        with self.assertRaisesRegex(LockError, "published through the tj-agents marketplace"):
+                            self.run_mode(mode)
+                        with self.assertRaisesRegex(LockError, "published through the tj-agents marketplace"):
+                            adopt_plugins.run(self.root, [], [], mode)
+                    with self.assertRaisesRegex(LockError, "published through the tj-agents marketplace"):
+                        adopt_plugins.parse_marketplace(f"{marketplace}={repository}")
+                    self.assertFalse((self.root / ".claude/settings.json").exists())
+                    self.assertFalse((self.root / ".codex/config.toml").exists())
+
     def test_resolve_names_the_selection_in_agents(self):
         self.assertEqual(self.selection, plugin_selection.resolve(self.root))
 
