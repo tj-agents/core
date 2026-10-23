@@ -872,10 +872,9 @@ def statement(root, found=None):
     if applicable:
         lines.append(
             "Codebase conventions: where a tier rule chooses between equivalent ways of writing the same "
-            "thing (`var` or an explicit type, `_field` or `this.field`, the assertion library, test or file "
-            "layout) and this codebase consistently does it one way, follow the codebase and never add a "
-            "second way; a new or already-conforming codebase gets the tier's way. Design rules (domain "
-            "modelling, error handling, correctness, structure) apply regardless and may enter gradually."
+            "thing and this codebase consistently does it one way, follow the codebase and never add a "
+            "second way; a new or already-conforming codebase gets the tier's way. Rules about design or "
+            "correctness apply regardless and may enter gradually."
         )
     for declaration, _ in result.employers:
         path = employer_context_path(declaration.payload_dir, declaration.employer["context_skill"])
