@@ -229,6 +229,12 @@ cached files are insufficient. The write router repeats admission before discove
 so a missing plugin cannot silently remove its own standards from enforcement. Read-only diagnosis
 remains available. Offline optional update polling does not invalidate already verified installations.
 
+Claude inventory receives launch-specific settings, setting sources and plugin paths. Codex's native
+inventory does not apply session activation overrides, so selected repositories refuse CLI profile,
+feature and non-model configuration overrides that cannot be verified. Persist those settings in the
+repository configuration instead. Model and reasoning overrides remain available; help, version and
+native maintenance commands remain available to repair an installation.
+
 For example, selecting `example@tj-agents` while it is absent from Codex's inventory prevents a
 Codex launch and file writes even if its `tier.json` and routes are entirely missing. Repair the
 selection/install and start a fresh session; copying a Claude cache directory does not satisfy it.

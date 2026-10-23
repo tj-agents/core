@@ -52,6 +52,17 @@ class Server:
 
 
 class LaunchCheckTests(unittest.TestCase):
+    def test_shell_admission_refuses_unverifiable_codex_override_before_optional_updates(self):
+        selection = self.state / ".agents/plugins.json"
+        selection.parent.mkdir()
+        selection.write_text('{"schema_version":1,"plugins":["base@tj-agents"]}', encoding="utf-8")
+        with mock.patch.object(CHECK, "check") as optional, mock.patch.object(sys, "stderr", io.StringIO()):
+            self.assertEqual(1, CHECK.main([
+                "--host", "codex", "--project", str(self.state), "--target", "native-cli",
+                "--", "--profile=alternate",
+            ]))
+        optional.assert_not_called()
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix="launch check ")
         self.addCleanup(temp.cleanup)
