@@ -24,10 +24,11 @@ COMMAND_SECONDS = 120
 LAUNCH_SECONDS = 600
 DROPPED_MERGE_SECONDS = 300
 CHECKS_REGISTER_SECONDS = 120
+HEAD_CHECKS_REGISTER_SECONDS = 600
 SWEEP_RETRY_SECONDS = 600
 SWEEP_ATTEMPTS = 6
 SAFE_PATH = re.compile(r"[A-Za-z0-9_./:\\-]+")
-QUOTABLE_PATH = re.compile(r"[^'\"$`]+")
+QUOTABLE_PATH = re.compile(r"[^'\u2018\u2019]+")
 TEXT_LIMIT = 300
 PR_FIELDS = ("number,state,isDraft,headRefOid,mergedAt,createdAt,url,reviewDecision,statusCheckRollup,"
              "autoMergeRequest")
@@ -107,24 +108,19 @@ def handle_of(identity):
     return f"{identity['host']}:{identity['session_id']}"
 
 
-def orchestrator_directory(state):
-    row = Observer(None, state, forge=False).session(state["orchestrator"])
-    location = row.get("cwd")
-    return location if location and Path(location).is_dir() else None
-
-
 def require_orchestrator(state, tools=None):
     if not state.get("orchestrator"):
         raise OrchestrationError("this orchestration has no recorded orchestrator session")
+    current = Observer(None, state, forge=False).session(state["orchestrator"])
+    location = current.get("cwd") if current.get("cwd") and Path(current["cwd"]).is_dir() else None
     try:
-        identity = caller({"tools": tools or state["tools"]}, cwd=orchestrator_directory(state))
+        identity = caller({"tools": tools or state["tools"]}, cwd=location)
     except OrchestrationError as error:
-        raise OrchestrationError(f"only the orchestrator session may change this orchestration; {error}; "
-                                 "run it from the orchestrator session's directory")
+        raise OrchestrationError(f"only the orchestrator session may change this orchestration; {error}")
     handle = handle_of(identity)
     if handle == state["orchestrator"]:
         return
-    if Observer(None, state, forge=False).session(state["orchestrator"]).get("handle") == handle:
+    if current.get("handle") == handle:
         state["orchestrator"] = handle
         return
     raise OrchestrationError("only the orchestrator session may change this orchestration; a new orchestrator "
@@ -376,7 +372,7 @@ class Observer:
             empty = worker.get("empty_rollup") or {}
             if empty.get("head") != value.get("headRefOid"):
                 empty = worker["empty_rollup"] = {"head": value.get("headRefOid"), "since": now()}
-            if now() - empty["since"] < CHECKS_REGISTER_SECONDS:
+            if now() - empty["since"] < HEAD_CHECKS_REGISTER_SECONDS:
                 value["checks"] = {"state": "pending", "names": ["checks not registered for this head yet"]}
         value["queued"] = bool(value.get("autoMergeRequest")) or self.queued(worker, value)
         return value
@@ -418,14 +414,22 @@ class Observer:
         pr = self.pull_request(worker)
         checkout = self.checkout(worker, pr)
         return {"session": row, "alive": self.alive(row), "pr": pr, "checkout": checkout,
-                "reports": reports(self.path, worker)}
+                "reports": self.own_reports(worker)}
+
+    def own_reports(self, worker):
+        kept = []
+        for entry in reports(self.path, worker):
+            reporter = entry.get("reporter") or {}
+            owner = worker_owning(self, self.state, reporter.get("handle"), reporter.get("cwd")) \
+                if reporter.get("handle") else None
+            if owner in (None, worker["id"]):
+                kept.append(entry)
+        return kept
 
 
 def latest_report(observation):
     found = [item for item in observation["reports"] if item.get("status") != "progress"]
     return found[-1] if found else None
-
-
 
 
 def idle(observation):
@@ -932,7 +936,7 @@ def wait(path, poll, slow_poll, timeout):
                     continue
             else:
                 row = observer.session(worker["session"]) if worker.get("session") else None
-                observation = {"session": row, "reports": reports(path, worker)}
+                observation = {"session": row, "reports": observer.own_reports(worker)}
                 if (worker.get("worktree") and not worker.get("session") and worker["phase"] == "dispatched"
                         and worker["host"] != "subagent"):
                     bound = observer.bind_launch(worker)
@@ -1013,22 +1017,38 @@ def command_configure(args):
     return {"tools": state["tools"], "missing": missing}
 
 
+def worker_owning(observer, state, handle, cwd=None):
+    for worker in state["workers"].values():
+        if worker["phase"] == "closed":
+            continue
+        handles = {worker.get("session")}
+        if worker.get("session"):
+            handles.add(observer.session(worker["session"]).get("handle"))
+        if handle in handles:
+            return worker["id"]
+        if cwd and worker.get("worktree") and same_path_key(cwd) == same_path_key(worker["worktree"]) \
+                and same_path_key(worker["worktree"]) != same_path_key(worker["repo"]):
+            return worker["id"]
+    return None
+
+
 def command_claim(args):
     path = resolve_file(args)
     with locked(path):
         state = load(path)
-        handle = handle_of(caller(state))
+        identity = caller(state)
+        handle = handle_of(identity)
         recorded = state.get("orchestrator")
-        if any(handle in (worker.get("session"), (Observer(path, state, forge=False).session(worker["session"])
-                                                  or {}).get("handle"))
-               for worker in state["workers"].values() if worker.get("session")):
+        if worker_owning(Observer(path, state, forge=False), state, handle, identity.get("cwd")):
             raise OrchestrationError("a worker session cannot claim the orchestration")
         if handle != recorded and recorded:
             observer = Observer(path, state, forge=False)
             row = observer.session(recorded)
-            if row.get("handle") != handle and not row.get("ended_at") and observer.alive(row) is True:
-                raise OrchestrationError(f"the recorded orchestrator {recorded} is still running; close it first")
-        state.setdefault("previous_orchestrators", []).append(recorded)
+            ended = row.get("ended_at") or row.get("handle") == handle or observer.alive(row) is False
+            if not ended and not args.confirm_ended:
+                raise OrchestrationError(
+                    f"the recorded orchestrator {recorded} may still be running; close it, or pass "
+                    "--confirm-ended once the user confirms its tab is gone")
         state["orchestrator"] = handle
         save(path, state)
     return {"orchestrator": handle}
@@ -1076,9 +1096,14 @@ def command_report(args):
     state = load(path)
     if args.worker not in state["workers"]:
         raise OrchestrationError(f"unknown worker {args.worker}")
+    reporter = None
+    with contextlib.suppress(OrchestrationError):
+        identity = caller(state)
+        reporter = {"handle": handle_of(identity), "cwd": identity.get("cwd")}
     file = side_directory(path) / "reports" / f"{args.worker}.jsonl"
     file.parent.mkdir(parents=True, exist_ok=True)
-    entry = {"status": args.status, "text": args.text, "reply": args.reply, "where": args.where, "at": now()}
+    entry = {"status": args.status, "text": args.text, "reply": args.reply, "where": args.where, "at": now(),
+             "reporter": reporter}
     with open(file, "a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, sort_keys=True) + "\n")
     return {"worker": args.worker, "status": args.status}
@@ -1178,7 +1203,8 @@ def parser():
     configure.add_argument("--tool", action="append", metavar="NAME=PATH")
     configure.add_argument("--title")
 
-    commands.add_parser("claim", parents=[common])
+    claim = commands.add_parser("claim", parents=[common])
+    claim.add_argument("--confirm-ended", action="store_true")
 
     for name in ("add", "adopt"):
         sub = commands.add_parser(name, parents=[common])
