@@ -97,6 +97,27 @@ class ReadOnlyWorkItemStore:
         finally:
             connection.close()
 
+    def sessions(self, handles=None, cwd=None):
+        connection = self._connection()
+        try:
+            clauses, arguments = [], []
+            if handles is not None:
+                handles = tuple(handles)
+                if not handles:
+                    return []
+                clauses.append(f"handle IN ({', '.join('?' for _ in handles)})")
+                arguments.extend(handles)
+            if cwd is not None:
+                clauses.append("cwd = ?")
+                arguments.append(str(cwd))
+            where = f"WHERE {' AND '.join(clauses)} " if clauses else ""
+            rows = connection.execute(f"SELECT * FROM sessions {where}ORDER BY handle", arguments).fetchall()
+            return [dict(row) for row in rows]
+        except sqlite3.DatabaseError as error:
+            raise StoreReadError(f"work-item session store query failed: {error}") from error
+        finally:
+            connection.close()
+
     def inspect(self, execution_key=None, repository=None):
         connection = self._connection()
         try:

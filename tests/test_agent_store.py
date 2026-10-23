@@ -75,6 +75,18 @@ class InspectTests(unittest.TestCase):
             timeout=15,
         )
 
+    def test_sessions_filter_by_handle_and_exact_directory(self):
+        connection = sqlite3.connect(self.database)
+        connection.execute("UPDATE sessions SET cwd = ? WHERE handle = ?", ("C:/work/one", "claude:one"))
+        connection.commit()
+        connection.close()
+        reader = load_reader().ReadOnlyWorkItemStore(self.database)
+        self.assertEqual([row["handle"] for row in reader.sessions(handles=["codex:two", "claude:one", "missing"])],
+                         ["claude:one", "codex:two"])
+        self.assertEqual([row["handle"] for row in reader.sessions(cwd="C:/work/one")], ["claude:one"])
+        self.assertEqual(reader.sessions(handles=[]), [])
+        self.assertEqual(len(reader.sessions()), 4)
+
     def test_lists_recorded_state_without_writing_and_sorts_every_collection(self):
         before = self.database.read_bytes()
         result = self.inspect()

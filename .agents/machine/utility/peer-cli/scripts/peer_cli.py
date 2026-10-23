@@ -1,5 +1,6 @@
 """List, resolve and safely close registered Claude/Codex sessions (Python 3.9+)."""
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -73,10 +74,15 @@ def main(argv=None):
     parser.add_argument("--under")
     parser.add_argument("--include-unrecorded", action="store_true")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     items = records()
     if args.include_unrecorded:
         items += unrecorded(items)
+    if args.action == "list" and args.json:
+        fields = ("session_id", "host", "title", "cwd", "pid", "alive")
+        print(json.dumps([{key: item.get(key) for key in fields} for item in scoped(items, args.all, args.under)]))
+        return 0
     if args.action == "list":
         for item in scoped(items, args.all, args.under):
             print("{title}\t{session}\t{alive}\t{pid}\t{cwd}".format(title=item.get("title") or "", session=item.get("session_id") or "", alive="?" if item["alive"] is None else item["alive"], pid=item.get("pid", ""), cwd=item.get("cwd") or ""))

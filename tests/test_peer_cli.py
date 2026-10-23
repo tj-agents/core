@@ -1,4 +1,7 @@
+import contextlib
 import importlib.util
+import io
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -9,6 +12,15 @@ sys.path.insert(0, str(PATH.parent))
 spec = importlib.util.spec_from_file_location("peer_cli", PATH); peer_cli = importlib.util.module_from_spec(spec); spec.loader.exec_module(peer_cli)
 
 class PeerCliTests(unittest.TestCase):
+    def test_list_json_reports_identity_and_liveness_only(self):
+        entries = [{"title": "core #1", "session_id": "a", "host": "codex", "cwd": "/w", "pid": 7,
+                    "pid_started_at": 1.0, "alive": True, "terminal": {"kind": "tmux"}}]
+        out = io.StringIO()
+        with mock.patch.object(peer_cli, "records", return_value=entries), contextlib.redirect_stdout(out):
+            self.assertEqual(peer_cli.main(["list", "--all", "--json"]), 0)
+        self.assertEqual(json.loads(out.getvalue()), [
+            {"session_id": "a", "host": "codex", "title": "core #1", "cwd": "/w", "pid": 7, "alive": True}])
+
     def test_ambiguous_prefix_refuses(self):
         entries = [
             {"title": "one", "session_id": "a"},
