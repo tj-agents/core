@@ -208,6 +208,7 @@ class Observer:
         self.state = state
         self.forge = forge
         self._peers = None
+        self._queried = set()
         self._reader = None
 
     def reader(self):
@@ -248,12 +249,20 @@ class Observer:
                 return row["handle"]
         return None
 
-    def peers(self):
-        if self._peers is None:
-            self._peers = {}
+    def peers(self, wanted):
+        if self._peers is None or not wanted <= self._queried:
+            self._peers, self._queried = {}, set(wanted)
+            for worker in self.state["workers"].values():
+                if worker.get("session") and worker["phase"] != "closed":
+                    row = self.session(worker["session"])
+                    if row.get("session_id"):
+                        self._queried.add(row["session_id"])
             command = tool(self.state, "peer-cli")
-            if command:
-                code, output, _ = run(command + ["list", "--all", "--json"])
+            if command and self._queried:
+                arguments = ["list", "--all", "--json"]
+                for value in sorted(self._queried):
+                    arguments += ["--id", value]
+                code, output, _ = run(command + arguments)
                 values = last_json(output) if code == 0 else None
                 for item in values or []:
                     if item.get("session_id"):
@@ -263,7 +272,7 @@ class Observer:
     def alive(self, row):
         if not row or not row.get("session_id"):
             return None
-        peer = self.peers().get(row["session_id"])
+        peer = self.peers({row["session_id"]}).get(row["session_id"])
         return None if peer is None else peer.get("alive")
 
     def pull_request(self, worker):

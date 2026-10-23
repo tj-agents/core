@@ -21,10 +21,10 @@ Dispatching dependent work is lifecycle, so the orchestrator is a new `workflow:
 a session-driven loop, not a background scheduler, and not a second handoff (it calls Machine's launchers
 for bounded side workstreams). No orchestration exists today (searched `.agents`, `docs`, `tests`, `plans`).
 
-The `workflow` package only exists on the open stack #352→#356 (Codex `01a16053`, human merge gate).
-This branch is a child of `Refactor/WorkflowLifecycle` (#355). It never rebases or edits their branches.
-It merges their branch forward if they push again. It can merge only after #352–#355. Docs#20's decision
-gains one line naming `orchestrate`, and its "no scheduler" wording stays true.
+The `workflow` package reached main with #354. The rest of the stack (#355, #356; Codex `01a16053`) stays
+with its owner, and this branch never edits their branches. Both register Workflow skills in `catalog.json`
+and `harness/workflow.json`, so this branch merges main after #355 lands and resolves that overlap. Docs#20's
+decision gains one line naming `orchestrate`, and its "no scheduler" wording stays true.
 
 Reused as-is, no edits (the stack changes launchers, `register_session.py`, `agent_recovery.py`):
 
@@ -79,12 +79,16 @@ A restarted orchestrator runs `tick` and continues.
 3. **Live acceptance**: drive one real three-worker run (Windows) with dummy-process workers. Linux runs
    the suite in CI. Native activation follows the stack's S3 gate.
 
-## Open decisions for Tommy
+## Progress
 
-- Placement: `workflow:orchestrate`, stacked on #355 and merging after the stack (recommended). The
-  alternative, `engineering:` on main now, would force #355's owner to migrate it.
+- 23 Oct: Tommy chose `workflow:` and asked to merge the stack. Its owner (Codex `01a16053`) was already
+  landing it with his authorization (#352, #353, #354 merged by 09:40 UTC), so this session did not race it.
+  Its follow-up endpoint was unavailable, so the boundary check was never delivered.
+- #354 put the Workflow package on main, so this branch is based on main, not stacked on #355.
+- Slice 1 committed (`908ebdd4`): runtime, Agent Store `sessions()`, `peer-cli list --json`, 12 tests.
+- Slice 2 in progress: canonical SKILL.md, host entry points, catalog skill, harness permissions.
 
 ## Next Steps
 
-Get Tommy's agreement on this plan and the Codex owner's boundary check. Then branch `Feature/Orchestrator`
-from `origin/Refactor/WorkflowLifecycle` and build slice 1.
+Finish slice 2's generation and layout checks, commit, push and open the PR. Then add the Docs#20 line after
+#355 lands, and run slice 3's live acceptance.

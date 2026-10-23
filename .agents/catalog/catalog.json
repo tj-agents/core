@@ -187,6 +187,7 @@
         "macos"
       ],
       "skills": [
+        "orchestrate",
         "status"
       ],
       "dependencies": {
@@ -202,7 +203,9 @@
           "exe:git",
           "python>=3.9"
         ],
-        "optional": []
+        "optional": [
+          "exe:gh"
+        ]
       },
       "digest": "sha256:1cecd524c7e574dd0702d191b06493a7f0de34d40237698b8ead12edc4943f22",
       "harness": {
@@ -232,7 +235,19 @@
             "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)"
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/workflow/orchestrate/scripts/orchestrate.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/orchestrate/scripts/orchestrate.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/orchestrate/scripts/orchestrate.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/workflow/workflow/orchestrate/scripts/orchestrate.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/orchestrate/scripts/orchestrate.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/orchestrate/scripts/orchestrate.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/workflow/workflow/orchestrate/scripts/orchestrate.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/orchestrate/scripts/orchestrate.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/orchestrate/scripts/orchestrate.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/workflow/orchestrate/scripts/orchestrate.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/orchestrate/scripts/orchestrate.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/orchestrate/scripts/orchestrate.py:*)"
           ],
           "codex_prefix_rules": [
             {
@@ -275,6 +290,49 @@
                   "python",
                   "${PLUGIN_ROOT}/skills/status/scripts/status.py",
                   "payments"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/workflow/workflow/orchestrate/scripts/orchestrate.py",
+                  "${PLUGIN_ROOT}/skills/orchestrate/scripts/orchestrate.py",
+                  "${PLUGIN_ROOT}/codex-skills/orchestrate/scripts/orchestrate.py"
+                ]
+              ],
+              "justification": "Run the orchestration file: dispatch workers, record the user's decisions, merge approved PRs and close finished workers.",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/orchestrate/scripts/orchestrate.py",
+                  "tick",
+                  "--name",
+                  "core-435"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/workflow/workflow/orchestrate/scripts/orchestrate.py",
+                  "status"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/writer.py"
+                ],
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/skills/orchestrate/scripts/orchestrate.py",
+                  "tick"
                 ]
               ]
             }
