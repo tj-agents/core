@@ -16,6 +16,7 @@
     "handoff-claude",
     "handoff-codex",
     "hook-control",
+    "lanes",
     "last-conversation",
     "open-claude",
     "open-cli",
