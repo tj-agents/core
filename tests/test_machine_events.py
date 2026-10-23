@@ -45,6 +45,21 @@ class ReconcileTests(unittest.TestCase):
         self.reconciler.repository(current(revision="b", policy="new-policy", marketplace=False))
         self.assertEqual(2, self.policy.call_count)
 
+    def test_a_revision_change_with_an_unchanged_catalog_never_refreshes(self):
+        self.reconciler.repository(current())
+        self.refresh.assert_called_once_with()
+        self.reconciler.repository(current(revision="b"))
+        self.refresh.assert_called_once_with()
+        self.assertEqual("b", self.reconciler.state["tj-agents/core"]["revision"])
+
+    def test_a_changed_catalog_oid_refreshes_again(self):
+        self.reconciler.repository(current())
+        self.refresh.assert_called_once_with()
+        changed = current(revision="b")
+        changed["marketplace"] = {"oid": "manifest-2"}
+        self.reconciler.repository(changed)
+        self.assertEqual(2, self.refresh.call_count)
+
     def test_standalone_plugin_changes_refresh_without_a_marketplace_manifest(self):
         state = current(policy=None, marketplace=False)
         state["plugin"] = {"oid": "plugin-manifest"}
