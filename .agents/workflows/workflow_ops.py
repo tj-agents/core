@@ -910,7 +910,15 @@ def cleanup_review_bundles(root, now=None):
             directory = locations["directory"]
             artifacts = [locations[name] for name in expected if name != "directory"]
             if directory.exists() and not is_redirect(directory) and not any(is_redirect(path) for path in artifacts):
-                shutil.rmtree(directory)
+                resolved_directory = directory.resolve()
+                for protected in worktree_roots(root):
+                    try:
+                        resolved_directory.relative_to(protected)
+                    except ValueError:
+                        continue
+                    break
+                else:
+                    shutil.rmtree(directory)
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, WorkflowOperationError):
             continue
 
