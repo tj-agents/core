@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 import functools
 import json
 import os
@@ -177,8 +176,7 @@ def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]]
 
 def refresh_claude(executable: str, project: Path, plugins: list[str]) -> list[str]:
     installations = json.loads(run([executable, "plugin", "list", "--json"], project))
-    installs = [(identity, scope) for identity in plugins for scope in declared_scopes(identity, project)
-                if entry_for(installations, identity, scope, project) is None]
+    installs = [(identity, scope) for identity in plugins for scope in declared_scopes(identity, project)]
     updates = [(identity, scope, owner) for identity in plugins
                for scope, owner in update_targets(identity, project, installations)]
     return apply_claude(executable, project, installs, updates)
@@ -237,56 +235,11 @@ def catalog_publishers(marketplaces: dict[str, tuple[str, Path]]) -> dict[str, d
     return result
 
 
-NAME = re.compile(r"[A-Za-z0-9_.-]+")
-REVISION_PATH = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*")
-
-
-def github_contents(wanted: dict[str, set[str]], installed: dict[str, set[str]], known: dict[str, str],
-                    query=None) -> tuple[dict[str, str], dict[str, str]]:
-    fields, wanted_fields = [], {}
-    for index, (key, paths) in enumerate(sorted(wanted.items())):
-        repo, ref = key.rsplit("@", 1)
-        owner, name = repo.split("/", 1)
-        if not (NAME.fullmatch(owner) and NAME.fullmatch(name) and REVISION_PATH.fullmatch(ref)):
-            continue
-        parts, fields_for = [f'h: object(expression: "{ref}") {{ oid }}'], {}
-        for path in sorted(path for path in paths if REVISION_PATH.fullmatch(path)):
-            for revision in [ref, *sorted(installed.get(key, ()))]:
-                if revision != ref and plugin_autoupdate.tree_key(repo, revision, path) in known:
-                    continue
-                alias = f"t{len(fields_for)}"
-                parts.append(f'{alias}: object(expression: "{revision}:{path}") {{ oid }}')
-                fields_for[alias] = (revision, path)
-        fields.append(f'r{index}: repository(owner: "{owner}", name: "{name}") {{ {" ".join(parts)} }}')
-        wanted_fields[f"r{index}"] = (key, ref, fields_for)
-    if not fields:
-        return {}, {}
-    if query is None:
-        import machine_events
-
-        query = machine_events.gh
-    data = query(["graphql", "-f", "query={" + " ".join(fields) + "}"]).get("data") or {}
-    heads, trees = {}, {}
-    for alias, (key, ref, fields_for) in wanted_fields.items():
-        found = data.get(alias) or {}
-        head = (found.get("h") or {}).get("oid")
-        if not head:
-            continue
-        heads[key] = head
-        repo = key.rsplit("@", 1)[0]
-        for field, (revision, path) in fields_for.items():
-            oid = (found.get(field) or {}).get("oid")
-            if oid:
-                trees[plugin_autoupdate.tree_key(repo, head if revision == ref else revision, path)] = oid
-    return heads, trees
-
-
 def refresh_heads(repositories: set[str] | None, revision=plugin_autoupdate.remote_revision, query=None) -> set[str]:
     marketplaces = tj_agents_marketplaces()
     owners = {f"{plugin}@{name}": source for name, plugins in catalog_publishers(marketplaces).items()
               for plugin, source in plugins.items()}
-    contents = plugin_autoupdate.read_contents()
-    everything = (repositories is None or not contents["heads"]
+    everything = (repositories is None or not plugin_autoupdate.read_contents()["heads"]
                   or any(repo in repositories for repo, _ in marketplaces.values()))
     wanted = {}
     for key, path in owners.values():
@@ -294,35 +247,26 @@ def refresh_heads(repositories: set[str] | None, revision=plugin_autoupdate.remo
             wanted.setdefault(key, set()).add(path)
     if not wanted:
         return set()
-    installed, keep = {}, set()
+    installed = {}
     for entry in installed_entries():
         sha = entry.get("gitCommitSha")
         if isinstance(sha, str) and plugin_autoupdate.SHA.fullmatch(sha) and entry["id"] in owners:
-            keep.add(sha)
             installed.setdefault(owners[entry["id"]][0], set()).add(sha)
-    try:
-        heads, trees = github_contents(wanted, installed, contents["trees"], query)
-    except (RuntimeError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
-        print(f"plugins: content check unavailable, comparing commits instead ({error})", file=sys.stderr)
-        heads, trees = {}, {}
-    unread = sorted(key for key in wanted if key not in heads)
-    if unread:
-        def resolve(key: str) -> str | None:
-            repo, ref = key.rsplit("@", 1)
-            return revision(f"https://github.com/{repo}.git", ref)
-
-        with ThreadPoolExecutor(max_workers=min(8, len(unread))) as pool:
-            heads.update({key: sha for key, sha in zip(unread, pool.map(resolve, unread)) if sha})
-    plugin_autoupdate.record_contents(heads, trees, keep)
+    heads = plugin_autoupdate.refresh_contents(wanted, installed, query, revision)
     return {key for key in wanted if key not in heads}
 
 
-def reconcile_claude(project: Path, event: bool = False, repositories: set[str] | None = None) -> list[str]:
+def attempt_key(identity: str, scope: str, owner: Path) -> str:
+    return f"{identity}|{scope}|{'user' if scope == 'user' else path_key(owner)}"
+
+
+def reconcile_claude(project: Path, event: bool = False, repositories: set[str] | None = None,
+                     fresh: frozenset[str] = frozenset()) -> list[str]:
     marketplaces, plugins = selection("claude", "", project)
     installations = installed_entries()
     contents = plugin_autoupdate.read_contents()
     publishers = catalog_publishers(tj_agents_marketplaces())
-    installs, updates = [], []
+    installs, updates, attempts = [], [], {}
     for identity in plugins:
         plugin, name = identity.rsplit("@", 1)
         key, path = publishers.get(name, {}).get(plugin, (None, None))
@@ -337,26 +281,36 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
                 continue
             same = (plugin_autoupdate.same_content(contents, key.rsplit("@", 1)[0], path, entry.get("gitCommitSha"), head)
                     if head is not None else True)
-            if forced or same is False or event and same is None:
+            attempted = contents["attempts"].get(attempt_key(identity, scope, owner)) == head
+            if forced or event and same is not True or not event and same is False and not attempted:
                 updates.append((identity, scope, owner))
+                if head is not None:
+                    attempts[attempt_key(identity, scope, owner)] = head
     if not installs and not updates:
         return []
+    plugin_autoupdate.record_contents(attempts=attempts)
     touched = {work[0].rsplit("@", 1)[1] for work in installs + updates}
     executable = agent_cli.resolve_claude_executable()
     refresh_marketplaces("claude", executable, project,
-                         {name: repo for name, repo in marketplaces.items() if name in touched})
+                         {name: repo for name, repo in marketplaces.items() if name in touched - fresh})
     return apply_claude(executable, project, installs, updates)
 
 
 def refresh_repositories(project: Path, repositories: set[str] | None, updated: set[str] | None = None,
                          revision=plugin_autoupdate.remote_revision, query=None) -> bool:
+    marketplaces, _ = selection("claude", "", project)
+    fresh = {name: repo for name, repo in marketplaces.items() if repositories is None or repo in repositories}
+    if fresh:
+        refresh_marketplaces("claude", agent_cli.resolve_claude_executable(), project, fresh)
     unresolved = refresh_heads(repositories, revision, query)
-    changed = reconcile_claude(project, event=True, repositories=repositories)
+    if unresolved:
+        print(f"plugins: could not read the published head of {', '.join(sorted(unresolved))}; "
+              "an expired cursor compares it again", file=sys.stderr)
+    changed = reconcile_claude(project, event=True, repositories=repositories, fresh=frozenset(fresh))
     if updated is not None:
         updated.update(changed)
-    if unresolved:
-        print(f"plugins: could not read the published head of {', '.join(sorted(unresolved))}", file=sys.stderr)
-    return not unresolved
+    (configuration_root("claude") / "plugins" / "tj-agents-plugin-versions.json").unlink(missing_ok=True)
+    return True
 
 
 def package_tree(root: Path) -> dict[str, bytes]:
