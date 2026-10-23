@@ -869,6 +869,11 @@ def statement(root, found=None):
         if declaration.data.get("routes"):
             line += " Load its skills before writing its files; the write gate blocks them until you do."
         lines.append(line)
+    if applicable:
+        lines.append(
+            "Codebase conventions: an applicable tier's conventions are defaults. Where this codebase "
+            "consistently does one another way, keep its way; never add a second way of doing the same thing."
+        )
     for declaration, _ in result.employers:
         path = employer_context_path(declaration.payload_dir, declaration.employer["context_skill"])
         lines.append("Employer context: `" + declaration.plugin + ":" + declaration.employer["context_skill"]
