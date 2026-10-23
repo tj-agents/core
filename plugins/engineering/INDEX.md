@@ -24,7 +24,6 @@ Generated from canonical `.agents/` definitions.
 - `handoff` — workflow — `.agents/engineering/workflow/handoff/SKILL.md`
 - `handoff-format` — convention — `.agents/engineering/convention/handoff-format/SKILL.md`
 - `incremental-review` — workflow — `.agents/engineering/workflow/incremental-review/SKILL.md`
-- `lanes` — policy — `.agents/engineering/policy/lanes/SKILL.md`
 - `list-work` — utility — `.agents/engineering/utility/list-work/SKILL.md`
 - `merge` — workflow — `.agents/engineering/workflow/merge/SKILL.md`
 - `merge-docs` — workflow — `.agents/engineering/workflow/merge-docs/SKILL.md`
