@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 
-from workflow_route import direct_control, read_receipt
+from continuation_receipts import direct_control, read_receipt
 
 WINDOWS = os.name == "nt"
 BLOCKS = "tj-agents-continuation-stop"

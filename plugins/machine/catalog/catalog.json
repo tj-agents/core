@@ -18,9 +18,8 @@
       "skills": [
         "agent-files",
         "cd",
-        "goal-continuation",
         "idea-initialization",
-        "plan-artifacts"
+        "task-routing"
       ],
       "dependencies": {
         "required": [],
@@ -32,7 +31,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:be708566b918b8d0551f02244a6004eb6b92d52825678792021bd5c5d03b7b8e",
+      "digest": "sha256:3f4704c1622c186edd8afa9c5f158b070468819142c0cfa91efd278b62d2ca88",
       "harness": {
         "marketplaces": [
           {
@@ -53,6 +52,13 @@
           },
           {
             "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/base/policy/task-routing/scripts/session-context.py",
             "hosts": [
               "claude",
               "codex"
@@ -200,6 +206,11 @@
         "macos"
       ],
       "skills": [
+        "handoff",
+        "plan",
+        "plan-artifacts",
+        "resume",
+        "run",
         "status"
       ],
       "dependencies": {
@@ -217,7 +228,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:1cecd524c7e574dd0702d191b06493a7f0de34d40237698b8ead12edc4943f22",
+      "digest": "sha256:46faaf6df05de438ff0e25cdac838e29043e4b76dc5749ef4b803f5ab606cbe5",
       "harness": {
         "marketplaces": [
           {
@@ -318,7 +329,6 @@
         "commit-all",
         "commit-push",
         "committing",
-        "continue-roadmap",
         "docs",
         "docs-review",
         "failing-tests",
@@ -328,8 +338,6 @@
         "git-branching",
         "guide",
         "guide-build",
-        "handoff",
-        "handoff-format",
         "incremental-review",
         "merge",
         "merge-docs",
@@ -338,9 +346,6 @@
         "open-worktree",
         "persistent-delivery",
         "persistent-workflow",
-        "plan-authoring",
-        "plan-checkpoint",
-        "plan-execution",
         "plans",
         "pr-preflight",
         "pr-screenshots",
@@ -350,7 +355,6 @@
         "push",
         "recents",
         "remote-validation",
-        "resume-plan",
         "review",
         "review-lifecycle",
         "self-repair",
@@ -387,7 +391,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:f94f76f4afc25e9960dbcf735c0a6a6e01215fcc814dec5b5c5ce02d8ab42a3b",
+      "digest": "sha256:1a53ab1d6504de4ad03c7897e32e9d06f6d4840cf74223add0d422497989bb25",
       "harness": {
         "marketplaces": [
           {
@@ -684,7 +688,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:8032c2b37b67417f46fcb7dc66a34ab25950d37615c02236f882433c977fb165",
+      "digest": "sha256:081751c70617d628228ec999740fc56a6f25da3be50342e292af0d3d6aa8232c",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
