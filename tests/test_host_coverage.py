@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / ".agents/base/policy/plan-artifacts/scripts/host_coverage.py"
+SCRIPT = ROOT / ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py"
 SPEC = importlib.util.spec_from_file_location("host_coverage", SCRIPT)
 coverage = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(coverage)
@@ -18,20 +18,20 @@ HEAD = "a" * 40
 def record(stage="plan"):
     value = {
         "schema_version": 1,
-        "shared_source": ".agents/base/policy/plan-artifacts/SKILL.md",
+        "shared_source": ".agents/workflow/contract/plan-artifacts/SKILL.md",
         "hosts": [
             {
                 "host": "claude",
                 "behavior": "loads the shared plan contract",
                 "source": ".claude/skills/plan-artifacts/SKILL.md",
-                "mapping": "plugins/base/skills/plan-artifacts/SKILL.md",
+                "mapping": "plugins/workflow/skills/plan-artifacts/SKILL.md",
                 "verification": {"level": "planned", "result": "pending", "evidence": "focused command is recorded"},
             },
             {
                 "host": "codex",
                 "behavior": "loads the shared plan contract",
                 "source": ".codex/skills/plan-artifacts/SKILL.md",
-                "mapping": "plugins/base/codex-skills/plan-artifacts/SKILL.md",
+                "mapping": "plugins/workflow/codex-skills/plan-artifacts/SKILL.md",
                 "verification": {"level": "planned", "result": "pending", "evidence": "focused command is recorded"},
             },
         ],

@@ -42,7 +42,7 @@ standard. A lifecycle or orchestrating skill that spans phases of varying shape 
 `merge`) must not either: invoking one re-points the whole session, so it inherits the session's model and
 routes each bounded phase down the ladder instead. The generator refuses a lane on a routed standard for
 exactly this reason; the test for the rest is whether an agent *runs* one unvarying shape of work.
-`commit` takes a lane; `committing`, `feature`, and `plan-authoring` do not. Planning does not itself
+`commit` takes a lane; `committing`, `feature`, and `workflow:plan` do not. Planning does not itself
 select a lane.
 
 **No declaration means inherit the session's model** — not a default rung. A lane is opt-in per skill, so

@@ -74,7 +74,7 @@ class WorkflowAdoptionTests(unittest.TestCase):
         self.assertIn("exclusive", adopters["bugfix"])
         self.assertIn("writes remain serialized", adopters["bugfix"])
         self.assertIn("mechanical-worker", adopters["address-debt"])
-        self.assertIn("plan-checkpoint", adopters["address-debt"])
+        self.assertIn("plans", adopters["address-debt"])
 
     def test_specialist_adoption_did_not_move_parent_authority(self):
         for name in ("bugfix", "address-debt"):

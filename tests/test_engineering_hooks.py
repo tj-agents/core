@@ -58,7 +58,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
         context = self.additional_context(result)
         self.assertIn("engineering:session (source SHA-256", context)
         self.assertNotIn("engineering:session-guidance", context)
-        self.assertIn("engineering:plan-execution", context)
+        self.assertIn("workflow:run", context)
         self.assertIn(str(contract), context)
         self.assertIn("source SHA-256", context)
         body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1].strip()
@@ -247,78 +247,6 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertIn("is empty", empty.stderr)
                 self.assertIn(heading, empty.stderr)
                 self.assertEqual("", empty.stdout)
-
-    def test_routes_an_active_goal_to_the_packaged_plan_execution_contract(self):
-        (self.cwd / "GOAL.md").write_text(
-            "# Goal\n\nStatus: in progress\n\nComplete every phase.\n", encoding="utf-8"
-        )
-        canonical = (
-            self.package / ".agents/engineering/workflow/plan-execution/SKILL.md"
-        ).read_text(encoding="utf-8").strip()
-        result = self.run_hook("hooks/workflow_route.py", {
-            "hook_event_name": "UserPromptSubmit",
-            "prompt": "Continue and complete the active goal.",
-        })
-        self.assertEqual(0, result.returncode, result.stderr)
-        context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
-        self.assertEqual(canonical, context.split("\n\n", 1)[1])
-        entry, standalone = context.split("## Standalone or runtime-unavailable execution", 1)
-        standalone, repository = standalone.split("## Repository runtime execution", 1)
-        self.assertNotRegex(entry.split("---", 2)[1], r"(?m)^lane:")
-        self.assertIn("The rest of this document does not apply in this mode", standalone)
-        self.assertIn(str(
-            self.package / ".agents/engineering/workflow/plan-execution/SKILL.md"
-        ), context)
-
-    def test_planning_then_approval_selects_the_corresponding_packaged_workflow(self):
-        (self.cwd / "GOAL.md").write_text(
-            "# Goal\n\nStatus: awaiting approval\n\nFinish the taxonomy proposal.\n", encoding="utf-8"
-        )
-        for prompt, name in (
-            ("Planning only: finish the taxonomy proposal, but do not implement it.", "plan-authoring"),
-            ("I approve the plan. Implement it through completion.", "plan-execution"),
-        ):
-            with self.subTest(workflow=name):
-                result = self.run_hook("hooks/workflow_route.py", {
-                    "hook_event_name": "UserPromptSubmit", "prompt": prompt,
-                })
-                self.assertEqual(0, result.returncode, result.stderr)
-                context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
-                canonical = (
-                    self.package / f".agents/engineering/workflow/{name}/SKILL.md"
-                ).read_text(encoding="utf-8").strip()
-                self.assertIn(f"engineering:{name} automatically selected", context)
-                self.assertEqual(canonical, context.split("\n\n", 1)[1])
-
-    def test_packaged_planning_intent_distinguishes_execution_and_authoring(self):
-        (self.cwd / "GOAL.md").write_text("# Goal\n\nStatus: in progress\n", encoding="utf-8")
-        for prompt, name in (
-            ("Implement phase 2 of the plan only, not phase 3", "plan-execution"),
-            ("Don’t only plan it, implement it", "plan-execution"),
-            ("Draft the plan without implementing it", "plan-authoring"),
-            ("Please revise the current plan only", "plan-authoring"),
-            ("I want to continue planning the migration", "plan-authoring"),
-            ("I want you to only plan the migration", "plan-authoring"),
-            ("Please continue with planning only", "plan-authoring"),
-            ("I don't want to continue planning the migration", None),
-            ("Continue with the plan only", "plan-execution"),
-            ("Do not implement any changes yet", None),
-            ("Review the plan branch without implementing it", None),
-        ):
-            with self.subTest(prompt=prompt):
-                result = self.run_hook("hooks/workflow_route.py", {
-                    "hook_event_name": "UserPromptSubmit", "prompt": prompt,
-                })
-                self.assertEqual(0, result.returncode, result.stderr)
-                if name is None:
-                    self.assertEqual("", result.stdout)
-                else:
-                    context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
-                    self.assertTrue(context.startswith(f"engineering:{name} automatically selected"))
-                    canonical = (
-                        self.package / f".agents/engineering/workflow/{name}/SKILL.md"
-                    ).read_text(encoding="utf-8").strip()
-                    self.assertEqual(canonical, context.split("\n\n", 1)[1])
 
     def test_packaged_review_runtime_resolves_consumer_routes(self):
         consumer = self.root / "routed consumer"

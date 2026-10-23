@@ -534,10 +534,8 @@ class PlanWorkflowHarness:
                 "The parent addresses the confirmed review finding before incremental review.",
                 target_stage_id="address-review",
             )
-        if event == "resume-plan-entry":
-            return {"entry": "resume-plan", "owner": "plan-execution"}
-        if event == "continue-roadmap-entry":
-            return {"entry": "continue-roadmap", "owner": "plan-authoring"}
+
+            return {"entry": "plan", "owner": "plan"}
         if event == "accept-continuation":
             return self.accept_continuation(scenario)
         if event == "contradicted-continuation":

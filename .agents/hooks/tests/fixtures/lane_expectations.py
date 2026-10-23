@@ -37,7 +37,7 @@ def generated_payload(authored, host):
 
 def authored_skill(name):
     root = Path(__file__).resolve().parents[4]
-    matches = [p for scope in ("base", "engineering", "machine")
+    matches = [p for scope in ("base", "engineering", "machine", "workflow")
                for p in (root / ".agents" / scope).rglob("SKILL.md") if p.parent.name == name]
     if len(matches) != 1:
         raise AssertionError(f"Expected one authored owner for {name}: {matches}")

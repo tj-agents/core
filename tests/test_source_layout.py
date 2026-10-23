@@ -59,7 +59,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(83, len(skills))
+        self.assertEqual(80, len(skills))
         self.assertEqual("machine", skills["hook-control"]["plugin"])
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
@@ -81,11 +81,11 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertFalse((self.root / "engineering").exists())
         self.assertFalse((self.root / "machine").exists())
         self.assertIn(
-            "plugins/base/.agents/base/policy/plan-artifacts/SKILL.md",
+            "plugins/workflow/.agents/workflow/contract/plan-artifacts/SKILL.md",
             output,
         )
         self.assertIn("plugins/base/.agents/base/policy/agent-files/SKILL.md", output)
-        self.assertIn("plugins/base/.agents/base/policy/goal-continuation/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/policy/task-routing/SKILL.md", output)
         self.assertIn("plugins/base/.agents/base/policy/idea-initialization/SKILL.md", output)
 
     def test_problem_record_consumers_and_shared_contract_ship_for_both_hosts(self):
@@ -205,8 +205,8 @@ class SourceLayoutTests(unittest.TestCase):
         for relative in (
             "plugins/base/skills/agent-files/scripts/session-context.py",
             "plugins/base/skills/idea-initialization/scripts/session-context.py",
-            "plugins/base/skills/plan-artifacts/scripts/session-context.py",
-            "plugins/base/codex-skills/plan-artifacts/templates/PLAN.md",
+            "plugins/base/skills/task-routing/scripts/session-context.py",
+            "plugins/workflow/codex-skills/plan-artifacts/templates/PLAN.md",
             "plugins/machine/skills/handoff-codex/scripts/launch_codex.py",
             "plugins/machine/codex-skills/handoff-claude/scripts/launch_claude.py",
             "plugins/machine/resources/machine/scripts/history.py",
@@ -279,13 +279,13 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertFalse((self.root / "unused state").exists())
 
     def test_generated_text_bytes_are_stable_across_checkout_line_endings(self):
-        source = self.root / ".agents/base/policy/plan-artifacts/templates/PLAN.md"
+        source = self.root / ".agents/workflow/contract/plan-artifacts/templates/PLAN.md"
         lf = source.read_bytes().replace(b"\r\n", b"\n")
         source.write_bytes(lf.replace(b"\n", b"\r\n"))
 
         _, output, _, _ = SYNC.build(self.root)
 
-        generated = output["plugins/base/.agents/base/policy/plan-artifacts/templates/PLAN.md"]
+        generated = output["plugins/workflow/.agents/workflow/contract/plan-artifacts/templates/PLAN.md"]
         self.assertEqual(lf, generated)
         self.assertNotIn(b"\r\n", generated)
 
