@@ -13,7 +13,7 @@ This public name owns only the special selection stage before
 
 ## Resolve one item
 
-Read [repository selection](../../resources/problem-records.md#repository-selection). When a provider is
+Read [repository selection](../../../workflow/resources/problem-records.md#repository-selection). When a provider is
 selected, list/read its candidates scoped to the requested epic and use their canonical identities and live
 states. The curated roadmap supplies design and dependency context; retain its existing graph keys and link
 the selected item rather than creating another live queue.
