@@ -1,6 +1,6 @@
 ---
 name: docs
-description: Keeping a repository's docs honest — one rule with exactly one owning document that everywhere else links to rather than restates, a doc living at the lowest node that fully contains its concern, a topic index mapping topic to owner, every instruction file reachable from something that actually loads it and checked by a hook, one line plus a diagnostic id where a machine can enforce the rule instead of prose re-arguing it, never naming violation sites in a rule doc because the citations rot, a rule sorted by the cost of missing it, and throwaway working markdown kept in the repository then deleted once it has served its purpose. Use when writing or editing any guidance doc, adding a rule, deciding where a rule belongs, finding the same rule in two places, or creating a scratch analysis, investigation prompt or handoff note.
+description: Keeping a repository's docs honest — one rule with exactly one owning document that a reader outside its delivery links to rather than restates, a doc living at the lowest node that fully contains its concern, a topic index mapping topic to owner, every instruction file reachable from something that actually loads it and checked by a hook, one line plus a diagnostic id where a machine can enforce the rule instead of prose re-arguing it, never naming violation sites in a rule doc because the citations rot, a rule sorted by the cost of missing it, and throwaway working markdown kept in the repository then deleted once it has served its purpose. Use when writing or editing any guidance doc, adding a rule, deciding where a rule belongs, finding the same rule in two places, or creating a scratch analysis, investigation prompt or handoff note.
 
 kind: convention
 domain: process
@@ -14,8 +14,9 @@ Start a standard with the responsibility it assigns, the evidence used to select
 lifecycle. Explain how an agent chooses the next action and where exceptions belong. A reader should
 be able to carry out the work from that model, including a case the author has not seen before.
 
-When a failure exposes an unclear boundary, repair that boundary in its existing owner and consolidate
-overlapping instructions. Incident details belong in tests, a commit message or the owning debt record.
+When a failure exposes an unclear boundary, repair that boundary in its existing owner, the versioned
+source every checkout loads, and consolidate overlapping instructions. Incident details belong in tests, a
+commit message or the owning debt record.
 A hard prohibition is appropriate for a material invariant: state the invariant and the reason in its
 owning contract. Repeated mistakes alone do not establish one. Use examples to clarify decisions;
 negative wording remains useful where it makes a real constraint precise.
@@ -26,9 +27,15 @@ provides guidance on its own path; host-wide enforcement requires observed host 
 
 ## One rule, one home
 
-**Exactly one file owns a rule.** Everywhere else links to it and never restates it. **A second copy is a bug,
-not emphasis** — two copies drift the day one changes, and the drift is invisible because both read as
-maintained.
+**Exactly one file owns a rule.** A reader its delivery already reaches needs nothing more; elsewhere links
+to it, and nothing restates it. **A second copy is a bug, not emphasis** — two copies drift the day one
+changes, and the drift is invisible because both read as maintained.
+
+```text
+Rule: a line core's session hook injects wherever a stack applies
+Stack contract: says nothing about it
+A doc outside that hook's reach: links to the hook's owner
+```
 
 - **A doc lives at the lowest node that fully contains its concern.** Single-component → that component's own
   folder, thin, inheriting upward and never restating. Cross-component or orchestration → the root. Create one
