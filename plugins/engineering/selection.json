@@ -5,6 +5,7 @@
   ],
   "prerequisites": [
     "base",
+    "agent-store",
     "machine"
   ],
   "external_prerequisites": [],
