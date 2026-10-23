@@ -5,6 +5,7 @@
   ],
   "prerequisites": [
     "base",
+    "agent-store",
     "machine"
   ],
   "external_prerequisites": [],
@@ -31,7 +32,6 @@
     "handoff",
     "handoff-format",
     "incremental-review",
-    "lanes",
     "list-work",
     "merge",
     "merge-docs",
