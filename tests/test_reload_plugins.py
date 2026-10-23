@@ -562,7 +562,7 @@ class HeadReconcileTests(unittest.TestCase):
             REFRESH.reconcile_claude(project, event=True, repositories={"tj-agents/core"})
         self.assertGreater(len(fake.commands), first)
 
-    def test_an_update_that_failed_to_run_is_retried_by_the_next_launch(self):
+    def test_a_failing_update_costs_one_plain_launch_and_is_retried_by_a_publish(self):
         project = self.home.project("preaward", "settings.local.json", "base@tj-agents")
         installations = self.home.installed(("base@tj-agents", "local", project, OLD_HEAD))
         self.record({"tj-agents/core@main": CORE_HEAD}, {f"tj-agents/core@{OLD_HEAD}:plugins/base": "1" * 40,
@@ -575,8 +575,12 @@ class HeadReconcileTests(unittest.TestCase):
             return fake(command, cwd)
         with mock.patch.object(REFRESH, "run", side_effect=failing), self.assertRaises(REFRESH.RefreshError):
             REFRESH.reconcile_claude(project)
+        before = len(fake.commands)
         with mock.patch.object(REFRESH, "run", side_effect=fake):
-            self.assertEqual(["base@tj-agents"], REFRESH.reconcile_claude(project))
+            self.assertEqual([], REFRESH.reconcile_claude(project))
+            self.assertEqual(before, len(fake.commands))
+            self.assertEqual(["base@tj-agents"], REFRESH.reconcile_claude(project, event=True,
+                                                                         repositories={"tj-agents/core"}))
 
     def test_content_query_names_only_validated_revisions_and_paths(self):
         wanted = {"tj-agents/core@main": {"plugins/base", 'plugins/x") { oid } evil: object(expression: "y'}}
