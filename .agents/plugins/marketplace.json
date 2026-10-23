@@ -29,10 +29,10 @@
       "category": "Productivity"
     },
     {
-      "name": "engineering",
+      "name": "machine",
       "source": {
         "source": "local",
-        "path": "./plugins/engineering"
+        "path": "./plugins/machine"
       },
       "policy": {
         "installation": "INSTALLED_BY_DEFAULT",
@@ -41,10 +41,22 @@
       "category": "Productivity"
     },
     {
-      "name": "machine",
+      "name": "workflow",
       "source": {
         "source": "local",
-        "path": "./plugins/machine"
+        "path": "./plugins/workflow"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "engineering",
+      "source": {
+        "source": "local",
+        "path": "./plugins/engineering"
       },
       "policy": {
         "installation": "INSTALLED_BY_DEFAULT",
