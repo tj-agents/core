@@ -29,7 +29,7 @@ def _session_store():
     global _SESSION_STORE
     if _SESSION_STORE is not None:
         return _SESSION_STORE
-    candidate = HERE / "session_store.py"
+    candidate = HERE.parents[2] / ".agents" / "agent-store" / "runtime" / "session_store.py"
     if candidate.is_file():
         spec = importlib.util.spec_from_file_location("work_item_sessions_session_store", candidate)
         module = importlib.util.module_from_spec(spec)
