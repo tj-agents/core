@@ -797,6 +797,33 @@ class SkillRouterTests(unittest.TestCase):
         self.assertEqual(2, result.returncode, result.stderr)
         self.assertIn("more than one routed repository", result.stderr)
 
+    def sibling_repository(self):
+        sibling = self.base / "repo.worktrees" / "feature"
+        (sibling / "src").mkdir(parents=True)
+        (sibling / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
+        (sibling / "stack.marker").write_text("", encoding="utf-8")
+        return sibling
+
+    def test_a_relative_write_into_a_routed_sibling_is_resolved_from_the_session_directory(self):
+        self.install_stack_tier()
+        self.sibling_repository()
+        session_directory = self.repo / "src"
+        payload = self.write_payload(str(uuid.uuid4()), tool_name="Bash", cwd=str(session_directory),
+                                     tool_input={"command": "echo b > ../../repo.worktrees/feature/src/b.sx"})
+        result = self.run_router(("--harness", "claude"), payload)
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("src/b.sx", result.stderr)
+
+    def test_an_unrouted_relative_target_is_not_checked_against_a_routed_sibling(self):
+        self.install_stack_tier()
+        sibling = self.sibling_repository()
+        payload = self.write_payload(str(uuid.uuid4()), tool_name="Bash", tool_input={
+            "command": f"echo a > src/a.sx && echo b > {(sibling / 'src' / 'b.sx').as_posix()}"})
+        result = self.run_router(("--harness", "claude"), payload)
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("src/b.sx", result.stderr)
+        self.assertNotIn("src/a.sx", result.stderr)
+
     def test_git_bash_drive_paths_resolve_to_windows_paths_only_on_windows(self):
         module = self.load_router()
         with patch.object(module.os, "name", "nt"):

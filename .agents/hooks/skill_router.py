@@ -262,7 +262,7 @@ def skill_search_dirs(harness):
         yield root / "skills"
 
 
-def repo_relative(path, cwd):
+def repo_relative(path, cwd, root=None):
     """POSIX repo-relative path, or None when the path lies outside this repository.
 
     Resolved against the payload's cwd, not the hook process's - a patch body names its files
@@ -275,6 +275,11 @@ def repo_relative(path, cwd):
         p = p.resolve()
     except OSError:
         return str(path).replace("\\", "/")
+    if root is not None:
+        try:
+            return p.relative_to(Path(root).resolve()).as_posix()
+        except ValueError:
+            return None
     for base in (Path(cwd).resolve(), *Path(cwd).resolve().parents):
         if (base / ROUTES_FILE).is_file() or (base / ".git").exists():
             try:
@@ -510,7 +515,7 @@ def shell_write_targets(command, depth=0):
     return [(path, text, replaces) for path, (text, replaces) in writes.items()]
 
 
-def removed_content_by_target(tool_input, cwd):
+def removed_content_by_target(tool_input, cwd, root=None):
     direct = [tool_input.get("old_string"), tool_input.get("old_source")]
     for edit in tool_input.get("edits") or []:
         if isinstance(edit, dict):
@@ -518,12 +523,12 @@ def removed_content_by_target(tool_input, cwd):
     removed = {}
     targets = written_targets(tool_input)
     if len(targets) == 1:
-        rel = repo_relative(targets[0], cwd)
+        rel = repo_relative(targets[0], cwd, root)
         if rel is not None:
             removed[rel] = "\n".join(part for part in direct if isinstance(part, str))
     for blob in strings(tool_input):
         for target, body in PATCH_FILE_BLOCK.findall(blob):
-            rel = repo_relative(target.strip().strip("\"'"), cwd)
+            rel = repo_relative(target.strip().strip("\"'"), cwd, root)
             lines = PATCH_REMOVED_LINE.findall(body)
             if rel is not None and lines:
                 removed[rel] = "\n".join(filter(None, (removed.get(rel), *lines)))
@@ -907,16 +912,13 @@ def routed(root):
         return True
 
 
-def write_scope(targets, cwd):
+def scope_root(targets, cwd):
     roots = target_roots(targets, cwd)
     if len(roots) > 1:
         roots = {root for root in roots if routed(root)}
         if len(roots) > 1:
             raise SplitWrite()
-    if len(roots) == 1 and (find_repo_root(cwd) not in roots
-                            or all(Path(native_path(target)).is_absolute() for target in targets)):
-        return str(next(iter(roots)))
-    return cwd
+    return next(iter(roots)) if roots else find_repo_root(cwd)
 
 
 class SplitWrite(Exception):
@@ -1468,19 +1470,19 @@ def main():
     else:
         shell_writes = []
         targets = written_targets(tool_input)
+    cwd = data.get("cwd") or os.getcwd()
     try:
-        cwd = write_scope(targets, data.get("cwd") or os.getcwd())
+        root = scope_root(targets, cwd)
     except SplitWrite:
         sys.stderr.write(
             "SKILL ROUTER - blocked, this call writes into more than one routed repository. Split it "
             "into one call per repository so each one's standards can be checked. Nothing was written.\n"
         )
         sys.exit(2)
-    root = find_repo_root(cwd)
     if root is None:
         sys.exit(0)
     relative_targets = [
-        rel for rel in (repo_relative(target, cwd) for target in targets) if rel is not None
+        rel for rel in (repo_relative(target, cwd, root) for target in targets) if rel is not None
     ]
     if not relative_targets:
         sys.exit(0)
@@ -1526,9 +1528,9 @@ def main():
     content = (
         "\n".join(text for _, text, _ in shell_writes if text) if is_shell else written_content(tool_input)
     )
-    removed_by_rel = removed_content_by_target(tool_input, cwd)
+    removed_by_rel = removed_content_by_target(tool_input, cwd, root)
     deleted = {
-        rel for rel in (repo_relative(target, cwd) for target in deleted_targets(tool_input))
+        rel for rel in (repo_relative(target, cwd, root) for target in deleted_targets(tool_input))
         if rel is not None
     }
     replaces = tool_name.casefold() in {"write", "write_file"}
@@ -1539,7 +1541,7 @@ def main():
     # shell write could ever satisfy it again - not even the write that overwrote the file clean.
     replaces_by_rel = (
         {rel: full for path, _, full in shell_writes
-         if (rel := repo_relative(path, cwd)) is not None} if is_shell else {}
+         if (rel := repo_relative(path, cwd, root)) is not None} if is_shell else {}
     )
 
     for rel in relative_targets:
