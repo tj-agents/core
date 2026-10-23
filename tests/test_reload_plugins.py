@@ -523,6 +523,13 @@ class HeadReconcileTests(unittest.TestCase):
         self.assertEqual(["dotnet@tj-agents"], installs)
         self.assertNotIn("update", [command[2] for command, _ in fake.commands])
 
+    def test_a_full_compare_tolerates_a_publisher_it_cannot_read(self):
+        project = self.home.project("preaward", "settings.local.json", "base@tj-agents")
+        self.home.installed(("base@tj-agents", "local", project, CORE_HEAD))
+        query = lambda arguments: {"data": {"r": {"h": {"oid": CORE_HEAD}}}} if 'name: "core"' in arguments[-1] else {}
+        with mock.patch.object(REFRESH, "run", side_effect=FakeClaude([])), mock.patch("sys.stderr"):
+            self.assertTrue(REFRESH.refresh_repositories(project, None, revision=lambda url, ref: None, query=query))
+
     def test_a_marketplace_publish_updates_its_catalog_before_reading_it(self):
         project = self.home.project("preaward", "settings.local.json", "base@tj-agents")
         fake = FakeClaude(self.home.installed(("base@tj-agents", "local", project, CORE_HEAD)))

@@ -827,13 +827,12 @@ def remove_retired_service(home: Path, run=subprocess.run) -> bool:
     return True
 
 
-def retired_files() -> list[Path]:
-    return [path for path in (plugin_autoupdate.claude_home() / "plugins" / "tj-agents-plugin-versions.json",)
-            if path.exists()]
+def retired_files(context: Context) -> list[Path]:
+    return [path for path in (context.claude_home / "plugins" / "tj-agents-plugin-versions.json",) if path.exists()]
 
 
 def check_retired(context: Context) -> list[str]:
-    files = [f"remove retired {path}" for path in retired_files()]
+    files = [f"remove retired {path}" for path in retired_files(context)]
     if context.windows:
         return files + [f"delete retired task {name}" for name in RETIRED_TASKS if task_exists(name, context.run)]
     pending = files + [f"remove retired cron line {line}" for line in retired_cron_lines(context.run)]
@@ -843,7 +842,7 @@ def check_retired(context: Context) -> list[str]:
 
 
 def apply_retired(context: Context) -> list[str]:
-    for path in retired_files():
+    for path in retired_files(context):
         path.unlink(missing_ok=True)
     if context.windows:
         remove_retired_windows(context.run)
