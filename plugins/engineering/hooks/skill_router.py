@@ -51,7 +51,12 @@ it for review-time queries. They share the exit-2 block
 contract but NOT the payload: Claude sends a PascalCase tool name and one path under `file_path`,
 while Codex sends `apply_patch` with the paths named inside the patch body. Matching only Claude's
 shape is not a partial rollout - it is a hook that allows every Codex write while looking wired. A
-repo opts in by carrying `.agents/skill-routes.json`; without one the hook exits 0 and does nothing.
+repo opts in by carrying `.agents/skill-routes.json`. Without one, a stack tier that applies to the
+project and declares `routes` in its own `tier.json` routes it, so every .NET repo is gated with no
+per-repo step; with neither, the hook exits 0 and does nothing.
+
+A subagent starts with none of its parent's loaded skills, so it proves its own loads in its own
+transcript, and its seen-state is its own.
 
 A Bash/PowerShell/Codex-shell call is also a candidate write - `cat >>`, `sed -i`, `tee` and a
 heredoc all reach a routed path exactly like `Write`/`Edit` do, and matching only the edit-tool
@@ -90,6 +95,9 @@ ROUTES_FILE = ".agents/skill-routes.json"
 # generated table committed into that repo and drifting there.
 SHIPPED_ROUTES_DIR = Path(__file__).resolve().parent.parent / "routes"
 REGISTRY_FILE = "registry.json"
+TIER_SKILL_DIRS = []
+SUBAGENT_ID = re.compile(r"[A-Za-z0-9_-]+")
+GIT_BASH_DRIVE = re.compile(r"^/([A-Za-z])/(.*)$")
 # A rename moves a skill between plugins; the qualified name in a route, a plan or a habit does not move
 # with it. `.agents/plugins/compatibility.json` already records every such move - it simply had no
 # reader, which is how the base: -> engineering: reorganisation made `base:review-lifecycle` resolve
@@ -242,6 +250,7 @@ def skill_search_dirs(harness):
     # The hook's own payload is independent of the harness variable vocabulary. Codex injects
     # PLUGIN_ROOT; Claude injects CLAUDE_PLUGIN_ROOT; a vendored copy resolves beside itself.
     yield own_payload_root(__file__) / "skills"
+    yield from TIER_SKILL_DIRS
 
     configured = os.environ.get("CLAUDE_CONFIG_DIR")
     linked_base = Path(configured) if configured and harness == "claude" else (
@@ -253,19 +262,24 @@ def skill_search_dirs(harness):
         yield root / "skills"
 
 
-def repo_relative(path, cwd):
+def repo_relative(path, cwd, root=None):
     """POSIX repo-relative path, or None when the path lies outside this repository.
 
     Resolved against the payload's cwd, not the hook process's - a patch body names its files
     relative to the session, and `Path.resolve()` alone would anchor them wherever python started.
     """
     try:
-        p = Path(path)
+        p = Path(native_path(path))
         if not p.is_absolute():
             p = Path(cwd) / p
         p = p.resolve()
     except OSError:
         return str(path).replace("\\", "/")
+    if root is not None:
+        try:
+            return p.relative_to(Path(root).resolve()).as_posix()
+        except ValueError:
+            return None
     for base in (Path(cwd).resolve(), *Path(cwd).resolve().parents):
         if (base / ROUTES_FILE).is_file() or (base / ".git").exists():
             try:
@@ -501,7 +515,7 @@ def shell_write_targets(command, depth=0):
     return [(path, text, replaces) for path, (text, replaces) in writes.items()]
 
 
-def removed_content_by_target(tool_input, cwd):
+def removed_content_by_target(tool_input, cwd, root=None):
     direct = [tool_input.get("old_string"), tool_input.get("old_source")]
     for edit in tool_input.get("edits") or []:
         if isinstance(edit, dict):
@@ -509,12 +523,12 @@ def removed_content_by_target(tool_input, cwd):
     removed = {}
     targets = written_targets(tool_input)
     if len(targets) == 1:
-        rel = repo_relative(targets[0], cwd)
+        rel = repo_relative(targets[0], cwd, root)
         if rel is not None:
             removed[rel] = "\n".join(part for part in direct if isinstance(part, str))
     for blob in strings(tool_input):
         for target, body in PATCH_FILE_BLOCK.findall(blob):
-            rel = repo_relative(target.strip().strip("\"'"), cwd)
+            rel = repo_relative(target.strip().strip("\"'"), cwd, root)
             lines = PATCH_REMOVED_LINE.findall(body)
             if rel is not None and lines:
                 removed[rel] = "\n".join(filter(None, (removed.get(rel), *lines)))
@@ -675,13 +689,22 @@ def skill_description(name, harness):
     return None if resolved is None else description_of(resolved[1])
 
 
+@functools.lru_cache(maxsize=4)
+def _selection(key):
+    return tier_gate.assess(Path(key))
+
+
+def selection_for(root):
+    return _selection(str(root))
+
+
 def routed_name(selection, root, name, harness=None):
     return tier_gate.replacement_skill(
         selection, name, lambda candidate: tier_gate.installed_replacement(root, candidate, harness)
     )
 
 
-def transcript_skill_outcomes(transcript_path, codex_skills=()):
+def transcript_skill_outcomes(transcript_path, codex_skills=(), read_skills=()):
     """Selected skill name -> whether the transcript proves it resolved this session, or None if unreadable.
 
     Scans the session's own JSONL transcript for `Skill` tool_use blocks and the `tool_result` each
@@ -707,6 +730,9 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
       bodies are the most-loaded skills. So the head OR the tail of the body is the anchor, plus enough
       matched bytes that a two-line excerpt cannot pass.
 
+    A Claude subagent may have no `Skill` tool, so for the names in `read_skills` a successful whole-file
+    `Read` of that skill's `SKILL.md` under its plugin is the same proof.
+
     Returns `None` - not `{}` - when the transcript itself could not be read at all, so the caller can
     tell "proof is unavailable, fall back" apart from "proof was checked and found nothing yet".
     """
@@ -728,11 +754,13 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
         span = min(len(normalized), PROOF_ANCHOR_BYTES)
         return normalized[:span], normalized[-span:] if span else ""
 
-    codex_proofs = [
-        (name, "/skills/%s/skill.md" % name.rpartition(":")[2].lower(),
-         "/" + name.partition(":")[0].lower() + "/" if ":" in name else "", anchors(body))
-        for name, _, body in codex_skills
-    ]
+    def segments(name):
+        return ("/skills/%s/skill.md" % name.rpartition(":")[2].lower(),
+                "/" + name.partition(":")[0].lower() + "/" if ":" in name else "")
+
+    codex_proofs = [(name, *segments(name), anchors(body)) for name, _, body in codex_skills]
+    read_proofs = [(name, *segments(name)) for name in read_skills]
+    pending_reads = {}
     try:
         with open(transcript_path, encoding="utf-8", errors="replace") as handle:
             for line in handle:
@@ -779,8 +807,23 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
                         name = (block.get("input") or {}).get("skill")
                         if tool_id and isinstance(name, str) and name:
                             pending[tool_id] = name
+                    elif block_type == "tool_use" and block.get("name") == "Read" and read_proofs:
+                        tool_id = block.get("id")
+                        read_input = block.get("input") or {}
+                        target = read_input.get("file_path")
+                        if not tool_id or not isinstance(target, str):
+                            continue
+                        if read_input.get("offset") not in (None, 0, 1) or read_input.get("limit") is not None:
+                            continue
+                        target = normalized_path(target)
+                        for name, segment, plugin_segment in read_proofs:
+                            if target.endswith(segment) and plugin_segment in target:
+                                pending_reads[tool_id] = name
                     elif block_type == "tool_result":
                         tool_id = block.get("tool_use_id")
+                        read_name = pending_reads.pop(tool_id, None) if tool_id else None
+                        if read_name is not None and not block.get("is_error"):
+                            outcomes[read_name] = True
                         name = pending.pop(tool_id, None) if tool_id else None
                         if name is None:
                             continue
@@ -790,6 +833,24 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
     except OSError:
         return None
     return outcomes
+
+
+def route_key(route):
+    return json.dumps([route.get("path"), route.get("content_requires"), sorted(route.get("skills") or [])])
+
+
+def subagent_id(data, harness):
+    agent = data.get("agent_id")
+    if harness != "claude" or not isinstance(agent, str) or not SUBAGENT_ID.fullmatch(agent):
+        return ""
+    return agent
+
+
+def proof_transcript(data, agent):
+    transcript = data.get("transcript_path")
+    if not agent or not transcript:
+        return transcript
+    return str(Path(transcript).with_suffix("") / "subagents" / f"agent-{agent}.jsonl")
 
 
 def state_path(session_id):
@@ -821,6 +882,47 @@ def find_repo_root(cwd):
         if (candidate / ".git").exists():
             return candidate
     return None
+
+
+def native_path(path):
+    text = str(path)
+    if os.name == "nt":
+        match = GIT_BASH_DRIVE.match(text)
+        if match:
+            return match.group(1).upper() + ":/" + match.group(2)
+    return text
+
+
+def target_roots(targets, cwd):
+    roots = set()
+    for target in targets:
+        path = Path(native_path(target))
+        if not path.is_absolute():
+            path = Path(cwd) / path
+        root = find_repo_root(path.parent)
+        if root is not None:
+            roots.add(root)
+    return roots
+
+
+def routed(root):
+    try:
+        return bool(load_routes(root))
+    except RoutesUnusable:
+        return True
+
+
+def scope_root(targets, cwd):
+    roots = target_roots(targets, cwd)
+    if len(roots) > 1:
+        roots = {root for root in roots if routed(root)}
+        if len(roots) > 1:
+            raise SplitWrite()
+    return next(iter(roots)) if roots else find_repo_root(cwd)
+
+
+class SplitWrite(Exception):
+    pass
 
 
 def git_common_dir(root):
@@ -904,12 +1006,40 @@ def registry_routes(root):
     return routes
 
 
+def tier_routes(root):
+    if not any("routes" in declaration.data for declaration in tier_gate.declarations(project=root)):
+        return []
+    selection = selection_for(root)
+    declarations = [*selection.ubiquitous, *(declaration for declaration, _ in selection.applicable)]
+    declarations += [declaration for declaration, _ in selection.employers if declaration not in declarations]
+    rows = []
+    for declaration in declarations:
+        if declaration.payload_dir is None or "routes" not in declaration.data:
+            continue
+        problems = tier_gate.route_diagnostics(declaration.data["routes"])
+        if problems:
+            raise RoutesUnusable(f"the {declaration.id} tier.json routes are unusable: {problems[0]['message']}")
+        rows.extend(declaration.data["routes"])
+        payload = Path(declaration.payload_dir)
+        if payload / "skills" not in TIER_SKILL_DIRS:
+            TIER_SKILL_DIRS.append(payload / "skills")
+    return rows
+
+
 def load_routes(root):
-    """No table and not registered -> None. Present but unusable, either tier -> raises.
+    """The repo's or registry table plus every applying tier's rows. None when there are none.
+
+    Present but unusable, any source -> raises.
 
     Failing open on a malformed table is the ENF1 failure exactly: enforcement that is inert while
     looking wired. A repo that created this file asked for routing, so a typo in it is a loud stop.
     """
+    own = own_routes(root)
+    combined = [*(own or []), *tier_routes(root)]
+    return combined if own is not None or combined else None
+
+
+def own_routes(root):
     path = root / ROUTES_FILE
     if not path.is_file():
         return registry_routes(root)
@@ -1220,7 +1350,7 @@ def query(argv):
         print(f"no readable {ROUTES_FILE} above {cwd} - no skill is owed")
         return 0
 
-    selection = tier_gate.assess(project or root)
+    selection = selection_for(project or root)
     harness = tier_gate.active_host()
     owed, violations = {}, []
     for given in paths:
@@ -1259,7 +1389,7 @@ def query(argv):
 
 
 def missing_routed_skills(routes, harness, root):
-    selection = tier_gate.assess(root)
+    selection = selection_for(root)
     names = {routed_name(selection, root, name, harness)
              for route in routes for name in route.get("skills") or []}
     return sorted(name for name in names if skill_description(name, harness) is None)
@@ -1283,7 +1413,7 @@ def verify_install(argv):
         print(f"no readable {ROUTES_FILE} above {cwd} - no installation to verify")
         return 2
 
-    selection = tier_gate.assess(root)
+    selection = selection_for(root)
     names = sorted({routed_name(selection, root, name, harness)
                     for route in routes for name in route.get("skills") or []})
     try:
@@ -1341,11 +1471,18 @@ def main():
         shell_writes = []
         targets = written_targets(tool_input)
     cwd = data.get("cwd") or os.getcwd()
-    root = find_repo_root(cwd)
+    try:
+        root = scope_root(targets, cwd)
+    except SplitWrite:
+        sys.stderr.write(
+            "SKILL ROUTER - blocked, this call writes into more than one routed repository. Split it "
+            "into one call per repository so each one's standards can be checked. Nothing was written.\n"
+        )
+        sys.exit(2)
     if root is None:
         sys.exit(0)
     relative_targets = [
-        rel for rel in (repo_relative(target, cwd) for target in targets) if rel is not None
+        rel for rel in (repo_relative(target, cwd, root) for target in targets) if rel is not None
     ]
     if not relative_targets:
         sys.exit(0)
@@ -1391,9 +1528,9 @@ def main():
     content = (
         "\n".join(text for _, text, _ in shell_writes if text) if is_shell else written_content(tool_input)
     )
-    removed_by_rel = removed_content_by_target(tool_input, cwd)
+    removed_by_rel = removed_content_by_target(tool_input, cwd, root)
     deleted = {
-        rel for rel in (repo_relative(target, cwd) for target in deleted_targets(tool_input))
+        rel for rel in (repo_relative(target, cwd, root) for target in deleted_targets(tool_input))
         if rel is not None
     }
     replaces = tool_name.casefold() in {"write", "write_file"}
@@ -1404,7 +1541,7 @@ def main():
     # shell write could ever satisfy it again - not even the write that overwrote the file clean.
     replaces_by_rel = (
         {rel: full for path, _, full in shell_writes
-         if (rel := repo_relative(path, cwd)) is not None} if is_shell else {}
+         if (rel := repo_relative(path, cwd, root)) is not None} if is_shell else {}
     )
 
     for rel in relative_targets:
@@ -1472,12 +1609,16 @@ def main():
             )
             sys.exit(2)
 
+    agent = subagent_id(data, harness)
     session = data.get("session_id")
+    if agent:
+        session = f"{session}:{agent}"
+    reads_prove = harness == "codex" or bool(agent)
     seen = load_seen(session)
-    selection = tier_gate.assess(root)
+    selection = selection_for(root)
     pending = []
     for rel, route in matched:
-        key = route.get("path")
+        key = route_key(route)
         if key in seen:
             continue
         pending.append((rel, dict(route, skills=[routed_name(selection, root, name, harness)
@@ -1508,7 +1649,8 @@ def main():
                 missing.add(name)
 
     outcomes = None if missing else transcript_skill_outcomes(
-        data.get("transcript_path"), codex_skills
+        proof_transcript(data, agent), codex_skills,
+        list(proof_names.values()) if agent else (),
     )
     rejected, unproven = set(), set()
     if not missing and outcomes is not None:
@@ -1522,8 +1664,7 @@ def main():
         unproven.update(descriptions)
 
     if not missing and not rejected and not unproven:
-        for _, route in pending:
-            seen.add(route.get("path"))
+        seen.update(route_key(route) for _, route in matched)
         save_seen(session, seen)
         sys.exit(0)
 
@@ -1553,9 +1694,9 @@ def main():
                 )
             elif desc:
                 lines.append(f"      {desc}")
-                # Codex exposes no `Skill` tool, so "invoke it" names an action it cannot take. Its
-                # contract is a completed read of the file, which it can only do if told which one.
-                if harness == "codex" and name in resolved_paths:
+                # Codex and a Claude subagent may expose no `Skill` tool, so "invoke it" names an action
+                # they cannot take. Their contract is a completed read of the file they are told about.
+                if reads_prove and name in resolved_paths:
                     lines.append(f"      READ THIS WHOLE FILE: {resolved_paths[name]}")
         if route.get("note"):
             lines.append(f"      NOTE: {route['note']}")
@@ -1580,6 +1721,10 @@ def main():
                 "write. The file was NOT written. This route stays blocked until a readable session "
                 "transcript records that read for every owning skill."
                 if harness == "codex" else
+                "Invoke the skill(s) above, or Read each file named above whole (no offset or limit), "
+                "then repeat this write. The file was NOT written. This subagent's own transcript must "
+                "record that load: skills its parent loaded are not in this subagent's context."
+                if agent else
                 "Invoke the skill(s) above, then repeat this write. The file was NOT written. This route "
                 "stays blocked until a readable session transcript records a successful invocation of "
                 "every owning skill."
