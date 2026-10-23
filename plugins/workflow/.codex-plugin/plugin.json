@@ -1,0 +1,23 @@
+{
+  "name": "workflow",
+  "description": "Goal lifecycle and recorded work status.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tj-agents/core",
+  "keywords": [
+    "workflow",
+    "status",
+    "plans"
+  ],
+  "skills": "./codex-skills/",
+  "interface": {
+    "displayName": "Workflow status",
+    "shortDescription": "Goal lifecycle and recorded work status.",
+    "longDescription": "Goal lifecycle and recorded work status.",
+    "developerName": "Tommy Seery",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the selected capability for this task."
+  }
+}

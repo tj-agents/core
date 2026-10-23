@@ -1,0 +1,15 @@
+{
+  "plugin": "workflow",
+  "payloads": [
+    "process"
+  ],
+  "prerequisites": [
+    "base",
+    "agent-store",
+    "machine"
+  ],
+  "external_prerequisites": [],
+  "skills": [
+    "status"
+  ]
+}
