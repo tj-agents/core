@@ -17,7 +17,7 @@ spec = importlib.util.spec_from_file_location("continuation_stop", SCRIPT)
 continuation_stop = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = continuation_stop
 spec.loader.exec_module(continuation_stop)
-import workflow_route
+import continuation_receipts
 
 
 class ContinuationStopTests(unittest.TestCase):
@@ -276,19 +276,39 @@ class ContinuationStopTests(unittest.TestCase):
             self.assertEqual("reason", continuation_stop.once_per_stop(session, "reason"))
             self.assertIsNone(continuation_stop.once_per_stop({**session, "stop_hook_active": True}, "reason"))
 
-    def test_bounded_side_handoff_blocks_stop_until_the_parent_has_an_owner(self):
-        scratch = Path(self.temp.name) / "side-handoff-receipt"
-        scratch.mkdir()
-        prompt = "Hand off this separate workstream and retain the current goal in this session."
-        payload = json.dumps({"hook_event_name": "UserPromptSubmit", "cwd": str(self.root),
-                              "session_id": self.session, "prompt": prompt})
-        with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)), \
-             patch.object(sys, "stdin", io.StringIO(payload)), patch.object(sys, "stdout", io.StringIO()):
-            self.assertEqual(0, workflow_route.main())
-            receipt = workflow_route.read_receipt(self.session)
-        self.assertTrue(receipt["execution_obligation"])
-        with patch.object(continuation_stop, "read_receipt", return_value=receipt):
-            self.assertIn("Initialize persistent-workflow", continuation_stop.outcome(self.payload()))
+    def test_source_and_generated_stop_hooks_block_a_routed_missing_owner(self):
+        scratch = Path(self.temp.name) / "receipt"
+        with patch.object(continuation_receipts.tempfile, "gettempdir", return_value=str(scratch)):
+            receipt = continuation_receipts.receipt_path(self.session)
+            receipt.parent.mkdir(parents=True)
+            receipt.write_text(json.dumps(self.receipt()), encoding="utf-8")
+            self.assertEqual(self.receipt(), continuation_receipts.read_receipt(self.session))
+        payload = json.dumps(self.payload())
+        environment = dict(
+            os.environ,
+            TEMP=str(scratch),
+            TMP=str(scratch),
+            TMPDIR=str(scratch),
+            AGENT_STATE_DIRECTORY=str(scratch / "state"),
+        )
+        scripts = (SCRIPT, ROOT / "plugins/engineering/hooks/continuation_stop.py")
+        for script in scripts:
+            with self.subTest(script=script):
+                result = subprocess.run(
+                    [sys.executable, "-B", str(script)],
+                    input=payload,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    cwd=self.root,
+                    env=environment,
+                    timeout=20,
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual("", result.stderr)
+                output = json.loads(result.stdout)
+                self.assertEqual("block", output["decision"])
+                self.assertIn("Initialize persistent-workflow", output["reason"])
 
     def test_invalid_owner_artifacts_block_unrouted_stop(self):
         path = self.root / ".agents/continuation/owner.json"
@@ -404,133 +424,6 @@ class ContinuationStopTests(unittest.TestCase):
         runtime.process_identity.return_value = "foreign"
         self.assertFalse(continuation_stop.foreground_owns_current_process(owner, runtime))
 
-    def test_read_only_questions_do_not_create_or_resume_an_execution_obligation(self):
-        scratch = Path(self.temp.name) / "receipt-questions"
-        scratch.mkdir()
-        prompts = (
-            "How does plan-execution work?",
-            "Why didn't you finish the plan?",
-            "Explain how to implement the plan.",
-            "How do I plan and implement the migration?",
-            "Can you explain how to plan and implement the migration?",
-            "Explain how to plan and implement the migration.",
-            "Please explain how to plan and implement the migration.",
-            "Should we plan and implement the migration?",
-            "Can I plan and implement the migration?",
-            "Would we plan and implement the migration?",
-            "Do we plan and implement the migration?",
-            "Do the agents plan and implement the migration?",
-            "Can't I plan and implement the migration?",
-            "Couldn’t we plan and implement the migration?",
-            "Won't we plan and implement the migration?",
-            "Must we plan and implement the migration?",
-            "Need I plan and implement the migration?",
-            "Must not plan and implement the migration.",
-            "Mustn't plan and implement the migration.",
-        )
-        with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)):
-            for prompt in prompts:
-                with self.subTest(prompt=prompt):
-                    payload = json.dumps({"hook_event_name": "UserPromptSubmit", "cwd": str(self.root),
-                                          "session_id": self.session, "prompt": prompt})
-                    with patch.object(sys, "stdin", io.StringIO(payload)), patch.object(sys, "stdout", io.StringIO()):
-                        self.assertEqual(0, workflow_route.main())
-                    receipt = workflow_route.read_receipt(self.session)
-                    self.assertIsNot(receipt.get("execution_obligation"), True)
-                    self.assertIsNone(continuation_stop.outcome(self.payload()))
-            workflow_route.record_receipt(self.session, cwd=self.root, execution_obligation=True)
-            workflow_route.record_receipt(self.session, cwd=self.root, suspend_execution=True, prompt="Pause.")
-            for prompt in prompts:
-                payload = json.dumps({"hook_event_name": "UserPromptSubmit", "cwd": str(self.root),
-                                      "session_id": self.session, "prompt": prompt})
-                with patch.object(sys, "stdin", io.StringIO(payload)), patch.object(sys, "stdout", io.StringIO()):
-                    self.assertEqual(0, workflow_route.main())
-                receipt = workflow_route.read_receipt(self.session)
-                self.assertTrue(receipt["execution_suspended"])
-                self.assertIsNone(continuation_stop.outcome(self.payload()))
-
-    def test_route_receipt_latches_execution_across_status_and_planning_scope(self):
-        scratch = Path(self.temp.name) / "scratch"
-        scratch.mkdir()
-        with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)), \
-             patch.object(workflow_route.time, "time", side_effect=(1, 2, 3, 4)):
-            workflow_route.record_receipt("route", cwd=self.root, execution_obligation=True, prompt="Execute")
-            first = workflow_route.read_receipt("route")
-            workflow_route.record_receipt("route", cwd=self.root, prompt="Status?")
-            status = workflow_route.read_receipt("route")
-            workflow_route.record_receipt("route", cwd=self.root, suspend_execution=True, prompt="Planning only")
-            planning = workflow_route.read_receipt("route")
-            workflow_route.record_receipt("route", cwd=self.root, execution_obligation=True, prompt="Resume execution")
-            resumed = workflow_route.read_receipt("route")
-        self.assertEqual(1, first["execution_obligation_at"])
-        self.assertEqual(1, status["execution_obligation_at"])
-        self.assertTrue(planning["execution_suspended"])
-        self.assertEqual(4, resumed["execution_obligation_at"])
-        self.assertNotIn("execution_suspended", resumed)
-
-    def test_pause_persists_across_prompts_until_explicit_resume(self):
-        scratch = Path(self.temp.name) / "controls"
-        scratch.mkdir()
-        with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)):
-            for previous_obligation in (False, True):
-                session = f"controls-{previous_obligation}"
-                workflow_route.record_receipt(session, cwd=self.root, execution_obligation=previous_obligation)
-                for prompt in ("Cancel it.", "Cancel this.", "Please pause this work."):
-                    control = workflow_route.direct_control(prompt)
-                    self.assertIn(control, {"pause", "cancel"})
-                    workflow_route.record_receipt(session, cwd=self.root, suspend_execution=True, prompt=prompt)
-                    workflow_route.record_receipt(session, cwd=self.root, prompt="Status?")
-                    receipt = workflow_route.read_receipt(session)
-                    self.assertTrue(receipt["execution_suspended"])
-                    with patch.object(continuation_stop, "read_receipt", return_value=receipt):
-                        self.assertIsNone(continuation_stop.outcome({**self.payload(), "session_id": session}))
-                    workflow_route.record_receipt(session, cwd=self.root, prompt="Continue.", resume_execution=True)
-                    self.assertFalse(workflow_route.read_receipt(session)["execution_suspended"])
-
-    def test_prompt_hook_persists_cancel_and_resumes_the_existing_obligation(self):
-        scratch = Path(self.temp.name) / "prompt-controls"
-        scratch.mkdir()
-        with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)):
-            workflow_route.record_receipt(self.session, cwd=self.root, execution_obligation=True)
-            for prompt in ("Cancel it.", "Status?", "Continue."):
-                payload = json.dumps({"hook_event_name": "UserPromptSubmit", "cwd": str(self.root), "session_id": self.session, "prompt": prompt})
-                with patch.object(sys, "stdin", io.StringIO(payload)), patch.object(sys, "stdout", io.StringIO()):
-                    self.assertEqual(0, workflow_route.main())
-                receipt = workflow_route.read_receipt(self.session)
-                with patch.object(continuation_stop, "read_receipt", return_value=receipt):
-                    result = continuation_stop.outcome(self.payload())
-                if prompt == "Continue.":
-                    self.assertIsNotNone(result)
-                else:
-                    self.assertTrue(receipt["execution_suspended"])
-                    self.assertIsNone(result)
-
-    def test_control_commands_do_not_adopt_quoted_text_or_other_worktrees(self):
-        for prompt in ('"Cancel it."', "Why did it stop?", "Continue? What does that mean?", "```text\nstop\n```", "The log says cancel this."):
-            self.assertIsNone(workflow_route.direct_control(prompt))
-        scratch = Path(self.temp.name) / "isolation"
-        scratch.mkdir()
-        with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)):
-            workflow_route.record_receipt("isolated", cwd=self.root, suspend_execution=True, prompt="Pause.")
-            workflow_route.record_receipt("isolated", cwd=self.root.parent, prompt="Status?")
-            self.assertNotIn("execution_suspended", workflow_route.read_receipt("isolated"))
-
-    def test_source_and_generated_stop_hooks_block_a_routed_missing_owner(self):
-        scratch = Path(self.temp.name) / "receipt"
-        receipt = scratch / "agents-workflow-route" / (workflow_route.hashlib.sha256(self.session.encode("utf-8")).hexdigest() + ".json")
-        receipt.parent.mkdir(parents=True)
-        receipt.write_text(json.dumps(self.receipt()), encoding="utf-8")
-        payload = json.dumps(self.payload())
-        environment = dict(os.environ, TEMP=str(scratch), TMP=str(scratch), TMPDIR=str(scratch),
-                           AGENT_STATE_DIRECTORY=str(scratch / "state"))
-        scripts = (SCRIPT, ROOT / "plugins/engineering/hooks/continuation_stop.py")
-        for script in scripts:
-            with self.subTest(script=script):
-                result = subprocess.run([sys.executable, "-B", str(script)], input=payload,
-                                        capture_output=True, text=True, cwd=self.root, env=environment, timeout=20)
-                self.assertEqual(0, result.returncode, result.stderr)
-                self.assertEqual("block", json.loads(result.stdout)["decision"])
-
     def test_binding_active_reads_the_head_through_real_artifact_normalization(self):
         workflows = continuation_stop.workflow_root()
         if str(workflows) not in sys.path:
@@ -557,3 +450,30 @@ class ContinuationStopTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ContinuationReceiptTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+
+    def test_direct_controls_and_read_only_receipts(self):
+        with patch.object(continuation_receipts.tempfile, "gettempdir", return_value=self.temp.name):
+            for prompt, expected in (("Pause this work.", "pause"), ("Cancel it.", "cancel"), ("stop", "stop"), ("Continue.", "continue"), ("quoted stop", None)):
+                with self.subTest(prompt=prompt):
+                    self.assertEqual(expected, continuation_receipts.direct_control(prompt))
+            path = continuation_receipts.receipt_path("session")
+            path.parent.mkdir()
+            path.write_text(json.dumps({"worktree": "/work", "execution_suspended": True}), encoding="utf-8")
+            self.assertEqual({"worktree": "/work", "execution_suspended": True}, continuation_receipts.read_receipt("session"))
+            path.write_text("[]", encoding="utf-8")
+            self.assertEqual({}, continuation_receipts.read_receipt("session"))
+            path.unlink()
+            self.assertEqual({}, continuation_receipts.read_receipt("session"))
+
+    def test_receipt_paths_are_exact_session_isolated(self):
+        with patch.object(continuation_receipts.tempfile, "gettempdir", return_value=self.temp.name):
+            first = continuation_receipts.receipt_path("first")
+            second = continuation_receipts.receipt_path("second")
+            self.assertNotEqual(first, second)
+            self.assertEqual(first.parent, second.parent)

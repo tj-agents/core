@@ -35,7 +35,7 @@ FAMILIES = {
         "tests": {".agents/hooks/tests/test_verify_machine.py"},
     },
     "handoff-transfer": {
-        "sources": {".agents/engineering/workflow/handoff/scripts/transfer.py"},
+        "sources": {".agents/workflow/workflow/handoff/scripts/transfer.py"},
         "tests": {".agents/hooks/tests/test_handoff_transfer.py"},
     },
 }

@@ -18,9 +18,8 @@
       "skills": [
         "agent-files",
         "cd",
-        "goal-continuation",
         "idea-initialization",
-        "plan-artifacts"
+        "task-routing"
       ],
       "dependencies": {
         "required": [],
@@ -53,6 +52,13 @@
           },
           {
             "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/base/policy/task-routing/scripts/session-context.py",
             "hosts": [
               "claude",
               "codex"
@@ -200,6 +206,11 @@
         "macos"
       ],
       "skills": [
+        "handoff",
+        "plan",
+        "plan-artifacts",
+        "resume",
+        "run",
         "status"
       ],
       "dependencies": {
@@ -318,7 +329,6 @@
         "commit-all",
         "commit-push",
         "committing",
-        "continue-roadmap",
         "docs",
         "docs-review",
         "failing-tests",
@@ -328,8 +338,6 @@
         "git-branching",
         "guide",
         "guide-build",
-        "handoff",
-        "handoff-format",
         "incremental-review",
         "merge",
         "merge-docs",
@@ -338,9 +346,6 @@
         "open-worktree",
         "persistent-delivery",
         "persistent-workflow",
-        "plan-authoring",
-        "plan-checkpoint",
-        "plan-execution",
         "plans",
         "pr-preflight",
         "pr-screenshots",
@@ -350,7 +355,6 @@
         "push",
         "recents",
         "remote-validation",
-        "resume-plan",
         "review",
         "review-lifecycle",
         "self-repair",

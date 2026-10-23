@@ -10,8 +10,8 @@ domain: process
 These conventions apply when engineering is selected for the current scope. They grant no
 implementation, publication or installation authority beyond the eligible internal repair authority in
 `engineering:self-repair`. Product profiles and compatibility policy remain
-with the project. The common maintained-plan contract is `base:plan-artifacts`. The common
-continuation owner is `base:goal-continuation`; it selects `engineering:persistent-workflow` when
+with the project. The common maintained-plan contract is `workflow:plan-artifacts`. The common
+continuation owner is `workflow:run`; it selects `engineering:persistent-workflow` when
 an authorized task has a future decision that may outlive the current session.
 
 ## When the user calls out a mistake
@@ -39,10 +39,10 @@ Why: three hook test files timed out at 6-way load and passed when run alone.
 
 ## A task has an owning lifecycle — load it before the first edit
 
-Authorized long-term or multi-phase work selects `engineering:plan-execution`, even when the user does
+Authorized long-term or multi-phase work selects `workflow:run`, even when the user does
 not name a plan or skill. Read an existing canonical goal before edits and keep its progress current.
 A bounded behavior change selects `engineering:feature`; a defect selects `engineering:bugfix`.
-Planning-only work selects `engineering:plan-authoring` and does not authorize implementation.
+Planning-only work selects `workflow:plan` and does not authorize implementation.
 A question or review request alone grants no implementation authority. A status question during already
 authorized execution should be answered before that execution continues.
 
@@ -81,7 +81,7 @@ the original task while a recording decision is pending or declined. Recording g
 authority to repair, publish, dispatch or schedule work.
 
 Feature, story, task and untyped recording requests use the selected profile's creation operation. Its
-policy resolves intent and native type; [repository selection](../../resources/problem-records.md#repository-selection)
+policy resolves intent and native type; [repository selection](../../../workflow/resources/problem-records.md#repository-selection)
 never grants permission to start implementation.
 
 ## Keep large changes reviewable
@@ -97,7 +97,7 @@ candidate before adding more scope; preserve atomic behavior and security when c
 ## Preserve one owner through completion
 
 When preparation or approved design has resolved the next action, enter that action through the owning
-lifecycle. A failed CI observation requires recovery under `engineering:plan-execution`; it does not end
+lifecycle. A failed CI observation requires recovery under `workflow:run`; it does not end
 ownership or establish a CI result.
 
 At normal start, read `machine:recover-agents`' linked command contract and inspect `status`. For a new
@@ -108,7 +108,7 @@ plan. Retain metadata and status unless deliberately transitioning; another owne
 
 Act on authorized reversible work and keep the canonical plan aligned with observed results. A phase,
 commit, open PR or context boundary does not narrow the original scope. Honor user limits and real
-external-action gates. Use `engineering:handoff` for an actual authorized context transfer; it checkpoints
+external-action gates. Use `workflow:handoff` for an actual authorized context transfer; it checkpoints
 first, invokes one selected machine launcher, and releases the previous writer. Prompt-only requests
 remain prompt-only. Missing runtime capabilities must be reported accurately, not assumed installed.
 

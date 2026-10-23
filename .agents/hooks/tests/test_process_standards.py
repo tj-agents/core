@@ -12,7 +12,7 @@ class ProcessStandardsTests(unittest.TestCase):
     def corpus(self):
         paths = [
             path
-            for scope in ("base", "engineering", "machine")
+            for scope in ("base", "engineering", "machine", "workflow")
             for path in (self.root / ".agents" / scope).rglob("SKILL.md")
         ]
         return "\n".join(path.read_text(encoding="utf-8") for path in paths)
@@ -34,18 +34,16 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertNotIn(phrase, corpus)
 
     def test_checkpoint_standard_owns_material_transitions_and_single_push(self):
-        checkpoint = authored_skill("plan-checkpoint").read_text(
-            encoding="utf-8"
-        )
+        checkpoint = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
 
         for phrase in (
             "material implementation milestone",
-            "genuine blocker",
-            "a full review completes",
-            "delivery, merge, publication, or final closeout crosses a terminal boundary",
-            "current context is ending with partial state",
-            "A plan-managed push has one leg",
-            "Never create or push an\nobservation-only",
+            "genuine blocker or ownership handoff",
+            "completed full review or important finding",
+            "terminal delivery transition",
+            "unsafe context ending",
+            "pushes once",
+            "Do not create observation-only",
             "200 lines",
             "16,000 UTF-8 bytes",
         ):
@@ -166,33 +164,6 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self_repair)
 
-    def test_plan_execution_reads_the_plan_corpus_only_when_it_changes_a_decision(self):
-        body = authored_skill("plan-execution").read_text(
-            encoding="utf-8"
-        )
-        flat = " ".join(body.split())
-
-        self.assertIn(
-            "in exactly three cases: selecting ownership for the first time in this "
-            "context, evidence that is missing or self-contradictory, and writing or "
-            "reconciling a material checkpoint",
-            flat,
-        )
-        self.assertIn(
-            "### Resume a preserved continuation without re-reading the corpus", body
-        )
-        self.assertIn(
-            "trustworthy when it names all five of the plan identity, the absolute "
-            "worktree, the branch, the current state, and the single next action",
-            flat,
-        )
-        self.assertIn("it does not relax the worktree identity check", flat)
-        self.assertIn(
-            "Do not re-read the plan, the ledger, `plans` or `plan-checkpoint`",
-            flat,
-        )
-        self.assertNotIn("Read the repository instructions, [`plans`]", body)
-
     def test_harness_specific_persistent_continuation_is_routed(self):
         remote = authored_skill("remote-validation").read_text(
             encoding="utf-8"
@@ -262,7 +233,6 @@ class ProcessStandardsTests(unittest.TestCase):
             for name in (
                 "persistent-delivery",
                 "merge",
-                "plan-execution",
                 "plans",
                 "feature",
                 "bugfix",
@@ -281,11 +251,6 @@ class ProcessStandardsTests(unittest.TestCase):
                 "merge",
                 "re-resolves merge authorization from the goal's recorded "
                 "authorization (`engineering:merging`)",
-            ),
-            (
-                "plan-execution",
-                "default-branch state (`engineering:merging` owns the goal-wide "
-                "merge-authorization scope)",
             ),
             (
                 "plans",
@@ -327,44 +292,22 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("the bundling test below is applied after that pick", flat)
         self.assertNotIn("Survey every `TECH_DEBT.md` in the repo, then choose", flat)
 
-    def test_plan_execution_resumes_into_owned_partial_work(self):
-        body = authored_skill("plan-execution").read_text(
-            encoding="utf-8"
-        )
-        flat = " ".join(body.split())
-
-        self.assertIn(
-            "A restored worktree that is dirty is not by itself a reason to stop", flat
-        )
-        self.assertIn("that is partial implementation to resume", flat)
-        self.assertIn(
-            "Stop only when the dirty state is conflicting, unexplained, unowned, or unsafe",
-            flat,
-        )
-
     def test_ownership_or_repository_change_selects_a_real_handoff(self):
         plans = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
-        execution = " ".join(
-            authored_skill("plan-execution").read_text(encoding="utf-8").split()
-        )
-        formatting = " ".join(
-            authored_skill("handoff-format").read_text(encoding="utf-8").split()
+        handoff = " ".join(
+            authored_skill("handoff").read_text(encoding="utf-8").split()
         )
 
         self.assertIn("changes owner, repository, worktree, PR, or logical workstream", plans)
         self.assertIn("execute the `handoff` workflow", plans)
         self.assertIn("a pointer in the response alone does not transfer ownership", plans)
-        self.assertIn("execute `engineering:handoff`", execution)
-        self.assertIn("invokes one selected launcher before this context releases ownership", execution)
-        self.assertIn("It does not select or perform a transfer", formatting)
-        self.assertIn("`engineering:handoff` performs the selected transfer", formatting)
-
+        self.assertIn("It prepares the exact `workflow:handoff` pointer", plans)
+        self.assertIn("Stop owned-path writes before invoking the launcher", handoff)
+        self.assertIn("Preparing a pointer alone does not complete a handoff", handoff)
     def test_planning_to_execution_uses_scale_and_context(self):
         lanes = " ".join(authored_skill("lanes").read_text(encoding="utf-8").split())
         plans = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
-        execution = " ".join(
-            authored_skill("plan-execution").read_text(encoding="utf-8").split()
-        )
+        execution = plans
         self.assertIn("Lane selection never transfers task ownership", lanes)
         self.assertIn("On either host the parent does its own work in the same checkout", lanes)
         self.assertIn("explicit path and responsibility ownership", lanes)
@@ -378,8 +321,8 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("Judge plans between these cases", plans)
         self.assertIn("plan length alone is not a mechanical threshold", plans)
         self.assertIn("changes owner, repository, worktree, PR, or logical workstream", plans)
-        self.assertIn("Do not transfer merely because a phase or commit completed", execution)
-        self.assertIn("A massive plan whose substantial design phase", execution)
+        self.assertIn("Do not select a handoff as routine phase-ending ceremony", execution)
+        self.assertIn("a massive plan has completed substantial design", execution)
 
         for host in ("codex", "claude"):
             with self.subTest(host=host):
@@ -411,20 +354,12 @@ class ProcessStandardsTests(unittest.TestCase):
 
     def test_plan_artifacts_always_reach_merged_default_branch(self):
         plans = authored_skill("plans").read_text(encoding="utf-8")
-        authoring = authored_skill("plan-authoring").read_text(
-            encoding="utf-8"
-        )
-        execution = authored_skill("plan-execution").read_text(
-            encoding="utf-8"
-        )
+        flat = " ".join(plans.split())
 
         self.assertIn("## Planning artifacts always land", plans)
         self.assertIn("## Roadmap → plan → progress", plans)
         self.assertIn("## Implementation examples and their standards", plans)
-        self.assertIn(
-            "planning-only or meta-only slice lands through `merge-docs`",
-            " ".join(plans.split()),
-        )
+        self.assertIn("planning-only or meta-only slice lands through `merge-docs`", flat)
         self.assertIn("Location alone never makes a restriction stale", plans)
         for live_gate in (
             "explicit current user limitation",
@@ -434,41 +369,9 @@ class ProcessStandardsTests(unittest.TestCase):
             "repository stop class",
         ):
             with self.subTest(live_gate=live_gate):
-                self.assertIn(live_gate, " ".join(plans.split()))
-        self.assertIn("land through `merge-docs`", " ".join(authoring.split()))
-        self.assertIn(
-            "Planning-only work carries standing authorization",
-            " ".join(authoring.split()),
-        )
-        self.assertIn(
-            "A live delivery restriction overrides that standing authorization",
-            " ".join(authoring.split()),
-        )
-        for live_gate in (
-            "explicit current user limitation",
-            "repository authorization",
-            "security or validation hold",
-            "merge hold",
-            "stop class",
-        ):
-            with self.subTest(authoring_live_gate=live_gate):
-                self.assertIn(live_gate, " ".join(authoring.split()))
-        self.assertIn(
-            "only after the design artifact and any owning ledger are merged to the default branch",
-            " ".join(authoring.split()),
-        )
-        self.assertIn(
-            "Planning-artifact publication remains part of the authorized plan lifecycle",
-            " ".join(execution.split()),
-        )
-        self.assertIn(
-            "Deliver a meta-only slice through `engineering:merge-docs`; "
-            "deliver any slice containing runtime, product, package, schema, deployment, "
-            "or test-selection changes through `engineering:merge`",
-            " ".join(execution.split()),
-        )
-        self.assertNotIn("delivering each completed slice through [`merge`]", execution)
-        self.assertIn("including a planning-only slice", " ".join(execution.split()))
+                self.assertIn(live_gate, flat)
+        self.assertIn("Planning-only work is terminal only when its", flat)
+        self.assertIn("implementation are terminal only when that delivery PR merges", flat)
 
     def test_review_keeps_injected_scope_and_rechecks_rule_identities(self):
         body = authored_skill("review").read_text(encoding="utf-8")
@@ -515,9 +418,8 @@ class ProcessStandardsTests(unittest.TestCase):
 
     def test_cd_and_handoff_transfer_active_directory_removal_to_the_successor(self):
         cd = " ".join(authored_skill("cd").read_text(encoding="utf-8").split())
-        handoff = " ".join(
-            authored_skill("handoff").read_text(encoding="utf-8").split()
-        )
+        handoff = " ".join(authored_skill("handoff").read_text(encoding="utf-8").split())
+        cleanup = " ".join(authored_skill("merging").read_text(encoding="utf-8").split())
 
         self.assertIn("Retarget the host **before** any helper or native command", cd)
         self.assertIn(
@@ -530,15 +432,15 @@ class ProcessStandardsTests(unittest.TestCase):
             "`handoff` successor own the removal, closing the predecessor through `machine:peer-cli`",
             cd,
         )
+        self.assertIn("follow `engineering:merging` under Transferred checkout cleanup", handoff)
         self.assertIn(
-            "put that exact operation and its final filesystem verification in the "
-            "successor's `## Next Steps`",
+            "Put the exact operation and final filesystem verification in the successor's `## Next Steps`",
             handoff,
         )
-        self.assertIn(
-            "The predecessor must not perform the operation after launch", handoff
-        )
-        self.assertIn("a command error or residual path as incomplete", handoff)
+        self.assertIn("The predecessor must not perform it after launch", handoff)
+        self.assertIn("a command error or residual path as incomplete", cleanup)
+
+
 
 
 if __name__ == "__main__":

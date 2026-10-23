@@ -18,12 +18,7 @@ Read the repository's branch/worktree guidance and the standards owed by the pat
 the requirement, success conditions, scope, and any material ambiguity from repository evidence before
 editing.
 
-Resolve one owning lifecycle skill and only the technical skills directly routed by the changed paths. Run
-the command as `python` on Windows or `python3` on Linux/macOS. Use
-`python .agents/workflows/workflow_ops.py --root . --workflow-run-id <id> skills --lifecycle feature --changed-path <path>` to record
-their identities and content hashes, and reuse that record while those hashes remain unchanged. Use the
-shared `inspect` operation once for routine repository state instead of reconstructing it through separate
-shell calls.
+When a Workflow owner delegates a bounded technical slice, perform that slice and return implementation, test, review and delivery evidence to the same owner. Do not claim the whole goal or redirect the operation back to `workflow:run`. Resolve technical rules through selected native discovery and use the shared `inspect` operation once for routine repository state.
 
 Use the short path when ownership is obvious, one coherent implementation follows existing patterns, and
 focused validation can prove it. The short path creates no plan, ledger, workflow sidecar, or automatic
@@ -34,7 +29,7 @@ Promote before recovery becomes fragile when the work grows across phases, deliv
 gates, or context/restart boundaries. Resolve and validate Workflow v2 repository state, then follow
 `engineering:plans` to create the durable plan and ledger and
 checkpoint them under
-`engineering:plan-checkpoint`. A Kandev-managed task may own the outer worktree and host
+`engineering:plans`. A Kandev-managed task may own the outer worktree and host
 session, but its identifiers are not workflow state. Continue under the plan's owner while the original
 implementation authority still covers the work.
 Promotion changes persistence, not the requested outcome.

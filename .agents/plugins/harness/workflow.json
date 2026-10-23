@@ -6,6 +6,7 @@
     ".agents/hooks/problem_records.py",
     ".agents/tiers/workflow.json",
     ".agents/workflow",
+    ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
     ".agents/workflow/resources/problem-records.md"
   ],
   "requires": {

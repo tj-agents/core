@@ -88,7 +88,7 @@ class WorkflowContractTests(unittest.TestCase):
                 "hosts": 2,
                 "roles": 5,
                 "release": "A",
-                "compatibility_entries": 3,
+                "compatibility_entries": 1,
             },
             self.contract.verify_bundle(),
         )
@@ -192,15 +192,23 @@ class WorkflowContractTests(unittest.TestCase):
                 self.assertIn(entry["replacement"], body)
                 self.assertLess(len(body.splitlines()), 60)
 
-    def test_release_a_cannot_deprecate_or_remove_an_entry(self):
+    def test_release_a_cannot_deprecate_a_compatibility_entry(self):
         contract = WorkflowContract(WORKFLOWS, repository_root=ROOT)
-        contract.compatibility["compatibility_entries"]["resume-plan"]["status"] = "deprecated"
+        contract.compatibility["compatibility_entries"]["temporary"] = {
+            "kind": "compatibility-entry",
+            "status": "deprecated",
+            "replacement": "staged-review",
+        }
         with self.assertRaisesRegex(ContractViolation, "cannot be deprecated before release B"):
             contract.verify_bundle()
 
     def test_a_compatibility_entry_cannot_replace_another_entry(self):
         contract = WorkflowContract(WORKFLOWS, repository_root=ROOT)
-        contract.compatibility["compatibility_entries"]["resume-plan"]["replacement"] = "continue-roadmap"
+        contract.compatibility["compatibility_entries"]["temporary"] = {
+            "kind": "compatibility-entry",
+            "status": "retained",
+            "replacement": "staged-review-all",
+        }
         with self.assertRaisesRegex(ContractViolation, "names another compatibility entry"):
             contract.verify_bundle()
 

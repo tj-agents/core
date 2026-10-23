@@ -17,14 +17,13 @@ Global architecture and cross-repository designs live in [`tj-agents/docs`](http
 (private; organization access required). Core-specific implementation plans and operational documentation
 stay here; shared plans link to their source owners.
 
-`base:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
+`workflow:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
 `base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
 [`base:idea-initialization`](.agents/base/policy/idea-initialization/SKILL.md) owns the once-per-idea
-assessment of existing capabilities and solutions; [`base:goal-continuation`](.agents/base/policy/goal-continuation/SKILL.md)
+assessment of existing capabilities and solutions; [`workflow:run`](.agents/workflow/workflow/run/SKILL.md)
 owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
-Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
-Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
+Known bugs, mistakes and debt follow the selected problem-record profile.
 The [recording contract](.agents/workflow/resources/problem-records.md) routes remote work-item
 operations to the repository's explicitly selected profile. Personal owns GitHub records; Infonetica owns
 Azure Boards records and native type policy. Core publishes the shared SQLite registry as Agent Store, generic work status as Workflow, and reusable
@@ -35,9 +34,8 @@ Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed wri
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
 current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or
 changed plugin hooks until they are reviewed and trusted in `/hooks`; a fresh missing-marketplace write
-probe is required before claiming enforcement. The host coverage limit is tracked in
-`.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents a generated native-instruction
-fallback.
+probe is required before claiming enforcement. The `base:agent-files` skill documents a generated
+native-instruction fallback.
 Codex hook commands use a per-session temporary snapshot preseeded for the running session's hooks.
 This lets those hooks keep running after a plugin update replaces an inactive package cache entry.
 New sessions create a fresh snapshot from the verified package; snapshots outside the plugin cache are

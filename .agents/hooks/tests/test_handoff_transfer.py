@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "engineering/workflow/handoff/scripts/transfer.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "workflow/workflow/handoff/scripts/transfer.py"
 
 
 class HandoffTransferTests(unittest.TestCase):

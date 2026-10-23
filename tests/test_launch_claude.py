@@ -188,7 +188,7 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn('routes to Codex L1', err)
         self.assertIn('use machine:handoff-codex, or omit --lane for an explicit user-named model.', err)
-        self.assertNotIn('engineering:handoff', err)
+        self.assertNotIn('workflow:handoff', err)
         self.agent_cli.launch_tab.assert_not_called()
 
     def test_claude_l1_with_an_explicit_model_redirects_to_codex_before_launch(self):

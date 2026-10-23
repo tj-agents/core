@@ -662,6 +662,119 @@ class ReviewTests(RepositoryFixture):
         locations.assert_not_called()
         self.assertTrue(Path(recent["bundle"]["directory"]).is_dir())
 
+    def test_cleanup_skips_absent_owned_bundle_without_resolving_locations(self):
+        expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
+        descriptor_path = Path(expired["artifact"])
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        descriptor["bundle"]["last_validated_at"] = "2000-01-01T00:00:00+00:00"
+        ops.atomic_json(descriptor_path, descriptor)
+        shutil.rmtree(expired["bundle"]["directory"])
+
+        with mock.patch.object(ops, "review_bundle_locations") as locations:
+            ops.cleanup_review_bundles(self.root)
+
+        locations.assert_not_called()
+
+    def test_cleanup_validates_existing_expired_bundle_before_removal(self):
+        expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
+        descriptor_path = Path(expired["artifact"])
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        descriptor["bundle"]["last_validated_at"] = "2000-01-01T00:00:00+00:00"
+        ops.atomic_json(descriptor_path, descriptor)
+
+        with mock.patch.object(ops, "review_bundle_locations", wraps=ops.review_bundle_locations) as locations:
+            ops.cleanup_review_bundles(self.root)
+
+        locations.assert_called_once()
+        self.assertFalse(Path(expired["bundle"]["directory"]).exists())
+
+    def test_cleanup_validates_redirected_expired_bundle_without_removal(self):
+        expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
+        descriptor_path = Path(expired["artifact"])
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        descriptor["bundle"]["last_validated_at"] = "2000-01-01T00:00:00+00:00"
+        ops.atomic_json(descriptor_path, descriptor)
+        directory = Path(expired["bundle"]["directory"])
+        shutil.rmtree(directory)
+        target = Path(self.temp.name) / "redirected-bundle"
+        target.mkdir()
+        if sys.platform == "win32":
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(directory), str(target)], check=True)
+            self.addCleanup(directory.rmdir)
+        else:
+            directory.symlink_to(target, target_is_directory=True)
+            self.addCleanup(directory.unlink)
+
+        with mock.patch.object(ops, "review_bundle_locations", wraps=ops.review_bundle_locations) as locations:
+            ops.cleanup_review_bundles(self.root)
+
+        locations.assert_called_once()
+        self.assertTrue(target.is_dir())
+
+    def test_cleanup_validates_redirected_cache_ancestor_before_absent_bundle_probe(self):
+        expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
+        descriptor_path = Path(expired["artifact"])
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        descriptor["bundle"]["last_validated_at"] = "2000-01-01T00:00:00+00:00"
+        ops.atomic_json(descriptor_path, descriptor)
+        directory = Path(expired["bundle"]["directory"])
+        run_cache = directory.parent
+        shutil.rmtree(directory)
+        shutil.rmtree(run_cache)
+        target = Path(self.temp.name) / "redirected-cache"
+        target.mkdir()
+        if sys.platform == "win32":
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(run_cache), str(target)], check=True)
+            self.addCleanup(run_cache.rmdir)
+        else:
+            run_cache.symlink_to(target, target_is_directory=True)
+            self.addCleanup(run_cache.unlink)
+
+        with mock.patch.object(ops, "review_bundle_locations", wraps=ops.review_bundle_locations) as locations:
+            ops.cleanup_review_bundles(self.root)
+
+        locations.assert_called_once()
+        self.assertTrue(target.is_dir())
+
+    def test_cleanup_validates_redirected_cache_ancestor_before_absent_bundle_probe(self):
+        expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
+        descriptor_path = Path(expired["artifact"])
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        descriptor["bundle"]["last_validated_at"] = "2000-01-01T00:00:00+00:00"
+        ops.atomic_json(descriptor_path, descriptor)
+        directory = Path(expired["bundle"]["directory"])
+        run_cache = directory.parent
+        shutil.rmtree(directory)
+        shutil.rmtree(run_cache)
+        target = Path(self.temp.name) / "redirected-cache"
+        target.mkdir()
+        if sys.platform == "win32":
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(run_cache), str(target)], check=True)
+            self.addCleanup(run_cache.rmdir)
+        else:
+            run_cache.symlink_to(target, target_is_directory=True)
+            self.addCleanup(run_cache.unlink)
+
+        with mock.patch.object(ops, "review_bundle_locations", wraps=ops.review_bundle_locations) as locations:
+            ops.cleanup_review_bundles(self.root)
+
+        locations.assert_called_once()
+        self.assertTrue(target.is_dir())
+
+    def test_cleanup_validates_foreign_absent_bundle_before_skipping(self):
+        expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
+        descriptor_path = Path(expired["artifact"])
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        descriptor["bundle"]["last_validated_at"] = "2000-01-01T00:00:00+00:00"
+        descriptor["bundle"]["patch"] = str(Path(self.temp.name) / "foreign.patch")
+        ops.atomic_json(descriptor_path, descriptor)
+        shutil.rmtree(expired["bundle"]["directory"])
+
+        with mock.patch.object(ops, "review_bundle_locations", wraps=ops.review_bundle_locations) as locations:
+            ops.cleanup_review_bundles(self.root)
+
+        locations.assert_called_once()
+
     def test_cleanup_never_scans_legacy_payload_trees(self):
         payloads = []
         for name, with_descriptor in (("stored", True), ("unpublished", False)):
@@ -1513,7 +1626,7 @@ class HostCoverageWorkflowTests(RepositoryFixture):
         return {
             "schema_version": 1,
             "candidate_head": head,
-            "shared_source": ".agents/base/policy/plan-artifacts/SKILL.md",
+            "shared_source": ".agents/workflow/contract/plan-artifacts/SKILL.md",
             "hosts": [
                 {
                     "host": "claude",
