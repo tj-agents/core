@@ -15,6 +15,8 @@ PROMPT_CONTEXT_HEADINGS = (
 
 SESSION_START_HEADING = "## Finish the session"
 
+FINISH_REMINDER = "Nothing owned left to do before this reply? Select `machine:close`."
+
 
 def prompt_context_section(body, heading):
     heading_match = re.search(rf"(?m)^{re.escape(heading)}[ \t]*$", body)
@@ -142,7 +144,7 @@ def main():
         try:
             context = (
                 f"engineering:session (source SHA-256 {digest})\n"
-                f"Source: {contract}\n\n{prompt_context(body)}"
+                f"Source: {contract}\n\n{prompt_context(body)}\n\n{FINISH_REMINDER}"
             )
         except ValueError as error:
             print(f"session: {error}", file=sys.stderr)
