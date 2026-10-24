@@ -78,33 +78,20 @@ delivery wait; it does not establish durable unattended continuation. Apply `wor
 before ending at a genuine boundary for the remaining whole goal. A completed slice or unavailable
 scheduler does not establish goal completion or a whole-goal blocker.
 
-## Notify the owning conversation
+## Listen for the next result
 
-A deterministic monitor observes remote state; the current host's notification mechanism delivers its
-result to this conversation. Establish both before reporting that pending CI is being monitored. Keep
-one monitor per exact delivery identity and retain its returned task/session ID and destination with the
-existing goal or delivery state. A scheduled headless continuation owns future work separately.
+Use `machine:background-listener` for this conversation's deferred result and completion notification.
+It owns generic background execution, the host callback and existing desktop alerts. The scheduled
+continuation below owns durable work separately. Keep the exact delivery identity from this workflow.
 
-Use the bound `workflow_ops.py monitor` command from `engineering:remote-validation`. A run monitor
-returns immediately for an already-completed run. A PR monitor emits one initial readiness observation
-when its nonempty exact-head check rollup is green; that observation does not grant review or merge
-approval. Reconnect to the same persisted identity after a material transition when another wait remains.
-
-Use the concrete listener procedure in this host's entry point and its documented completion
-notification. On a real wake, consume the compact bound result and report readiness, failure or the
-next human action through `engineering:open-pr`'s reporting contract before parking again. Unchanged
-state produces no model turn or repeated user report. Let the user's existing host notification settings
-handle desktop alerts; listener setup does not create or reconfigure a notification service.
-
-A returned task ID or headless log alone does not establish a callback to this conversation. If the
-current surface lacks that notification capability, report `product-capability-unavailable` for the
-callback and continue independent work or supported foreground observation. A separate durable delivery
-owner remains valid for its recorded actions; describe that ownership accurately.
+The bound run monitor returns immediately for an already-completed run. The PR monitor emits one initial
+readiness observation when its nonempty exact-head check rollup is green, then suppresses unchanged
+reconnects. That signal grants no review or merge approval. On a wake, route the bound result through
+`persistent-delivery` and report the next gate through `engineering:open-pr`.
 
 ```text
-CI is pending: bind its exact run, start one host-backed listener and retain the returned task ID.
-The completion event arrives in the owning conversation: inspect that result and report the PR's next gate.
-Only a headless scheduler is available: record its work ownership and the unavailable chat notification.
+Pending CI: give its exact-head monitor command to machine:background-listener.
+Completion: route the returned bound result, report the PR's next gate and continue the same goal.
 ```
 
 ## Initialize one owner
