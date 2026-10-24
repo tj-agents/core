@@ -66,7 +66,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertIn("auto_approve_design=false", context)
         self.assertEqual([], list(self.cwd.iterdir()))
 
-    def test_session_start_context_carries_only_the_finish_section(self):
+    def test_session_start_context_carries_the_callout_lifecycle_and_finish_sections(self):
         script = ".agents/engineering/policy/session/scripts/session-context.py"
         contract = self.package / ".agents/engineering/policy/session/SKILL.md"
         result = self.run_hook(
@@ -79,11 +79,24 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertIn(str(contract), context)
         self.assertIn("machine:close", context)
         self.assertIn("Before returning a completed outcome", context)
-        self.assertNotIn("## Finish the session", context)
-        self.assertNotIn("## Keep large changes reviewable", context)
-        self.assertNotIn("A task has an owning lifecycle", context)
-        self.assertLess(len(context), 1000)
+        self.assertIn("before any host product feedback", context)
+        self.assertIn("A bounded behavior change selects `engineering:feature`", context)
+        self.assertNotIn("## ", context)
+        self.assertNotIn("Repository routine-decision delegation", context)
+        self.assertLess(len(context), 4000)
         self.assertEqual([], list(self.cwd.iterdir()))
+
+    def test_manifest_dispatches_session_start_context_to_codex(self):
+        manifest = json.loads(
+            (ROOT / ".agents/plugins/manifests/codex/engineering-hooks.json").read_text(encoding="utf-8")
+        )
+        hook = manifest["hooks"]["SessionStart"][0]["hooks"][0]
+        for field in ("command", "commandWindows"):
+            self.assertIn(
+                '--hook "${PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py" '
+                "--session-start-context",
+                hook[field],
+            )
 
     def test_manifest_dispatches_session_start_context_to_claude(self):
         manifest = json.loads(

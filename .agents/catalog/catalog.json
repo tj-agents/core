@@ -410,7 +410,8 @@
           {
             "path": ".agents/engineering/policy/session/scripts/session-context.py",
             "hosts": [
-              "claude"
+              "claude",
+              "codex"
             ]
           },
           {
@@ -423,7 +424,8 @@
           {
             "path": "hooks/hook_dispatch.py",
             "hosts": [
-              "claude"
+              "claude",
+              "codex"
             ]
           },
           {
