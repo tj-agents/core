@@ -115,30 +115,10 @@ bounded timeout. Direct `gh run watch`, ad hoc sleeping forge loops, and model-t
 
 ### Notify before parking a listener
 
-Before the model parks on a silent process, wire its completion notification. **Do not spend later model turns
-polling a listener handle with `write_stdin`, `functions.wait`, status, or tail calls.** A background relay may
-read one already-bound monitor session and notify only for nonempty output or a terminal result; an empty,
-still-running read does not wake the model.
-
-When a host documents `functions.exec`, start its documented background cell only after binding the monitor
-session. Replace `12345` with the `session_id` returned for that existing bound monitor; cells do not share
-local variables. Inside the cell, use the documented `tools.write_stdin` and `notify` globals directly. This
-body does not start a second monitor or invent a durable continuation API:
-
-```js
-const sessionId = 12345; // Existing bound monitor session_id.
-for (;;) {
-  const update = await tools.write_stdin({session_id: sessionId, chars: "", yield_time_ms: 30_000});
-  const terminal = update.exit_code !== undefined;
-  const hasOutput = typeof update.output === "string" && update.output.trim() !== "";
-  if (hasOutput || terminal) notify(JSON.stringify({output: update.output, terminal}));
-  if (terminal) break;
-}
-```
-
-Other hosts use their supported `persistent-workflow` notification or wake mechanism. This policy does not
-define a universal listener API or a durable continuation; `persistent-workflow` owns those host-specific
-details.
+Use `engineering:persistent-workflow`'s owning-conversation notification contract and the current host's
+concrete listener procedure. That workflow owns notification activation, capability verification and the
+readiness report. Attach its relay to the existing bound monitor; a durable headless owner is a separate
+execution capability. Host-specific tool calls live in those host entry points.
 
 Read forge status for a PR, head, or run once, again only after a real wake or observed state change, and
 keep one shared monitor per identity.
