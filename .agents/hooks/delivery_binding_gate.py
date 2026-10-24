@@ -45,9 +45,26 @@ _VALUE_FLAGS = {
               "--author-email", "-A", "--match-head-commit"},
 }
 _MERGE_ALIASES = {"-m": "--merge", "-r": "--rebase", "-s": "--squash", "-d": "--delete-branch"}
+_CONNECTOR_WRITE = re.compile(r"(?:^|__)(?:github_)?(create|update)_pull_request$")
 
 
-def pr_command(command):
+def validate_connector_before(data):
+    operation = _CONNECTOR_WRITE.search(data.get("tool_name", ""))
+    if operation is None:
+        return False
+    arguments = data.get("tool_input")
+    if not isinstance(arguments, dict):
+        announce("PR BODY GATE: GitHub write arguments must be an object.")
+    if operation.group(1) == "update" and arguments.get("body") is None:
+        return True
+    validation = validate_pr_body(arguments.get("body"))
+    if not validation["valid"]:
+        announce("PR BODY GATE: " + "; ".join(validation["errors"])
+                 + ". Supply nonempty What and Why sections before the GitHub write.")
+    return True
+
+
+def pr_command(command, operations=None):
     tokens = []
     end = 0
     for match in _TOKEN.finditer(command):
@@ -68,7 +85,7 @@ def pr_command(command):
         if index and tokens[index - 1][1] not in {"&&", ";", "&", "||", "|"}:
             continue
         operation = tokens[index + 2][0]
-        if operation in {"create", "new", "edit", "merge"}:
+        if operation in {"create", "new", "edit", "merge"} and (operations is None or operation in operations):
             return operation, tokens[index + 3:], index
     return None
 
@@ -358,11 +375,16 @@ def main():
         return 0
     if not isinstance(data, dict):
         return 0
-    command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
-    parsed = pr_command(command) if command else None
     validate_body = "--validate-body" in sys.argv or data.get("hook_event_name") == "PreToolUse"
+    if validate_body and validate_connector_before(data):
+        return 0
+    command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
+    writes_only = "--pr-writes-only" in sys.argv
+    operations = {"create", "new", "edit"} if writes_only else None
+    parsed = pr_command(command, operations) if command else None
     if parsed is None:
-        if validate_body and command and re.match(r"^\s*gh(?:\.exe)?\s+pr\s+(?:create|new|edit|merge)\b", command, re.IGNORECASE):
+        names = "create|new|edit" if writes_only else "create|new|edit|merge"
+        if validate_body and command and re.match(r"^\s*gh(?:\.exe)?\s+pr\s+(?:" + names + r")\b", command, re.IGNORECASE):
             announce("PR BODY GATE: command cannot be inspected. Split into a simple gh command with a readable body file.")
         return 0
     if validate_body:

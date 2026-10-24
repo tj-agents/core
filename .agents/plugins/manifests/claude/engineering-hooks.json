@@ -39,6 +39,27 @@
           }
         ],
         "matcher": "Bash|PowerShell"
+      },
+      {
+        "matcher": "Bash|PowerShell|mcp__.*__(github_)?(create|update)_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
+              "--deadline",
+              "25",
+              "--deny-on-timeout",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py",
+              "--validate-body",
+              "--pr-writes-only"
+            ]
+          }
+        ]
       }
     ]
   }
