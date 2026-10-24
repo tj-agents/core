@@ -38,6 +38,23 @@ NAME = re.compile(r"[A-Za-z0-9_.-]+")
 REVISION_PATH = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*")
 CONTENTS_WAIT_SECONDS = 10
 SNAPSHOT_FIRST = "(Path(s) if s else d/'hook-snapshots')/k/"
+MARKETPLACE_NAME = "tj-agents"
+MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
+
+
+def producer_repository(repository: object) -> bool:
+    return (isinstance(repository, str) and repository.casefold().startswith("tj-agents/")
+            and repository.casefold() != MARKETPLACE_REPOSITORY)
+
+
+def marketplace_error(name: str, repository: object) -> str | None:
+    canonical_repository = isinstance(repository, str) and repository.casefold() == MARKETPLACE_REPOSITORY
+    if ((name == MARKETPLACE_NAME and repository != MARKETPLACE_REPOSITORY)
+            or (name != MARKETPLACE_NAME and canonical_repository)):
+        return f"The {MARKETPLACE_NAME} marketplace must be {MARKETPLACE_REPOSITORY} and nothing else may use that name"
+    if producer_repository(repository):
+        return f"{repository} is published through the {MARKETPLACE_NAME} marketplace; select {MARKETPLACE_REPOSITORY}"
+    return None
 
 
 def state_directory() -> Path:
@@ -137,6 +154,7 @@ def section(config: dict, name: str) -> dict:
 def declared_targets(config: dict) -> tuple[dict[str, dict], list[str]]:
     user = section(config, "marketplaces")
     candidates: dict[str, dict[tuple, dict]] = {}
+    ignored = []
     for rank, (directory, declared) in enumerate(declarations(config)):
         marketplaces = section(declared, "marketplaces")
         for identity, settings in sorted(section(declared, "plugins").items()):
@@ -146,10 +164,14 @@ def declared_targets(config: dict) -> tuple[dict[str, dict], list[str]]:
             source = git_marketplace(marketplaces[name] if name in marketplaces else user.get(name))
             if source is None:
                 continue
+            error = marketplace_error(name, github_repository(source["source"]))
+            if error:
+                ignored.append(f"{name} declared by {directory}: {error}")
+                continue
             option = candidates.setdefault(name, {}).setdefault(
                 (source["source"], source["ref"]), {**source, "project": directory, "rank": rank, "plugins": set()})
             option["plugins"].add(identity)
-    targets, ignored = {}, []
+    targets = {}
     for name, options in sorted(candidates.items()):
         chosen = min(options.values(), key=lambda option: (option["rank"] > 0, is_pinned(option["ref"]),
                                                             option["rank"]))
