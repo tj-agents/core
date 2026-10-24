@@ -6,6 +6,6 @@
     "infonetica:work-item": "Optional repository-selected infonetica operation; Core never selects or installs this profile.",
     "infonetica:create-work-item": "Optional repository-selected infonetica operation; Core never selects or installs this profile.",
     "infonetica:address-work-item": "Optional repository-selected infonetica operation; Core never selects or installs this profile.",
-    "personal:current-solution": "This source repository explicitly adopts Personal policy in AGENTS.md; the canonical policy is authored and published by tj-agents/personal."
+    "personal:rules": "This source repository explicitly adopts Personal policy in AGENTS.md; the canonical policy is authored and published by tj-agents/personal."
   }
 }
