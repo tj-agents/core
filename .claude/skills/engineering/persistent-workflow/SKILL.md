@@ -11,7 +11,8 @@ Read the [shared continuation workflow](../../../../.agents/engineering/workflow
 
 For a surface exposing the native Bash tool's `run_in_background` option, run the exact bound monitor
 command with that option enabled and retain its returned task ID. Keep the session available for its
-native completion notification. On `<task-notification>`, retrieve that task's compact result once and
+native completion notification and the user's existing alert settings. On `<task-notification>`, retrieve
+that task's compact result once and
 apply the shared wake/report contract. Do not run a second monitor or repeatedly call TaskOutput while
 nothing has changed. A foreground shell started without background notification is not this listener.
 
@@ -23,7 +24,7 @@ Completion notification: read this task's result once, then report the next gate
 ```
 
 Use another native monitor or channel only when the current surface documents it and the shared
-notification acceptance condition is observed. Background Bash belongs to the live Claude session;
+notification contract is satisfied. Background Bash belongs to the live Claude session;
 exiting the application ends that notification route. Source fixtures for task notifications do not
 prove a live wake. A separately launched `claude -p` process does not notify this conversation.
 

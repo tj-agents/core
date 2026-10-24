@@ -90,20 +90,16 @@ returns immediately for an already-completed run. A PR monitor emits one initial
 when its nonempty exact-head check rollup is green; that observation does not grant review or merge
 approval. Reconnect to the same persisted identity after a material transition when another wait remains.
 
-Select the concrete listener procedure in this host's entry point. Establish native notification support
-with a bounded deterministic process, then observe its completion event reaching the owning conversation.
-A task ID, successful process exit, log file or output obtained by a later manual wait proves only that
-step. It does not establish that an idle conversation will wake. Keep source, active-turn and idle-turn
-verification distinct, and carry a verified capability forward while its host identity is unchanged.
+Use the concrete listener procedure in this host's entry point and its documented completion
+notification. On a real wake, consume the compact bound result and report readiness, failure or the
+next human action through `engineering:open-pr`'s reporting contract before parking again. Unchanged
+state produces no model turn or repeated user report. Let the user's existing host notification settings
+handle desktop alerts; listener setup does not create or reconfigure a notification service.
 
-On a real wake, consume the compact bound result and report readiness, failure or the next human action
-through `engineering:open-pr`'s reporting contract before parking again. Unchanged state produces no
-model turn or repeated user report. Notification transport failure is an explicit capability result.
-
-When the current surface cannot notify an idle conversation, report `product-capability-unavailable`
-for that notification and preserve its resolver and resume condition. Continue independent authorized
-work and supported foreground observation. Do not promise a later chat update from a scheduler that
-only launches a separate context. Its durable delivery owner remains valid for its recorded actions.
+A returned task ID or headless log alone does not establish a callback to this conversation. If the
+current surface lacks that notification capability, report `product-capability-unavailable` for the
+callback and continue independent work or supported foreground observation. A separate durable delivery
+owner remains valid for its recorded actions; describe that ownership accurately.
 
 ```text
 CI is pending: bind its exact run, start one host-backed listener and retain the returned task ID.
