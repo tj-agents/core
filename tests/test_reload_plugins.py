@@ -306,8 +306,20 @@ class RefreshCliTests(unittest.TestCase):
                           "plugins": {"base@core": {"enabled": True}}}
                 with mock.patch.object(REFRESH, "AppServer") as server:
                     server.return_value.__enter__.return_value.request.return_value = {"config": config}
-                    self.assertEqual(({"core": "tj-agents/core"}, ["base@core"]),
-                                     REFRESH.selection("codex", "codex", ROOT))
+                    with self.assertRaisesRegex(REFRESH.RefreshError, "published through the tj-agents marketplace"):
+                        REFRESH.selection("codex", "codex", ROOT)
+
+    def test_claude_refresh_rejects_python_and_react_producer_selections(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name in ("python", "react"):
+                with self.subTest(plugin=name):
+                    config = {"enabledPlugins": {f"{name}@{name}-agents": True},
+                              "extraKnownMarketplaces": {f"{name}-agents": {
+                                  "source": {"source": "github", "repo": f"tj-agents/{name}"}}}}
+                    with mock.patch.object(REFRESH, "read_json", return_value=config):
+                        with self.assertRaisesRegex(REFRESH.RefreshError, "published through the tj-agents marketplace"):
+                            REFRESH.selection("claude", "claude", root)
 
     def test_external_publisher_packages_are_verified_at_the_declared_revision(self):
         with tempfile.TemporaryDirectory() as temporary:

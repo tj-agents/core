@@ -73,21 +73,8 @@ def selection_document(root: Path, requested: set[str], foreign: set[str], decla
         raise lock_io.LockError("Repository has both plugins.json and plugins.lock.json; remove the old lock after migration")
     if selection.is_file() or legacy.is_file():
         existing = lock_io.load_json(selection if selection.is_file() else legacy)
-        document = existing if plugin_selection.is_current(existing) else plugin_selection.migrate(existing)
+        document = plugin_selection.migrate(existing)
         marketplaces, kept = plugin_selection.validate(document)
-        retired = {name for name, source in marketplaces.items()
-                   if name != plugin_selection.MARKETPLACE_NAME
-                   and source["repository"].split("/", 1)[0].casefold() == "tj-agents"}
-        migrated = []
-        for identity in kept:
-            name, marketplace = plugin_selection.split(identity)
-            if marketplace in retired:
-                if name not in roster["plugins"]:
-                    raise lock_io.LockError(f"Selected plugin {identity} has no known shared-marketplace replacement")
-                identity = plugin_selection.plugin_id(name)
-            migrated.append(identity)
-        kept = sorted(set(migrated))
-        marketplaces = {name: source for name, source in marketplaces.items() if name not in retired}
         requested |= {plugin_selection.split(identity)[0] for identity in kept
                       if plugin_selection.split(identity)[1] == plugin_selection.MARKETPLACE_NAME
                       and plugin_selection.split(identity)[0] in roster["plugins"]}

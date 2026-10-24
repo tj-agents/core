@@ -33,15 +33,18 @@ class PackagedSessionLifecycleHook(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         return json.loads(result.stdout)['hookSpecificOutput']
 
-    def test_session_start_carries_only_the_finish_section(self):
+    def test_session_start_carries_the_callout_lifecycle_and_finish_sections(self):
         output = self.output(self.run_hook())
         self.assertEqual('SessionStart', output['hookEventName'])
         context = output['additionalContext']
         self.assertIn('workflow:session-lifecycle (source SHA-256', context)
         self.assertIn(str(self.package / '.agents/workflow/policy/session-lifecycle/SKILL.md'), context)
+        self.assertEqual(['## When the user calls out a mistake',
+                          '## A task has an owning lifecycle — load it before the first edit',
+                          '## Finish the session'],
+                         [line for line in context.splitlines() if line.startswith('## ')])
         self.assertIn('Before returning a completed outcome, select `machine:close`', context)
-        self.assertNotIn('## ', context)
-        self.assertLess(len(context), 1000)
+        self.assertLess(len(context), 2500)
         self.assertEqual([], list(self.cwd.iterdir()))
 
     def test_each_prompt_carries_only_the_one_line_reminder(self):
@@ -61,22 +64,28 @@ class SessionInjectionManifests(unittest.TestCase):
         path = ROOT / '.agents/plugins/manifests' / host / f'{plugin}-hooks.json'
         return json.loads(path.read_text(encoding='utf-8'))['hooks']
 
-    def test_workflow_injects_the_lifecycle_on_both_hosts(self):
-        claude = self.manifest('claude', 'workflow')
-        self.assertEqual('${CLAUDE_PLUGIN_ROOT}/' + SCRIPT, claude['SessionStart'][0]['hooks'][0]['args'][-1])
-        self.assertEqual(['${CLAUDE_PLUGIN_ROOT}/' + SCRIPT, '--prompt'],
-                         claude['UserPromptSubmit'][0]['hooks'][0]['args'][-2:])
-        codex = self.manifest('codex', 'workflow')
+    def session_start_dispatch(self, host, plugin):
+        hook = self.manifest(host, plugin)['SessionStart'][0]['hooks'][0]
+        if host == 'claude':
+            return [' '.join(hook['args'][-1:])]
+        return [hook['command'], hook['commandWindows']]
+
+    def test_each_plugin_injects_its_session_rules_once_at_session_start_on_both_hosts(self):
+        for plugin, script in (('workflow', SCRIPT),
+                               ('engineering', '.agents/engineering/policy/session/scripts/session-context.py')):
+            for host in ('claude', 'codex'):
+                with self.subTest(plugin=plugin, host=host):
+                    for command in self.session_start_dispatch(host, plugin):
+                        self.assertTrue(command.rstrip('"').endswith(script), command)
+
+    def test_only_the_one_line_reminder_is_injected_per_prompt(self):
+        claude = self.manifest('claude', 'workflow')['UserPromptSubmit'][0]['hooks'][0]
+        self.assertEqual(['${CLAUDE_PLUGIN_ROOT}/' + SCRIPT, '--prompt'], claude['args'][-2:])
+        codex = self.manifest('codex', 'workflow')['UserPromptSubmit'][0]['hooks'][0]
         for field in ('command', 'commandWindows'):
-            self.assertTrue(codex['SessionStart'][0]['hooks'][0][field].endswith(f'/{SCRIPT}"'))
-            self.assertTrue(codex['UserPromptSubmit'][0]['hooks'][0][field].endswith(f'/{SCRIPT}" --prompt'))
-
-    def test_engineering_injects_no_session_text(self):
+            self.assertTrue(codex[field].endswith(f'/{SCRIPT}" --prompt'))
         for host in ('claude', 'codex'):
-            hooks = self.manifest(host, 'engineering')
-            self.assertNotIn('SessionStart', hooks)
-            self.assertNotIn('UserPromptSubmit', hooks)
-
+            self.assertNotIn('UserPromptSubmit', self.manifest(host, 'engineering'))
 
 if __name__ == '__main__':
     unittest.main()

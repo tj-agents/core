@@ -40,6 +40,30 @@ class PackagedEngineeringHooks(unittest.TestCase):
                               input=json.dumps(payload), capture_output=True, text=True,
                               encoding='utf-8', cwd=self.cwd, env=self.environment, timeout=20)
 
+    def test_session_start_carries_the_callout_and_lifecycle_sections(self):
+        contract = self.package / ".agents/engineering/policy/session/SKILL.md"
+        result = self.run_hook(".agents/engineering/policy/session/scripts/session-context.py",
+                               {"hook_event_name": "SessionStart"})
+        self.assertEqual(0, result.returncode, result.stderr)
+        output = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual("SessionStart", output["hookEventName"])
+        context = output["additionalContext"]
+        self.assertIn("engineering:session (source SHA-256", context)
+        self.assertIn(str(contract), context)
+        self.assertIn("## When the user calls out a mistake", context)
+        self.assertIn("before any host product feedback", " ".join(context.split()))
+        self.assertIn("A bounded behavior change selects `engineering:feature`", context)
+        self.assertNotIn("## Repository routine-decision delegation", context)
+        self.assertLess(len(context), 2000)
+        self.assertEqual([], list(self.cwd.iterdir()))
+
+    def test_missing_session_contract_is_an_actionable_error(self):
+        (self.package / ".agents/engineering/policy/session/SKILL.md").unlink()
+        result = self.run_hook(".agents/engineering/policy/session/scripts/session-context.py")
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("cannot read contract", result.stderr)
+        self.assertEqual("", result.stdout)
+
     def test_packaged_review_runtime_resolves_consumer_routes(self):
         consumer = self.root / "routed consumer"
         subprocess.run(["git", "init", "-q", "-b", "main", str(consumer)], check=True)
