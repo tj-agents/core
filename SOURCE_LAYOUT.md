@@ -17,8 +17,9 @@ maintained source.
 
 ## Host-specific source
 
-`.codex/` contains only material whose shape or behavior is specific to Codex: skill entry points,
-agent TOML and installation details. `.claude/` contains the corresponding Claude-only material.
+`.codex/` contains only material whose shape or behavior is specific to Codex: skill entry points
+(`skills/<plugin>/<name>/SKILL.md`), agent TOML and installation details. `.claude/` contains the
+corresponding Claude-only material.
 
 Authored host manifests and hook wiring live under `.agents/plugins/manifests/`, with their Codex or
 Claude identity explicit in the path. `.agents/plugins/sources.json` is the one source map used to

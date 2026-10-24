@@ -123,18 +123,18 @@ class AutoMergeTests(unittest.TestCase):
             binding = self.binding(root)
             value = {"files": [{"path": "README.md"}], "changedFiles": 1, "labels": []}
             policy = root / ".agents" / "delivery-authorization.json"
+            settings = root / ".agents" / "settings.json"
             base = {"standing_authorization": "auto", "instruction": "merge when green"}
+            policy.write_text(json.dumps(base), encoding="utf-8")
             with patch.object(AUTO_MERGE.workflow_ops, "changed_paths", return_value=["README.md"]), \
                  patch.object(AUTO_MERGE.workflow_ops, "scoped_approval", return_value=None):
                 for declared in (None, False):
                     with self.subTest(auto_merge=declared):
-                        current = dict(base)
-                        if declared is not None:
-                            current["auto_merge"] = declared
-                        policy.write_text(json.dumps(current), encoding="utf-8")
+                        core = {} if declared is None else {"auto_merge": declared}
+                        settings.write_text(json.dumps({"configuration": {"core": core}}), encoding="utf-8")
                         with self.assertRaisesRegex(AUTO_MERGE.AutoMergeError, "not enabled"):
                             AUTO_MERGE.current_authorization(root, binding, value)
-                policy.write_text(json.dumps({**base, "auto_merge": True}), encoding="utf-8")
+                settings.write_text(json.dumps({"configuration": {"core": {"auto_merge": True}}}), encoding="utf-8")
                 self.assertEqual(["README.md"], AUTO_MERGE.current_authorization(root, binding, value))
                 stops = [
                     ".agents/delivery-authorization.json", ".github/workflows/check.yml", "db/migrations/1.sql",
@@ -143,12 +143,12 @@ class AutoMergeTests(unittest.TestCase):
                 for path in stops:
                     with self.subTest(stop=path), patch.object(AUTO_MERGE.workflow_ops, "changed_paths", return_value=[path]):
                         if path == "private/handler.py":
-                            policy.write_text(json.dumps({**base, "auto_merge": True, "always_stop_paths": [r"^private/"]}), encoding="utf-8")
+                            policy.write_text(json.dumps({**base, "always_stop_paths": [r"^private/"]}), encoding="utf-8")
                         else:
-                            policy.write_text(json.dumps({**base, "auto_merge": True}), encoding="utf-8")
+                            policy.write_text(json.dumps(base), encoding="utf-8")
                         with self.assertRaisesRegex(AUTO_MERGE.AutoMergeError, "authorization"):
                             AUTO_MERGE.current_authorization(root, binding, value)
-                policy.write_text(json.dumps({**base, "auto_merge": True, "hold_label": "hold"}), encoding="utf-8")
+                policy.write_text(json.dumps({**base, "hold_label": "hold"}), encoding="utf-8")
                 with patch.object(AUTO_MERGE.workflow_ops, "changed_paths", return_value=["README.md"]):
                     with self.assertRaisesRegex(AUTO_MERGE.AutoMergeError, "authorization"):
                         AUTO_MERGE.current_authorization(root, binding, {**value, "labels": [{"name": "hold"}]})
@@ -183,7 +183,7 @@ class AutoMergeTests(unittest.TestCase):
                 with self.assertRaisesRegex(AUTO_MERGE.AutoMergeError, "authorization"):
                     AUTO_MERGE.current_authorization(root, binding, value)
 
-    def test_main_controls_invalid_settings_for_absent_and_legacy_authorization(self):
+    def test_main_controls_invalid_settings_for_absent_and_present_authorization(self):
         with tempfile.TemporaryDirectory(prefix="repository settings ") as raw:
             root = Path(raw).resolve()
             agents = root / ".agents"
@@ -209,7 +209,7 @@ class AutoMergeTests(unittest.TestCase):
                 ),
             }
             policy_path = agents / "delivery-authorization.json"
-            for policy in (None, {"standing_authorization": "auto", "instruction": "merge when green", "auto_merge": True}):
+            for policy in (None, {"standing_authorization": "auto", "instruction": "merge when green"}):
                 with self.subTest(policy=policy is not None):
                     if policy is None:
                         policy_path.unlink(missing_ok=True)
@@ -242,10 +242,10 @@ class AutoMergeTests(unittest.TestCase):
             (root / ".agents").mkdir()
             (root / ".agents" / "merge-gate.json").write_text(json.dumps({"security_paths": []}), encoding="utf-8")
             binding = self.binding(root)
-            clean = f"**Reviewed up to commit:** `{HEAD}`\n- [x] complete\n"
+            clean = f"**Reviewed up to commit:** `{HEAD}`\n**Review status:** `complete`\n**Judgment:** `approved`\n- [x] complete\n"
             cases = [
                 (SimpleNamespace(returncode=1, stdout=""), [], "absent"),
-                (SimpleNamespace(returncode=0, stdout=f"**Reviewed up to commit:** `{'b' * 40}`\n"), [], "stale"),
+                (SimpleNamespace(returncode=0, stdout=f"**Reviewed up to commit:** `{'b' * 40}`\n**Review status:** `complete`\n**Judgment:** `approved`\n"), [], "stale"),
                 (SimpleNamespace(returncode=0, stdout=clean + "- [ ] finding\n"), [], "unresolved"),
                 (SimpleNamespace(returncode=0, stdout=clean), ["authorization/token.py"], "security"),
             ]
@@ -264,7 +264,7 @@ class AutoMergeTests(unittest.TestCase):
             binding = self.binding(root)
             review = root / "reviews" / "feature-auto-merge.md"
             review.parent.mkdir()
-            review.write_text(f"**Reviewed up to commit:** `{HEAD}`\n- [x] complete\n", encoding="utf-8")
+            review.write_text(f"**Reviewed up to commit:** `{HEAD}`\n**Review status:** `complete`\n**Judgment:** `approved`\n- [x] complete\n", encoding="utf-8")
             with patch.object(AUTO_MERGE.workflow_ops, "git", side_effect=AUTO_MERGE.workflow_ops.WorkflowOperationError("missing")):
                 AUTO_MERGE.current_review(root, binding, [])
 
@@ -276,9 +276,9 @@ class AutoMergeTests(unittest.TestCase):
             binding = self.binding(root)
             review = root / "reviews" / "feature-auto-merge.md"
             review.parent.mkdir()
-            clean = f"**Reviewed up to commit:** `{HEAD}`\n- [x] complete\n"
+            clean = f"**Reviewed up to commit:** `{HEAD}`\n**Review status:** `complete`\n**Judgment:** `approved`\n- [x] complete\n"
             cases = [
-                (f"**Reviewed up to commit:** `{'b' * 40}`\n", [], "stale"),
+                (f"**Reviewed up to commit:** `{'b' * 40}`\n**Review status:** `complete`\n**Judgment:** `approved`\n", [], "stale"),
                 (clean + "- [ ] unresolved\n", [], "unresolved"),
                 (clean, ["authorization/token.py"], "security"),
             ]

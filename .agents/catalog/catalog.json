@@ -211,6 +211,7 @@
         "plan-artifacts",
         "resume",
         "run",
+        "session",
         "status"
       ],
       "dependencies": {
@@ -242,7 +243,22 @@
           "tj-agents/machine",
           "tj-agents/workflow"
         ],
-        "hooks": [],
+        "hooks": [
+          {
+            "path": ".agents/workflow/policy/session/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/hook_dispatch.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          }
+        ],
         "permissions": {
           "claude_allow": [
             "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
@@ -444,10 +460,6 @@
         ],
         "permissions": {
           "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
             "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
             "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
@@ -468,45 +480,6 @@
             "PowerShell(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)"
           ],
           "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                "--clear"
-              ],
-              "justification": "Records an evidenced retention disposition for the exact merged checkout after validating the real close refusal and separate fallback; pending cleanup remains incomplete",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                  "--clear",
-                  "${PROJECT_ROOT}",
-                  "--reason",
-                  "capability",
-                  "--evidence",
-                  "evidence.json"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
-                ],
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                  "--clear"
-                ]
-              ]
-            },
             {
               "pattern": [
                 [
@@ -762,6 +735,13 @@
             ]
           },
           {
+            "path": ".agents/machine/utility/close/scripts/close_landed.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
             "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
             "hosts": [
               "claude",
@@ -785,14 +765,6 @@
         ],
         "permissions": {
           "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
             "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
@@ -879,40 +851,6 @@
             "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)"
           ],
           "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py",
-                  "${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py",
-                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
-                ]
-              ],
-              "justification": "engineering:merge Step 5: after cleanup_proof.py, a delivered report and unchanged verified idle session permit finish to remove its merged worktree",
-              "match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/other.py"
-                ]
-              ]
-            },
             {
               "pattern": [
                 [

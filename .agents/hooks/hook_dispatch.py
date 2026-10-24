@@ -1,7 +1,6 @@
 """Run several hook scripts for one host event inside a single interpreter.
 
-Legacy arguments are script paths, absolute or beside this one, optionally followed by
-``@<tool matcher>``. Repeated ``--hook <script> [arguments...]`` groups pass arguments to each script.
+Repeated ``--hook <script> [arguments...]`` groups pass arguments to each script.
 The host's sibling-hook merge is reproduced here, so one event costs one
 interpreter launch instead of one per gate. Each gate still runs as its own ``__main__`` with its
 own stdin, stdout and stderr. A leading ``--deadline <seconds>`` stays under the host timeout: a gate
@@ -14,7 +13,6 @@ import io
 import json
 import os
 from pathlib import Path
-import re
 import runpy
 import sys
 import threading
@@ -23,7 +21,6 @@ import traceback
 
 HOOKS = Path(__file__).resolve().parent
 DECISIONS = ("deny", "defer", "ask", "allow")
-LEGACY_DECISIONS = {"approve": "allow", "block": "deny"}
 BLOCKING_EXIT = 2
 
 
@@ -138,12 +135,7 @@ def merge(event: str, results: list[tuple[str, int, str, str]]) -> tuple[dict, s
                 specific.setdefault(key, value)
 
         decision = data.get("decision")
-        if event == "PreToolUse" and decision in LEGACY_DECISIONS:
-            reason = data.get("reason")
-            decisions.setdefault(LEGACY_DECISIONS[decision], []).append(
-                reason if isinstance(reason, str) else ""
-            )
-        elif decision == "block":
+        if decision == "block":
             reason = data.get("reason")
             blocks.append(reason.strip() if isinstance(reason, str) and reason.strip()
                           else f"{name} blocked this {event} event.")
@@ -186,18 +178,6 @@ def merge(event: str, results: list[tuple[str, int, str, str]]) -> tuple[dict, s
     if suppress:
         merged["suppressOutput"] = True
     return merged, "\n".join(diagnostics)
-
-
-def selected(spec: str, tool: str) -> str | None:
-    name, separator, matcher = spec.rpartition("@")
-    if not separator or not name.endswith(".py"):
-        return spec
-    if not tool:
-        return None
-    try:
-        return name if re.fullmatch(matcher, tool) else None
-    except re.error:
-        return name
 
 
 def overrun_notice(event: str, merged: dict, deadline: float, unfinished: list[str]) -> dict:
@@ -262,22 +242,20 @@ def main(argv: list[str]) -> int:
                 pass
             except OSError:
                 pass
-    tool = data.get("tool_name") if isinstance(data.get("tool_name"), str) else ""
-
+    if arguments[0] != "--hook":
+        stderr.write("hook-dispatch: use --hook <script> [arguments...] groups.\n")
+        return 1
     gates: list[tuple[str, list[str]]] = []
-    if arguments[0] == "--hook":
-        for argument in arguments:
-            if argument == "--hook":
-                gates.append(("", []))
-            elif not gates[-1][0]:
-                gates[-1] = (argument, [])
-            else:
-                gates[-1][1].append(argument)
-        if any(not name for name, _ in gates):
-            stderr.write("hook-dispatch: each --hook requires a script.\n")
-            return 1
-    else:
-        gates = [(name, []) for name in (selected(spec, tool) for spec in arguments) if name]
+    for argument in arguments:
+        if argument == "--hook":
+            gates.append(("", []))
+        elif not gates[-1][0]:
+            gates[-1] = (argument, [])
+        else:
+            gates[-1][1].append(argument)
+    if any(not name for name, _ in gates):
+        stderr.write("hook-dispatch: each --hook requires a script.\n")
+        return 1
     names = [name for name, _ in gates]
     results: list[tuple[str, int, str, str]] = []
     lock = threading.Lock()

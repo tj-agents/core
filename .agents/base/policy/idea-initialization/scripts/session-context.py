@@ -12,8 +12,7 @@ IDENTITY = "base:idea-initialization"
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--instruction-fragment", action="store_true")
-    args = parser.parse_args()
+    parser.parse_args()
     if sys.version_info < (3, 9):
         print("idea-initialization: Python 3.9 or newer is required.", file=sys.stderr)
         return 1
@@ -30,12 +29,9 @@ def main():
 
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     context = f"{IDENTITY} (source SHA-256 {digest})\nSource: {contract}\n\n{body.strip()}"
-    if args.instruction_fragment:
-        print(f"<!-- BEGIN {IDENTITY} sha256:{digest} -->\n{context}\n<!-- END {IDENTITY} -->")
-    else:
-        print(json.dumps({"hookSpecificOutput": {
-            "hookEventName": "SessionStart", "additionalContext": context
-        }}, ensure_ascii=True))
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "SessionStart", "additionalContext": context
+    }}, ensure_ascii=True))
     return 0
 
 

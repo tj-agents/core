@@ -279,15 +279,6 @@ def receipt_platform(receipt):
     platform = receipt.get("platform")
     if platform in {"linux-systemd", "windows-scheduledtasks"}:
         return platform
-    legacy_windows = (platform is None and receipt.get("version") == 2
-                      and isinstance(receipt.get("task_name"), str)
-                      and receipt["task_name"].startswith(TASK_PREFIX)
-                      and receipt.get("task_path") == "\\"
-                      and all(isinstance(receipt.get(key), str) and receipt[key]
-                              for key in ("description", "execute", "arguments"))
-                      and not any(key in receipt for key in ("service_path", "timer_path", "timer_enable_path")))
-    if legacy_windows:
-        return "windows-scheduledtasks"
     raise SchedulerError("scheduler receipt has no recognized platform identity")
 
 
@@ -391,16 +382,13 @@ def _windows_static(receipt, owner_path, owner, root, transport):
         return False
     if receipt["task_name"] != owner_task_name(owner["owner_id"]) or receipt["task_path"] != "\\":
         return False
-    if receipt.get("version") == 3:
-        if not all(isinstance(receipt.get(key), str) and receipt[key]
-                   for key in ("python", "script", "host_executable")):
-            return False
-        command = adapter_command(receipt)
-        if (receipt.get("adapter_command") != command or receipt["execute"] != command[0]
-                or receipt["arguments"] != subprocess.list2cmdline(command[1:])
-                or receipt["description"] != windows_description(receipt)):
-            return False
-    elif receipt.get("version") != 2:
+    if receipt.get("version") != 3 or not all(isinstance(receipt.get(key), str) and receipt[key]
+                                              for key in ("python", "script", "host_executable")):
+        return False
+    command = adapter_command(receipt)
+    if (receipt.get("adapter_command") != command or receipt["execute"] != command[0]
+            or receipt["arguments"] != subprocess.list2cmdline(command[1:])
+            or receipt["description"] != windows_description(receipt)):
         return False
     try:
         task = _windows_task(receipt, transport)

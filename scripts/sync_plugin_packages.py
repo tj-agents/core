@@ -217,13 +217,6 @@ def catalog_index(catalog: dict) -> dict[str, dict]:
 
 def render_capabilities(catalog: dict) -> str:
     packages = catalog_index(catalog)
-    lines = [
-        "# Agent capabilities",
-        "",
-        "Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).",
-        "Select plugins in a project's `.agents/plugins.json`; do not copy definitions between repositories.",
-        "",
-    ]
     return "\n".join(
         [
             "# Agent capabilities",
@@ -245,45 +238,6 @@ def render_capabilities(catalog: dict) -> str:
             ),
         ]
     )
-    return "\n".join(
-        [
-            "# Agent capabilities",
-            "",
-            "Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).",
-            "Select plugins in a project's `.agents/plugins.json`; do not copy definitions between repositories.",
-            "",
-            *(
-                line
-                for package in packages.values()
-                for line in (
-                    f"## {package['id']}",
-                    "",
-                    f"Owner: [`{package['owner_repository']}`]({package['source'].removesuffix('.git')})",
-                    "",
-                    package["description"],
-                    "",
-                )
-            ),
-        ]
-    )
-    for release in releases.values():
-        lines.extend((
-            f"## {release['marketplace']} {release['version']}",
-            "",
-            f"Owner: [`{release['owner_repository']}`]({release['source'].removesuffix('.git')}) "
-            f"· immutable revision `{release['revision']}`",
-            "",
-        ))
-        for plugin in release["plugins"]:
-            marker = " (deprecated)" if plugin["status"] == "deprecated" else ""
-            lines.append(f"- **`{plugin['id']}`{marker}** — {plugin['description']}")
-            if plugin.get("replacement"):
-                lines.append(
-                    f"  Replacement: {', '.join(f'`{value}`' for value in plugin['replacement'])}; "
-                    f"remove after {plugin['remove_after']}."
-                )
-        lines.append("")
-    return "\n".join(lines)
 
 
 def canonical_output_bytes(data: str | bytes) -> bytes:
@@ -557,7 +511,7 @@ def validate_default_selection(
             )
 
     selected_skills = {
-        name for name, skill in skills.items() if skill["plugin"] in selected
+        skill["name"] for skill in skills.values() if skill["plugin"] in selected
     }
     required_values = compatibility.get("fresh_required_skills")
     if (
@@ -592,8 +546,9 @@ def discover(root: Path, config: dict) -> dict[str, dict]:
             body = read(path)
             values = metadata(body, path)
             name = values["name"]
-            if name in found:
-                raise ValueError(f"Duplicate public skill name: {name}")
+            identity = f"{scope['plugin']}:{name}"
+            if identity in found:
+                raise ValueError(f"Duplicate public skill name: {identity}")
             if values["domain"] != scope["domain"]:
                 raise ValueError(
                     f"{path}: domain {values['domain']} does not match {scope['domain']}"
@@ -603,7 +558,8 @@ def discover(root: Path, config: dict) -> dict[str, dict]:
                     f"{path}: kind {values['kind']} does not match kind folder "
                     f"{path.parent.parent.name}"
                 )
-            found[name] = {
+            found[identity] = {
+                "name": name,
                 "path": path,
                 "body": body,
                 "metadata": values,
@@ -613,10 +569,11 @@ def discover(root: Path, config: dict) -> dict[str, dict]:
             }
     # `tech-debt` beside `techdebt` reads as one skill to a person and as two to a matcher.
     unhyphenated: dict[str, str] = {}
-    for name in sorted(found):
-        other = unhyphenated.setdefault(name.replace("-", ""), name)
-        if other != name:
-            raise ValueError(f"Public skill names differ only by hyphens: {other}, {name}")
+    for identity in sorted(found):
+        plugin, name = identity.split(":", 1)
+        other = unhyphenated.setdefault(f"{plugin}:{name.replace('-', '')}", identity)
+        if other != identity:
+            raise ValueError(f"Public skill names differ only by hyphens: {other}, {identity}")
     return found
 
 
@@ -627,7 +584,7 @@ def expected_adapter_body(shared: dict, host: str) -> str:
     )
     return (
         f"\n{title}\n\n"
-        f"Read and follow the [canonical shared definition](../../../{shared['relative']}) in full.\n"
+        f"Read and follow the [canonical shared definition](../../../../{shared['relative']}) in full.\n"
         f"This entry point supplies only {host.capitalize()} discovery metadata; "
         "the shared procedure is authored once under `.agents/`.\n"
     )
@@ -638,7 +595,7 @@ def validate_host_neutral(config: dict, skills: dict[str, dict]) -> None:
         host: [re.compile(term, re.MULTILINE) for term in terms]
         for host, terms in config.get("host_only_terms", {}).items()
     }
-    for name, shared in skills.items():
+    for shared in skills.values():
         for document in sorted(shared["path"].parent.rglob("*.md")):
             text = document.read_text(encoding="utf-8")
             for host, compiled in patterns.items():
@@ -647,7 +604,8 @@ def validate_host_neutral(config: dict, skills: dict[str, dict]) -> None:
                     if match:
                         raise ValueError(
                             f"{document.as_posix()}: {host}-only term {match.group(0)!r} belongs in "
-                            f".{host}/skills/{name}/SKILL.md, registered in extended_host_adapters, "
+                            f".{host}/skills/{shared['plugin']}/{shared['name']}/SKILL.md, registered in "
+                            "extended_host_adapters, "
                             "not the shared definition"
                         )
 
@@ -664,14 +622,16 @@ def validate_adapters(root: Path, config: dict, skills: dict[str, dict]) -> dict
     for host, adapter_root_value in config["host_adapter_roots"].items():
         adapter_root = inside(root, adapter_root_value)
         host_adapters: dict[str, Path] = {}
-        actual_names = {path.parent.name for path in adapter_root.glob("*/SKILL.md")}
+        actual_names = {
+            f"{path.parent.parent.name}:{path.parent.name}" for path in adapter_root.glob("*/*/SKILL.md")
+        }
         if actual_names != set(skills):
             missing = sorted(set(skills) - actual_names)
             extra = sorted(actual_names - set(skills))
             raise ValueError(f"{host} adapter roster mismatch; missing={missing}, extra={extra}")
         table = lane_tables[host]
         for name, shared in skills.items():
-            path = adapter_root / name / "SKILL.md"
+            path = adapter_root / shared["plugin"] / shared["name"] / "SKILL.md"
             body = read(path)
             values = metadata(body, path)
             shared_fields = ("name", "kind", "domain") if name in extended else (
@@ -699,7 +659,7 @@ def validate_adapters(root: Path, config: dict, skills: dict[str, dict]) -> dict
             if match is None:
                 raise ValueError(f"{path}: adapter has no body")
             if name in extended:
-                reference = f"](../../../{shared['relative']})"
+                reference = f"](../../../../{shared['relative']})"
                 if body.count(reference) != 1:
                     raise ValueError(
                         f"{path}: extended adapter must reference its canonical definition once"
@@ -882,11 +842,11 @@ def build(root: Path, validate_catalog_digests: bool = True, catalog=None):
                 data = path.read_bytes()
                 if relative == "SKILL.md":
                     data = read(path).replace(
-                        "../../../.agents/", "../../.agents/"
+                        "../../../../.agents/", "../../.agents/"
                     ).encode("utf-8")
-                emit(f"plugins/{shared['plugin']}/{tree}/{name}/{relative}", data)
+                emit(f"plugins/{shared['plugin']}/{tree}/{shared['name']}/{relative}", data)
             for relative, data in shared_resources:
-                emit(f"plugins/{shared['plugin']}/{tree}/{name}/{relative}", data)
+                emit(f"plugins/{shared['plugin']}/{tree}/{shared['name']}/{relative}", data)
 
     # Declared shared runtime stays under the owning plugin's canonical .agents tree.
     for resource in config.get("resources", []):
@@ -932,10 +892,10 @@ def build(root: Path, validate_catalog_digests: bool = True, catalog=None):
             if manifests[plugin]["codex"].get(field) != manifests[plugin]["claude"].get(field):
                 raise ValueError(f"{plugin}: host manifests disagree on {field}")
 
-        owned = sorted(name for name, skill in skills.items() if skill["plugin"] == plugin)
+        owned = sorted(skill["name"] for skill in skills.values() if skill["plugin"] == plugin)
         index = [f"# {plugin} capabilities", "", "Generated from canonical `.agents/` definitions.", ""]
         for name in owned:
-            skill = skills[name]
+            skill = skills[f"{plugin}:{name}"]
             index.append(
                 f"- `{name}` — {skill['metadata']['kind']} — `{skill['relative']}`"
             )
@@ -1005,7 +965,7 @@ def build(root: Path, validate_catalog_digests: bool = True, catalog=None):
             raise ValueError(f"Catalog prerequisite drift: {plugin_id}")
         if entry.get("external_dependencies", {"required": [], "optional": []}) != {"required": external, "optional": []}:
             raise ValueError(f"Catalog external prerequisite drift: {plugin_id}")
-        if entry["skills"] != sorted(name for name, skill in skills.items() if skill["plugin"] == plugin):
+        if entry["skills"] != sorted(skill["name"] for skill in skills.values() if skill["plugin"] == plugin):
             raise ValueError(f"Catalog skill roster drift: {plugin_id}")
         if entry["package_path"] != f"plugins/{plugin}":
             raise ValueError(f"Catalog package path drift: {plugin_id}")

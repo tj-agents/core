@@ -443,21 +443,6 @@ def executable_for(host: str) -> str:
     return agent_cli.resolve_claude_executable() if host == "claude" else agent_cli.resolve_codex_executable()[0]
 
 
-def review_legacy(hosts: tuple[str, ...], project: Path) -> tuple[list[str], dict[str, list[str]]]:
-    import legacy_marketplaces
-
-    removed, problems = [], {}
-    for host in hosts:
-        try:
-            gone, found = legacy_marketplaces.review(host, project, lambda host=host: executable_for(host), run)
-        except (RefreshError, agent_cli.LaunchError, OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
-            gone, found = [], [f"legacy marketplace review failed: {error}"]
-        removed += gone
-        if found:
-            problems[host] = found
-    return removed, problems
-
-
 def relaunch_session(project: Path, updated: set[str]) -> dict | None:
     import session_relaunch
 
@@ -494,7 +479,6 @@ def main(argv: list[str] | None = None) -> int:
     project = arguments.project.resolve()
     hosts = ("claude", "codex") if arguments.host == "both" else (arguments.host,)
     updated: set[str] = set()
-    removed, legacy = review_legacy(hosts, project)
     relaunch_allowed = "claude" in hosts and not arguments.no_relaunch and not arguments.verify_only
     if not (arguments.all or arguments.verify or arguments.verify_only):
         result = launch_check.check(project, update=lambda host, repositories, root:
@@ -503,19 +487,13 @@ def main(argv: list[str] | None = None) -> int:
                                     host=None if arguments.host == "both" else arguments.host)
         if result != "unconfigured":
             summary = {"check": result}
-            if removed:
-                summary["legacy_removed"] = removed
-            if legacy:
-                summary["legacy_problems"] = legacy
             relaunched = relaunch_session(project, updated) if relaunch_allowed and result != "failed" else None
             if relaunched:
                 summary["claude"] = relaunched
             print(json.dumps(summary, indent=2))
             if result == "updated":
                 print(ADOPTION, file=sys.stderr)
-            for line in [line for found in legacy.values() for line in found]:
-                print("plugins: " + line, file=sys.stderr)
-            failed = bool(legacy) or bool(relaunched and relaunched["relaunch"] == "failed")
+            failed = bool(relaunched and relaunched["relaunch"] == "failed")
             return int(result in {"failed", "offline", "busy"} or failed)
     reports = []
     for host in hosts:
@@ -529,8 +507,6 @@ def main(argv: list[str] | None = None) -> int:
         except (RefreshError, agent_cli.LaunchError, OSError, ValueError, RuntimeError, KeyError, TypeError, subprocess.TimeoutExpired) as error:
             report = {"host": host, "problems": [str(error)]}
         refreshed = not report["problems"]
-        report["problems"] = report["problems"] + legacy.get(host, [])
-        report["legacy_removed"] = [name for name in removed if name.startswith(host + ":")]
         if host == "claude" and relaunch_allowed and refreshed:
             relaunched = relaunch_session(project, updated)
             if relaunched:
