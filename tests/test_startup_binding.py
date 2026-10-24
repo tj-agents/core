@@ -23,7 +23,7 @@ SPEC.loader.exec_module(BINDING)
 
 
 class StartupBindingTests(unittest.TestCase):
-    def test_unverifiable_codex_override_never_reaches_optional_refresh_or_native_start(self):
+    def test_unverifiable_codex_override_never_reaches_native_start(self):
         selection = self.project / ".agents/plugins.json"
         selection.parent.mkdir()
         selection.write_text('{"schema_version":1,"plugins":["base@tj-agents"]}', encoding="utf-8")
@@ -34,7 +34,6 @@ class StartupBindingTests(unittest.TestCase):
                 "--status-file", str(status), "--", "-cplugins={}",
             ]))
         native.assert_not_called()
-        self.check.assert_not_called()
         self.assertEqual("failed", json.loads(status.read_text(encoding="utf-8"))["state"])
 
     def test_missing_required_standards_never_start_the_native_cli(self):
@@ -78,6 +77,15 @@ class StartupBindingTests(unittest.TestCase):
             with mock.patch("sys.stderr"):
                 self.assertEqual(0, BINDING.main(arguments))
         self.assertEqual("native", order[-1])
+
+    def test_admission_runs_after_the_install_check_so_a_new_declaration_can_launch(self):
+        order = []
+        self.check.side_effect = lambda project, host: order.append("install")
+        with mock.patch.object(BINDING.required_plugins, "check_launch",
+                               side_effect=lambda *args: order.append("admission")), \
+                mock.patch.object(BINDING, "run_session", side_effect=lambda *a, **k: order.append("native") or 0):
+            self.assertEqual(0, BINDING.main(["--host", "claude", "--project", str(self.project), "--target", "claude"]))
+        self.assertEqual(["install", "admission", "native"], order)
 
     def test_status_file_reports_preparation_failure_and_exit(self):
         status = self.project / "launch.status.json"

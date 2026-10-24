@@ -148,16 +148,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     phase("checking-plugins")
     try:
+        launch_check.check(parsed.project.resolve(), host=parsed.host)
+    except Exception as error:
+        print(f"plugins: update check failed: {error}", file=sys.stderr)
+    try:
         required_plugins.check_launch(parsed.project.resolve(), parsed.host, parsed.target, arguments)
     except required_plugins.RequiredPluginsError as error:
         message = f"launch: {error}"
         print(message, file=sys.stderr)
         report("failed", error=message)
         return 1
-    try:
-        launch_check.check(parsed.project.resolve(), host=parsed.host)
-    except Exception as error:
-        print(f"plugins: update check failed: {error}", file=sys.stderr)
 
     try:
         options = {"require_session_start": True} if parsed.require_session_start else {}

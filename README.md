@@ -245,8 +245,9 @@ repository configuration instead. Model and reasoning overrides remain available
 native maintenance commands remain available to repair an installation.
 
 For example, selecting `example@tj-agents` while it is absent from Codex's inventory prevents a
-Codex launch and file writes even if its `tier.json` and routes are entirely missing. Repair the
-selection/install and start a fresh session; copying a Claude cache directory does not satisfy it.
+Codex launch and file writes even if its `tier.json` and routes are entirely missing. A Claude launch
+installs a declared plugin missing from its scope before this check; otherwise install it with
+`machine:sync-plugins`. Copying a Claude cache directory does not satisfy it.
 
 A GitHub query per repository reads its head and each plugin directory's tree into `~/.agents-state/plugin-heads.json`,
 both hosts update in parallel, and the cursor advances once both succeed. A failed host retries on the next

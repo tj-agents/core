@@ -210,7 +210,7 @@ def check(project: Path, host: str, executable: str | None = None,
     if missing:
         raise RequiredPluginsError(
             f"Required standards unavailable for {host} in {project}: {', '.join(missing)}. "
-            "Repair repository selection/native installation, then start a fresh session. "
+            "Install them with machine:sync-plugins or core's sync.ps1/sync.sh; the next call rechecks. "
             "Cached files from another host do not establish activation."
         )
     return tuple(roots.values())
