@@ -69,7 +69,9 @@
               "hook",
               "stop",
               "--host",
-              "claude"
+              "claude",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_landed.py"
             ]
           }
         ]
