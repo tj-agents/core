@@ -810,11 +810,34 @@ class RunStepsTests(Machine):
 
     def test_the_steps_run_in_the_documented_order(self):
         self.assertEqual([
-            "preconditions", "event channel and publishers", "Claude marketplace auto-update",
+        "preconditions", "native permission defaults", "event channel and publishers", "Claude marketplace auto-update",
             "retired jobs and listener", "launch-check runtime", "shell profiles", "hidden Git Bash for Claude",
             "Codex profile agents", "plugin and merge-policy catch-up", "harness permissions",
             "legacy Codex configuration",
         ], [item.name for item in setup.STEPS])
+
+
+class NativePermissionsTests(Machine):
+    def test_native_permissions_follow_portable_mode_and_converge_for_both_platforms(self):
+        settings = self.checkout / ".agents/settings.json"
+        settings.parent.mkdir()
+        for windows in (True, False):
+            context = self.context(windows=windows)
+            for mode in ("bypass", "standard", "bypass"):
+                with self.subTest(windows=windows, mode=mode):
+                    settings.write_text(json.dumps({"configuration": {"core": {"permissions": mode}}}), encoding="utf-8")
+                    before = snapshot(self.root)
+                    setup.check_native_permissions(context)
+                    self.assertEqual(before, snapshot(self.root))
+                    setup.apply_native_permissions(context)
+                    self.assertEqual([], setup.check_native_permissions(context))
+                    converged = snapshot(self.root)
+                    self.assertEqual([], setup.apply_native_permissions(context))
+                    self.assertEqual(converged, snapshot(self.root))
+                    claude = json.loads((context.claude_home / "settings.json").read_text(encoding="utf-8"))
+                    codex = tomllib.loads((context.codex_home / "config.toml").read_text(encoding="utf-8"))
+                    self.assertEqual("bypassPermissions" if mode == "bypass" else "default", claude["permissions"]["defaultMode"])
+                    self.assertEqual(":danger-full-access" if mode == "bypass" else ":workspace", codex["default_permissions"])
 
 
 if __name__ == "__main__":
