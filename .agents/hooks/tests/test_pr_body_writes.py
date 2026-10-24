@@ -37,7 +37,7 @@ class PrWriteTests(unittest.TestCase):
             return code
 
     def test_direct_connector_create_and_body_edit_require_both_sections(self):
-        for prefix in ("mcp__codex_apps__github_", "mcp__github__"):
+        for prefix in ("mcp__codex_apps__github_", "mcp__github__", "mcp__plugin_github_github__", "github_"):
             for operation in ("create", "update"):
                 tool = prefix + operation + "_pull_request"
                 for invalid in ("Change with a reason but no labels", "## Why\nReason", "## What\nChange\n## Why\n<!-- empty -->"):
@@ -50,6 +50,7 @@ class PrWriteTests(unittest.TestCase):
         self.assertEqual(0, self.invoke("mcp__codex_apps__github_update_pull_request", {"title": "New title"}))
         self.assertEqual(0, self.invoke("mcp__github__update_pull_request", {"body": None, "state": "closed"}))
         self.assertEqual(0, self.invoke("mcp__codex_apps__github_get_pr_info", {}))
+        self.assertEqual(0, self.invoke("mcp__gitlab__create_pull_request", {"description": "Different provider"}))
 
     def test_pr_write_mode_does_not_change_merge_authorization(self):
         self.assertEqual(0, self.invoke("exec_command", {"cmd": "gh pr merge 42 --merge"}))
@@ -81,6 +82,7 @@ class PrWriteTests(unittest.TestCase):
                 manifest = json.loads((ROOT / f".agents/plugins/manifests/{host}/engineering-hooks.json").read_text(encoding="utf-8"))
                 registration = next(group for group in manifest["hooks"]["PreToolUse"]
                                     if "delivery_binding_gate.py" in json.dumps(group))
+                self.assertIsNone(re.fullmatch(registration["matcher"], "mcp__gitlab__create_pull_request"))
                 hook = registration["hooks"][0]
                 commands = [hook["args"]] if host == "claude" else [shlex.split(hook[key])[1:] for key in ("command", "commandWindows")]
                 for arguments in commands:

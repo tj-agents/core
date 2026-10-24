@@ -41,7 +41,7 @@
         "matcher": "Bash|PowerShell"
       },
       {
-        "matcher": "Bash|PowerShell|mcp__.*__(github_)?(create|update)_pull_request",
+        "matcher": "Bash|PowerShell|(?:mcp__codex_apps__github_|mcp__github__|mcp__plugin_github_github__|github_)(create|update)_pull_request",
         "hooks": [
           {
             "type": "command",
