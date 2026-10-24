@@ -84,6 +84,59 @@ def touches_security(changed_paths, patterns=_SECURITY_PATTERNS):
     return None
 
 
+_CD_RE = re.compile(r"(?:^|[;&|]|&&)\s*cd\s+((?:\"[^\"]*\")|(?:\'[^\']*\')|(?:[^\s;&|]+))")
+
+# Deliberately a contract, not a shell parser. Codex does not report an exec_command
+# workdir to hooks, and trying to infer one from arbitrary cmd/PowerShell/Bash text means
+# reimplementing three shells. The shared `pushd` + `&&` envelope works in all three;
+# restricting the tail to gh's valueless merge switches keeps the target proof exact.
+_CANONICAL_MERGE_RE = re.compile(
+    r'\Apushd "(?P<target>[^"\r\n]+)" && gh pr merge (?P<pr>[1-9]\d*)'
+    r'(?P<options>(?: --(?:auto|admin|merge|squash|rebase|delete-branch))*)\Z'
+)
+_PUSHD_TOKEN_RE = re.compile(r"\bpushd\b", re.IGNORECASE)
+_CANONICAL_UNSAFE_TARGET_CHARS = frozenset('$%!`&|;<>^\r\n')
+
+
+def is_codex_invocation(data):
+    """Codex hook payloads carry a turn id; Claude hook payloads do not."""
+    return "turn_id" in data or "turnId" in data
+
+
+def canonical_merge_target_dir(command):
+    """Return the proven checkout from the shared cross-harness merge envelope."""
+    match = _CANONICAL_MERGE_RE.fullmatch(command)
+    if match is None:
+        return None
+
+    raw = match.group("target")
+    if raw.endswith("\\") or any(char in raw for char in _CANONICAL_UNSAFE_TARGET_CHARS):
+        return None
+    target = Path(raw)
+    if not target.is_absolute() or not target.is_dir():
+        return None
+    try:
+        return str(target.resolve(strict=True))
+    except OSError:
+        return None
+
+
+def merge_target_dir(command, data):
+    """The directory the merge actually runs in: the last `cd` before it, else the tool cwd.
+
+    Adopted from PR #495. Without it a `cd <worktree> && merge` was still judged against
+    the pinned project dir, so a merge with no PR number read the wrong branch's review.
+    """
+    pos = command.find("gh pr " "merge")
+    prefix = command if pos < 0 else command[:pos]
+    target = None
+    for m in _CD_RE.finditer(prefix):
+        target = m.group(1)
+        if len(target) >= 2 and target[0] == target[-1] and target[0] in "\"'":
+            target = target[1:-1]
+    return target or data.get("cwd") or "."
+
+
 def review_only(base, head):
     """True when everything between base and head touched reviews/ alone.
 

@@ -198,6 +198,44 @@ resources remain covered.
 
 ## Machine setup and updates
 
+Core's portable permission preference is an enum in `.agents/settings.json`:
+
+```json
+{"configuration":{"core":{"permissions":"bypass"}}}
+```
+
+`bypass` is the default, including when the setting is omitted. `standard` opts into normal native
+permission checks. Machine setup installs the preference into both user profiles. Cloning Core carries the
+declaration; running its existing setup applies the same defaults on another Windows or Linux machine.
+
+| Shared mode | Claude user-profile `permissions.defaultMode` | Codex `approval_policy` | Codex `default_permissions` |
+|---|---|---|---|
+| `bypass` | `bypassPermissions` | `never` | `:danger-full-access` |
+| `standard` | `default` | `on-request` | `:workspace` |
+
+Claude 2.1.257+ ignores bypass in project and local settings. Repository generation therefore inherits
+Claude's installed user default for `bypass`, and emits `default` for the supported `standard` project
+override. It never treats a committed bypass value as effective activation. Codex supports either mode
+in trusted repository settings. Run the same machine setup after cloning on another machine; no
+machine-specific permission list or hand-edited host profile is needed.
+
+Run setup with `--step "native permission defaults"` for only this repair, or add `--check` to inspect
+drift without writing. Existing model, plugin, hook and trust settings are preserved. The mapping migrates
+legacy Codex sandbox keys instead of combining incompatible configuration formats. Managed host policy,
+initial project trust and an explicit session selection remain authoritative; changing a default does
+not change an already-running restricted session. Merge authorization is configured separately.
+
+The desktop app can retain a local host-mode override separately from `config.toml`. Setup removes
+that saved local override so new desktop chats follow the configured permission profile, including
+repository-specific `standard` settings. Remote host preferences and existing chat permissions remain
+intact. Close Codex Desktop before running this setup step from a terminal, then reopen it. Setup
+refuses to rewrite the app state while the app is running, because its cached state could undo the change.
+For example, a saved `guardian-approvals` mode must not keep new chats restricted after Core installs
+`bypass`; clearing that override lets the configured `:danger-full-access` profile take effect.
+
+Native settings: [Codex](https://developers.openai.com/codex/config-reference/),
+[Claude Code](https://code.claude.com/docs/en/permissions).
+
 Run once per machine. Rerunning setup converges on the same channel and launch configuration:
 
 ```text

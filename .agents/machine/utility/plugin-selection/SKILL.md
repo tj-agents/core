@@ -73,6 +73,24 @@ existing foreign marketplaces and selections. Every selected approved publisher 
 
 ## Generate settings from an existing selection
 
+Native permission defaults come from `.agents/settings.json`, independently of plugin selection:
+
+```json
+{"configuration":{"core":{"permissions":"bypass"}}}
+```
+
+`permissions` is a host-neutral enum: `bypass` (the default when omitted) or `standard`.
+Machine setup projects it to Claude's user-profile `permissions.defaultMode` (`bypassPermissions` or
+`default`) and Codex's `approval_policy` plus `default_permissions` (`never`/`:danger-full-access` or
+`on-request`/`:workspace`). It replaces conflicting legacy Codex sandbox keys while preserving
+unrelated settings. Install profile defaults once per machine through Core's `setup.ps1` on Windows
+or `setup.sh` on Linux. Claude 2.1.257+ ignores bypass in project and local settings, so repository
+generation omits that inert value and inherits the installed user default; `standard` writes its
+supported project override. Codex projects either mode into repository settings. `check` reports
+source drift; it does not prove the Claude user-profile setup has run.
+Native project trust, managed restrictions and explicit session overrides still apply; an existing
+restricted session must change its native permissions or restart before it can use changed defaults.
+
 ```powershell
 python -B '<skill-directory>\scripts\repo_config.py' --root C:\path\to\repository --mode write
 ```
@@ -90,7 +108,7 @@ Both commands pick the scope from repository ownership, and `--scope local` forc
 scope writes `.claude/settings.local.json`, `.codex/config.toml`, optional `.codex/rules/agent-harness.rules`
 and `.agents/repo-capabilities.local.json` ownership state. It git-excludes all of them and the selection,
 preserves unrelated selections and approvals, and refuses tracked targets, changed owned settings and links
-that escape the root. Local settings need Python 3.11 or newer.
+that escape the root. Settings generation requires Python 3.11 or newer.
 
 ## Audit a machine
 

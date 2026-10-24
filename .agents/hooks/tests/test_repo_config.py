@@ -253,8 +253,9 @@ class RepoConfigTests(unittest.TestCase):
         self.assertIs(settings["enabledPlugins"]["browser@foreign"], True)
         self.assertIn("foreign", settings["extraKnownMarketplaces"])
         self.assertEqual({"MODE": "test"}, settings["env"])
+        self.assertNotIn("defaultMode", settings["permissions"])
         self.assertEqual({"allow": ["Bash(manual)", "Bash(shared)"], "deny": ["Bash(forbidden)"], "ask": ["Bash(prompt)"]}, settings["permissions"])
-        self.assertTrue(codex.read_text(encoding="utf-8").startswith(prefix))
+        self.assertIn(prefix, codex.read_text(encoding="utf-8"))
 
     def test_local_restores_prior_value_when_selection_becomes_stale(self):
         claude = self.root / ".claude/settings.local.json"

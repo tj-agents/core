@@ -38,6 +38,8 @@ procedure that goes stale in the repo that renames one.
   flow), or a wedged queue. Never because the queue is slow. **Skipping a suite is not the same as skipping
   the queue:** to run less, apply the tier label below and enqueue normally so the hard floor still builds
   against current base.
+- **A required approval is Tommy's, and `--auto` waits for it.** Where the ruleset requires one, enable
+  `--auto` and report the PR link as awaiting his approval; his approval lands it. Never bypass it.
 - **`--delete-branch` is rejected while a queue is enabled.** Delete the branch separately, after it lands.
 
 ## Steps

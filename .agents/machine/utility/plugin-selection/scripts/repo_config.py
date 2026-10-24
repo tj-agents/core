@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate project host settings from a repository's plugin selection."""
+"""Generate project host settings from a repository's plugin selection (Python 3.11+)."""
 
 from __future__ import annotations
 
@@ -16,6 +16,11 @@ import harness_permissions
 import lock_io
 import machine_paths
 import plugin_selection
+
+if sys.version_info < (3, 11):
+    raise SystemExit("Repository settings generation requires Python 3.11 or newer")
+
+host_permissions = plugin_selection.runtime_module("host_permissions")
 
 
 MANAGED_START = "# BEGIN repo-declared agent capabilities"
@@ -380,7 +385,7 @@ def plan(
     rules_path = root / ".codex/rules/agent-harness.rules"
     state_path = root / LOCAL_STATE
     paths = [claude, codex, rules_path] + ([state_path] if scope == "local" else [])
-    inputs = [*read_paths, lock_path.resolve().parent / "repository-harness.json"]
+    inputs = [*read_paths, lock_path.resolve().parent / "repository-harness.json", root / ".agents/settings.json"]
     if lock_document is None:
         inputs.append(lock_path)
     exclude = preflight_paths(root, [*paths, *prospective_paths], scope=scope, read_paths=inputs, run=execute)
@@ -401,6 +406,13 @@ def plan(
             targets[exclude] = exclusion_text(exclude, root, [*paths, *[contained(root, path) for path in [*prospective_paths, *selection]]])
     else:
         targets = {claude: claude_settings(claude, sources, identities, allow), codex: codex_settings(codex, sources, identities), rules_path: expected_rules}
+    try:
+        mode = host_permissions.permissions(root)
+        targets[claude] = host_permissions.claude_settings(targets[claude], mode, project=True)
+        targets[codex] = host_permissions.codex_settings(targets[codex], mode)
+    except ValueError as error:
+        raise lock_io.LockError(str(error)) from error
+    if scope == "project":
         reject_machine_paths(root, targets)
     for path in targets:
         text_at(path)
