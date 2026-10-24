@@ -201,27 +201,42 @@ def wait_for_delivery(proxy, receipt, accepted):
         time.sleep(min(0.5, remaining))
 
 
-def send(proxy, receipt, receipt_path, message):
+def recipient(proxy, receipt):
     thread = read_thread(proxy, receipt)
     if not any(value == receipt['thread_id'] for value in pages(proxy, 'thread/loaded/list', {})):
         raise FollowupError('Target is not loaded in this server; no replacement session started')
     if thread.get('canAcceptDirectInput') is not True:
         raise FollowupError('Target does not advertise direct input; no message sent')
     state = thread['status']['type']
-    params = {'threadId': receipt['thread_id'], 'clientUserMessageId': receipt['client_id'],
-              'input': [{'type': 'text', 'text': message, 'text_elements': []}]}
+    turn_id = None
     if state == 'active':
         active = [turn for turn in pages(proxy, 'thread/turns/list', {
             'threadId': receipt['thread_id'], 'sortDirection': 'desc', 'itemsView': 'notLoaded',
         }) if turn['status'] == 'inProgress']
         if len(active) != 1:
             raise FollowupError('Cannot identify exactly one active turn; no message sent')
-        method = 'turn/steer'
-        params['expectedTurnId'] = active[0]['id']
-    elif state == 'idle':
-        method = 'turn/start'
-    else:
+        turn_id = active[0]['id']
+    elif state != 'idle':
         raise FollowupError(f'Target runtime state {state!r} does not permit a follow-up')
+    return state, turn_id
+
+
+def probe(proxy, target):
+    state, _ = recipient(proxy, target)
+    return {'status': 'reachable', 'thread_id': target['thread_id'],
+            'cwd': target['cwd'], 'codex_home': target['codex_home'],
+            'runtime_state': state, 'acknowledged': False,
+            'next_action': 'Reachable at this observation only. Nothing was sent. '
+                           'An authorized send rechecks the recipient before submission.'}
+
+
+def send(proxy, receipt, receipt_path, message):
+    state, turn_id = recipient(proxy, receipt)
+    method = 'turn/steer' if state == 'active' else 'turn/start'
+    params = {'threadId': receipt['thread_id'], 'clientUserMessageId': receipt['client_id'],
+              'input': [{'type': 'text', 'text': message, 'text_elements': []}]}
+    if turn_id is not None:
+        params['expectedTurnId'] = turn_id
     try:
         with receipt_path.open('x', encoding='utf-8') as output:
             json.dump(receipt, output, indent=2)
@@ -261,6 +276,10 @@ def main(argv=None):
     submit.add_argument('--codex-home', default=os.environ.get('CODEX_HOME', str(Path.home() / '.codex')))
     submit.add_argument('--message-file', required=True, type=Path)
     submit.add_argument('--receipt', required=True, type=Path)
+    inspect = sub.add_parser('probe', help='Check exact recipient reachability without sending')
+    inspect.add_argument('--thread', required=True, type=uuid.UUID)
+    inspect.add_argument('--cwd', required=True)
+    inspect.add_argument('--codex-home', default=os.environ.get('CODEX_HOME', str(Path.home() / '.codex')))
     status = sub.add_parser('status')
     status.add_argument('--receipt', required=True, type=Path)
     args = parser.parse_args(argv)
@@ -271,13 +290,17 @@ def main(argv=None):
         if not 0 < args.timeout <= 60:
             raise FollowupError('--timeout must be greater than zero and at most 60 seconds')
         deadline = time.monotonic() + args.timeout
-        exists = args.receipt.exists()
-        if args.command == 'send':
+        exists = args.command != 'probe' and args.receipt.exists()
+        if args.command in ('send', 'probe'):
+            if not Path(args.cwd).is_dir() or not Path(args.codex_home).is_dir():
+                raise FollowupError('Expected cwd and Codex profile must be existing directories')
+        if args.command == 'probe':
+            receipt = {'thread_id': str(args.thread), 'cwd': path_key(args.cwd),
+                       'codex_home': path_key(args.codex_home)}
+        elif args.command == 'send':
             message = args.message_file.read_text(encoding='utf-8-sig')
             if not message.strip():
                 raise FollowupError('Message file is empty')
-            if not Path(args.cwd).is_dir() or not Path(args.codex_home).is_dir():
-                raise FollowupError('Expected cwd and Codex profile must be existing directories')
             expected = {'version': 1, 'thread_id': str(args.thread), 'client_id': str(uuid.uuid4()),
                         'cwd': path_key(args.cwd), 'codex_home': path_key(args.codex_home),
                         'message_sha256': hashlib.sha256(message.encode('utf-8')).hexdigest()}
@@ -291,13 +314,22 @@ def main(argv=None):
             reserved = True
         proxy = Proxy(args.codex, receipt['codex_home'], deadline)
         proxy.initialize()
-        if args.command == 'status' or exists:
+        if args.command == 'probe':
+            result = probe(proxy, receipt)
+        elif args.command == 'status' or exists:
             result = wait_for_delivery(proxy, receipt, False)
         else:
             result = send(proxy, receipt, args.receipt, message)
     except (FollowupError, OSError, ValueError, KeyError, TypeError, AttributeError) as error:
         mismatch = isinstance(error, ReceiptMismatch)
-        if mismatch:
+        if args.command == 'probe':
+            status, next_action = 'unavailable', (
+                'Nothing was sent and no receipt was created. A live session may be outside the '
+                'shared server, including one launched with --no-daemon. Verify exact owner liveness '
+                'before considering recovery; do not start a daemon, resume a live owner or retry '
+                'through a duplicate writer. Continue independent authorized work.'
+            )
+        elif mismatch:
             status, next_action = 'unavailable', (
                 'Nothing was sent for this message by this run; this receipt path already holds a '
                 'receipt for a different message or target. Use a new receipt file for this message; '
@@ -318,17 +350,20 @@ def main(argv=None):
                 'approval justification. Assess available supported automated coordination through '
                 'machine:open-codex for the verified exact owner; verify the exact native id, cwd, and Codex '
                 'profile. If automated coordination is unavailable or ineligible, report the blocker and '
-                'provide the message for the user to paste.'
+                'continue independent authorized work. Offer to provide the message for the user to paste '
+                'only when useful and consistent with the user instructions; retain the current task.'
             )
         if isinstance(error, Rejected):
             status = 'rejected'
-        result = {'status': status, 'detail': str(error), 'receipt': str(args.receipt),
+        result = {'status': status, 'detail': str(error),
                   'acknowledged': False, 'next_action': next_action}
+        if args.command != 'probe':
+            result['receipt'] = str(args.receipt)
     finally:
         if proxy:
             proxy.close()
     print(json.dumps(result, ensure_ascii=False))
-    return 0 if result['status'] == 'delivered' else 2
+    return 0 if result['status'] in ('delivered', 'reachable') else 2
 
 
 if __name__ == '__main__':
