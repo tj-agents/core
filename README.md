@@ -45,6 +45,22 @@ an `unconfigured` update check is not completion evidence. If setup or verificat
 work blocked, diagnose the failed step and rerun the supported setup; do not silently continue on stale
 machine state. [Machine setup and updates](#machine-setup-and-updates) explains the owned steps and scope.
 
+After a Core change merges, wait for the post-merge regeneration job to publish its packages on `main`,
+update the primary Core checkout, then rerun the full setup and verification above to deploy machine
+runtime changes. Normal `claude` and `codex` launches check for published updates automatically. For an
+immediate explicit refresh from the Core checkout, run:
+
+```powershell
+./sync.ps1 --verify
+```
+
+```bash
+./sync.sh --verify
+```
+
+`machine:sync-plugins` owns adoption in a running session, including resuming the same conversation when
+native reload is unavailable. Manual sync is available whenever an immediate refresh is needed.
+
 `engineering:skill-authoring` owns skill selection triggers, names, and sizing; the
 [`template:check` validator](https://github.com/tj-agents/template) owns required skill content and layout
 validation. `engineering:docs` owns the generic guidance-writing convention.
@@ -176,7 +192,7 @@ gate. Source verification does not establish installed-host trust or acceptance.
   selected host adapter. Nothing under it is an authored source.
 - `shell/` owns the PowerShell profile, one concern per file.
 - `cli-session-recovery/` owns save/restore scripts and their regression suite.
-- install.ps1 installs the PowerShell profile; cli-session-recovery provides its own installer.
+- setup.ps1 and setup.sh install the machine runtime and shell profiles; cli-session-recovery provides its own installer.
 
 ### Windows CLI hook windows
 
@@ -343,7 +359,7 @@ The generic service scaffold does not generate it. GitHub Free's repository rule
 apply to private repositories.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
-loaded; new sessions pick up the update. `install.ps1` still wires the Windows `shell/` profile.
+loaded; follow `machine:sync-plugins` for adoption and the required recovery verification.
 
 ### Refresh and repository boundaries
 
@@ -407,17 +423,10 @@ entry. An installed cache can subsequently load solely from trusted project decl
 settings alone do not prove fresh-machine installation. See the current
 [cutover acceptance record](plans/repo-declared-config/CUTOVER.md).
 
-Automatic updates belong to Claude's native updater and the background updater installed by `setup.ps1`.
-The scheduled Codex updater also installs missing declared plugins after a repository has native trust.
-Its native `plugin add` commands maintain the host's required user installation entries automatically;
-repository settings remain the authored selection. Codex currently provides no cache-only install scope.
-Nothing updates packages in the launch path.
+The [machine setup and update flow](#machine-setup-and-updates) owns automatic launch checks and explicit
+refresh. Codex's native `plugin add` commands maintain required user installation entries; repository
+settings remain the authored selection. Codex currently provides no cache-only install scope.
 
-For an explicit native refresh use `machine:sync-plugins`. Its default performs native marketplace
-and plugin updates; remote revision verification is opt-in and prints progress. `/sync-plugins`
-adopts updates in an open Claude session; start a new Codex session to load updated packages.
-
-Codex does not load agent definitions directly from plugins. Its engineering package supplies
-`scripts/install-codex-agents.ps1` for explicit profile delivery; launcher startup no longer copies
-agents or records hook trust. Native hook trust review still applies. Claude loads the package's
-`agents/` payload directly.
+Codex does not load agent definitions directly from plugins. Core setup owns their profile installation;
+Claude loads the package's `agents/` payload directly. Codex launch and refresh verify required hook trust
+as described under [faulty-hook recovery](#recover-from-a-faulty-installed-hook).

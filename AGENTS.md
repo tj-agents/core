@@ -7,8 +7,16 @@ agent configuration do not establish personal scope. Infonetica is work scope, i
 Read the target repository's README.md and AGENTS.md before selecting its policy profiles.
 Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts, hooks, or launchers.
 Install machine state only through `./setup.ps1` or `./setup.sh`; rerunning converges.
+Before relying on machine setup or declaring its repair complete, follow
+[Required setup on every machine](README.md#required-setup-on-every-machine) and its completion evidence.
 Shipped code must run on Windows and Linux; follow
 [Supported platforms](CODE_CONVENTIONS.md#supported-platforms).
+
+```text
+Shell wrappers exist, but the launch check reports unconfigured:
+Follow README > Required setup on every machine before resuming ordinary work.
+Wrapper presence does not establish setup completion.
+```
 
 Machine setup and standards injection are reproducible Core deliverables. Implement their behavior in
 repository-owned code reached through the setup and sync entry points, with shared Python logic for
