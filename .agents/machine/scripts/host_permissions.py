@@ -84,6 +84,26 @@ def codex_settings(text: str, mode: str) -> str:
     return result
 
 
+def codex_app_settings(text: str) -> str:
+    settings = json.loads(text)
+    if not isinstance(settings, dict):
+        raise ValueError("Codex app state must be an object")
+    if "electron-persisted-atom-state" not in settings:
+        return text
+    atoms = settings["electron-persisted-atom-state"]
+    if not isinstance(atoms, dict):
+        raise ValueError("Codex app atom state must be an object")
+    if "agent-mode-by-host-id" not in atoms:
+        return text
+    modes = atoms["agent-mode-by-host-id"]
+    if not isinstance(modes, dict):
+        raise ValueError("Codex app host modes must be an object")
+    if "local" not in modes:
+        return text
+    del modes["local"]
+    return json.dumps(settings, indent=2, ensure_ascii=False) + "\n"
+
+
 def plan(claude: Path, codex: Path, mode: str) -> dict[Path, str]:
     targets = {}
     for path, render in ((claude, claude_settings), (codex, codex_settings)):
@@ -93,4 +113,12 @@ def plan(claude: Path, codex: Path, mode: str) -> dict[Path, str]:
         updated = render(text, mode)
         if updated != text:
             targets[path] = updated
+    desktop = codex.parent / ".codex-global-state.json"
+    if desktop.is_symlink() or desktop.exists() and not desktop.is_file():
+        raise ValueError(f"Native settings must be regular files: {desktop}")
+    if desktop.is_file():
+        text = desktop.read_text(encoding="utf-8-sig")
+        updated = codex_app_settings(text)
+        if updated != text:
+            targets[desktop] = updated
     return targets
