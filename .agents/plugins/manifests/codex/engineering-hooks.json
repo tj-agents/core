@@ -26,7 +26,7 @@
         "matcher": "exec_command|unified_exec|local_shell|shell"
       },
       {
-        "matcher": "exec_command|unified_exec|local_shell|shell|mcp__.*__(github_)?(create|update)_pull_request",
+        "matcher": "exec_command|unified_exec|local_shell|shell|(?:mcp__codex_apps__github_|mcp__github__|mcp__plugin_github_github__|github_)(create|update)_pull_request",
         "hooks": [
           {
             "type": "command",

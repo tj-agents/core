@@ -45,7 +45,7 @@ _VALUE_FLAGS = {
               "--author-email", "-A", "--match-head-commit"},
 }
 _MERGE_ALIASES = {"-m": "--merge", "-r": "--rebase", "-s": "--squash", "-d": "--delete-branch"}
-_CONNECTOR_WRITE = re.compile(r"(?:^|__)(?:github_)?(create|update)_pull_request$")
+_CONNECTOR_WRITE = re.compile(r"^(?:mcp__codex_apps__github_|mcp__github__|mcp__plugin_github_github__|github_)(create|update)_pull_request$")
 
 
 def validate_connector_before(data):
