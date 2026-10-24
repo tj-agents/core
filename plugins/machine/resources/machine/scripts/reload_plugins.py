@@ -74,7 +74,12 @@ def selection(host: str, executable: str, project: Path) -> tuple[dict, list[str
     sources = {name: repo for name, repo in sources.items() if repo and repo.split("/", 1)[0] == "tj-agents"}
     enabled = sorted(name for name in enabled if name.rsplit("@", 1)[-1] in sources)
     used = {name.rsplit("@", 1)[-1] for name in enabled}
-    return {name: repo for name, repo in sorted(sources.items()) if name in used}, enabled
+    selected = {name: repo for name, repo in sorted(sources.items()) if name in used}
+    for name, repo in selected.items():
+        error = plugin_autoupdate.marketplace_error(name, repo)
+        if error:
+            raise RefreshError(error)
+    return selected, enabled
 
 
 def run(command: list[str], project: Path) -> str:

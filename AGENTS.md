@@ -10,6 +10,22 @@ Install machine state only through `./setup.ps1` or `./setup.sh`; rerunning conv
 Shipped code must run on Windows and Linux; follow
 [Supported platforms](CODE_CONVENTIONS.md#supported-platforms).
 
+Machine setup and standards injection are reproducible Core deliverables. Implement their behavior in
+repository-owned code reached through the setup and sync entry points, with shared Python logic for
+Windows and Linux. A repair confined to one machine's profile, plugin cache or local settings is
+incomplete: carry it into source, then deploy it through those entry points. Verify effective native-host
+standards discovery and the affected behavior in a fresh session on each supported platform; report
+missing prerequisites or remaining verification explicitly. Keep credentials and native trust decisions
+under their existing controls. See [Machine setup and updates](README.md#machine-setup-and-updates).
+
+```text
+One laptop is missing Engineering after setup:
+1. Repair the repository-owned selection, installation or injection path that caused the omission.
+2. Run setup and sync through their supported entry points on Windows and Linux.
+3. Verify Engineering discovery and the affected operation in fresh native host sessions.
+Result: copying a cached skill onto that laptop alone does not complete the repair.
+```
+
 Global design and cross-repository plans belong in [`tj-agents/docs`](https://github.com/tj-agents/docs).
 Keep core implementation plans here and link to shared designs instead of copying them.
 
@@ -38,6 +54,9 @@ For machine setup, event handling or repository adoption, read the
 [refresh and repository boundaries](README.md#refresh-and-repository-boundaries) before changing them.
 Preserve the separation with the [machine event fixtures](tests/test_machine_events.py); repository
 adoption and local exclusions follow [machine:plugin-selection](.agents/machine/utility/plugin-selection/SKILL.md).
+Consumer validation and native refresh share `.agents/machine/scripts/plugin_autoupdate.py`.
+Follow the [shared catalog's identity policy](https://github.com/tj-agents/marketplace#readme)
+when changing marketplace declarations or installed-registration cleanup.
 
 This repository owns common agent behavior, selected engineering process and machine utilities.
 `plan-artifacts` supplies maintained plans without requiring an engineering lifecycle. Stack standards,
