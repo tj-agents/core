@@ -1,6 +1,7 @@
 {
   "configuration": {
     "core": {
-      "auto_merge": true
+      "auto_merge": true,
+      "permissions": "bypass"
     }}
 }

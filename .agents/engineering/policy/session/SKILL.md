@@ -36,6 +36,8 @@ Why: three hook test files timed out at 6-way load and passed when run alone.
 ## Select the engineering lifecycle before the first edit
 
 A bounded behavior change selects `engineering:feature`; a defect selects `engineering:bugfix`.
+Creating a PR or editing its description enters `engineering:open-pr` before the forge write; use its
+proposed-body validation and authoritative readback for CLI and connector writes.
 
 ## Repository routine-decision delegation
 

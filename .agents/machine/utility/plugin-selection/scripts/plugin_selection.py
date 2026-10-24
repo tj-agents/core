@@ -10,19 +10,19 @@ import re
 import lock_io
 
 
-def identity_rules():
+def runtime_module(name):
     for parent in Path(__file__).resolve().parents:
-        for relative in ("scripts/plugin_autoupdate.py", "resources/machine/scripts/plugin_autoupdate.py"):
+        for relative in (f"scripts/{name}.py", f"resources/machine/scripts/{name}.py"):
             candidate = parent / relative
             if candidate.is_file():
-                spec = importlib.util.spec_from_file_location("selection_plugin_autoupdate", candidate)
+                spec = importlib.util.spec_from_file_location(f"selection_{name}", candidate)
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 return module
-    raise RuntimeError("The shipped plugin_autoupdate.py runtime was not found")
+    raise RuntimeError(f"The shipped {name}.py runtime was not found")
 
 
-IDENTITY_RULES = identity_rules()
+IDENTITY_RULES = runtime_module("plugin_autoupdate")
 MARKETPLACE_NAME = IDENTITY_RULES.MARKETPLACE_NAME
 MARKETPLACE_REPOSITORY = IDENTITY_RULES.MARKETPLACE_REPOSITORY
 
