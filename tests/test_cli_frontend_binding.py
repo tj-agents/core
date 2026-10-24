@@ -61,6 +61,11 @@ class FrontendBindingTests(unittest.TestCase):
             with self.assertRaisesRegex(session_close.Refusal, 'exact frontend launch binding'):
                 session_close.close_target(self.entry)
 
+    def test_unbound_codex_refuses_even_when_no_peer_registration_exists(self):
+        self.entries[:] = [('own.json', self.entry)]
+        with self.assertRaisesRegex(session_close.Refusal, 'exact frontend launch binding'):
+            session_close.close_target(self.entry)
+
     def test_reused_process_detached_child_or_older_registration_is_refused(self):
         process = session_close.register_session.ProcessInfo
         for replacement in (process(21, 20, 'codex.exe', 203.0),

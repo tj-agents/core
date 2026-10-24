@@ -403,6 +403,8 @@ def close_target(entry):
                     "terminal": terminal, "title": wrapper.get("title")}
     if shared:
         raise Refusal("registered host is shared by multiple session identities; an exact frontend launch binding is required")
+    if entry["host"] == "codex":
+        raise Refusal("an exact frontend launch binding is required for Codex; registration alone cannot identify its frontend")
     return entry
 
 
