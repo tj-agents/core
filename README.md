@@ -2,10 +2,10 @@
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
 The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core).
-Select `base@tj-agents`, `agent-store@tj-agents`, `machine@tj-agents`, `workflow@tj-agents` and `engineering@tj-agents` from
+Select `base@tj-agents`, `agent-store@tj-agents`, `machine@tj-agents`, `cli@tj-agents`, `workflow@tj-agents` and `engineering@tj-agents` from
 [`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
-The repository publishes Base, Agent Store, Machine, Workflow and Engineering packages. Agent Store owns recorded
-execution/session state; Machine observes and operates native hosts; Engineering owns code work and delivery.
+The repository publishes Base, Agent Store, Machine, CLI, Workflow and Engineering packages. Agent Store owns recorded
+execution/session state; Machine observes native hosts; CLI owns closure and closeout; Engineering owns code work and delivery.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
 
@@ -77,13 +77,25 @@ A package never imports a sibling plugin installation. Machine's hooks remain th
 
 ```text
 Machine -> Base + Agent Store
-Engineering -> Base + Agent Store + Machine
+CLI -> Base + Agent Store + Machine
+Workflow -> Base + Agent Store + Machine + CLI
+Engineering -> Base + Agent Store + Machine + CLI + Workflow
 Agent Store inspection -> existing sessions.db, read-only JSON
 ```
 
 These are source package relationships. The central marketplace roster and native installation must
 also contain a package before a selected host can discover it; successful source generation is not
 installed activation.
+
+`cli:close` closes only the current terminal tab after the final reply and preserves unfinished work.
+`cli:closeout` first finishes the authorized workflow, then uses the same closure primitive and the
+proof-guarded worktree sweep. Workflow completion and automatic closure after a landed delivery select
+closeout; an explicit request to dismiss a CLI selects close.
+
+For shared Codex backends, a resumed frontend is bound to its exact native launch receipt, child PID/start
+time and terminal observation captured by the launcher. The watcher waits for that frontend to exit,
+leaving the shared backend alive. A session without an exact frontend/tab binding stays open and records
+the refusal; older receipts are not upgraded using inferred titles or process names.
 
 ## Repository auto-merge
 
@@ -124,7 +136,7 @@ gate. Source verification does not establish installed-host trust or acceptance.
 
 ## Layout
 
-- `.agents/` is the canonical host-neutral source. Base, Agent Store, Machine, Workflow and Engineering ownership is expressed
+- `.agents/` is the canonical host-neutral source. Base, Agent Store, Machine, CLI, Workflow and Engineering ownership is expressed
   below it alongside shared workflows, hooks, schemas, tests and resources.
 - `.codex/` contains only Codex entry points and host configuration. `.claude/` contains only Claude
   entry points and host configuration. Their skills reference canonical `.agents/` definitions rather
@@ -153,6 +165,7 @@ on Windows and Linux. Install the current coordinator with:
 ```text
 codex plugin marketplace add https://github.com/tj-agents/marketplace.git
 codex plugin add machine@tj-agents
+codex plugin add cli@tj-agents
 ```
 
 Claude Code can open a visible Git Bash window for each hook. On Windows, run

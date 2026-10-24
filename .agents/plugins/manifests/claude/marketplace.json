@@ -38,6 +38,17 @@
       ]
     },
     {
+      "name": "cli",
+      "source": "./plugins/cli",
+      "description": "Close CLI tabs or finish their workflows before closing.",
+      "category": "Productivity",
+      "keywords": [
+        "cli",
+        "sessions",
+        "closeout"
+      ]
+    },
+    {
       "name": "workflow",
       "source": "./plugins/workflow",
       "description": "Goal lifecycle and recorded work status.",
