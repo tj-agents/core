@@ -56,10 +56,13 @@ class ArgumentTests(unittest.TestCase):
                          RELAUNCH.preserved_arguments(argv))
 
     def test_a_dummy_process_command_line_is_read_back(self):
-        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", "--add-dir", "C:/extra dir",
-                                    "--settings", "s.json"])
+        process = subprocess.Popen([sys.executable, "-c", "import time; print('ready', flush=True); time.sleep(30)",
+                                    "--add-dir", "C:/extra dir", "--settings", "s.json"], stdout=subprocess.PIPE,
+                                   text=True)
+        self.addCleanup(process.stdout.close)
         self.addCleanup(process.wait)
         self.addCleanup(process.kill)
+        self.assertEqual("ready\n", process.stdout.readline())
         self.assertEqual(["--add-dir", "C:/extra dir", "--settings", "s.json"],
                          RELAUNCH.preserved_arguments(RELAUNCH.host_arguments(process.pid)))
 
