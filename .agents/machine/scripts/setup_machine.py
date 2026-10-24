@@ -1042,6 +1042,12 @@ def check_native_permissions(context: Context) -> list[str]:
 
 def apply_native_permissions(context: Context) -> list[str]:
     targets = native_permissions_plan(context)
+    desktop = codex_config_path(context).parent / ".codex-global-state.json"
+    if desktop in targets:
+        if host_permissions.desktop_running():
+            raise SetupError("Close Codex Desktop, run setup --step 'native permission defaults' "
+                             "from a terminal, then reopen the app to load the configured defaults")
+        targets = native_permissions_plan(context)
     for path, text in targets.items():
         write_profile(path, text, "utf-8", False)
     return [f"updated native permission defaults in {path}" for path in targets]
