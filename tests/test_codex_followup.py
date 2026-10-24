@@ -413,8 +413,14 @@ for line in sys.stdin:
     print(json.dumps({'id': request['id'], 'result': result}), flush=True)
 """
         proxy = self.create_proxy(source)
+        proxy.deadline = time.monotonic() - 1
+
+        def proxy_with_caller_deadline(executable, profile, deadline):
+            proxy.deadline = deadline
+            return proxy
+
         output = io.StringIO()
-        with patch.object(FOLLOWUP, 'Proxy', return_value=proxy), \
+        with patch.object(FOLLOWUP, 'Proxy', side_effect=proxy_with_caller_deadline), \
                 patch.object(proxy, '_write', wraps=proxy._write) as write, \
                 contextlib.redirect_stdout(output):
             code = FOLLOWUP.main(['send', '--thread', THREAD, '--cwd', str(root),
