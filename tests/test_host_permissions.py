@@ -13,6 +13,16 @@ import host_permissions
 
 
 class HostPermissionsTests(unittest.TestCase):
+    def test_app_process_detection_distinguishes_native_cli_and_desktop(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cli = root / "vendor/bin/codex.exe"
+            desktop = root / "desktop/codex.exe"
+            (desktop.parent / "resources").mkdir(parents=True)
+            (desktop.parent / "resources/app.asar").write_bytes(b"fixture")
+            self.assertFalse(host_permissions.desktop_running([cli]))
+            self.assertTrue(host_permissions.desktop_running([cli, desktop]))
+
     def test_app_drops_only_the_local_override_and_converges(self):
         for saved in ("guardian-approvals", "auto", "read-only", "full-access", "custom", None):
             with self.subTest(saved=saved):

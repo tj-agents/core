@@ -234,7 +234,8 @@ not change an already-running restricted session. Merge authorization is configu
 The desktop app can retain a local host-mode override separately from `config.toml`. Setup removes
 that saved local override so new desktop chats follow the configured permission profile, including
 repository-specific `standard` settings. Remote host preferences and existing chat permissions remain
-intact. If the desktop app is already open, restart it once after setup to reload its saved defaults.
+intact. Close Codex Desktop before running this setup step from a terminal, then reopen it. Setup
+refuses to rewrite the app state while the app is running, because its cached state could undo the change.
 For example, a saved `guardian-approvals` mode must not keep new chats restricted after Core installs
 `bypass`; clearing that override lets the configured `:danger-full-access` profile take effect.
 

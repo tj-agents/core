@@ -818,7 +818,8 @@ class RunStepsTests(Machine):
 
 
 class NativePermissionsTests(Machine):
-    def test_native_permissions_follow_portable_mode_and_converge_for_both_platforms(self):
+    @mock.patch.object(setup.host_permissions, "desktop_running", return_value=False)
+    def test_native_permissions_follow_portable_mode_and_converge_for_both_platforms(self, _desktop):
         settings = self.checkout / ".agents/settings.json"
         settings.parent.mkdir()
         for windows in (True, False):
@@ -844,6 +845,27 @@ class NativePermissionsTests(Machine):
                     self.assertEqual(":danger-full-access" if mode == "bypass" else ":workspace", codex["default_permissions"])
                     app = json.loads(app_state.read_text(encoding="utf-8"))
                     self.assertEqual({"remote": "read-only"}, app["electron-persisted-atom-state"]["agent-mode-by-host-id"])
+
+    def test_open_app_blocks_all_writes_and_closed_app_state_is_read_again(self):
+        context = self.context()
+        app = context.codex_home / ".codex-global-state.json"
+        app.parent.mkdir(parents=True, exist_ok=True)
+        state = {"electron-persisted-atom-state": {"agent-mode-by-host-id": {"local": "guardian-approvals"}}}
+        app.write_text(json.dumps(state), encoding="utf-8")
+        before = snapshot(self.root)
+        with mock.patch.object(setup.host_permissions, "desktop_running", return_value=True):
+            with self.assertRaisesRegex(setup.SetupError, "Close Codex Desktop"):
+                setup.apply_native_permissions(context)
+        self.assertEqual(before, snapshot(self.root))
+
+        def closed():
+            state["saved-during-shutdown"] = True
+            app.write_text(json.dumps(state), encoding="utf-8")
+            return False
+
+        with mock.patch.object(setup.host_permissions, "desktop_running", side_effect=closed):
+            setup.apply_native_permissions(context)
+        self.assertTrue(json.loads(app.read_text(encoding="utf-8"))["saved-during-shutdown"])
 
 
 if __name__ == "__main__":
