@@ -859,7 +859,10 @@ class DeliveryContinuationTests(unittest.TestCase):
                     "import json,os,shutil;print(json.dumps([shutil.which('gh'),os.environ['TJ_AGENT'],os.environ['GH_CONFIG_DIR']]))"],
                     env=environment, capture_output=True, text=True, timeout=10)
                 self.assertEqual(0, result.returncode, result.stderr)
-                self.assertEqual([str(shim), "1", isolated], json.loads(result.stdout))
+                resolved, flag, configuration = json.loads(result.stdout)
+                self.assertIsNotNone(resolved)
+                self.assertEqual(shim, Path(resolved))
+                self.assertEqual(["1", isolated], [flag, configuration])
 
     def test_installed_package_resources_and_custom_profile_are_portable(self):
         package = (Path(self.temp.name) / "installed package £").resolve()
