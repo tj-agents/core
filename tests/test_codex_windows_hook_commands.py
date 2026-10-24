@@ -22,7 +22,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
                 names.append(script)
                 self.assertEqual(budget, 12)
                 self.assertEqual(hook["timeout"] - budget, 3)
-        self.assertCountEqual(names, ["git_auth_scope_gate.py"])
+        self.assertCountEqual(names, ["git_auth_scope_gate.py", "delivery_binding_gate.py"])
 
     def test_every_plugin_uses_host_expanded_plugin_root_and_pretool_adapter(self):
         for name in ("base", "engineering", "machine"):

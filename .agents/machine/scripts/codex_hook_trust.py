@@ -4,13 +4,14 @@ import argparse
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import queue
 import re
 import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import threading
 import time
 
@@ -125,6 +126,28 @@ def source_package(plugin, cwd, published=None):
     if marketplace.get("sourceType") != "git" or not repository or repository[0] != TRUSTED_OWNER:
         return None
     source = plugin.get("source", {})
+    if source.get("source") == "git-subdir":
+        publisher = github_repository(source.get("url"))
+        relative = source.get("path")
+        ref = source.get("sha") or source.get("ref") or "main"
+        if (
+            not publisher or publisher[0] != TRUSTED_OWNER
+            or not isinstance(relative, str) or not relative or "\\" in relative
+            or PurePosixPath(relative).is_absolute() or ".." in PurePosixPath(relative).parts
+            or not isinstance(ref, str) or not ref or ref.startswith("-")
+        ):
+            raise RuntimeError(f"Invalid published plugin source: {plugin['pluginId']}")
+        key = (publisher, ref, relative)
+        published = {} if published is None else published
+        if key not in published:
+            with tempfile.TemporaryDirectory(prefix="tj-agents-hook-source-") as directory:
+                root = Path(directory)
+                run(["git", "init", "--quiet", str(root)], cwd)
+                run(["git", "-C", str(root), "fetch", "--depth=1",
+                     f"https://github.com/{publisher[0]}/{publisher[1]}.git", ref], cwd)
+                revision = run(["git", "-C", str(root), "rev-parse", "FETCH_HEAD"], cwd)
+                published[key] = committed_files(root, revision, relative, cwd)
+        return published[key]
     if source.get("source") != "local" or not source.get("path"):
         return None
     path = Path(source["path"]).resolve(strict=True)
@@ -233,7 +256,9 @@ def trust_updates(inventory, entries, cwd, verified_roots=None):
                     raise RuntimeError(f"Installed plugin differs from its Git source: {identity}")
                 verified.add((identity, package))
             key, current_hash = hook["key"], hook["currentHash"]
-            if not key.startswith(identity + ":") or not re.fullmatch(r"sha256:[0-9a-f]{64}", current_hash):
+            if not key.startswith(identity + ":") or not re.fullmatch(
+                r"sha256:[0-9a-f]{64}(?:/sha256:[0-9a-f]{64})?", current_hash
+            ):
                 raise RuntimeError(f"Invalid native hook identity: {identity}")
             updates[key] = {"trusted_hash": current_hash}
     return updates
