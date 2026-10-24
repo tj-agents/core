@@ -9,6 +9,42 @@ execution/session state; Machine observes and operates native hosts; Engineering
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
 
+## Required setup on every machine
+
+Installing the plugins or cloning this repository does **not** complete machine setup. From a current
+primary Core checkout, run the full setup on each PC before relying on automatic plugin refresh:
+
+```powershell
+# Windows, from the Core checkout
+./setup.ps1
+./setup.ps1 --check
+```
+
+```bash
+# Linux, from the Core checkout
+./setup.sh
+./setup.sh --check
+```
+
+Both commands must finish successfully. A permissions-only `--step` run is a scoped repair, not full
+setup. Full setup owns the event channel, publisher configuration, launch runtime, shell profiles and
+catch-up. Wrapper files alone do not prove the event channel is configured.
+
+Open a fresh terminal so its profile loads. In PowerShell, `Get-Command claude,codex` must resolve the
+managed functions; in bash/zsh, `type claude codex` must show the managed shell functions. Verify the
+installed launch check without starting an agent, from a repository that selects its standards:
+
+```powershell
+python -B "$HOME/.agents-state/bin/launch_check.py" --host codex --project (Get-Location).Path
+python -B "$HOME/.agents-state/bin/launch_check.py" --host claude --project (Get-Location).Path
+```
+
+On Linux, use `python3` and `--project "$PWD"`. Setup is complete only when the full `--check` exits zero,
+both fresh-terminal launch checks succeed, and required hooks execute successfully. A version string or
+an `unconfigured` update check is not completion evidence. If setup or verification fails, keep ordinary
+work blocked, diagnose the failed step and rerun the supported setup; do not silently continue on stale
+machine state. [Machine setup and updates](#machine-setup-and-updates) explains the owned steps and scope.
+
 `engineering:skill-authoring` owns skill selection triggers, names, and sizing; the
 [`template:check` validator](https://github.com/tj-agents/template) owns required skill content and layout
 validation. `engineering:docs` owns the generic guidance-writing convention.
@@ -236,12 +272,8 @@ For example, a saved `guardian-approvals` mode must not keep new chats restricte
 Native settings: [Codex](https://developers.openai.com/codex/config-reference/),
 [Claude Code](https://code.claude.com/docs/en/permissions).
 
-Run once per machine. Rerunning setup converges on the same channel and launch configuration:
-
-```text
-./setup.ps1          # Windows (PowerShell)
-./setup.sh           # Linux (bash and python3)
-```
+Follow [Required setup on every machine](#required-setup-on-every-machine) for the full installation and
+fresh-terminal verification. Rerunning setup converges on the same channel and launch configuration.
 
 Repeat `--step` to select existing setup steps for a scoped repair. They retain their declared order
 and always include required preconditions. Selecting shell profiles also includes their launch-check
@@ -364,9 +396,10 @@ Use `machine:plugin-selection` to commit `.agents/plugins.json`, `.claude/settin
 `enabledPlugins`. Codex declares `[marketplaces]` and `[plugins]` in trusted project configuration.
 Native admission, installation, credentials and caches remain host responsibilities.
 
-Handoff, open and recovery launchers start the native CLI without refreshing plugins, generating
-packages or rewriting host configuration. They retain handoff startup acknowledgement and recovery
-pickup verification. Running sessions retain the instructions they already loaded.
+Shell, handoff, open and recovery launchers use the shared launch check before starting the native CLI.
+They do not independently generate packages or rewrite repository configuration. Handoff startup
+acknowledgement and recovery pickup verification remain separate from refresh and required-hook
+readiness. Running sessions retain the instructions and hook definitions they already loaded.
 
 On Codex 0.163.0-alpha.1, declarations make a plugin discoverable but do not install it in an empty
 profile. `codex plugin add <plugin>@<marketplace>` installs the native cache and writes a user enabled
