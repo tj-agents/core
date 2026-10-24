@@ -391,7 +391,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:76348e29adbdaef8437d88d6cb8b89c0b652a132513e0d8f00e85015522c8de9",
+      "digest": "sha256:f9df3ee5899efc093424ee65aad41df00cf6d84cd760da6a5061e71f2b5ad250",
       "harness": {
         "marketplaces": [
           {
@@ -409,6 +409,13 @@
         "hooks": [
           {
             "path": ".agents/engineering/policy/session/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/delivery_binding_gate.py",
             "hosts": [
               "claude",
               "codex"
@@ -454,7 +461,11 @@
             "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
             "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)"
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)"
           ],
           "codex_prefix_rules": [
             {
@@ -594,6 +605,36 @@
                   "C:/repo"
                 ]
               ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
+                ],
+                "-B",
+                "${PLUGIN_ROOT}/workflows/pr_body.py",
+                "--body-file"
+              ],
+              "justification": "Reads a proposed PR description and rejects missing or empty What and Why sections before any forge write; no repository or remote state changes",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/workflows/pr_body.py",
+                  "--body-file",
+                  "body.md"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/workflows/pr_body.py"
+                ]
+              ]
             }
           ],
           "auto_merge": {
@@ -696,7 +737,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:9602f786bfef095411ef0b5df8940b82a832c20d23f31b226071532dd63e9d6e",
+      "digest": "sha256:2ed979e377444292473a996c4b39935423f0fe84bf87482aa706e97199750848",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
