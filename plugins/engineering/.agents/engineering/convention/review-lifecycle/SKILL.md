@@ -21,8 +21,7 @@ The strong parent finalizes an ordinary review with `review-record --descriptor 
 host coverage, then atomically writes a Git-private receipt binding repository, checkout, branch, exact
 head, descriptor identity and body hash. Editing the body invalidates that receipt until a reviewed pass
 is completed again. All merge and delivery readers use the same resolver; invalid private evidence never
-falls back to a committed or local durable file. Legacy durable evidence remains readable during migration.
-Private proof requires the exact head; legacy review-only transport compatibility does not extend it.
+falls back to a committed or local durable file. Private proof requires the exact head.
 
 The strong parent is the sole writer. Native review and fresh lenses return candidate evidence only. They
 never edit the file, assign final severity, approve the change, or see one another's conclusions.

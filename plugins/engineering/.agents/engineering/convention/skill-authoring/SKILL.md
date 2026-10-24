@@ -58,15 +58,15 @@ and checklists with the skill they support.
 
 A public name is a lowercase hyphenated word or phrase naming the subject an agent has in mind when it
 needs the skill, not the mechanism inside it. Generation enforces the syntax and rejects an exact
-duplicate within the repository; core's generator also rejects two names equal once their hyphens are
-removed.
+duplicate within one plugin; core's generator also rejects two names in one plugin equal once their
+hyphens are removed.
 
-Before choosing a name, check this repository's skills and every installed plugin on both hosts for the
-same bare name and for a near miss: a plural, a reordered phrase, or a name that differs only by hyphens.
-Generation sees only this repository's plugins, and no generator catches every near miss. Choose a
-different name for an exact match or a near miss. Where a bare name is already shared with another
-publisher, write the qualified `plugin:name` in every reference to it, because a bare name may select the
-other plugin's skill.
+The same subject in another plugin's context keeps the same bare name, such as `workflow:session` and
+`engineering:session`. Otherwise, before choosing a name, check this repository's skills and every
+installed plugin on both hosts for the same bare name and for a near miss: a plural, a reordered phrase,
+or a name that differs only by hyphens. No generator catches every near miss. Choose a different name for
+an unrelated exact match or a near miss. Write the qualified `plugin:name` in every reference to a shared
+bare name, because a bare name may select the other plugin's skill.
 
 ## Mirror a host's native command
 

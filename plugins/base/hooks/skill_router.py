@@ -101,15 +101,6 @@ TIER_SKILL_DIRS = []
 VERIFIED_PLUGIN_ROOTS = {}
 SUBAGENT_ID = re.compile(r"[A-Za-z0-9_-]+")
 GIT_BASH_DRIVE = re.compile(r"^/([A-Za-z])/(.*)$")
-# A rename moves a skill between plugins; the qualified name in a route, a plan or a habit does not move
-# with it. `.agents/plugins/compatibility.json` already records every such move - it simply had no
-# reader, which is how the base: -> engineering: reorganisation made `base:review-lifecycle` resolve
-# nowhere and deadlocked the very route that demanded it. Packaged beside this file; one level up in the
-# source tree.
-ALIAS_CANDIDATES = (
-    Path(__file__).resolve().parent / "compatibility.json",
-    Path(__file__).resolve().parent.parent / "plugins" / "compatibility.json",
-)
 REMOTE_URL = re.compile(r'\[remote "origin"\][^\[]*?\burl\s*=\s*([^\r\n]+)', re.DOTALL)
 # Lowercased, because the two harnesses do not agree on casing or on names. Claude writes through
 # Write/Edit/MultiEdit/NotebookEdit; Codex writes through apply_patch, and matching only Claude's
@@ -229,19 +220,11 @@ def discovery_diagnostic(error):
           file=sys.stderr)
 
 
-def active_harness(tool_name, data, explicit_harness=None):
+def active_harness(tool_name, harness):
     lowered = tool_name.lower()
     if lowered not in WRITE_TOOLS:
         return None
-    if explicit_harness is not None:
-        return explicit_harness
-    if lowered == "bash" and data.get("turn_id"):
-        return "codex"
-    if lowered in CLAUDE_WRITE_TOOLS:
-        return "claude"
-    if lowered in CODEX_WRITE_TOOLS:
-        return "codex"
-    return None
+    return harness
 
 
 def skill_search_dirs(harness):
@@ -592,29 +575,6 @@ def plugin_of(skills_dir):
 PROOF_ANCHOR_BYTES = 400
 
 
-@functools.lru_cache(maxsize=1)
-def skill_aliases():
-    """Superseded plugin-qualified skill name -> its current name.
-
-    Unreadable or absent resolves to no aliases, never to an error: an alias is a recovery path for a
-    name that would otherwise resolve nowhere, so losing it can only restore today's behaviour.
-    """
-    for candidate in ALIAS_CANDIDATES:
-        try:
-            data = json.loads(candidate.read_text(encoding="utf-8-sig"))
-        except (OSError, ValueError):
-            continue
-        skills = data.get("skills") if isinstance(data, dict) else None
-        if not isinstance(skills, dict):
-            continue
-        return {
-            superseded: current
-            for superseded, current in skills.items()
-            if isinstance(superseded, str) and isinstance(current, str) and superseded != current
-        }
-    return {}
-
-
 def _readable_skill(bare, harness, wanted_plugin):
     """Find a readable skill in the selected plugin, or the nearest unqualified copy."""
     first = None
@@ -635,7 +595,7 @@ def _readable_skill(bare, harness, wanted_plugin):
     return first
 
 
-def resolved_skill(name, harness, following_alias=False):
+def resolved_skill(name, harness):
     """The installed skill file and body, or ``None`` when it cannot be read.
 
     The FIRST readable copy wins, deliberately: nearest delivery answers, and every later root holds a
@@ -650,27 +610,7 @@ def resolved_skill(name, harness, following_alias=False):
     home, which is every utility and every route that names only one side.
     """
     wanted_plugin, _, bare = name.rpartition(":")
-    discovery_error = None
-    try:
-        found = _readable_skill(bare, harness, wanted_plugin)
-    except NativePluginDiscoveryError as error:
-        discovery_error = error
-        found = None
-    if found is not None:
-        return found
-    current = None if following_alias else skill_aliases().get(name)
-    if current:
-        try:
-            aliased = resolved_skill(current, harness, True)
-        except NativePluginDiscoveryError:
-            if discovery_error is None:
-                raise
-        else:
-            if aliased is not None:
-                return aliased
-    if discovery_error is not None:
-        raise discovery_error
-    return None
+    return _readable_skill(bare, harness, wanted_plugin)
 
 
 def invocable_name(name, skill_path):
@@ -1448,9 +1388,9 @@ def main():
     if "--harness" in sys.argv[1:]:
         index = sys.argv.index("--harness")
         explicit_harness = sys.argv[index + 1] if len(sys.argv) > index + 1 else None
-        if explicit_harness not in {"claude", "codex"}:
-            print("SKILL ROUTER - --harness requires claude or codex", file=sys.stderr)
-            sys.exit(2)
+    if explicit_harness not in {"claude", "codex"}:
+        print("SKILL ROUTER - --harness requires claude or codex", file=sys.stderr)
+        sys.exit(2)
 
     try:
         data = json.load(sys.stdin)
@@ -1460,7 +1400,7 @@ def main():
     tool_name = data.get("tool_name")
     if not isinstance(tool_name, str):
         sys.exit(0)
-    harness = active_harness(tool_name, data, explicit_harness)
+    harness = active_harness(tool_name, explicit_harness)
     if harness is None:
         sys.exit(0)
 

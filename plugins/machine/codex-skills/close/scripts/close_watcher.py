@@ -97,11 +97,18 @@ def transcript_verdict(args):
     return verdict
 
 
+def superseded(args):
+    record = session_close.read_json(armed_path(args.session_id)) or {}
+    return record.get("armed_at") not in (None, args.armed_at)
+
+
 def wait_for_idle(args, clock=time.time, sleep=time.sleep):
-    """Return the idle turn's activity token, or None when the close is cancelled."""
+    """Return the idle turn's activity token, or None when the close is cancelled or re-armed."""
     deadline = clock() + args.timeout
     stopped, since, settled = None, None, None
     while clock() < deadline:
+        if superseded(args):
+            return None
         if not session_close.verified_live(args.pid, args.pid_started_at):
             return None
         row = session_row(args)
@@ -165,6 +172,10 @@ def outcome_path(session_id):
     return session_close.state_directory() / "session-close" / (session_id + ".json")
 
 
+def armed_path(session_id):
+    return session_close.state_directory() / "session-close" / (session_id + ".armed.json")
+
+
 def main(argv=None):
     args = arguments(argv)
     if args.state_directory:
@@ -180,6 +191,8 @@ def main(argv=None):
             status = "closed"
     except (OSError, ValueError, RuntimeError, sqlite3.Error) as error:
         status = "refused: " + str(error)
+    if status == "cancelled" and superseded(args):
+        return 0
     session_close.write_json(outcome_path(args.session_id), {"status": status, "at": time.time()})
     if status == "closed":
         sweep(args)

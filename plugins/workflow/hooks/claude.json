@@ -1,0 +1,44 @@
+{
+  "description": "Workflow session lifecycle: close the session when owned work is finished.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
+              "--deadline",
+              "10",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/workflow/policy/session/scripts/session-context.py"
+            ]
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
+              "--deadline",
+              "10",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/workflow/policy/session/scripts/session-context.py",
+              "--prompt"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

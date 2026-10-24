@@ -12,7 +12,6 @@ AUTHORIZATION_KEYS = {
     "always_stop_paths",
     "hold_label",
     "authorized_stop_classes",
-    "auto_merge",
 }
 
 
@@ -86,12 +85,10 @@ def validate(policy):
         raise PolicyViolation(
             "`authorized_stop_classes` requires auto or merge standing authorization"
         )
-    if "auto_merge" in policy and type(policy["auto_merge"]) is not bool:
-        raise PolicyViolation("`auto_merge` must be a boolean when present")
     return policy
 
 
-def load_legacy_policy(root):
+def load_policy(root):
     path = Path(root) / ".agents" / "delivery-authorization.json"
     try:
         path.lstat()
@@ -108,7 +105,5 @@ def load_legacy_policy(root):
     return validate(policy)
 
 
-def auto_merge_preference(root, policy):
-    if policy is not None:
-        validate(policy)
-    return _configuration_reader().auto_merge(root, policy)
+def auto_merge_preference(root):
+    return _configuration_reader().auto_merge(root)

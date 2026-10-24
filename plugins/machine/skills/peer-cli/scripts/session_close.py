@@ -17,7 +17,6 @@ from pathlib import Path
 import register_session
 
 
-RECEIPT_MAX_AGE_SECONDS = 3600.0
 IDENTITY_TOLERANCE_SECONDS = 2.0
 SUBPROCESS_TIMEOUT_SECONDS = 20
 DEFAULT_TIMEOUTS = {
@@ -376,18 +375,6 @@ def same_session_process(left, right):
     )
 
 
-def other_live_claimant(worktree, own_entry):
-    for _path, entry in entries():
-        if same_session_process(entry, own_entry):
-            continue
-        if not nonempty_string(entry.get("cwd")) or not under_or_equal(entry["cwd"], worktree):
-            continue
-        # Unknown inspection is not evidence that an attached session is dead.
-        if identity_status(entry.get("pid"), entry.get("pid_started_at")) not in {"exited", "reused"}:
-            return entry
-    return None
-
-
 def git(cwd, *arguments):
     try:
         result = subprocess.run(
@@ -404,87 +391,6 @@ def worktree_from_cwd(cwd=None):
     if code:
         raise Refusal("the current directory is not inside a Git worktree")
     return Path(output).resolve()
-
-
-def worktree_registrations(primary):
-    code, output, error = git(primary, "worktree", "list", "--porcelain")
-    if code:
-        raise Refusal("could not enumerate Git worktrees: " + error)
-    records = []
-    for block in output.split("\n\n"):
-        fields = {}
-        detached = False
-        for line in block.splitlines():
-            if line == "detached":
-                detached = True
-            elif " " in line:
-                key, value = line.split(" ", 1)
-                fields[key] = value
-        if fields.get("worktree"):
-            records.append({
-                "worktree": Path(fields["worktree"]).resolve(),
-                "head": fields.get("HEAD"),
-                "branch": fields.get("branch"),
-                "detached": detached,
-            })
-    if not records:
-        raise Refusal("Git returned no worktree registrations")
-    return records
-
-
-def matching_receipt(worktree):
-    best = None
-    directory = state_directory() / "merge-cleanup" / "receipts"
-    for path in directory.glob("*.json") if directory.is_dir() else ():
-        receipt = read_json(path)
-        if receipt and nonempty_string(receipt.get("worktree")) and path_key(receipt["worktree"]) == path_key(worktree):
-            recorded_at = receipt.get("recorded_at")
-            if not finite_positive(recorded_at):
-                continue
-            if best is None or recorded_at > best[1].get("recorded_at", 0):
-                best = path, receipt
-    if best is None:
-        raise Refusal("no cleanup_proof.py receipt recorded for this worktree")
-    return best[1]
-
-
-def fresh_removable_receipt(worktree):
-    receipt = matching_receipt(worktree)
-    required = ("worktree", "primary", "branch", "head", "default", "verdict", "recorded_at")
-    if any(not nonempty_string(receipt.get(key)) for key in required if key != "recorded_at"):
-        raise Refusal("the cleanup receipt is incomplete")
-    if receipt.get("verdict") != "removable":
-        raise Refusal("the cleanup receipt is not removable")
-    if (not finite_positive(receipt.get("recorded_at")) or
-            receipt["recorded_at"] > now() + IDENTITY_TOLERANCE_SECONDS or
-            now() - receipt["recorded_at"] > RECEIPT_MAX_AGE_SECONDS):
-        raise Refusal("the cleanup receipt is stale; run cleanup_proof.py again")
-    target = Path(worktree).resolve()
-    primary = Path(receipt["primary"]).resolve()
-    if path_key(receipt["worktree"]) != path_key(target):
-        raise Refusal("the cleanup receipt target no longer matches this worktree")
-    if target == primary:
-        raise Refusal("the primary checkout cannot be removed; use close.py")
-    if not primary.is_dir() or not target.is_dir():
-        raise Refusal("the cleanup receipt names a missing worktree or primary checkout")
-    records = worktree_registrations(primary)
-    if records[0]["worktree"] != primary:
-        raise Refusal("the cleanup receipt primary is not the main checkout")
-    matching = [record for record in records if record["worktree"] == target]
-    expected_ref = "refs/heads/" + receipt["branch"]
-    if (len(matching) != 1 or matching[0]["detached"]
-            or matching[0]["branch"] != expected_ref
-            or matching[0]["head"] != receipt["head"]):
-        raise Refusal("the cleanup target is not the registered receipt worktree")
-    code, head, _ = git(target, "rev-parse", "HEAD")
-    branch_code, branch, _ = git(target, "symbolic-ref", "--quiet", "--short", "HEAD")
-    if code or branch_code or head != receipt.get("head") or branch != receipt.get("branch"):
-        raise Refusal("worktree HEAD/branch no longer match the cleanup receipt")
-    return receipt
-
-
-def observer_path():
-    return Path(__file__).with_name("finish_reaper.py")
 
 
 def scheduler_diagnostic(completed):

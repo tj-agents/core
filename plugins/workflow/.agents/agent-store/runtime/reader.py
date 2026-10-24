@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 WORK_ITEM_STATUSES = ("proposed", "active", "blocked", "paused", "delivery-gated", "done")
-SUPPORTED_SCHEMA_VERSIONS = frozenset({2, 3, 4})
+SCHEMA_VERSION = 4
 
 
 class StoreReadError(ValueError):
@@ -25,7 +25,7 @@ class ReadOnlyWorkItemStore:
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA query_only = ON")
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version not in SUPPORTED_SCHEMA_VERSIONS:
+            if version != SCHEMA_VERSION:
                 raise StoreReadError(f"work-item session store has unsupported schema version {version}")
             tables = {
                 row[0]
@@ -38,9 +38,8 @@ class ReadOnlyWorkItemStore:
             required = {
                 "work_items": {"key", "status", "pr"},
                 "sessions": {"handle", "repo", "branch", "cwd", "work_item", "role", "ended_at"},
+                "work_item_references": {"provider", "scope", "native_id", "work_item"},
             }
-            if version == 4:
-                required["work_item_references"] = {"provider", "scope", "native_id", "work_item"}
             for table, columns in required.items():
                 available = {
                     row[1]
@@ -111,7 +110,7 @@ class ReadOnlyWorkItemStore:
                 sessions = connection.execute(
                     "SELECT * FROM sessions WHERE work_item = ? ORDER BY handle", (execution_key,)
                 ).fetchall()
-                references = self._references(connection, version, "WHERE work_item = ?", (execution_key,))
+                references = self._references(connection, "WHERE work_item = ?", (execution_key,))
             elif repository is not None:
                 work_items = connection.execute(
                     "SELECT * FROM work_items WHERE repo = ? ORDER BY key", (repository,)
@@ -124,7 +123,7 @@ class ReadOnlyWorkItemStore:
                         (repository, *keys),
                     ).fetchall()
                     references = self._references(
-                        connection, version, f"WHERE work_item IN ({placeholders})", keys,
+                        connection, f"WHERE work_item IN ({placeholders})", keys,
                     )
                 else:
                     sessions = connection.execute(
@@ -134,7 +133,7 @@ class ReadOnlyWorkItemStore:
             else:
                 work_items = connection.execute("SELECT * FROM work_items ORDER BY key").fetchall()
                 sessions = connection.execute("SELECT * FROM sessions ORDER BY handle").fetchall()
-                references = self._references(connection, version)
+                references = self._references(connection)
             return {
                 "schema_version": version,
                 "state_kind": "recorded",
@@ -149,9 +148,7 @@ class ReadOnlyWorkItemStore:
             connection.close()
 
     @staticmethod
-    def _references(connection, version, clause="", arguments=()):
-        if version < 4:
-            return []
+    def _references(connection, clause="", arguments=()):
         return connection.execute(
             "SELECT provider, scope, native_id, work_item FROM work_item_references "
             f"{clause} ORDER BY provider, scope, native_id",

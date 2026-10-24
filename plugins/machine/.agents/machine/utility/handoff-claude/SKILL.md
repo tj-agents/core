@@ -139,3 +139,8 @@ This is an unmanaged handoff. Do not invoke Agent Workboard, pass Workboard toke
 Workboard state, or imply that the new window will checkpoint workflow status.
 
 Open only one Claude tab per requested handoff. After launch, report the target checkout and prompt file.
+
+When the handoff's purpose is to verify or test something rather than to hand off a user-facing task, the
+written prompt must instruct the spawned session to `SendMessage` its result back to the launching session
+as its last step, before any close. An unmanaged handoff with no return channel otherwise leaves the
+verification's outcome unread by anyone.
