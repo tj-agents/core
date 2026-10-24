@@ -30,13 +30,11 @@ for (;;) {
 }
 ```
 
-Use only the current surface's documented background-cell syntax and keep the relay awaited. Do not
-infer idle-turn wake from these API names or from output collected with `functions.wait`; apply the
-shared notification acceptance condition. Standalone Codex CLI does not inherit this surface's tools.
-Native async hook output and the CLI's outbound `notify` setting do not start an idle conversation turn.
-An existing exact-thread app-server connection can use `machine:followup-codex` only within that utility's
-identity, authorization and delivery-verification contract. Queue submission alone is not notification
-acceptance; do not start a daemon, resume a session or change host configuration to invent a route.
+Use the current surface's documented background-cell syntax and keep the relay awaited. A native
+background completion event returns the compact result to this conversation; report the next gate and
+let the user's normal Codex notification settings handle the alert. Standalone CLI surfaces do not
+inherit hosted tool APIs. If no completion-notification primitive is available, apply the shared
+capability result; a separately scheduled child does not supply that callback.
 
 ## Durable work after this conversation
 
