@@ -171,7 +171,7 @@ def observe(state, binding, observer=None):
         return {"kind": "actionable" if state.get("next_action") else "pending",
                 "next_action": state.get("next_action", "")}
     args = observer or ["gh", "pr", "view", str(binding["pr"]), "--repo", binding["repo"],
-                        "--json", "number,headRefOid,headRefName,state,statusCheckRollup,url"]
+                        "--json", "number,headRefOid,headRefName,state,statusCheckRollup,reviewDecision,autoMergeRequest,url"]
     value = json.loads(command(args, state["worktree"]))
     if (value.get("number") != binding["pr"] or value.get("headRefOid") != binding["head"]
             or value.get("headRefName") != binding["branch"]
@@ -182,9 +182,11 @@ def observe(state, binding, observer=None):
         raise Gate("pull-request-closed-without-merge")
     if value.get("state") not in {"OPEN", "MERGED"}:
         raise Gate("forge-state-unsupported")
-    kind = "failure" if failures else "pending" if pending else "ready"
+    kind = "merged" if value["state"] == "MERGED" else "failure" if failures else "pending" if pending else "ready"
     return {"kind": kind, "pr_state": value["state"], "failures": failures,
             "pending": pending, "head": binding["head"],
+            "review_decision": value.get("reviewDecision"),
+            "auto_merge": value.get("autoMergeRequest") is not None,
             "checks": sorted(value.get("statusCheckRollup") or [], key=lambda item: json.dumps(item, sort_keys=True)),
             "delivery": {key: binding.get(key) for key in
                          ("pending_evidence", "review", "merge_authorization", "completion_condition")}}
@@ -388,7 +390,9 @@ def launch(path, state, binding, evidence, executable):
               "For a PR, load persistent-delivery and honor its review/evidence/authority decisions. "
               "The supervisor already owns the writer and scheduler; do not recursively initialize, "
               "claim, register or wake this owner. Preserve user host safeguards. "
-              "Do not claim same-chat continuation. Stop at an actual authority or human decision gate.")
+              "Do not claim same-chat continuation. Stop at an actual authority or human decision gate. "
+              "An authorized auto-merge request waiting for a required GitHub review remains waiting; "
+              "retain its binding and scheduler, then finish authorized post-merge work when it merges.")
     args = lane_command(state, prompt, executable)
     state.update(launch_nonce=nonce, launches=state["launches"] + 1, result_path=str(result),
                  child_path=str(child_path))

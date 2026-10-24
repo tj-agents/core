@@ -63,7 +63,13 @@ def exact_local_identity(root, binding):
 def green_exact_head(value, head):
     if str(value.get("state", "")).lower() != "open" or value.get("isDraft") is not False:
         raise AutoMergeError("PR is not open and ready")
-    if str(value.get("mergeStateStatus", "")).lower() != "clean":
+    merge_state = str(value.get("mergeStateStatus", "")).upper()
+    awaiting_review = (
+        merge_state == "BLOCKED"
+        and value.get("reviewDecision") == "REVIEW_REQUIRED"
+        and value.get("mergeable") == "MERGEABLE"
+    )
+    if merge_state != "CLEAN" and not awaiting_review:
         raise AutoMergeError("PR base is not eligible for merge")
     if value.get("headRefOid") != head:
         raise AutoMergeError("PR head does not match the binding")
