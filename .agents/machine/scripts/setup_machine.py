@@ -887,6 +887,8 @@ def configure_publishers(topic: str, repositories, api=machine_events.gh, secret
         if repository.get("isArchived") or repository.get("isFork"):
             continue
         name = repository["nameWithOwner"]
+        if isinstance(name, str) and name.lower() == "tj-agents/company":
+            continue
         if not machine_events.valid_repository(name):
             raise ValueError("Unsupported publisher repository")
         endpoint = f"repos/{name}/actions/variables"
@@ -992,7 +994,15 @@ def stale_repositories(context: Context) -> list[str]:
 
 
 def check_catch_up(context: Context) -> list[str]:
-    return [f"catch up {name}" for name in stale_repositories(context)]
+    stale = stale_repositories(context)
+    for current in publisher_repositories(context):
+        name = current.get("nameWithOwner")
+        if (current.get("isArchived") or current.get("isFork") or not current.get("defaultBranchRef")
+                or not machine_events.valid_repository(name) or not current.get("policy")):
+            continue
+        if machine_events.reconcile_policy(name, check_only=True) and name not in stale:
+            stale.append(name)
+    return [f"catch up {name}" for name in stale]
 
 
 def apply_catch_up(context: Context) -> list[str]:

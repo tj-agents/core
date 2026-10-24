@@ -23,8 +23,7 @@ def current(repository="tj-agents/core", revision="a", policy="policy", marketpl
 
 class HintTests(unittest.TestCase):
     def test_only_valid_repo_hints_are_accepted(self):
-        for message in ({"v": 1, "repo": "other/repo"}, {"v": 1, "repo": "tj-agents/../x"},
-                        {"v": True, "repo": "tj-agents/core"}, [], "garbage"):
+                        {"v": 1, "repo": "tj-agents/../x"}, {"v": True, "repo": "tj-agents/core"}, [], "garbage"):
             self.assertIsNone(events.parse_hint({"event": "message", "message": json.dumps(message)}))
         message = {"v": 1, "repo": "tj-agents/core", "policy": {"agents_may_merge": True}, "command": "evil"}
         self.assertEqual("tj-agents/core", events.parse_hint({"event": "message", "message": json.dumps(message)}))
@@ -44,6 +43,32 @@ class ReconcileTests(unittest.TestCase):
         self.policy.assert_called_once_with("tj-agents/core")
         self.reconciler.repository(current(revision="b", policy="new-policy", marketplace=False))
         self.assertEqual(2, self.policy.call_count)
+
+    def test_catch_up_reconciles_unchanged_policies_and_keeps_hint_deduplication(self):
+        self.reconciler.repository(current())
+        self.policy.reset_mock()
+        self.refresh.reset_mock()
+
+        self.assertEqual([], self.reconciler.catch_up([current()]))
+        self.assertEqual([], self.reconciler.catch_up([current(revision="b")]))
+        self.reconciler.repository(current(revision="b"))
+
+        self.assertEqual([mock.call("tj-agents/core"), mock.call("tj-agents/core")], self.policy.call_args_list)
+        self.assertEqual(2, self.refresh.call_count)
+        self.assertEqual("b", self.reconciler.state["tj-agents/core"]["revision"])
+
+    def test_catch_up_ignores_ineligible_and_undeclared_policies(self):
+        rows = [current("tj-agents/company"), current("employer/project"),
+                current("tj-agents/undeclared", policy=None), current("tj-agents/archived"),
+                current("tj-agents/fork"), current("tj-agents/empty")]
+        rows[3]["isArchived"] = True
+        rows[4]["isFork"] = True
+        rows[5]["defaultBranchRef"] = None
+
+        self.assertEqual([], self.reconciler.catch_up(rows))
+
+        self.policy.assert_not_called()
+        self.assertEqual(["tj-agents/undeclared"], list(self.reconciler.state))
 
     def test_a_revision_change_with_an_unchanged_catalog_never_refreshes(self):
         self.reconciler.repository(current())
@@ -96,13 +121,39 @@ class ReconcileTests(unittest.TestCase):
                 self.assertEqual(0, events.main(["--repo", "tj-agents/core", "--state-directory", directory]))
                 self.assertEqual(0, events.main(["--state-directory", directory]))
         cleanup.assert_not_called()
-        self.policy.assert_called_once_with("tj-agents/core")
+        self.assertEqual([mock.call("tj-agents/core"), mock.call("tj-agents/core")], self.policy.call_args_list)
         self.assertEqual(2, self.refresh.call_count)
 
     def bind(self, reconciler, state=None, refresh=None, policy=None):
         reconciler.state = state if state is not None else {}
         reconciler.refresh = self.refresh
         reconciler.policy = self.policy
+
+    def test_explicit_repository_reconciles_again_at_the_same_revision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                mock.patch.dict(os.environ),
+                mock.patch.object(events, "RotatingFileHandler", return_value=logging.NullHandler()),
+                mock.patch.object(events, "require_tommy"),
+                mock.patch.object(events, "repository_state", return_value=current()),
+                mock.patch.object(events.Reconciler, "__init__", autospec=True, side_effect=self.bind),
+            ):
+                arguments = ["--repo", "tj-agents/core", "--state-directory", directory]
+                self.assertEqual(0, events.main(arguments))
+                self.assertEqual(0, events.main(arguments))
+        self.assertEqual([mock.call("tj-agents/core"), mock.call("tj-agents/core")], self.policy.call_args_list)
+        self.refresh.assert_called_once_with()
+
+    def test_excluded_repository_fails_before_github_access(self):
+        with mock.patch.object(events, "require_tommy") as identity, \
+                mock.patch.object(events, "repository_state") as repository:
+            with self.assertRaisesRegex(ValueError, "Unsupported repository"):
+                events.main(["--repo", "tj-agents/company"])
+        identity.assert_not_called()
+        repository.assert_not_called()
+        api = mock.Mock()
+        with self.assertRaisesRegex(ValueError, "Unsupported repository"):
+        api.assert_not_called()
 
     def test_plugin_refresh_keeps_the_generic_updater_cleanup_disabled(self):
         with mock.patch.object(events.plugins, "main", return_value=0) as update:
@@ -138,6 +189,24 @@ class ReconcileTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.reconciler.repository(current())
         self.assertEqual({}, self.reconciler.state)
+
+
+class PolicyCheckTests(unittest.TestCase):
+    def test_check_reports_only_exit_one_as_drift_and_never_requests_apply(self):
+        for returncode, expected in ((0, False), (1, True)):
+            with self.subTest(returncode=returncode):
+                run = mock.Mock(return_value=subprocess.CompletedProcess([], returncode, "", ""))
+                with mock.patch.object(events, "policy_script", return_value=Path("/installed/merge_policy.py")):
+                    self.assertIs(expected, events.reconcile_policy("tj-agents/core", run=run, check_only=True))
+                self.assertEqual(["reconcile", "--repo", "tj-agents/core", "--check"], run.call_args.args[0][-4:])
+
+    def test_policy_errors_fail_checks_and_apply(self):
+        for check_only, returncode in ((True, 2), (True, 3), (False, 1)):
+            with self.subTest(check_only=check_only, returncode=returncode):
+                run = mock.Mock(return_value=subprocess.CompletedProcess([], returncode, "", "policy unavailable"))
+                with mock.patch.object(events, "policy_script", return_value=Path("/installed/merge_policy.py")):
+                    with self.assertRaisesRegex(RuntimeError, "policy unavailable"):
+                        events.reconcile_policy("tj-agents/core", run=run, check_only=check_only)
 
 
 class IdentityTests(unittest.TestCase):
@@ -206,6 +275,18 @@ class SetupTests(unittest.TestCase):
         secret.assert_called_once_with("tj-agents/new", "a" * 48)
         self.assertEqual("POST", api.call_args.args[0][1])
         self.assertEqual("repos/tj-agents/new/actions/variables", api.call_args.args[0][2])
+
+    def test_work_repository_is_excluded_from_publisher_configuration(self):
+        api = mock.Mock()
+        secret = mock.Mock()
+        for dry_run in (False, True):
+            with self.subTest(dry_run=dry_run):
+                self.assertEqual(0, setup.configure_publishers(
+        api.assert_not_called()
+        secret.assert_not_called()
+        with self.assertRaisesRegex(ValueError, "Unsupported publisher repository"):
+            setup.configure_publishers("a" * 48, [current("employer/project")], api=api, secret=secret)
+        api.assert_not_called()
 
     def test_existing_variable_is_migrated_to_a_topic_secret(self):
         api = mock.Mock(side_effect=[{"variables": [{"name": "MACHINE_EVENTS_TOPIC", "value": "a" * 48}]},

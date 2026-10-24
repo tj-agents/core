@@ -302,10 +302,12 @@ The same value is stored as an Actions secret for callers, so public run logs ma
 The topic is an untrusted public hint channel; it contains only repository names and change categories.
 No administrative GitHub credential is stored in Actions.
 
-Setup ends with one catch-up through `machine_events.py`, which re-reads GitHub and invokes the
-installed github-actions plugin's `merge-policy reconcile` for committed policy changes as Tommy's saved
-`gh` account. Install that plugin before setup. Launches do not reconcile merge policy; run
-`machine_events.py --repo <owner/name>` after a policy change.
+Setup checks declared merge policies against live GitHub state through the installed github-actions
+plugin's read-only `merge-policy reconcile --check`, including repositories whose default branch has
+not moved. Revision or policy drift triggers one catch-up through `machine_events.py`, which re-reads
+GitHub and reconciles every eligible declared policy as Tommy's saved `gh` account. Install that plugin
+before setup. Launches do not reconcile merge policy; `machine_events.py --repo <owner/name>` explicitly
+reconciles the repository even when its committed policy and revision are unchanged.
 
 A Codex upgrade first snapshots each installed hook package, so a running Codex session keeps calling the
 hooks it started with. Only packages whose hook loader still reads the cache first wait for running Codex
@@ -328,8 +330,10 @@ adopt the personal profile, generate project workflows or apply a merge policy t
 GitHub Actions. Running sessions retain their loaded instructions and hook snapshots.
 
 The personal event publishers and automatic ruleset reconciliation are restricted to `tj-agents`,
-`Concertable` and `tomjseery`. Hints request a GitHub re-read, and only a changed, committed
-`.github/merge-policy.json` can trigger that repository's ruleset reconciliation. Publisher adoption is
+`Concertable` and `tomjseery`, excluding `tj-agents/company`. Hints request a GitHub re-read and
+reconcile changed, committed `.github/merge-policy.json` declarations. Setup catch-up and explicit
+repository reconciliation also repair live drift when the declaration is unchanged. Repositories without
+a committed declaration receive no default policy. Publisher adoption is
 owned by [github-actions:machine-events](https://github.com/tj-agents/github-actions/blob/main/.agents/github-actions/utility/machine-events/SKILL.md);
 the policy writer also enforces its owner boundary before GitHub access.
 

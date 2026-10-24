@@ -662,6 +662,66 @@ class CatchUpTests(Machine):
         main.assert_called_once_with([])
         mark.assert_called_once_with()
 
+    def test_unchanged_revision_policy_drift_converges_through_one_catch_up(self):
+        state = self.home / ".agents-state" / "machine-events-state.json"
+        setup.plugin_autoupdate.write_json(state, {"tj-agents/core": {"revision": "a" * 40, "policy": "policy"}})
+        rows = [dict(self.rows[0], policy={"oid": "policy"})]
+        drift = True
+
+        def policy(repository, check_only=False):
+            self.assertTrue(check_only)
+            return drift
+
+        def catch_up(argv):
+            nonlocal drift
+            drift = False
+            return 0
+
+        with mock.patch.object(setup.machine_events, "catch_up_states", return_value=iter(rows)) as inventory, \
+                mock.patch.object(setup.machine_events, "reconcile_policy", side_effect=policy) as check, \
+                mock.patch.object(setup.machine_events, "main", side_effect=catch_up) as main, \
+                mock.patch.object(setup.launch_check, "mark_current", return_value=True):
+            self.converge(step("plugin and merge-policy catch-up"), self.context(windows=False))
+        inventory.assert_called_once()
+        main.assert_called_once_with([])
+        self.assertTrue(all(call == mock.call("tj-agents/core", check_only=True) for call in check.call_args_list))
+
+    def test_checks_cover_declared_policies_with_moved_and_current_revisions_only(self):
+        rows = [
+            dict(self.rows[0], policy={"oid": "policy"}),
+            {"nameWithOwner": "tj-agents/moved", "defaultBranchRef": {"target": {"oid": "b" * 40}},
+             "policy": {"oid": "policy"}},
+            dict(self.rows[0], nameWithOwner="tj-agents/undeclared"),
+            dict(self.rows[0], nameWithOwner="employer/project", policy={"oid": "policy"}),
+            dict(self.rows[0], nameWithOwner="tj-agents/fork", isFork=True, policy={"oid": "policy"}),
+            dict(self.rows[1], policy={"oid": "policy"}),
+            dict(self.rows[2], policy={"oid": "policy"}),
+        ]
+        saved = {name: {"revision": "a" * 40} for name in ("tj-agents/core", "tj-agents/undeclared")}
+        setup.plugin_autoupdate.write_json(self.home / ".agents-state" / "machine-events-state.json", saved)
+        before = snapshot(self.root)
+        with mock.patch.object(setup.machine_events, "catch_up_states", return_value=iter(rows)), \
+                mock.patch.object(setup.machine_events, "reconcile_policy", side_effect=[False, True]) as policy, \
+                mock.patch.object(setup.machine_events, "main") as apply:
+            self.assertEqual(["catch up tj-agents/moved"], setup.check_catch_up(self.context(windows=False)))
+        self.assertEqual([mock.call("tj-agents/core", check_only=True), mock.call("tj-agents/moved", check_only=True)],
+                         policy.call_args_list)
+        apply.assert_not_called()
+        self.assertEqual(before, snapshot(self.root))
+
+    def test_policy_check_failure_fails_setup_without_applying(self):
+        rows = [dict(self.rows[0], policy={"oid": "policy"})]
+        for check_only in (False, True):
+            with self.subTest(check_only=check_only):
+                err = io.StringIO()
+                with mock.patch.object(setup.machine_events, "catch_up_states", return_value=iter(rows)), \
+                        mock.patch.object(setup.machine_events, "reconcile_policy", side_effect=RuntimeError("policy unavailable")), \
+                        mock.patch.object(setup.machine_events, "main") as apply:
+                    self.assertEqual(2, setup.run_steps([step("plugin and merge-policy catch-up")],
+                                                       self.context(windows=False), check_only, io.StringIO(), err))
+                apply.assert_not_called()
+                self.assertIn("policy unavailable", err.getvalue())
+
     def test_catch_up_failures_fail_the_step(self):
         err = io.StringIO()
         with mock.patch.object(setup.machine_events, "catch_up_states", lambda api: iter(self.rows)), \

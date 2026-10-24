@@ -61,7 +61,7 @@ def require_tommy(api=gh):
 
 
 def valid_repository(value):
-    return isinstance(value, str) and bool(re.fullmatch(
+    return isinstance(value, str) and value.lower() != "tj-agents/company" and bool(re.fullmatch(
         r"(?:tj-agents|Concertable|tomjseery)/[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}", value, re.I))
 
 
@@ -78,6 +78,8 @@ def parse_hint(envelope):
 
 
 def repository_state(repository, api=gh):
+    if not valid_repository(repository):
+        raise ValueError("Unsupported repository")
     owner, name = repository.split("/")
     query = "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){" + FIELDS + "}}"
     response = api(["graphql", "-f", "query=" + query, "-f", "owner=" + owner, "-f", "name=" + name])
@@ -120,10 +122,15 @@ def policy_script():
     return script
 
 
-def reconcile_policy(repository, run=subprocess.run):
-    result = run([plugins.console_python(), "-B", str(policy_script()), "reconcile", "--repo", repository],
+def reconcile_policy(repository, run=subprocess.run, check_only=False):
+    arguments = [plugins.console_python(), "-B", str(policy_script()), "reconcile", "--repo", repository]
+    if check_only:
+        arguments.append("--check")
+    result = run(arguments,
                  env=tommy_environment(), capture_output=True, text=True, encoding="utf-8", errors="replace",
                  timeout=180, check=False, creationflags=plugins.NO_WINDOW)
+    if check_only and result.returncode in (0, 1):
+        return bool(result.returncode)
     if result.returncode:
         raise RuntimeError(result.stderr.strip() or "merge-policy reconciliation failed")
 
@@ -141,7 +148,7 @@ class Reconciler:
         self.refresh = refresh or refresh_plugins
         self.policy = policy
 
-    def repository(self, current, refresh_plugins=True):
+    def repository(self, current, refresh_plugins=True, force_policy=False):
         if not current or current.get("isArchived") or current.get("isFork"):
             return
         repository = current.get("nameWithOwner")
@@ -152,9 +159,9 @@ class Reconciler:
         policy = (current.get("policy") or {}).get("oid")
         catalog = sorted(oid for name in ("marketplace", "catalog", "plugin", "codexPlugin")
                         if (oid := (current.get(name) or {}).get("oid")))
-        if old.get("revision") == revision:
+        if old.get("revision") == revision and not force_policy:
             return
-        if policy and policy != old.get("policy"):
+        if policy and (force_policy or policy != old.get("policy")):
             self.policy(repository)
         if catalog and catalog != old.get("catalog") and refresh_plugins:
             if self.refresh() != 0:
@@ -167,7 +174,7 @@ class Reconciler:
         failures = []
         for current in states:
             try:
-                self.repository(current, refresh_plugins=False)
+                self.repository(current, refresh_plugins=False, force_policy=True)
             except Exception:
                 LOG.exception("Catch-up failed for %s", current.get("nameWithOwner"))
                 failures.append(current["nameWithOwner"])
@@ -187,6 +194,8 @@ def main(argv=None):
     parser.add_argument("--repo")
     parser.add_argument("--state-directory", type=Path)
     arguments = parser.parse_args(argv)
+    if arguments.repo and not valid_repository(arguments.repo):
+        raise ValueError("Unsupported repository")
     if arguments.state_directory:
         os.environ["AGENT_STATE_DIRECTORY"] = str(arguments.state_directory.resolve())
     directory = plugins.state_directory()
@@ -204,9 +213,7 @@ def main(argv=None):
         require_tommy()
         failures = []
         if arguments.repo:
-            if not valid_repository(arguments.repo):
-                raise ValueError("Unsupported repository")
-            reconciler.repository(repository_state(arguments.repo))
+            reconciler.repository(repository_state(arguments.repo), force_policy=True)
         else:
             failures = reconciler.catch_up(catch_up_states())
         plugins.write_json(state_file, reconciler.state)
