@@ -16,6 +16,13 @@
       "domain": "process"
     },
     {
+      "name": "agent",
+      "root": ".agents/agent",
+      "layout": "kind",
+      "plugin": "agent",
+      "domain": "process"
+    },
+    {
       "name": "machine",
       "root": ".agents/machine",
       "layout": "kind",
@@ -66,6 +73,7 @@
   "generated_roots": [
     "plugins/base",
     "plugins/agent-store",
+    "plugins/agent",
     "plugins/machine",
     "plugins/workflow",
     "plugins/engineering",
@@ -374,6 +382,11 @@
       "plugin": "workflow",
       "source": ".agents/hooks/codex_hook_snapshot.py",
       "destination": "hooks/codex_hook_snapshot.py"
+    },
+    {
+      "plugin": "agent",
+      "source": ".agents/tiers/agent.json",
+      "destination": "tier.json"
     }
   ],
   "prerequisites": {
@@ -386,13 +399,18 @@
     "workflow": [
       "base",
       "agent-store",
-      "machine"
+      "machine",
+      "agent"
     ],
     "engineering": [
       "base",
       "workflow",
       "agent-store",
-      "machine"
+      "machine",
+      "agent"
+    ],
+    "agent": [
+      "base"
     ]
   },
   "external_prerequisites": {
@@ -400,10 +418,11 @@
     "agent-store": [],
     "machine": [],
     "workflow": [],
-    "engineering": []
+    "engineering": [],
+    "agent": []
   },
   "extended_host_adapters": [
-    "machine:background-listener",
+    "agent:background-listener",
     "engineering:persistent-workflow",
     "engineering:review",
     "machine:sync-plugins"

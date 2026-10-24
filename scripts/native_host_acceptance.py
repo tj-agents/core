@@ -20,7 +20,7 @@ from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = ("base", "agent-store", "machine", "workflow", "engineering")
+PACKAGES = ("base", "agent-store", "agent", "machine", "workflow", "engineering")
 IDENTITIES = tuple(f"{package}@tj-agents" for package in PACKAGES)
 
 

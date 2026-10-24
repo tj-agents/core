@@ -2,9 +2,10 @@
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
 The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core).
-Select `base@tj-agents`, `agent-store@tj-agents`, `machine@tj-agents`, `workflow@tj-agents` and `engineering@tj-agents` from
+Select `base@tj-agents`, `agent-store@tj-agents`, `agent@tj-agents`, `machine@tj-agents`, `workflow@tj-agents` and `engineering@tj-agents` from
 [`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
-The repository publishes Base, Agent Store, Machine, Workflow and Engineering packages. Agent Store owns recorded
+The repository publishes Base, Agent Store, Agent, Machine, Workflow and Engineering packages. Agent owns shared
+execution and background completion across hosts. Agent Store owns recorded
 execution/session state; Machine observes and operates native hosts; Engineering owns code work and delivery.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.

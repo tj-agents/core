@@ -2,7 +2,7 @@
 name: background-listener
 description: Run one deterministic command in the background and return its result through the current host completion notification. Use when waiting for a build, test, CI monitor or other deferred result while continuing work or parking the turn.
 kind: utility
-domain: machine
+domain: process
 ---
 
 # Background listener

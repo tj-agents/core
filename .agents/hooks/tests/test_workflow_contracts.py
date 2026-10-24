@@ -392,7 +392,7 @@ class WorkflowGenerationTests(unittest.TestCase):
 
     def test_extended_host_adapter_preserves_one_public_identity(self):
         config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
-        self.assertEqual(["machine:background-listener", "engineering:persistent-workflow", "engineering:review", "machine:sync-plugins"],
+        self.assertEqual(["agent:background-listener", "engineering:persistent-workflow", "engineering:review", "machine:sync-plugins"],
                          config["extended_host_adapters"])
         for identity in config["extended_host_adapters"]:
             plugin, skill = identity.split(":")
