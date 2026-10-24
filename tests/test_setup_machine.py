@@ -826,6 +826,10 @@ class NativePermissionsTests(Machine):
             for mode in ("bypass", "standard", "bypass"):
                 with self.subTest(windows=windows, mode=mode):
                     settings.write_text(json.dumps({"configuration": {"core": {"permissions": mode}}}), encoding="utf-8")
+                    app_state = context.codex_home / ".codex-global-state.json"
+                    app_state.parent.mkdir(parents=True, exist_ok=True)
+                    app_state.write_text(json.dumps({"electron-persisted-atom-state": {
+                        "agent-mode-by-host-id": {"local": "guardian-approvals", "remote": "read-only"}}}), encoding="utf-8")
                     before = snapshot(self.root)
                     setup.check_native_permissions(context)
                     self.assertEqual(before, snapshot(self.root))
@@ -838,6 +842,8 @@ class NativePermissionsTests(Machine):
                     codex = tomllib.loads((context.codex_home / "config.toml").read_text(encoding="utf-8"))
                     self.assertEqual("bypassPermissions" if mode == "bypass" else "default", claude["permissions"]["defaultMode"])
                     self.assertEqual(":danger-full-access" if mode == "bypass" else ":workspace", codex["default_permissions"])
+                    app = json.loads(app_state.read_text(encoding="utf-8"))
+                    self.assertEqual({"remote": "read-only"}, app["electron-persisted-atom-state"]["agent-mode-by-host-id"])
 
 
 if __name__ == "__main__":
