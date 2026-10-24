@@ -21,6 +21,7 @@ class HostPermissionsTests(unittest.TestCase):
             (desktop.parent / "resources").mkdir(parents=True)
             (desktop.parent / "resources/app.asar").write_bytes(b"fixture")
             self.assertFalse(host_permissions.desktop_running([cli]))
+            self.assertFalse(host_permissions.desktop_running([desktop.parent / "resources/codex.exe"]))
             self.assertTrue(host_permissions.desktop_running([cli, desktop]))
 
     def test_app_drops_only_the_local_override_and_converges(self):

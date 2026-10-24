@@ -129,7 +129,8 @@ def desktop_running(executables=None) -> bool:
     except (OSError, subprocess.SubprocessError) as error:
         raise ValueError("Cannot verify that Codex Desktop is closed") from error
     return any((path.parent / "resources/app.asar").is_file()
-               or (path.parent.parent / "Resources/app.asar").is_file() for path in paths)
+               or path.parent.name == "MacOS" and (path.parent.parent / "Resources/app.asar").is_file()
+               for path in paths)
 
 
 def codex_app_settings(text: str) -> str:
