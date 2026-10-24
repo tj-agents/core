@@ -33,7 +33,8 @@
               "--deadline",
               "25",
               "--deny-on-timeout",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py@Bash|PowerShell"
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py"
             ]
           }
         ],

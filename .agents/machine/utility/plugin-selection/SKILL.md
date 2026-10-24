@@ -45,9 +45,6 @@ two marketplace names cannot refer to the same repository. The schema is `catalo
 TJ Agents producer repositories are package sources, not selectable marketplaces. Follow the
 [shared catalog naming rule](https://github.com/tj-agents/marketplace#readme); ordinary validation rejects
 producer registrations, including Python and React, before either host's settings are written.
-Schema 2 and 3 locks migrate only through the adoption command. Migration replaces producer identities
-with their known shared-roster identities, collapses duplicates, preserves foreign publishers, writes
-the schema 1 selection, and removes the old lock and all revision pins.
 
 ## Adopt a stack
 
@@ -73,13 +70,6 @@ placement is independent of this policy boundary. Selecting a profile does not p
 A bare `--plugin <name>` selects from `tj-agents`. Add a foreign plugin with
 `--plugin concertable@agents --marketplace agents=Concertable/agents`. Subsequent adoption preserves
 existing foreign marketplaces and selections. Every selected approved publisher follows `main`.
-
-Adoption also moves existing selections from retired individual `tj-agents` publisher marketplaces
-to the shared marketplace, using the shipped roster's known plugin names. It removes the retired
-declarations from both host settings in the same write; it keeps foreign publishers and never adds
-Personal implicitly. Unknown replacements fail explicitly. For example, an existing
-`python@python-agents` selection becomes `python@tj-agents`; the same rule applies to every known
-plugin rather than treating Python specially. Run preview, write, then check to migrate once.
 
 ## Generate settings from an existing selection
 
