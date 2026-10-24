@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -81,8 +82,9 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertIn("Before returning a completed outcome", context)
         self.assertIn("before any host product feedback", context)
         self.assertIn("A bounded behavior change selects `engineering:feature`", context)
-        self.assertNotIn("## ", context)
-        self.assertNotIn("Repository routine-decision delegation", context)
+        self.assertIn("## A task has an owning lifecycle — load it before the first edit", context)
+        self.assertIn("## When the user calls out a mistake", context)
+        self.assertNotIn("## Repository routine-decision delegation", context)
         self.assertLess(len(context), 4000)
         self.assertEqual([], list(self.cwd.iterdir()))
 
@@ -90,7 +92,12 @@ class PackagedEngineeringHooks(unittest.TestCase):
         manifest = json.loads(
             (ROOT / ".agents/plugins/manifests/codex/engineering-hooks.json").read_text(encoding="utf-8")
         )
-        hook = manifest["hooks"]["SessionStart"][0]["hooks"][0]
+        registrations = manifest["hooks"]["SessionStart"]
+        self.assertEqual(1, len(registrations))
+        self.assertEqual(1, len(registrations[0]["hooks"]))
+        hook = registrations[0]["hooks"][0]
+        deadline = int(re.search(r"--deadline (\d+)", hook["command"]).group(1))
+        self.assertLess(deadline, hook["timeout"])
         for field in ("command", "commandWindows"):
             self.assertIn(
                 '--hook "${PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py" '
