@@ -163,6 +163,38 @@ def enabled_roots(host: str, project: Path, entries: list) -> dict[str, Path]:
     return roots
 
 
+def inventory(binary: str, host: str, launch_directory: Path, inventory_options: tuple[str, ...],
+              marketplace: str | None = None) -> list:
+    command = [binary, *inventory_options, "plugin", "list"]
+    if marketplace is not None:
+        command.extend(("--marketplace", marketplace))
+    command.append("--json")
+    if os.name == "nt" and Path(binary).suffix.casefold() == ".ps1":
+        command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-File", *command]
+    try:
+        result = subprocess.run(
+            command, cwd=launch_directory, capture_output=True,
+            text=True, encoding="utf-8", errors="replace", timeout=INVENTORY_TIMEOUT_SECONDS,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        scope = f" for marketplace {marketplace}" if marketplace is not None else ""
+        raise RequiredPluginsError(f"Required {host} plugin inventory{scope} could not run: {error}") from error
+    if result.returncode:
+        scope = f" for marketplace {marketplace}" if marketplace is not None else ""
+        raise RequiredPluginsError(
+            f"Required {host} plugin inventory{scope} failed: {(result.stderr or result.stdout).strip()[:1024]}"
+        )
+    try:
+        data = json.loads(result.stdout)
+    except ValueError as error:
+        raise RequiredPluginsError(f"Required {host} plugin inventory returned invalid JSON") from error
+    entries = data.get("installed") if host == "codex" and isinstance(data, dict) else data
+    if not isinstance(entries, list):
+        raise RequiredPluginsError(f"Required {host} plugin inventory returned an invalid roster")
+    return entries
+
+
 def check(project: Path, host: str, executable: str | None = None,
           inventory_options: tuple[str, ...] = ()) -> tuple[Path, ...] | None:
     launch_directory = project.resolve()
@@ -183,28 +215,10 @@ def check(project: Path, host: str, executable: str | None = None,
     binary = executable or shutil.which(host)
     if not binary:
         raise RequiredPluginsError(f"Required standards cannot be verified: {host} executable is unavailable")
-    try:
-        command = [binary, *inventory_options, "plugin", "list", "--json"]
-        if os.name == "nt" and Path(binary).suffix.casefold() == ".ps1":
-            command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-File", *command]
-        result = subprocess.run(
-            command, cwd=launch_directory, capture_output=True,
-            text=True, encoding="utf-8", errors="replace", timeout=INVENTORY_TIMEOUT_SECONDS,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
-        raise RequiredPluginsError(f"Required {host} plugin inventory could not run: {error}") from error
-    if result.returncode:
-        raise RequiredPluginsError(
-            f"Required {host} plugin inventory failed: {(result.stderr or result.stdout).strip()[:1024]}"
-        )
-    try:
-        data = json.loads(result.stdout)
-    except ValueError as error:
-        raise RequiredPluginsError(f"Required {host} plugin inventory returned invalid JSON") from error
-    entries = data.get("installed") if host == "codex" and isinstance(data, dict) else data
-    if not isinstance(entries, list):
-        raise RequiredPluginsError(f"Required {host} plugin inventory returned an invalid roster")
+    marketplaces = sorted({identity.rsplit("@", 1)[1] for identity in required}) if host == "codex" else (None,)
+    entries = []
+    for marketplace in marketplaces:
+        entries.extend(inventory(binary, host, launch_directory, inventory_options, marketplace))
     roots = enabled_roots(host, launch_directory, entries)
     missing = sorted(set(required) - roots.keys())
     if missing:
