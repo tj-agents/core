@@ -2,10 +2,10 @@
 name: background-listener
 description: Run one deterministic command in the background and return its result through the current host completion notification. Use when waiting for a build, test, CI monitor or other deferred result while continuing work or parking the turn.
 kind: utility
-domain: machine
+domain: process
 ---
 
-Read the [shared background listener](../../../../.agents/machine/utility/background-listener/SKILL.md).
+Read the [shared background listener](../../../../.agents/agent/utility/background-listener/SKILL.md).
 
 Use the current surface's native background completion primitive when available. When the surface
 provides background `functions.exec` cells, `tools.write_stdin` and `notify`, start the command through
