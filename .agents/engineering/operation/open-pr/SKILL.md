@@ -171,6 +171,9 @@ harness's `persistent-workflow` skill to give that binding a continuation.
 
 ### 7. Report and continue
 
+For pending CI, establish the owning-conversation listener through `engineering:persistent-workflow`
+before reporting the wait. Its notification contract owns capability limits and the later readiness update.
+
 When the canonical goal has a fenced `completion` record, retain every unchecked PR task there with the
 PR's repository, number, full head SHA, task text, owner, and next action. Keep those entries until a fresh
 completion check observes the task resolved.

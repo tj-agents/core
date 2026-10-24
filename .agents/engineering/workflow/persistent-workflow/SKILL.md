@@ -78,6 +78,39 @@ delivery wait; it does not establish durable unattended continuation. Apply `wor
 before ending at a genuine boundary for the remaining whole goal. A completed slice or unavailable
 scheduler does not establish goal completion or a whole-goal blocker.
 
+## Notify the owning conversation
+
+A deterministic monitor observes remote state; the current host's notification mechanism delivers its
+result to this conversation. Establish both before reporting that pending CI is being monitored. Keep
+one monitor per exact delivery identity and retain its returned task/session ID and destination with the
+existing goal or delivery state. A scheduled headless continuation owns future work separately.
+
+Use the bound `workflow_ops.py monitor` command from `engineering:remote-validation`. A run monitor
+returns immediately for an already-completed run. A PR monitor emits one initial readiness observation
+when its nonempty exact-head check rollup is green; that observation does not grant review or merge
+approval. Reconnect to the same persisted identity after a material transition when another wait remains.
+
+Select the concrete listener procedure in this host's entry point. Establish native notification support
+with a bounded deterministic process, then observe its completion event reaching the owning conversation.
+A task ID, successful process exit, log file or output obtained by a later manual wait proves only that
+step. It does not establish that an idle conversation will wake. Keep source, active-turn and idle-turn
+verification distinct, and carry a verified capability forward while its host identity is unchanged.
+
+On a real wake, consume the compact bound result and report readiness, failure or the next human action
+through `engineering:open-pr`'s reporting contract before parking again. Unchanged state produces no
+model turn or repeated user report. Notification transport failure is an explicit capability result.
+
+When the current surface cannot notify an idle conversation, report `product-capability-unavailable`
+for that notification and preserve its resolver and resume condition. Continue independent authorized
+work and supported foreground observation. Do not promise a later chat update from a scheduler that
+only launches a separate context. Its durable delivery owner remains valid for its recorded actions.
+
+```text
+CI is pending: bind its exact run, start one host-backed listener and retain the returned task ID.
+The completion event arrives in the owning conversation: inspect that result and report the PR's next gate.
+Only a headless scheduler is available: record its work ownership and the unavailable chat notification.
+```
+
 ## Initialize one owner
 
 Use the packaged `<engineering-package-root>/workflows/continuation_runtime.py` module from an installed
