@@ -82,6 +82,11 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/hooks/delivery_binding_gate.py",
+      "destination": "hooks/delivery_binding_gate.py"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/machine/scripts/required_plugins.py",
       "destination": "hooks/required_plugins.py"
     },

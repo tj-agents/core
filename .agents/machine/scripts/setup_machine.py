@@ -24,6 +24,7 @@ from typing import Callable
 import launch_check
 import plugin_autoupdate
 import machine_events
+import host_permissions
 
 COMMAND_TIMEOUT_SECONDS = 60
 INSTALLER_TIMEOUT_SECONDS = 600
@@ -691,8 +692,35 @@ def nothing(context: Context) -> list[str]:
     return []
 
 
+def codex_config_path(context: Context) -> Path:
+    return context.codex_home / "config.toml"
+
+
+def native_permissions_plan(context: Context) -> dict[Path, str]:
+    mode = host_permissions.permissions(context.checkout_path())
+    return host_permissions.plan(context.claude_home / "settings.json", codex_config_path(context), mode)
+
+
+def check_native_permissions(context: Context) -> list[str]:
+    return [f"update native permission defaults in {path}" for path in native_permissions_plan(context)]
+
+
+def apply_native_permissions(context: Context) -> list[str]:
+    targets = native_permissions_plan(context)
+    desktop = codex_config_path(context).parent / ".codex-global-state.json"
+    if desktop in targets:
+        if host_permissions.desktop_running():
+            raise SetupError("Close Codex Desktop, run setup --step 'native permission defaults' "
+                             "from a terminal, then reopen the app to load the configured defaults")
+        targets = native_permissions_plan(context)
+    for path, text in targets.items():
+        write_profile(path, text, "utf-8", False)
+    return [f"updated native permission defaults in {path}" for path in targets]
+
+
 STEPS = (
     Step("preconditions", check_preconditions, nothing, required=True),
+    Step("native permission defaults", check_native_permissions, apply_native_permissions),
     Step("event channel and publishers", check_channel, apply_channel),
     Step("Claude marketplace auto-update", check_autoupdate, apply_autoupdate),
     Step("launch-check runtime", check_runtime, apply_runtime),

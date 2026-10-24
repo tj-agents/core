@@ -363,6 +363,16 @@
       "sha256": "baf6fef69709e0053a0546667bd23fce0b3a908b4756dac463c9142c53281eb1"
     },
     {
+      "path": ".agents/hooks/delivery_binding_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "c581ce7a1eed0fd163be81cb70a4c8f0f8a74a6b222c55f4645b53eb4c2b545f"
+    },
+    {
+      "path": ".agents/hooks/tests/test_delivery_binding_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "ef5013264d119b1806f134e704b6fa9a868cbed2829ffaa667760c9dce6697fe"
+    },
+    {
       "path": ".agents/hooks/tests/test_plan_graph.py",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "2612bbccb357ebb53810a3dec577eb739a5946358782d246b96d395f0e7cd859"

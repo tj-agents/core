@@ -1,3 +1,6 @@
+import argparse
+import json
+from pathlib import Path
 import re
 
 
@@ -94,3 +97,19 @@ def validate_pr_body(body):
         elif not sections[name]:
             errors.append(f"Empty {name.title()} section")
     return {"valid": not errors, "errors": errors}
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Validate a proposed PR body before a forge write.")
+    parser.add_argument("--body-file", required=True, type=Path)
+    arguments = parser.parse_args(argv)
+    try:
+        result = validate_pr_body(arguments.body_file.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError) as error:
+        result = {"valid": False, "errors": [f"Cannot read PR body file: {error}"]}
+    print(json.dumps(result))
+    return 0 if result["valid"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

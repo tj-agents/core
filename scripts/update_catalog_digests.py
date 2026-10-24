@@ -23,8 +23,13 @@ def update(root: Path, check: bool) -> None:
     catalog_path = root / ".agents/catalog/catalog.json"
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     harnesses = HARNESS.synchronize(root, check=True)
-    _, output, _, _ = SYNC.build(root, validate_catalog_digests=False)
     changed: list[str] = []
+    for package in catalog["packages"]:
+        required = harnesses[package["name"]]["requires"]
+        if package.get("harness") != required:
+            changed.append(package["id"])
+            package["harness"] = required
+    _, output, _, _ = SYNC.build(root, validate_catalog_digests=False, catalog=catalog)
     for package in catalog["packages"]:
         if package["owner_repository"] != "tj-agents/core":
             raise ValueError("Core catalog may contain only core packages")
@@ -33,7 +38,8 @@ def update(root: Path, check: bool) -> None:
             output, package["package_path"], package.get("digest_excludes", [])
         )
         if package.get("harness") != required or package["digest"] != actual:
-            changed.append(package["id"])
+            if package["id"] not in changed:
+                changed.append(package["id"])
             package["harness"] = required
             package["digest"] = actual
     if check and changed:

@@ -10,6 +10,7 @@
           "type": "object",
           "properties": {
             "auto_merge": {"type": "boolean"},
+            "permissions": {"enum": ["bypass", "standard"], "default": "bypass"},
             "auto_approve": {
               "type": "object",
               "properties": {
