@@ -351,51 +351,6 @@ class SessionStatement(TemporaryProject):
         self.assertNotIn("do not read, invoke or cite", text)
 
 
-class Gate(TemporaryProject):
-    def setUp(self):
-        super().setUp()
-        self.found = [
-            declaration("base", "tj-agents", BASE),
-            declaration("dotnet", "dotagents", DOTNET),
-        ]
-
-    def call(self, payload):
-        return gate.gate(dict(payload, cwd=str(self.project)), self.found)
-
-    def test_a_blocked_tier_skill_is_refused(self):
-        payload = {"tool_name": "Skill", "tool_input": {"skill": "dotnet:persistence"}}
-        self.assertEqual(self.call(payload), 2)
-
-    def test_a_ubiquitous_skill_is_allowed(self):
-        payload = {"tool_name": "Skill", "tool_input": {"skill": "engineering:review"}}
-        self.assertEqual(self.call(payload), 0)
-
-    def test_the_same_skill_is_allowed_where_the_stack_exists(self):
-        (self.project / "Api.csproj").write_text("", encoding="utf-8")
-        payload = {"tool_name": "Skill", "tool_input": {"skill": "dotnet:persistence"}}
-        self.assertEqual(self.call(payload), 0)
-
-    def test_a_codex_shell_read_of_the_standard_is_the_same_event(self):
-        command = 'cat ~/.codex/plugins/cache/dotagents/dotnet/1.1.0/skills/persistence/SKILL.md'
-        payload = {"tool_name": "shell", "tool_input": {"command": command}}
-        self.assertEqual(self.call(payload), 2)
-
-    def test_naming_the_plugin_without_reading_a_standard_is_not_a_block(self):
-        payload = {"tool_name": "Bash", "tool_input": {"command": "git log dotagents/dotnet"}}
-        self.assertEqual(self.call(payload), 0)
-
-    def test_source_inspection_does_not_enable_skill_invocation(self):
-        command = 'cat ../standards/.agents/dotnet/contract/style/SKILL.md'
-        self.assertEqual(self.call({"tool_name": "shell", "tool_input": {"command": command}}), 0)
-        self.assertEqual(self.call({"tool_name": "Skill", "tool_input": {"skill": "dotnet:style"}}), 2)
-        _, applicable, blocked = gate.assess(self.project, self.found)
-        self.assertEqual(applicable, [])
-        self.assertEqual([item.tier for item in blocked], ["dotnet"])
-
-    def test_an_unrecognized_payload_allows(self):
-        self.assertEqual(self.call({"tool_name": "Read", "tool_input": {"file_path": "x"}}), 0)
-
-
 class ShippedDeclarations(unittest.TestCase):
     def test_every_core_package_declares_itself_ubiquitous(self):
         names = sorted(path.stem for path in DECLARED.glob("*.json"))

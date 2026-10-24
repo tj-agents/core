@@ -407,7 +407,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:2e7e311cbec477df19dd34dc5e95bd23724a6e02f6f03bc634104a400bc4d08b",
+      "digest": "sha256:4f30b03e68de39b090a975d700c6d96c2df424757c201959c822a28ef952ee96",
       "harness": {
         "marketplaces": [
           {
@@ -453,10 +453,6 @@
         ],
         "permissions": {
           "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
             "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
             "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
@@ -473,45 +469,6 @@
             "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)"
           ],
           "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                "--clear"
-              ],
-              "justification": "Records an evidenced retention disposition for the exact merged checkout after validating the real close refusal and separate fallback; pending cleanup remains incomplete",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                  "--clear",
-                  "${PROJECT_ROOT}",
-                  "--reason",
-                  "capability",
-                  "--evidence",
-                  "evidence.json"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
-                ],
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                  "--clear"
-                ]
-              ]
-            },
             {
               "pattern": [
                 [
@@ -712,7 +669,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:8ea24ab67cca72fa8953494b9b370119100880e63a668912d2096a88a28a827f",
+      "digest": "sha256:9602f786bfef095411ef0b5df8940b82a832c20d23f31b226071532dd63e9d6e",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -767,14 +724,6 @@
         ],
         "permissions": {
           "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
             "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
@@ -861,40 +810,6 @@
             "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)"
           ],
           "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py",
-                  "${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py",
-                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
-                ]
-              ],
-              "justification": "engineering:merge Step 5: after cleanup_proof.py, a delivered report and unchanged verified idle session permit finish to remove its merged worktree",
-              "match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/other.py"
-                ]
-              ]
-            },
             {
               "pattern": [
                 [

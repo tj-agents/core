@@ -131,11 +131,6 @@
       "destination": "hooks/hook_dispatch.py"
     },
     {
-      "plugin": "base",
-      "source": ".agents/plugins/compatibility.json",
-      "destination": "hooks/compatibility.json"
-    },
-    {
       "plugin": "engineering",
       "source": ".agents/lanes",
       "destination": ".agents/lanes"
@@ -222,33 +217,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/plugins/compatibility.json",
-      "destination": "hooks/compatibility.json"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/compact_output_gate.py",
-      "destination": "hooks/compact_output_gate.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/hooks/problem_records.py",
       "destination": "hooks/problem_records.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/continuation_stop.py",
-      "destination": "hooks/continuation_stop.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/delivery_binding_gate.py",
-      "destination": "hooks/delivery_binding_gate.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/forge_poll_gate.py",
-      "destination": "hooks/forge_poll_gate.py"
     },
     {
       "plugin": "engineering",
@@ -267,53 +237,13 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/repo-owners.json",
-      "destination": "hooks/repo-owners.json"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/harness_grant.py",
-      "destination": "hooks/harness_grant.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/denial_prompt.py",
-      "destination": "hooks/denial_prompt.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/hooks/merge_review_gate.py",
       "destination": "hooks/merge_review_gate.py"
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/merge_cleanup_gate.py",
-      "destination": "hooks/merge_cleanup_gate.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/persistent_workflow_merge_gate.py",
-      "destination": "hooks/persistent_workflow_merge_gate.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/hooks/plan_graph.py",
       "destination": "hooks/plan_graph.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/worktree_cleanup_gate.py",
-      "destination": "hooks/worktree_cleanup_gate.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/worktree_placement_gate.py",
-      "destination": "hooks/worktree_placement_gate.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/continuation_receipts.py",
-      "destination": "hooks/continuation_receipts.py"
     },
     {
       "plugin": "engineering",
@@ -329,11 +259,6 @@
       "plugin": "engineering",
       "source": ".codex/adapters/pre_tool_use.py",
       "destination": "hooks/pre_tool_use_adapter.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/red_run_gate.py",
-      "destination": "hooks/red_run_gate.py"
     },
     {
       "plugin": "engineering",

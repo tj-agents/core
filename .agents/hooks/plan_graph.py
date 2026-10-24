@@ -227,14 +227,11 @@ def plan_path(path):
     root = ledger_root(path)
     text = path.read_text(encoding="utf-8")
     declared = metadata(text, "Plan")
-    plan = (
-        repo_relative_path(root, declared, "_PLAN.md")
-        if declared
-        else path.with_name(path.name.removesuffix("_PROGRESS.md") + "_PLAN.md")
-    )
+    if not declared:
+        return None
+    plan = repo_relative_path(root, declared, "_PLAN.md")
     if not plan.is_file():
-        source = f"declared Plan `{declared}`" if declared else "legacy filename convention"
-        raise ValueError(f"Missing companion plan for {path} from {source}: {plan}")
+        raise ValueError(f"Missing companion plan for {path} from declared Plan `{declared}`: {plan}")
     if plan.parent != path.parent:
         raise ValueError(f"Plan and ledger must share an epic folder: {plan} and {path}")
     return plan

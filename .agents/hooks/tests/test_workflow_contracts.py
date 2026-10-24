@@ -87,8 +87,6 @@ class WorkflowContractTests(unittest.TestCase):
                 "decks": 1,
                 "hosts": 2,
                 "roles": 5,
-                "release": "A",
-                "compatibility_entries": 1,
             },
             self.contract.verify_bundle(),
         )
@@ -176,41 +174,6 @@ class WorkflowContractTests(unittest.TestCase):
         ).lower()
         for model in ("gpt-6.1-sol", "gpt-6-luna", "codex-spark", "opus", "sonnet"):
             self.assertNotIn(model, shared_policy)
-
-    def test_every_compatibility_entry_and_replacement_is_an_installed_skill(self):
-        for name, entry in self.contract.compatibility["compatibility_entries"].items():
-            with self.subTest(entry=name):
-                self.assertTrue(authored_skill(name).is_file())
-                self.assertTrue(authored_skill(entry["replacement"]).is_file())
-
-    def test_a_compatibility_entry_stays_a_thin_entry_over_its_replacement(self):
-        for name, entry in self.contract.compatibility["compatibility_entries"].items():
-            if entry["kind"] != "compatibility-entry":
-                continue
-            with self.subTest(entry=name):
-                body = authored_skill(name).read_text(encoding="utf-8")
-                self.assertIn(entry["replacement"], body)
-                self.assertLess(len(body.splitlines()), 60)
-
-    def test_release_a_cannot_deprecate_a_compatibility_entry(self):
-        contract = WorkflowContract(WORKFLOWS, repository_root=ROOT)
-        contract.compatibility["compatibility_entries"]["temporary"] = {
-            "kind": "compatibility-entry",
-            "status": "deprecated",
-            "replacement": "staged-review",
-        }
-        with self.assertRaisesRegex(ContractViolation, "cannot be deprecated before release B"):
-            contract.verify_bundle()
-
-    def test_a_compatibility_entry_cannot_replace_another_entry(self):
-        contract = WorkflowContract(WORKFLOWS, repository_root=ROOT)
-        contract.compatibility["compatibility_entries"]["temporary"] = {
-            "kind": "compatibility-entry",
-            "status": "retained",
-            "replacement": "staged-review-all",
-        }
-        with self.assertRaisesRegex(ContractViolation, "names another compatibility entry"):
-            contract.verify_bundle()
 
     def test_bundle_rejects_provider_capabilities_outside_compatibility(self):
         contract = WorkflowContract(WORKFLOWS, repository_root=ROOT)
@@ -658,7 +621,7 @@ class WorkflowGenerationTests(unittest.TestCase):
             with self.assertRaisesRegex(ContractViolation, "oneOf branches"):
                 contract.validate("host", reconciliation)
 
-    def test_codex_installer_manages_profile_roles_and_migrates_project_copies(self):
+    def test_codex_installer_manages_profile_roles(self):
         hosts = powershell_hosts()
         self.assertNotEqual([], hosts)
         for name, arguments in hosts:
@@ -674,64 +637,19 @@ class WorkflowGenerationTests(unittest.TestCase):
                     former_profile = target / "workflow-review-lens.toml"
                     former_profile.write_text('name = "personal-former-name"\n', encoding="utf-8")
 
-                    project = root / "project"
-                    (project / ".git").mkdir(parents=True)
-                    project_target = project / ".codex" / "agents"
-                    project_target.mkdir(parents=True)
-                    unrelated_project = project_target / "unrelated.toml"
-                    unrelated_project.write_text('name = "unrelated-project"\n', encoding="utf-8")
                     generated = sorted((ROOT / "plugins" / "engineering" / "codex-agents").glob("*.toml"))
-                    shutil.copy2(generated[0], project_target / generated[0].name)
-                    former = project_target / "workflow-review-lens.toml"
-                    former.write_text('name = "former"\n', encoding="utf-8")
                     preview = subprocess.run(
-                        [
-                            *arguments,
-                            "-File",
-                            str(script),
-                            "-CodexHome",
-                            str(codex_home),
-                            "-ProjectRoot",
-                            str(project),
-                        ],
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home)],
                         capture_output=True,
                         text=True,
                     )
                     self.assertEqual(0, preview.returncode, preview.stderr)
                     self.assertEqual(
-                        f"PREVIEW ONLY: {len(generated) + 1} change(s)",
+                        f"PREVIEW ONLY: {len(generated)} change(s)",
                         preview.stdout.splitlines()[-1].split(";")[0],
                     )
-                    self.assertIn("-ProjectRoot is deprecated", preview.stdout)
-                    preview_lines = preview.stdout.splitlines()
-                    profile_action = next(
-                        index
-                        for index, line in enumerate(preview_lines)
-                        if line.startswith("ADD ")
-                        and line.casefold().endswith(generated[0].name.casefold())
-                    )
-                    project_action = next(
-                        index
-                        for index, line in enumerate(preview_lines)
-                        if line.startswith("REMOVE ")
-                        and line.casefold().endswith(generated[0].name.casefold())
-                    )
-                    self.assertLess(
-                        profile_action,
-                        project_action,
-                        "profile changes must be reported before project cleanup",
-                    )
                     applied = subprocess.run(
-                        [
-                            *arguments,
-                            "-File",
-                            str(script),
-                            "-CodexHome",
-                            str(codex_home),
-                            "-ProjectRoot",
-                            str(project),
-                            "-Apply",
-                        ],
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
                         capture_output=True,
                         text=True,
                     )
@@ -746,42 +664,19 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.assertEqual(
                         'name = "unrelated-profile"\n', unrelated_profile.read_text(encoding="utf-8")
                     )
-                    self.assertEqual(
-                        'name = "unrelated-project"\n', unrelated_project.read_text(encoding="utf-8")
-                    )
                     self.assertEqual('name = "personal-former-name"\n', former_profile.read_text(encoding="utf-8"))
-                    self.assertEqual('name = "former"\n', former.read_text(encoding="utf-8"))
-                    self.assertFalse((project_target / generated[0].name).exists())
                     ownership = json.loads((target / ".tj-agents-delivery.json").read_text(encoding="utf-8"))
                     self.assertEqual([path.name for path in generated], sorted(item["name"] for item in ownership["files"]))
 
                     verified = subprocess.run(
-                        [
-                            *arguments,
-                            "-File",
-                            str(script),
-                            "-CodexHome",
-                            str(codex_home),
-                            "-MigrateProjectRoot",
-                            str(project),
-                            "-Verify",
-                        ],
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Verify"],
                         capture_output=True,
                         text=True,
                     )
                     self.assertEqual(0, verified.returncode, verified.stderr)
                     self.assertIn(f"VERIFIED: {len(generated)} profile agent(s)", verified.stdout)
                     repeated = subprocess.run(
-                        [
-                            *arguments,
-                            "-File",
-                            str(script),
-                            "-CodexHome",
-                            str(codex_home),
-                            "-MigrateProjectRoot",
-                            str(project),
-                            "-Apply",
-                        ],
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
                         capture_output=True,
                         text=True,
                     )
@@ -990,150 +885,6 @@ class WorkflowGenerationTests(unittest.TestCase):
                     )
                     self.assertEqual(0, removed.returncode, removed.stderr)
                     self.assertFalse(target.exists())
-
-    def test_codex_installer_migrates_the_legacy_ownership_manifest_in_place(self):
-        hosts = powershell_hosts()
-        self.assertNotEqual([], hosts)
-        for name, arguments in hosts:
-            with self.subTest(host=name):
-                with tempfile.TemporaryDirectory() as temp:
-                    root = Path(temp)
-                    bundle = root / "bundle" / ".codex"
-                    shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", bundle / "agents")
-                    script = bundle / "install-workflow-agents.ps1"
-                    shutil.copy2(ROOT / ".codex" / script.name, script)
-                    shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
-                    codex_home = root / "codex-home"
-                    target = codex_home / "agents"
-
-                    def run(*flags):
-                        return subprocess.run(
-                            [*arguments, "-File", str(script), "-CodexHome", str(codex_home), *flags],
-                            capture_output=True,
-                            text=True,
-                        )
-
-                    installed = run("-Apply")
-                    self.assertEqual(0, installed.returncode, installed.stderr)
-                    current = target / ".tj-agents-delivery.json"
-                    legacy = target / ".base-agents-delivery.json"
-                    ownership = json.loads(current.read_text(encoding="utf-8"))
-                    self.assertEqual("tj-agents", ownership["owner"])
-                    ownership["owner"] = "base-agents"
-                    legacy.write_text(json.dumps(ownership), encoding="utf-8")
-                    current.unlink()
-
-                    verified = run("-Verify")
-                    self.assertEqual(0, verified.returncode, verified.stderr)
-                    migrated = run("-Apply")
-                    self.assertEqual(0, migrated.returncode, migrated.stderr)
-                    self.assertFalse(legacy.exists())
-                    self.assertEqual("tj-agents", json.loads(current.read_text(encoding="utf-8"))["owner"])
-                    self.assertEqual(sorted(item["name"] for item in ownership["files"]),
-                                     sorted(item["name"] for item in json.loads(current.read_text(encoding="utf-8"))["files"]))
-                    self.assertIn("INSTALLED: 0 change(s)", migrated.stdout)
-
-                    legacy.write_text(json.dumps(ownership), encoding="utf-8")
-                    healed = run("-Apply")
-                    self.assertEqual(0, healed.returncode, healed.stderr)
-                    self.assertFalse(legacy.exists())
-                    self.assertEqual("tj-agents", json.loads(current.read_text(encoding="utf-8"))["owner"])
-
-                    conflicting = dict(ownership)
-                    conflicting["files"] = [{"name": "unknown.toml", "sha256": "A" * 64}]
-                    legacy.write_text(json.dumps(conflicting), encoding="utf-8")
-                    ambiguous = run("-Apply")
-                    self.assertNotEqual(0, ambiguous.returncode)
-                    self.assertIn("legacy", ambiguous.stderr)
-
-    def test_codex_installer_verify_uses_current_ownership_when_legacy_is_a_migrated_subset(self):
-        hosts = powershell_hosts()
-        self.assertNotEqual([], hosts)
-        for name, arguments in hosts:
-            with self.subTest(host=name):
-                with tempfile.TemporaryDirectory() as temp:
-                    root = Path(temp)
-                    bundle = root / "bundle" / ".codex"
-                    source = bundle / "agents"
-                    shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
-                    script = bundle / "install-workflow-agents.ps1"
-                    shutil.copy2(ROOT / ".codex" / script.name, script)
-                    shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
-                    codex_home = root / "codex-home"
-                    target = codex_home / "agents"
-
-                    def run(*flags):
-                        return subprocess.run(
-                            [*arguments, "-File", str(script), "-CodexHome", str(codex_home), *flags],
-                            capture_output=True,
-                            text=True,
-                        )
-
-                    installed = run("-Apply")
-                    self.assertEqual(0, installed.returncode, installed.stderr)
-                    current = target / ".tj-agents-delivery.json"
-                    legacy = target / ".base-agents-delivery.json"
-                    ownership = json.loads(current.read_text(encoding="utf-8"))
-                    retiring = ownership["files"][0]["name"]
-
-                    # A legacy manifest proven migrated (every entry matches current exactly) but a strict
-                    # subset that omits the role this run retires from the generated bundle.
-                    subset = dict(ownership)
-                    subset["owner"] = "base-agents"
-                    subset["files"] = [item for item in ownership["files"] if item["name"] != retiring]
-                    legacy.write_text(json.dumps(subset), encoding="utf-8")
-
-                    (source / retiring).unlink()
-                    (target / retiring).unlink()
-
-                    verified = run("-Verify")
-                    self.assertNotEqual(0, verified.returncode)
-                    self.assertIn("owned role missing", verified.stderr)
-                    self.assertIn(retiring, verified.stderr)
-
-    def test_codex_installer_migrates_only_digest_proven_former_project_agents(self):
-        hosts = powershell_hosts()
-        self.assertNotEqual([], hosts)
-        for name, arguments in hosts:
-            with self.subTest(host=name):
-                with tempfile.TemporaryDirectory() as temp:
-                    root = Path(temp)
-                    bundle = root / "bundle" / ".codex"
-                    source = bundle / "agents"
-                    shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
-                    script = bundle / "install-workflow-agents.ps1"
-                    shutil.copy2(ROOT / ".codex" / script.name, script)
-                    delivery = json.loads((ROOT / ".codex" / "agent-delivery.json").read_text(encoding="utf-8"))
-                    known_content = b'name = "known-former"\n'
-                    delivery["project_managed_agent_sha256"]["workflow-review-lens.toml"] = [
-                        hashlib.sha256(known_content).hexdigest()
-                    ]
-                    (bundle / "agent-delivery.json").write_text(json.dumps(delivery), encoding="utf-8")
-                    project = root / "project"
-                    (project / ".git").mkdir(parents=True)
-                    project_agents = project / ".codex" / "agents"
-                    project_agents.mkdir(parents=True)
-                    known = project_agents / "workflow-review-lens.toml"
-                    known.write_bytes(known_content)
-                    unknown = project_agents / "workflow-log-analyst.toml"
-                    unknown.write_text('name = "personal-collision"\n', encoding="utf-8")
-                    completed = subprocess.run(
-                        [
-                            *arguments,
-                            "-File",
-                            str(script),
-                            "-CodexHome",
-                            str(root / "codex-home"),
-                            "-MigrateProjectRoot",
-                            str(project),
-                            "-Apply",
-                        ],
-                        capture_output=True,
-                        text=True,
-                    )
-                    self.assertEqual(0, completed.returncode, completed.stderr)
-                    self.assertFalse(known.exists())
-                    self.assertEqual('name = "personal-collision"\n', unknown.read_text(encoding="utf-8"))
 
     def test_the_authored_installer_refuses_to_run_without_generated_roles(self):
         hosts = powershell_hosts()
@@ -1997,7 +1748,7 @@ class RepositoryProviderTests(unittest.TestCase):
         )
         return document
 
-    def write_session_store(self, status, owner=None, pr=None, schema_version=2):
+    def write_session_store(self, status, owner=None, pr=None, schema_version=4):
         state = self.root / "state"
         state.mkdir(exist_ok=True)
         database = state / "sessions.db"
@@ -2009,6 +1760,7 @@ class RepositoryProviderTests(unittest.TestCase):
             "item TEXT NOT NULL, status TEXT NOT NULL, branch TEXT, pr TEXT, updated_at REAL);"
             "CREATE TABLE sessions (handle TEXT PRIMARY KEY, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, "
             "role TEXT, ended_at REAL);"
+            "CREATE TABLE work_item_references (provider TEXT, scope TEXT, native_id TEXT, work_item TEXT);"
         )
         connection.execute(f"PRAGMA user_version = {schema_version}")
         key = "github.com/example/runtime:runtime-bridge/readme-reader"
@@ -2086,19 +1838,20 @@ class RepositoryProviderTests(unittest.TestCase):
         self.assertEqual(["reviews/runtime.md#BUG1", "reviews/runtime.md#NAT1"], state["open_findings"])
         self.assertEqual(before, after)
 
-    def test_read_only_work_item_store_accepts_v3_and_refuses_invalid_stores_without_writes(self):
-        state = self.root / "v3-reader-state"
+    def test_read_only_work_item_store_accepts_v4_and_refuses_invalid_stores_without_writes(self):
+        state = self.root / "v4-store-reader-state"
         state.mkdir()
         database = state / "sessions.db"
         source = ROOT / ".agents" / "agent-store" / "runtime" / "session_store.py"
-        spec = importlib.util.spec_from_file_location("workflow_contract_v3_session_store", source)
+        spec = importlib.util.spec_from_file_location("workflow_contract_v4_session_store", source)
         session_store = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(session_store)
         key = "github.com/example/runtime:runtime-bridge/readme-reader"
         connection = sqlite3.connect(database)
         connection.executescript(session_store.WORK_ITEMS_SCHEMA)
         connection.executescript(session_store.SESSIONS_SCHEMA)
-        connection.execute("PRAGMA user_version = 3")
+        connection.executescript(session_store.WORK_ITEM_REFERENCES_SCHEMA)
+        connection.execute("PRAGMA user_version = 4")
         connection.execute(
             "INSERT INTO work_items "
             "(key, repo, feature, item, status, branch, pr, title, plan_path, updated_at) "
@@ -2111,7 +1864,7 @@ class RepositoryProviderTests(unittest.TestCase):
                 "active",
                 "Feature/provider-fixture",
                 None,
-                "Read the v3 work item",
+                "Read the v4 work item",
                 "plans/features/runtime-bridge/work-items/readme-reader/README.md",
                 0,
             ),
@@ -2134,7 +1887,7 @@ class RepositoryProviderTests(unittest.TestCase):
             "CREATE TABLE work_items (key TEXT, status TEXT, title TEXT, plan_path TEXT);"
             "CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, "
             "role TEXT, ended_at REAL);"
-            "PRAGMA user_version = 3;"
+            "PRAGMA user_version = 4;"
         )
         connection.commit()
         connection.close()
@@ -2357,7 +2110,8 @@ class RepositoryProviderTests(unittest.TestCase):
         connection.executescript(
             "CREATE TABLE work_items (key TEXT, status TEXT);"
             "CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);"
-            "PRAGMA user_version = 2;"
+            "CREATE TABLE work_item_references (provider TEXT, scope TEXT, native_id TEXT, work_item TEXT);"
+            "PRAGMA user_version = 4;"
         )
         connection.close()
         with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):

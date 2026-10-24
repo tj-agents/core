@@ -27,15 +27,14 @@ class RepositoryConfigurationTests(unittest.TestCase):
         self.root = Path(self.temporary.name).resolve()
         self.agents = self.root / ".agents"
         self.agents.mkdir()
-        self.policy = {"standing_authorization": "auto", "instruction": "Merge green reviewed PRs", "auto_merge": True}
 
     def write(self, value):
         path = self.agents / "settings.json"
         path.write_text(value if isinstance(value, str) else json.dumps(value), encoding="utf-8")
         return path
 
-    def test_absent_settings_fall_back_to_a_valid_legacy_preference(self):
-        self.assertTrue(delivery_policy.auto_merge_preference(self.root, self.policy))
+    def test_absent_settings_disable_auto_merge_and_design_approval(self):
+        self.assertFalse(delivery_policy.auto_merge_preference(self.root))
         self.assertFalse(CONFIGURATION.auto_approve_design(self.root))
 
     def test_design_approval_defaults_to_false_without_settings(self):
@@ -43,23 +42,12 @@ class RepositoryConfigurationTests(unittest.TestCase):
         self.assertFalse(enabled)
         self.assertIn("no settings file", provenance)
 
-    def test_design_approval_uses_nested_precedence_and_legacy_alias(self):
+    def test_design_approval_uses_nested_precedence(self):
         cases = (
             ({"auto_approve": {"all": True}}, True, "auto_approve.all"),
             ({"auto_approve": {"all": False, "design": True}}, True, "auto_approve.design"),
             ({"auto_approve": {"all": True, "design": False}}, False, "auto_approve.design"),
             ({"auto_approve": {}}, False, "auto_approve default"),
-            ({"auto_approve_design": True}, True, "auto_approve_design"),
-            (
-                {"auto_approve": {"design": False}, "auto_approve_design": True},
-                False,
-                "auto_approve.design",
-            ),
-            (
-                {"auto_approve": {}, "auto_approve_design": True},
-                False,
-                "auto_approve default",
-            ),
         )
         for core, expected, provenance_selector in cases:
             with self.subTest(core=core):
@@ -69,10 +57,10 @@ class RepositoryConfigurationTests(unittest.TestCase):
                 self.assertEqual(expected, enabled)
                 self.assertIn(provenance_selector, provenance)
 
-    def test_design_approval_is_independent_of_legacy_auto_merge(self):
+    def test_design_approval_is_independent_of_auto_merge(self):
         self.write({"configuration": {"core": {"auto_approve": {"design": True}}}})
         self.assertTrue(CONFIGURATION.auto_approve_design(self.root))
-        self.assertFalse(delivery_policy.auto_merge_preference(self.root, self.policy))
+        self.assertFalse(delivery_policy.auto_merge_preference(self.root))
 
     def test_present_settings_are_authoritative_and_preserve_other_namespaces(self):
         path = self.write({
@@ -80,46 +68,42 @@ class RepositoryConfigurationTests(unittest.TestCase):
             "configuration": {"future": {"feature": {"enabled": True}}},
         })
         before = path.read_text(encoding="utf-8")
-        self.assertFalse(delivery_policy.auto_merge_preference(self.root, self.policy))
+        self.assertFalse(delivery_policy.auto_merge_preference(self.root))
         self.assertEqual(before, path.read_text(encoding="utf-8"))
 
         self.write({"configuration": {"core": {"auto_merge": False}}})
-        self.assertFalse(delivery_policy.auto_merge_preference(self.root, self.policy))
+        self.assertFalse(delivery_policy.auto_merge_preference(self.root))
 
         self.write({"configuration": {"core": {"auto_merge": True}}})
-        self.assertTrue(delivery_policy.auto_merge_preference(self.root, self.policy))
+        self.assertTrue(delivery_policy.auto_merge_preference(self.root))
 
-    def test_empty_or_incomplete_present_settings_disable_the_legacy_preference(self):
+    def test_empty_or_incomplete_present_settings_disable_auto_merge(self):
         for settings in ({}, {"configuration": {}}, {"configuration": {"core": {}}}):
             with self.subTest(settings=settings):
                 self.write(settings)
-                self.assertFalse(delivery_policy.auto_merge_preference(self.root, self.policy))
+                self.assertFalse(delivery_policy.auto_merge_preference(self.root))
 
     def test_configuration_json_is_not_a_second_public_interface(self):
         (self.agents / "configuration.json").write_text(
             json.dumps({"configuration": {"core": {"auto_merge": True}}}), encoding="utf-8"
         )
-        policy = {"standing_authorization": "auto", "instruction": "Merge green reviewed PRs"}
-        self.assertFalse(delivery_policy.auto_merge_preference(self.root, policy))
+        self.assertFalse(delivery_policy.auto_merge_preference(self.root))
 
     def test_core_settings_are_strict(self):
         for core in (
             {"auto_merge": "true"},
             {"auto_merge": 1},
-            {"auto_approve_design": "true"},
-            {"auto_approve_design": 1},
             {"auto_approve": True},
             {"auto_approve": {"all": "true"}},
             {"auto_approve": {"all": 1}},
             {"auto_approve": {"design": "true"}},
             {"auto_approve": {"unknown": True}},
-            {"auto_approve": {"all": True}, "auto_approve_design": "true"},
             {"unknown": True},
         ):
             with self.subTest(core=core):
                 self.write({"configuration": {"core": core}})
                 with self.assertRaises(ValueError):
-                    delivery_policy.auto_merge_preference(self.root, self.policy)
+                    delivery_policy.auto_merge_preference(self.root)
                 with self.assertRaises(ValueError):
                     CONFIGURATION.auto_approve_design(self.root)
 
@@ -130,7 +114,7 @@ class RepositoryConfigurationTests(unittest.TestCase):
                 "foreign": {"enabled": "future"},
             }
         })
-        self.assertTrue(delivery_policy.auto_merge_preference(self.root, self.policy))
+        self.assertTrue(delivery_policy.auto_merge_preference(self.root))
         self.assertFalse(CONFIGURATION.auto_approve_design(self.root))
 
         self.write({
@@ -139,7 +123,7 @@ class RepositoryConfigurationTests(unittest.TestCase):
                 "foreign": {"enabled": "future"},
             }
         })
-        self.assertFalse(delivery_policy.auto_merge_preference(self.root, self.policy))
+        self.assertFalse(delivery_policy.auto_merge_preference(self.root))
         self.assertTrue(CONFIGURATION.auto_approve_design(self.root))
 
     def test_reader_rejects_malformed_duplicate_nonfinite_and_invalid_namespaces(self):
@@ -151,8 +135,7 @@ class RepositoryConfigurationTests(unittest.TestCase):
             '{"configuration": {"future": {"item": 1, "item": 2}}}',
             '{"configuration": {"future": {"item": NaN}}}',
             '{"configuration": {"future": {"item": 1e999}}}',
-            '{"configuration": {"core": {"auto_approve": {'
-            '"design": true, "design": false}, "auto_approve_design": true}}}',
+            '{"configuration": {"core": {"auto_approve": {"design": true, "design": false}}}}',
         )
         for value in invalid:
             with self.subTest(value=value):
@@ -197,17 +180,17 @@ class RepositoryConfigurationTests(unittest.TestCase):
         with self.assertRaises(CONFIGURATION.ConfigurationViolation):
             CONFIGURATION.load(self.root)
 
-    def test_unreadable_present_settings_and_invalid_legacy_are_not_fallbacks(self):
+    def test_unreadable_settings_and_invalid_policy_are_refused(self):
         path = self.write({"configuration": {"core": {"auto_merge": True}}})
         with patch.object(Path, "read_text", side_effect=PermissionError("denied")):
             with self.assertRaises(CONFIGURATION.ConfigurationViolation):
                 CONFIGURATION.load(self.root)
 
         path.unlink()
-        legacy = self.agents / "delivery-authorization.json"
-        legacy.write_text("{", encoding="utf-8")
+        policy = self.agents / "delivery-authorization.json"
+        policy.write_text("{", encoding="utf-8")
         with self.assertRaises(delivery_policy.PolicyViolation):
-            delivery_policy.load_legacy_policy(self.root)
+            delivery_policy.load_policy(self.root)
 
     def test_reader_ignores_ancestor_and_host_settings(self):
         checkout = self.root / "checkout"
@@ -220,8 +203,7 @@ class RepositoryConfigurationTests(unittest.TestCase):
         (checkout / ".claude" / "settings.json").write_text(
             json.dumps({"configuration": {"core": {"auto_merge": True}}}), encoding="utf-8"
         )
-        policy = {"standing_authorization": "auto", "instruction": "Merge green reviewed PRs"}
-        self.assertFalse(delivery_policy.auto_merge_preference(checkout, policy))
+        self.assertFalse(delivery_policy.auto_merge_preference(checkout))
 
     def test_schema_keeps_root_settings_open_and_matches_namespace_rules(self):
         schema = json.loads(
@@ -237,10 +219,6 @@ class RepositoryConfigurationTests(unittest.TestCase):
         core = configuration["properties"]["core"]
         self.assertFalse(core["additionalProperties"])
         self.assertEqual({"type": "boolean"}, core["properties"]["auto_merge"])
-        self.assertEqual(
-            {"type": "boolean", "deprecated": True},
-            core["properties"]["auto_approve_design"],
-        )
         auto_approve = core["properties"]["auto_approve"]
         self.assertFalse(auto_approve["additionalProperties"])
         self.assertEqual(

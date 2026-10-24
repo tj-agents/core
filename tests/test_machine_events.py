@@ -173,20 +173,6 @@ class IdentityTests(unittest.TestCase):
 
 
 class SetupTests(unittest.TestCase):
-    def test_only_retired_cron_jobs_are_removed_idempotently(self):
-        text = "0 5 * * * backup\n@reboot old # tj-agents-plugin-autoupdate\n17 * * * * old # tj-agents-merge-gates\n"
-        run = mock.Mock(return_value=mock.Mock(returncode=0, stdout=text))
-        setup.remove_retired_cron(run=run)
-        self.assertEqual("0 5 * * * backup\n", run.call_args.kwargs["input"])
-        run = mock.Mock(return_value=mock.Mock(returncode=0, stdout="0 5 * * * backup\n"))
-        setup.remove_retired_cron(run=run)
-        self.assertEqual(1, run.call_count)
-
-    def test_linux_without_crontab_can_still_install_the_listener(self):
-        run = mock.Mock(side_effect=FileNotFoundError("crontab"))
-        setup.remove_retired_cron(run=run)
-        run.assert_called_once()
-
     def test_shared_topic_is_reused_without_writing_github_on_rerun(self):
         with tempfile.TemporaryDirectory() as directory:
             api = mock.Mock(return_value={"variables": [{"name": "MACHINE_EVENTS_TOPIC", "value": "a" * 48}]})
@@ -239,34 +225,9 @@ class SetupTests(unittest.TestCase):
                                     text=True, timeout=30)
             self.assertEqual(0, result.returncode, result.stderr)
 
-    def test_the_retired_plugin_version_record_is_reported_and_removed(self):
-        with tempfile.TemporaryDirectory() as directory:
-            record = Path(directory) / "plugins/tj-agents-plugin-versions.json"
-            record.parent.mkdir()
-            record.write_text("{}", encoding="utf-8")
-            context = mock.Mock(windows=True, claude_home=Path(directory))
-            with (mock.patch.object(setup, "task_exists", return_value=False),
-                  mock.patch.object(setup, "remove_retired_windows")):
-                self.assertEqual([f"remove retired {record}"], setup.check_retired(context))
-                setup.apply_retired(context)
-                self.assertEqual([], setup.check_retired(context))
-
     def test_the_listener_service_and_task_are_retired_and_never_scheduled(self):
-        self.assertIn("tj-agents machine events", setup.RETIRED_TASKS)
         for name in ("schedule_windows", "schedule_systemd", "windows_task_xml"):
             self.assertFalse(hasattr(setup, name))
-        with tempfile.TemporaryDirectory() as directory:
-            home = Path(directory)
-            unit = home / ".config/systemd/user" / setup.RETIRED_SERVICE
-            unit.parent.mkdir(parents=True)
-            unit.write_text("[Service]\n", encoding="utf-8")
-            run = mock.Mock()
-            self.assertTrue(setup.remove_retired_service(home, run=run))
-            self.assertFalse(unit.exists())
-            self.assertEqual(["systemctl", "--user", "disable", "--now", setup.RETIRED_SERVICE],
-                             run.call_args_list[0].args[0])
-            self.assertFalse(setup.remove_retired_service(home, run=run))
-            self.assertEqual(2, run.call_count)
 
 
 if __name__ == "__main__":

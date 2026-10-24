@@ -19,14 +19,8 @@ must already represent this branch. If no work order exists, route to `review`. 
 `in-progress`, resume or restart that frozen pass rather than starting a competing incremental pass.
 
 Read the single top-level `Reviewed up to commit:` marker. It is the only source of truth for the completed
-watermark. Validate that its SHA resolves. A legacy work order with no marker and no recorded frozen pass
-requires one human answer:
-
-```bash
-git log -20 --format='%h  %ci  %s'
-```
-
-Ask which commit the existing review covered; never infer it from dates or prose.
+watermark. Validate that its SHA resolves. A work order without the marker has no completed watermark;
+route to `review`.
 
 ## Freeze the delta
 

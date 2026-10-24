@@ -34,8 +34,7 @@ Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed wri
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
 current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or
 changed plugin hooks until they are reviewed and trusted in `/hooks`; a fresh missing-marketplace write
-probe is required before claiming enforcement. The `base:agent-files` skill documents a generated
-native-instruction fallback.
+probe is required before claiming enforcement.
 Codex hook commands use a per-session temporary snapshot preseeded for the running session's hooks.
 This lets those hooks keep running after a plugin update replaces an inactive package cache entry.
 New sessions create a fresh snapshot from the verified package; snapshots outside the plugin cache are
@@ -117,14 +116,11 @@ An all-categories opt-in is:
 {"configuration":{"core":{"auto_approve":{"all":true}}}}
 ```
 
-An explicit `design` value overrides `all`, and omitted members default to `false`. The legacy
-`configuration.core.auto_approve_design` boolean remains available only when `auto_approve` is absent;
-an empty `auto_approve` object is authoritative and disables design approval. When enabled, an agent may
-make and record routine design or convention choices within work already authorized by the user. It does
-not override an explicit user reservation, task scope, stricter repository rule, or any merge,
-publication, installation, or permission gate. Use a current core package that understands the nested setting
-before enabling it; older strict readers reject unknown core settings. Source verification does not
-establish installed-host trust or acceptance.
+An explicit `design` value overrides `all`, and omitted members default to `false`; an empty
+`auto_approve` object disables design approval. When enabled, an agent may make and record routine design
+or convention choices within work already authorized by the user. It does not override an explicit user
+reservation, task scope, stricter repository rule, or any merge, publication, installation, or permission
+gate. Source verification does not establish installed-host trust or acceptance.
 
 ## Layout
 
@@ -193,9 +189,7 @@ consumes its result. Selection never cancels a prior run or transfers a previous
 
 The `machine:plugin-selection` skill creates a repository's `.agents/plugins.json` and generates the committed
 Claude and Codex plugin settings from it, so a fresh clone installs exactly what it selects from rolling main.
-Selections can combine `tj-agents` and `Concertable` marketplaces without revision pins. Adoption explicitly
-migrates the old single- or multi-marketplace lock, preserving selections and removing its pins.
-It also audits a machine for old user-level plugin settings.
+Selections can combine `tj-agents` and `Concertable` marketplaces without revision pins.
 
 Catalog packages have no release or manifest version. `sha256-tree-v1` hashes
 the sorted package paths, lengths and bytes. The machine package excludes only its embedded
@@ -222,9 +216,7 @@ runtime dependency. `--check` inspects that same selection without applying it:
 
 The full setup enables Claude's native auto-update, copies the launch-check runtime to `~/.agents-state/bin` and
 adds `claude` and `codex` functions to the PowerShell profiles (and `~/.bashrc` or `~/.zshrc` on
-Linux) inside one marked block, keeping a `.pre-launch-check.bak` copy. It removes the retired CLI
-launchers, the machine event listener task or systemd service, and the former hourly plugin-autoupdate
-and merge-gates tasks or cron entries. Nothing runs in the background.
+Linux) inside one marked block, keeping a `.pre-tj-agents.bak` copy. Nothing runs in the background.
 
 Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: one non-blocking ntfy.sh
 poll for events since the saved cursor; offline it starts anyway. Events name the publishing repositories.

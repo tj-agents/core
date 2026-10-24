@@ -217,13 +217,6 @@ def catalog_index(catalog: dict) -> dict[str, dict]:
 
 def render_capabilities(catalog: dict) -> str:
     packages = catalog_index(catalog)
-    lines = [
-        "# Agent capabilities",
-        "",
-        "Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).",
-        "Select plugins in a project's `.agents/plugins.json`; do not copy definitions between repositories.",
-        "",
-    ]
     return "\n".join(
         [
             "# Agent capabilities",
@@ -245,45 +238,6 @@ def render_capabilities(catalog: dict) -> str:
             ),
         ]
     )
-    return "\n".join(
-        [
-            "# Agent capabilities",
-            "",
-            "Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).",
-            "Select plugins in a project's `.agents/plugins.json`; do not copy definitions between repositories.",
-            "",
-            *(
-                line
-                for package in packages.values()
-                for line in (
-                    f"## {package['id']}",
-                    "",
-                    f"Owner: [`{package['owner_repository']}`]({package['source'].removesuffix('.git')})",
-                    "",
-                    package["description"],
-                    "",
-                )
-            ),
-        ]
-    )
-    for release in releases.values():
-        lines.extend((
-            f"## {release['marketplace']} {release['version']}",
-            "",
-            f"Owner: [`{release['owner_repository']}`]({release['source'].removesuffix('.git')}) "
-            f"· immutable revision `{release['revision']}`",
-            "",
-        ))
-        for plugin in release["plugins"]:
-            marker = " (deprecated)" if plugin["status"] == "deprecated" else ""
-            lines.append(f"- **`{plugin['id']}`{marker}** — {plugin['description']}")
-            if plugin.get("replacement"):
-                lines.append(
-                    f"  Replacement: {', '.join(f'`{value}`' for value in plugin['replacement'])}; "
-                    f"remove after {plugin['remove_after']}."
-                )
-        lines.append("")
-    return "\n".join(lines)
 
 
 def canonical_output_bytes(data: str | bytes) -> bytes:

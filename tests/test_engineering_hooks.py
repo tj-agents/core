@@ -105,20 +105,6 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertEqual(["feature"], [rule["name"] for rule in result["rules"]])
         self.assertEqual(".agents/skills/feature/SKILL.md", result["rules"][0]["path"])
 
-    def test_policy_gates_are_silent_without_repository_opt_in(self):
-        commands = {'forge_poll_gate': 'gh pr checks 42',
-                    'compact_output_gate': 'python -m unittest',
-                    'persistent_workflow_merge_gate': 'gh pr merge 42 --auto',
-                    'worktree_cleanup_gate': ''}
-        for name, command in commands.items():
-            with self.subTest(name=name):
-                result = self.run_hook(f'hooks/{name}.py', dict(
-                    tool_name='Bash', tool_input={'command': command},
-                    tool_response='https://github.com/example/repository/pull/42',
-                    hook_event_name='SessionStart' if name == 'worktree_cleanup_gate' else 'PreToolUse'))
-                self.assertEqual(0, result.returncode, result.stderr)
-                self.assertEqual('', result.stdout + result.stderr)
-
     def test_credential_guard_blocks_widening_but_allows_read_only_status(self):
         for tool, field in (('Bash', 'command'), ('exec_command', 'cmd')):
             for command, expected in (('gh auth refresh -s admin:org', 2), ('gh auth status', 0)):

@@ -41,8 +41,8 @@ Folder per epic: the roadmap and every plan it spins off live inside it. A plan'
 workstream across delivery PRs; its worktree and branch are temporary execution state, safe to recreate from
 the remote default branch once the prior PR's worktree is removed.
 
-A legacy plan with no ledger stays valid: reconstruct the state from the plan and repository evidence, then
-create the ledger before recording further progress.
+A plan with no ledger is incomplete: create its ledger from the plan and repository evidence before
+recording further progress.
 
 ## The active delivery branch owns current planning state
 
@@ -166,8 +166,7 @@ Every `<NAME>_PLAN.md` has at least one same-directory `<NAME>_PROGRESS.md` comp
 `- Plan:` header is the authoritative plan↔ledger grouping, not the filename.
 
 Required headers: `Plan:`, `Roadmap:`, and the stable `<epic>/<slug>` `Roadmap item:` key. Together they form
-the roadmap→plan→ledger graph that `plan_graph.py` checks. Reconstruct them from the plan and roadmap when
-adopting a legacy ledger.
+the roadmap→plan→ledger graph that `plan_graph.py` checks.
 
 Each ledger keeps these current sections:
 
@@ -219,7 +218,7 @@ with commit, PR, run, package, and review links. `plan_graph.py` warns on these 
 For a deliberate transfer, `## Next Steps` retains `Transfer:`, `Transfer to:`, `Resume stage:`, and `Resume
 when:` before its existing scope fields. The exact absolute plan and owning ledger pointer follows
 `workflow:handoff`. For selected Engineering software handoff, retain the effective
-`configuration.core.auto_approve` value or legacy alias, its settings provenance, and user-reserved decisions.
+`configuration.core.auto_approve` value, its settings provenance, and user-reserved decisions.
 
 Update a material ledger transition before the substantive commit that carries it and record that commit as
 `this commit`; never create a bookkeeping follow-up merely to add its SHA. A plan-managed push chooses one

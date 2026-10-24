@@ -16,11 +16,9 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 REAPER = ROOT / ".agents/machine/utility/peer-cli/scripts/finish_reaper.py"
 CLOSE = ROOT / ".agents/machine/utility/peer-cli/scripts/close.py"
-FINISH = ROOT / ".agents/machine/utility/peer-cli/scripts/finish.py"
 CLOSE_SESSION = ROOT / ".agents/machine/utility/close/scripts/close_session.py"
 sys.path.insert(0, str(REAPER.parent))
 import session_close
-import finish
 import finish_reaper
 import close as own_close
 
@@ -103,7 +101,7 @@ class HostFallbackTests(unittest.TestCase):
                 own_close.close_tab.TerminalUnavailable("unavailable"),
                 own_close.close_tab.TerminalRefusal("absent or ambiguous"),
         ):
-            for module in (own_close, finish):
+            for module in (own_close,):
                 for mode in ("", "process"):
                     with self.subTest(module=module.__name__, refusal=type(refusal).__name__, mode=mode), \
                             mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": mode}), \
@@ -119,7 +117,7 @@ class HostFallbackTests(unittest.TestCase):
                  "terminal": {"kind": "windows-terminal", "automation_id": "tab-1"}}
         target = {"title": "own", "identity": entry["terminal"]}
         for inventory in ([], [target, target]):
-            for module in (own_close, finish):
+            for module in (own_close,):
                 with self.subTest(module=module.__name__, inventory=inventory), \
                         mock.patch.object(session_close, "verified_live", return_value=True), \
                         mock.patch.object(session_close, "liveness", return_value=True), \
@@ -132,7 +130,7 @@ class HostFallbackTests(unittest.TestCase):
 
     def test_verified_terminal_close_never_signals_a_process(self):
         entry = {"pid": 30, "pid_started_at": 3.0}
-        for module in (own_close, finish):
+        for module in (own_close,):
             with self.subTest(module=module.__name__), \
                     mock.patch.object(session_close, "verified_live", return_value=True), \
                     mock.patch.object(module.close_tab, "close_entry") as closer, \
@@ -143,7 +141,7 @@ class HostFallbackTests(unittest.TestCase):
 
     def test_unknown_host_refuses_before_terminal_close_or_signal(self):
         entry = {"pid": 30, "pid_started_at": 3.0}
-        for module in (own_close, finish):
+        for module in (own_close,):
             with self.subTest(module=module.__name__), \
                     mock.patch.object(session_close, "verified_live", return_value=False), \
                     mock.patch.object(module.close_tab, "close_entry") as closer, \
@@ -157,7 +155,7 @@ class HostFallbackTests(unittest.TestCase):
 class CloseRefusalCaptureTests(unittest.TestCase):
     def test_missing_native_attachment_cannot_produce_target_evidence(self):
         with tempfile.TemporaryDirectory() as state:
-            for module in (own_close, finish):
+            for module in (own_close,):
                 with self.subTest(command=module.__name__), \
                         mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state}), \
                         mock.patch.object(session_close, "own_host_and_entry",
@@ -169,17 +167,13 @@ class CloseRefusalCaptureTests(unittest.TestCase):
     def test_failed_evidence_write_preserves_the_original_close_refusal(self):
         entry = {"session_id": "ours", "cwd": str(ROOT), "host": "codex", "pid": 123,
                  "pid_started_at": 1.0, "started_at": 1.0}
-        for module in (own_close, finish):
+        for module in (own_close,):
             with self.subTest(command=module.__name__), \
                     mock.patch.object(session_close, "own_host_and_entry", return_value=entry), \
                     mock.patch.object(module, "close_session", side_effect=session_close.Refusal("original refusal")), \
                     mock.patch.object(session_close, "write_json", side_effect=PermissionError("denied")):
                 with self.assertRaisesRegex(session_close.Refusal, "original refusal"):
                     module.main([])
-
-
-def git(cwd, *args):
-    return subprocess.run(["git", "-C", str(cwd), *args], text=True, capture_output=True, check=True).stdout.strip()
 
 
 @unittest.skipUnless(sys.platform == "linux" or os.name == "nt", "Supported process backends")
@@ -203,80 +197,6 @@ class FinishReaperProcessTests(unittest.TestCase):
             store = staged._load_session_store()
         self.assertIsNotNone(store)
         self.assertTrue(hasattr(store, "delete_session"))
-
-    def test_armed_observer_waits_for_exit_then_removes_worktree_and_obligation(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary); bare = root / "origin.git"; primary = root / "primary"; worktree = root / "feature"; state = root / "state"
-            subprocess.run(["git", "init", "--bare", "-q", "-b", "main", str(bare)], check=True)
-            subprocess.run(["git", "clone", "-q", str(bare), str(primary)], check=True)
-            git(primary, "config", "user.email", "t@example.com"); git(primary, "config", "user.name", "t")
-            (primary / "base").write_text("base\n", encoding="utf-8"); git(primary, "add", "."); git(primary, "commit", "-q", "-m", "base"); git(primary, "push", "-q", "-u", "origin", "main"); git(primary, "remote", "set-head", "origin", "main")
-            git(primary, "branch", "feature"); git(primary, "worktree", "add", "-q", str(worktree), "feature")
-            (worktree / "feature").write_text("feature\n", encoding="utf-8"); git(worktree, "add", "."); git(worktree, "commit", "-q", "-m", "feature")
-            head = git(worktree, "rev-parse", "HEAD"); git(primary, "checkout", "-q", "main"); git(primary, "merge", "-q", "--squash", "feature"); git(primary, "commit", "-q", "-m", "merged"); git(primary, "push", "-q", "origin", "main")
-            receipts = state / "merge-cleanup/receipts"; receipts.mkdir(parents=True)
-            (receipts / "receipt.json").write_text(json.dumps({"worktree": str(worktree), "primary": str(primary), "branch": "feature", "head": head, "default": "main", "verdict": "removable", "recorded_at": time.time()}), encoding="utf-8")
-            obligation = state / "merge-cleanup/obligations/one.json"; obligation.parent.mkdir(parents=True); obligation.write_text(json.dumps({"worktree": str(worktree), "session_id": "ours"}), encoding="utf-8")
-            host = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], cwd=worktree)
-            started = self.process_started_at(host.pid)
-            result = state / "merge-cleanup/results/result.json"; env = dict(os.environ, AGENT_STATE_DIRECTORY=str(state), AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10")
-            with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
-                store = session_close.register_session._load_session_store()
-                connection = store.connect()
-                try:
-                    store.ensure_session(connection, "claude", "ours")
-                    store.ensure_session(connection, "claude", "other")
-                finally:
-                    connection.close()
-            invocation_id = "integration-invocation"
-            observer = subprocess.Popen([
-                sys.executable, str(REAPER), "--host-pid", str(host.pid),
-                "--host-start", str(started), "--worktree", str(worktree),
-                "--result", str(result), "--session-id", "ours",
-                "--invocation-id", invocation_id, "--head", head,
-                "--primary", str(primary), "--branch", "feature", "--default", "main",
-            ], env=env)
-            try:
-                for _ in range(200):
-                    if result.exists(): break
-                    time.sleep(.05)
-                record = json.loads(result.read_text(encoding="utf-8"))
-                (Path(str(result) + ".accepted")).write_text(
-                    json.dumps({
-                        "host_pid": host.pid, "host_start": started,
-                        "worktree": str(worktree.resolve()), "session_id": "ours",
-                        "invocation_id": invocation_id, "head": head,
-                        "primary": str(primary), "branch": "feature", "default": "main",
-                        "accepted": time.time(), "reaper_pid": record["reaper_pid"],
-                        "reaper_started_at": record["reaper_started_at"],
-                        "observer_pid": record["reaper_pid"],
-                        "observer_started_at": record["reaper_started_at"],
-                    }),
-                    encoding="utf-8",
-                )
-                for _ in range(200):
-                    if Path(str(result) + ".armed").exists(): break
-                    time.sleep(.05)
-                self.assertTrue(worktree.exists())
-                self.assertTrue(obligation.exists())
-                host.terminate(); host.wait(5); observer.wait(10)
-                self.assertFalse(worktree.exists())
-                self.assertFalse(obligation.exists()); self.assertEqual(1, subprocess.run(["git", "-C", str(primary), "show-ref", "--verify", "--quiet", "refs/heads/feature"]).returncode)
-                self.assertEqual("succeeded", json.loads(result.read_text(encoding="utf-8"))["status"])
-                with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
-                    connection = store.connect()
-                    try:
-                        remaining = [row["handle"] for row in connection.execute("SELECT handle FROM sessions")]
-                    finally:
-                        connection.close()
-                self.assertEqual(["claude:other"], remaining)
-            finally:
-                if host.poll() is None:
-                    host.kill()
-                host.wait(timeout=5)
-                if observer.poll() is None:
-                    observer.kill()
-                observer.wait(timeout=5)
 
     def test_close_entrypoint_records_verified_session_exit_without_removing_checkout(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -396,90 +316,6 @@ class FinishReaperProcessTests(unittest.TestCase):
                     host.kill()
                 host.wait(timeout=5)
 
-    def test_finish_entrypoint_removes_verified_disposable_worktree_after_host_exit(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            bare = root / "origin.git"
-            primary = root / "primary"
-            worktree = root / "feature"
-            state = root / "state"
-            host_executable, host_name = self.fixture_host(root)
-            subprocess.run(["git", "init", "--bare", "-q", "-b", "main", str(bare)], check=True)
-            subprocess.run(["git", "clone", "-q", str(bare), str(primary)], check=True)
-            for key, value in (("user.email", "t@example.com"), ("user.name", "t")):
-                subprocess.run(["git", "-C", str(primary), "config", key, value], check=True)
-            (primary / "base").write_text("base\n", encoding="utf-8")
-            subprocess.run(["git", "-C", str(primary), "add", "."], check=True)
-            subprocess.run(["git", "-C", str(primary), "commit", "-q", "-m", "base"], check=True)
-            subprocess.run(["git", "-C", str(primary), "push", "-q", "-u", "origin", "main"], check=True)
-            subprocess.run(["git", "-C", str(primary), "remote", "set-head", "origin", "main"], check=True)
-            subprocess.run(["git", "-C", str(primary), "branch", "feature"], check=True)
-            subprocess.run(["git", "-C", str(primary), "worktree", "add", "-q", str(worktree), "feature"], check=True)
-            head = git(worktree, "rev-parse", "HEAD")
-            receipt_directory = state / "merge-cleanup/receipts"
-            receipt_directory.mkdir(parents=True)
-            (receipt_directory / "receipt.json").write_text(json.dumps({
-                "worktree": str(worktree), "primary": str(primary), "branch": "feature",
-                "head": head, "default": "main", "verdict": "removable",
-                "recorded_at": time.time(),
-            }), encoding="utf-8")
-            obligation = state / "merge-cleanup/obligations/ours.json"
-            obligation.parent.mkdir(parents=True)
-            obligation.write_text(json.dumps({"worktree": str(worktree), "session_id": "ours"}), encoding="utf-8")
-            env = dict(
-                os.environ,
-                AGENT_STATE_DIRECTORY=str(state),
-                AGENT_CLI_HOST_NAMES=host_name,
-                AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
-            )
-            host = subprocess.Popen([
-                str(host_executable), "-c",
-                "import os, subprocess, sys, time; "
-                "\nwhile not os.path.exists(sys.argv[2]): time.sleep(.01)"
-                "\nraise SystemExit(subprocess.call([sys.executable, sys.argv[3], sys.argv[1]]))",
-                str(FINISH), str(root / "start"), str(self.terminal_fixture(root)),
-            ], cwd=worktree, env=env)
-            try:
-                started = self.process_started_at(host.pid)
-                sessions = state / "cli-sessions"
-                sessions.mkdir(parents=True)
-                (sessions / "ours.json").write_text(json.dumps({
-                    "session_id": "ours", "cwd": str(worktree), "pid": host.pid,
-                    "pid_started_at": started, "started_at": time.time(),
-                    "host": host_name,
-                }), encoding="utf-8")
-                self.record_idle_session(state, host_name, "ours", worktree, host.pid, started)
-                (root / "start").touch()
-                result_directory = state / "merge-cleanup/results"
-                for _ in range(300):
-                    results = list(result_directory.glob("*.json")) if result_directory.exists() else []
-                    if results:
-                        break
-                    time.sleep(.05)
-                self.assertTrue(results)
-                result_path = results[0]
-                for _ in range(300):
-                    result = session_close.read_json(result_path) or {}
-                    if result.get("status") in {"succeeded", "branch-preserved", "failed"}:
-                        break
-                    time.sleep(.05)
-                self.assertEqual("succeeded", result["status"])
-                self.assertTrue(result["session_exited"])
-                self.assertFalse(worktree.exists())
-                self.assertFalse(obligation.exists())
-                self.wait_for_observer_exit(result)
-                self.assertEqual(
-                    1,
-                    subprocess.run([
-                        "git", "-C", str(primary), "show-ref", "--verify", "--quiet",
-                        "refs/heads/feature",
-                    ], check=False).returncode,
-                )
-            finally:
-                if host.poll() is None:
-                    host.kill()
-                host.wait(timeout=5)
-
     def wait_for_observer_exit(self, result):
         # A final result precedes observer exit; Windows holds its cwd until that exact process exits.
         for _ in range(200):
@@ -536,76 +372,6 @@ class FinishReaperProcessTests(unittest.TestCase):
             connection.close()
 
 
-class ReceiptSafetyTests(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.worktree = Path(self.temp.name) / "worktree"
-        self.worktree.mkdir()
-        self.original_state = os.environ.get("AGENT_STATE_DIRECTORY")
-        os.environ["AGENT_STATE_DIRECTORY"] = self.temp.name
-        self.addCleanup(self.restore_state)
-        self.original_git = session_close.git
-        self.original_now = session_close.now
-        def fake_git(_cwd, *args):
-            if args[:3] == ("worktree", "list", "--porcelain"):
-                return 0, "worktree " + str(self.worktree.resolve()), ""
-            return 0, "head" if args[-1] == "HEAD" else "branch", ""
-
-        session_close.git = fake_git
-        session_close.now = lambda: 1000.0
-        self.addCleanup(self.restore_helpers)
-
-    def restore_state(self):
-        if self.original_state is None: os.environ.pop("AGENT_STATE_DIRECTORY", None)
-        else: os.environ["AGENT_STATE_DIRECTORY"] = self.original_state
-
-    def restore_helpers(self):
-        session_close.git = self.original_git; session_close.now = self.original_now
-
-    def receipt(self, **changes):
-        value = {"worktree": str(self.worktree), "primary": str(Path(self.temp.name) / "primary"), "branch": "branch", "head": "head", "default": "main", "verdict": "removable", "recorded_at": 999.0}
-        value.update(changes)
-        directory = Path(self.temp.name) / "merge-cleanup/receipts"; directory.mkdir(parents=True, exist_ok=True)
-        (directory / "entry.json").write_text(json.dumps(value), encoding="utf-8")
-
-    def test_missing_malformed_stale_future_and_nonremovable_receipts_refuse(self):
-        with self.assertRaises(session_close.Refusal): session_close.fresh_removable_receipt(self.worktree)
-        for name, changes in (("malformed", {}), ("stale", {"recorded_at": -9999}), ("future", {"recorded_at": 2000}), ("preserve", {"verdict": "preserve"})):
-            with self.subTest(name=name):
-                directory = Path(self.temp.name) / "merge-cleanup/receipts"; directory.mkdir(parents=True, exist_ok=True)
-                for item in directory.iterdir(): item.unlink()
-                if name == "malformed": (directory / "entry.json").write_text("[", encoding="utf-8")
-                else: self.receipt(**changes)
-                with self.assertRaises(session_close.Refusal): session_close.fresh_removable_receipt(self.worktree)
-
-    def test_moved_head_and_primary_refuse(self):
-        self.receipt()
-        session_close.git = lambda _cwd, *args: (
-            0, "moved" if args[-1] == "HEAD" else "branch", ""
-        )
-        with self.assertRaises(session_close.Refusal): session_close.fresh_removable_receipt(self.worktree)
-        session_close.git = lambda _cwd, *args: (
-            0, "head" if args[-1] == "HEAD" else "branch", ""
-        )
-        directory = Path(self.temp.name) / "merge-cleanup/receipts"
-        (directory / "entry.json").unlink(); self.receipt(primary=str(self.worktree))
-        with self.assertRaises(session_close.Refusal): session_close.fresh_removable_receipt(self.worktree)
-
-    def test_finish_refuses_a_foreign_worktree_before_receipt_or_observer(self):
-        original = (finish.session_close.own_host_and_entry, finish.session_close.worktree_from_cwd,
-                    finish.session_close.under_or_equal, finish.session_close.fresh_removable_receipt)
-        finish.session_close.own_host_and_entry = lambda: {"cwd": str(self.worktree), "session_id": "ours"}
-        finish.session_close.worktree_from_cwd = lambda: self.worktree
-        finish.session_close.under_or_equal = lambda *_args: True
-        finish.session_close.fresh_removable_receipt = lambda *_args: self.fail("receipt must not be read")
-        try:
-            with self.assertRaises(session_close.Refusal): finish.main(["--worktree", str(Path(self.temp.name) / "foreign")])
-        finally:
-            (finish.session_close.own_host_and_entry, finish.session_close.worktree_from_cwd,
-             finish.session_close.under_or_equal, finish.session_close.fresh_removable_receipt) = original
-
-
 class ProcessIdentityTests(unittest.TestCase):
     def test_absent_zombie_reused_and_unqueryable_are_distinct(self):
         original = session_close.register_session.build_process_lookup
@@ -655,91 +421,6 @@ class ClaimAndObligationSafetyTests(unittest.TestCase):
         directory = Path(self.temp.name) / "cli-sessions"
         directory.mkdir(parents=True, exist_ok=True)
         (directory / name).write_text(json.dumps(entry), encoding="utf-8")
-
-    def test_unknown_attached_claimant_blocks_cleanup(self):
-        worktree = self.worktree
-        own = {"session_id": "ours", "pid": 98, "pid_started_at": 4.0}
-        self.write_entry("unknown.json", {
-            "session_id": "other", "cwd": str(worktree), "pid": 99,
-            "pid_started_at": 5.0, "started_at": 6.0, "host": "codex",
-        })
-        with mock.patch.object(session_close, "identity_status", return_value="unknown"):
-            self.assertIsNotNone(session_close.other_live_claimant(worktree, own))
-
-    def test_only_exact_own_session_process_is_excluded(self):
-        worktree = self.worktree
-        own = {"session_id": "ours", "pid": 10, "pid_started_at": 1.0}
-        self.write_entry("ours.json", {
-            "session_id": "ours", "cwd": str(worktree), "pid": 10,
-            "pid_started_at": 1.0, "started_at": 2.0, "host": "codex",
-        })
-        with mock.patch.object(session_close, "identity_status", return_value="live"):
-            self.assertIsNone(session_close.other_live_claimant(worktree, own))
-        for suffix, pid, started, status in (
-                ("different-pid", 11, 1.0, "live"),
-                ("different-start", 10, 3.0, "unknown"),
-        ):
-            with self.subTest(suffix=suffix):
-                self.write_entry("ours.json", {
-                    "session_id": "ours", "cwd": str(worktree), "pid": pid,
-                    "pid_started_at": started, "started_at": 4.0, "host": "codex",
-                })
-                with mock.patch.object(session_close, "identity_status", return_value=status):
-                    self.assertIsNotNone(session_close.other_live_claimant(worktree, own))
-
-    def test_finish_preflight_passes_full_own_identity_to_claim_check(self):
-        entry = {"host": "codex", "session_id": "ours", "pid": 10, "pid_started_at": 1.0,
-                 "started_at": 2.0, "cwd": str(self.worktree)}
-        receipt = {"head": "head", "primary": "primary", "branch": "branch", "default": "main"}
-        with mock.patch.object(finish.session_close, "own_host_and_entry", return_value=entry), \
-                mock.patch.object(finish.session_close, "worktree_from_cwd", return_value=self.worktree), \
-                mock.patch.object(finish.session_close, "under_or_equal", return_value=True), \
-                mock.patch.object(finish.session_close, "awaiting_input_activity", return_value=3.0), \
-                mock.patch.object(finish.session_close, "fresh_removable_receipt", return_value=receipt), \
-                mock.patch.object(finish.session_close, "other_live_claimant", return_value={"pid": 11}) as claimant, \
-                mock.patch.object(finish.session_close, "start_observer") as observer, \
-                mock.patch.object(finish.os, "kill") as killer:
-            with self.assertRaisesRegex(session_close.Refusal, "another verified"):
-                finish.main(["--worktree", str(self.worktree)])
-        claimant.assert_called_once_with(self.worktree, entry)
-        observer.assert_not_called()
-        killer.assert_not_called()
-
-    def test_refresh_cleanup_passes_full_own_identity_to_claim_check(self):
-        entry = {"host": "codex", "session_id": "ours", "pid": 10, "pid_started_at": 1.0,
-                 "started_at": 2.0, "cwd": str(self.worktree)}
-        receipt = {"head": "head", "primary": "primary", "branch": "branch", "default": "main"}
-        with mock.patch.object(finish.session_close, "own_host_and_entry", return_value=entry), \
-                mock.patch.object(finish.session_close, "worktree_from_cwd", return_value=self.worktree), \
-                mock.patch.object(finish.session_close, "under_or_equal", return_value=True), \
-                mock.patch.object(finish.session_close, "awaiting_input_activity", return_value=3.0), \
-                mock.patch.object(finish.session_close, "fresh_removable_receipt", return_value=receipt), \
-                mock.patch.object(finish.session_close, "other_live_claimant", return_value={"pid": 11}) as claimant, \
-                mock.patch.object(finish.os, "kill") as killer:
-            with self.assertRaisesRegex(session_close.Refusal, "another registered"):
-                finish.refresh_cleanup(entry, self.worktree, receipt)
-        claimant.assert_called_once_with(self.worktree, entry)
-        killer.assert_not_called()
-
-    def test_final_preflight_blocks_same_id_successor_without_removing_or_signalling(self):
-        args = SimpleNamespace(
-            worktree=str(self.worktree), head="head", primary="primary", branch="branch",
-            default="main", session_id="ours", host_pid=10, host_start=1.0,
-        )
-        receipt = {"head": "head", "primary": "primary", "branch": "branch", "default": "main"}
-        with mock.patch.object(finish_reaper.session_close, "fresh_removable_receipt", return_value=receipt), \
-                mock.patch.object(finish_reaper.session_close, "verified_exited", return_value=True), \
-                mock.patch.object(finish_reaper.session_close, "other_live_claimant", return_value={"pid": 11}) as claimant, \
-                mock.patch.object(finish_reaper.session_close, "git") as git_call, \
-                mock.patch.object(finish_reaper.os, "kill") as killer:
-            with self.assertRaisesRegex(session_close.Refusal, "another verified"):
-                finish_reaper.final_preflight(args)
-        claimant.assert_called_once_with(
-            self.worktree,
-            {"session_id": "ours", "pid": 10, "pid_started_at": 1.0},
-        )
-        git_call.assert_not_called()
-        killer.assert_not_called()
 
     def test_obligation_removal_requires_both_session_and_worktree(self):
         directory = Path(self.temp.name) / "merge-cleanup/obligations"
@@ -1010,16 +691,6 @@ class EndReasonRecordingTests(unittest.TestCase):
     def setUp(self):
         self.entry = {"host": "claude", "session_id": "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "pid": 1, "pid_started_at": 1.0}
 
-    def test_finish_records_finished_reason_through_the_shared_store(self):
-        store = mock.Mock()
-        store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
-        connection = mock.Mock()
-        store.connect.return_value = connection
-        with mock.patch.object(finish.register_session, "_load_session_store", return_value=store):
-            finish._record_own_end(self.entry, "finished")
-        store.end_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "finished")
-        connection.close.assert_called_once()
-
     def test_close_records_closed_reason_through_the_shared_store(self):
         store = mock.Mock()
         store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
@@ -1035,21 +706,21 @@ class EndReasonRecordingTests(unittest.TestCase):
         store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
         connection = mock.Mock()
         store.connect.return_value = connection
-        with mock.patch.object(finish.register_session, "_load_session_store", return_value=store):
-            finish._reopen_own_end(self.entry, "finished")
-        store.reopen_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "finished")
+        with mock.patch.object(own_close.register_session, "_load_session_store", return_value=store):
+            own_close._reopen_own_end(self.entry, "closed")
+        store.reopen_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "closed")
         connection.close.assert_called_once()
 
     def test_recording_never_raises_when_the_store_is_unavailable(self):
-        with mock.patch.object(finish.register_session, "_load_session_store", return_value=None):
-            finish._record_own_end(self.entry, "finished")
-        with mock.patch.object(finish.register_session, "_load_session_store", side_effect=RuntimeError("boom")):
-            finish._record_own_end(self.entry, "finished")
+        with mock.patch.object(own_close.register_session, "_load_session_store", return_value=None):
+            own_close._record_own_end(self.entry, "closed")
+        with mock.patch.object(own_close.register_session, "_load_session_store", side_effect=RuntimeError("boom")):
+            own_close._record_own_end(self.entry, "closed")
 
     def test_recording_is_skipped_without_a_known_host_or_session(self):
         store = mock.Mock()
-        with mock.patch.object(finish.register_session, "_load_session_store", return_value=store):
-            finish._record_own_end({"pid": 1, "pid_started_at": 1.0}, "finished")
+        with mock.patch.object(own_close.register_session, "_load_session_store", return_value=store):
+            own_close._record_own_end({"pid": 1, "pid_started_at": 1.0}, "closed")
         store.connect.assert_not_called()
 
 
@@ -1099,25 +770,23 @@ class SelfCloseActivityGuardTests(unittest.TestCase):
                 session_close.awaiting_input_activity(self.entry, 39.0)
 
     def test_first_guard_refuses_before_cleanup_observer_end_record_or_signal(self):
-        for module in (own_close, finish):
+        for module in (own_close,):
             with self.subTest(module=module.__name__), \
                     mock.patch.object(module.session_close, "own_host_and_entry", return_value=self.entry), \
                     mock.patch.object(module.session_close, "worktree_from_cwd", return_value=self.cwd), \
                     mock.patch.object(module.session_close, "under_or_equal", return_value=True), \
                     mock.patch.object(module.session_close, "awaiting_input_activity", side_effect=session_close.Refusal("session is not awaiting input")), \
-                    mock.patch.object(module.session_close, "fresh_removable_receipt") as receipt, \
                     mock.patch.object(module.session_close, "start_observer") as observer, \
                     mock.patch.object(module, "_record_own_end") as end_record, \
                     mock.patch.object(module, "close_host") as closer:
                 with self.assertRaisesRegex(session_close.Refusal, "not awaiting input"):
                     module.main([])
-                receipt.assert_not_called()
                 observer.assert_not_called()
                 end_record.assert_not_called()
                 closer.assert_not_called()
 
     def test_prompt_then_stop_with_a_new_idle_token_refuses_before_end_or_signal(self):
-        for module in (own_close, finish):
+        for module in (own_close,):
             with self.subTest(module=module.__name__), ExitStack() as stack:
                 stack.enter_context(mock.patch.object(module.session_close, "own_host_and_entry", return_value=self.entry))
                 stack.enter_context(mock.patch.object(module.session_close, "worktree_from_cwd", return_value=self.cwd))
@@ -1126,8 +795,6 @@ class SelfCloseActivityGuardTests(unittest.TestCase):
                     module.session_close, "awaiting_input_activity",
                     side_effect=[40.0, session_close.Refusal("session activity changed before close")],
                 ))
-                stack.enter_context(mock.patch.object(module.session_close, "fresh_removable_receipt", return_value={"head": "h", "primary": str(self.cwd), "branch": "b", "default": "main"}))
-                stack.enter_context(mock.patch.object(module.session_close, "other_live_claimant", return_value=None))
                 stack.enter_context(mock.patch.object(module.session_close, "git", return_value=(0, "", "")))
                 stack.enter_context(mock.patch.object(module.session_close, "results_path", return_value=self.state / "result.json"))
                 stack.enter_context(mock.patch.object(module.session_close, "qualified_windows_wrapper", return_value=None))
@@ -1138,7 +805,6 @@ class SelfCloseActivityGuardTests(unittest.TestCase):
                 stack.enter_context(mock.patch.object(module.session_close, "write_json"))
                 cancel = stack.enter_context(mock.patch.object(module.session_close, "cancel_observer"))
                 stack.enter_context(mock.patch.object(module, "refresh_attachment", return_value=None, create=True))
-                stack.enter_context(mock.patch.object(module, "refresh_cleanup", return_value=None, create=True))
                 end_record = stack.enter_context(mock.patch.object(module, "_record_own_end"))
                 closer = stack.enter_context(mock.patch.object(module, "close_host"))
                 with self.assertRaisesRegex(session_close.Refusal, "activity changed"):

@@ -54,15 +54,3 @@ A deck owns the outer task, worktree, and host session. It is optional and never
 A deck that is absent, unavailable, or defective degrades to the bare-CLI path with no change to workflow
 selection or semantics. Deck recovery defects belong to the deck's own plan, not to this contract.
 
-## Compatibility entries and release gates
-
-| Entry | Kind | Status | Replacement |
-|---|---|---|---|
-| `staged-review-all` | driver | retained | drives `staged-review`; no removal gate |
-
-The release letter in `compatibility.json` is the contraction gate. Release **A** publishes the new workflows
-and thin entries. Release **B** may mark an entry `deprecated` once every standards-managed consumer has
-migrated. Release **C** may remove one only after Release B is installed everywhere, a repository-wide
-route, skill, and plan grep finds no remaining caller, and both host acceptance suites pass through the
-replacement. One remaining caller keeps the entry for another published version. A driver has no removal
-gate because it is not a wrapper over a retired name.
