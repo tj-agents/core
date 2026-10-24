@@ -98,7 +98,6 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          python -B scripts/update_catalog_digests.py
           ./.agents/sync-generated.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -109,10 +108,6 @@ jobs:
       - name: tier payloads conform to the shipped shape
         shell: pwsh
         run: python -B .agents/hooks/check_tier_payload.py --root .
-
-      - name: local capability catalog digests are current
-        shell: pwsh
-        run: python -B scripts/update_catalog_digests.py --check
 
       - name: harness declarations cover authored sources
         shell: pwsh
@@ -196,7 +191,6 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          python -B scripts/update_catalog_digests.py
           ./.agents/sync-generated.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -206,9 +200,6 @@ jobs:
 
       - name: tier payloads conform to the shipped shape
         run: python -B .agents/hooks/check_tier_payload.py --root .
-
-      - name: local capability catalog digests are current
-        run: python -B scripts/update_catalog_digests.py --check
 
       - name: harness declarations cover authored sources
         run: python -B scripts/sync_harness_manifests.py --check
@@ -282,7 +273,6 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          python -B scripts/update_catalog_digests.py
           ./.agents/sync-generated.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -294,7 +284,6 @@ jobs:
           ./.agents/sync-generated.ps1 -Check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -B .agents/hooks/check_tier_payload.py --root .
-          python -B scripts/update_catalog_digests.py --check
           python -B scripts/sync_harness_manifests.py --check
 
       - name: commit and push the regeneration
@@ -305,11 +294,10 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .agents/catalog/catalog.json plugins .agents/plugins/marketplace.json .claude-plugin/marketplace.json CAPABILITIES.md
+          git add plugins .agents/plugins/marketplace.json .claude-plugin/marketplace.json CAPABILITIES.md
           $staged = git diff --cached --name-only
           if ($staged) {
             git commit -m "Regenerate packages for $env:GITHUB_SHA"
-            python -B scripts/update_catalog_digests.py --check
             git push origin HEAD:main
             "changed=true" >> $env:GITHUB_OUTPUT
           } else {

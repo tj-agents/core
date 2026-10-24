@@ -25,8 +25,6 @@
       "Bash(python -B scripts/ci_selection.py run --group source)",
       "Bash(python -B scripts/sync_harness_manifests.py --check)",
       "Bash(python -B scripts/sync_harness_manifests.py)",
-      "Bash(python -B scripts/update_catalog_digests.py --check)",
-      "Bash(python -B scripts/update_catalog_digests.py)",
       "Bash(python .agents/workflows/workflow_ops.py *)",
       "Bash(python3 -B scripts/ci_native_acceptance.py)",
       "Edit(/.agents/**)",
@@ -79,8 +77,6 @@
       "PowerShell(python -B scripts/ci_selection.py run --group source)",
       "PowerShell(python -B scripts/sync_harness_manifests.py --check)",
       "PowerShell(python -B scripts/sync_harness_manifests.py)",
-      "PowerShell(python -B scripts/update_catalog_digests.py --check)",
-      "PowerShell(python -B scripts/update_catalog_digests.py)",
       "PowerShell(python .agents/workflows/workflow_ops.py *)",
       "PowerShell(python3 -B scripts/ci_native_acceptance.py)"
     ],

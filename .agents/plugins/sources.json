@@ -72,7 +72,8 @@
     "plugins/publication.json",
     ".agents/plugins/marketplace.json",
     ".claude-plugin/marketplace.json",
-    "CAPABILITIES.md"
+    "CAPABILITIES.md",
+    "plugins/packages.json"
   ],
   "resources": [
     {
@@ -174,11 +175,6 @@
       "plugin": "machine",
       "source": ".agents/lanes",
       "destination": "resources/lanes"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/catalog",
-      "destination": "catalog"
     },
     {
       "plugin": "machine",
@@ -374,6 +370,16 @@
       "plugin": "workflow",
       "source": ".agents/hooks/codex_hook_snapshot.py",
       "destination": "hooks/codex_hook_snapshot.py"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/schemas/packages.schema.json",
+      "destination": "schemas/packages.schema.json"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/schemas/plugin-selection.schema.json",
+      "destination": "schemas/plugin-selection.schema.json"
     }
   ],
   "prerequisites": {
@@ -424,5 +430,76 @@
   "workflow": {
     "source": ".agents/workflows",
     "plugin": "engineering"
+  },
+  "platforms": {
+    "agent-store": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "base": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "engineering": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "machine": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "workflow": [
+      "windows",
+      "linux",
+      "macos"
+    ]
+  },
+  "runtime_prerequisites": {
+    "agent-store": {
+      "required": [
+        "python>=3.9"
+      ],
+      "optional": []
+    },
+    "base": {
+      "required": [
+        "python>=3.9"
+      ],
+      "optional": []
+    },
+    "engineering": {
+      "required": [
+        "exe:git",
+        "python>=3.9"
+      ],
+      "optional": [
+        "exe:bash",
+        "exe:gh",
+        "exe:powershell"
+      ]
+    },
+    "machine": {
+      "required": [
+        "python>=3.9"
+      ],
+      "optional": [
+        "exe:powershell",
+        "exe:codex",
+        "exe:claude",
+        "windows-terminal",
+        "python>=3.11"
+      ]
+    },
+    "workflow": {
+      "required": [
+        "exe:git",
+        "python>=3.9"
+      ],
+      "optional": []
+    }
   }
 }

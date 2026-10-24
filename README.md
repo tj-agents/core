@@ -132,7 +132,7 @@ gate. Source verification does not establish installed-host trust or acceptance.
 - [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md) defines this source/adapter/distribution boundary.
 - [`SKILL_KINDS.md`](SKILL_KINDS.md) defines the shared open taxonomy used by every agent marketplace repo.
 - [`PACKAGING.md`](PACKAGING.md) is the rule that a utility skill's runtime dependencies ship with it.
-- `.agents/catalog/catalog.json` records current package definitions and package digests. The generated
+- `plugins/packages.json` contains generated package definitions and package digests. The generated
   [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index. Consumers select plugins in a
   committed `.agents/plugins.json` with qualified identities and a marketplace-to-repository map; selected
   approved publishers follow `main`.
@@ -166,11 +166,10 @@ bypass this Git Bash workaround and require an upstream host fix.
 
 A PR carries authored sources only. CI's guard job rejects generated paths, PR CI regenerates its own
 workspace before testing, and the post-merge `regenerate` job commits the refreshed `plugins/*`,
-catalog digests, marketplace bridges and `CAPABILITIES.md` to main. To refresh a local tree for tests,
-run the same two commands and leave their output uncommitted:
+package records, marketplace bridges and `CAPABILITIES.md` to main. To refresh a local tree for tests,
+run the same command and leave their output uncommitted:
 
 ```powershell
-python -B scripts/update_catalog_digests.py
 pwsh .agents/sync-generated.ps1
 ```
 
@@ -191,9 +190,9 @@ The `machine:plugin-selection` skill creates a repository's `.agents/plugins.jso
 Claude and Codex plugin settings from it, so a fresh clone installs exactly what it selects from rolling main.
 Selections can combine `tj-agents` and `Concertable` marketplaces without revision pins.
 
-Catalog packages have no release or manifest version. `sha256-tree-v1` hashes
+Generated packages have no release or manifest version. `sha256-tree-v1` hashes
 the sorted package paths, lengths and bytes. The machine package excludes only its embedded
-`catalog/catalog.json` from its own digest to avoid a self-reference; its schemas, bootstrap and all other
+`packages.json` from its own digest to avoid a self-reference; its schemas, bootstrap and all other
 resources remain covered.
 
 ## Machine setup and updates

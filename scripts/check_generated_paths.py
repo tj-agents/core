@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject pull requests that modify generated distribution output, including catalog digests."""
+"""Reject pull requests that modify generated distribution output."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-CATALOG = ".agents/catalog/catalog.json"
 
 
 def git(*args: str, root: Path = ROOT) -> str:
@@ -24,30 +23,7 @@ def generated_roots(merge_base: str, root: Path = ROOT) -> list[str]:
     # Read from the merge base, not the PR's tree: a PR editing sources.json
     # must not be able to exempt its own paths from this guard.
     config = json.loads(git("show", f"{merge_base}:.agents/plugins/sources.json", root=root))
-    return list(config["generated_roots"])
-
-
-def catalog_digests(revision: str, root: Path = ROOT) -> dict[str, str]:
-    try:
-        catalog = json.loads(git("show", f"{revision}:{CATALOG}", root=root))
-    except subprocess.CalledProcessError:
-        return {}
-    packages = catalog.get("packages")
-    if packages is None:
-        packages = [package for release in catalog.get("releases", []) for package in release.get("plugins", [])]
-    return {package["id"]: package.get("digest") for package in packages}
-
-
-# The catalog itself is authored, but its digests are written by the same post-merge job as plugins/*.
-# A PR that commits them collides with that job's commit on main, and every other open PR touching the
-# same package then conflicts on the digest line.
-def changed_digests(merge_base: str, root: Path = ROOT) -> list[str]:
-    before, after = catalog_digests(merge_base, root), catalog_digests("HEAD", root)
-    return sorted(
-        f"{CATALOG} digest of {plugin_id}"
-        for plugin_id in before.keys() & after.keys()
-        if before[plugin_id] != after[plugin_id]
-    )
+    return ["plugins", *config["generated_roots"]]
 
 
 def offending_paths(base: str, root: Path = ROOT) -> list[str]:
@@ -58,7 +34,7 @@ def offending_paths(base: str, root: Path = ROOT) -> list[str]:
         path
         for path in changed
         if any(path == generated or path.startswith(generated + "/") for generated in roots)
-    ) + changed_digests(merge_base, root)
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
