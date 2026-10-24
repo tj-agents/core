@@ -231,6 +231,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--target")
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     arguments = parser.parse_args(argv)
+    try:
+        host = arguments.host or os.environ.get(HOST_VARIABLE, "").strip().casefold()
+        check(arguments.project.resolve(), host=host if host in HOSTS else None)
+    except Exception as error:
+        print(f"plugins: update check failed: {error}", file=sys.stderr)
     if arguments.host:
         import required_plugins
 
@@ -240,11 +245,6 @@ def main(argv: list[str] | None = None) -> int:
         except required_plugins.RequiredPluginsError as error:
             print(f"plugins: {error}", file=sys.stderr)
             return 1
-    try:
-        host = arguments.host or os.environ.get(HOST_VARIABLE, "").strip().casefold()
-        check(arguments.project.resolve(), host=host if host in HOSTS else None)
-    except Exception as error:
-        print(f"plugins: update check failed: {error}", file=sys.stderr)
     return 0
 
 

@@ -25,6 +25,7 @@ def load(name):
 
 
 CHECK = load("launch_check")
+import required_plugins as REQUIRED  # noqa: E402
 import setup_machine as SETUP  # noqa: E402
 TOPIC = "t" * 40
 
@@ -52,16 +53,22 @@ class Server:
 
 
 class LaunchCheckTests(unittest.TestCase):
-    def test_shell_admission_refuses_unverifiable_codex_override_before_optional_updates(self):
+    def test_shell_admission_refuses_unverifiable_codex_override(self):
         selection = self.state / ".agents/plugins.json"
         selection.parent.mkdir()
         selection.write_text('{"schema_version":1,"plugins":["base@tj-agents"]}', encoding="utf-8")
-        with mock.patch.object(CHECK, "check") as optional, mock.patch.object(sys, "stderr", io.StringIO()):
+        with mock.patch.object(CHECK, "check"), mock.patch.object(sys, "stderr", io.StringIO()):
             self.assertEqual(1, CHECK.main([
                 "--host", "codex", "--project", str(self.state), "--target", "native-cli",
                 "--", "--profile=alternate",
             ]))
-        optional.assert_not_called()
+
+    def test_admission_runs_after_the_install_check_so_a_new_declaration_can_launch(self):
+        order = []
+        with mock.patch.object(CHECK, "check", side_effect=lambda *args, **kwargs: order.append("install")), \
+                mock.patch.object(REQUIRED, "check_launch", side_effect=lambda *args: order.append("admission")):
+            self.assertEqual(0, CHECK.main(["--host", "claude", "--project", str(self.state), "--target", "claude"]))
+        self.assertEqual(["install", "admission"], order)
 
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix="launch check ")
@@ -89,7 +96,7 @@ class LaunchCheckTests(unittest.TestCase):
         self.cursor.write_text(json.dumps({"since": "abc"}), encoding="utf-8")
         with mock.patch.object(subprocess, "Popen", side_effect=AssertionError("subprocess")) as popen, \
                 mock.patch.object(subprocess, "run", side_effect=AssertionError("subprocess")):
-            self.assertEqual("current", CHECK.check(ROOT, fetch=server, update=self.update()))
+            self.assertEqual("current", CHECK.check(self.state, fetch=server, update=self.update()))
         self.assertEqual([f"/{TOPIC}/json?poll=1&since=abc"], server.paths)
         popen.assert_not_called()
         self.assertEqual([], self.updates)
@@ -157,7 +164,7 @@ class LaunchCheckTests(unittest.TestCase):
 
     def test_events_for_repositories_without_plugins_only_advance_the_cursor(self):
         server = Server([{"id": "m1", "event": "message", "message": "{}"}])
-        self.assertEqual("current", CHECK.check(ROOT, fetch=server, update=self.update(), now=1234))
+        self.assertEqual("current", CHECK.check(self.state, fetch=server, update=self.update(), now=1234))
         self.assertEqual([], self.updates)
         self.assertEqual({"since": "m1", "since_at": 1234}, self.saved())
 

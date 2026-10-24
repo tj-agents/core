@@ -159,9 +159,12 @@ def persistence_problems(expected: list[tuple[str, str, Path, str]], installatio
 
 def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]],
                  updates: list[tuple[str, str, Path]], starting=None) -> list[str]:
+    updated = []
     for identity, scope in installs:
         run([executable, "plugin", "install", identity, "--scope", scope], project)
-    expected, updated = [], []
+        if identity not in updated:
+            updated.append(identity)
+    expected = []
     for identity, scope, owner in updates:
         if starting is not None:
             starting(identity, scope, owner)
@@ -171,7 +174,9 @@ def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]]
         if result["updateOutcome"] == "updated" and identity not in updated:
             updated.append(identity)
     after = json.loads(run([executable, "plugin", "list", "--json"], project))
-    problems = persistence_problems(expected, after) + plugin_errors(after, project)
+    problems = [f"{identity} ({scope}) install did not persist for {project}" for identity, scope in installs
+                if entry_for(after, identity, scope, project) is None]
+    problems += persistence_problems(expected, after) + plugin_errors(after, project)
     if problems:
         raise RefreshError("; ".join(problems))
     return updated
@@ -275,7 +280,7 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
         key, path = publishers.get(name, {}).get(plugin, (None, None))
         head = contents["heads"].get(key) if key else None
         forced = event and key is None and (repositories is None or marketplaces.get(name) in repositories)
-        if event:
+        if event or not any(entry.get("id") == identity and applies(entry, project) for entry in installations):
             installs += [(identity, scope) for scope in declared_scopes(identity, project)
                          if entry_for(installations, identity, scope, project) is None]
         for scope, owner in update_targets(identity, project, installations):

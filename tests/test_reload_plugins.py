@@ -532,6 +532,43 @@ class HeadReconcileTests(unittest.TestCase):
         self.assertEqual(["dotnet@tj-agents"], installs)
         self.assertNotIn("update", [command[2] for command, _ in fake.commands])
 
+    def test_a_plain_launch_installs_a_newly_declared_plugin(self):
+        project = self.home.project("core", "settings.json", "base@tj-agents", "workflow@tj-agents")
+        fake = FakeClaude(self.home.installed(("base@tj-agents", "project", project, CORE_HEAD)))
+        self.record({"tj-agents/core@main": CORE_HEAD})
+
+        def install(command, cwd):
+            if command[2] == "install":
+                fake.installations.append({"id": command[3], "scope": command[5], "projectPath": str(cwd),
+                                           "enabled": True, "version": "v2"})
+            return fake(command, cwd)
+        with mock.patch.object(REFRESH, "run", side_effect=install):
+            self.assertEqual(["workflow@tj-agents"], REFRESH.reconcile_claude(project))
+        self.assertIn((["claude", "plugin", "install", "workflow@tj-agents", "--scope", "project"], project),
+                      fake.commands)
+        self.assertNotIn("update", [command[2] for command, _ in fake.commands])
+
+    def test_a_plain_launch_leaves_a_declaration_a_user_install_already_serves(self):
+        project = self.home.project("core", "settings.json", "base@tj-agents")
+        self.home.installed(("base@tj-agents", "user", None, CORE_HEAD))
+        self.record({"tj-agents/core@main": CORE_HEAD})
+        with mock.patch.object(REFRESH, "run", side_effect=AssertionError("process started")):
+            self.assertEqual([], REFRESH.reconcile_claude(project))
+
+    def test_an_install_the_cli_records_elsewhere_fails_loudly(self):
+        project = self.home.project("core", "settings.json", "workflow@tj-agents")
+        nested = project / ".worktrees" / "Feature"
+        fake = FakeClaude(self.home.installed(("base@tj-agents", "user", None, CORE_HEAD)))
+
+        def install(command, cwd):
+            if command[2] == "install":
+                fake.installations.append({"id": command[3], "scope": command[5], "projectPath": str(nested),
+                                           "enabled": True, "version": "v2"})
+            return fake(command, cwd)
+        with mock.patch.object(REFRESH, "run", side_effect=install), \
+                self.assertRaisesRegex(REFRESH.RefreshError, "workflow@tj-agents \\(project\\) install did not persist"):
+            REFRESH.reconcile_claude(project)
+
     def test_a_full_compare_tolerates_a_publisher_it_cannot_read(self):
         project = self.home.project("preaward", "settings.local.json", "base@tj-agents")
         self.home.installed(("base@tj-agents", "local", project, CORE_HEAD))
