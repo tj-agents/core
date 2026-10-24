@@ -38,8 +38,12 @@ procedure that goes stale in the repo that renames one.
   flow), or a wedged queue. Never because the queue is slow. **Skipping a suite is not the same as skipping
   the queue:** to run less, apply the tier label below and enqueue normally so the hard floor still builds
   against current base.
-- **A required approval is Tommy's, and `--auto` waits for it.** Where the ruleset requires one, enable
-  `--auto` and report the PR link as awaiting his approval; his approval lands it. Never bypass it.
+- **A required approval is Tommy's, and `--auto` waits for it.** Before arming auto-merge, initialize,
+  claim, register and observe the existing `engineering:persistent-workflow` continuation for the exact
+  PR/head and its authorized post-merge steps. Use the guarded command below and report the approval link
+  once. GitHub's required review remains a waiting dependency; retain the binding and scheduler so a
+  merge observation resumes cleanup and publication without another prompt. Never approve or bypass it.
+  A missing task authorization or an explicit hold remains a human gate.
 - **`--delete-branch` is rejected while a queue is enabled.** Delete the branch separately, after it lands.
 
 ## Steps
@@ -171,9 +175,12 @@ present:
   the skip took, because those suites never run on a PR at all; only the label, or a correctly-blocked
   trailer, changes what the *queue* runs.
 
-```bash
-pushd "<absolute-worktree>" && gh pr merge <n> --merge --auto
-# no --delete-branch: the queue rejects it
+Use the guarded command from `engineering:persistent-delivery`, with `python` on Windows or `python3`
+on Linux/macOS. It admits a conflict-free, green PR awaiting required review while retaining the exact-head,
+independent-review, repository preference and authorization checks. GitHub still enforces its ruleset.
+
+```text
+python -B <engineering-package-root>/workflows/auto_merge.py --root <absolute-worktree>
 ```
 
 When the repository's `.github/merge-policy.json` sets `agents_may_merge: false`, the merge needs the
