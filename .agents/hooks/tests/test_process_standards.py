@@ -81,7 +81,7 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertNotIn("concurrent fixes", address)
 
     def test_always_on_instructions_own_the_stage_pointer_rule(self):
-        instructions = authored_skill("session-lifecycle").read_text(
+        instructions = authored_skill("workflow:session").read_text(
             encoding="utf-8"
         )
 
@@ -93,7 +93,7 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertEqual(1, self.corpus().count("stage is actually entered"))
 
     def test_always_on_instructions_reconcile_known_problems_before_terminal_results(self):
-        instructions = authored_skill("session").read_text(
+        instructions = authored_skill("engineering:session").read_text(
             encoding="utf-8"
         )
         flat = " ".join(instructions.split())
@@ -107,7 +107,7 @@ class ProcessStandardsTests(unittest.TestCase):
         )
 
     def test_standards_repair_requires_internal_source_authority(self):
-        instructions = authored_skill("session").read_text(
+        instructions = authored_skill("engineering:session").read_text(
             encoding="utf-8"
         )
         flat = " ".join(instructions.split())
@@ -144,8 +144,8 @@ class ProcessStandardsTests(unittest.TestCase):
                 instructions.split("## When the user calls out a mistake", 1)[1].split("## ", 1)[0].split()
             )
 
-        self.assertTrue(callout("session-lifecycle").startswith("Answer the direct question first"))
-        section = callout("session")
+        self.assertTrue(callout("workflow:session").startswith("Answer the direct question first"))
+        section = callout("engineering:session")
         for phrase in (
             "`engineering:self-repair`",
             "source ownership, causal evidence and repair eligibility",
@@ -175,10 +175,10 @@ class ProcessStandardsTests(unittest.TestCase):
         )
         workflow = authored_skill("persistent-workflow").read_text(encoding="utf-8")
         claude = (
-            self.root / ".claude/skills/persistent-workflow/SKILL.md"
+            self.root / ".claude/skills/engineering/persistent-workflow/SKILL.md"
         ).read_text(encoding="utf-8")
         codex = (
-            self.root / ".codex/skills/persistent-workflow/SKILL.md"
+            self.root / ".codex/skills/engineering/persistent-workflow/SKILL.md"
         ).read_text(encoding="utf-8")
 
         self.assertIn("persistent-workflow skill", remote)

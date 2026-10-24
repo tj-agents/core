@@ -390,7 +390,7 @@ class ReviewWorkflowAcceptanceTests(unittest.TestCase):
         description = next(line for line in canonical.splitlines() if line.startswith("description: "))
         for host in (".codex", ".claude"):
             with self.subTest(host=host):
-                adapter = (ROOT / host / "skills" / "docs-review" / "SKILL.md").read_text(encoding="utf-8")
+                adapter = (ROOT / host / "skills" / "engineering" / "docs-review" / "SKILL.md").read_text(encoding="utf-8")
                 self.assertIn(description, adapter)
 
     def test_review_family_keeps_one_canonical_body_and_thin_host_entries(self):

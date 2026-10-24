@@ -312,14 +312,14 @@
       "adaptation": "Codex-only delivery configuration is authored under .codex and packaged with the engineering plugin."
     },
     {
-      "path": ".claude/skills/persistent-workflow/SKILL.md",
+      "path": ".claude/skills/engineering/persistent-workflow/SKILL.md",
       "source_path": ".claude/workflow-skills/persistent-workflow/SKILL.md",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "479a7c0aa2fc47b8563701776e3c794674343f7f23a8fc26f326136ab01a3bd5",
       "adaptation": "Claude host behavior extends and references the canonical .agents workflow definition."
     },
     {
-      "path": ".codex/skills/persistent-workflow/SKILL.md",
+      "path": ".codex/skills/engineering/persistent-workflow/SKILL.md",
       "source_path": ".codex/workflow-skills/persistent-workflow/SKILL.md",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "7e54dc045b59ab07e2a99b02849362ea1ab60166ebb30b8a70a5290ae42c1e8d",
