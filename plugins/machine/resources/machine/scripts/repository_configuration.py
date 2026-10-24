@@ -7,8 +7,9 @@ from pathlib import Path
 
 SETTINGS_PATH = Path(".agents") / "settings.json"
 NAMESPACE_NAME = re.compile(r"^[a-z][a-z0-9-]*$")
-CORE_KEYS = frozenset({"auto_merge", "auto_approve", "auto_approve_design"})
+CORE_KEYS = frozenset({"auto_merge", "auto_approve", "auto_approve_design", "permissions"})
 AUTO_APPROVE_KEYS = frozenset({"all", "design"})
+PERMISSION_MODES = frozenset({"bypass", "standard"})
 
 
 class ConfigurationViolation(ValueError):
@@ -95,6 +96,9 @@ def core(root):
     for key in ("auto_merge", "auto_approve_design"):
         if key in value and type(value[key]) is not bool:
             raise ConfigurationViolation(f"core {key} must be a boolean")
+    if "permissions" in value and (not isinstance(value["permissions"], str)
+                                    or value["permissions"] not in PERMISSION_MODES):
+        raise ConfigurationViolation("core permissions must be bypass or standard")
     if "auto_approve" in value:
         auto_approve = value["auto_approve"]
         if not isinstance(auto_approve, dict):
@@ -115,6 +119,11 @@ def auto_merge(root, legacy_policy):
     if settings is None:
         return legacy_policy is not None and legacy_policy.get("auto_merge") is True
     return settings.get("auto_merge", False)
+
+
+def permissions(root):
+    settings = core(root)
+    return "bypass" if settings is None else settings.get("permissions", "bypass")
 
 
 def auto_approve_design(root):
