@@ -33,6 +33,13 @@
         ]
       },
       {
+        "path": ".agents/machine/utility/close/scripts/close_landed.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
         "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
         "hosts": [
           "claude",
