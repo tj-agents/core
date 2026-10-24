@@ -234,6 +234,70 @@ class FollowupTests(unittest.TestCase):
         self.assertFalse(proxy.submitted)
         self.assertEqual(original, self.receipt_path.read_bytes())
 
+    def probe_arguments(self):
+        return ['--timeout', '0.1', 'probe', '--thread', THREAD, '--cwd', str(self.root),
+                '--codex-home', str(self.root)]
+
+    def test_probe_observes_active_and_idle_recipients_without_input_or_files(self):
+        original = {path.name: path.read_bytes() for path in self.root.iterdir()}
+        for state in ('active', 'idle'):
+            with self.subTest(state=state):
+                proxy = Session(self.receipt, state=state)
+                code, result = self.run_main(self.probe_arguments(), proxy)
+                self.assertEqual(0, code)
+                self.assertEqual('reachable', result['status'])
+                self.assertEqual(state, result['runtime_state'])
+                self.assertFalse(result['acknowledged'])
+                self.assertNotIn('receipt', result)
+                self.assertFalse(proxy.submitted)
+                self.assertTrue(all(method in ('thread/read', 'thread/loaded/list',
+                                               'thread/turns/list') for method, _ in proxy.calls))
+        self.assertEqual(original, {path.name: path.read_bytes() for path in self.root.iterdir()})
+
+    def test_probe_rejects_wrong_target_and_unreachable_runtime_without_mutating(self):
+        for variant in ('identity', 'cwd', 'unloaded', 'capability', 'state', 'turn'):
+            with self.subTest(variant=variant):
+                proxy = Session(self.receipt)
+                if variant == 'identity':
+                    proxy.thread['id'] = CLIENT
+                elif variant == 'cwd':
+                    proxy.thread['cwd'] = str(self.root / 'other')
+                elif variant == 'unloaded':
+                    proxy.loaded = []
+                elif variant == 'capability':
+                    proxy.thread['canAcceptDirectInput'] = False
+                elif variant == 'state':
+                    proxy.thread['status']['type'] = 'systemError'
+                else:
+                    proxy.turns.append({'id': 'another-turn', 'status': 'inProgress'})
+                code, result = self.run_main(self.probe_arguments(), proxy)
+                self.assertEqual(2, code)
+                self.assertEqual('unavailable', result['status'])
+                self.assertNotIn('receipt', result)
+                self.assertFalse(proxy.submitted)
+                self.assertFalse(self.receipt_path.exists())
+
+    def test_probe_transport_failure_does_not_require_a_message_or_receipt(self):
+        output = io.StringIO()
+        with patch.object(FOLLOWUP, 'Proxy', side_effect=OSError('No shared server')), \
+                contextlib.redirect_stdout(output):
+            code = FOLLOWUP.main(self.probe_arguments())
+        result = json.loads(output.getvalue())
+        self.assertEqual(2, code)
+        self.assertEqual('unavailable', result['status'])
+        self.assertEqual('No shared server', result['detail'])
+        self.assertNotIn('receipt', result)
+        self.assertFalse(self.receipt_path.exists())
+
+    def test_send_rechecks_target_after_a_successful_probe(self):
+        proxy = Session(self.receipt)
+        self.assertEqual('reachable', FOLLOWUP.probe(proxy, self.receipt)['status'])
+        proxy.loaded = []
+        with self.assertRaisesRegex(FOLLOWUP.FollowupError, 'not loaded'):
+            self.submit(proxy)
+        self.assertFalse(proxy.submitted)
+        self.assertFalse(self.receipt_path.exists())
+
     def test_unavailable_proxy_never_claims_sent(self):
         output = io.StringIO()
         with patch.object(FOLLOWUP, 'Proxy', side_effect=OSError('No proxy')), \
