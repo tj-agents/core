@@ -51,7 +51,8 @@ once review and exact-head CI are green — and marking it ready is still not me
   the next commit and are not worth mentioning. Only uncommitted **code** means the PR would ship incomplete.
 - **Keep whatever attribution the harness and the repository mandate** — a commit trailer, a PR-body footer,
   or both. Never strip one to tidy the body.
-- **Use the forge's own CLI and nothing else.** Where a machine also carries an issue-tracker-linked PR
+- **Use the repository's forge connector or native CLI.** Apply the same body preflight and saved-body
+  validation to both. Where a machine also carries an issue-tracker-linked PR
   procedure for a *different* organisation, that procedure is not this one and none of it — work-item links,
   board transitions, assignees — carries across. The user's own instructions say which repositories are
   which; this doc does not guess.
