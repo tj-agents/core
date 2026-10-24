@@ -13,7 +13,11 @@ PROMPT_CONTEXT_HEADINGS = (
     "## Repository routine-decision delegation",
 )
 
-SESSION_START_HEADING = "## Finish the session"
+SESSION_START_HEADINGS = (
+    "## When the user calls out a mistake",
+    "## A task has an owning lifecycle — load it before the first edit",
+    "## Finish the session",
+)
 
 
 def prompt_context_section(body, heading):
@@ -120,7 +124,9 @@ def main():
         return 0
     if args.session_start_context:
         try:
-            section = prompt_context_section(body, SESSION_START_HEADING)
+            section = "\n\n".join(
+                f"{heading}\n\n{prompt_context_section(body, heading)}" for heading in SESSION_START_HEADINGS
+            )
         except ValueError as error:
             print(f"session: {error}", file=sys.stderr)
             return 1
