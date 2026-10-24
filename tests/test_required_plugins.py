@@ -74,7 +74,7 @@ class RequiredPluginsTests(unittest.TestCase):
             binary.write_text(f'@echo off\r\n"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
         else:
             binary = root / "inventory"
-            binary.write_text(f'#!{sys.executable}\nexec "{sys.executable}" "{script}" "$@"\n', encoding="utf-8")
+            binary.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', encoding="utf-8")
             binary.chmod(0o755)
         return binary, log
 
