@@ -53,7 +53,8 @@ python -B '<skill-directory>\scripts\adopt_plugins.py' --root C:\path\to\reposit
 
 Repeat `--plugin`. Each plugin's requirements come from the `tj-agents` marketplace's published catalog,
 so selecting a plugin adds what it requires; a plugin absent from that catalog is rejected. A new selection
-always includes core's packages, and existing selections are kept unchanged. Which plugins a project needs is
+always includes core's packages, and existing selections are kept unchanged; `--plugin <name>` again refreshes
+that plugin's requirements. Which plugins a project needs is
 the owning package's decision, never this tool's. Read the repository's README.md and AGENTS.md first, and select
 a profile only where its owner's adoption rules admit that repository; ownership, location or a publisher account
 never establishes a profile's scope. `preview` lists the changed files, `write` applies them
