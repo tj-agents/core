@@ -846,7 +846,7 @@ class SkillRouterTests(unittest.TestCase):
         hook = group["hooks"][0]
         self.assertEqual("block", hook["onFailure"])
         arguments = hook["args"]
-        self.assertEqual(["--deny-on-timeout", "--hook", "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py",
+        self.assertEqual(["--hook", "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py",
                           "--harness", "claude"], arguments[4:])
         local_arguments = [str(self.router) if value.endswith("/skill_router.py") else
                            str(HOOKS / Path(value).name) if value.startswith("${CLAUDE_PLUGIN_ROOT}/hooks/") else value

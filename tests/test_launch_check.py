@@ -67,6 +67,9 @@ class LaunchCheckTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory(prefix="launch check ")
         self.addCleanup(temp.cleanup)
         self.state = Path(temp.name)
+        readiness = mock.patch.object(CHECK, "ensure_hooks")
+        self.readiness = readiness.start()
+        self.addCleanup(readiness.stop)
         patcher = mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state),
                                                "CLAUDE_CONFIG_DIR": str(self.state / "claude")})
         patcher.start()

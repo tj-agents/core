@@ -54,6 +54,9 @@ class StartupBindingTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="startup binding ")
         self.addCleanup(self.temp.cleanup)
         self.project = Path(self.temp.name)
+        readiness = mock.patch.object(BINDING.launch_check, "ensure_hooks")
+        self.readiness = readiness.start()
+        self.addCleanup(readiness.stop)
         patcher = mock.patch.object(BINDING.launch_check, "check", return_value="current")
         self.check = patcher.start()
         self.addCleanup(patcher.stop)
@@ -110,6 +113,29 @@ class StartupBindingTests(unittest.TestCase):
         self.assertEqual({"state": "exited", "returncode": 0},
                          {key: value for key, value in json.loads(status.read_text(encoding="utf-8")).items()
                           if key in {"state", "returncode"}})
+
+    def test_current_plugins_do_not_allow_launch_with_unready_hooks(self):
+        status = self.project / "unready-hooks.json"
+        self.readiness.side_effect = RuntimeError("base hook still modified")
+        with mock.patch.object(BINDING, "run_session") as native, mock.patch("sys.stderr"):
+            self.assertEqual(1, BINDING.main([
+                "--host", "codex", "--project", str(self.project), "--target", "codex",
+                "--status-file", str(status),
+            ]))
+        native.assert_not_called()
+        saved = json.loads(status.read_text(encoding="utf-8"))
+        self.assertEqual("failed", saved["state"])
+        self.assertIn("base hook still modified", saved["error"])
+
+    def test_plugin_repair_commands_remain_available_without_running_an_agent(self):
+        self.readiness.side_effect = RuntimeError("unready hooks")
+        with mock.patch.object(BINDING, "run_session", return_value=0) as native:
+            self.assertEqual(0, BINDING.main([
+                "--host", "codex", "--project", str(self.project), "--target", "codex",
+                "--", "plugin", "list", "--json",
+            ]))
+        self.readiness.assert_not_called()
+        native.assert_called_once()
 
     def test_handoff_failure_retains_native_debug_destination_and_last_phase(self):
         status = self.project / "handoff.json"

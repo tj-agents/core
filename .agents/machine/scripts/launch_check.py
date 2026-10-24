@@ -222,6 +222,25 @@ def mark_current(fetch=https_get, now: float | None = None) -> bool:
     return True
 
 
+def ensure_hooks(project: Path, executable: str | None = None) -> None:
+    import agent_cli
+    import codex_hook_trust
+    import required_plugins
+
+    binary = executable or agent_cli.resolve_codex_executable()[0]
+    required = required_plugins.selected(required_plugins.project_root(project))
+    expected = set()
+    if required:
+        roots = required_plugins.check(project, "codex", binary)
+        for root in roots or ():
+            identity = f"{root.parent.name}@{root.parent.parent.name}"
+            if identity in required:
+                manifest = json.loads((root / ".codex-plugin/plugin.json").read_text(encoding="utf-8-sig"))
+                if manifest.get("hooks"):
+                    expected.add(identity)
+    codex_hook_trust.apply_trust(binary, project.resolve(), required=expected)
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
@@ -231,12 +250,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--target")
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     arguments = parser.parse_args(argv)
+    interactive = True
     if arguments.host:
         import required_plugins
 
         try:
             native_arguments = arguments.arguments[1:] if arguments.arguments[:1] == ["--"] else arguments.arguments
-            required_plugins.check_launch(arguments.project.resolve(), arguments.host, arguments.target, native_arguments)
+            interactive = required_plugins.check_launch(arguments.project.resolve(), arguments.host,
+                                                        arguments.target, native_arguments)
         except required_plugins.RequiredPluginsError as error:
             print(f"plugins: {error}", file=sys.stderr)
             return 1
@@ -245,6 +266,12 @@ def main(argv: list[str] | None = None) -> int:
         check(arguments.project.resolve(), host=host if host in HOSTS else None)
     except Exception as error:
         print(f"plugins: update check failed: {error}", file=sys.stderr)
+    if host == "codex" and interactive:
+        try:
+            ensure_hooks(arguments.project.resolve(), arguments.target)
+        except Exception as error:
+            print(f"plugins: required hook readiness failed: {error}", file=sys.stderr)
+            return 1
     return 0
 
 

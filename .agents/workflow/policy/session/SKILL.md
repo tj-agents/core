@@ -20,6 +20,15 @@ evidence or a stated user decision, and say what changed.
 
 ## A task has an owning lifecycle — load it before the first edit
 
+Required hooks are an execution prerequisite. If a required hook fails, times out, is skipped, lacks a
+verdict, or needs trust review, stop ordinary task work and delivery even when the host permits the tool
+call. Limit actions to bounded diagnosis and authorized repair. For stale or changed plugin contents,
+use `machine:sync-plugins` once and verify recovery; a successful refresh or trusted hash alone does not
+prove the failed hook ran. Resume only after the affected required hooks complete successfully. If
+recovery fails or execution cannot be verified, keep work blocked and name the hook, cause, resolver and
+exact supported recovery command. Never bypass trust, disable a required hook, suppress its failure, or
+start another executor to continue around the gate.
+
 Authorized long-term or multi-phase work selects `workflow:run`, even when the user does
 not name a plan or skill. Read an existing canonical goal before edits and keep its progress current.
 Planning-only work selects `workflow:plan` and does not authorize implementation.
