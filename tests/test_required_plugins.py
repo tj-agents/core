@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -51,6 +52,31 @@ class RequiredPluginsTests(unittest.TestCase):
             self.assertEqual(self.project, run.call_args.kwargs["cwd"])
             self.assertLess(run.call_args.kwargs["timeout"], 7)
             return result
+
+    def inventory_binary(self):
+        root = Path(self.temporary.name)
+        script = root / "inventory.py"
+        log = root / "inventory.jsonl"
+        script.write_text(
+            "import json, os, sys, time\n"
+            "args = sys.argv[1:]\n"
+            "with open(os.environ['REQUIRED_PLUGINS_LOG'], 'a', encoding='utf-8') as output:\n"
+            "    output.write(json.dumps(args) + '\\n')\n"
+            "if '--marketplace' not in args:\n"
+            "    time.sleep(6)\n"
+            "marketplace = args[args.index('--marketplace') + 1]\n"
+            "print(json.dumps({'installed': [{'name': 'arbitrary-stack', 'marketplaceName': marketplace, "
+            "'version': 'version', 'enabled': True}]}))\n",
+            encoding="utf-8",
+        )
+        if os.name == "nt":
+            binary = root / "inventory.cmd"
+            binary.write_text(f'@echo off\r\n"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
+        else:
+            binary = root / "inventory"
+            binary.write_text(f'#!{sys.executable}\nexec "{sys.executable}" "{script}" "$@"\n', encoding="utf-8")
+            binary.chmod(0o755)
+        return binary, log
 
     def test_unselected_repository_does_not_query_or_require_a_host(self):
         with mock.patch.object(required.subprocess, "run") as run:
@@ -103,6 +129,38 @@ class RequiredPluginsTests(unittest.TestCase):
         with mock.patch.object(required.subprocess, "run", side_effect=subprocess.TimeoutExpired("native-cli", 3)):
             with self.assertRaises(required.RequiredPluginsError):
                 required.check(self.project, "codex", "native-cli")
+
+    def test_codex_queries_each_required_marketplace_separately(self):
+        self.select("arbitrary-stack@arbitrary-publisher", "second-stack@another-publisher")
+        first = self.entry("codex")
+        second = self.entry("codex", "second-stack@another-publisher")
+        responses = [
+            subprocess.CompletedProcess([], 0, json.dumps({"installed": [second]}), ""),
+            subprocess.CompletedProcess([], 0, json.dumps({"installed": [first]}), ""),
+        ]
+        with mock.patch.object(required.subprocess, "run", side_effect=responses) as run:
+            self.assertEqual(2, len(required.check(self.project, "codex", "native-cli")))
+        self.assertEqual(
+            [
+                ["native-cli", "plugin", "list", "--marketplace", "another-publisher", "--json"],
+                ["native-cli", "plugin", "list", "--marketplace", "arbitrary-publisher", "--json"],
+            ],
+            [call.args[0] for call in run.call_args_list],
+        )
+
+    def test_codex_marketplace_inventory_skips_a_slow_unfiltered_query(self):
+        self.select("arbitrary-stack@arbitrary-publisher")
+        self.entry("codex")
+        binary, log = self.inventory_binary()
+        with mock.patch.dict(os.environ, {"REQUIRED_PLUGINS_LOG": str(log)}):
+            started = time.monotonic()
+            self.assertEqual((self.profile / "plugins/cache/arbitrary-publisher/arbitrary-stack/version",),
+                             required.check(self.project, "codex", str(binary)))
+        self.assertLess(time.monotonic() - started, required.INVENTORY_TIMEOUT_SECONDS)
+        self.assertEqual(
+            [["plugin", "list", "--marketplace", "arbitrary-publisher", "--json"]],
+            [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()],
+        )
 
     def test_subdirectories_use_their_own_repository_selection(self):
         self.select("arbitrary-stack@arbitrary-publisher")
@@ -215,7 +273,8 @@ class RequiredPluginsTests(unittest.TestCase):
         response = subprocess.CompletedProcess([], 0, json.dumps({"installed": [entry]}), "")
         with mock.patch.object(required.subprocess, "run", return_value=response) as run:
             required.check_launch(self.project, "codex", "native-cli", ["-cmodel_reasoning_effort=high"])
-            self.assertEqual(["native-cli", "-c", "model_reasoning_effort=high", "plugin", "list", "--json"],
+            self.assertEqual(["native-cli", "-c", "model_reasoning_effort=high", "plugin", "list",
+                              "--marketplace", "arbitrary-publisher", "--json"],
                              run.call_args.args[0])
 
     def test_relative_claude_settings_and_project_scope_use_the_actual_launch_directory(self):
