@@ -797,6 +797,29 @@ class DeliveryContinuationTests(unittest.TestCase):
         transport.task["Description"] = receipt["description"]
         self.assertTrue(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
 
+    def test_registered_agent_cli_resolves_without_the_interactive_environment(self):
+        directory = self.root / "agent bin"
+        directory.mkdir()
+        shim = directory / ("gh.exe" if os.name == "nt" else "gh")
+        shim.write_text("fixture", encoding="utf-8")
+        shim.chmod(shim.stat().st_mode | stat.S_IXUSR)
+        isolated = str(self.root / "isolated github config")
+        self.environment.update(PATH=str(directory), TJ_AGENT="1", GH_CONFIG_DIR=isolated)
+        for receipt in (self.receipt(), self.windows_receipt()):
+            with self.subTest(platform=receipt["platform"]):
+                self.assertNotIn("GH_TOKEN", receipt["profile_environment"])
+                with patch.dict(os.environ, {"PATH": str(self.root / "ambient bin"), "TJ_AGENT": "0",
+                                             "GH_CONFIG_DIR": str(self.root / "ambient config")}):
+                    environment = adapter.wake_environment(receipt)
+                result = subprocess.run([sys.executable, "-I", "-c",
+                    "import json,os,shutil;print(json.dumps([shutil.which('gh'),os.environ['TJ_AGENT'],os.environ['GH_CONFIG_DIR']]))"],
+                    env=environment, capture_output=True, text=True, timeout=10)
+                self.assertEqual(0, result.returncode, result.stderr)
+                resolved, flag, configuration = json.loads(result.stdout)
+                self.assertIsNotNone(resolved)
+                self.assertEqual(shim, Path(resolved))
+                self.assertEqual(["1", isolated], [flag, configuration])
+
     def test_installed_package_resources_and_custom_profile_are_portable(self):
         package = (Path(self.temp.name) / "installed package £").resolve()
         scripts, workflows = package / "skills/persistent-workflow/scripts", package / "workflows"
