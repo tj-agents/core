@@ -1906,7 +1906,7 @@ def goal_preflight(root, workflow_run_id):
 
 
 def pull_request_state(root, pr, repo=None):
-    fields = "number,url,body,headRefOid,headRefName,state,isDraft,mergeStateStatus,labels,files,changedFiles,statusCheckRollup"
+    fields = "number,url,body,headRefOid,headRefName,state,isDraft,mergeStateStatus,mergeable,reviewDecision,labels,files,changedFiles,statusCheckRollup"
     arguments = ["gh", "pr", "view"]
     if pr is not None:
         arguments.append(str(pr))
