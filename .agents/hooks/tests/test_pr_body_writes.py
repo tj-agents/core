@@ -108,6 +108,17 @@ class PrWriteTests(unittest.TestCase):
                             self.assertEqual(denied, actual, (host, arguments, result.stdout, result.stderr))
                             if not denied:
                                 self.assertEqual(0, result.returncode, result.stderr)
+                    if host == "claude":
+                        payload = {"hook_event_name": "PreToolUse", "tool_name": tool,
+                                   "tool_input": {field: "gh auth refresh --scopes admin:org"},
+                                   "cwd": str(caller), "turn_id": "auth-fixture"}
+                        result = subprocess.run(
+                            [sys.executable, *arguments], input=json.dumps(payload), cwd=caller,
+                            capture_output=True, text=True, encoding="utf-8", timeout=20,
+                        )
+                        output = json.loads(result.stdout)["hookSpecificOutput"]
+                        self.assertEqual("deny", output["permissionDecision"], result.stderr)
+                        self.assertIn("GIT-AUTH GATE", output["permissionDecisionReason"])
 
 
 if __name__ == "__main__":
