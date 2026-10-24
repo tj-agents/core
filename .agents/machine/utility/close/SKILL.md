@@ -42,6 +42,9 @@ Closure means the exact terminal tab is gone and the registered host has exited.
 closure cannot be verified, preserve the session and report the refusal. Never substitute process exit
 for tab closure.
 
+A session in a linked worktree also closes itself, unarmed, when a turn ends with its tree clean and its
+branch's pull request merged at HEAD during the session.
+
 Closing never removes a worktree. After closing, the watcher runs the worktree sweep, which removes the
 checkout only if its PR merged and nothing is left in it.
 

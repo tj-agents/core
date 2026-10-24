@@ -4,6 +4,7 @@ import argparse
 import importlib
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import sys
@@ -69,8 +70,7 @@ def claude_transcript(session_id):
     return matches[0] if len(matches) == 1 else None
 
 
-def arm():
-    shared = runtime()
+def own_session(shared):
     entry = verified_entry(shared)
     store = shared.register_session._load_session_store()
     if store is None:
@@ -80,11 +80,18 @@ def arm():
         activity = store.get_session(connection, store.session_handle(entry['host'], entry['session_id']))
     finally:
         connection.close()
-    if (not isinstance(activity, dict) or activity.get('ended_at') is not None
-            or activity.get('turn_state') != 'working'):
+    if not isinstance(activity, dict) or activity.get('ended_at') is not None:
         raise shared.Refusal('this session has no active turn to close after')
+    return entry, activity
+
+
+def armed_path(shared, session_id):
+    return shared.state_directory() / 'session-close' / (session_id + '.armed.json')
+
+
+def start_watcher(shared, entry, armed_at):
     arguments = ['--host', entry['host'], '--session-id', entry['session_id'], '--pid', str(entry['pid']),
-                 '--pid-started-at', repr(entry['pid_started_at']), '--armed-at', repr(time.time()),
+                 '--pid-started-at', repr(entry['pid_started_at']), '--armed-at', repr(armed_at),
                  '--state-directory', str(shared.state_directory()),
                  '--host-names', os.environ.get('AGENT_CLI_HOST_NAMES', '')]
     transcript = claude_transcript(entry['session_id']) if entry['host'] == 'claude' else None
@@ -93,12 +100,34 @@ def arm():
     primary, sweep = primary_checkout(shared), sweep_script(shared)
     if primary and sweep:
         arguments += ['--repo', str(primary), '--sweep', str(sweep)]
+    shared.write_json(armed_path(shared, entry['session_id']), {'armed_at': armed_at})
     here = Path(__file__).resolve()
     scripts = peer_scripts()
     shared.start_detached(here.with_name('close_watcher.py'), arguments,
                           [scripts / 'close.py', scripts / 'close_tab.py', scripts / 'windows_terminal_uia.ps1'])
     return {'operation': 'session-close', 'status': 'armed', 'session_id': entry['session_id'],
             'transcript_checked': transcript is not None}
+
+
+def arm():
+    shared = runtime()
+    entry, activity = own_session(shared)
+    if activity.get('turn_state') != 'working':
+        raise shared.Refusal('this session has no active turn to close after')
+    return start_watcher(shared, entry, time.time())
+
+
+def arm_after_stop(landed_at):
+    """Arm from a Stop hook that runs after the session store recorded this turn's stop."""
+    shared = runtime()
+    entry, activity = own_session(shared)
+    stopped = activity.get('last_activity_at')
+    if activity.get('turn_state') != 'awaiting_input' or not shared.finite_positive(stopped):
+        raise shared.Refusal('this session has no recorded stop to close after')
+    started = activity.get('started_at')
+    if not shared.finite_positive(started) or started >= landed_at:
+        raise shared.Refusal('the delivery landed before this session started')
+    return start_watcher(shared, entry, math.nextafter(stopped, 0.0))
 
 
 def main(argv=None):
