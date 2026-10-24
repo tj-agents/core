@@ -52,6 +52,15 @@ class Server:
 
 
 class LaunchCheckTests(unittest.TestCase):
+    def test_unselected_project_does_not_require_an_uninstalled_codex(self):
+        import agent_cli
+        import codex_hook_trust
+
+        with mock.patch.object(agent_cli, "resolve_codex_executable", side_effect=AssertionError("Codex is absent")), \
+                mock.patch.object(codex_hook_trust, "apply_trust") as trust:
+            load("launch_check").ensure_hooks(self.state)
+        trust.assert_not_called()
+
     def test_readiness_uses_only_selected_plugins_and_all_their_definitions(self):
         import codex_hook_trust
         import required_plugins
