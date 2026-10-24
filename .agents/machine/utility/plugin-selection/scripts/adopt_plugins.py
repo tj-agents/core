@@ -68,12 +68,8 @@ def selection_document(root: Path, requested: set[str], foreign: set[str], decla
     selection = plugin_selection.resolve(root)
     kept: list[str] = []
     marketplaces = {}
-    legacy = root / ".agents" / "plugins.lock.json"
-    if selection.is_file() and legacy.is_file():
-        raise lock_io.LockError("Repository has both plugins.json and plugins.lock.json; remove the old lock after migration")
-    if selection.is_file() or legacy.is_file():
-        existing = lock_io.load_json(selection if selection.is_file() else legacy)
-        document = plugin_selection.migrate(existing)
+    if selection.is_file():
+        document = lock_io.load_json(selection)
         marketplaces, kept = plugin_selection.validate(document)
         requested |= {plugin_selection.split(identity)[0] for identity in kept
                       if plugin_selection.split(identity)[1] == plugin_selection.MARKETPLACE_NAME
@@ -108,9 +104,6 @@ def plan(root: Path, stacks: list[str], plugins: list[str], scope: str | None, m
     selection = root / ".agents" / plugin_selection.SELECTION_NAME
     host_targets = repo_config.plan(selection, root=root, scope=scope, prospective_paths=[selection], lock_document=document)
     targets = {selection: json.dumps(document, indent=2, ensure_ascii=False) + "\n", **host_targets}
-    legacy = root / ".agents" / "plugins.lock.json"
-    if legacy.is_file() and not selection.is_file():
-        targets[legacy] = None
     return targets, root
 
 

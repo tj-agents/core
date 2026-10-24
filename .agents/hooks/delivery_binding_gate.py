@@ -156,8 +156,8 @@ def authoritative_body(root, pr, repo=None):
 
 def auto_merge_enabled(root):
     try:
-        policy = delivery_policy.load_legacy_policy(root)
-        return delivery_policy.auto_merge_preference(root, policy)
+        delivery_policy.load_policy(root)
+        return delivery_policy.auto_merge_preference(root)
     except (OSError, ValueError, DeliveryContractViolation):
         return False
 

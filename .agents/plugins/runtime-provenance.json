@@ -312,14 +312,14 @@
       "adaptation": "Codex-only delivery configuration is authored under .codex and packaged with the engineering plugin."
     },
     {
-      "path": ".claude/skills/persistent-workflow/SKILL.md",
+      "path": ".claude/skills/engineering/persistent-workflow/SKILL.md",
       "source_path": ".claude/workflow-skills/persistent-workflow/SKILL.md",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "479a7c0aa2fc47b8563701776e3c794674343f7f23a8fc26f326136ab01a3bd5",
       "adaptation": "Claude host behavior extends and references the canonical .agents workflow definition."
     },
     {
-      "path": ".codex/skills/persistent-workflow/SKILL.md",
+      "path": ".codex/skills/engineering/persistent-workflow/SKILL.md",
       "source_path": ".codex/workflow-skills/persistent-workflow/SKILL.md",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "7e54dc045b59ab07e2a99b02849362ea1ab60166ebb30b8a70a5290ae42c1e8d",
@@ -353,36 +353,6 @@
       "sha256": "953897549dbe991fe3f4e8c098b8b25f2cdb6ec6de91fc9d3b70eff6c9522118"
     },
     {
-      "path": ".agents/hooks/forge_poll_gate.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "67fb62e88ab12683f70ca10d5dd4b5c7291f38e9b56bf188f6cb24cb4329404e"
-    },
-    {
-      "path": ".agents/hooks/tests/test_forge_poll_gate.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "78fa66dd0e093069f10378afc5538837754a1e73885d8963b5045c29d70c6fcd"
-    },
-    {
-      "path": ".agents/hooks/compact_output_gate.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "3669a8fe65a9fe7751a052a7aba294cd7605120490d09fc7bd5bfe1098cb149e"
-    },
-    {
-      "path": ".agents/hooks/tests/test_compact_output_gate.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "c46570750e9d2119b826a95200a3bf22d676ce0d0e3b1c34081338d71b36d6de"
-    },
-    {
-      "path": ".agents/hooks/worktree_cleanup_gate.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "1de5a539c83d48f1fc674378504a655c049066d7c58d810c5d4001c78d2aee9c"
-    },
-    {
-      "path": ".agents/hooks/tests/test_worktree_cleanup_gate.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "fae8fda7a96cd28263ebf4f0500252de2458eb1aead54705f770d3072640bbdf"
-    },
-    {
       "path": ".agents/hooks/merge_review_gate.py",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "14725a3fba2e948636eba521beda791c703892f26e74f354aec3c39e711492cd"
@@ -391,16 +361,6 @@
       "path": ".agents/hooks/tests/test_merge_review_gate.py",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "baf6fef69709e0053a0546667bd23fce0b3a908b4756dac463c9142c53281eb1"
-    },
-    {
-      "path": ".agents/hooks/persistent_workflow_merge_gate.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "b7dff755875c1860aa0558386355a7bb2f4f08cfad7a707322a7785ec325a2bc"
-    },
-    {
-      "path": ".agents/hooks/tests/test_persistent_workflow_merge_gate.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "d9f9c285b3151ae0043c13aa26e8b42c49d471eccc89448435e9d29e5135ef20"
     },
     {
       "path": ".agents/hooks/delivery_binding_gate.py",

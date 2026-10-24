@@ -1,7 +1,10 @@
 import importlib.util
+import io
 import json
+import math
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -18,6 +21,10 @@ sys.path.insert(0, str(close.peer_scripts()))
 WATCHER_SPEC = importlib.util.spec_from_file_location('close_watcher', SCRIPT.with_name('close_watcher.py'))
 watcher = importlib.util.module_from_spec(WATCHER_SPEC)
 WATCHER_SPEC.loader.exec_module(watcher)
+sys.path.insert(0, str(SCRIPT.parent))
+LANDED_SPEC = importlib.util.spec_from_file_location('close_landed', SCRIPT.with_name('close_landed.py'))
+landed = importlib.util.module_from_spec(LANDED_SPEC)
+LANDED_SPEC.loader.exec_module(landed)
 
 
 class ArmTests(unittest.TestCase):
@@ -26,6 +33,7 @@ class ArmTests(unittest.TestCase):
                       'cwd': str(Path.cwd()), 'started_at': 100}
         self.shared = mock.Mock()
         self.shared.Refusal = RuntimeError
+        self.shared.state_directory.return_value = Path('state')
         self.shared.own_host_and_entry.return_value = self.entry
         self.shared.entries.return_value = [('own.json', self.entry)]
         self.shared.git.return_value = (1, '', '')
@@ -72,6 +80,29 @@ class ArmTests(unittest.TestCase):
             self.store.get_session.return_value = row
             with self.assertRaisesRegex(RuntimeError, 'no active turn'):
                 self.arm()
+        self.shared.start_detached.assert_not_called()
+
+    def arm_after_stop(self, landed_at=2000.0):
+        with mock.patch.object(close, 'runtime', return_value=self.shared),                 mock.patch.object(close, 'sweep_script', return_value=None):
+            return close.arm_after_stop(landed_at)
+
+    def test_arm_after_stop_binds_the_watcher_to_the_recorded_stop(self):
+        self.shared.finite_positive = watcher.session_close.finite_positive
+        self.store.get_session.return_value = {'ended_at': None, 'turn_state': 'awaiting_input',
+                                               'last_activity_at': 1005.0, 'started_at': 100.0}
+        self.assertEqual('armed', self.arm_after_stop()['status'])
+        arguments = self.shared.start_detached.call_args.args[1]
+        armed_at = float(arguments[arguments.index('--armed-at') + 1])
+        self.assertEqual(math.nextafter(1005.0, 0.0), armed_at)
+        self.assertEqual({'armed_at': armed_at}, self.shared.write_json.call_args.args[1])
+
+    def test_arm_after_stop_refuses_mid_turn_or_a_delivery_that_landed_before_the_session(self):
+        self.shared.finite_positive = watcher.session_close.finite_positive
+        for row, reason in (({'turn_state': 'working', 'last_activity_at': 1005.0, 'started_at': 100.0}, 'no recorded stop'),
+                            ({'turn_state': 'awaiting_input', 'last_activity_at': 1005.0, 'started_at': 2500.0}, 'before this session')):
+            self.store.get_session.return_value = {'ended_at': None, **row}
+            with self.assertRaisesRegex(RuntimeError, reason):
+                self.arm_after_stop()
         self.shared.start_detached.assert_not_called()
 
     def test_multiplexed_host_cannot_arm(self):
@@ -144,6 +175,18 @@ class WatcherTests(unittest.TestCase):
 
     def test_a_stop_from_before_arming_is_not_the_final_reply(self):
         self.assertIsNone(self.wait([(1e9, self.row('awaiting_input', 999))]))
+
+    def test_an_arm_after_the_stop_closes_on_that_stop(self):
+        self.args.armed_at = math.nextafter(1005.0, 0.0)
+        self.assertEqual(1005, self.wait([(1e9, self.row('awaiting_input', 1005.0))]))
+
+    def test_a_newer_arm_supersedes_this_watcher_without_recording_an_outcome(self):
+        watcher.session_close.write_json(watcher.armed_path('own'), {'armed_at': 2000.0})
+        self.assertIsNone(self.wait([(1e9, self.row('awaiting_input', 1005))]))
+        with mock.patch.object(watcher, 'wait_for_idle', return_value=None):
+            self.assertEqual(0, watcher.main(['--host', 'claude', '--session-id', 'own', '--pid', '123',
+                                              '--pid-started-at', '100.5', '--armed-at', '1000']))
+        self.assertFalse(watcher.outcome_path('own').exists())
 
     def test_ended_session_or_exited_host_cancels(self):
         self.assertIsNone(self.wait([(1e9, {**self.row('awaiting_input', 1005), 'ended_at': 1006})]))
@@ -311,6 +354,50 @@ class WatcherTests(unittest.TestCase):
         sweep.assert_not_called()
         self.assertEqual('refused: tab ambiguous',
                          watcher.session_close.read_json(watcher.outcome_path('own'))['status'])
+
+
+def git(cwd, *arguments):
+    subprocess.run(['git', '-C', str(cwd), *arguments], check=True, capture_output=True)
+
+
+class LandedTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.primary = Path(directory.name) / 'primary'
+        self.linked = Path(directory.name) / 'linked'
+        git(directory.name, 'init', '-q', '-b', 'main', str(self.primary))
+        git(self.primary, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'base')
+        git(self.primary, 'worktree', 'add', '-q', '-b', 'Fix/Thing', str(self.linked))
+        self.head = subprocess.run(['git', '-C', str(self.linked), 'rev-parse', 'HEAD'], capture_output=True,
+                                   text=True, check=True).stdout.strip()
+
+    def merged_at(self, cwd, pulls):
+        with mock.patch.object(landed, 'merged_pulls', return_value=pulls) as lookup:
+            return landed.merged_at(cwd, watcher.session_close.git), lookup
+
+    def test_a_clean_linked_worktree_merged_at_head_reports_the_merge_time(self):
+        pulls = [{'headRefOid': 'other', 'mergedAt': '2026-10-24T13:00:00Z'},
+                 {'headRefOid': self.head, 'mergedAt': '2026-10-24T12:00:00Z'}]
+        when, lookup = self.merged_at(self.linked, pulls)
+        self.assertEqual(1792843200.0, when)
+        lookup.assert_called_once_with(self.linked, 'Fix/Thing')
+
+    def test_unmerged_head_dirty_tree_or_primary_checkout_never_lands(self):
+        self.assertIsNone(self.merged_at(self.linked, [{'headRefOid': 'older', 'mergedAt': '2026-10-24T12:00:00Z'}])[0])
+        merged = [{'headRefOid': self.head, 'mergedAt': '2026-10-24T12:00:00Z'}]
+        self.assertIsNone(self.merged_at(self.primary, merged)[0])
+        (self.linked / 'work.txt').write_text('unsaved', encoding='utf-8')
+        when, lookup = self.merged_at(self.linked, merged)
+        self.assertIsNone(when)
+        lookup.assert_not_called()
+
+    def test_hook_arms_only_a_landed_delivery_and_never_raises(self):
+        payload = json.dumps({'hook_event_name': 'Stop', 'session_id': 'own', 'cwd': str(self.linked)})
+        for landed_at, failure in ((None, None), (1792843200.0, None), (1792843200.0, RuntimeError('refused'))):
+            with mock.patch.object(landed, 'merged_at', return_value=landed_at),                     mock.patch.object(landed.close_session, 'arm_after_stop', side_effect=failure) as arm,                     mock.patch.object(sys, 'stdin', io.StringIO(payload)):
+                self.assertEqual(0, landed.main())
+            self.assertEqual(landed_at is not None, arm.called)
 
 
 if __name__ == '__main__':

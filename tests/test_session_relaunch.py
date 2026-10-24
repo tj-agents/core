@@ -189,7 +189,6 @@ class SyncTests(State):
         relaunched = mock.Mock(return_value=relaunch or {"relaunch": "armed", "session_id": SESSION})
         with mock.patch.dict(os.environ, environment), \
                 mock.patch.object(REFRESH.launch_check, "check", return_value=result), \
-                mock.patch.object(REFRESH, "review_legacy", return_value=([], {})), \
                 mock.patch.object(REFRESH, "selection", return_value=({}, ["machine@tj-agents"])), \
                 mock.patch.object(RELAUNCH, "stale_plugins", return_value=list(stale)), \
                 mock.patch.object(RELAUNCH, "relaunch", relaunched), \
@@ -220,7 +219,6 @@ class SyncTests(State):
         relaunched = mock.Mock(side_effect=RuntimeError("relaunch was not armed: refused"))
         with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": SESSION, "CLAUDE_PID": "4242"}), \
                 mock.patch.object(REFRESH.launch_check, "check", return_value="updated"), \
-                mock.patch.object(REFRESH, "review_legacy", return_value=([], {})), \
                 mock.patch.object(REFRESH, "selection", return_value=({}, ["machine@tj-agents"])), \
                 mock.patch.object(RELAUNCH, "stale_plugins", return_value=["machine@tj-agents"]), \
                 mock.patch.object(RELAUNCH, "relaunch", relaunched), \

@@ -1,4 +1,3 @@
-import io
 import json
 import shutil
 import subprocess
@@ -50,9 +49,9 @@ class PrivateReviewTests(unittest.TestCase):
         self.assertEqual(self.path, evidence.work_order_path(self.root, BRANCH))
 
     def test_changed_body_missing_receipt_and_stale_head_fail_closed(self):
-        legacy = evidence.legacy_path(self.root, BRANCH)
-        legacy.parent.mkdir()
-        legacy.write_text(self.body, encoding="utf-8")
+        durable = evidence.durable_path(self.root, BRANCH)
+        durable.parent.mkdir()
+        durable.write_text(self.body, encoding="utf-8")
         self.path.write_text(self.body + "- [ ] changed\n", encoding="utf-8")
         with self.assertRaisesRegex(evidence.ReviewEvidenceError, "changed"):
             evidence.resolve(self.root, BRANCH, HEAD)
@@ -92,7 +91,7 @@ class PrivateReviewTests(unittest.TestCase):
 
     def test_staged_promotion_preserves_the_body_and_retires_private_proof(self):
         path = evidence.prepare_path(self.root, BRANCH, durable=True)
-        self.assertEqual(evidence.legacy_path(self.root, BRANCH), path)
+        self.assertEqual(evidence.durable_path(self.root, BRANCH), path)
         self.assertEqual(self.body, path.read_text(encoding="utf-8"))
         self.assertFalse(self.path.exists())
         self.assertFalse(evidence.private_paths(self.root, BRANCH)["receipt"].exists())
@@ -122,7 +121,7 @@ class PrivateReviewTests(unittest.TestCase):
             auto_merge.current_review(self.root, binding, [])
 
     def test_live_durable_findings_take_precedence_over_committed_approval(self):
-        legacy = evidence.prepare_path(self.root, BRANCH, durable=True)
+        durable = evidence.prepare_path(self.root, BRANCH, durable=True)
         def git(*args):
             if args == ("branch", "--show-current"):
                 return BRANCH
@@ -133,7 +132,7 @@ class PrivateReviewTests(unittest.TestCase):
             (self.body + "- [ ] finding\n", "unresolved"),
         ):
             with self.subTest(message=message):
-                legacy.write_text(body, encoding="utf-8")
+                durable.write_text(body, encoding="utf-8")
                 with patch.object(evidence, "git_text", side_effect=lambda root, *args: git(*args)) as reader:
                     self.assertEqual(body, evidence.resolve(self.root, BRANCH, HEAD)["body"])
                     self.assertFalse(any(call.args[1] == "show" for call in reader.call_args_list))
@@ -142,17 +141,17 @@ class PrivateReviewTests(unittest.TestCase):
                     self.assertIsNone(ops.review_binding(self.root, BRANCH, HEAD)["reviewed_sha"])
                     with self.assertRaisesRegex(auto_merge.AutoMergeError, message):
                         auto_merge.current_review(self.root, {"branch": BRANCH, "remote_head_sha": HEAD}, [])
-        legacy.unlink()
+        durable.unlink()
         with patch.object(evidence, "git_text", return_value=self.body):
             self.assertEqual(self.body, evidence.resolve(self.root, BRANCH, HEAD)["body"])
 
     def test_other_checked_out_branch_or_head_uses_committed_durable_evidence(self):
-        legacy = evidence.prepare_path(self.root, BRANCH, durable=True)
+        durable = evidence.prepare_path(self.root, BRANCH, durable=True)
         for branch, head in (("Fix/Other", HEAD), (BRANCH, "c" * 40)):
             for local, committed in ((self.body, self.body + "- [ ] committed finding\n"),
                                      (self.body + "- [ ] local finding\n", self.body)):
                 with self.subTest(branch=branch, head=head, local=local):
-                    legacy.write_text(local, encoding="utf-8")
+                    durable.write_text(local, encoding="utf-8")
                     def git(*args):
                         if args == ("branch", "--show-current"):
                             return branch
@@ -182,8 +181,7 @@ class PrivateReviewTests(unittest.TestCase):
                     self.assertIsNone(ops.review_binding(self.root, BRANCH, HEAD)["reviewed_sha"])
                 with self.assertRaisesRegex(auto_merge.AutoMergeError, "incomplete"):
                     auto_merge.current_review(self.root, {"branch": BRANCH, "remote_head_sha": HEAD}, [])
-                self.assertIsNotNone(gate.review_completion_problem(body, strict=True))
-        self.assertIsNone(gate.review_completion_problem(marker))
+                self.assertIsNotNone(gate.review_completion_problem(body))
 
     def test_private_evidence_preserves_finding_completion_and_security_gates(self):
         binding = {"branch": BRANCH, "remote_head_sha": HEAD}
@@ -197,28 +195,6 @@ class PrivateReviewTests(unittest.TestCase):
                 self.record()
                 with self.assertRaisesRegex(auto_merge.AutoMergeError, message):
                     auto_merge.current_review(self.root, binding, paths)
-
-    def test_merge_hook_accepts_private_proof_and_blocks_edited_body(self):
-        payload = {"tool_name": "Bash", "cwd": str(self.root), "tool_input": {"command": "gh pr merge --merge"}}
-
-        def git(*args):
-            if args == ("rev-parse", "--show-toplevel"):
-                return str(self.root)
-            if args == ("rev-parse", "--abbrev-ref", "HEAD"):
-                return BRANCH
-            return HEAD
-
-        for edited, expected in ((False, 0), (True, 2)):
-            if edited:
-                self.path.write_text(self.body + "changed\n", encoding="utf-8")
-            with patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
-                    patch.object(gate, "git", side_effect=git), \
-                    patch.object(gate, "claim_invocation", return_value=True), \
-                    patch.object(gate, "changed_against_main", return_value=[]), \
-                    patch.object(gate, "grant_if_trusted"), \
-                    self.assertRaises(SystemExit) as result:
-                gate.main()
-            self.assertEqual(expected, result.exception.code)
 
     def test_work_item_findings_include_in_progress_private_body(self):
         self.path.write_text(self.body + "- [~] **R1 — HIGH**\n", encoding="utf-8")

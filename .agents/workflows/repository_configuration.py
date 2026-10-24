@@ -7,7 +7,7 @@ from pathlib import Path
 
 SETTINGS_PATH = Path(".agents") / "settings.json"
 NAMESPACE_NAME = re.compile(r"^[a-z][a-z0-9-]*$")
-CORE_KEYS = frozenset({"auto_merge", "auto_approve", "auto_approve_design", "permissions"})
+CORE_KEYS = frozenset({"auto_merge", "auto_approve", "permissions"})
 AUTO_APPROVE_KEYS = frozenset({"all", "design"})
 PERMISSION_MODES = frozenset({"bypass", "standard"})
 
@@ -93,9 +93,8 @@ def core(root):
     unknown = set(value) - CORE_KEYS
     if unknown:
         raise ConfigurationViolation(f"core settings have unknown keys {sorted(unknown)!r}")
-    for key in ("auto_merge", "auto_approve_design"):
-        if key in value and type(value[key]) is not bool:
-            raise ConfigurationViolation(f"core {key} must be a boolean")
+    if "auto_merge" in value and type(value["auto_merge"]) is not bool:
+        raise ConfigurationViolation("core auto_merge must be a boolean")
     if "permissions" in value and (not isinstance(value["permissions"], str)
                                     or value["permissions"] not in PERMISSION_MODES):
         raise ConfigurationViolation("core permissions must be bypass or standard")
@@ -114,10 +113,10 @@ def core(root):
     return value
 
 
-def auto_merge(root, legacy_policy):
+def auto_merge(root):
     settings = core(root)
     if settings is None:
-        return legacy_policy is not None and legacy_policy.get("auto_merge") is True
+        return False
     return settings.get("auto_merge", False)
 
 
@@ -132,7 +131,7 @@ def auto_approve_design(root):
         return False
     auto_approve = settings.get("auto_approve")
     if auto_approve is None:
-        return settings.get("auto_approve_design", False)
+        return False
     if "design" in auto_approve:
         return auto_approve["design"]
     return auto_approve.get("all", False)
@@ -150,6 +149,4 @@ def auto_approve_design_provenance(root):
         if "all" in auto_approve:
             return auto_approve["all"], f"configuration.core.auto_approve.all at {path}"
         return False, f"configuration.core.auto_approve default at {path}"
-    if "auto_approve_design" in settings:
-        return settings["auto_approve_design"], f"configuration.core.auto_approve_design at {path}"
     return False, f"configuration.core.auto_approve default at {path}"

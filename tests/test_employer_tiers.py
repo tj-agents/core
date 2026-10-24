@@ -64,11 +64,6 @@ class EmployerScope(unittest.TestCase):
         subprocess.run(['git', '-C', str(self.project), 'config', 'remote.origin.url', url],
                        check=True, capture_output=True)
 
-    def hooks(self):
-        return ({'cwd': str(self.project), 'tool_name': 'Skill', 'tool_input': {'skill': 'work:ask-person'}},
-                {'cwd': str(self.project), 'tool_name': 'PowerShell',
-                 'tool_input': {'command': "Get-Content '" + str(self.work / 'skills/ask-person/SKILL.md') + "'"}})
-
     def test_actual_work_remote_allows_both_hosts_and_reports_exact_context(self):
         employer = self.install('employer-a', EMPLOYER)
         self.remote('employer-a/service')
@@ -82,8 +77,6 @@ class EmployerScope(unittest.TestCase):
         self.assertIn(str((employer / 'skills/communication-context/SKILL.md').resolve()), context)
         self.assertIn('employer-a:communication-context', context)
         self.assertEqual(context.count(WORK['session_context']), 1)
-        for hook in self.hooks():
-            self.assertEqual(gate.gate(hook, self.found()), 0)
 
     def test_work_scope_requires_both_exact_host_and_owner_for_every_origin_form(self):
         self.install('employer-a', EMPLOYER)
@@ -104,11 +97,6 @@ class EmployerScope(unittest.TestCase):
                 self.assertEqual(any(item.plugin == 'work' for item, _ in result.applicable), applies)
                 self.assertEqual(bool(result.employers), applies)
                 self.assertEqual(WORK['session_context'] in gate.statement(self.project, self.found()), applies)
-                for hook in self.hooks():
-                    stderr = io.StringIO()
-                    with contextlib.redirect_stderr(stderr):
-                        verdict = gate.gate(hook, self.found())
-                    self.assertEqual(verdict, 0 if applies else 2, stderr.getvalue())
         subprocess.run(['git', '-C', str(self.project), 'config', '--unset', 'remote.origin.url'],
                        check=True, capture_output=True)
         self.assertEqual(gate.assess(self.project, self.found()).applicable, [])
@@ -136,11 +124,6 @@ class EmployerScope(unittest.TestCase):
         self.assertNotIn(WORK['session_context'], context)
         self.assertNotIn('Employer context:', context)
         self.assertNotIn(str(employer / 'skills/communication-context/SKILL.md'), context)
-        for hook in self.hooks():
-            stderr = io.StringIO()
-            with contextlib.redirect_stderr(stderr):
-                self.assertEqual(gate.gate(hook, self.found()), 2)
-            self.assertIn('work', stderr.getvalue())
 
     def test_missing_malformed_and_orphaned_employers_never_establish_the_fact(self):
         self.remote('employer-a/service')

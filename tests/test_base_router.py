@@ -45,7 +45,8 @@ class BaseRouterTests(unittest.TestCase):
                         "tool_input": tool_input,
                     }
                     result = subprocess.run(
-                        [sys.executable, "-B", str(plugin / "hooks/skill_router.py")],
+                        [sys.executable, "-B", str(plugin / "hooks/skill_router.py"),
+                         "--harness", host],
                         cwd=repo, env=environment, input=json.dumps(payload),
                         capture_output=True, text=True, encoding="utf-8", timeout=20,
                     )

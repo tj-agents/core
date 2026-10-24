@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py\" --session-start-context",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py\" --session-start-context",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py\"",
             "timeout": 10
           }
         ]

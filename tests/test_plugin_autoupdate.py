@@ -767,15 +767,11 @@ class SetupTests(unittest.TestCase):
             self.assertTrue(saved['tj-agents']['autoUpdate'])
             self.assertFalse(saved['legacy']['autoUpdate'])
 
-    def test_launchers_replace_retired_blocks_keep_other_lines_and_are_idempotent(self):
+    def test_installing_a_shell_profile_keeps_other_lines_and_is_idempotent(self):
         with tempfile.TemporaryDirectory(prefix='profile ü ') as temp:
             profile = Path(temp) / 'Microsoft.PowerShell_profile.ps1'
             original = (b'\xef\xbb\xbf' + (
                 "$env:Path = 'x'\r\n"
-                "# >>> base-agents claude launcher >>>\r\nfunction global:claude {}\r\n"
-                "# <<< base-agents claude launcher <<<\r\n"
-                "# >>> base-agents codex launcher >>>\r\nfunction global:codex {}\r\n"
-                "# <<< base-agents codex launcher <<<\r\n"
                 ". 'accounts.ps1'\r\n").encode('utf-8'))
             profile.write_bytes(original)
             script = Path(temp) / "it's bin" / 'launch_check.py'
@@ -789,7 +785,6 @@ class SetupTests(unittest.TestCase):
             text = installed[3:].decode('utf-8')
             self.assertTrue(text.startswith("$env:Path = 'x'\r\n. 'accounts.ps1'\r\n\r\n" + SETUP.PROFILE_START + '\r\n'))
             self.assertTrue(text.endswith(SETUP.PROFILE_END + '\r\n'))
-            self.assertNotIn('base-agents', text)
             self.assertNotIn('\n', text.replace('\r\n', ''))
             self.assertIn("it''s bin", text)
             self.assertEqual(original, profile.with_name(profile.name + '.pre-tj-agents.bak').read_bytes())

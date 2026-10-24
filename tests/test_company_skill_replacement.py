@@ -91,22 +91,9 @@ class CompanySkillReplacement(unittest.TestCase):
         for router in ROUTERS:
             self.assertEqual(set(self.query(router)), {"stackx:style", "stackx:logging"})
 
-    def test_both_packaged_gates_redirect_native_calls_and_read_paths(self):
+    def test_both_packaged_gates_name_the_company_replacement_at_session_start(self):
         for gate in GATES:
             with self.subTest(gate=gate):
-                payload = {"cwd": str(self.repo), "tool_name": "Skill",
-                           "tool_input": {"skill": "stackx:style"}}
-                result = self.run_hook(gate, payload=payload)
-                self.assertEqual(result.returncode, 2, result.stderr)
-                self.assertIn("acme-stackx:style", result.stderr)
-                payload["tool_input"]["skill"] = "stackx:logging"
-                self.assertEqual(self.run_hook(gate, payload=payload).returncode, 0)
-                payload = {"cwd": str(self.repo), "tool_name": "PowerShell",
-                           "tool_input": {"command": "Get-Content '" + str(
-                               self.cache / "market/stackx/1/skills/style/SKILL.md") + "'"}}
-                result = self.run_hook(gate, payload=payload)
-                self.assertEqual(result.returncode, 2, result.stderr)
-                self.assertIn("acme-stackx:style", result.stderr)
                 context = self.run_hook(gate, "--session-context", "--project", str(self.repo))
                 self.assertIn("acme-<stack>:<name>", context.stdout)
 

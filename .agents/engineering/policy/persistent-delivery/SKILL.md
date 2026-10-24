@@ -80,12 +80,9 @@ approval cannot add exemptions or bypass a stop. **Re-run the binder on every re
 may add a stop path or hold.
 
 The auto-merge preference comes from `.agents/settings.json` in the actual checkout, at
-`configuration.core.auto_merge`, separately from delivery authority. When that file is present, it is
-authoritative: `false` or an omitted `configuration`, `core` or `auto_merge` disables auto-merge and never
-falls back to the legacy declaration, and malformed present settings fail closed. Only when the settings
-file is wholly absent may the validated legacy declaration's `auto_merge: true` enable the
-preference; omitted legacy `auto_merge` means `false`. The settings file itself is always a non-exemptible
-stop. After the normal green exact-head, independent-review and merge-authorization decision, invoke only
+`configuration.core.auto_merge`, separately from delivery authority. An absent file or an omitted
+`configuration`, `core` or `auto_merge` disables auto-merge, and malformed settings fail closed. The
+settings file itself is always a non-exemptible stop. After the normal green exact-head, independent-review and merge-authorization decision, invoke only
 the packaged guarded command:
 
 ```text
