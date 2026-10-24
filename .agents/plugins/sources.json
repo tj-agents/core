@@ -473,9 +473,9 @@
     "engineering": []
   },
   "extended_host_adapters": [
-    "persistent-workflow",
-    "review",
-    "sync-plugins"
+    "engineering:persistent-workflow",
+    "engineering:review",
+    "machine:sync-plugins"
   ],
   "host_only_terms": {
     "claude": [

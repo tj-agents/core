@@ -14,7 +14,7 @@
               "--deadline",
               "10",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/workflow/policy/session-lifecycle/scripts/session-context.py"
+              "${CLAUDE_PLUGIN_ROOT}/.agents/workflow/policy/session/scripts/session-context.py"
             ]
           }
         ]
@@ -33,7 +33,7 @@
               "--deadline",
               "10",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/workflow/policy/session-lifecycle/scripts/session-context.py",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/workflow/policy/session/scripts/session-context.py",
               "--prompt"
             ]
           }

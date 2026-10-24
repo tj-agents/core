@@ -429,23 +429,25 @@ class WorkflowGenerationTests(unittest.TestCase):
 
     def test_extended_host_adapter_preserves_one_public_identity(self):
         config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
-        self.assertEqual(["persistent-workflow", "review", "sync-plugins"], config["extended_host_adapters"])
-        for skill in config["extended_host_adapters"]:
-            canonical = authored_skill(skill)
-            package = ROOT / "plugins" / canonical.relative_to(ROOT / ".agents").parts[0]
+        self.assertEqual(["engineering:persistent-workflow", "engineering:review", "machine:sync-plugins"],
+                         config["extended_host_adapters"])
+        for identity in config["extended_host_adapters"]:
+            plugin, skill = identity.split(":")
+            canonical = authored_skill(identity)
+            package = ROOT / "plugins" / plugin
             for host, tree in (("claude", "skills"), ("codex", "codex-skills")):
                 with self.subTest(skill=skill, host=host):
-                    source = ROOT / f".{host}" / "skills" / skill / "SKILL.md"
+                    source = ROOT / f".{host}" / "skills" / plugin / skill / "SKILL.md"
                     authored = source.read_text(encoding="utf-8")
                     self.assertIn(
-                        f"](../../../{canonical.relative_to(ROOT).as_posix()})",
+                        f"](../../../../{canonical.relative_to(ROOT).as_posix()})",
                         authored,
                     )
                     generated = (
                         package / tree / skill / "SKILL.md"
                     ).read_text(encoding="utf-8")
                     self.assertEqual(
-                        authored.replace("../../../.agents/", "../../.agents/"),
+                        authored.replace("../../../../.agents/", "../../.agents/"),
                         generated,
                     )
             packaged = package / canonical.relative_to(ROOT)

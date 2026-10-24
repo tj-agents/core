@@ -25,7 +25,7 @@
     ],
     "hooks": [
       {
-        "path": ".agents/workflow/policy/session-lifecycle/scripts/session-context.py",
+        "path": ".agents/workflow/policy/session/scripts/session-context.py",
         "hosts": [
           "claude",
           "codex"

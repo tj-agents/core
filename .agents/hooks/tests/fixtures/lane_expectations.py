@@ -37,15 +37,15 @@ def generated_payload(authored, host):
 
 def authored_skill(name):
     root = Path(__file__).resolve().parents[4]
-    matches = [p for scope in ("base", "engineering", "machine", "workflow")
-               for p in (root / ".agents" / scope).rglob("SKILL.md") if p.parent.name == name]
+    scope, _, name = name.rpartition(":")
+    owners = (scope,) if scope else ("base", "engineering", "machine", "workflow")
+    matches = [p for owner in owners
+               for p in (root / ".agents" / owner).rglob("SKILL.md") if p.parent.name == name]
     if len(matches) != 1:
         raise AssertionError(f"Expected one authored owner for {name}: {matches}")
     return matches[0]
 
 
 def packaged_adapter(root, name, host):
-    authored = (Path(root) / f".{host}" / "skills" / name / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
-    return authored.replace("../../../.agents/", "../../.agents/")
+    (path,) = (Path(root) / f".{host}" / "skills").glob(f"*/{name}/SKILL.md")
+    return path.read_text(encoding="utf-8").replace("../../../../.agents/", "../../.agents/")

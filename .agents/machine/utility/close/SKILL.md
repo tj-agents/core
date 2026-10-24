@@ -14,14 +14,14 @@ explicit keep-open request. Do not offer optional follow-ups to avoid closing.
 
 A user callout about a mistake opens an unresolved repair outcome. Answer the direct question and preserve
 the repair outcome until its current owner resolves it before reassessing completion.
-`workflow:session-lifecycle` owns assessment of that outcome; when engineering is selected,
+`workflow:session` owns assessment of that outcome; when engineering is selected,
 `engineering:self-repair` owns eligibility for a separate standards repair. A question about missed
 close-out does not instruct you to close immediately.
 
 ```text
 User: "Why didn't you close when the work was done?"
 Action: explain the omission and keep the repair outcome active. Assess the active task under
-workflow:session-lifecycle; when engineering is selected, apply engineering:self-repair's source and
+workflow:session; when engineering is selected, apply engineering:self-repair's source and
 authority decision only for a suspected reusable tooling defect.
 ```
 
