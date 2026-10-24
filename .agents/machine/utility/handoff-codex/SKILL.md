@@ -102,6 +102,12 @@ python3 '<skill-directory>/scripts/launch_codex.py' --working-directory '<absolu
 On Windows, `python3` is often the Microsoft Store
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
+Checkpointed continuation callers may pass `--status-file <absolute-new-startup-receipt>` to bind startup
+evidence before invocation, and `--codex-home <absolute-refreshed-profile>` to preserve the effective profile
+through terminal-server environments. An existing startup receipt returns exit 3 without opening a tab;
+inspect that attempt rather than replacing it. The profile is passed through the shared launch environment,
+so tmux or another terminal server cannot substitute its own profile for the one just refreshed.
+
 Add `--lane '<L1..L6>'` (or `--frontier`) to have the launcher resolve model and effort, or `--model
 '<model-id>'` and `--reasoning-effort '<level>'` for values the user named. Omitting them all lets
 `codex` fall back to its own configured default — the same behavior an interactively launched session
@@ -146,7 +152,7 @@ several windows.
 A Claude Code parent exports variables that make a child render plain and behave as a managed nested
 session. Two treatments are needed, not one:
 
-Everything is **cleared**; nothing is forced. `NO_COLOR`, `TERM`, the session-binding set `CLAUDECODE`,
+The inherited rendering and nesting variables are **cleared**. `NO_COLOR`, `TERM`, the session-binding set `CLAUDECODE`,
 `CLAUDE_CODE_CHILD_SESSION`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SESSION_ID`, `CLAUDE_PID`, the
 `CLAUDE_CODE_MESSAGING_*` pair, and the `WORKBOARD_*` pair.
 

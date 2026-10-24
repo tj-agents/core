@@ -39,6 +39,8 @@ def parse_args(argv, agent_cli):
     parser.add_argument('--title', default='Codex handoff')
     parser.add_argument('--status-file', type=Path,
                         help='Absolute reserved startup receipt path for a checkpointed continuation')
+    parser.add_argument('--codex-home', type=Path,
+                        help='Absolute caller profile to preserve across terminal-server environments')
     parser.add_argument('--model')
     parser.add_argument('--reasoning-effort', choices=('low', 'medium', 'high', 'xhigh', 'max', 'ultra'))
     parser.add_argument('--lane', choices=('L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'))
@@ -115,6 +117,8 @@ def main(argv=None):
     status_path = None
     try:
         args = parse_args(argv, agent_cli)
+        if args.codex_home is not None and not args.codex_home.is_absolute():
+            raise agent_cli.LaunchError('--codex-home must be absolute.')
         if args.status_file is not None:
             if not args.status_file.is_absolute():
                 raise agent_cli.LaunchError('--status-file must be absolute.')
@@ -150,6 +154,7 @@ def main(argv=None):
             arguments=agent_cli.bound_terminal_arguments("codex", working_directory, codex, arguments,
                                                         status_path, require_session_start=True),
             clear=('TERM',),
+            force={'CODEX_HOME': str(args.codex_home.resolve())} if args.codex_home is not None else None,
         )
 
         agent_cli.await_handoff_startup(status_path)
