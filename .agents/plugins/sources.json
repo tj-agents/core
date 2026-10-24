@@ -23,6 +23,13 @@
       "domain": "machine"
     },
     {
+      "name": "cli",
+      "root": ".agents/cli",
+      "layout": "kind",
+      "plugin": "cli",
+      "domain": "cli"
+    },
+    {
       "name": "workflow",
       "root": ".agents/workflow",
       "layout": "kind",
@@ -67,6 +74,7 @@
     "plugins/base",
     "plugins/agent-store",
     "plugins/machine",
+    "plugins/cli",
     "plugins/workflow",
     "plugins/engineering",
     "plugins/publication.json",
@@ -374,6 +382,31 @@
       "plugin": "workflow",
       "source": ".agents/hooks/codex_hook_snapshot.py",
       "destination": "hooks/codex_hook_snapshot.py"
+    },
+    {
+      "plugin": "cli",
+      "source": ".agents/machine/utility/peer-cli/scripts",
+      "destination": ".agents/machine/utility/peer-cli/scripts"
+    },
+    {
+      "plugin": "cli",
+      "source": ".agents/machine/scripts",
+      "destination": "resources/machine/scripts"
+    },
+    {
+      "plugin": "cli",
+      "source": ".agents/agent-store/runtime",
+      "destination": ".agents/agent-store/runtime"
+    },
+    {
+      "plugin": "cli",
+      "source": ".agents/tiers/cli.json",
+      "destination": "tier.json"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/cli",
+      "destination": ".agents/cli"
     }
   ],
   "prerequisites": {
@@ -386,11 +419,18 @@
     "workflow": [
       "base",
       "agent-store",
-      "machine"
+      "machine",
+      "cli"
     ],
     "engineering": [
       "base",
       "workflow",
+      "agent-store",
+      "machine",
+      "cli"
+    ],
+    "cli": [
+      "base",
       "agent-store",
       "machine"
     ]
@@ -400,7 +440,8 @@
     "agent-store": [],
     "machine": [],
     "workflow": [],
-    "engineering": []
+    "engineering": [],
+    "cli": []
   },
   "extended_host_adapters": [
     "engineering:persistent-workflow",

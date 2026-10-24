@@ -195,6 +195,16 @@ class RecoveryTests(unittest.TestCase):
         processes[42] = SimpleNamespace(started_at=None)
         self.assertIsNone(RECOVERY._wrapper_identity(status, processes.get))
 
+    def test_wrapper_identity_preserves_the_frontends_terminal_observation(self):
+        status = self.root / "frontend.status.json"
+        terminal = {"kind": "tmux", "pane_id": "%12", "socket": "/tmp/exact-socket"}
+        status.write_text(json.dumps({"pid": 41, "child_pid": 42, "state": "running",
+                                      "terminal": terminal, "title": "exact frontend"}), encoding="utf-8")
+        processes = {41: SimpleNamespace(started_at=5.0), 42: SimpleNamespace(started_at=6.0)}
+        identity = RECOVERY._wrapper_identity(status, processes.get)
+        self.assertEqual(terminal, identity['terminal'])
+        self.assertEqual('exact frontend', identity['title'])
+
     def test_untracked_receipt_is_released_only_by_confirmation_after_pending_settles(self):
         receipt = RECOVERY._claim("codex", "exact_id", "profile")
         with self.assertRaises(ValueError):

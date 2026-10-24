@@ -1,8 +1,8 @@
 ---
-name: close
+name: closeout
 description: Close this CLI session when everything you were asked to do is finished, as your last action. Not for closing another session.
-kind: utility
-domain: machine
+kind: workflow
+domain: cli
 route: infer
 ---
 
@@ -25,12 +25,13 @@ workflow:session; when engineering is selected, apply engineering:self-repair's 
 authority decision only for a suspected reusable tooling defect.
 ```
 
-Close with the host's own close capability if it exposes one (a tool that archives or settles the current
-thread). Otherwise, as your last command, run:
+Finish the authorized owning workflow before closing. Preserve any required user decision and report it;
+do not manufacture completion, merge authority, or an approval. Once all owned outcomes are finished,
+use the same exact-tab primitive as `cli:close`. As your last command, run:
 
 ```text
-python -B <skill-directory>/scripts/close_session.py arm      # Windows
-python3 -B <skill-directory>/scripts/close_session.py arm     # Linux/macOS
+python -B <skill-directory>/scripts/closeout.py arm      # Windows
+python3 -B <skill-directory>/scripts/closeout.py arm     # Linux/macOS
 ```
 
 Then give the final reply and end the turn. A detached watcher closes this session's tab and process once
@@ -38,7 +39,7 @@ the turn has ended and stayed idle for about 3 seconds. A new prompt before then
 not prove closure; a refusal leaves the session open, and its reason is recorded in
 `~/.agents-state/session-close/<session-id>.json`.
 
-Closure means the exact terminal tab is gone and the registered host has exited. If tab ownership or
+Closure means the exact terminal tab is gone and its dedicated frontend has exited. If tab ownership or
 closure cannot be verified, preserve the session and report the refusal. Never substitute process exit
 for tab closure.
 
@@ -48,4 +49,5 @@ branch's pull request merged at HEAD during the session.
 Closing never removes a worktree. After closing, the watcher runs the worktree sweep, which removes the
 checkout only if its PR merged and nothing is left in it.
 
-`peer-cli` closes other sessions.
+`cli:close` closes this tab immediately after the final reply, preserving unfinished work and skipping cleanup.
+`machine:peer-cli` closes other sessions.

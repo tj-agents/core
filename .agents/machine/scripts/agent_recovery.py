@@ -493,7 +493,8 @@ def _wrapper_identity(status_path, process_lookup=None):
         if process is not None and started is None:
             return None
         identity[name] = {"pid": pid, "started_at": started}
-    return {**identity["wrapper"], **({"child": identity["child"]} if "child" in identity else {})}
+    terminal = {key: status[key] for key in ("terminal", "title") if key in status}
+    return {**identity["wrapper"], **({"child": identity["child"]} if "child" in identity else {}), **terminal}
 
 
 def _launch_ended(previous, process_lookup=None):

@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "plugin": "tj-agents/cli",
+  "source_roots": [
+    ".agents/agent-store/runtime",
+    ".agents/cli",
+    ".agents/machine/scripts",
+    ".agents/machine/utility/peer-cli/scripts",
+    ".agents/tiers/cli.json"
+  ],
+  "requires": {
+    "marketplaces": [
+      {
+        "id": "tj-agents",
+        "repository": "tj-agents/marketplace"
+      }
+    ],
+    "plugins": [
+      "tj-agents/agent-store",
+      "tj-agents/base",
+      "tj-agents/cli",
+      "tj-agents/machine"
+    ],
+    "hooks": [],
+    "permissions": {
+      "claude_allow": [
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)"
+      ],
+      "codex_prefix_rules": [
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
+              "${PLUGIN_ROOT}/skills/close/scripts/close_session.py",
+              "${PLUGIN_ROOT}/codex-skills/close/scripts/close_session.py"
+            ],
+            "arm"
+          ],
+          "justification": "Arm a watcher that closes only this verified CLI after its final reply",
+          "match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
+              "arm"
+            ]
+          ],
+          "not_match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
+              "hook"
+            ],
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/other.py",
+              "arm"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
+              "${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py",
+              "${PLUGIN_ROOT}/codex-skills/closeout/scripts/closeout.py"
+            ],
+            "arm"
+          ],
+          "justification": "Arm a watcher that closes only this verified CLI after its final reply",
+          "match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
+              "arm"
+            ]
+          ],
+          "not_match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
+              "hook"
+            ],
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/other.py",
+              "arm"
+            ]
+          ]
+        }
+      ]
+    }
+  }
+}
