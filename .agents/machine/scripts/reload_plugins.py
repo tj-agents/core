@@ -486,12 +486,43 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", choices=("claude", "codex", "both"), default="both")
     parser.add_argument("--project", type=Path, default=Path.cwd())
     parser.add_argument("--no-relaunch", action="store_true", help="Never relaunch the calling Claude session")
+    parser.add_argument("--continue-codex", type=Path, metavar="GOAL",
+                        help="Refresh then transfer the complete task checkpoint to one verified fresh Codex session")
+    parser.add_argument("--continuation-status", action="store_true",
+                        help="Print this Codex session's stable continuation receipt without refreshing or launching")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--all", action="store_true", help="Refresh every selected plugin, not only published changes")
     modes.add_argument("--verify", action="store_true", help="Refresh, then inspect native installations and remote main revisions")
     modes.add_argument("--verify-only", action="store_true", help="Inspect without changing plugins")
     arguments = parser.parse_args(argv)
     project = arguments.project.resolve()
+    if arguments.continuation_status:
+        import codex_continuation
+
+        try:
+            receipt = codex_continuation.receipt_path(project)
+            print(json.dumps({"receipt": str(receipt), "continuation": read_json(receipt)}))
+            return 0
+        except (OSError, ValueError, RuntimeError) as error:
+            print(f"plugins: {error}", file=sys.stderr)
+            return 1
+    if arguments.continue_codex:
+        if arguments.host != "codex" or arguments.verify_only:
+            parser.error("--continue-codex requires --host codex and rejects --verify-only")
+        import codex_continuation
+
+        refresh_arguments = ["--host", "codex", "--project", str(project)]
+        if arguments.all:
+            refresh_arguments.append("--all")
+        if arguments.verify:
+            refresh_arguments.append("--verify")
+        try:
+            return codex_continuation.continue_session(project, arguments.continue_codex,
+                                                      lambda: main(refresh_arguments))
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            print(f"plugins: continuation blocked: {error}. Retain the checkpoint and receipt; "
+                  "repair this prerequisite and repeat the same command only if launch has not begun.", file=sys.stderr)
+            return 1
     hosts = ("claude", "codex") if arguments.host == "both" else (arguments.host,)
     updated: set[str] = set()
     removed, legacy = review_legacy(hosts, project)

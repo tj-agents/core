@@ -72,6 +72,11 @@
   ],
   "resources": [
     {
+      "plugin": "machine",
+      "source": ".agents/workflow/workflow/handoff/scripts/transfer.py",
+      "destination": "resources/machine/scripts/handoff_transfer.py"
+    },
+    {
       "plugin": "base",
       "source": ".agents/machine/scripts/required_plugins.py",
       "destination": "hooks/required_plugins.py"

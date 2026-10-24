@@ -1,6 +1,6 @@
 ---
 name: sync-plugins
-description: Bring this CLI's tj-agents plugins up to date and into the running session. Run it yourself, without asking, whenever plugins look outdated - a skill or hook is missing or behaves like an older version, or a plugin PR just merged - or when asked to sync, reload, refresh or update the plugins.
+description: Refresh this CLI's tj-agents plugins and continue authorized work through the host's supported adoption mechanism when a fresh process is required. Run it yourself, without asking, whenever plugins look outdated - a skill or hook is missing or behaves like an older version, or a plugin PR just merged - or when asked to sync, reload, refresh or update the plugins.
 kind: utility
 domain: machine
 route: infer
@@ -24,4 +24,11 @@ It fails loudly on a native update that did not persist, a plugin the host lists
 superseded marketplace registration it cannot remove; report those. It removes a superseded registration
 that nothing uses.
 
-The host entry point names how this session adopts the result.
+The host entry point owns adoption, including automatic continuation when standards require a fresh
+process during an authorized task. Follow it after successful refresh before resuming deliverable writes.
+
+```text
+STANDARDS STALE blocks an authorized repair.
+Refresh succeeds, but the current process retains old instructions.
+Use the host adapter's adoption mechanism to continue the same task automatically.
+```
