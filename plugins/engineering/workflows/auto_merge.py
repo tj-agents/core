@@ -126,7 +126,7 @@ def current_review(root, binding, changed):
         review = evidence["body"]
     except workflow_ops.review_evidence.ReviewEvidenceError as error:
         raise AutoMergeError(str(error)) from error
-    if merge_review_gate.review_completion_problem(review, strict=evidence["private"]):
+    if merge_review_gate.review_completion_problem(review):
         raise AutoMergeError("review work order is incomplete")
     reviewed = merge_review_gate.work_order_sha_field(review, "Reviewed up to commit")
     head = binding["remote_head_sha"]
