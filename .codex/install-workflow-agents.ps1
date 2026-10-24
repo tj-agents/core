@@ -1,8 +1,6 @@
 [CmdletBinding()]
 param(
-    [string[]] $ProjectRoot = @(),
     [string] $CodexHome,
-    [string[]] $MigrateProjectRoot = @(),
     [switch] $Apply,
     [switch] $Verify,
     [switch] $Uninstall
@@ -11,20 +9,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $ownershipManifestName = '.tj-agents-delivery.json'
 $pendingManifestName = '.tj-agents-delivery.pending.json'
-$legacyOwnershipManifestName = '.base-agents-delivery.json'
-$legacyPendingManifestName = '.base-agents-delivery.pending.json'
 $ownershipOwner = 'tj-agents'
-$legacyOwnershipOwner = 'base-agents'
 
 if ($Verify -and ($Apply -or $Uninstall)) {
     throw '-Verify cannot be combined with -Apply or -Uninstall.'
-}
-if ($ProjectRoot.Count) {
-    Write-Warning '-ProjectRoot is deprecated; use -MigrateProjectRoot. The profile is installed and verified before project copies are removed.'
-    $MigrateProjectRoot = @($MigrateProjectRoot) + @($ProjectRoot)
-}
-if ($Uninstall -and $MigrateProjectRoot.Count) {
-    throw '-MigrateProjectRoot and deprecated -ProjectRoot are available only while installing or verifying profile roles.'
 }
 
 function Get-BytesSha256([byte[]] $Bytes) {
@@ -39,13 +27,6 @@ function Get-BytesSha256([byte[]] $Bytes) {
 
 function Get-FileSha256([string] $Path) {
     return Get-BytesSha256 ([System.IO.File]::ReadAllBytes($Path))
-}
-
-function Get-NormalizedTextSha256([string] $Path) {
-    $text = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
-    $normalized = $text.Replace("`r`n", "`n").Replace("`r", "`n")
-    $utf8 = New-Object System.Text.UTF8Encoding($false)
-    return Get-BytesSha256 ($utf8.GetBytes($normalized))
 }
 
 function Test-SafeDeliveryEntry([string] $Path, [switch] $AllowUninspectable) {
@@ -122,59 +103,6 @@ function Resolve-CodexProfile([string] $ExplicitPath) {
     return $resolved
 }
 
-function Resolve-ManagedProject([string] $Path) {
-    $candidate = [System.IO.Path]::GetFullPath($Path)
-    Assert-SafeDeliveryPath $candidate
-    $project = (Resolve-Path -LiteralPath $candidate).ProviderPath
-    Assert-SafeDeliveryPath $project
-    if (-not (Test-Path -LiteralPath (Join-Path $project '.git'))) {
-        throw "MigrateProjectRoot is not a Git checkout: $project"
-    }
-    Assert-SafeDeliveryPath (Join-Path $project '.codex')
-    Assert-SafeDeliveryPath (Join-Path $project '.codex/agents')
-    return $project
-}
-
-function Test-LegacyOwnershipMigrated([string] $Current, [string] $Legacy) {
-    try {
-        $currentOwned = Read-OwnershipManifest $Current $ownershipOwner
-        $legacyOwned = Read-OwnershipManifest $Legacy $legacyOwnershipOwner
-    }
-    catch {
-        return $false
-    }
-    $unmatched = @($legacyOwned.Keys | Where-Object {
-        -not $currentOwned.ContainsKey($_) -or $currentOwned[$_] -ne $legacyOwned[$_]
-    })
-    return $unmatched.Count -eq 0
-}
-
-function Resolve-OwnershipState([string] $Current, [string] $Legacy) {
-    Assert-SafeDeliveryPath $Current
-    Assert-SafeDeliveryPath $Legacy
-    $hasCurrent = Test-Path -LiteralPath $Current
-    $hasLegacy = Test-Path -LiteralPath $Legacy
-    if ($hasCurrent -and $hasLegacy) {
-        if (-not (Test-LegacyOwnershipMigrated $Current $Legacy)) {
-            throw "Both $Current and legacy $Legacy exist. Remove the stale one, then rerun."
-        }
-        if ($Apply) {
-            Assert-SafeDeliveryPath $Legacy
-            Remove-Item -LiteralPath $Legacy -Force
-        }
-        return [pscustomobject]@{ Path = $Current; Owner = $ownershipOwner }
-    }
-    if ($hasLegacy) { return [pscustomobject]@{ Path = $Legacy; Owner = $legacyOwnershipOwner } }
-    return [pscustomobject]@{ Path = $Current; Owner = $ownershipOwner }
-}
-
-function Remove-LegacyOwnershipState([string[]] $Paths) {
-    foreach ($path in $Paths) {
-        Assert-SafeDeliveryPath $path
-        if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
-    }
-}
-
 function Read-OwnershipManifest([string] $ManifestPath, [string] $Owner = $ownershipOwner) {
     $owned = @{}
     if (-not (Test-Path -LiteralPath $ManifestPath)) { return $owned }
@@ -226,12 +154,6 @@ function Write-OwnershipManifest([string] $ManifestPath, [hashtable] $Owned) {
     Move-Item -LiteralPath $temporary -Destination $ManifestPath -Force
 }
 
-function Test-KnownProjectAgent([string] $Path, [string] $Name, [hashtable] $KnownDigests) {
-    if (-not $KnownDigests.ContainsKey($Name)) { return $false }
-    $digest = Get-NormalizedTextSha256 $Path
-    return @($KnownDigests[$Name]) -contains $digest
-}
-
 function Assert-ProfileRoles([string] $Target, [System.IO.FileInfo[]] $SourceFiles, [hashtable] $Owned) {
     $problems = @()
     foreach ($file in $SourceFiles) {
@@ -254,23 +176,6 @@ function Assert-ProfileRoles([string] $Target, [System.IO.FileInfo[]] $SourceFil
     }
     if ($problems.Count) {
         throw "Profile verification failed: $($problems -join '; ')"
-    }
-}
-
-function Assert-ProjectsMigrated([string[]] $Projects, [string[]] $Names, [hashtable] $KnownDigests) {
-    $problems = @()
-    foreach ($project in $Projects) {
-        $target = Join-Path $project '.codex/agents'
-        foreach ($name in $Names) {
-            $destination = Join-Path $target $name
-            if ((Test-Path -LiteralPath $destination -PathType Leaf) -and
-                (Test-KnownProjectAgent $destination $name $KnownDigests)) {
-                $problems += $destination
-            }
-        }
-    }
-    if ($problems.Count) {
-        throw "Project migration verification failed; tj-agents-owned role copies remain: $($problems -join ', ')"
     }
 }
 
@@ -306,46 +211,20 @@ $generatedAgentPatterns = @($delivery.generated_agent_patterns)
 if (-not $generatedAgentPatterns.Count -or $generatedAgentPatterns -contains '*.toml') {
     throw 'Codex agent delivery patterns must name generated families without matching every TOML file.'
 }
-$formerManagedAgents = @($delivery.former_managed_agents)
-foreach ($name in $formerManagedAgents) { Assert-AgentName $name 'former managed' }
-
 $sourceFiles = @($generatedAgentPatterns |
     ForEach-Object { Get-ChildItem -LiteralPath $source -File -Filter $_ } |
     Sort-Object Name -Unique)
 if (-not $sourceFiles.Count) { throw "No generated role files matched the delivery patterns in $source" }
 $sourceNames = @($sourceFiles | ForEach-Object { $_.Name })
-$projectManagedNames = @($sourceNames + $formerManagedAgents | Sort-Object -Unique)
-$projectKnownDigests = @{}
-foreach ($file in $sourceFiles) {
-    $projectKnownDigests[$file.Name] = @((Get-NormalizedTextSha256 $file.FullName))
-}
-if ($null -ne $delivery.project_managed_agent_sha256) {
-    foreach ($property in @($delivery.project_managed_agent_sha256.PSObject.Properties)) {
-        Assert-AgentName $property.Name 'project managed'
-        $digests = @($property.Value | ForEach-Object { ([string] $_).ToUpperInvariant() })
-        if (-not $digests.Count -or @($digests | Where-Object { $_ -notmatch '^[0-9A-F]{64}$' }).Count) {
-            throw "Invalid project managed digest inventory for $($property.Name)"
-        }
-        $existing = if ($projectKnownDigests.ContainsKey($property.Name)) { @($projectKnownDigests[$property.Name]) } else { @() }
-        $projectKnownDigests[$property.Name] = @(@($existing) + @($digests) | Sort-Object -Unique)
-    }
-}
 
 $profile = Resolve-CodexProfile $CodexHome
 $target = Join-Path $profile 'agents'
 $manifestPath = Join-Path $target $ownershipManifestName
 $pendingPath = Join-Path $target $pendingManifestName
-$legacyManifestPath = Join-Path $target $legacyOwnershipManifestName
-$legacyPendingPath = Join-Path $target $legacyPendingManifestName
 Assert-SafeDeliveryPath $target
-$migrationProjects = @(
-    $MigrateProjectRoot | ForEach-Object { Resolve-ManagedProject $_ } | Sort-Object -Unique
-)
-$manifestState = Resolve-OwnershipState $manifestPath $legacyManifestPath
-$ownedDigests = Read-OwnershipManifest $manifestState.Path $manifestState.Owner
-$pendingState = Resolve-OwnershipState $pendingPath $legacyPendingPath
-$pendingExists = Test-Path -LiteralPath $pendingState.Path
-$pendingDigests = Read-OwnershipManifest $pendingState.Path $pendingState.Owner
+$ownedDigests = Read-OwnershipManifest $manifestPath
+$pendingExists = Test-Path -LiteralPath $pendingPath
+$pendingDigests = Read-OwnershipManifest $pendingPath
 if ($pendingExists) {
     foreach ($name in @($pendingDigests.Keys)) {
         $destination = Join-Path $target $name
@@ -370,19 +249,17 @@ if ($pendingExists) {
 
 if ($Verify) {
     if ($pendingExists) {
-        throw "Profile verification found an interrupted install journal at $($pendingState.Path). Rerun with -Apply to recover it."
+        throw "Profile verification found an interrupted install journal at $pendingPath. Rerun with -Apply to recover it."
     }
     Assert-ProfileRoles $target $sourceFiles $ownedDigests
-    Assert-ProjectsMigrated $migrationProjects $projectManagedNames $projectKnownDigests
-    $suffix = if ($migrationProjects.Count) { '; known tj-agents project copies absent' } else { '' }
-    Write-Output "VERIFIED: $($sourceFiles.Count) profile agent(s)$suffix."
+    Write-Output "VERIFIED: $($sourceFiles.Count) profile agent(s)."
     exit 0
 }
 
 $changes = 0
 if ($Uninstall) {
     if ($pendingExists) {
-        throw "Profile uninstall found an interrupted install journal at $($pendingState.Path). Rerun with -Apply before uninstalling."
+        throw "Profile uninstall found an interrupted install journal at $pendingPath. Rerun with -Apply before uninstalling."
     }
     foreach ($name in @($ownedDigests.Keys | Sort-Object)) {
         $destination = Join-Path $target $name
@@ -403,7 +280,6 @@ if ($Uninstall) {
     }
     if ($Apply) {
         Write-OwnershipManifest $manifestPath @{}
-        Remove-LegacyOwnershipState @($legacyManifestPath, $legacyPendingPath)
         Remove-DirectoryIfEmpty $target
         Write-Output "UNINSTALLED: $changes change(s), unrelated profile agents preserved."
     }
@@ -509,39 +385,13 @@ foreach ($destination in $retiredOwned) {
 
 if ($Apply) {
     Write-OwnershipManifest $manifestPath $newOwned
-    # Project cleanup is intentionally ordered after this verification. A failed or partial profile
-    # install can never remove the only usable project-scoped copy.
     Assert-ProfileRoles $target $sourceFiles $newOwned
     Write-OwnershipManifest $pendingPath @{}
-    Remove-LegacyOwnershipState @($legacyManifestPath, $legacyPendingPath)
-}
-
-foreach ($project in $migrationProjects) {
-    $projectTarget = Join-Path $project '.codex/agents'
-    foreach ($name in $projectManagedNames) {
-        $destination = Join-Path $projectTarget $name
-        Assert-SafeDeliveryPath $destination
-        if (-not (Test-Path -LiteralPath $destination)) { continue }
-        $item = Get-Item -Force -LiteralPath $destination
-        if ($item.PSIsContainer) { throw "Candidate project Codex agent is not a file: $destination" }
-        if (-not (Test-KnownProjectAgent $destination $name $projectKnownDigests)) {
-            Write-Output "PRESERVE $destination"
-            continue
-        }
-        Write-Output "REMOVE $destination"
-        $changes++
-        if ($Apply) {
-            Assert-SafeDeliveryPath $destination
-            Remove-Item -LiteralPath $destination -Force
-        }
-    }
-    if ($Apply) { Remove-DirectoryIfEmpty $projectTarget }
 }
 
 if (-not $Apply) {
     Write-Output "PREVIEW ONLY: $changes change(s); rerun with -Apply to install."
 }
 else {
-    Assert-ProjectsMigrated $migrationProjects $projectManagedNames $projectKnownDigests
-    Write-Output "INSTALLED: $changes change(s), unrelated profile and project agents preserved."
+    Write-Output "INSTALLED: $changes change(s), unrelated profile agents preserved."
 }

@@ -20,7 +20,7 @@ PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/plugin-selection/scripts"
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 import harness_permissions  # noqa: E402
 
-INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "finish.py"), ("machine", "close.py"), ("workflow", "status.py"))
+INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "close.py"), ("workflow", "status.py"))
 HOST_ENTRY_SKILLS = {"engineering": "merge", "machine": "peer-cli", "workflow": "status"}
 
 
@@ -234,22 +234,6 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
     def rendered(self, plugin):
         manifest = json.loads((ROOT / f".agents/plugins/harness/{plugin}.json").read_text(encoding="utf-8"))
         return harness_permissions.render_permissions(manifest["requires"]["permissions"], self.PLUGIN_ROOT)
-
-    def test_retention_permissions_require_the_clear_command(self):
-        manifest = json.loads((ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8"))
-        harness_permissions.validate_requires(manifest["requires"], "engineering")
-        claude_allow, codex_rules = self.rendered("engineering")
-        entries = [entry for entry in claude_allow if "merge_cleanup_gate.py" in entry]
-        self.assertEqual(8, len(entries))
-        for shell in ("Bash", "PowerShell"):
-            for python in ("python", "python3"):
-                self.assertTrue(any(entry.startswith(f"{shell}({python} -B ")
-                                    and entry.endswith("/hooks/merge_cleanup_gate.py --clear:*)")
-                                    for entry in (value.replace("\\", "/") for value in entries)))
-        rules = [rule for rule in codex_rules if "merge_cleanup_gate.py" in json.dumps(rule)]
-        self.assertEqual(1, len(rules))
-        self.assertEqual("--clear", rules[0]["pattern"][-1])
-        self.assertEqual("-B", rules[0]["pattern"][1])
 
     def test_every_instructed_command_is_declared_for_both_hosts(self):
         for plugin, script in INSTRUCTED_SCRIPTS:

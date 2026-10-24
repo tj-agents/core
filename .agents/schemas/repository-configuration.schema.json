@@ -17,8 +17,7 @@
                 "design": {"type": "boolean"}
               },
               "additionalProperties": false
-            },
-            "auto_approve_design": {"type": "boolean", "deprecated": true}
+            }
           },
           "additionalProperties": false
         }
