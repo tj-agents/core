@@ -20,8 +20,7 @@ On Linux/macOS use `python3`. It updates only installs whose plugin files differ
 reports `current` but a plugin is still stale, rerun with `--all` (optionally `--host claude|codex`).
 `--verify` also checks native installations against remote main; `--verify-only` changes nothing.
 
-It fails loudly on a native update that did not persist, a plugin the host lists with errors, and a
-superseded marketplace registration it cannot remove; report those. It removes a superseded registration
-that nothing uses.
+It fails loudly on a native update that did not persist and a plugin the host lists with errors; report
+those.
 
 The host entry point names how this session adopts the result.

@@ -426,7 +426,7 @@ def inspect_repository(root, workflow_run_id):
             continue
     reviews = sorted(str(path.relative_to(root)).replace("\\", "/") for path in root.glob("reviews/*.md"))
     private = review_work_order(root, branch)
-    if private.is_file() and private != review_evidence.legacy_path(root, branch):
+    if private.is_file() and private != review_evidence.durable_path(root, branch):
         reviews.append(str(private))
     result = {
         "schema_version": SCHEMA_VERSION,
@@ -676,65 +676,10 @@ def compact_candidate_key(value):
     return base64.urlsafe_b64encode(bytes.fromhex(value)).decode("ascii").rstrip("=")[:22]
 
 
-def legacy_review_bundle_locations(locations):
-    directory = locations["private"]
-    return {
-        "directory": directory,
-        "patch": directory / "candidate.patch",
-        "paths": directory / "paths.nul",
-        "tree": directory / "tree",
-        "tree_archive": directory / "tree.tar",
-        "identity": directory / "identity.json",
-    }
-
-
 def bundle_matches_locations(bundle, locations):
     return all(bundle.get(name) == str(locations[name]) for name in (
         "directory", "patch", "paths", "tree", "tree_archive", "identity"
     ))
-
-
-def remove_legacy_review_payload(locations):
-    legacy = legacy_review_bundle_locations(locations)
-    for name in ("patch", "paths", "tree", "tree_archive", "identity"):
-        path = legacy[name]
-        if not path.exists() and not is_redirect(path):
-            continue
-        if is_redirect(path):
-            raise WorkflowOperationError("legacy review bundle contains a redirected artifact path")
-        if path.is_dir():
-            shutil.rmtree(path)
-        else:
-            path.unlink()
-
-
-def validate_legacy_review_bundle(root, value, locations):
-    artifacts = [locations[name] for name in ("patch", "paths", "tree", "tree_archive", "identity")]
-    present = [path.exists() or is_redirect(path) for path in artifacts]
-    if not any(present):
-        return
-    if not all(present):
-        raise WorkflowOperationError("legacy review bundle is incomplete")
-    if any(is_redirect(path) for path in artifacts):
-        raise WorkflowOperationError("legacy review bundle contains a redirected artifact path")
-    if sha256_file(locations["patch"]) != value["patch_sha256"]:
-        raise WorkflowOperationError("legacy review patch hash differs from its descriptor")
-    path_bytes = locations["paths"].read_bytes()
-    if hashlib.sha256(path_bytes).hexdigest() != value["path_digest"]:
-        raise WorkflowOperationError("legacy review path manifest differs from its descriptor")
-    if sha256_file(locations["tree_archive"]) != value["tree_archive_sha256"]:
-        raise WorkflowOperationError("legacy review tree archive hash differs from its descriptor")
-    if sha256_file(locations["identity"]) != value["bundle"]["identity_sha256"]:
-        raise WorkflowOperationError("legacy review identity manifest hash differs from its descriptor")
-    if json.loads(locations["identity"].read_text(encoding="utf-8")) != expected_identity(value, path_bytes):
-        raise WorkflowOperationError("legacy review identity manifest differs from the frozen candidate")
-    if tree_content_digest(locations["tree"]) != value["tree_content_sha256"]:
-        raise WorkflowOperationError("legacy materialized review tree differs from its descriptor")
-    if git(root, "rev-parse", f"{value['head']}^{{tree}}") != value["head_tree"]:
-        raise WorkflowOperationError("review head tree differs from the repository object")
-    patch = run_process(["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False).stdout
-    if hashlib.sha256(patch).hexdigest() != value["patch_sha256"]:
-        raise WorkflowOperationError("review patch differs from the repository objects")
 
 
 def create_review_bundle_directory(locations):
@@ -846,11 +791,7 @@ def review_descriptor_paths(runs):
         return
     for current_path, directory_names, file_names in os.walk(runs, topdown=True, followlinks=False):
         current = Path(current_path)
-        legacy_candidate = current.parent.name == "review" and re.fullmatch(r"[0-9a-f]{64}", current.name)
-        directory_names[:] = [
-            name for name in directory_names
-            if not is_redirect(current / name) and not (legacy_candidate and name == "tree")
-        ]
+        directory_names[:] = [name for name in directory_names if not is_redirect(current / name)]
         descriptor = current / "descriptor.json"
         if current.parent.name == "review" and "descriptor.json" in file_names and not is_redirect(descriptor):
             yield descriptor
@@ -1119,7 +1060,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize, docs_
 def load_descriptor(root, workflow_run_id, path):
     descriptor_path = Path(path).absolute()
     value = json.loads(descriptor_path.read_text(encoding="utf-8"))
-    required_fields = ("operation", "repository", "base", "head", "head_tree", "tree_archive_sha256", "tree_content_sha256", "paths", "path_digest", "patch_sha256", "rules", "docs_review", "descriptor_id", "bundle")
+    required_fields = ("operation", "repository", "base", "head", "head_tree", "tree_archive_sha256", "tree_content_sha256", "paths", "path_digest", "patch_sha256", "rules", "routed_skills", "route_violations", "docs_review", "descriptor_id", "bundle")
     if not isinstance(value, dict) or any(field not in value for field in required_fields):
         raise WorkflowOperationError("review descriptor is incomplete")
     if value.get("operation") != "review-prepare":
@@ -1140,23 +1081,8 @@ def load_descriptor(root, workflow_run_id, path):
         raise WorkflowOperationError("review descriptor is outside the current workflow run")
     if is_redirect(descriptor_path):
         raise WorkflowOperationError("review descriptor is redirected")
-    legacy = legacy_review_bundle_locations(locations)
-    external_bundle = bundle_matches_locations(bundle, locations)
-    legacy_bundle = bundle_matches_locations(bundle, legacy)
-    if not external_bundle and not legacy_bundle:
+    if not bundle_matches_locations(bundle, locations):
         raise WorkflowOperationError("review descriptor is not bound to its expected external bundle")
-    if legacy_bundle:
-        validate_legacy_review_bundle(root, value, legacy)
-        if locations["directory"].exists():
-            validate_review_bundle(root, value, locations)
-        else:
-            restore_review_bundle(root, value, locations)
-            validate_review_bundle(root, value, locations)
-        value["bundle"].update({name: str(locations[name]) for name in (
-            "directory", "patch", "paths", "tree", "tree_archive", "identity"
-        )})
-        atomic_json(descriptor_path, value)
-        remove_legacy_review_payload(locations)
     directory = locations["directory"]
     required = {name: locations[name] for name in ("patch", "paths", "tree", "tree_archive", "identity")}
     expected_names = {"patch": "candidate.patch", "paths": "paths.nul", "tree": "tree", "tree_archive": "tree.tar", "identity": "identity.json"}
@@ -1199,7 +1125,7 @@ def load_descriptor(root, workflow_run_id, path):
         raise WorkflowOperationError("review patch differs from the repository objects")
     expected_rules = []
     routed, violations = route_findings(required["tree"], paths, root)
-    if "routed_skills" in value and (value["routed_skills"], value.get("route_violations")) != (routed, violations):
+    if (value["routed_skills"], value["route_violations"]) != (routed, violations):
         raise WorkflowOperationError("review routing differs from the frozen tree routing evidence")
     for name in routed:
         rule_path = required["tree"] / ".agents" / "skills" / name / "SKILL.md"
@@ -1215,7 +1141,6 @@ def load_descriptor(root, workflow_run_id, path):
         raise WorkflowOperationError("review rules differ from the frozen tree routing evidence")
     value["bundle"]["last_validated_at"] = utc_now()
     atomic_json(descriptor_path, value)
-    remove_legacy_review_payload(locations)
     return value
 
 
@@ -2106,7 +2031,7 @@ def review_binding(root, branch, head):
         gate = review_gate_module()
         reviewed = gate.work_order_sha_field(body, "Reviewed up to commit")
         reviewed = resolved_commit(root, reviewed) if reviewed not in (None, "invalid") else None
-        if (not gate.review_completion_problem(body, strict=evidence["private"]) and not gate.unresolved_review_items(body)
+        if (not gate.review_completion_problem(body) and not gate.unresolved_review_items(body)
                 and reviewed is not None and review_is_current(root, reviewed, head)):
             watermark = reviewed
         path = evidence["path"]
@@ -2133,8 +2058,8 @@ def review_record(root, workflow_run_id, descriptor_path, work_order):
     raw = expected.read_bytes()
     body = raw.decode("utf-8")
     gate = review_gate_module()
-    private = expected != review_evidence.legacy_path(root, descriptor["branch"])
-    if gate.review_completion_problem(body, strict=private):
+    private = expected != review_evidence.durable_path(root, descriptor["branch"])
+    if gate.review_completion_problem(body):
         raise WorkflowOperationError("review work order is incomplete")
     if gate.work_order_sha_field(body, "Reviewed up to commit") != descriptor["head"]:
         raise WorkflowOperationError("review completion does not match the frozen candidate")
@@ -2148,7 +2073,7 @@ def review_record(root, workflow_run_id, descriptor_path, work_order):
 
 def standing_authorization(root, changed_paths, labels):
     try:
-        policy = delivery_policy.load_legacy_policy(root)
+        policy = delivery_policy.load_policy(root)
     except delivery_policy.PolicyViolation as error:
         raise WorkflowOperationError(str(error)) from error
     try:

@@ -92,9 +92,7 @@ class WindowsTransport(scheduler.SchedulerTransport):
         self.query_invalid_json = False
         self.query_duration = None
         self.query_timeouts = []
-        self.legacy_timeouts = []
         self.inventory_timeouts = []
-        self.legacy_tasks = []
         self.registrations = []
 
     def run(self, args, **kwargs):
@@ -106,15 +104,6 @@ class WindowsTransport(scheduler.SchedulerTransport):
             if self.query_duration is not None and self.query_duration > kwargs.get("timeout", 15):
                 raise subprocess.TimeoutExpired(args, kwargs.get("timeout", 15))
             return Result(json.dumps(self.registrations))
-        if args[-1] == adapter.LEGACY_WINDOWS_SCRIPT:
-            self.legacy_timeouts.append(kwargs.get("timeout"))
-            if self.query_duration is not None and self.query_duration > kwargs.get("timeout", 15):
-                raise subprocess.TimeoutExpired(args, kwargs.get("timeout", 15))
-            if self.query_error:
-                return Result(returncode=1, stderr=self.query_error)
-            if self.query_invalid_json:
-                return Result("{")
-            return Result(json.dumps({"Tasks": self.legacy_tasks}))
         if operation == "query":
             self.query_timeouts.append(kwargs.get("timeout"))
             if self.query_duration is not None and self.query_duration > kwargs.get("timeout", 15):
@@ -372,7 +361,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertEqual(previous, resolved)
         self.assertEqual(previous, json.loads((self.owner_path.parent / "scheduler.json").read_text(encoding="utf-8")))
 
-    def test_windows_query_and_legacy_transport_errors_preserve_transaction_evidence(self):
+    def test_windows_query_errors_preserve_transaction_evidence(self):
         receipt = self.windows_receipt()
         pending = self.owner_path.parent / "scheduler.pending.json"
         scheduler.atomic_json(pending, {"previous": None, "proposed": receipt})
@@ -383,19 +372,12 @@ class DeliveryContinuationTests(unittest.TestCase):
             scheduler.reconcile_pending(pending, self.owner_path.parent / "scheduler.json",
                                         self.owner_path, self.owner, self.root, transport, windows=True)
         self.assertEqual(before, pending.read_bytes())
-        with self.assertRaisesRegex(RuntimeError, "legacy ScheduledTasks query failed"):
-            adapter.legacy_conflict(self.root, transport, windows=True)
         transport.query_error = None
         transport.query_invalid_json = True
         with self.assertRaisesRegex(RuntimeError, "invalid JSON"):
             scheduler.reconcile_pending(pending, self.owner_path.parent / "scheduler.json",
                                         self.owner_path, self.owner, self.root, transport, windows=True)
         self.assertEqual(before, pending.read_bytes())
-        transport.query_invalid_json = False
-        transport.legacy_tasks = [{"TaskName": "AgentStandards-Delivery-old", "TaskPath": "\\",
-                                   "Actions": [{"WorkingDirectory": str(self.root)}]}]
-        with self.assertRaisesRegex(RuntimeError, "legacy delivery task"):
-            adapter.legacy_conflict(self.root, transport, windows=True)
 
     def test_windows_read_queries_allow_slow_valid_reads_and_reject_invalid_or_timed_out_tasks(self):
         receipt = self.windows_receipt()
@@ -407,25 +389,12 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertEqual(receipt["task_name"], result["registered"])
         self.assertTrue(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
         self.assertTrue(transport.query_timeouts)
-        self.assertTrue(transport.legacy_timeouts)
         transport.registrations = [{"TaskName": receipt["task_name"]}]
         with patch.object(adapter.os, "name", "nt"):
             self.assertEqual([{"TaskName": receipt["task_name"]}], adapter.list_registrations(transport)["entries"])
         self.assertTrue(transport.inventory_timeouts)
         self.assertEqual({scheduler.WINDOWS_READ_QUERY_TIMEOUT},
-                         set(transport.query_timeouts + transport.legacy_timeouts + transport.inventory_timeouts))
-
-        conflicting = WindowsTransport()
-        conflicting.query_duration = 9
-        conflicting.legacy_tasks = [{"TaskName": "AgentStandards-Delivery-old", "TaskPath": "\\",
-                                     "Actions": [{"WorkingDirectory": str(self.root)}]}]
-        receipt_before = (self.owner_path.parent / "scheduler.json").read_bytes()
-        with self.assertRaisesRegex(RuntimeError, "legacy delivery task"):
-            with patch.object(adapter, "receipt_for", return_value=receipt):
-                adapter.register(self.owner, self.root, self.owner_path, arguments, conflicting, windows=True)
-        self.assertIsNone(conflicting.task)
-        self.assertFalse((self.owner_path.parent / "scheduler.pending.json").exists())
-        self.assertEqual(receipt_before, (self.owner_path.parent / "scheduler.json").read_bytes())
+                         set(transport.query_timeouts + transport.inventory_timeouts))
 
         transport.task["Actions"][0]["Arguments"] = "foreign"
         self.assertFalse(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
@@ -434,21 +403,8 @@ class DeliveryContinuationTests(unittest.TestCase):
 
         transport.query_duration = 16
         self.assertFalse(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
-        with self.assertRaises(subprocess.TimeoutExpired):
-            adapter.legacy_conflict(self.root, transport, windows=True)
 
-    def test_known_version_two_windows_receipt_migrates_for_remove_but_arbitrary_receipts_do_not(self):
-        receipt = self.windows_receipt()
-        receipt["version"] = 2
-        receipt.pop("platform")
-        receipt["description"] = "Continuation owner " + self.owner["owner_id"]
-        transport = WindowsTransport(self.windows_task(receipt))
-        self.assertFalse(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
-        scheduler.atomic_json(self.owner_path.parent / "scheduler.json", receipt)
-        result = adapter.remove(self.owner, self.root, self.owner_path,
-                                self.args("remove", "--owner", str(self.owner_path)), transport)
-        self.assertTrue(result["removed"])
-        self.assertIsNone(transport.task)
+    def test_a_receipt_without_a_recognized_platform_is_refused(self):
         arbitrary = {"version": 3, "owner_id": self.owner["owner_id"], "owner_path": str(self.owner_path),
                      "worktree": str(self.root), "task_name": "anything"}
         with self.assertRaisesRegex(scheduler.SchedulerError, "recognized platform"):
@@ -864,56 +820,6 @@ class DeliveryContinuationTests(unittest.TestCase):
                                 text=True, encoding="utf-8", capture_output=True, check=False)
         self.assertEqual(0, result.returncode)
         self.assertEqual(json.loads(payload), json.loads(result.stdout))
-
-    @unittest.skipUnless(os.name == "nt" or shutil.which("pwsh"),
-                         "requires inbox Windows PowerShell on Windows or the repository pwsh prerequisite on Linux")
-    def test_legacy_powershell_query_serializes_nested_actions_without_registration(self):
-        executable = "powershell.exe" if os.name == "nt" else "pwsh"
-
-        class ShadowTransport(scheduler.SchedulerTransport):
-            def __init__(self, tasks=None, failure=None):
-                self.tasks = tasks or []
-                self.failure = failure
-                self.calls = []
-
-            def run(self, args, **kwargs):
-                self.calls.append(tuple(args))
-                if self.failure:
-                    shadow = "function Get-ScheduledTask { throw '" + self.failure + "' };"
-                else:
-                    payload = json.dumps({"Tasks": self.tasks}, ensure_ascii=False).replace("'", "''")
-                    shadow = "$fixture = @'\n" + payload + "\n'@ | ConvertFrom-Json;function Get-ScheduledTask { @($fixture.Tasks) };"
-                command = list(args)
-                command[-1] = shadow + command[-1]
-                return super().run(command, **kwargs)
-
-        unrelated = str((self.root / "unrelated worktree").resolve())
-        nested = str((self.root / "unrelated worktree" / "nested").resolve())
-        tasks = [
-            {"TaskName": "AgentStandards-Delivery-one", "TaskPath": "\\",
-             "Actions": [{"WorkingDirectory": unrelated}]},
-            {"TaskName": "AgentStandards-Delivery-two", "TaskPath": "\\",
-             "Actions": [{"WorkingDirectory": nested}]},
-        ]
-        transport = ShadowTransport(tasks)
-        with patch.object(adapter.scheduler, "_powershell", return_value=executable):
-            result = transport.run([executable, "-NoProfile", "-NonInteractive", "-Command",
-                                    adapter.LEGACY_WINDOWS_SCRIPT], timeout=8)
-            self.assertEqual(0, result.returncode, result.stderr)
-            payload = json.loads(result.stdout)
-            self.assertEqual(tasks, payload["Tasks"])
-            adapter.legacy_conflict(self.root, transport, windows=True)
-
-            owned = ShadowTransport([{"TaskName": "AgentStandards-Delivery-owned", "TaskPath": "\\",
-                                      "Actions": [{"WorkingDirectory": str(self.root)}]}])
-            with self.assertRaisesRegex(RuntimeError, "legacy delivery task"):
-                adapter.legacy_conflict(self.root, owned, windows=True)
-
-            failed = ShadowTransport(failure="fixture query failure")
-            with self.assertRaisesRegex(RuntimeError, "legacy ScheduledTasks query failed: .*fixture query failure"):
-                adapter.legacy_conflict(self.root, failed, windows=True)
-
-        self.assertTrue(all("Register-ScheduledTask" not in call[-1] for call in transport.calls + owned.calls + failed.calls))
 
     @unittest.skipUnless(os.name == "nt" or shutil.which("pwsh"),
                          "requires inbox Windows PowerShell on Windows or the repository pwsh prerequisite on Linux")

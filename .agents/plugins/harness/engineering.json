@@ -4,11 +4,8 @@
   "source_roots": [
     ".agents/agent-store/runtime",
     ".agents/engineering",
-    ".agents/hooks/continuation_receipts.py",
-    ".agents/hooks/continuation_stop.py",
     ".agents/hooks/docs_reachability.py",
     ".agents/hooks/hook_dispatch.py",
-    ".agents/hooks/merge_cleanup_gate.py",
     ".agents/hooks/problem_records.py",
     ".agents/workflow/resources/problem-records.md",
     ".agents/workflows",
@@ -68,10 +65,6 @@
     ],
     "permissions": {
       "claude_allow": [
-        "Bash(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
         "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
         "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
@@ -92,45 +85,6 @@
         "PowerShell(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)"
       ],
       "codex_prefix_rules": [
-        {
-          "pattern": [
-            [
-              "python",
-              "python.exe",
-              "python3",
-              "py"
-            ],
-            "-B",
-            "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-            "--clear"
-          ],
-          "justification": "Records an evidenced retention disposition for the exact merged checkout after validating the real close refusal and separate fallback; pending cleanup remains incomplete",
-          "match": [
-            [
-              "python",
-              "-B",
-              "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-              "--clear",
-              "${PROJECT_ROOT}",
-              "--reason",
-              "capability",
-              "--evidence",
-              "evidence.json"
-            ]
-          ],
-          "not_match": [
-            [
-              "python",
-              "-B",
-              "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
-            ],
-            [
-              "python",
-              "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-              "--clear"
-            ]
-          ]
-        },
         {
           "pattern": [
             [

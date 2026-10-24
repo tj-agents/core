@@ -59,24 +59,27 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(80, len(skills))
-        self.assertEqual("machine", skills["hook-control"]["plugin"])
-        self.assertEqual(set(skills), {
-            path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
-        })
-        self.assertEqual(set(skills), {
-            path.parent.name for path in (self.root / ".claude/skills").glob("*/SKILL.md")
-        })
+        self.assertEqual(81, len(skills))
+        self.assertEqual("machine", skills["machine:hook-control"]["plugin"])
+        self.assertEqual("session", skills["workflow:session"]["name"])
+        self.assertEqual("session", skills["engineering:session"]["name"])
+        for host in ("codex", "claude"):
+            self.assertEqual(set(skills), {
+                f"{path.parent.parent.name}:{path.parent.name}"
+                for path in (self.root / f".{host}/skills").glob("*/*/SKILL.md")
+            })
         for name, skill in skills.items():
             for host in ("codex", "claude"):
-                adapter = (self.root / f".{host}/skills/{name}/SKILL.md").read_text(
+                adapter = (self.root / f".{host}/skills/{skill['plugin']}/{skill['name']}/SKILL.md").read_text(
                     encoding="utf-8"
                 )
                 self.assertEqual(
                     1,
-                    adapter.count(f"](../../../{skill['relative']})"),
+                    adapter.count(f"](../../../../{skill['relative']})"),
                     f"{host}:{name}",
                 )
+        for plugin in ("workflow", "engineering"):
+            self.assertIn(f"plugins/{plugin}/skills/session/SKILL.md", output)
         self.assertFalse((self.root / "base").exists())
         self.assertFalse((self.root / "engineering").exists())
         self.assertFalse((self.root / "machine").exists())
@@ -100,7 +103,7 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertIn(workflow_resource, output)
         for name, relative in canonical.items():
             with self.subTest(skill=name):
-                self.assertEqual("engineering", skills[name]["plugin"])
+                self.assertEqual("engineering", skills[f"engineering:{name}"]["plugin"])
                 for tree in ("skills", "codex-skills"):
                     adapter = output[f"plugins/engineering/{tree}/{name}/SKILL.md"].decode("utf-8")
                     self.assertIn(f"](../../.agents/engineering/{relative}/SKILL.md)", adapter)
@@ -180,7 +183,7 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertIn(resource, output)
         for name, relative in canonical.items():
             with self.subTest(skill=name):
-                self.assertEqual("machine", skills[name]["plugin"])
+                self.assertEqual("machine", skills[f"machine:{name}"]["plugin"])
                 for tree in ("skills", "codex-skills"):
                     adapter = output[f"plugins/machine/{tree}/{name}/SKILL.md"].decode("utf-8")
                     self.assertIn(f"](../../.agents/machine/{relative}/SKILL.md)", adapter)
@@ -338,7 +341,7 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertIn("workflow", engineering_selection["prerequisites"])
 
         required = set(compatibility["fresh_required_skills"])
-        owners = {name: skill["plugin"] for name, skill in skills.items()}
+        owners = {skill["name"]: skill["plugin"] for skill in skills.values()}
         self.assertEqual({"cd", "handoff", "handoff-codex"}, required)
         self.assertLessEqual(required, catalog_skills)
         for tree in ("skills", "codex-skills"):
@@ -434,15 +437,15 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertEqual("preserve", unrelated.read_text(encoding="utf-8"))
 
     def test_adapter_roster_and_body_are_enforced(self):
-        (self.root / ".codex/skills/commit/SKILL.md").unlink()
+        (self.root / ".codex/skills/engineering/commit/SKILL.md").unlink()
         with self.assertRaisesRegex(ValueError, "adapter roster mismatch"):
             SYNC.build(self.root)
 
         shutil.copy2(
-            ROOT / ".codex/skills/commit/SKILL.md",
-            self.root / ".codex/skills/commit/SKILL.md",
+            ROOT / ".codex/skills/engineering/commit/SKILL.md",
+            self.root / ".codex/skills/engineering/commit/SKILL.md",
         )
-        path = self.root / ".codex/skills/commit/SKILL.md"
+        path = self.root / ".codex/skills/engineering/commit/SKILL.md"
         path.write_text(path.read_text(encoding="utf-8") + "\nDuplicated rule.\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "thin canonical reference"):
             SYNC.build(self.root)
@@ -461,7 +464,7 @@ class SourceLayoutTests(unittest.TestCase):
         ):
             with self.subTest(host=host, term=term):
                 shared.write_text(original + f"\nRun {term} here.\n", encoding="utf-8")
-                with self.assertRaisesRegex(ValueError, rf"{host}-only term .* belongs in \.{host}/skills/review"):
+                with self.assertRaisesRegex(ValueError, rf"{host}-only term .* belongs in \.{host}/skills/engineering/review"):
                     SYNC.build(self.root)
         shared.write_text(
             original + "\nThe `code-review-lens` path engineering/code-review/ runs in the Codex review lane"
@@ -493,16 +496,8 @@ class SourceLayoutTests(unittest.TestCase):
             encoding="utf-8",
         )
         path = self.root / ".agents/machine/utility/clip/SKILL.md"
-        duplicate = self.root / ".agents/engineering/utility/clip"
-        shutil.copytree(path.parent, duplicate)
-        duplicate_skill = duplicate / "SKILL.md"
-        duplicate_skill.write_text(
-            duplicate_skill.read_text(encoding="utf-8").replace(
-                "domain: machine", "domain: process"
-            ),
-            encoding="utf-8",
-        )
-        with self.assertRaisesRegex(ValueError, "Duplicate public skill name"):
+        shutil.copytree(path.parent, self.root / ".agents/machine/utility/clip-copy")
+        with self.assertRaisesRegex(ValueError, "Duplicate public skill name: machine:clip"):
             SYNC.build(self.root)
 
     def test_public_names_equal_without_hyphens_fail_generation(self):
@@ -514,7 +509,7 @@ class SourceLayoutTests(unittest.TestCase):
             skill.read_text(encoding="utf-8").replace("name: address-debt", "name: addressdebt"),
             encoding="utf-8",
         )
-        with self.assertRaisesRegex(ValueError, "differ only by hyphens: address-debt, addressdebt"):
+        with self.assertRaisesRegex(ValueError, "differ only by hyphens: engineering:address-debt, engineering:addressdebt"):
             SYNC.build(self.root)
 
     def test_resources_and_generated_roots_cannot_escape_ownership(self):

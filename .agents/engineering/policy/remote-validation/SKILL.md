@@ -44,8 +44,7 @@ python .agents/workflows/workflow_ops.py --workflow-run-id <id> run --label <sta
 It writes complete stdout and stderr under repository-private Git workflow artifacts. A success returns only
 command identity, duration, exit state, captured-line count, and artifact path. A failure adds bounded failing
 items and a bounded diagnostic summary. Never paste or return the raw artifact unless a focused diagnostic
-step needs exact lines. The compact-output hook blocks uncaptured validation and `gh run view --log*` in
-standards-managed repositories.
+step needs exact lines.
 
 Local integration and E2E runs are **diagnostic tools, not routine completion gates.** After CI or the queue
 reports a failure, run the narrowest failing test, class, module, or scenario locally. A human may explicitly

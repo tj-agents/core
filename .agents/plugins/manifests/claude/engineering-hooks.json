@@ -14,8 +14,7 @@
               "--deadline",
               "10",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py",
-              "--session-start-context"
+              "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py"
             ]
           }
         ]
