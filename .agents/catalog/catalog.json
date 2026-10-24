@@ -229,7 +229,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:585b67ea28e7a723ffe2a2b5729aae9bceff538c5310db0c5c5d11fea63db7ee",
+      "digest": "sha256:ad561a71005890f186dc5c4f728fbac0b58e564fddbeb5b63cd752c1301c3824",
       "harness": {
         "marketplaces": [
           {
@@ -407,7 +407,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:fd0c9e6b596e1385d8b96b782f74787d222a6d9e8e8b763bf50d3421e916c0c8",
+      "digest": "sha256:d9adf0d119a923abd6693eeee90b900afb3c0d6a545947069de2a9dee9820555",
       "harness": {
         "marketplaces": [
           {
@@ -424,6 +424,13 @@
         ],
         "hooks": [
           {
+            "path": ".agents/engineering/policy/session/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
             "path": "hooks/git_auth_scope_gate.py",
             "hosts": [
               "claude",
@@ -433,7 +440,8 @@
           {
             "path": "hooks/hook_dispatch.py",
             "hosts": [
-              "claude"
+              "claude",
+              "codex"
             ]
           },
           {
@@ -704,7 +712,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:92b007df0636c5370437f19d75e343360edbf286aa669af2a43e4b83407a458f",
+      "digest": "sha256:37cef42a0df30489cc523ff43a9bf8ef70de1b624cd39753c35304099e5e8c12",
       "digest_excludes": [
         "catalog/catalog.json"
       ],

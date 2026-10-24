@@ -7,19 +7,23 @@ import sys
 
 
 IDENTITY = "workflow:session-lifecycle"
-FINISH_HEADING = "## Finish the session"
+SESSION_START_HEADINGS = (
+    "## When the user calls out a mistake",
+    "## A task has an owning lifecycle — load it before the first edit",
+    "## Finish the session",
+)
 FINISH_REMINDER = "Nothing owned left to do before this reply? Select `machine:close`."
 
 
-def finish_section(body):
-    heading = re.search(rf"(?m)^{re.escape(FINISH_HEADING)}[ \t]*$", body)
-    if heading is None:
-        raise ValueError(f"missing section {FINISH_HEADING!r}")
-    following = re.search(r"(?m)^## ", body[heading.end():])
-    section = body[heading.end():heading.end() + following.start() if following else len(body)].strip()
-    if not section:
-        raise ValueError(f"section {FINISH_HEADING!r} is empty")
-    return section
+def section(body, heading):
+    match = re.search(rf"(?m)^{re.escape(heading)}[ \t]*$", body)
+    if match is None:
+        raise ValueError(f"missing section {heading!r}")
+    following = re.search(r"(?m)^## ", body[match.end():])
+    text = body[match.end():match.end() + following.start() if following else len(body)].strip()
+    if not text:
+        raise ValueError(f"section {heading!r} is empty")
+    return f"{heading}\n\n{text}"
 
 
 def emit(event, context):
@@ -44,12 +48,12 @@ def main():
         _, body = text.removeprefix("---\n").split("\n---\n", 1)
         if not text.startswith("---\n") or not body.strip():
             raise ValueError("missing frontmatter or contract body")
-        section = finish_section(body)
+        sections = "\n\n".join(section(body, heading) for heading in SESSION_START_HEADINGS)
     except (OSError, UnicodeError, ValueError) as error:
         print(f"session-lifecycle: cannot read contract at {contract}: {error}", file=sys.stderr)
         return 1
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    emit("SessionStart", f"{IDENTITY} (source SHA-256 {digest})\nSource: {contract}\n\n{section}")
+    emit("SessionStart", f"{IDENTITY} (source SHA-256 {digest})\nSource: {contract}\n\n{sections}")
     return 0
 
 
