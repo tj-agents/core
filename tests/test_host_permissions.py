@@ -13,6 +13,47 @@ import host_permissions
 
 
 class HostPermissionsTests(unittest.TestCase):
+    def test_app_process_detection_distinguishes_native_cli_and_desktop(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cli = root / "vendor/bin/codex.exe"
+            desktop = root / "desktop/codex.exe"
+            (desktop.parent / "resources").mkdir(parents=True)
+            (desktop.parent / "resources/app.asar").write_bytes(b"fixture")
+            self.assertFalse(host_permissions.desktop_running([cli]))
+            self.assertFalse(host_permissions.desktop_running([desktop.parent / "resources/codex.exe"]))
+            self.assertTrue(host_permissions.desktop_running([cli, desktop]))
+
+    def test_app_drops_only_the_local_override_and_converges(self):
+        for saved in ("guardian-approvals", "auto", "read-only", "full-access", "custom", None):
+            with self.subTest(saved=saved):
+                before = {"electron-persisted-atom-state": {
+                    "agent-mode-by-host-id": {"local": saved, "remote": "read-only"},
+                    "thread-permissions": {"existing": "read-only"}}, "window": {"x": 10}}
+                expected = json.loads(json.dumps(before))
+                del expected["electron-persisted-atom-state"]["agent-mode-by-host-id"]["local"]
+                updated = host_permissions.codex_app_settings(json.dumps(before))
+                self.assertEqual(expected, json.loads(updated))
+                self.assertEqual(updated, host_permissions.codex_app_settings(updated))
+        self.assertEqual("{}", host_permissions.codex_app_settings("{}"))
+
+    def test_native_plan_checks_app_state_before_any_profile_write(self):
+        with tempfile.TemporaryDirectory(prefix="app defaults ü ") as directory:
+            root = Path(directory)
+            claude, codex = root / "claude.json", root / "config.toml"
+            desktop = root / ".codex-global-state.json"
+            for malformed in ("[", "[]", '{"electron-persisted-atom-state":null}',
+                              '{"electron-persisted-atom-state":{"agent-mode-by-host-id":[]}}'):
+                desktop.write_text(malformed, encoding="utf-8")
+                with self.subTest(malformed=malformed), self.assertRaises(ValueError):
+                    host_permissions.plan(claude, codex, "bypass")
+                self.assertFalse(claude.exists())
+                self.assertFalse(codex.exists())
+            desktop.write_text('{"electron-persisted-atom-state":{"agent-mode-by-host-id":{"local":"guardian-approvals"}}}', encoding="utf-8")
+            targets = host_permissions.plan(claude, codex, "bypass")
+            self.assertIn(desktop, targets)
+            self.assertNotIn("local", json.loads(targets[desktop])["electron-persisted-atom-state"]["agent-mode-by-host-id"])
+
     def test_modes_use_native_host_values_and_preserve_unrelated_settings(self):
         for mode, claude, approval, profile in (
             ("bypass", "bypassPermissions", "never", ":danger-full-access"),
