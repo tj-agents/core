@@ -238,17 +238,18 @@ def ensure_hooks(project: Path, executable: str | None = None) -> None:
     import codex_hook_trust
     import required_plugins
 
-    binary = executable or agent_cli.resolve_codex_executable()[0]
     required = required_plugins.selected(required_plugins.project_root(project))
+    if not required:
+        return
+    binary = executable or agent_cli.resolve_codex_executable()[0]
     expected = {}
-    if required:
-        roots = required_plugins.check(project, "codex", binary)
-        for root in roots or ():
-            identity = f"{root.parent.name}@{root.parent.parent.name}"
-            if identity in required:
-                definitions = codex_hook_trust.required_definitions(root, identity)
-                if definitions:
-                    expected[identity] = definitions
+    roots = required_plugins.check(project, "codex", binary)
+    for root in roots or ():
+        identity = f"{root.parent.name}@{root.parent.parent.name}"
+        if identity in required:
+            definitions = codex_hook_trust.required_definitions(root, identity)
+            if definitions:
+                expected[identity] = definitions
     codex_hook_trust.apply_trust(binary, project.resolve(), required=expected)
 
 
