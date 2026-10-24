@@ -3,12 +3,12 @@
   "plugin": "tj-agents/machine",
   "source_roots": [
     ".agents/agent-store/runtime",
-    ".agents/catalog/catalog.schema.json",
-    ".agents/catalog/plugins.schema.json",
     ".agents/hooks/hook_dispatch.py",
     ".agents/machine",
     ".agents/machine/scripts/machine_events.py",
     ".agents/machine/scripts/setup_machine.py",
+    ".agents/schemas/packages.schema.json",
+    ".agents/schemas/plugin-selection.schema.json",
     ".agents/workflows/delivery_policy.py",
     ".agents/workflows/repository_configuration.py"
   ],

@@ -9,8 +9,10 @@ Base, Agent Store, Machine, Workflow and Engineering packages are classification
 top-level repository trees. Shared workflow contracts, hooks, schemas, tests and resources also remain
 under `.agents/`.
 
-The package catalog and project-selection schemas live under `.agents/catalog/`. `CAPABILITIES.md` is generated
-from that canonical catalog and is never edited as a second source.
+The package-record and project-selection schemas live under `.agents/schemas/` as
+`packages.schema.json` and `plugin-selection.schema.json`. Package records in `plugins/packages.json`
+and `CAPABILITIES.md` are generated from the source map, discovered skills, host manifests and harness
+declarations. Platform and runtime prerequisite declarations live in `.agents/plugins/sources.json`.
 
 A shared rule or procedure is written once. Neither host adapter may reproduce its body as an independently
 maintained source.

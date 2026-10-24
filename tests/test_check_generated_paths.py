@@ -21,10 +21,6 @@ def git(cwd, *arguments):
     )
 
 
-def catalog(digest, description='a package'):
-    return {'packages': [{'id': 'market/pkg', 'description': description, 'digest': digest}]}
-
-
 class GeneratedPathGuardTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix='generated guard ')
@@ -36,7 +32,6 @@ class GeneratedPathGuardTests(unittest.TestCase):
         git(self.repo, 'config', 'gc.auto', '0')
         git(self.repo, 'config', 'maintenance.auto', 'false')
         self.write('.agents/plugins/sources.json', {'generated_roots': ['plugins']})
-        self.write(GUARD.CATALOG, catalog('sha256:old'))
         self.write('plugins/pkg/file.txt', 'generated')
         self.commit('base')
         git(self.repo, 'switch', '--quiet', '-c', 'feature')
@@ -55,7 +50,6 @@ class GeneratedPathGuardTests(unittest.TestCase):
 
     def test_an_authored_change_passes(self):
         self.write('src.py', 'print(1)\n')
-        self.write(GUARD.CATALOG, catalog('sha256:old', description='edited by hand'))
         self.commit('authored')
         self.assertEqual(self.offending(), [])
 
@@ -64,34 +58,26 @@ class GeneratedPathGuardTests(unittest.TestCase):
         self.commit('generated')
         self.assertEqual(self.offending(), ['plugins/pkg/file.txt'])
 
-    def test_a_committed_catalog_digest_is_rejected(self):
-        self.write(GUARD.CATALOG, catalog('sha256:new'))
-        self.commit('digest')
-        self.assertEqual(self.offending(), [f'{GUARD.CATALOG} digest of market/pkg'])
+    def test_generated_package_records_are_rejected(self):
+        self.write('plugins/packages.json', {'packages': [{'digest': 'sha256:new'}]})
+        self.commit('package records')
+        self.assertEqual(self.offending(), ['plugins/packages.json'])
 
-    def test_a_new_catalog_entry_may_arrive_with_its_digest(self):
-        added = catalog('sha256:old')
-        added['packages'].append({'id': 'market/new', 'digest': 'sha256:first'})
-        self.write(GUARD.CATALOG, added)
-        self.commit('new package')
-        self.assertEqual(self.offending(), [])
+    def test_source_map_cannot_exempt_generated_package_records(self):
+        self.write('.agents/plugins/sources.json', {'generated_roots': []})
+        self.write('plugins/packages.json', {'packages': []})
+        self.commit('try to exempt package records')
+        self.assertEqual(self.offending(), ['plugins/packages.json'])
 
-
-    def test_catalog_format_migration_preserves_digest_guard(self):
-        self.write(GUARD.CATALOG, {'releases': [{'plugins': catalog('sha256:old')['packages']}]})
-        self.commit('historical catalog')
-        git(self.repo, 'branch', '-f', 'main', 'HEAD')
-        self.write(GUARD.CATALOG, catalog('sha256:new'))
-        self.commit('migration changes digest')
-        self.assertEqual(self.offending(), [f'{GUARD.CATALOG} digest of market/pkg'])
-
-    def test_catalog_format_migration_with_unchanged_digest_passes(self):
-        self.write(GUARD.CATALOG, {'releases': [{'plugins': catalog('sha256:old')['packages']}]})
-        self.commit('historical catalog')
-        git(self.repo, 'branch', '-f', 'main', 'HEAD')
-        self.write(GUARD.CATALOG, catalog('sha256:old'))
-        self.commit('migration preserves digest')
-        self.assertEqual(self.offending(), [])
+    def test_package_records_are_guarded_before_the_base_declares_them(self):
+        git(self.repo, 'switch', '--quiet', 'main')
+        self.write('.agents/plugins/sources.json', {'generated_roots': ['plugins/pkg']})
+        self.commit('base declares only package directories')
+        git(self.repo, 'switch', '--quiet', 'feature')
+        git(self.repo, 'merge', '--quiet', 'main')
+        self.write('plugins/packages.json', {'packages': []})
+        self.commit('new generated record path')
+        self.assertEqual(self.offending(), ['plugins/packages.json'])
 
 
 if __name__ == '__main__':
