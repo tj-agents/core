@@ -8,6 +8,7 @@
   "plugins": [
     "agent-store@tj-agents",
     "base@tj-agents",
+    "cli@tj-agents",
     "engineering@tj-agents",
     "machine@tj-agents",
     "personal@tj-agents",

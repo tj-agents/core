@@ -10,8 +10,9 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import time
 
-import close_session
+import closeout
 
 GH_TIMEOUT_SECONDS = 20
 
@@ -55,9 +56,19 @@ def main():
     if not isinstance(cwd, str) or not cwd:
         return 0
     try:
-        landed = merged_at(Path(cwd), close_session.runtime().git)
+        shared = closeout.close_session.runtime()
+        session_id = data.get('session_id') or data.get('sessionId')
+        if not isinstance(session_id, str) or not session_id:
+            return 0
+        armed = shared.read_json(closeout.close_session.armed_path(shared, session_id))
+        outcome = shared.read_json(shared.state_directory() / 'session-close' / (session_id + '.json')) or {}
+        if (isinstance(armed, dict) and shared.finite_positive(armed.get('armed_at'))
+                and 0 <= time.time() - armed['armed_at'] < 900
+                and not outcome.get('at', 0) >= armed['armed_at']):
+            return 0
+        landed = merged_at(Path(cwd), shared.git)
         if landed is not None:
-            close_session.arm_after_stop(landed)
+            closeout.arm_after_stop(landed, session_id)
     except Exception:
         pass
     return 0

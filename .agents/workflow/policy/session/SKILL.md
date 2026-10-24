@@ -72,11 +72,11 @@ remain prompt-only. Missing runtime capabilities must be reported accurately, no
 
 ## Finish the session
 
-Before returning a completed outcome, select `machine:close` and apply its completion decision. It owns
+Before returning a completed outcome, select `cli:closeout` and apply its completion decision. It owns
 the final-action ordering, keep-open requests and terminal closure. A new mistake callout is answered
 and corrected first; completion is then reassessed.
 
 ```text
-Delivery and validation complete, no owned wait: apply machine:close before the final reply.
+Delivery and validation complete, no owned wait: apply cli:closeout before the final reply.
 User calls out a mistake: answer and correct the active task, then reassess completion.
 ```

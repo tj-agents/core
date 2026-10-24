@@ -16,7 +16,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 REAPER = ROOT / ".agents/machine/utility/peer-cli/scripts/finish_reaper.py"
 CLOSE = ROOT / ".agents/machine/utility/peer-cli/scripts/close.py"
-CLOSE_SESSION = ROOT / ".agents/machine/utility/close/scripts/close_session.py"
+CLOSE_SESSION = ROOT / ".agents/cli/workflow/closeout/scripts/closeout.py"
 sys.path.insert(0, str(REAPER.parent))
 import session_close
 import finish_reaper
@@ -31,10 +31,15 @@ def load_close_session(path):
 
 
 class HostFallbackTests(unittest.TestCase):
+    def setUp(self):
+        environment = mock.patch.dict(os.environ, {'CODEX_THREAD_ID': '', 'CLAUDE_CODE_SESSION_ID': ''})
+        environment.start()
+        self.addCleanup(environment.stop)
+
     def assert_sweep_script(self, script_path, updater_path, expected):
         script_path.parent.mkdir(parents=True)
         updater_path.parent.mkdir(parents=True)
-        script_path.write_text(CLOSE_SESSION.read_text(encoding="utf-8"), encoding="utf-8")
+        script_path.write_text(CLOSE_SESSION.read_text(encoding="utf-8").replace("close_session = close_runtime()", "close_session = None"), encoding="utf-8")
         updater_path.write_text(
             "def load_codex_config():\n    return None\n"
             f"def sweep_script(config):\n    return {expected!r}\n",
@@ -46,7 +51,7 @@ class HostFallbackTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             self.assert_sweep_script(
-                root / ".agents/machine/utility/close/scripts/close_session.py",
+                root / ".agents/cli/workflow/closeout/scripts/closeout.py",
                 root / ".agents/machine/scripts/plugin_autoupdate.py",
                 "source",
             )
@@ -55,7 +60,7 @@ class HostFallbackTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             self.assert_sweep_script(
-                root / ".agents/machine/utility/close/scripts/close_session.py",
+                root / ".agents/cli/workflow/closeout/scripts/closeout.py",
                 root / "resources/machine/scripts/plugin_autoupdate.py",
                 "canonical",
             )
@@ -64,7 +69,7 @@ class HostFallbackTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             self.assert_sweep_script(
-                root / "skills/close/scripts/close_session.py",
+                root / "skills/closeout/scripts/closeout.py",
                 root / "resources/machine/scripts/plugin_autoupdate.py",
                 "skills",
             )
@@ -259,7 +264,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 host.wait(timeout=5)
 
     def test_armed_close_without_terminal_preserves_its_disposable_host(self):
-        operation = ROOT / '.agents/machine/utility/close/scripts/close_session.py'
+        operation = ROOT / '.agents/cli/utility/close/scripts/close_session.py'
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             worktree, state = root / 'consumer', root / 'state'
@@ -306,6 +311,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                     time.sleep(.05)
                 self.assertIn('refused: no native terminal identity',
                               json.loads(outcome.read_text(encoding='utf-8'))['status'])
+                self.wait_for_observer_exit(json.loads(outcome.read_text(encoding='utf-8')))
                 self.assertIsNone(host.poll())
                 connection = store.connect(state / 'sessions.db')
                 self.assertIsNone(store.get_session(connection, handle)['ended_at'])

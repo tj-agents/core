@@ -59,7 +59,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(81, len(skills))
+        self.assertEqual(82, len(skills))
         self.assertEqual("machine", skills["machine:hook-control"]["plugin"])
         self.assertEqual("session", skills["workflow:session"]["name"])
         self.assertEqual("session", skills["engineering:session"]["name"])
@@ -118,11 +118,11 @@ class SourceLayoutTests(unittest.TestCase):
         _, output, _, _ = SYNC.build(self.root)
         catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
         engineering = next(package for package in catalog["packages"] if package["id"] == "tj-agents/engineering")
-        self.assertEqual(["tj-agents/base", "tj-agents/workflow", "tj-agents/agent-store", "tj-agents/machine"], engineering["dependencies"]["required"])
+        self.assertEqual(["tj-agents/base", "tj-agents/workflow", "tj-agents/agent-store", "tj-agents/machine", "tj-agents/cli"], engineering["dependencies"]["required"])
         self.assertEqual([], engineering["external_dependencies"]["required"])
         harness = json.loads(output["plugins/engineering/harness.json"].decode("utf-8"))
         self.assertEqual([{"id": "tj-agents", "repository": "tj-agents/marketplace"}], harness["requires"]["marketplaces"])
-        self.assertEqual(["tj-agents/agent-store", "tj-agents/base", "tj-agents/engineering", "tj-agents/machine", "tj-agents/workflow"], harness["requires"]["plugins"])
+        self.assertEqual(["tj-agents/agent-store", "tj-agents/base", "tj-agents/cli", "tj-agents/engineering", "tj-agents/machine", "tj-agents/workflow"], harness["requires"]["plugins"])
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertEqual([], selection["external_prerequisites"])
 
@@ -310,7 +310,7 @@ class SourceLayoutTests(unittest.TestCase):
             for entry in compatibility["fresh_selection"]
         ]
 
-        self.assertEqual(["base", "agent-store", "machine", "workflow", "engineering"], fresh_plugins)
+        self.assertEqual(["base", "agent-store", "machine", "cli", "workflow", "engineering"], fresh_plugins)
         self.assertEqual(fresh_plugins, default_plugins)
         self.assertEqual(
             fresh_plugins,
@@ -335,7 +335,7 @@ class SourceLayoutTests(unittest.TestCase):
             catalog_skills.update(catalog["skills"])
 
         workflow_selection = json.loads(output["plugins/workflow/selection.json"].decode("utf-8"))
-        self.assertEqual(["base", "agent-store", "machine"], workflow_selection["prerequisites"])
+        self.assertEqual(["base", "agent-store", "machine", "cli"], workflow_selection["prerequisites"])
         self.assertNotIn("engineering", workflow_selection["prerequisites"])
         engineering_selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertIn("workflow", engineering_selection["prerequisites"])
