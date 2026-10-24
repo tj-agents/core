@@ -385,7 +385,16 @@ Nothing updates packages in the launch path.
 
 For an explicit native refresh use `machine:sync-plugins`. Its default performs native marketplace
 and plugin updates; remote revision verification is opt-in and prints progress. `/sync-plugins`
-adopts updates in an open Claude session; start a new Codex session to load updated packages.
+adopts updates in an open Claude session. During an authorized task, mandatory fresh-process adoption
+in Codex selects automatic checkpointed continuation through its
+[sync adapter](.codex/skills/sync-plugins/SKILL.md). The shipped sync command refreshes before launching
+one verified successor, retains uncertain attempts, and requires acknowledgement before successor writes.
+Recorded execution owners retain their supported release/claim mechanism through `workflow:handoff`.
+
+```text
+STANDARDS STALE during an authorized repair -> checkpoint -> successful refresh -> one fresh Codex
+successor -> verified pickup -> continue the repair, without a user restart.
+```
 
 Codex does not load agent definitions directly from plugins. Its engineering package supplies
 `scripts/install-codex-agents.ps1` for explicit profile delivery; launcher startup no longer copies

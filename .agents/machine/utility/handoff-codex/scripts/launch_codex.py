@@ -37,6 +37,8 @@ def parse_args(argv, agent_cli):
     parser.add_argument('--working-directory', required=True)
     parser.add_argument('--prompt-path', required=True)
     parser.add_argument('--title', default='Codex handoff')
+    parser.add_argument('--status-file', type=Path,
+                        help='Absolute reserved startup receipt path for a checkpointed continuation')
     parser.add_argument('--model')
     parser.add_argument('--reasoning-effort', choices=('low', 'medium', 'high', 'xhigh', 'max', 'ultra'))
     parser.add_argument('--lane', choices=('L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'))
@@ -113,6 +115,13 @@ def main(argv=None):
     status_path = None
     try:
         args = parse_args(argv, agent_cli)
+        if args.status_file is not None:
+            if not args.status_file.is_absolute():
+                raise agent_cli.LaunchError('--status-file must be absolute.')
+            status_path = args.status_file.resolve()
+            if status_path.exists():
+                raise agent_cli.LaunchTimeout(f'Startup receipt already exists; inspect it before retry: {status_path}')
+            status_path.parent.mkdir(parents=True, exist_ok=True)
 
         # parse_args already rejected the one argparse-level contradiction (--frontier beside --lane or
         # --model). What happens here is the first filesystem or lane-table work, so the directory is
@@ -135,7 +144,7 @@ def main(argv=None):
         # that was set -- TERM -- is what broke it. On POSIX this clearing has no effect either way:
         # launch_tab never forces or clears TERM there, because the terminal that actually starts the tab
         # sets TERM for that session itself.
-        status_path = agent_cli.handoff_status_path()
+        status_path = status_path or agent_cli.handoff_status_path()
         agent_cli.launch_tab(
             working_directory, sys.executable, args.title,
             arguments=agent_cli.bound_terminal_arguments("codex", working_directory, codex, arguments,
