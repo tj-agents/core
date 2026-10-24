@@ -1,6 +1,6 @@
 ---
 name: session
-description: Own the engineering session from task selection through repair and completion. Use when starting, continuing or finishing work under an explicitly selected engineering lifecycle, or when asked to note or record a bug, mistake or debt.
+description: Own the software-specific rules of an engineering session: standards-defect repair, feature and bugfix lifecycle selection, routine-decision delegation, reviewable delivery slices and source ownership. Use when starting, continuing or finishing work under an explicitly selected engineering lifecycle.
 kind: policy
 domain: process
 ---

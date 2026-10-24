@@ -57,6 +57,10 @@
     "machine": {
       "codex": ".agents/plugins/manifests/codex/machine-hooks.json",
       "claude": ".agents/plugins/manifests/claude/machine-hooks.json"
+    },
+    "workflow": {
+      "codex": ".agents/plugins/manifests/codex/workflow-hooks.json",
+      "claude": ".agents/plugins/manifests/claude/workflow-hooks.json"
     }
   },
   "generated_roots": [
@@ -430,6 +434,16 @@
       "plugin": "workflow",
       "source": ".agents/tiers/workflow.json",
       "destination": "tier.json"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/hooks/hook_dispatch.py",
+      "destination": "hooks/hook_dispatch.py"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/hooks/codex_hook_snapshot.py",
+      "destination": "hooks/codex_hook_snapshot.py"
     }
   ],
   "prerequisites": {

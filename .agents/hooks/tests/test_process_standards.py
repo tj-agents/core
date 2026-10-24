@@ -81,7 +81,7 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertNotIn("concurrent fixes", address)
 
     def test_always_on_instructions_own_the_stage_pointer_rule(self):
-        instructions = authored_skill("session").read_text(
+        instructions = authored_skill("session-lifecycle").read_text(
             encoding="utf-8"
         )
 
@@ -138,12 +138,14 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn(phrase, self_repair)
 
     def test_callout_corrects_task_before_optional_standards_repair(self):
-        instructions = authored_skill("session").read_text(encoding="utf-8")
-        section = " ".join(
-            instructions.split("## When the user calls out a mistake", 1)[1].split("## ", 1)[0].split()
-        )
+        def callout(skill):
+            instructions = authored_skill(skill).read_text(encoding="utf-8")
+            return " ".join(
+                instructions.split("## When the user calls out a mistake", 1)[1].split("## ", 1)[0].split()
+            )
 
-        self.assertTrue(section.startswith("When the user calls out a mistake, answer the direct question first"))
+        self.assertTrue(callout("session-lifecycle").startswith("Answer the direct question first"))
+        section = callout("session")
         for phrase in (
             "`engineering:self-repair`",
             "source ownership, causal evidence and repair eligibility",

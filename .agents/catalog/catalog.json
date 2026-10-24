@@ -211,6 +211,7 @@
         "plan-artifacts",
         "resume",
         "run",
+        "session-lifecycle",
         "status"
       ],
       "dependencies": {
@@ -228,7 +229,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:46faaf6df05de438ff0e25cdac838e29043e4b76dc5749ef4b803f5ab606cbe5",
+      "digest": "sha256:585b67ea28e7a723ffe2a2b5729aae9bceff538c5310db0c5c5d11fea63db7ee",
       "harness": {
         "marketplaces": [
           {
@@ -242,7 +243,22 @@
           "tj-agents/machine",
           "tj-agents/workflow"
         ],
-        "hooks": [],
+        "hooks": [
+          {
+            "path": ".agents/workflow/policy/session-lifecycle/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/hook_dispatch.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          }
+        ],
         "permissions": {
           "claude_allow": [
             "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
@@ -391,7 +407,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:c60b1135b8a2bcdf7bdf0219acfdb95f6ae2754fc90406759940a0a64ec9afda",
+      "digest": "sha256:fd0c9e6b596e1385d8b96b782f74787d222a6d9e8e8b763bf50d3421e916c0c8",
       "harness": {
         "marketplaces": [
           {
@@ -407,12 +423,6 @@
           "tj-agents/workflow"
         ],
         "hooks": [
-          {
-            "path": ".agents/engineering/policy/session/scripts/session-context.py",
-            "hosts": [
-              "claude"
-            ]
-          },
           {
             "path": "hooks/git_auth_scope_gate.py",
             "hosts": [
@@ -694,7 +704,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:da111191d6b51e9d497da033c6031bc8cca5201f3589c4a60432789235aa678e",
+      "digest": "sha256:92b007df0636c5370437f19d75e343360edbf286aa669af2a43e4b83407a458f",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
