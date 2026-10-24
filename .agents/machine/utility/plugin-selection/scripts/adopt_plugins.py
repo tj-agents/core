@@ -87,15 +87,12 @@ def selection_document(root: Path, requested: set[str], foreign: set[str], decla
         marketplaces, kept = plugin_selection.validate(document)
     else:
         requested |= set(plugin_selection.CORE_PLUGINS)
-    own = {plugin_selection.split(identity)[0] for identity in kept
-           if plugin_selection.split(identity)[1] == plugin_selection.MARKETPLACE_NAME}
-    if requested or own:
-        catalog = marketplace_catalog(plugin_selection.MARKETPLACE_REPOSITORY)
-        requested |= own & set(catalog)
+    selected = set()
     if requested:
+        catalog = marketplace_catalog(plugin_selection.MARKETPLACE_REPOSITORY)
+        selected = {plugin_selection.plugin_id(name) for name in expand(requested, catalog)}
         marketplaces.setdefault(plugin_selection.MARKETPLACE_NAME, {"repository": plugin_selection.MARKETPLACE_REPOSITORY})
     marketplaces.update(declared)
-    selected = {plugin_selection.plugin_id(name) for name in expand(requested, catalog)} if requested else set()
     document = {
         "schema_version": plugin_selection.SCHEMA_VERSION,
         "marketplaces": dict(sorted(marketplaces.items())),

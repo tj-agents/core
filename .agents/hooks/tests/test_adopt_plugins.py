@@ -101,8 +101,11 @@ class AdoptPluginsTests(unittest.TestCase):
         adopt_plugins.run(self.root, ["stack-a-tool"], "write")
         self.assertEqual(with_core("stack-a@tj-agents", "stack-a-tool@tj-agents"), self.plugins())
         self.write_selection(["base@tj-agents"])
+        self.catalog.reset_mock()
         adopt_plugins.run(self.root, [], "write")
         self.assertEqual(["base@tj-agents"], self.plugins())
+        self.assertEqual([], adopt_plugins.run(self.root, [], "check"))
+        self.catalog.assert_not_called()
 
     def test_existing_selection_keeps_plugins_the_catalog_no_longer_lists(self):
         self.write_selection(["retired@tj-agents"])
