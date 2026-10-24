@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -140,13 +141,13 @@ def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[s
                                     raise ValueError(f"{hook_path}: {field} script target is missing: {script}")
 
 
-def catalog_marketplaces(packages: dict[str, dict]) -> dict[str, dict[str, str]]:
+def package_marketplaces(packages: dict[str, dict]) -> dict[str, dict[str, str]]:
     marketplaces: dict[str, dict[str, str]] = {}
 
     def claim(marketplace: str, owner_repository: str, source: str) -> None:
         owner = {"owner_repository": owner_repository, "source": source}
         if marketplaces.setdefault(marketplace, owner) != owner:
-            raise ValueError(f"Catalog marketplace has inconsistent ownership: {marketplace}")
+            raise ValueError(f"Package marketplace has inconsistent ownership: {marketplace}")
 
     for package in packages.values():
         claim(package["marketplace"], package["owner_repository"], package["source"])
@@ -158,23 +159,23 @@ def catalog_marketplaces(packages: dict[str, dict]) -> dict[str, dict[str, str]]
     return marketplaces
 
 
-def catalog_index(catalog: dict) -> dict[str, dict]:
-    if catalog.get("schema_version") != 1 or catalog.get("digest_format") != "sha256-tree-v1":
-        raise ValueError("Unsupported capability catalog schema or digest format")
+def package_index(records: dict) -> dict[str, dict]:
+    if records.get("schema_version") != 1 or records.get("digest_format") != "sha256-tree-v1":
+        raise ValueError("Unsupported package records schema or digest format")
     plugins: dict[str, dict] = {}
-    for plugin in catalog.get("packages", []):
+    for plugin in records.get("packages", []):
         plugin_id = plugin.get("id")
         if not plugin_id or plugin_id in plugins:
-            raise ValueError(f"Invalid or duplicate catalog package: {plugin_id}")
+            raise ValueError(f"Invalid or duplicate package record: {plugin_id}")
         if plugin_id != f"{plugin.get('marketplace')}/{plugin.get('name')}":
-            raise ValueError(f"Catalog package identity disagrees with its marketplace: {plugin_id}")
+            raise ValueError(f"Package identity disagrees with its marketplace: {plugin_id}")
         if not isinstance(plugin.get("owner_repository"), str) or not isinstance(plugin.get("source"), str):
-            raise ValueError(f"Catalog package is missing its owner source: {plugin_id}")
+            raise ValueError(f"Package is missing its owner source: {plugin_id}")
         if not re.fullmatch(r"sha256:[0-9a-f]{64}", plugin.get("digest", "")):
-            raise ValueError(f"Invalid catalog digest: {plugin_id}")
+            raise ValueError(f"Invalid package digest: {plugin_id}")
         plugins[plugin_id] = plugin
     if not plugins:
-        raise ValueError("Capability catalog has no packages")
+        raise ValueError("Package records contain no packages")
     for plugin_id, plugin in plugins.items():
         declared = plugin.get("external_dependencies", EMPTY_EXTERNAL_DEPENDENCIES)
         if not isinstance(declared, dict) or set(declared) != {"required", "optional"}:
@@ -194,13 +195,13 @@ def catalog_index(catalog: dict) -> dict[str, dict]:
             for dependency in dependencies.get(kind, []):
                 if dependency not in plugins and owned.get(dependency) != kind:
                     raise ValueError(f"{plugin_id} names unknown dependency {dependency}")
-    catalog_marketplaces(plugins)
+    package_marketplaces(plugins)
     visiting: set[str] = set()
     visited: set[str] = set()
 
     def visit(plugin_id: str):
         if plugin_id in visiting:
-            raise ValueError(f"Catalog dependency cycle includes {plugin_id}")
+            raise ValueError(f"Package dependency cycle includes {plugin_id}")
         if plugin_id in visited:
             return
         visiting.add(plugin_id)
@@ -215,13 +216,13 @@ def catalog_index(catalog: dict) -> dict[str, dict]:
     return plugins
 
 
-def render_capabilities(catalog: dict) -> str:
-    packages = catalog_index(catalog)
+def render_capabilities(records: dict) -> str:
+    packages = package_index(records)
     return "\n".join(
         [
             "# Agent capabilities",
             "",
-            "Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).",
+            "Generated from [`plugins/packages.json`](plugins/packages.json).",
             "Select plugins in a project's `.agents/plugins.json`; do not copy definitions between repositories.",
             "",
             *(
@@ -268,16 +269,16 @@ def output_tree_digest(output: dict[str, bytes], package_path: str, excluded: li
     return "sha256:" + digest.hexdigest()
 
 
-def publication_fingerprint(root: Path, output: dict[str, bytes]) -> str:
-    catalog = load(root / ".agents/catalog/catalog.json")
-    for package in catalog["packages"]:
-        package.pop("digest", None)
+def publication_fingerprint(output: dict[str, bytes]) -> str:
     members = [
         (path, data)
         for path, data in output.items()
-        if path not in {"CAPABILITIES.md", "plugins/machine/catalog/catalog.json", "plugins/publication.json"}
+        if path not in {"CAPABILITIES.md", "plugins/packages.json", "plugins/machine/packages.json", "plugins/publication.json"}
     ]
-    members.append((".agents/catalog/catalog.json", canonical_output_bytes(json.dumps(catalog, indent=2) + "\n")))
+    records = json.loads(output["plugins/packages.json"])
+    for package in records["packages"]:
+        package.pop("digest")
+    members.append(("plugins/packages.json", canonical_output_bytes(json.dumps(records, indent=2) + "\n")))
     digest = hashlib.sha256()
     for path, data in sorted(members):
         digest.update(path.encode("utf-8"))
@@ -318,7 +319,7 @@ def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set
             continue
         excluded = ["hooks/codex.json"]
         if plugin == "machine":
-            excluded.append("catalog/catalog.json")
+            excluded.append("packages.json")
         expected = output_tree_digest(output, f"plugins/{plugin}", excluded)
         payload = json.loads(output[hook_path])
         for groups in payload["hooks"].values():
@@ -385,6 +386,28 @@ def validate_configuration(root: Path, config: dict) -> set[str]:
         raise ValueError("External prerequisite owners do not match declared plugins")
     for plugin in plugins:
         external_prerequisites(config, plugin)
+
+    for field in ("platforms", "runtime_prerequisites"):
+        if set(config[field]) != plugins:
+            raise ValueError(f"{field} owners do not match declared plugins")
+    for plugin in plugins:
+        platforms = config["platforms"][plugin]
+        if (
+            not isinstance(platforms, list) or not platforms
+            or any(value not in {"windows", "linux", "macos"} for value in platforms)
+            or len(platforms) != len(set(platforms))
+        ):
+            raise ValueError(f"Invalid platforms for {plugin}")
+        runtime = config["runtime_prerequisites"][plugin]
+        if not isinstance(runtime, dict) or set(runtime) != {"required", "optional"}:
+            raise ValueError(f"Invalid runtime prerequisites for {plugin}")
+        for values in runtime.values():
+            if (
+                not isinstance(values, list)
+                or not all(isinstance(value, str) and value for value in values)
+                or len(values) != len(set(values))
+            ):
+                raise ValueError(f"Invalid runtime prerequisites for {plugin}")
 
     visiting: set[str] = set()
     visited: set[str] = set()
@@ -786,26 +809,23 @@ def emit_workflow_agents(root: Path, config: dict, emit):
             agent_payload(role, body, host),
         )
 
-def build(root: Path, validate_catalog_digests: bool = True, catalog=None):
+def build(root: Path):
     root = root.resolve()
     config = load(root / ".agents/plugins/sources.json")
     payloads = load(root / ".agents/plugins/payloads.json")["payloads"]
     compatibility = load(root / ".agents/plugins/compatibility.json")
-    if catalog is None:
-        catalog = load(root / ".agents/catalog/catalog.json")
-    catalog_plugins = catalog_index(catalog)
-    if any(package["owner_repository"] != "tj-agents/core" for package in catalog_plugins.values()):
-        raise ValueError("Core's authored catalog may contain only core packages")
     marketplace = core_marketplace(root, config)
-    harnesses = {
-        path.stem: load(path)
-        for path in (root / ".agents/plugins/harness").glob("*.json")
-    }
     skills = discover(root, config)
     validate_host_neutral(config, skills)
     adapters = validate_adapters(root, config, skills)
     plugins = validate_configuration(root, config)
     validate_default_selection(root, config, skills, compatibility)
+    spec = importlib.util.spec_from_file_location(
+        "harness_sync", Path(__file__).resolve().with_name("sync_harness_manifests.py")
+    )
+    harness_sync = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(harness_sync)
+    harnesses = harness_sync.synchronize(root, check=True)
 
     output: dict[str, bytes] = {}
 
@@ -910,8 +930,6 @@ def build(root: Path, validate_catalog_digests: bool = True, catalog=None):
         }
         emit(f"plugins/{plugin}/selection.json", json.dumps(selection, indent=2) + "\n")
 
-    emit("CAPABILITIES.md", render_capabilities(catalog))
-
     emit(
         ".agents/plugins/marketplace.json",
         read(inside(root, f"{config['host_manifest_roots']['codex']}/marketplace.json")),
@@ -920,11 +938,6 @@ def build(root: Path, validate_catalog_digests: bool = True, catalog=None):
         ".claude-plugin/marketplace.json",
         read(inside(root, f"{config['host_manifest_roots']['claude']}/marketplace.json")),
     )
-    emit(
-        "plugins/publication.json",
-        json.dumps({"schema_version": 1, "source_fingerprint": publication_fingerprint(root, output)}, indent=2) + "\n",
-    )
-
     # Every packaged adapter must resolve to the one packaged canonical definition.
     for path, data in output.items():
         if not re.match(r"plugins/[^/]+/(?:skills|codex-skills)/[^/]+/SKILL\.md$", path):
@@ -951,43 +964,44 @@ def build(root: Path, validate_catalog_digests: bool = True, catalog=None):
     bind_codex_hook_snapshots(root, output, plugins)
     validate_hook_outputs(output, config, plugins)
 
+    records = {"schema_version": 1, "digest_format": "sha256-tree-v1", "packages": []}
     for plugin in sorted(plugins):
-        plugin_id = f"{marketplace}/{plugin}"
-        entry = catalog_plugins.get(plugin_id)
-        if entry is None:
-            raise ValueError(f"Catalog is missing local plugin {plugin_id}")
+        excluded = ["packages.json"] if plugin == "machine" else []
         external = external_prerequisites(config, plugin)
-        expected_dependencies = [
-            *[f"{marketplace}/{value}" for value in config["prerequisites"][plugin]],
-            *[value["id"] for value in external],
-        ]
-        if entry["dependencies"]["required"] != expected_dependencies:
-            raise ValueError(f"Catalog prerequisite drift: {plugin_id}")
-        if entry.get("external_dependencies", {"required": [], "optional": []}) != {"required": external, "optional": []}:
-            raise ValueError(f"Catalog external prerequisite drift: {plugin_id}")
-        if entry["skills"] != sorted(skill["name"] for skill in skills.values() if skill["plugin"] == plugin):
-            raise ValueError(f"Catalog skill roster drift: {plugin_id}")
-        if entry["package_path"] != f"plugins/{plugin}":
-            raise ValueError(f"Catalog package path drift: {plugin_id}")
-        if entry.get("harness") != harnesses[plugin]["requires"]:
-            raise ValueError(f"Catalog harness drift: {plugin_id}")
-        allowed_excludes = ["catalog/catalog.json"] if plugin == "machine" else []
-        if entry.get("digest_excludes", []) != allowed_excludes:
-            raise ValueError(f"Catalog digest exclusion drift: {plugin_id}")
-        if entry["marketplace"] != marketplace or entry["owner_repository"] != "tj-agents/core":
-            raise ValueError(f"Catalog owner drift: {plugin_id}")
-        if validate_catalog_digests:
-            actual_digest = output_tree_digest(
-                output,
-                entry["package_path"],
-                entry.get("digest_excludes", []),
-            )
-            if entry["digest"] != actual_digest:
-                raise ValueError(
-                    f"Catalog digest drift for {plugin_id}: expected {entry['digest']}, actual {actual_digest}. "
-                    "Run python -B scripts/update_catalog_digests.py and leave the result uncommitted: "
-                    "main's post-merge regenerate job commits catalog digests"
-                )
+        package = {
+            "owner_repository": "tj-agents/core",
+            "source": "https://github.com/tj-agents/core.git",
+            "marketplace": marketplace,
+            "id": f"{marketplace}/{plugin}",
+            "name": plugin,
+            "package_path": f"plugins/{plugin}",
+            "description": manifests[plugin]["codex"]["description"],
+            "platforms": config["platforms"][plugin],
+            "skills": sorted(skill["name"] for skill in skills.values() if skill["plugin"] == plugin),
+            "dependencies": {
+                "required": [
+                    *[f"{marketplace}/{value}" for value in config["prerequisites"][plugin]],
+                    *[value["id"] for value in external],
+                ],
+                "optional": [],
+            },
+            "external_dependencies": {"required": external, "optional": []},
+            "external_prerequisites": config["runtime_prerequisites"][plugin],
+            "harness": harnesses[plugin]["requires"],
+            "digest": output_tree_digest(output, f"plugins/{plugin}", excluded),
+        }
+        if excluded:
+            package["digest_excludes"] = excluded
+        records["packages"].append(package)
+    package_index(records)
+    serialized = json.dumps(records, indent=2) + "\n"
+    emit("plugins/packages.json", serialized)
+    emit("plugins/machine/packages.json", serialized)
+    emit("CAPABILITIES.md", render_capabilities(records))
+    emit(
+        "plugins/publication.json",
+        json.dumps({"schema_version": 1, "source_fingerprint": publication_fingerprint(output)}, indent=2) + "\n",
+    )
 
     return config, output, skills, compatibility
 

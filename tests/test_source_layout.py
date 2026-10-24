@@ -116,8 +116,8 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_engineering_leaves_recording_profile_selection_to_the_repository(self):
         _, output, _, _ = SYNC.build(self.root)
-        catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
-        engineering = next(package for package in catalog["packages"] if package["id"] == "tj-agents/engineering")
+        records = json.loads(SYNC.build(self.root)[1]["plugins/packages.json"])
+        engineering = next(package for package in records["packages"] if package["id"] == "tj-agents/engineering")
         self.assertEqual(["tj-agents/base", "tj-agents/workflow", "tj-agents/agent-store", "tj-agents/machine"], engineering["dependencies"]["required"])
         self.assertEqual([], engineering["external_dependencies"]["required"])
         harness = json.loads(output["plugins/engineering/harness.json"].decode("utf-8"))
@@ -127,50 +127,50 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertEqual([], selection["external_prerequisites"])
 
     def test_external_dependencies_are_validated_per_owner(self):
-        catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
-        packages = {package["id"]: package for package in catalog["packages"]}
+        records = json.loads(SYNC.build(self.root)[1]["plugins/packages.json"])
+        packages = {package["id"]: package for package in records["packages"]}
         external = "personal-agents/personal"
         engineering = packages["tj-agents/engineering"]
         engineering["dependencies"]["required"].append(external)
         engineering["external_dependencies"]["required"].append({
             "id": external, "marketplace": "personal-agents", "repository": "tj-agents/personal"})
 
-        borrowed = json.loads(json.dumps(catalog))
+        borrowed = json.loads(json.dumps(records))
         next(package for package in borrowed["packages"] if package["id"] == "tj-agents/machine")[
             "dependencies"]["required"].append(external)
         with self.assertRaisesRegex(ValueError, "tj-agents/machine names unknown dependency"):
-            SYNC.catalog_index(borrowed)
+            SYNC.package_index(borrowed)
 
         for mutation in (
             lambda dependency: dependency.update(marketplace="Personal_Items", id="Personal_Items/personal"),
             lambda dependency: dependency.update(repository="not a repository"),
         ):
-            invalid = json.loads(json.dumps(catalog))
+            invalid = json.loads(json.dumps(records))
             engineering = next(package for package in invalid["packages"] if package["id"] == "tj-agents/engineering")
             mutation(engineering["external_dependencies"]["required"][0])
             with self.subTest(dependency=engineering["external_dependencies"]["required"][0]):
                 with self.assertRaisesRegex(ValueError, "Invalid external dependency for tj-agents/engineering"):
-                    SYNC.catalog_index(invalid)
+                    SYNC.package_index(invalid)
 
-        duplicate = json.loads(json.dumps(catalog))
+        duplicate = json.loads(json.dumps(records))
         engineering = next(package for package in duplicate["packages"] if package["id"] == "tj-agents/engineering")
         engineering["external_dependencies"]["required"].append(dict(engineering["external_dependencies"]["required"][0]))
         with self.assertRaisesRegex(ValueError, "Invalid external dependency for tj-agents/engineering"):
-            SYNC.catalog_index(duplicate)
+            SYNC.package_index(duplicate)
 
-        conflicting = json.loads(json.dumps(catalog))
+        conflicting = json.loads(json.dumps(records))
         machine = next(package for package in conflicting["packages"] if package["id"] == "tj-agents/machine")
         machine["dependencies"]["optional"].append(external)
         machine["external_dependencies"] = {"required": [], "optional": [
             {"id": external, "marketplace": "personal-agents", "repository": "someone/else"}]}
         with self.assertRaisesRegex(ValueError, "inconsistent ownership: personal-agents"):
-            SYNC.catalog_index(conflicting)
+            SYNC.package_index(conflicting)
 
         self.assertEqual(
             {"owner_repository": "tj-agents/personal", "source": "https://github.com/tj-agents/personal.git"},
-            SYNC.catalog_marketplaces(SYNC.catalog_index(catalog))["personal-agents"],
+            SYNC.package_marketplaces(SYNC.package_index(records))["personal-agents"],
         )
-        self.assertEqual(set(packages), set(SYNC.catalog_index(catalog)))
+        self.assertEqual(set(packages), set(SYNC.package_index(records)))
 
     def test_task_recovery_contract_ships_for_both_hosts(self):
         _, output, skills, _ = SYNC.build(self.root)
@@ -218,8 +218,8 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/machine/skills/plugin-selection/scripts/repo_config.py",
             "plugins/machine/skills/hook-control/scripts/hook_control.py",
             "plugins/machine/codex-skills/hook-control/scripts/hook_control.py",
-            "plugins/machine/catalog/catalog.json",
-            "plugins/machine/catalog/plugins.schema.json",
+            "plugins/machine/packages.json",
+            "plugins/machine/schemas/plugin-selection.schema.json",
             "plugins/workflow/skills/status/scripts/status.py",
             "plugins/workflow/codex-skills/status/scripts/status.py",
             "CAPABILITIES.md",
@@ -317,7 +317,7 @@ class SourceLayoutTests(unittest.TestCase):
             [plugin["name"] for plugin in claude_marketplace["plugins"]],
         )
 
-        catalog_skills = set()
+        records_skills = set()
         for plugin in fresh_plugins:
             expected_source = f"./plugins/{plugin}"
             claude_entry = next(
@@ -326,13 +326,13 @@ class SourceLayoutTests(unittest.TestCase):
                 if entry["name"] == plugin
             )
             self.assertEqual(expected_source, claude_entry["source"])
-            catalog = json.loads(
+            records = json.loads(
                 output[f"plugins/{plugin}/selection.json"].decode("utf-8")
             )
             self.assertLessEqual(
-                set(catalog["prerequisites"]), set(fresh_plugins)
+                set(records["prerequisites"]), set(fresh_plugins)
             )
-            catalog_skills.update(catalog["skills"])
+            records_skills.update(records["skills"])
 
         workflow_selection = json.loads(output["plugins/workflow/selection.json"].decode("utf-8"))
         self.assertEqual(["base", "agent-store", "machine"], workflow_selection["prerequisites"])
@@ -343,7 +343,7 @@ class SourceLayoutTests(unittest.TestCase):
         required = set(compatibility["fresh_required_skills"])
         owners = {skill["name"]: skill["plugin"] for skill in skills.values()}
         self.assertEqual({"cd", "handoff", "handoff-codex"}, required)
-        self.assertLessEqual(required, catalog_skills)
+        self.assertLessEqual(required, records_skills)
         for tree in ("skills", "codex-skills"):
             for name in required:
                 self.assertIn(
@@ -534,14 +534,16 @@ class SourceLayoutTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "overlaps authored source"):
             SYNC.build(self.root)
 
-    def test_catalog_digest_exclusion_cannot_be_widened(self):
-        path = self.root / ".agents/catalog/catalog.json"
-        catalog = json.loads(path.read_text(encoding="utf-8"))
-        machine = next(package for package in catalog["packages"] if package["id"] == "tj-agents/machine")
-        machine["digest_excludes"].append("codex-skills/plugin-selection/SKILL.md")
-        path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "digest exclusion drift"):
-            SYNC.build(self.root, validate_catalog_digests=False)
+    def test_machine_digest_exclusion_is_fixed_and_schemas_are_covered(self):
+        _, output, _, _ = SYNC.build(self.root)
+        records = json.loads(output["plugins/packages.json"])
+        machine = next(package for package in records["packages"] if package["name"] == "machine")
+        self.assertEqual(["packages.json"], machine["digest_excludes"])
+        self.assertEqual(machine["digest"], SYNC.output_tree_digest(output, "plugins/machine", ["packages.json"]))
+        output["plugins/machine/packages.json"] = b"tampered"
+        self.assertEqual(machine["digest"], SYNC.output_tree_digest(output, "plugins/machine", ["packages.json"]))
+        output["plugins/machine/schemas/packages.schema.json"] = b"tampered"
+        self.assertNotEqual(machine["digest"], SYNC.output_tree_digest(output, "plugins/machine", ["packages.json"]))
 
     def test_prerequisite_cycles_and_missing_owners_fail(self):
         self.config(lambda value: value["prerequisites"]["base"].append("engineering"))

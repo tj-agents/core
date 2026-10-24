@@ -38,7 +38,7 @@ Call site: the agent selects query-building when the task asks to compose a reus
 
 ## Extend an owner before creating a skill
 
-Look the subject up first: the repository's catalog or capability index, then the skills installed on
+Look the subject up first: the repository's package records or capability index, then the skills installed on
 both hosts. When a rule is consulted by the same task that already loads an existing skill, it belongs
 in that skill, even if the existing name does not mention it. A new skill is justified only by a subject
 that a task loads on its own.
