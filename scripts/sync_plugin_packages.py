@@ -826,12 +826,13 @@ def emit_workflow_agents(root: Path, config: dict, emit):
             agent_payload(role, body, host),
         )
 
-def build(root: Path, validate_catalog_digests: bool = True):
+def build(root: Path, validate_catalog_digests: bool = True, catalog=None):
     root = root.resolve()
     config = load(root / ".agents/plugins/sources.json")
     payloads = load(root / ".agents/plugins/payloads.json")["payloads"]
     compatibility = load(root / ".agents/plugins/compatibility.json")
-    catalog = load(root / ".agents/catalog/catalog.json")
+    if catalog is None:
+        catalog = load(root / ".agents/catalog/catalog.json")
     catalog_plugins = catalog_index(catalog)
     if any(package["owner_repository"] != "tj-agents/core" for package in catalog_plugins.values()):
         raise ValueError("Core's authored catalog may contain only core packages")
