@@ -1,6 +1,6 @@
 ---
 name: plugin-selection
-description: Select a repository's plugins and generate its rolling-main Claude and Codex settings. Use when adopting plugins for a repository or stack, updating a repository's selected packages, or auditing a machine before removing old user-level plugin settings.
+description: Select a repository's plugins and generate its rolling-main Claude and Codex settings. Use when adopting plugins for a repository, updating a repository's selected packages, or auditing a machine before removing old user-level plugin settings.
 
 kind: utility
 domain: machine
@@ -33,9 +33,8 @@ settings are current, not that native trust, installation or session loading suc
 {"schema_version": 1,
  "marketplaces": {
    "tj-agents": {"repository": "tj-agents/marketplace"},
-   "agents": {"repository": "Concertable/agents"}},
- "plugins": ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents",
-             "dotnet@tj-agents", "concertable@agents"]}
+   "<name>": {"repository": "<owner>/<repository>"}},
+ "plugins": ["base@tj-agents", "engineering@tj-agents", "<plugin>@tj-agents", "<plugin>@<name>"]}
 ```
 
 The selection lists every required package explicitly as `<plugin>@<marketplace>`. A marketplace key must
@@ -45,29 +44,22 @@ two marketplace names cannot refer to the same repository. The schema is `catalo
 Schema 2 and 3 locks migrate only through the adoption command; it preserves their source repositories
 and plugin identities, writes the schema 1 selection, and removes the old lock and all revision pins.
 
-## Adopt a stack
+## Adopt plugins
 
 ```powershell
 python -B '<skill-directory>\scripts\adopt_plugins.py' --root C:\path\to\repository `
-  --stack dotnet --mode preview
+  --plugin <plugin> --mode preview
 ```
 
-A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `python`, `github-actions`,
-`plugin-repository`) resolves to its plugins through `scripts/plugin_roster.json`, so nobody guesses which
-plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Required plugins are added and
-existing selections are kept. With no requested stack or plugin, a new selection uses the default base,
-engineering and machine packages. `preview` lists the changed files, `write` applies them together, and `check`
-exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
-
-Personal is only for personal projects explicitly adopting `personal@tj-agents`. Read the repository's
-README.md and AGENTS.md before selection; a GitHub owner, home directory or publisher account never
-establishes personal scope. `--plugin personal` selects it explicitly, and later adoption preserves that
-selection. Ownership alone never adds it. Infonetica, including `tj-agents/infonetica` work-tooling source
-and its worktrees, is work scope: never select or inject Personal there. Owner-based project/local file
-placement is independent of this policy boundary. Selecting a profile does not prove its instructions loaded.
+Repeat `--plugin`. Each plugin's requirements come from the `tj-agents` marketplace's published catalog,
+so selecting a plugin adds what it requires; a plugin absent from that catalog is rejected. A new selection
+always includes core's packages, and existing selections are kept. Which plugins a project needs is the
+owning package's decision, never this tool's. `preview` lists the changed files, `write` applies them
+together, and `check` exits nonzero on drift, which is what CI runs. Selecting a profile does not prove its
+instructions loaded.
 
 A bare `--plugin <name>` selects from `tj-agents`. Add a foreign plugin with
-`--plugin concertable@agents --marketplace agents=Concertable/agents`. Subsequent adoption preserves
+`--plugin <plugin>@<name> --marketplace <name>=<owner>/<repository>`. Subsequent adoption preserves
 existing foreign marketplaces and selections. Every selected approved publisher follows `main`.
 
 ## Generate settings from an existing selection

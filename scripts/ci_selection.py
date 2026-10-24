@@ -24,10 +24,7 @@ FAMILIES = {
         },
     },
     "plugin-adoption": {
-        "sources": {
-            ".agents/machine/utility/plugin-selection/scripts/adopt_plugins.py",
-            ".agents/machine/utility/plugin-selection/scripts/plugin_roster.json",
-        },
+        "sources": {".agents/machine/utility/plugin-selection/scripts/adopt_plugins.py"},
         "tests": {".agents/hooks/tests/test_adopt_plugins.py"},
     },
     "machine-verification": {

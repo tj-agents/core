@@ -1,6 +1,6 @@
 ---
 name: plugin-selection
-description: Select a repository's plugins and generate its rolling-main Claude and Codex settings. Use when adopting plugins for a repository or stack, updating a repository's selected packages, or auditing a machine before removing old user-level plugin settings.
+description: Select a repository's plugins and generate its rolling-main Claude and Codex settings. Use when adopting plugins for a repository, updating a repository's selected packages, or auditing a machine before removing old user-level plugin settings.
 
 kind: utility
 domain: machine
