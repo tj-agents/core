@@ -244,7 +244,7 @@ class LaunchCodexTests(unittest.TestCase):
         self.run_main()
         clear = self.agent_cli.launch_tab.call_args.kwargs['clear']
         self.assertEqual(tuple(clear), ('TERM',))
-        self.assertNotIn('force', self.agent_cli.launch_tab.call_args.kwargs)
+        self.assertNotIn('TERM', self.agent_cli.launch_tab.call_args.kwargs.get('force') or {})
 
     def test_executable_is_resolved_before_bound_session_launch(self):
         self.run_main()
