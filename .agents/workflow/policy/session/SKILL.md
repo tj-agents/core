@@ -29,6 +29,12 @@ recovery fails or execution cannot be verified, keep work blocked and name the h
 exact supported recovery command. Never bypass trust, disable a required hook, suppress its failure, or
 start another executor to continue around the gate.
 
+```text
+Required Base startup hook: timed out; no verdict.
+Action: stop application writes, diagnose and repair, then run the affected hook successfully.
+If plugin refresh is unconfigured, run Core's full setup and its --check before resuming.
+```
+
 Authorized long-term or multi-phase work selects `workflow:run`, even when the user does
 not name a plan or skill. Read an existing canonical goal before edits and keep its progress current.
 Planning-only work selects `workflow:plan` and does not authorize implementation.

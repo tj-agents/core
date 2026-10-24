@@ -34,6 +34,12 @@ conversation. Use `workflow:handoff` only for a separately authorized context tr
 native directory-changing command, report that limitation and give the supported exact resume command
 for this existing conversation; do not create or fork another conversation.
 
+```text
+Task moves to C:/work/meal-estimator; the agent has no native directory-control tool.
+Reply: Enter /cd C:/work/meal-estimator in Codex, then say continue.
+Keep this conversation open. Resume after the host reports C:/work/meal-estimator.
+```
+
 When the transfer exists to release the current directory for removal, the handoff must make the successor
 the sole owner of the removal and final filesystem verification. After verified launcher submission the
 original stops repository-scoped work; a completed delivery closes its own session through

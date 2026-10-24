@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import io
 import json
 import os
@@ -264,16 +265,59 @@ def trust_updates(inventory, entries, cwd, verified_roots=None):
     return updates
 
 
-def require_ready(listing, cwd, required=(), expected=None):
+def signature(hook):
+    return hook.get("eventName"), hook.get("matcher"), hook.get("handlerType"), hook.get("command")
+
+
+def required_definitions(root, identity):
+    root = root.resolve()
+    manifest = json.loads((root / ".codex-plugin/plugin.json").read_text(encoding="utf-8-sig"))
+    sources = manifest.get("hooks")
+    if sources is None:
+        sources = ["hooks/hooks.json"] if (root / "hooks/hooks.json").is_file() else []
+    if not isinstance(sources, list):
+        sources = [sources]
+    profile = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+    data = profile / "plugins/data" / identity.replace("@", "-")
+    result = []
+    for source in sources:
+        if isinstance(source, str):
+            path = (root / source).resolve()
+            if not path.is_relative_to(root):
+                raise RuntimeError(f"Required hook declaration escapes its plugin: {identity}")
+            source = json.loads(path.read_text(encoding="utf-8-sig"))
+        events = source.get("hooks", source)
+        for event, groups in events.items():
+            for group in groups:
+                for handler in group["hooks"]:
+                    kind = handler["type"]
+                    parts = kind.split("_")
+                    native_kind = parts[0] + "".join(part.title() for part in parts[1:])
+                    cmd = handler.get("commandWindows", handler.get("command")) if os.name == "nt" else handler.get("command")
+                    if isinstance(cmd, str):
+                        for variable, value in (("PLUGIN_ROOT", root), ("CLAUDE_PLUGIN_ROOT", root),
+                                                ("PLUGIN_DATA", data), ("CLAUDE_PLUGIN_DATA", data)):
+                            cmd = cmd.replace("${" + variable + "}", str(value))
+                    result.append((event[0].lower() + event[1:], group.get("matcher"), native_kind, cmd))
+    return result
+
+
+def require_ready(listing, cwd, required=None, expected=None):
     entries = [entry for entry in listing.get("data", [])
                if Path(entry.get("cwd", "")).resolve() == cwd]
     if not entries or any(entry.get("errors") for entry in entries):
         raise RuntimeError("Required hook inventory is missing or contains loading errors")
     hooks = {hook["key"]: hook for entry in entries for hook in entry.get("hooks", [])}
-    present = {hook.get("pluginId") for hook in hooks.values()}
-    problems = [f"{identity}: required hook definitions missing" for identity in sorted(set(required) - present)]
+    problems = []
+    for identity, definitions in (required or {}).items():
+        present = Counter(signature(hook) for hook in hooks.values() if hook.get("pluginId") == identity)
+        missing = Counter(definitions) - present
+        if missing:
+            problems.append(f"{identity}: required hook definitions missing: {list(missing.elements())}")
     for key, hook in hooks.items():
-        if hook.get("pluginId") in required and not hook.get("enabled"):
+        if required is not None and hook.get("pluginId") not in required:
+            continue
+        if not hook.get("enabled") and required is not None:
             problems.append(f"{key}: disabled")
         elif hook.get("enabled") and not hook.get("isManaged") and hook.get("trustStatus") != "trusted":
             problems.append(f"{key}: {hook.get('trustStatus', 'unknown trust')}")
@@ -286,7 +330,9 @@ def require_ready(listing, cwd, required=(), expected=None):
 
 
 def apply_trust(executable, cwd, preview=False, verified_roots=None, launch_args=(), environment=None,
-                timeout=None, required=()):
+                timeout=None, required=None):
+    if required == {}:
+        return {}
     limit = TIMEOUT if timeout is None else timeout
     if limit <= 0:
         raise RuntimeError("Codex hook trust deadline expired")
@@ -298,6 +344,10 @@ def apply_trust(executable, cwd, preview=False, verified_roots=None, launch_args
         if config.get("allow_managed_hooks_only") is True:
             raise RuntimeError("Required plugin hooks are excluded by allow_managed_hooks_only")
         listing = server.request("hooks/list", {"cwds": [str(cwd)]})
+        if required is not None:
+            listing = {"data": [dict(entry, hooks=[hook for hook in entry.get("hooks", [])
+                                                   if hook.get("pluginId") in required])
+                                for entry in listing.get("data", [])]}
         if not any(
             hook.get("source") == "plugin" and hook.get("enabled")
             and hook.get("trustStatus") in {"untrusted", "modified"}

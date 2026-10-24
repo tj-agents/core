@@ -61,11 +61,13 @@ class StartupBindingTests(unittest.TestCase):
         self.check = patcher.start()
         self.addCleanup(patcher.stop)
 
-    def test_plugin_check_runs_after_the_claim_and_before_the_native_cli_and_never_blocks_it(self):
+    def test_plugin_check_runs_after_the_claim_and_before_the_native_cli(self):
         status = self.project / "launch.status.json"
         order = []
-        self.check.side_effect = lambda project, host: order.append(
-            ("check", project, host, json.loads(status.read_text(encoding="utf-8"))["phase"]))
+        def check(project, host):
+            order.append(("check", project, host, json.loads(status.read_text(encoding="utf-8"))["phase"]))
+            return "current"
+        self.check.side_effect = check
 
         def run(*_args, **_kwargs):
             order.append("native")
@@ -79,8 +81,29 @@ class StartupBindingTests(unittest.TestCase):
             status.unlink()
             self.check.side_effect = RuntimeError("broken check")
             with mock.patch("sys.stderr"):
-                self.assertEqual(0, BINDING.main(arguments))
-        self.assertEqual("native", order[-1])
+                self.assertEqual(1, BINDING.main(arguments))
+        self.assertEqual(1, order.count("native"))
+
+    def test_incomplete_or_failed_update_checks_block_both_hosts(self):
+        for host in ("codex", "claude"):
+            for result in ("unconfigured", "failed", "busy", None):
+                with self.subTest(host=host, result=result), mock.patch.object(BINDING, "run_session") as native, mock.patch("sys.stderr"):
+                    self.check.return_value = result
+                    self.assertEqual(1, BINDING.main([
+                        "--host", host, "--project", str(self.project), "--target", host,
+                    ]))
+                    native.assert_not_called()
+
+    def test_readiness_and_refresh_use_the_native_directory_override(self):
+        destination = self.project / "destination"
+        destination.mkdir()
+        with mock.patch.object(BINDING.required_plugins, "check"), mock.patch.object(BINDING, "run_session", return_value=0):
+            self.assertEqual(0, BINDING.main([
+                "--host", "codex", "--project", str(self.project), "--target", "codex",
+                "--", "-C", str(destination),
+            ]))
+        self.check.assert_called_once_with(destination.resolve(), host="codex")
+        self.readiness.assert_called_once_with(destination.resolve(), "codex")
 
     def test_status_file_reports_preparation_failure_and_exit(self):
         status = self.project / "launch.status.json"
