@@ -24,6 +24,17 @@
           }
         ],
         "matcher": "exec_command|unified_exec|local_shell|shell"
+      },
+      {
+        "matcher": "exec_command|unified_exec|local_shell|shell|mcp__.*__(github_)?(create|update)_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/delivery_binding_gate.py\" --validate-body --pr-writes-only",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/delivery_binding_gate.py\" --validate-body --pr-writes-only"
+          }
+        ]
       }
     ]
   }
