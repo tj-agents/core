@@ -1,6 +1,5 @@
 import argparse
 from contextlib import closing, redirect_stdout
-import importlib.util
 import io
 import json
 import os
@@ -69,6 +68,7 @@ class CodexContinuationTests(unittest.TestCase):
         arguments = self.launch.call_args.args[0]
         self.assertNotIn("--bypass-hook-trust", arguments)
         self.assertEqual(arguments[arguments.index("--working-directory") + 1], str(self.root))
+        self.assertEqual(arguments[arguments.index("--codex-home") + 1], str(self.root / "profile"))
         prompt = Path(arguments[arguments.index("--prompt-path") + 1]).read_text(encoding="utf-8")
         self.assertIn(str(self.goal), prompt)
         self.assertIn(data["attempt"], prompt)
@@ -141,15 +141,39 @@ class CodexContinuationTests(unittest.TestCase):
                 self.run_continuation()
         self.launch.assert_not_called()
 
-    def test_registered_execution_requires_its_existing_lease_transfer(self):
+    def create_association(self, role=None):
         self.receipt.parent.parent.mkdir(parents=True)
         with closing(sqlite3.connect(self.receipt.parent.parent / "sessions.db")) as connection:
-            connection.execute("CREATE TABLE sessions (host TEXT, session_id TEXT, work_item TEXT)")
-            connection.execute("INSERT INTO sessions VALUES ('codex', 'predecessor', 'execution:owned')")
+            connection.execute("CREATE TABLE sessions (host TEXT, session_id TEXT, work_item TEXT, "
+                               "role TEXT, ended_at REAL, handle TEXT)")
+            connection.execute("INSERT INTO sessions VALUES ('codex', 'predecessor', 'execution:owned', ?, NULL, 'codex:predecessor')", (role,))
             connection.commit()
+
+    def test_registered_execution_requires_its_existing_lease_transfer(self):
+        self.create_association("owner")
         with self.assertRaisesRegex(ValueError, "owner release/claim"):
             self.run_continuation()
         self.refresh.assert_not_called()
+        self.launch.assert_not_called()
+
+    def test_metadata_association_without_a_claim_does_not_block_continuation(self):
+        self.create_association()
+        self.assertEqual(self.run_continuation(), 0)
+        self.launch.assert_called_once()
+
+    def test_another_recorded_owner_prevents_unclaimed_session_from_launching(self):
+        self.create_association()
+        with closing(sqlite3.connect(self.receipt.parent.parent / "sessions.db")) as connection:
+            connection.execute("INSERT INTO sessions VALUES ('codex', 'other', 'execution:owned', 'owner', NULL, 'codex:other')")
+            connection.commit()
+        with self.assertRaisesRegex(ValueError, "owner release/claim"):
+            self.run_continuation()
+        self.launch.assert_not_called()
+
+    def test_bounded_role_retains_its_existing_lease_transfer(self):
+        self.create_association("bounded: parser")
+        with self.assertRaisesRegex(ValueError, "owner release/claim"):
+            self.run_continuation()
         self.launch.assert_not_called()
 
     def test_sync_entrypoint_refreshes_codex_before_continuing_even_when_current(self):
@@ -199,6 +223,22 @@ class CodexContinuationTests(unittest.TestCase):
             self.assertEqual(launcher.main(["--working-directory", str(self.root), "--prompt-path", str(self.goal),
                                            "--status-file", str(startup)]), 3)
         launch.assert_not_called()
+
+    def test_real_launcher_preserves_explicit_profile_through_terminal_environment(self):
+        launcher = CONTINUE.session_relaunch.load(
+            ROOT / ".agents/machine/utility/handoff-codex/scripts/launch_codex.py", "test_profile_launcher")
+        profile = self.root / "refreshed profile"
+        with mock.patch.object(launcher, "_load_agent_cli", return_value=REFRESH.agent_cli), \
+                mock.patch.object(REFRESH.agent_cli, "resolve_codex_executable", return_value=("codex", {
+                    "core": (0, 164, 0), "text": "0.164.0"})), \
+                mock.patch.object(REFRESH.agent_cli, "launch_tab") as launch, \
+                mock.patch.object(REFRESH.agent_cli, "await_handoff_startup"), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(launcher.main(["--working-directory", str(self.root), "--prompt-path", str(self.goal),
+                                           "--codex-home", str(profile)]), 0)
+        self.assertEqual(launch.call_args.kwargs["force"], {"CODEX_HOME": str(profile)})
+        inner = REFRESH.agent_cli.posix_inner_command(self.root, [], {"CODEX_HOME": str(profile)}, "python3", [])
+        self.assertIn("CODEX_HOME=" + str(profile), inner)
 
 
 if __name__ == "__main__":

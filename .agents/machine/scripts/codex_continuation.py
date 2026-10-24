@@ -9,7 +9,6 @@ import json
 import os
 from pathlib import Path
 import sqlite3
-import sys
 
 import session_relaunch
 import agent_cli
@@ -31,9 +30,12 @@ def session_id():
     return values.pop()
 
 
+def profile_directory():
+    return Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").resolve()
+
+
 def receipt_path(project):
-    profile = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").resolve()
-    identity = json.dumps([str(profile), session_id(), str(Path(project).resolve())])
+    identity = json.dumps([str(profile_directory()), session_id(), str(Path(project).resolve())])
     key = hashlib.sha256(identity.encode("utf-8")).hexdigest()
     return session_relaunch.state_directory() / "codex-continuation" / (key + ".json")
 
@@ -44,11 +46,14 @@ def check_owner(predecessor):
         return
     try:
         with closing(sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True, timeout=5)) as connection:
-            row = connection.execute("SELECT work_item FROM sessions WHERE host = ? AND session_id = ?",
+            row = connection.execute("SELECT work_item, role FROM sessions WHERE host = ? AND session_id = ?",
                                      ("codex", predecessor)).fetchone()
+            owner = connection.execute(
+                "SELECT handle FROM sessions WHERE work_item = ? AND role = 'owner' AND ended_at IS NULL LIMIT 1",
+                (row[0],)).fetchone() if row and row[0] else None
     except sqlite3.Error as error:
         raise ValueError(f"Cannot verify the existing execution owner: {error}") from error
-    if row and row[0]:
+    if row and row[0] and (row[1] or owner):
         raise ValueError(f"Recorded execution {row[0]} requires its owner release/claim procedure. "
                          "Continue automatically through workflow:handoff using that existing owner; "
                          "this standalone checkpoint command cannot bypass its lease.")
@@ -120,7 +125,8 @@ def continue_session(project, goal, refresh):
     try:
         with redirect_stdout(output), redirect_stderr(output):
             result = launcher.main(["--working-directory", str(project), "--prompt-path", str(prompt),
-                                    "--title", "Codex standards continuation", "--status-file", str(startup)])
+                                    "--title", "Codex standards continuation", "--status-file", str(startup),
+                                    "--codex-home", str(profile_directory())])
     except BaseException:
         evidence.write_text(output.getvalue() or "Launcher interrupted\n", encoding="utf-8")
         transfer.mutate(argparse.Namespace(command="fail", receipt=str(receipt), attempt=data["attempt"],
