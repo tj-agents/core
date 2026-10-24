@@ -65,6 +65,23 @@ class AutoMergeTests(unittest.TestCase):
             with self.subTest(changed=changed), self.assertRaises(AUTO_MERGE.AutoMergeError):
                 AUTO_MERGE.green_exact_head({**base, **changed}, HEAD)
 
+    def test_readiness_allows_required_review_without_weakening_other_gates(self):
+        base = {
+            "state": "OPEN", "isDraft": False, "mergeStateStatus": "BLOCKED",
+            "mergeable": "MERGEABLE", "reviewDecision": "REVIEW_REQUIRED", "headRefOid": HEAD,
+            "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "SUCCESS"}],
+        }
+        AUTO_MERGE.green_exact_head(base, HEAD)
+        for changed in (
+            {"reviewDecision": "CHANGES_REQUESTED"}, {"reviewDecision": "APPROVED"},
+            {"reviewDecision": None}, {"mergeable": "CONFLICTING"}, {"mergeable": "UNKNOWN"},
+            {"mergeStateStatus": "BEHIND"}, {"isDraft": True}, {"headRefOid": "b" * 40},
+            {"statusCheckRollup": [{"status": "IN_PROGRESS"}]},
+            {"statusCheckRollup": [{"status": "COMPLETED", "conclusion": "FAILURE"}]},
+        ):
+            with self.subTest(changed=changed), self.assertRaises(AUTO_MERGE.AutoMergeError):
+                AUTO_MERGE.green_exact_head({**base, **changed}, HEAD)
+
     def test_arm_executes_only_the_fixed_guarded_merge_arguments(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()
@@ -75,7 +92,9 @@ class AutoMergeTests(unittest.TestCase):
                 "headRefOid": HEAD,
                 "state": "OPEN",
                 "isDraft": False,
-                "mergeStateStatus": "CLEAN",
+                "mergeStateStatus": "BLOCKED",
+                "mergeable": "MERGEABLE",
+                "reviewDecision": "REVIEW_REQUIRED",
                 "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "SUCCESS"}],
             }
             with (
