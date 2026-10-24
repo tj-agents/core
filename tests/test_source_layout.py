@@ -59,7 +59,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(81, len(skills))
+        self.assertEqual(82, len(skills))
         self.assertEqual("machine", skills["machine:hook-control"]["plugin"])
         self.assertEqual("session", skills["workflow:session"]["name"])
         self.assertEqual("session", skills["engineering:session"]["name"])
