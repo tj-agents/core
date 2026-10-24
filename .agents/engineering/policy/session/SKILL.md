@@ -8,7 +8,7 @@ domain: process
 # Engineering session
 
 These conventions apply when engineering is selected for the current scope, on top of
-`workflow:session-lifecycle`. They grant no implementation, publication or installation authority beyond
+`workflow:session`. They grant no implementation, publication or installation authority beyond
 the eligible internal repair authority in `engineering:self-repair`. Product profiles and compatibility
 policy remain with the project. `workflow:run` selects `engineering:persistent-workflow` when an authorized
 task has a future decision that may outlive the current session.

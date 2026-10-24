@@ -1,4 +1,4 @@
-"""Exercise the workflow session-lifecycle hook from a relocated, self-contained package."""
+"""Exercise the workflow session hook from a relocated, self-contained package."""
 import json
 import os
 from pathlib import Path
@@ -10,7 +10,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ".agents/workflow/policy/session-lifecycle/scripts/session-context.py"
+SCRIPT = ".agents/workflow/policy/session/scripts/session-context.py"
 REMINDER = "Nothing owned left to do before this reply? Select `machine:close`."
 
 
@@ -37,8 +37,8 @@ class PackagedSessionLifecycleHook(unittest.TestCase):
         output = self.output(self.run_hook())
         self.assertEqual('SessionStart', output['hookEventName'])
         context = output['additionalContext']
-        self.assertIn('workflow:session-lifecycle (source SHA-256', context)
-        self.assertIn(str(self.package / '.agents/workflow/policy/session-lifecycle/SKILL.md'), context)
+        self.assertIn('workflow:session (source SHA-256', context)
+        self.assertIn(str(self.package / '.agents/workflow/policy/session/SKILL.md'), context)
         self.assertEqual(['## When the user calls out a mistake',
                           '## A task has an owning lifecycle — load it before the first edit',
                           '## Finish the session'],
@@ -52,7 +52,7 @@ class PackagedSessionLifecycleHook(unittest.TestCase):
         self.assertEqual({'hookEventName': 'UserPromptSubmit', 'additionalContext': REMINDER}, output)
 
     def test_missing_contract_is_an_actionable_error(self):
-        (self.package / '.agents/workflow/policy/session-lifecycle/SKILL.md').unlink()
+        (self.package / '.agents/workflow/policy/session/SKILL.md').unlink()
         result = self.run_hook()
         self.assertNotEqual(0, result.returncode)
         self.assertIn('cannot read contract', result.stderr)
