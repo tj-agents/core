@@ -264,17 +264,46 @@ def trust_updates(inventory, entries, cwd, verified_roots=None):
     return updates
 
 
-def apply_trust(executable, cwd, preview=False, verified_roots=None, launch_args=(), environment=None, timeout=None):
+def require_ready(listing, cwd, required=(), expected=None):
+    entries = [entry for entry in listing.get("data", [])
+               if Path(entry.get("cwd", "")).resolve() == cwd]
+    if not entries or any(entry.get("errors") for entry in entries):
+        raise RuntimeError("Required hook inventory is missing or contains loading errors")
+    hooks = {hook["key"]: hook for entry in entries for hook in entry.get("hooks", [])}
+    present = {hook.get("pluginId") for hook in hooks.values()}
+    problems = [f"{identity}: required hook definitions missing" for identity in sorted(set(required) - present)]
+    for key, hook in hooks.items():
+        if hook.get("pluginId") in required and not hook.get("enabled"):
+            problems.append(f"{key}: disabled")
+        elif hook.get("enabled") and not hook.get("isManaged") and hook.get("trustStatus") != "trusted":
+            problems.append(f"{key}: {hook.get('trustStatus', 'unknown trust')}")
+    for key, value in (expected or {}).items():
+        if key not in hooks or hooks[key].get("currentHash") != value["trusted_hash"]:
+            problems.append(f"{key}: contents changed during verification")
+    if problems:
+        raise RuntimeError("Required hooks are not ready: " + "; ".join(problems)
+                           + ". Stop ordinary work; repair and verify these hooks in /hooks.")
+
+
+def apply_trust(executable, cwd, preview=False, verified_roots=None, launch_args=(), environment=None,
+                timeout=None, required=()):
     limit = TIMEOUT if timeout is None else timeout
     if limit <= 0:
         raise RuntimeError("Codex hook trust deadline expired")
     with AppServer(executable, cwd, launch_args, environment, timeout=limit) as server:
+        config = server.request("config/read", {"cwd": str(cwd), "includeLayers": False})["config"]
+        features = config.get("features") or {}
+        if features.get("hooks", features.get("codex_hooks", True)) is False:
+            raise RuntimeError("Required hooks are disabled in the effective Codex configuration")
+        if config.get("allow_managed_hooks_only") is True:
+            raise RuntimeError("Required plugin hooks are excluded by allow_managed_hooks_only")
         listing = server.request("hooks/list", {"cwds": [str(cwd)]})
         if not any(
             hook.get("source") == "plugin" and hook.get("enabled")
             and hook.get("trustStatus") in {"untrusted", "modified"}
             for entry in listing["data"] for hook in entry.get("hooks", [])
         ):
+            require_ready(listing, cwd, required)
             return {}
         if not launch_args and not environment:
             inventory = json.loads(run([*command(executable), "plugin", "list", "--json"], cwd, limit))
@@ -291,6 +320,9 @@ def apply_trust(executable, cwd, preview=False, verified_roots=None, launch_args
                 "edits": [{"keyPath": "hooks.state", "value": updates, "mergeStrategy": "upsert"}],
                 "reloadUserConfig": True,
             })
+            listing = server.request("hooks/list", {"cwds": [str(cwd)]})
+        if not preview:
+            require_ready(listing, cwd, required, expected=updates)
         return updates
 
 
@@ -300,8 +332,6 @@ def main(argv=None):
     parser.add_argument("--project", type=Path, default=Path.cwd())
     parser.add_argument("--preview", action="store_true")
     arguments = parser.parse_args(argv)
-    if os.environ.get("TJ_AGENTS_CODEX_HOOK_TRUST", "").casefold() == "off":
-        return 0
     try:
         updates = apply_trust(arguments.codex, arguments.project.resolve(strict=True), arguments.preview)
         if updates:

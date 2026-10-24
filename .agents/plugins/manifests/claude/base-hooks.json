@@ -39,7 +39,6 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
               "--deadline",
               "25",
-              "--deny-on-timeout",
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py",
               "--harness",

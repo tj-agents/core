@@ -347,8 +347,13 @@ requirements. The machine event fixtures cover both event and catch-up paths wit
 ### Recover from a faulty installed hook
 
 A hook repair reaches a machine after it merges, the `regenerate` job publishes it to `main`, and the next
-automatic update installs it. On Codex, a changed package digest changes the hook definition, so the hook
-needs trust review again. A running session keeps the hook bytes it loaded; start a new session.
+automatic update installs it. Codex launch and refresh verify published package contents, apply trust only
+to verified current hook hashes, and read back required-hook readiness. Failed readiness blocks ordinary
+work; native plugin maintenance remains available for recovery. A running session keeps the hook bytes it
+loaded. Use `machine:sync-plugins` to recover, and verify the affected hooks actually execute successfully.
+If native reload is unavailable, resume the same conversation by its exact session ID and directory.
+Keep ownership and leave the conversation open for that user action; do not launch a successor merely
+to change directory or reload hooks. `base:cd` owns the native directory-change fallback.
 
 Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.
 

@@ -148,7 +148,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     phase("checking-plugins")
     try:
-        required_plugins.check_launch(parsed.project.resolve(), parsed.host, parsed.target, arguments)
+        interactive = required_plugins.check_launch(parsed.project.resolve(), parsed.host, parsed.target, arguments)
     except required_plugins.RequiredPluginsError as error:
         message = f"launch: {error}"
         print(message, file=sys.stderr)
@@ -158,6 +158,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         launch_check.check(parsed.project.resolve(), host=parsed.host)
     except Exception as error:
         print(f"plugins: update check failed: {error}", file=sys.stderr)
+
+    if parsed.host == "codex" and interactive:
+        phase("verifying-required-hooks")
+        try:
+            launch_check.ensure_hooks(parsed.project.resolve(), parsed.target)
+        except Exception as error:
+            message = f"launch: required hook readiness failed: {error}"
+            print(message, file=sys.stderr)
+            report("failed", error=message)
+            return 1
 
     try:
         options = {"require_session_start": True} if parsed.require_session_start else {}

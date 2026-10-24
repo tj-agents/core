@@ -31,12 +31,13 @@ class CodexWindowsHookCommands(unittest.TestCase):
                 for event, groups in manifest["hooks"].items():
                     for group in groups:
                         for hook in group["hooks"]:
-                            command = hook["commandWindows"]
-                            self.assertIn("${PLUGIN_ROOT}", command)
-                            self.assertNotIn("%PLUGIN_ROOT%", command)
-                            if event == "PreToolUse":
-                                self.assertIn("/hooks/pre_tool_use_adapter.py", command)
-                                self.assertTrue((ROOT / "plugins" / name / "hooks" / "pre_tool_use_adapter.py").is_file())
+                            for platform in ("command", "commandWindows"):
+                                command = hook[platform]
+                                self.assertIn("${PLUGIN_ROOT}", command)
+                                self.assertNotIn("%PLUGIN_ROOT%", command)
+                                if event == "PreToolUse":
+                                    self.assertIn("/hooks/pre_tool_use_adapter.py", command)
+                                    self.assertTrue((ROOT / "plugins" / name / "hooks" / "pre_tool_use_adapter.py").is_file())
 
 
 if __name__ == "__main__":

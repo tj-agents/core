@@ -90,6 +90,14 @@ class CodexPreToolAdapter(unittest.TestCase):
                 self.assertEqual(process.returncode, 0, stderr)
                 self.assertIn("input", self.decision(stdout))
 
+    def test_success_exit_with_invalid_hook_output_still_denies(self):
+        for source in ("print('not json')\n", "print('[]')\n"):
+            with self.subTest(source=source):
+                process = self.launch(source)
+                stdout, stderr = process.communicate(b"{}", timeout=4)
+                self.assertEqual(process.returncode, 0, stderr)
+                self.assertIn("invalid output", self.decision(stdout))
+
     def test_hung_child_denies_within_deadline(self):
         process = self.launch("import time\ntime.sleep(60)\n")
         started = time.monotonic()
