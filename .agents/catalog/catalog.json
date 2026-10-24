@@ -408,6 +408,12 @@
         ],
         "hooks": [
           {
+            "path": ".agents/engineering/policy/session/scripts/session-context.py",
+            "hosts": [
+              "claude"
+            ]
+          },
+          {
             "path": "hooks/git_auth_scope_gate.py",
             "hosts": [
               "claude",

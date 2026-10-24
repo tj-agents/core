@@ -13,6 +13,8 @@ PROMPT_CONTEXT_HEADINGS = (
     "## Repository routine-decision delegation",
 )
 
+SESSION_START_HEADING = "## Finish the session"
+
 
 def prompt_context_section(body, heading):
     heading_match = re.search(rf"(?m)^{re.escape(heading)}[ \t]*$", body)
@@ -95,6 +97,7 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--instruction-fragment", action="store_true")
     mode.add_argument("--prompt-context", action="store_true")
+    mode.add_argument("--session-start-context", action="store_true")
     args = parser.parse_args()
     if sys.version_info < (3, 9):
         print("session: Python 3.9 or newer is required.", file=sys.stderr)
@@ -114,6 +117,17 @@ def main():
     context = f"engineering:session (source SHA-256 {digest})\nSource: {contract}\n\n{body.strip()}"
     if args.instruction_fragment:
         print(f"<!-- BEGIN engineering:session sha256:{digest} -->\n{context}\n<!-- END engineering:session -->")
+        return 0
+    if args.session_start_context:
+        try:
+            section = prompt_context_section(body, SESSION_START_HEADING)
+        except ValueError as error:
+            print(f"session: {error}", file=sys.stderr)
+            return 1
+        context = f"engineering:session (source SHA-256 {digest})\nSource: {contract}\n\n{section}"
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "SessionStart", "additionalContext": context
+        }}, ensure_ascii=True))
         return 0
     try:
         root = hook_root()
