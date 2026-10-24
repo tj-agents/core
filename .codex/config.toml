@@ -22,6 +22,9 @@ enabled = true
 [plugins."personal@tj-agents"]
 enabled = true
 
+[plugins."template@tj-agents"]
+enabled = true
+
 [plugins."workflow@tj-agents"]
 enabled = true
 
