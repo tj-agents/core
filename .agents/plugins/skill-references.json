@@ -6,6 +6,6 @@
     "company:work-item": "Optional repository-selected company operation; Core never selects or installs this profile.",
     "company:create-work-item": "Optional repository-selected company operation; Core never selects or installs this profile.",
     "company:address-work-item": "Optional repository-selected company operation; Core never selects or installs this profile.",
-    "personal:current-solution": "This source repository explicitly adopts Personal policy in AGENTS.md; the canonical policy is authored and published by tj-agents/personal."
+    "personal:rules": "This source repository explicitly adopts Personal policy in AGENTS.md; the canonical policy is authored and published by tj-agents/personal."
   }
 }
