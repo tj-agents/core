@@ -32,8 +32,10 @@ def prompt_context_section(body, heading):
     return section
 
 
-def prompt_context(body, headings=PROMPT_CONTEXT_HEADINGS):
-    return "\n\n".join(prompt_context_section(body, heading) for heading in headings)
+def prompt_context(body):
+    return "\n\n".join(
+        prompt_context_section(body, heading) for heading in PROMPT_CONTEXT_HEADINGS
+    )
 
 
 def stdin_text():
@@ -122,7 +124,9 @@ def main():
         return 0
     if args.session_start_context:
         try:
-            section = prompt_context(body, SESSION_START_HEADINGS)
+            section = "\n\n".join(
+                f"{heading}\n\n{prompt_context_section(body, heading)}" for heading in SESSION_START_HEADINGS
+            )
         except ValueError as error:
             print(f"session: {error}", file=sys.stderr)
             return 1
