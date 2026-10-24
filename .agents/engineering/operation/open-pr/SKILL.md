@@ -175,7 +175,15 @@ When the canonical goal has a fenced `completion` record, retain every unchecked
 PR's repository, number, full head SHA, task text, owner, and next action. Keep those entries until a fresh
 completion check observes the task resolved.
 
-Print the PR URL. Opening a draft is not a context boundary: continue implementing, reviewing, or observing
+Include a clickable PR URL in the same user-facing message whenever reporting a created or updated PR
+or requesting its review, approval or merge, even when the link appeared earlier or in tool output.
+Use a Markdown link in rich chat and a plain URL in terminals, outside code formatting.
+
+```text
+Ready for your approval: [PR #123](https://github.com/owner/repo/pull/123).
+```
+
+Opening a draft is not a context boundary: continue implementing, reviewing, or observing
 the candidate when the current authorization and context still cover that work. If landing is genuinely next,
 `engineering:merge` owns it. Update a plan only if PR creation is part of a material ownership handoff or
 context-ending state; never merely because this procedure reported.
