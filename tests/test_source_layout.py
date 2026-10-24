@@ -364,6 +364,31 @@ class SourceLayoutTests(unittest.TestCase):
                 "never make\nmanual `/cd` the normal transfer path", normalized
             )
 
+    def test_codex_sync_plugins_routes_fresh_session_adoption_through_handoff(self):
+        _, output, _, _ = SYNC.build(self.root)
+        description = (
+            "description: Refresh this CLI's tj-agents plugins and use the host's "
+            "supported session-adoption path when updated instructions must take effect."
+        )
+        sources = [
+            self.root / ".agents/machine/utility/sync-plugins/SKILL.md",
+            self.root / ".codex/skills/sync-plugins/SKILL.md",
+            self.root / ".claude/skills/sync-plugins/SKILL.md",
+        ]
+        generated = output["plugins/machine/codex-skills/sync-plugins/SKILL.md"].decode("utf-8")
+        for source in sources:
+            body = source.read_text(encoding="utf-8")
+            self.assertIn(description, body)
+            self.assertNotIn("into the running session", body)
+
+        codex_source = sources[1].read_text(encoding="utf-8")
+        for body in (codex_source, generated):
+            self.assertIn("`workflow:handoff`", body)
+            self.assertIn("`machine:handoff-codex`", body)
+            self.assertIn("exactly one fresh Codex session", body)
+            self.assertNotIn("ask the user to exit", body)
+            self.assertNotIn("codex resume <this-session-id>", body)
+
     def test_fresh_selection_must_match_marketplace_policy(self):
         path = self.root / ".agents/plugins/manifests/codex/marketplace.json"
         marketplace = json.loads(path.read_text(encoding="utf-8"))
