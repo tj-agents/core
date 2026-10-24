@@ -251,6 +251,7 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(self.wake()["launches"], 2)
 
     def test_required_review_wait_stays_silent_then_merge_finishes_post_merge_work(self):
+        self.init("--max-launches", "2")
         self.binding("COMPLETED", "SUCCESS")
         observation = json.loads((self.root / "observation.json").read_text())
         observation.update(reviewDecision="REVIEW_REQUIRED", autoMergeRequest={"enabledAt": "2026-10-24"})
@@ -265,6 +266,9 @@ class ContinuationTests(unittest.TestCase):
         for _ in range(2):
             self.assertEqual(self.wake()["launches"], 1)
         observation = json.loads((self.root / "observation.json").read_text())
+        observation["reviewDecision"] = "APPROVED"
+        (self.root / "observation.json").write_text(json.dumps(observation))
+        self.assertEqual(self.wake()["launches"], 1)
         observation["state"] = "MERGED"
         observation["statusCheckRollup"] = [{"name": "CI", "status": "IN_PROGRESS"}]
         (self.root / "observation.json").write_text(json.dumps(observation))

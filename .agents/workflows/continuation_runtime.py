@@ -469,7 +469,10 @@ def wake(path, state, args):
     state["foreground"] = None
     binding = check_identity(state)
     evidence = observe(state, binding, args.observer_command)
-    token = fingerprint(evidence)
+    stable_evidence = dict(evidence)
+    if evidence.get("auto_merge") and evidence.get("review_decision") in {"REVIEW_REQUIRED", "APPROVED"}:
+        stable_evidence["review_decision"] = "AUTO_MERGE_READY"
+    token = fingerprint(stable_evidence)
     retry = state.pop("retry", False)
     if evidence["kind"] == "pending" or (token == state.get("evidence") and not retry):
         transition(state, "waiting", "evidence-pending-or-unchanged", state["next_action"])
