@@ -254,9 +254,11 @@ def powershell_block(python: str, script: Path, loader: Path | None, newline: st
             f"    $tjAgentsTarget = Get-Command {name} -CommandType Application, ExternalScript"
             " -ErrorAction SilentlyContinue | Select-Object -First 1",
             f"    if (-not $tjAgentsTarget) {{ Write-Error '{name} was not found on PATH'; return }}",
-            f"    if (Test-Path -LiteralPath {quoted(python)}) {{ try {{ $env:{launch_check.HOST_VARIABLE} = '{name}';"
-            f" & {quoted(python)} -I -B {quoted(script)} }} finally {{"
-            f" Remove-Item Env:{launch_check.HOST_VARIABLE} -ErrorAction SilentlyContinue }} }}",
+            f"    if (-not (Test-Path -LiteralPath {quoted(python)})) {{ Write-Error 'Standards verifier Python is unavailable'; $global:LASTEXITCODE = 1; return }}",
+            f"    try {{ $env:{launch_check.HOST_VARIABLE} = '{name}';"
+            f" & {quoted(python)} -I -B {quoted(script)} --host {name} --target $tjAgentsTarget.Source -- @args }}"
+            f" finally {{ Remove-Item Env:{launch_check.HOST_VARIABLE} -ErrorAction SilentlyContinue }}",
+            "    if ($LASTEXITCODE -ne 0) { return }",
             "    & $tjAgentsTarget.Source @args",
             "}",
         ]
@@ -268,8 +270,8 @@ def posix_block(python: str, script: Path) -> str:
         return "'" + str(value).replace("'", "'\\''") + "'"
 
     return "\n".join([PROFILE_START, *(
-        f'{name}() {{ [ -x {quoted(python)} ] && {launch_check.HOST_VARIABLE}={name} {quoted(python)} -I -B {quoted(script)};'
-        f' command {name} "$@"; }}'
+        f'{name}() {{ [ -x {quoted(python)} ] || {{ printf "%s\\n" "Standards verifier Python is unavailable" >&2; return 1; }}; '
+        f'{launch_check.HOST_VARIABLE}={name} {quoted(python)} -I -B {quoted(script)} --host {name} --target "$(command -v {name})" -- "$@" || return $?; command {name} "$@"; }}'
         for name in HOSTS), PROFILE_END])
 
 
@@ -1114,8 +1116,14 @@ def main(argv: list[str] | None = None) -> int:
         return delegated
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="report drift, write nothing, exit 1 on drift")
+    parser.add_argument("--step", action="append", choices=[step.name for step in STEPS],
+                        help="run named steps with their dependencies and required preconditions; repeat to select several")
     parsed = parser.parse_args(arguments)
-    return run_steps(STEPS, machine_context(checkout), parsed.check)
+    selected = set(parsed.step or ())
+    if "shell profiles" in selected:
+        selected.add("launch-check runtime")
+    steps = tuple(step for step in STEPS if not selected or step.required or step.name in selected)
+    return run_steps(steps, machine_context(checkout), parsed.check)
 
 
 if __name__ == "__main__":

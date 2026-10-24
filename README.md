@@ -211,7 +211,16 @@ Run once per machine. Rerunning setup converges on the same channel and launch c
 ./setup.sh           # Linux (bash and python3)
 ```
 
-It enables Claude's native auto-update, copies the launch-check runtime to `~/.agents-state/bin` and
+Repeat `--step` to select existing setup steps for a scoped repair. They retain their declared order
+and always include required preconditions. Selecting shell profiles also includes their launch-check
+runtime dependency. `--check` inspects that same selection without applying it:
+
+```text
+./setup.ps1 --check --step "launch-check runtime" --step "shell profiles"  # Windows
+./setup.sh --check --step "launch-check runtime" --step "shell profiles"   # Linux
+```
+
+The full setup enables Claude's native auto-update, copies the launch-check runtime to `~/.agents-state/bin` and
 adds `claude` and `codex` functions to the PowerShell profiles (and `~/.bashrc` or `~/.zshrc` on
 Linux) inside one marked block, keeping a `.pre-launch-check.bak` copy. It removes the retired CLI
 launchers, the machine event listener task or systemd service, and the former hourly plugin-autoupdate
@@ -219,12 +228,32 @@ and merge-gates tasks or cron entries. Nothing runs in the background.
 
 Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: one non-blocking ntfy.sh
 poll for events since the saved cursor; offline it starts anyway. Events name the publishing repositories.
+
+Repository-required standards are a separate, blocking check. Before starting the native host,
+the shell and handoff launchers compare every identity in `.agents/plugins.json` with that host's
+enabled native installations for the exact project. A missing, disabled, broken or wrong-project
+installation refuses the launch with the required identities. An unavailable verifier also refuses
+the launch. This does not depend on a Python, .NET or other stack-specific route, and another host's
+cached files are insufficient. The write router repeats admission before discovering plugin routes,
+so a missing plugin cannot silently remove its own standards from enforcement. Read-only diagnosis
+remains available. Offline optional update polling does not invalidate already verified installations.
+
+Claude inventory receives launch-specific settings, setting sources and plugin paths. Codex's native
+inventory does not apply session activation overrides, so selected repositories refuse CLI profile,
+feature and non-model configuration overrides that cannot be verified. Persist those settings in the
+repository configuration instead. Model and reasoning overrides remain available; help, version and
+native maintenance commands remain available to repair an installation.
+
+For example, selecting `example@tj-agents` while it is absent from Codex's inventory prevents a
+Codex launch and file writes even if its `tier.json` and routes are entirely missing. Repair the
+selection/install and start a fresh session; copying a Claude cache directory does not satisfy it.
+
 A GitHub query per repository reads its head and each plugin directory's tree into `~/.agents-state/plugin-heads.json`,
 both hosts update in parallel, and the cursor advances once both succeed. A failed host retries on the next
 launch; a cursor older than ntfy's retention compares every publisher instead. Every launch except `codex` then compares
 this project's Claude installs with the recorded heads from local files only, and updates an install only
-when its plugin directory differs at the head; a plain launch does not retry an update that did not reach
-the head. Codex re-adds a plugin only when its directory changed. Without GitHub content, both compare commits.
+when its plugin directory differs at the head; a plain launch tries each install at most once per head,
+and any publish retries it. Codex re-adds a plugin only when its directory changed. Without GitHub content, both compare commits.
 `machine:sync-plugins` runs the same check in a running session.
 
 Main-branch callers publish events through the shared
