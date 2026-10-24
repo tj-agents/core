@@ -250,6 +250,48 @@ class ContinuationTests(unittest.TestCase):
         self.assertTrue(Path(final["last_result"]).exists())
         self.assertEqual(self.wake()["launches"], 2)
 
+    def test_required_review_wait_stays_silent_then_merge_finishes_post_merge_work(self):
+        self.binding("COMPLETED", "SUCCESS")
+        observation = json.loads((self.root / "observation.json").read_text())
+        observation.update(reviewDecision="REVIEW_REQUIRED", autoMergeRequest={"enabledAt": "2026-10-24"})
+        (self.root / "observation.json").write_text(json.dumps(observation))
+        self.fixture("complete", receipt={
+            "state": "waiting", "reason": "auto-merge-awaiting-review",
+            "next_action": "Observe merge, then verify publication and cleanup",
+        })
+        waiting = self.wake()
+        self.assertEqual(waiting["state"], "waiting")
+        self.assertEqual(waiting["launches"], 1)
+        for _ in range(2):
+            self.assertEqual(self.wake()["launches"], 1)
+        observation = json.loads((self.root / "observation.json").read_text())
+        observation["state"] = "MERGED"
+        observation["statusCheckRollup"] = [{"name": "CI", "status": "IN_PROGRESS"}]
+        (self.root / "observation.json").write_text(json.dumps(observation))
+        self.fixture("post-merge")
+        final = self.wake()
+        self.assertEqual(final["state"], "complete")
+        self.assertEqual(final["launches"], 2)
+        self.assertEqual((self.root / "post-merge-completed").read_text(), final["head"])
+        self.assertEqual(self.wake()["launches"], 2)
+
+    def test_review_rejection_wakes_the_waiting_owner_once(self):
+        self.binding("COMPLETED", "SUCCESS")
+        self.fixture("complete", receipt={
+            "state": "waiting", "reason": "auto-merge-awaiting-review",
+            "next_action": "Observe the required review and merge",
+        })
+        self.assertEqual(self.wake()["launches"], 1)
+        self.assertEqual(self.wake()["launches"], 1)
+        observation = json.loads((self.root / "observation.json").read_text())
+        observation["reviewDecision"] = "CHANGES_REQUESTED"
+        (self.root / "observation.json").write_text(json.dumps(observation))
+        self.fixture("gate")
+        rejected = self.wake()
+        self.assertEqual(rejected["state"], "blocked")
+        self.assertEqual(rejected["launches"], 2)
+        self.assertEqual(self.wake()["launches"], 2)
+
     def test_real_child_supervisor_boundary_suppresses_bytecode_without_ambient_env(self):
         pycache = WORKFLOWS / "__pycache__"
         if pycache.exists():

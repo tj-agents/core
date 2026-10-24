@@ -176,6 +176,12 @@ process, hook, or ordinary model turn provides persistence.
 
 Persistent delivery may implement, test, commit, push, diagnose exact-head CI, and obtain the required review.
 It must not merge, enable auto-merge, approve, deploy, delete, or widen scope without the recorded authority.
+An authorized auto-merge request awaiting GitHub's required review stays `waiting`, with its binding and
+scheduled owner intact. The user approves in GitHub; approval alone requires no agent turn. A merge
+observation wakes the same owner to finish the authorized post-merge steps. Report the approval link once;
+do not ask the user to announce approval. A rejected review, changed head, explicit hold or missing task
+authorization retains its existing repair or human-gate behavior.
+
 A merge authorization never covers publishing: releasing to a package feed stays an explicit human call
 whatever the standing instruction says about merging.
 The ordinary review/merge skills remain authoritative. Keep one monitor and one read per wake. Launch
