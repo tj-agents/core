@@ -1,0 +1,7 @@
+{
+  "agents_may_merge": false,
+  "required_checks": [
+    "ci-required"
+  ],
+  "ci_pushes_default_branch": true
+}
