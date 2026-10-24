@@ -366,9 +366,23 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_codex_sync_plugins_routes_fresh_session_adoption_through_handoff(self):
         _, output, _, _ = SYNC.build(self.root)
-        source = self.root / ".codex/skills/sync-plugins/SKILL.md"
+        description = (
+            "description: Refresh this CLI's tj-agents plugins and use the host's "
+            "supported session-adoption path when updated instructions must take effect."
+        )
+        sources = [
+            self.root / ".agents/machine/utility/sync-plugins/SKILL.md",
+            self.root / ".codex/skills/sync-plugins/SKILL.md",
+            self.root / ".claude/skills/sync-plugins/SKILL.md",
+        ]
         generated = output["plugins/machine/codex-skills/sync-plugins/SKILL.md"].decode("utf-8")
-        for body in (source.read_text(encoding="utf-8"), generated):
+        for source in sources:
+            body = source.read_text(encoding="utf-8")
+            self.assertIn(description, body)
+            self.assertNotIn("into the running session", body)
+
+        codex_source = sources[1].read_text(encoding="utf-8")
+        for body in (codex_source, generated):
             self.assertIn("`workflow:handoff`", body)
             self.assertIn("`machine:handoff-codex`", body)
             self.assertIn("exactly one fresh Codex session", body)

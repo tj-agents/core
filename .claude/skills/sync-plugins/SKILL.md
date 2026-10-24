@@ -1,6 +1,6 @@
 ---
 name: sync-plugins
-description: Bring this CLI's tj-agents plugins up to date and into the running session. Run it yourself, without asking, whenever plugins look outdated - a skill or hook is missing or behaves like an older version, or a plugin PR just merged - or when asked to sync, reload, refresh or update the plugins.
+description: Refresh this CLI's tj-agents plugins and use the host's supported session-adoption path when updated instructions must take effect. Run it yourself, without asking, whenever plugins look outdated - a skill or hook is missing or behaves like an older version, or a plugin PR just merged - or when asked to sync, reload, refresh or update the plugins.
 kind: utility
 domain: machine
 ---
