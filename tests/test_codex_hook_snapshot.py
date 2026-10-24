@@ -125,7 +125,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
                 'nested/a.txt': 'café\r\n'.encode('utf-8'),
                 'nested/Z.bin': b'\xff\x00\r\n',
                 'A.txt': b'first\r\nsecond\rthird\n',
-                'catalog/catalog.json': b'catalog\r\n',
+                'packages.json': b'packages\r\n',
                 'hooks/codex.json': b'excluded bytes',
             }
             for relative, content in files.items():
@@ -133,7 +133,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(content)
             (root / 'empty directory').mkdir()
-            self.assertEqual('sha256:4cae22b1da621db254dd6f8cae7c0e630f64de733ba21a92b739f5173f54cb5d',
+            self.assertEqual('sha256:715761a505223d396f3e9ed670ed8ace017904acdcf4b7eadfb9ab8b787d617e',
                              SNAPSHOT.digest_tree(root, 'base'))
             self.assertEqual('sha256:31d98d8abb3e0ea352cb87114db6c920bea86ade05e9ac72c6be9b1177789254',
                              SNAPSHOT.digest_tree(root, 'machine'))
@@ -150,7 +150,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             for relative, target in [('file-link', target_file),
                                      ('directory-link', target_directory),
                                      ('hooks/codex.json', target_file),
-                                     ('catalog/catalog.json', target_file)]:
+                                     ('packages.json', target_file)]:
                 with self.subTest(relative=relative):
                     link = root / relative
                     link.parent.mkdir(parents=True, exist_ok=True)

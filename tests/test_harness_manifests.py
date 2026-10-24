@@ -1,4 +1,4 @@
-"""Package harness declarations stay consistent with the catalog and hook wiring."""
+"""Package harness declarations stay consistent with the records and hook wiring."""
 
 from copy import deepcopy
 import importlib.util
@@ -46,12 +46,12 @@ foreach ($document in $documents) {{
 
 
 class HarnessManifestTests(unittest.TestCase):
-    def test_core_manifests_are_current_and_catalog_is_core_only(self):
+    def test_core_manifests_are_current_and_records_are_core_only(self):
         manifests = HARNESS.synchronize(ROOT, check=True)
         self.assertEqual({"agent-store", "base", "engineering", "machine", "workflow"}, set(manifests))
-        catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
-        self.assertEqual({"tj-agents/core"}, {package["owner_repository"] for package in catalog["packages"]})
-        for package in catalog["packages"]:
+        records = json.loads(HARNESS.PACKAGES.build(ROOT)[1]["plugins/packages.json"])
+        self.assertEqual({"tj-agents/core"}, {package["owner_repository"] for package in records["packages"]})
+        for package in records["packages"]:
             self.assertEqual(manifests[package["name"]]["requires"], package["harness"])
 
     def test_additional_roots_require_canonical_owned_shipped_resources(self):
@@ -62,12 +62,12 @@ class HarnessManifestTests(unittest.TestCase):
             original = json.loads(path.read_text(encoding="utf-8"))
             HARNESS.synchronize(root, check=True)
             for roots in (
-                [".agents/catalog/catalog.schema.json"],
-                [".agents/machine", ".agents/catalog/catalog.schema.json"],
+                [".agents/schemas/packages.schema.json"],
+                [".agents/machine", ".agents/schemas/standards-context.schema.json"],
                 [".agents/machine", ".agents/machine"],
                 [".agents/lanes", ".agents/machine", ".agents/workflows"],
-                [".agents/catalog/missing.json", ".agents/machine"],
-                [".agents/catalog/../catalog/catalog.schema.json", ".agents/machine"],
+                [".agents/schemas/missing.json", ".agents/machine"],
+                [".agents/schemas/../schemas/packages.schema.json", ".agents/machine"],
                 ["../outside", ".agents/machine"],
             ):
                 with self.subTest(roots=roots):
@@ -107,7 +107,6 @@ class HarnessManifestTests(unittest.TestCase):
             )
 
     def test_wildcard_script_paths_in_claude_permissions_are_rejected(self):
-        catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
         config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
         original = json.loads((ROOT / ".agents/plugins/harness/machine.json").read_text(encoding="utf-8"))["requires"]
         for command in (
@@ -118,18 +117,17 @@ class HarnessManifestTests(unittest.TestCase):
                 requires = json.loads(json.dumps(original))
                 requires["permissions"]["claude_allow"] = [command]
                 with self.assertRaisesRegex(ValueError, "wildcard script path"):
-                    HARNESS.validate_requires(ROOT, config, catalog, "machine", requires)
+                    HARNESS.validate_requires(ROOT, config, "machine", requires)
 
     def test_foreign_marketplace_owner_is_rejected(self):
-        catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
         config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
         requires = json.loads((ROOT / ".agents/plugins/harness/base.json").read_text(encoding="utf-8"))["requires"]
         requires["marketplaces"][0]["repository"] = "another-org/core"
-        with self.assertRaisesRegex(ValueError, "disagrees with catalog"):
-            HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
+        with self.assertRaisesRegex(ValueError, "disagree with source map"):
+            HARNESS.validate_requires(ROOT, config, "base", requires)
         requires["marketplaces"][0]["repository"] = "tj-agents/core"
-        with self.assertRaisesRegex(ValueError, "disagrees with catalog"):
-            HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
+        with self.assertRaisesRegex(ValueError, "disagree with source map"):
+            HARNESS.validate_requires(ROOT, config, "base", requires)
 
     def test_core_marketplace_identity_matches_plugin_selection(self):
         import plugin_selection

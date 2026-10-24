@@ -362,11 +362,11 @@ class RepoConfigTests(unittest.TestCase):
 
     def test_untracked_bracket_output_does_not_match_different_indexed_path(self):
         self.git("init", "--quiet")
-        tracked = self.root / ".agents/catalog/catalog.json"
+        tracked = self.root / "plugins/packages.json"
         tracked.parent.mkdir()
         tracked.write_text("tracked", encoding="utf-8")
         self.git("add", tracked.relative_to(self.root).as_posix())
-        prospective = tracked.with_name("catalo[g].json")
+        prospective = tracked.with_name("package[s].json")
         targets = repo_config.plan(self.lock, root=self.root, scope="local", prospective_paths=[prospective])
         repo_config.write_batch({path: expected for path, expected in targets.items() if repo_config.text_at(path) != expected})
         self.assertEqual("tracked", tracked.read_text(encoding="utf-8"))
@@ -376,12 +376,12 @@ class RepoConfigTests(unittest.TestCase):
 
     def test_exact_indexed_bracket_output_is_rejected_without_writes(self):
         self.git("init", "--quiet")
-        prospective = self.root / ".agents/catalog/catalo[g].json"
+        prospective = self.root / "plugins/package[s].json"
         prospective.parent.mkdir()
         prospective.write_text("tracked", encoding="utf-8")
         self.git("--literal-pathspecs", "add", prospective.relative_to(self.root).as_posix())
         before = self.snapshot_files()
-        with self.assertRaisesRegex(repo_config.lock_io.LockError, r"tracked.*catalo\[g\]\.json"):
+        with self.assertRaisesRegex(repo_config.lock_io.LockError, r"tracked.*package\[s\]\.json"):
             targets = repo_config.plan(self.lock, root=self.root, scope="local", prospective_paths=[prospective])
             repo_config.write_batch({path: expected for path, expected in targets.items() if repo_config.text_at(path) != expected})
         self.assertEqual(before, self.snapshot_files())
