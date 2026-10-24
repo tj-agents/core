@@ -151,7 +151,7 @@ def apply(envelopes: list[dict], cursor: dict, path: Path, project: Path, update
     scopes = [repositories for repositories in work.values() if repositories]
     named = ", ".join(sorted(set().union(*scopes))) if scopes else "a full comparison"
     if failed:
-        print(f"plugins: {', '.join(failed)} update from {named} failed; a later check retries it", file=sys.stderr)
+        print(f"plugins: {', '.join(failed)} update from {named} failed", file=sys.stderr)
         return "failed"
     print(f"plugins: updated from {named}", file=sys.stderr)
     return "updated"

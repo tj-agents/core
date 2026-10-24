@@ -120,8 +120,8 @@ diagnose, repair and focused verification loop. Do not weaken a check merely to 
 ## Finish the session
 
 Before returning a completed outcome, select `machine:close` and apply its completion decision. It owns
-the final-action ordering, keep-open requests and terminal closure. A new mistake callout returns to
-the callout decision above before completion is reassessed.
+the final-action ordering, keep-open requests and terminal closure. A new mistake callout is answered
+and corrected first; completion is then reassessed.
 
 ```text
 Delivery and validation complete, no owned wait: apply machine:close before the final reply.
