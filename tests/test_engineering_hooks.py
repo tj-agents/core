@@ -100,6 +100,21 @@ class PackagedEngineeringHooks(unittest.TestCase):
             hook["args"],
         )
 
+    def test_manifest_dispatches_prompt_context_to_claude(self):
+        manifest = json.loads(
+            (ROOT / ".agents/plugins/manifests/claude/engineering-hooks.json").read_text(encoding="utf-8")
+        )
+        registrations = manifest["hooks"]["UserPromptSubmit"]
+        self.assertEqual(1, len(registrations))
+        self.assertEqual(1, len(registrations[0]["hooks"]))
+        hook = registrations[0]["hooks"][0]
+        self.assertEqual(
+            ["-B", "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py", "--deadline", "10", "--hook",
+             "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py",
+             "--prompt-context"],
+            hook["args"],
+        )
+
     def test_missing_context_contract_is_an_actionable_error(self):
         contract = self.package / ".agents/engineering/policy/session/SKILL.md"
         contract.unlink()
@@ -234,9 +249,12 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertIn("source SHA-256", context)
                 self.assertIn(expected, context)
                 self.assertTrue(context.split("\n\n", 1)[1].startswith(expected))
+                self.assertIn("machine:close", context)
+                self.assertIn("Nothing owned left to do before this reply?", context)
                 self.assertIn("auto_approve_design=false", context)
                 self.assertNotIn("## A link to another skill is a stage pointer", context)
                 self.assertNotIn("## Keep large changes reviewable", context)
+                self.assertNotIn("## Finish the session", context)
                 self.assertLess(len(context), 4000)
 
         before = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
