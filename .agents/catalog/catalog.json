@@ -694,7 +694,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:50fb1c5503167731702e11eb22abd541ebb70e44f4d456975c3ae0478a3a6b48",
+      "digest": "sha256:da111191d6b51e9d497da033c6031bc8cca5201f3589c4a60432789235aa678e",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -713,6 +713,13 @@
         "hooks": [
           {
             "path": ".agents/agent-store/runtime/session_store.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/machine/utility/close/scripts/close_landed.py",
             "hosts": [
               "claude",
               "codex"
