@@ -46,6 +46,9 @@ Planning-only work selects `workflow:plan` and does not authorize implementation
 A question or review request alone grants no implementation authority. A status question during already
 authorized execution should be answered before that execution continues.
 
+Creating a PR or editing its description enters `engineering:open-pr` before the forge write; use its
+proposed-body validation and authoritative readback for CLI and connector writes.
+
 Use `machine:lanes` to match substantive work to suitable capability. Reuse its loaded contract;
 routine commands and phase labels do not require another read or lane rationale. Keep cheap leaf lanes
 for clerical work and delegate useful batches under that contract. Reconsider the

@@ -1,12 +1,37 @@
 ---
 name: open-pr
-description: Open or update the review that owns the resolved delivery slice, integrating corrections from other branches before publication. Use when opening a PR, publishing a correction, or showing the corrected review.
+description: Create or edit a pull request with explicit nonempty Why and What sections, validating the proposed body before the forge write and the saved body afterward. Use before any PR creation or description edit through a CLI or connector, publishing a correction, or showing the corrected review.
 
 kind: operation
 domain: process
 ---
 
 # Opening a pull request
+
+## Validate the body before writing
+
+Every new or edited PR description has explicit, nonempty **Why** and **What** sections. Explain the
+problem or missing behavior under Why and the concrete resulting change under What. Use Markdown
+headings, or `**Why:**` and `**What:**` paragraphs for a small change. Unlabelled prose does not satisfy
+this contract, even when it discusses the reason and change.
+
+Prepare the complete body in a UTF-8 file and run the packaged `workflows/pr_body.py` validator before
+any CLI or connector mutation. Resolve the package root from this skill, not a guessed checkout path.
+Use `python` on Windows and `python3` on Linux/macOS:
+
+```text
+python -B <engineering-package>/workflows/pr_body.py --body-file <proposed-body-file>
+# {"valid": true, "errors": []} permits the write; a nonzero exit leaves it pending.
+```
+
+Read the authoritative saved body and run Step 6's `pr-body-check` after the write, before binding,
+marking ready or reporting the PR. Preserve attribution and existing scope. A connector's successful
+write response alone is not body validation. Reuse the same validator for both hosts and both write paths.
+
+Selected Engineering hooks enforce this contract for recognized `gh pr create/new/edit` commands and
+direct GitHub MCP create/update calls. They do not inspect a connector hidden inside an orchestration
+tool that emits no corresponding hook event; the preflight and authoritative readback still apply there.
+The PR-write registration excludes merge commands and changes no merge authorization.
 
 Resolve the work and its owning review under `engineering:git-branching`. **During implementation, open a draft PR at the first stable
 candidate that needs remote validation**; later stable candidates within that slice push to the same
@@ -26,7 +51,8 @@ once review and exact-head CI are green — and marking it ready is still not me
   the next commit and are not worth mentioning. Only uncommitted **code** means the PR would ship incomplete.
 - **Keep whatever attribution the harness and the repository mandate** — a commit trailer, a PR-body footer,
   or both. Never strip one to tidy the body.
-- **Use the forge's own CLI and nothing else.** Where a machine also carries an issue-tracker-linked PR
+- **Use the repository's forge connector or native CLI.** Apply the same body preflight and saved-body
+  validation to both. Where a machine also carries an issue-tracker-linked PR
   procedure for a *different* organisation, that procedure is not this one and none of it — work-item links,
   board transitions, assignees — carries across. The user's own instructions say which repositories are
   which; this doc does not guess.
@@ -95,8 +121,7 @@ Push only when the delivery branch has no upstream or has unpublished commits.
   - <a non-default end-to-end tier and why; a version-sync consequence if publishable source changed>
   ```
 
-  Every body requires nonempty What and Why sections. A small change collapses to two paragraphs,
-  `**What:** <change>` then `**Why:** <reason>`, with no headings. Drop optional sections with nothing
+  A small change uses the labelled paragraphs defined above. Drop optional sections with nothing
   to say. State what was verified and what was not; never claim an unobserved result. A visible
   UI change attaches screenshots per `engineering:pr-screenshots`. Keep the mandated attribution footer.
 
