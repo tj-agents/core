@@ -23,7 +23,7 @@ from terminal_command import command_for_target, without_binding_state
 
 PEER_SCRIPTS = Path(__file__).resolve().parent.parent / "utility/peer-cli/scripts"
 if not PEER_SCRIPTS.is_dir():
-    PEER_SCRIPTS = Path(__file__).resolve().parents[2] / ".agents/machine/utility/peer-cli/scripts"
+    PEER_SCRIPTS = Path(__file__).resolve().parents[3] / ".agents/machine/utility/peer-cli/scripts"
 sys.path.insert(0, str(PEER_SCRIPTS))
 import register_session
 
