@@ -356,7 +356,11 @@ class RefreshTests(unittest.TestCase):
         (cache / 'hooks' / 'codex_hook_snapshot.py').write_text("raise SystemExit('new loader')\n", encoding='utf-8')
         (cache / 'hooks' / 'hook_runtime.py').write_text("raise SystemExit('new hooks')\n", encoding='utf-8')
         data = Path(os.environ['CODEX_HOME']) / 'plugins' / 'data' / 'base-tj-agents'
-        result = subprocess.run(command, shell=True, cwd=ROOT, env=dict(os.environ, PLUGIN_DATA=str(data)),
+        environment = dict(os.environ, PLUGIN_DATA=str(data), TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY="",
+                           HOME=os.environ['CODEX_HOME'], USERPROFILE=os.environ['CODEX_HOME'],
+                           PLUGIN_ROOT=str(cache), CODEX_PLUGIN_ROOT=str(cache), CLAUDE_PLUGIN_ROOT="")
+        result = subprocess.run(command, shell=True, cwd=Path(os.environ['CODEX_HOME']),
+                                env=environment,
                                 stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
 
         self.assertEqual(0, result.returncode, result.stderr)

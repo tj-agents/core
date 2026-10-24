@@ -70,6 +70,13 @@ A bare `--plugin <name>` selects from `tj-agents`. Add a foreign plugin with
 `--plugin concertable@agents --marketplace agents=Concertable/agents`. Subsequent adoption preserves
 existing foreign marketplaces and selections. Every selected approved publisher follows `main`.
 
+Adoption also moves existing selections from retired individual `tj-agents` publisher marketplaces
+to the shared marketplace, using the shipped roster's known plugin names. It removes the retired
+declarations from both host settings in the same write; it keeps foreign publishers and never adds
+Personal implicitly. Unknown replacements fail explicitly. For example, an existing
+`python@python-agents` selection becomes `python@tj-agents`; the same rule applies to every known
+plugin rather than treating Python specially. Run preview, write, then check to migrate once.
+
 ## Generate settings from an existing selection
 
 ```powershell
