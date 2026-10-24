@@ -113,6 +113,40 @@ class HookTrustTests(unittest.TestCase):
         self.assertEqual({}, self.updates(self.hook))
 
     @patch.object(TRUST, "run")
+    def test_git_subdir_uses_published_objects_and_preserves_native_composite_hash(self, runner):
+        self.plugin["source"] = {"source": "git-subdir", "url": "https://github.com/tj-agents/core.git",
+                                 "path": "plugins/base", "ref": "main"}
+        self.hook["currentHash"] += "/sha256:" + "b" * 64
+        runner.side_effect = lambda args, cwd: "c" * 40 if "rev-parse" in args else ""
+        self.assertEqual({self.hook["key"]: {"trusted_hash": self.hook["currentHash"]}}, self.updates(self.hook))
+        TRUST.committed_files.assert_called_once()
+        self.assertEqual(("c" * 40, "plugins/base", self.cwd), TRUST.committed_files.call_args.args[1:])
+        fetch = next(call.args[0] for call in runner.call_args_list if "fetch" in call.args[0])
+        self.assertEqual(["https://github.com/tj-agents/core.git", "main"], fetch[-2:])
+        (self.cache / "hooks/context.py").write_text('print("changed")\n')
+        with self.assertRaisesRegex(RuntimeError, "differs from its Git source"):
+            self.updates(self.hook)
+
+    @patch.object(TRUST, "run")
+    def test_git_subdir_rejects_untrusted_publishers_paths_and_revisions(self, runner):
+        source = {"source": "git-subdir", "url": "https://github.com/tj-agents/core.git",
+                  "path": "plugins/base", "ref": "main"}
+        for changes in ({"url": "https://github.com/other/core.git"}, {"path": "../base"},
+                        {"path": "/base"}, {"path": "C:\\base"}, {"ref": "--upload-pack=other"}):
+            self.plugin["source"] = dict(source, **changes)
+            with self.subTest(changes=changes), self.assertRaisesRegex(RuntimeError, "Invalid published"):
+                self.updates(self.hook)
+        runner.assert_not_called()
+
+    @patch.object(TRUST, "run")
+    def test_rejects_malformed_native_hashes(self, runner):
+        runner.side_effect = self.git_result
+        for value in ("sha256:" + "a" * 63, "sha256:" + "a" * 64 + "/other", "/".join(["sha256:" + "a" * 64] * 3)):
+            self.hook["currentHash"] = value
+            with self.subTest(value=value), self.assertRaisesRegex(RuntimeError, "Invalid native hook"):
+                self.updates(self.hook)
+
+    @patch.object(TRUST, "run")
     def test_rejects_changed_source(self, runner):
         runner.side_effect = lambda args, cwd: " M source/hooks/context.py" if "status" in args else self.git_result(args, cwd)
         with self.assertRaisesRegex(RuntimeError, "local changes"):
