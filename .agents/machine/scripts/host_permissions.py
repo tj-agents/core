@@ -5,7 +5,10 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tomllib
 
 
@@ -82,6 +85,51 @@ def codex_settings(text: str, mode: str) -> str:
     if tomllib.loads(result) != expected:
         raise ValueError("Cannot update Codex permission settings without changing unrelated configuration")
     return result
+
+
+def desktop_executables() -> list[Path]:
+    if os.name == "nt":
+        command = (
+            "$ErrorActionPreference = 'Stop'; "
+            "[Console]::OutputEncoding = [Text.UTF8Encoding]::new(); "
+            "Get-CimInstance Win32_Process -Filter \"Name = 'Codex.exe'\" | "
+            "Select-Object ProcessId,ExecutablePath | ConvertTo-Json -Compress"
+        )
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
+            capture_output=True, text=True, encoding="utf-8", check=True, timeout=15,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        rows = json.loads(result.stdout) if result.stdout.strip() else []
+        rows = [rows] if isinstance(rows, dict) else rows
+        if any(not row.get("ExecutablePath") for row in rows):
+            raise ValueError("Cannot verify that Codex Desktop is closed: a process path is unavailable")
+        return [Path(row["ExecutablePath"]) for row in rows]
+    if sys.platform == "linux":
+        paths = []
+        for process in Path("/proc").iterdir():
+            if not process.name.isdigit():
+                continue
+            try:
+                if (process / "comm").read_text(encoding="utf-8", errors="replace").strip().casefold() != "codex":
+                    continue
+                paths.append((process / "exe").resolve(strict=True))
+            except FileNotFoundError:
+                continue
+        return paths
+    result = subprocess.run(["ps", "-axo", "comm="], capture_output=True, text=True,
+                            encoding="utf-8", check=True, timeout=15)
+    return [Path(line.strip()) for line in result.stdout.splitlines()
+            if Path(line.strip()).name.casefold() == "codex"]
+
+
+def desktop_running(executables=None) -> bool:
+    try:
+        paths = desktop_executables() if executables is None else executables
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ValueError("Cannot verify that Codex Desktop is closed") from error
+    return any((path.parent / "resources/app.asar").is_file()
+               or (path.parent.parent / "Resources/app.asar").is_file() for path in paths)
 
 
 def codex_app_settings(text: str) -> str:
