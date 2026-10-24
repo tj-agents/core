@@ -403,6 +403,7 @@
     "engineering": []
   },
   "extended_host_adapters": [
+    "machine:background-listener",
     "engineering:persistent-workflow",
     "engineering:review",
     "machine:sync-plugins"
