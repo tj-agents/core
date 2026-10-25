@@ -61,7 +61,8 @@ class CodexHookSnapshotTests(unittest.TestCase):
             environment = dict(os.environ, PLUGIN_DATA=str(temporary / "data"),
                                AGENT_STATE_DIRECTORY=str(temporary / "state"),
                                TJ_AGENTS_STARTUP_ACK_DIRECTORY=str(temporary),
-                               TJ_AGENTS_STARTUP_ACK_TOKEN=token)
+                               TJ_AGENTS_STARTUP_ACK_TOKEN=token,
+                               TJ_AGENTS_STARTUP_REQUIRED_HOOKS=json.dumps(['machine@tj-agents']))
             result = subprocess.run(
                 command, shell=True, cwd=temporary, env=environment,
                 input=json.dumps({"hook_event_name": "SessionStart", "session_id": "fixture-session",

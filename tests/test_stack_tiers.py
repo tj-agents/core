@@ -58,6 +58,22 @@ def declaration(plugin, marketplace, data):
 
 
 class DeclarationDiscovery(unittest.TestCase):
+    def test_an_uncached_plugin_root_never_promotes_an_unrelated_ancestor_to_a_cache(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            plugin = home / 'scratch' / 'engineering'
+            plugin.mkdir(parents=True)
+            cache = home / '.codex/plugins/cache'
+            native = cache / 'tj-agents/base/local'
+            native.mkdir(parents=True)
+            cleared = {name: '' for name in (*gate.PLUGIN_ROOT_VARIABLES, 'CLAUDE_CONFIG_DIR', 'CODEX_HOME')}
+            with unittest.mock.patch.dict(os.environ, dict(cleared, PLUGIN_ROOT=str(plugin))), \
+                    unittest.mock.patch.object(gate.Path, 'home', return_value=home):
+                self.assertNotIn(plugin.parents[2], gate.cache_roots())
+            with unittest.mock.patch.dict(os.environ, dict(cleared, PLUGIN_ROOT=str(native))), \
+                    unittest.mock.patch.object(gate.Path, 'home', return_value=home):
+                self.assertEqual(cache.resolve(), gate.cache_roots()[0])
+
     def test_identity_comes_from_the_installed_path_not_the_declaration(self):
         with tempfile.TemporaryDirectory() as cache:
             payload = Path(cache) / "dotagents" / "dotnet" / "1.1.0"
@@ -354,7 +370,7 @@ class SessionStatement(TemporaryProject):
 class ShippedDeclarations(unittest.TestCase):
     def test_every_core_package_declares_itself_ubiquitous(self):
         names = sorted(path.stem for path in DECLARED.glob("*.json"))
-        self.assertEqual(names, ["agent", "agent-store", "base", "cli", "engineering", "machine", "workflow"])
+        self.assertEqual(names, ["base", "engineering", "machine", "workflow"])
         for path in DECLARED.glob("*.json"):
             data = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(data["schema_version"], 1)

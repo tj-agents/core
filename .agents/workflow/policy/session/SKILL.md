@@ -64,6 +64,24 @@ never grants permission to start implementation.
 
 ## Preserve one owner through completion
 
+Coordinate with another agent when its verified responsibility needs the information. Before sending,
+establish the exact recipient, its current responsibility from an owned goal, work-item binding or explicit
+assignment, and the concrete decision or action the message supports. Shared checkout, parent conversation,
+similar title and convenience do not establish that relationship. Unknown or irrelevant ownership keeps the
+information with the current task while ownership is reconciled. Existing task authority covers necessary
+coordination with a verified responsible recipient; do not add a confirmation step to every message.
+
+Correct a mistaken route in the original recipient's conversation by identifying and retracting the earlier
+assignment. That correction does not assign it the repair. Resolve the actual owner before routing work again.
+`machine:followup-codex` implements admission and delivery evidence for independent Codex sessions; native
+in-conversation messaging follows the same responsibility decision.
+
+```text
+The repair goal names session A as owner; session B shares its repository but owns a naming migration.
+Send repair evidence to A because it changes A's next diagnostic step. Keep B out of the repair.
+If an earlier message assigned B the repair, retract that assignment in B using its original delivery receipt.
+```
+
 When preparation or approved design has resolved the next action, enter that action through the owning
 lifecycle.
 
