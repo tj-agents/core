@@ -12,11 +12,10 @@ from __future__ import annotations
 import argparse
 import codecs
 from dataclasses import dataclass, field
-import hashlib
 import importlib.util
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import secrets
 import shlex
 import shutil
@@ -641,66 +640,38 @@ def runtime_source(context: Context) -> Path:
     return context.script_directory.parents[2] / ".agents" / "dependencies" / "agent"
 
 
+def runtime_delivery(source: Path):
+    path = source / ".agents" / "agent" / "runtime" / "runtime_delivery.py"
+    spec = importlib.util.spec_from_file_location("tj_agents_runtime_delivery", path)
+    if spec is None or spec.loader is None:
+        raise SetupError(f"the staged Agent runtime delivery helper is unavailable: {path}")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except (OSError, ImportError) as error:
+        raise SetupError(f"the staged Agent runtime delivery helper is unavailable: {path}") from error
+    return module
+
+
 def runtime_manifest(source: Path) -> dict:
     receipt = source / "source.json"
     try:
         value = json.loads(receipt.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
+        return runtime_delivery(source).validate_receipt(value, source)
+    except (OSError, ValueError, RuntimeError) as error:
         raise SetupError(f"missing or invalid staged Agent receipt: {receipt}") from error
-    if not isinstance(value, dict):
-        raise SetupError(f"invalid staged Agent receipt: {receipt}")
-    repository = value.get("repository")
-    revision = value.get("revision")
-    exports = value.get("exports")
-    digest = value.get("sha256")
-    if repository != "tj-agents/agent" or not isinstance(revision, str) or not revision \
-            or not isinstance(exports, list) or not exports or not all(isinstance(item, str) for item in exports) \
-            or not isinstance(digest, str):
-        raise SetupError(f"invalid staged Agent receipt: {receipt}")
-    if len(exports) != len(set(exports)) or not all(item.startswith(".agents/") and "\\" not in item
-                                                   and not PurePosixPath(item).is_absolute()
-                                                   and ".." not in PurePosixPath(item).parts for item in exports) \
-            or len(digest) != 64 or not all(character in "0123456789abcdef" for character in digest):
-        raise SetupError(f"invalid staged Agent receipt: {receipt}")
-    return value
-
-
-def runtime_digest(source: Path, files: list[Path]) -> str:
-    value = hashlib.sha256()
-    for relative in sorted(files, key=lambda path: path.as_posix()):
-        if relative == Path("source.json"):
-            continue
-        body = (source / relative).read_bytes()
-        name = relative.as_posix().encode("utf-8")
-        value.update(name + b"\0" + str(len(body)).encode("ascii") + b"\0" + body)
-    return value.hexdigest()
 
 
 def runtime_files(source: Path) -> list[Path]:
     manifest = runtime_manifest(source)
-    files = [Path("source.json")]
-    for export in manifest["exports"]:
-        root = source / export
-        if not root.is_dir() or not root.resolve().is_relative_to(source.resolve()):
-            raise SetupError(f"missing staged Agent export: {root}")
-        files.extend(path.relative_to(source) for path in root.rglob("*") if path.is_file()
-                     and not path.is_symlink() and "__pycache__" not in path.parts and path.suffix != ".pyc")
-    if runtime_digest(source, files) != manifest["sha256"]:
-        raise SetupError(f"staged Agent receipt does not match its exported bytes: {source / 'source.json'}")
-    return files
+    return [Path("source.json"), *(Path(name) for name in manifest["files"])]
 
 
 def install_runtime(directory: Path, source: Path) -> Path:
-    files = runtime_files(source)
-    directory.mkdir(parents=True, exist_ok=True)
-    for relative in files:
-        if relative == Path("source.json"):
-            continue
-        target = directory / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        temporary = target.with_suffix(target.suffix + ".next")
-        shutil.copyfile(source / relative, temporary)
-        os.replace(temporary, target)
+    receipt = runtime_manifest(source)
+    errors = runtime_delivery(source).apply(directory, source, receipt)
+    if errors:
+        raise SetupError("; ".join(errors))
     for name in MANAGED_LEGACY_RUNTIME:
         (directory / name).unlink(missing_ok=True)
     receipt = directory / "source.json"
@@ -713,9 +684,8 @@ def install_runtime(directory: Path, source: Path) -> Path:
 def check_runtime(context: Context) -> list[str]:
     directory = context.state_directory / "bin"
     source = runtime_source(context)
-    changes = [f"install {directory / relative}" for relative in runtime_files(source)
-               if not (directory / relative).is_file()
-               or (directory / relative).read_bytes() != (source / relative).read_bytes()]
+    receipt = runtime_manifest(source)
+    changes = [f"install Agent runtime: {error}" for error in runtime_delivery(source).check(directory, source, receipt)]
     changes.extend(f"remove retired runtime {directory / name}" for name in MANAGED_LEGACY_RUNTIME
                    if (directory / name).exists())
     if not context.windows:
