@@ -55,7 +55,7 @@ acting**. The copy in another checkout may be stale, and remembered state is not
 
 After a delivery PR merges, the default branch inherits its planning state. Reconcile and continue an
 already-recorded successor stack layer. When no successor exists, start the next branch from the current
-remote default and select an available checkout under `engineering:branching`. An in-flight sibling reads the owning branch or PR when it
+remote default and select an available checkout under `engineering:git-branching`. An in-flight sibling reads the owning branch or PR when it
 needs newer evidence; it does not create a competing ledger copy.
 
 **A plan must not cite its roadmap — but an agent working the plan may read it.** The document dependency
@@ -108,12 +108,12 @@ gap resurfaces downstream as naming churn over a thing whose job was never fixed
 
 ## Delivery slices within a phase
 
-A phase can require several PRs. Apply `engineering:branching` before implementing or expanding a
+A phase can require several PRs. Apply `engineering:git-branching` before implementing or expanding a
 large change; its split assessment and atomicity exceptions govern the delivery map. Record each PR
 slice's purpose, included code/tests, base or parent, dependency, size estimate and validation gate.
 Deliver slices sequentially by default, landing the current ready and authorized PR before starting the
 next from the updated remote default. If dependent work must proceed before its parent lands, record
-why and maintain the required stack under `engineering:branching`. Keep a single goal and one current
+why and maintain the required stack under `engineering:git-branching`. Keep a single goal and one current
 ledger, with branch/PR links and exact base/head SHAs for the active slices. Checkout allocation follows
 active execution needs, separately from planned PR boundaries.
 
@@ -372,7 +372,7 @@ alone does not require that transfer; the context-transfer decision is owned by
    a review is recorded** (a `## Reviews` entry or a review watermark); then PR, merge, publication,
    dependency, or platform sync. `plan_graph.py` enforces this. Once the PR merges, complete the checkout
    cleanup under `engineering:merge`; if work remains, reconcile and continue its existing successor layer, or start the next branch from
-   the current remote default in a checkout selected under `engineering:branching`. Resume the same ledger.
+   the current remote default in a checkout selected under `engineering:git-branching`. Resume the same ledger.
 5. **Close out only after the entire lifecycle is terminal.** Planning-only work is terminal only when its
    reviewed artifacts are merged to the default branch through `merge-docs`; planning artifacts updated with
    implementation are terminal only when that delivery PR merges. A local commit, pushed branch, or open PR
@@ -386,7 +386,7 @@ A branch owns one PR-sized delivery slice, while the plan survives through the c
 default branch. After merge, retire the completed branch and any isolated checkout through
 `engineering:merge`, then continue the reconciled successor layer.
 When remaining work has no existing slice, start its branch from the current remote default and select
-its checkout under `engineering:branching`; create isolation only when active execution needs it.
+its checkout under `engineering:git-branching`; create isolation only when active execution needs it.
 Never reopen a merged branch to append observations; the forge owns remote evidence until a
 later substantive commit or final closeout needs it.
 

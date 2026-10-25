@@ -1,6 +1,6 @@
 ---
-name: branching
-description: Choose branches, worktrees and stacks for reviewable engineering work. Use when starting or reusing a delivery branch, sizing a PR, or arranging dependent work.
+name: git-branching
+description: Branch hygiene and reviewable delivery slices — finish and merge one ready, authorized PR at a time by default; maintain a proper stack whenever work must build on an unmerged PR; allocate worktrees for active execution needs. Covers fresh bases, branch casing, measured scope and independent guidance changes. Use before creating or reusing a delivery branch or worktree.
 
 kind: policy
 domain: process
@@ -51,10 +51,12 @@ current-with-base rule in the `merging` skill — by which point the wasted work
 For a dependent stack layer, branch from its recorded parent's current tip instead of `origin/main`.
 The parent must already contain the dependency; changing a PR's base does not transplant commits.
 
-**Reusing an existing branch or worktree?** Apply `engineering:session`'s work-item base check, then use
-`git rev-list --count HEAD..<actual-base>` against the PR's default or stack-parent base. Merge when behind
-and the tree is clean. Do not reflexively merge every turn: it will not refresh already-loaded instructions
-(only a fresh session does), and mutating a dirty tree mid-task invites conflicts.
+**Reusing an existing branch or worktree?** At session start, fetch and check
+`git rev-list --count HEAD..<actual-base>` against the PR's default or stack-parent base; sync before
+working, and never build on a stale tip. Don't
+reflex-merge the default branch every turn: it will not refresh already-loaded instructions (only a fresh
+session does), and mutating a dirty tree mid-task invites conflicts. Merge when you are behind and the
+tree is clean.
 
 ## `<Type>/<Name>`, with the type prefix capitalized
 
