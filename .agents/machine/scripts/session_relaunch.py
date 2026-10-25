@@ -14,6 +14,9 @@ import subprocess
 import sys
 import time
 
+import agent_cli
+import required_plugins
+
 HERE = Path(__file__).resolve().parent
 IN_USE = ".in_use"
 PROMPT = ("This same conversation was automatically resumed to adopt refreshed plugins. "
@@ -80,6 +83,8 @@ def codex_arguments(argv: list[str]) -> list[str]:
               "--remote", "--remote-auth-token-env", "--local-provider"}
     flags = {"--no-daemon", "--no-alt-screen", "--search", "--oss", "--strict-config",
              "--approve-for-me", "--dangerously-bypass-approvals-and-sandbox"}
+    recorder = {f'shell_environment_policy.set.{name}=""' for name in
+                ("CODEX_TUI_RECORD_SESSION", "CODEX_TUI_SESSION_LOG_PATH")}
     while index < len(argv):
         token = argv[index]
         name, equals, _ = token.partition("=")
@@ -99,9 +104,12 @@ def codex_arguments(argv: list[str]) -> list[str]:
         if name in flags and not equals:
             kept.append(token)
         elif name in single and equals:
-            kept.append(token)
+            value = token[2:].removeprefix("=") if name in {"-c", "-m", "-p", "-s", "-a"} else token.partition("=")[2]
+            if name not in {"-c", "--config"} or value not in recorder:
+                kept.append(token)
         elif name in single and index < len(argv):
-            kept += [token, argv[index]]
+            if name not in {"-c", "--config"} or argv[index] not in recorder:
+                kept += [token, argv[index]]
             index += 1
         elif name in {"--cd", "-C", "--image", "-i"} and not equals:
             index += 1
@@ -110,6 +118,11 @@ def codex_arguments(argv: list[str]) -> list[str]:
         elif name == "--last":
             selector = False
     return kept
+
+
+def codex_preflight(project: Path, session_id: str, native: list[str]) -> None:
+    executable, _ = agent_cli.resolve_codex_executable()
+    required_plugins.check_launch(project, "codex", executable, [*native, "resume", session_id, PROMPT])
 
 
 def windows_split(command_line: str) -> list[str]:
@@ -218,6 +231,8 @@ def relaunch(project: Path, installed: dict, shared=None, close=None, arguments=
         raise RuntimeError("the refresh checkout does not match this Codex client's checkout")
     session_id = entry["session_id"]
     native = (codex_arguments if host == "codex" else preserved_arguments)(arguments(entry["pid"]))
+    if host == "codex":
+        codex_preflight(project, session_id, native)
     token = secrets.token_hex(16)
     record = record_path(session_id)
     write_json(record, {"state": "waiting", "token": token, "session_id": session_id, "pid": entry["pid"],
