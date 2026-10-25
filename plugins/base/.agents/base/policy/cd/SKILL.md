@@ -22,10 +22,23 @@ requirement. Retarget the host **before** any helper or native command unregiste
 A successful Git removal, or an empty residual directory, does not prove the host attachment was released;
 the old path remaining on disk is incomplete cleanup.
 
-Use the host's native command interface rather than sending `/cd` through a shell. If that interface is
-not exposed to the agent, resolve and invoke the unqualified `handoff` workflow with the exact target
-checkout. That workflow checkpoints the current owner, selects the supported Codex launcher by default,
-starts exactly one successor, verifies launcher submission, and releases the original writer.
+Keep the same conversation and owner. Use the host's native directory-changing interface when it is
+exposed to the agent; never send `/cd` through a shell. If the agent cannot invoke that interface, give
+the user the exact `/cd <absolute-path>` command to enter in the host's input box, then ask them to say
+`continue`. Explain that this changes the current conversation's directory. Pause repository-scoped work
+until the host reports the target directory, retain the task and context, and leave this session open.
+The directory change is a user action, not a request to approve the implementation again.
+
+Missing agent access to `/cd` does not authorize a handoff, another terminal, a successor, or closing this
+conversation. Use `workflow:handoff` only for a separately authorized context transfer. If the host has no
+native directory-changing command, report that limitation and give the supported exact resume command
+for this existing conversation; do not create or fork another conversation.
+
+```text
+Task moves to C:/work/meal-estimator; the agent has no native directory-control tool.
+Reply: Enter /cd C:/work/meal-estimator in Codex, then say continue.
+Keep this conversation open. Resume after the host reports C:/work/meal-estimator.
+```
 
 When the transfer exists to release the current directory for removal, the handoff must make the successor
 the sole owner of the removal and final filesystem verification. After verified launcher submission the
@@ -35,7 +48,5 @@ removal, closing the predecessor through `machine:peer-cli`, and the original mu
 The successor continues from the target checkout only after the predecessor no longer holds the old path,
 and treats any removal error or residual path as incomplete cleanup.
 
-Only after the automatic `handoff` capability is genuinely unavailable, or its launcher fails after
-diagnosis, give the user the exact `/cd <absolute-path>` command and pause repository-scoped work until the
-session has been retargeted. Never claim that a shell directory change updated the session, and never make
-manual `/cd` the normal transfer path.
+For a separately authorized transfer needed to release a directory for removal, follow the ownership
+and cleanup ordering above. A pending manual `/cd` keeps the current owner and is not a completed outcome.
