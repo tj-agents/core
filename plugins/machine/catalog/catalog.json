@@ -132,7 +132,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:de2a8c71ae167910b659e3ab63e9717f50de42596b6bae11ae016a34b29be512",
+      "digest": "sha256:46ad8c197424d2f1369262ef8a744e97058b319de3e791a3fac89453854f9548",
       "harness": {
         "marketplaces": [
           {
@@ -283,7 +283,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:bfb3cf679c508aa94f26f1fdf582116849c2d4f03fc7961bc688ee90cead9b74",
+      "digest": "sha256:d7fc074f0c2bfdc9473bfb6785a4f76c6504b54203c6cd1499b0d896ee7e865a",
       "harness": {
         "marketplaces": [
           {
@@ -414,7 +414,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:04a0ec099a90263737422c1b081830b748ee2e27feed4c45bdb77f3f97b40962",
+      "digest": "sha256:4a9f7e313bb028da21d070c126e29d3787635d034071a0919e66602cbf48e9c2",
       "harness": {
         "marketplaces": [
           {
@@ -615,7 +615,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:5b2527efdcf6d027adc86f4f74c758df92e7788db4599e3ea852dbcd83361f75",
+      "digest": "sha256:ec24b45b5834652cfe6c86eb9425e5047a9eed699f903f82126ed05c7de32ab3",
       "harness": {
         "marketplaces": [
           {
@@ -919,7 +919,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:dbea5a20f41ce9da7453bc9b0334c548357148604549db1ade819e5f5885fa47",
+      "digest": "sha256:3051d7ab6b50eb92ee032916117899e31c6aa31e0226e9ab44a02a78596e363c",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -944,7 +944,7 @@
             ]
           },
           {
-            "path": ".agents/machine/utility/close/scripts/close_landed.py",
+            "path": ".agents/cli/workflow/closeout/scripts/close_landed.py",
             "hosts": [
               "claude",
               "codex"
