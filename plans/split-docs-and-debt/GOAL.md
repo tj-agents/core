@@ -29,7 +29,7 @@ it, and a guidance rule added there looks like a tech-debt change.
 ## Completion expectation
 
 1. Read `AGENTS.md`, `README.md`, `SOURCE_LAYOUT.md`, `SKILL_KINDS.md`, `PACKAGING.md`, the current
-   `docs-and-debt` skill, the `techdebt` workflow and `engineering:git-branching`.
+   `docs-and-debt` skill, the `techdebt` workflow and `engineering:branching`.
 2. Decide and record here: the new skill names (one guidance-ownership convention, one tech-debt
    convention), where throwaway working markdown belongs, whether the debt convention stays separate from
    the `techdebt` workflow, and how `engineering:docs-and-debt` consumers keep working (check the
