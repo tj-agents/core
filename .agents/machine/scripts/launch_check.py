@@ -233,7 +233,7 @@ def require_update_check(result: str) -> None:
         )
 
 
-def ensure_hooks(project: Path, executable: str | None = None) -> None:
+def ensure_hooks(project: Path, executable: str | None = None, *, running_session=False) -> None:
     import agent_cli
     import codex_hook_trust
     import required_plugins
@@ -251,6 +251,8 @@ def ensure_hooks(project: Path, executable: str | None = None) -> None:
             if definitions:
                 expected[identity] = definitions
     codex_hook_trust.apply_trust(binary, project.resolve(), required=expected)
+    if running_session:
+        codex_hook_trust.reload_running(binary, project.resolve(), required=expected)
 
 
 def main(argv: list[str] | None = None) -> int:

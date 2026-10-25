@@ -71,6 +71,28 @@ class RefreshCliTests(unittest.TestCase):
         self.readiness = readiness.start()
         self.addCleanup(readiness.stop)
 
+    def test_current_plugins_still_require_live_hook_reload(self):
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="current"), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(0, REFRESH.main(["--host", "codex"]))
+        self.readiness.assert_called_once_with(Path.cwd().resolve(), running_session=True)
+
+    def test_live_hook_reload_failure_fails_current_refresh(self):
+        self.readiness.side_effect = RuntimeError("Live hooks still modified")
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="current"), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex"]))
+
+    def test_live_hook_reload_failure_fails_verified_refresh(self):
+        self.readiness.side_effect = RuntimeError("Live hooks still modified")
+        with mock.patch.object(REFRESH.agent_cli, "resolve_codex_executable", return_value=("codex", "version")), \
+                mock.patch.object(REFRESH, "selection", return_value=({}, [])), \
+                mock.patch.object(REFRESH, "refresh", return_value=[]), \
+                mock.patch.object(REFRESH, "verify", return_value={"problems": []}), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex", "--verify"]))
+        self.readiness.assert_called_once_with(Path.cwd().resolve(), "codex", running_session=True)
+
     def test_default_uses_native_commands_without_verification_or_bound_launch(self):
         with mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude"), \
                 mock.patch.object(REFRESH, "selection", return_value=({"tj-agents": "tj-agents/marketplace"}, ["machine@tj-agents"])), \
