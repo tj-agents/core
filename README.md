@@ -11,6 +11,12 @@ The repository also owns explicit PowerShell profile and CLI session-recovery in
 
 ## Required setup on every machine
 
+For authorized machine setup or Core delivery, the agent owns this procedure through execution and
+verification, including post-merge publication, setup and sync. Run the supported commands, repair failed
+steps and report observed results; handing Tommy commands to execute does not complete work the agent
+can perform. A genuinely user-owned credential or native trust action retains its existing control;
+keep the remaining deployment work owned and resume it when that dependency is resolved.
+
 Installing the plugins or cloning this repository does **not** complete machine setup. From a current
 primary Core checkout, run the full setup on each PC before relying on automatic plugin refresh:
 
@@ -59,7 +65,7 @@ immediate explicit refresh from the Core checkout, run:
 ```
 
 `machine:sync-plugins` owns adoption in a running session, including resuming the same conversation when
-native reload is unavailable. Manual sync is available whenever an immediate refresh is needed.
+native reload is unavailable. The agent runs explicit sync whenever an immediate refresh is needed.
 
 `engineering:skill-authoring` owns skill selection triggers, names, and sizing; the
 [`template:check` validator](https://github.com/tj-agents/template) owns required skill content and layout
