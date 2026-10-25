@@ -1,6 +1,6 @@
 ---
 name: stack
-description: Maintain a required stack when work must build on an unmerged PR. Covers the concrete reason for overlap, verified parent branches, parent-targeted child PRs, cumulative validation and prompt bottom-up landing. Sequential delivery and checkout allocation follow git-branching.
+description: Maintain a required stack when work must build on an unmerged PR. Covers the concrete reason for overlap, verified parent branches, parent-targeted child PRs, cumulative validation and prompt bottom-up landing. Sequential delivery and checkout allocation follow branching.
 
 kind: operation
 domain: process

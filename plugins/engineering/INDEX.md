@@ -6,6 +6,7 @@ Generated from canonical `.agents/` definitions.
 - `address-debt` — workflow — `.agents/engineering/workflow/address-debt/SKILL.md`
 - `address-mistake` — workflow — `.agents/engineering/workflow/address-mistake/SKILL.md`
 - `address-review` — workflow — `.agents/engineering/workflow/address-review/SKILL.md`
+- `branching` — policy — `.agents/engineering/policy/branching/SKILL.md`
 - `bugfix` — workflow — `.agents/engineering/workflow/bugfix/SKILL.md`
 - `commit` — operation — `.agents/engineering/operation/commit/SKILL.md`
 - `commit-all` — operation — `.agents/engineering/operation/commit-all/SKILL.md`
@@ -17,7 +18,6 @@ Generated from canonical `.agents/` definitions.
 - `failure-provenance` — contract — `.agents/engineering/contract/failure-provenance/SKILL.md`
 - `feature` — workflow — `.agents/engineering/workflow/feature/SKILL.md`
 - `git-auth` — policy — `.agents/engineering/policy/git-auth/SKILL.md`
-- `git-branching` — policy — `.agents/engineering/policy/git-branching/SKILL.md`
 - `guide` — convention — `.agents/engineering/convention/guide/SKILL.md`
 - `guide-build` — utility — `.agents/engineering/utility/guide-build/SKILL.md`
 - `incremental-review` — workflow — `.agents/engineering/workflow/incremental-review/SKILL.md`
