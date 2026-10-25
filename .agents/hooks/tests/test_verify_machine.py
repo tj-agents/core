@@ -8,7 +8,8 @@ import unittest
 from unittest import mock
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "plugin-selection" / "scripts" / "verify_machine.py"
+SCRIPT = (Path(__file__).resolve().parents[2] / "dependencies" / "agent" / ".agents" /
+          "agent" / "utility" / "plugins" / "scripts" / "verify_machine.py")
 spec = importlib.util.spec_from_file_location("verify_machine", SCRIPT)
 verify_machine = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(verify_machine)

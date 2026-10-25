@@ -18,7 +18,8 @@
       "skills": [
         "agent-files",
         "cd",
-        "idea-initialization",
+        "project-setup",
+        "solution-assessment",
         "task-routing"
       ],
       "dependencies": {
@@ -31,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:992151305defc901a7d3209f3ea0018e32f7315b85c120707e2b253c2803ea2b",
+      "digest": "sha256:c4ecc67c6db321160a2883eaff5672279ccaf3bcfb00eda30cd3228dcdf2fc9c",
       "harness": {
         "marketplaces": [
           {
@@ -51,7 +52,14 @@
             ]
           },
           {
-            "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
+            "path": ".agents/base/policy/project-setup/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/base/policy/solution-assessment/scripts/session-context.py",
             "hosts": [
               "claude",
               "codex"
@@ -911,7 +919,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:914b027337ca19df325a523051d7da4a391607ec493641240e0a631e41b96603",
+      "digest": "sha256:dbea5a20f41ce9da7453bc9b0334c548357148604549db1ade819e5f5885fa47",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
