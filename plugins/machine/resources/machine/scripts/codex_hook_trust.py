@@ -50,29 +50,51 @@ def run(arguments, cwd, timeout=TIMEOUT):
 
 
 class AppServer:
-    def __init__(self, executable, cwd, launch_args=(), environment=None, timeout=TIMEOUT):
+    def __init__(self, executable, cwd, launch_args=(), environment=None, timeout=TIMEOUT, existing=False):
+        if existing:
+            from codex_websocket import WebSocketStdio
+
         self.timeout = timeout
         self.process = subprocess.Popen(
-            [*command(executable), *launch_args, "app-server"], cwd=cwd,
+            [*command(executable), *launch_args, "app-server", *(["proxy"] if existing else [])], cwd=cwd,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, encoding="utf-8", bufsize=1,
+            text=not existing, encoding=None if existing else "utf-8", bufsize=-1 if existing else 1,
             env=dict(os.environ, **(environment or {})),
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
         self.messages = queue.Queue()
         self.sequence = 0
+        self.ready = threading.Event()
+        self.connection_error = None
+        self.websocket = None
+        if existing:
+            self.websocket = WebSocketStdio(self.process.stdout, self.process.stdin)
         threading.Thread(target=self.read, daemon=True).start()
 
     def read(self):
         try:
+            if self.websocket:
+                self.websocket.handshake()
+                self.ready.set()
+                while True:
+                    self.messages.put(self.websocket.receive())
             for line in self.process.stdout:
                 self.messages.put(json.loads(line))
-        except (OSError, ValueError) as error:
+        except (OSError, ValueError, RuntimeError) as error:
+            self.connection_error = error
             self.messages.put(error)
         finally:
+            self.ready.set()
             self.messages.put(None)
 
     def send(self, message):
+        if self.websocket:
+            if not self.ready.wait(self.timeout):
+                raise RuntimeError("Existing Codex daemon WebSocket initialization timed out")
+            if self.connection_error:
+                raise RuntimeError(f"Existing Codex daemon connection failed: {self.connection_error}")
+            self.websocket.send(message)
+            return
         self.process.stdin.write(json.dumps(message) + "\n")
         self.process.stdin.flush()
 
@@ -374,6 +396,30 @@ def apply_trust(executable, cwd, preview=False, verified_roots=None, launch_args
         if not preview:
             require_ready(listing, cwd, required, expected=updates)
         return updates
+
+
+def reload_running(executable, cwd, required, session_id=None, timeout=TIMEOUT):
+    identity = session_id or os.environ.get("CODEX_THREAD_ID")
+    if not identity or not required:
+        return
+    deadline = time.monotonic() + timeout
+    with AppServer(executable, cwd, timeout=timeout, existing=True) as server:
+        if identity not in server.request("thread/loaded/list", {}).get("data", []):
+            raise RuntimeError("Current Codex conversation is not loaded in the existing daemon; "
+                               "resume this same conversation in a fresh native process")
+        thread = server.request("thread/read", {"threadId": identity, "includeTurns": False})["thread"]
+        if thread.get("id") != identity or Path(thread.get("cwd", "")).resolve() != cwd:
+            raise RuntimeError("Existing Codex conversation does not match the refresh checkout")
+        server.request("config/batchWrite", {"edits": [], "reloadUserConfig": True})
+        while True:
+            listing = server.request("hooks/list", {"cwds": [str(cwd)]})
+            try:
+                require_ready(listing, cwd, required)
+                return
+            except RuntimeError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.1)
 
 
 def main(argv=None):
