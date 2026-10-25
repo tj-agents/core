@@ -1,8 +1,8 @@
 """Stop hook: close a session once the pull request it worked on merged at its worktree's head (Python 3.9+).
 
 Runs after the session store records the stop. It arms only for a clean linked worktree whose branch has a
-pull request merged at exactly its HEAD after this session started; the watcher then closes only that CLI
-client. Checkout cleanup remains an explicit engineering operation.
+pull request merged at exactly its HEAD after this session started; the watcher then closes the tab and the
+worktree sweep removes the checkout only with its own proof.
 """
 
 from datetime import datetime
@@ -55,9 +55,12 @@ def main():
     if not isinstance(cwd, str) or not cwd:
         return 0
     try:
+        session_id = data.get('session_id') or data.get('sessionId')
+        if not isinstance(session_id, str) or not session_id:
+            return 0
         landed = merged_at(Path(cwd), close_session.runtime().git)
         if landed is not None:
-            close_session.arm_after_stop(landed, session_id=data.get('session_id'))
+            close_session.arm_after_stop(landed, session_id)
     except Exception:
         pass
     return 0

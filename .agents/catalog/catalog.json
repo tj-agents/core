@@ -373,6 +373,158 @@
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
       "marketplace": "tj-agents",
+      "id": "tj-agents/cli",
+      "name": "cli",
+      "package_path": "plugins/cli",
+      "description": "Close CLI tabs or finish their workflows before closing.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "close",
+        "closeout"
+      ],
+      "dependencies": {
+        "required": [
+          "tj-agents/base",
+          "tj-agents/agent-store",
+          "tj-agents/machine"
+        ],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "python>=3.9"
+        ],
+        "optional": [
+          "exe:powershell",
+          "exe:codex",
+          "exe:claude",
+          "windows-terminal",
+          "python>=3.11"
+        ]
+      },
+      "digest": "sha256:04a0ec099a90263737422c1b081830b748ee2e27feed4c45bdb77f3f97b40962",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/agent-store",
+          "tj-agents/base",
+          "tj-agents/cli",
+          "tj-agents/machine"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
+                  "${PLUGIN_ROOT}/skills/close/scripts/close_session.py",
+                  "${PLUGIN_ROOT}/codex-skills/close/scripts/close_session.py"
+                ],
+                "arm"
+              ],
+              "justification": "Arm a watcher that closes only this verified CLI after its final reply",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
+                  "arm"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
+                  "hook"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/other.py",
+                  "arm"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
+                  "${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py",
+                  "${PLUGIN_ROOT}/codex-skills/closeout/scripts/closeout.py"
+                ],
+                "arm"
+              ],
+              "justification": "Arm a watcher that closes only this verified CLI after its final reply",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
+                  "arm"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
+                  "hook"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/other.py",
+                  "arm"
+                ]
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
       "id": "tj-agents/engineering",
       "name": "engineering",
       "package_path": "plugins/engineering",
@@ -455,7 +607,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:0ce5d815a02c5f1bdbd54457bbff7f56db7985ed65418a46db4826e2caecdbd7",
+      "digest": "sha256:5b2527efdcf6d027adc86f4f74c758df92e7788db4599e3ea852dbcd83361f75",
       "harness": {
         "marketplaces": [
           {
@@ -759,7 +911,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:357d6240aba986afd6aec92a8ce0e723b5731dac043aa308c79a39879cdf075c",
+      "digest": "sha256:914b027337ca19df325a523051d7da4a391607ec493641240e0a631e41b96603",
       "digest_excludes": [
         "catalog/catalog.json"
       ],

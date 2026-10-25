@@ -21,6 +21,12 @@ import cli_client
 import required_plugins
 from terminal_command import command_for_target, without_binding_state
 
+PEER_SCRIPTS = Path(__file__).resolve().parent.parent / "utility/peer-cli/scripts"
+if not PEER_SCRIPTS.is_dir():
+    PEER_SCRIPTS = Path(__file__).resolve().parents[3] / ".agents/machine/utility/peer-cli/scripts"
+sys.path.insert(0, str(PEER_SCRIPTS))
+import register_session
+
 ACK_DIRECTORY_ENV = "TJ_AGENTS_STARTUP_ACK_DIRECTORY"
 ACK_TOKEN_ENV = "TJ_AGENTS_STARTUP_ACK_TOKEN"
 STARTUP_TIMEOUT_SECONDS = 20
@@ -113,7 +119,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     parsed = parser.parse_args(argv)
     arguments = parsed.arguments[1:] if parsed.arguments[:1] == ["--"] else parsed.arguments
-    status: dict[str, object] = {"pid": os.getpid()}
+    status: dict[str, object] = {
+        "pid": os.getpid(), "terminal": register_session.terminal_identity(),
+        "title": os.environ.get(register_session.TITLE_ENV),
+    }
     if parsed.host == "claude" and parsed.require_session_start and parsed.status_file is not None:
         if not any(value == "--debug-file" or value.startswith("--debug-file=") for value in arguments):
             debug_log = parsed.status_file.resolve().parent / "native-debug.log"

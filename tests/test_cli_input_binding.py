@@ -67,8 +67,8 @@ class InputBindingTests(unittest.TestCase):
         self.commands[pid] = ['codex', *arguments]
         return ticket, environment, arguments
 
-    def resolve(self, since=0):
-        return client.recorded_client('current-thread', self.nearest, self.infos.get, self.infos, since)
+    def resolve(self):
+        return client.recorded_client('current-thread', self.nearest, self.infos.get, self.infos)
 
     def test_launcher_starts_a_sanitized_daemon_and_keeps_each_frontend_private_record(self):
         ticket, environment, arguments = self.bind()
@@ -91,10 +91,13 @@ class InputBindingTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Cannot attribute'):
                 self.resolve()
 
-    def test_latest_submitted_input_is_required_and_copied_old_history_is_rejected(self):
+    def test_first_submitted_input_before_delayed_session_hook_is_attributable(self):
         ticket, _, _ = self.bind()
-        with self.assertRaisesRegex(RuntimeError, 'Cannot attribute'):
-            self.resolve(since=ticket['created_at'] + 2)
+        with mock.patch.object(client.time, 'time', return_value=ticket['created_at'] + 20):
+            self.assertEqual(123, self.resolve()[0].pid)
+
+    def test_latest_submitted_input_is_required_after_another_thread_submission(self):
+        ticket, _, _ = self.bind()
         path = Path(ticket['recording_path'])
         with path.open('a', encoding='utf-8') as stream:
             stream.write(json.dumps(events('new-other-thread-input', ticket['created_at'] + 3)[1]) + '\n')
@@ -139,8 +142,8 @@ class InputBindingTests(unittest.TestCase):
         client.release(ticket)
         self.assertEqual('existing', path.read_text(encoding='utf-8'))
 
-    def test_other_hosts_maintenance_and_private_clients_do_not_enable_recording(self):
-        for host, arguments in [('claude', []), ('codex', ['--no-daemon']), ('codex', ['review']),
+    def test_other_hosts_and_maintenance_do_not_enable_recording(self):
+        for host, arguments in [('claude', []), ('codex', ['review']),
                                 ('codex', ['exec']), ('codex', ['app-server']), ('codex', ['--help'])]:
             with self.subTest(host=host, arguments=arguments):
                 prepared, environment, ticket = client.prepare(host, arguments, self.root,
@@ -149,6 +152,27 @@ class InputBindingTests(unittest.TestCase):
                 self.assertNotIn(client.RECORD_ENV, environment)
                 self.assertNotIn(client.RECORD_PATH_ENV, environment)
                 self.assertIsNone(ticket)
+
+    def test_private_frontend_requires_native_current_input_instead_of_ancestry(self):
+        arguments, environment, ticket = client.prepare('codex', ['--no-daemon'], self.root,
+                                                       os.environ, executable='codex')
+        self.assertIsNone(ticket['backend'])
+        self.assertEqual('1', environment[client.RECORD_ENV])
+        self.assertIn('--no-daemon', arguments)
+        client.subprocess.run.assert_not_called()
+        client.attach(ticket, 123)
+        Path(ticket['recording_path']).write_text(''.join(json.dumps(row) + '\n'
+            for row in events('displayed-thread-input', ticket['created_at'] + 1)), encoding='utf-8')
+        self.infos[123] = SimpleNamespace(pid=123, name='codex.exe', started_at=ticket['created_at'])
+        self.contexts[123] = {'profile': str(self.profile.resolve()), client.RECORD_ENV: '1',
+                              client.RECORD_PATH_ENV: ticket['recording_path']}
+        self.commands[123] = ['codex', *arguments]
+        self.nearest = self.infos[123]
+        with self.assertRaisesRegex(RuntimeError, 'Cannot attribute'):
+            self.resolve()
+        self.input.return_value = 'displayed-thread-input'
+        self.assertEqual(123, self.resolve()[0].pid)
+        self.assertFalse(codex_hook_trust.AppServer.call_args.kwargs['existing'])
 
 
 class RecorderTests(unittest.TestCase):
@@ -164,7 +188,6 @@ class RecorderTests(unittest.TestCase):
                 self.assertIsNone(client.latest_input(path))
             path.write_text(''.join(json.dumps(row) + '\n' for row in events('own', 100)), encoding='utf-8')
             self.assertEqual('own', client.latest_input(path))
-            self.assertIsNone(client.latest_input(path, since=101))
             with path.open('a', encoding='utf-8') as stream:
                 stream.write('{')
             with self.assertRaisesRegex(RuntimeError, 'incomplete'):
@@ -187,6 +210,13 @@ class RecorderTests(unittest.TestCase):
         server.request.side_effect = request
         self.assertEqual('steering-input', client.current_input(server, 'thread'))
         self.assertEqual('desc', server.request.call_args.args[1]['sortDirection'])
+
+    def test_background_thread_with_copied_parent_input_never_owns_a_frontend(self):
+        server = mock.Mock()
+        server.request.return_value = {'thread': {'source': {'subAgent': {'parentThreadId': 'parent'}}}}
+        with self.assertRaisesRegex(RuntimeError, 'background agent'):
+            client.current_input(server, 'child')
+        server.request.assert_called_once_with('thread/read', {'threadId': 'child', 'includeTurns': False})
 
 
 class DaemonSafetyTests(unittest.TestCase):
