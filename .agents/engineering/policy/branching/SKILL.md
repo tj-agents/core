@@ -40,7 +40,9 @@ start in the normal checkout; the delivery branch carries its plan with its subs
 ## Fetch first; use the remote default or the recorded stack parent
 
 ```bash
-git fetch origin --quiet && git checkout -b <Type>/<Name> origin/main
+git fetch origin --quiet
+default=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)
+git switch -c Feature/MapIndex "origin/$default"
 ```
 
 Local `main` silently drifts behind, and branching off it builds and tests everything against a stale
@@ -48,7 +50,7 @@ tree. **That staleness is invisible locally: the build is green, because it is g
 tree.** It is how work that has already merged gets reinvented, and how a PR later trips the
 current-with-base rule in the `merging` skill — by which point the wasted work is already done.
 
-For a dependent stack layer, branch from its recorded parent's current tip instead of `origin/main`.
+For a dependent stack layer, branch from its recorded parent's current tip instead of the remote default.
 The parent must already contain the dependency; changing a PR's base does not transplant commits.
 
 **Reusing an existing branch or worktree?** Apply `engineering:session`'s work-item base check, then use
