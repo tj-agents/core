@@ -27,6 +27,12 @@ Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
 
 Goal lifecycle and recorded work status.
 
+## tj-agents/cli
+
+Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
+
+Close CLI tabs or finish their workflows before closing.
+
 ## tj-agents/engineering
 
 Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
