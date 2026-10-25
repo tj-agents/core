@@ -1,6 +1,7 @@
 """Shared verified-session and cleanup primitives for peer-cli (Python 3.9+)."""
 
 import csv
+import importlib.util
 import json
 import math
 import os
@@ -43,6 +44,114 @@ ET.register_namespace("", TASK_SCHEDULER_NAMESPACE)
 
 class Refusal(RuntimeError):
     pass
+
+
+def client_runtime_path():
+    here = Path(__file__).resolve().parent
+    candidates = [here / "cli_client.py", here.parents[2] / "scripts/cli_client.py",
+                  here.parents[2] / "resources/machine/scripts/cli_client.py"]
+    if len(here.parents) > 4 and here.parents[3].name == ".agents":
+        candidates.append(here.parents[4] / "resources/machine/scripts/cli_client.py")
+    for path in candidates:
+        if path.is_file():
+            return path
+    raise Refusal("The shipped CLI client runtime is unavailable")
+
+
+def client_runtime():
+    path = client_runtime_path()
+    spec = importlib.util.spec_from_file_location("session_close_cli_client", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def current_codex_client(session_id, nearest):
+    client = client_runtime()
+    info, record = client.recorded_client(session_id, nearest, process_info,
+                                          register_session.process_table())
+    return info, {'client_identity': 'managed-input', 'launch_cwd': record['launch_cwd'],
+                  'title': record.get('title'), 'client_message_id': record['client_message_id'],
+                  'recording_path': record['recording_path'], 'backend': record['backend'], 'profile': record['profile'],
+                  'terminal': register_session.terminal_identity(record.get('terminal_environment', {}))}
+
+
+def stop_verified_process(pid, started_at, before_signal=lambda: None):
+    if not valid_identity(pid, started_at):
+        raise Refusal("CLI client process identity is invalid")
+    if os.name != "nt":
+        import select
+        import signal
+
+        if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
+            raise Refusal("Safe CLI closure requires Linux pidfd support")
+        descriptor = os.pidfd_open(pid)
+        try:
+            info = process_info(pid)
+            if info is None or abs(info.started_at - started_at) > 0.001:
+                raise Refusal("CLI client process identity changed before close")
+            before_signal()
+            signal.pidfd_send_signal(descriptor, signal.SIGTERM)
+            if not select.select([descriptor], [], [], 5)[0]:
+                signal.pidfd_send_signal(descriptor, signal.SIGKILL)
+                if not select.select([descriptor], [], [], 5)[0]:
+                    raise Refusal("CLI client exit was not confirmed")
+        finally:
+            os.close(descriptor)
+        return
+    import ctypes
+    from ctypes import wintypes
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel.GetProcessTimes.argtypes = [wintypes.HANDLE, *([ctypes.POINTER(wintypes.FILETIME)] * 4)]
+    kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    handle = kernel.OpenProcess(0x100001 | 0x1000, False, pid)
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        created, exited, kernel_time, user_time = (wintypes.FILETIME() for _ in range(4))
+        if not kernel.GetProcessTimes(handle, ctypes.byref(created), ctypes.byref(exited),
+                                      ctypes.byref(kernel_time), ctypes.byref(user_time)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        actual = ((created.dwHighDateTime << 32) + created.dwLowDateTime) / 10_000_000 - 11644473600
+        if abs(actual - started_at) > 0.001:
+            raise Refusal("CLI client process identity changed before close")
+        before_signal()
+        if not kernel.TerminateProcess(handle, 0):
+            raise ctypes.WinError(ctypes.get_last_error())
+        if kernel.WaitForSingleObject(handle, 10000) != 0:
+            raise Refusal("CLI client exit was not confirmed")
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def stop_cli_client(entry, before_signal=lambda: None):
+    info = process_info(entry["pid"])
+    if (info is None or register_session.stem(info.name) != entry["host"]
+            or not verified_live(entry["pid"], entry["pid_started_at"])):
+        raise Refusal("CLI client identity is no longer live")
+    if entry["host"] == "codex":
+        client = client_runtime()
+        arguments = client.process_arguments(entry["pid"])
+        if not arguments or client.command_name(arguments[1:]) in client.OTHER_COMMANDS:
+            raise Refusal("The registered Codex process is a backend or maintenance process, not a CLI client")
+    def revalidate():
+        if entry.get('client_identity') == 'managed-input':
+            context = client.process_context(entry['pid'])
+            if (context.get(client.RECORD_PATH_ENV) != entry['recording_path']
+                    or Path(context['profile']) != Path(entry['profile'])
+                    or (entry.get('backend') is not None
+                        and client.daemon_identity({'CODEX_HOME': entry['profile']},
+                                                  expected_pid=entry['backend']['pid']) != entry['backend'])
+                    or client.latest_input(entry['recording_path']) != entry['client_message_id']):
+                raise Refusal('The frontend input or backend binding changed before close')
+        before_signal()
+    stop_verified_process(entry['pid'], entry['pid_started_at'], revalidate)
+
 
 
 def _update_own_end(entry, operation, reason):
@@ -342,6 +451,19 @@ def own_host_and_entry(cwd=None, session_id=None):
         current = info.ppid
     if nearest is None:
         raise Refusal("current process is not attached to a recognized registered host")
+    if register_session.stem(nearest.name) == 'codex' and not session_id:
+        session_id = os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID")
+        if not session_id:
+            raise Refusal('Native Codex thread identity is unavailable; preserve the frontend and backend')
+    if session_id and register_session.stem(nearest.name) == "codex":
+        try:
+            client, details = current_codex_client(session_id, nearest)
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
+            raise Refusal(str(error)) from error
+        return register_session.record(
+            {"session_id": session_id, "cwd": str(cwd)},
+            client={"pid": client.pid, "host": "codex", "pid_started_at": client.started_at, **details},
+        )
     matches = []
     native_session = session_id or (os.environ.get("CODEX_THREAD_ID")
                                     if register_session.stem(nearest.name) == "codex"
