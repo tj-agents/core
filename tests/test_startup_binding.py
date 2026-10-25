@@ -23,6 +23,100 @@ SPEC.loader.exec_module(BINDING)
 
 
 class StartupBindingTests(unittest.TestCase):
+    def test_verified_launch_binds_the_exact_child_and_propagates_exit(self):
+        process = mock.Mock(pid=4242)
+        process.wait.return_value = 7
+        process.poll.return_value = 7
+        ticket = {'token': 'fixture'}
+        with mock.patch.object(BINDING.cli_client, 'prepare', return_value=(['prepared'], {'ENV': 'value'}, ticket)), \
+                mock.patch.object(BINDING.cli_client, 'attach') as attach, \
+                mock.patch.object(BINDING.cli_client, 'release') as release, \
+                mock.patch.object(BINDING, 'command_for_target', return_value=['native', 'original']), \
+                mock.patch.object(BINDING.subprocess, 'Popen', return_value=process) as spawn:
+            self.assertEqual(7, BINDING.run_session('codex', 'native', self.project, ['original']))
+        spawn.assert_called_once_with(['native', 'prepared'], cwd=self.project, env={'ENV': 'value'},
+                                      start_new_session=os.name != 'nt')
+        attach.assert_called_once_with(ticket, 4242)
+        release.assert_called_once_with(ticket)
+        process.terminate.assert_not_called()
+
+    def test_failed_identity_recording_stops_only_the_child_and_releases_binding(self):
+        process = mock.Mock(pid=4242)
+        process.poll.return_value = None
+        with mock.patch.object(BINDING.cli_client, 'prepare', return_value=([], {}, {'token': 'fixture'})), \
+                mock.patch.object(BINDING.cli_client, 'attach', side_effect=OSError('cannot record frontend')), \
+                mock.patch.object(BINDING.cli_client, 'release') as release, \
+                mock.patch.object(BINDING.subprocess, 'Popen', return_value=process), \
+                self.assertRaisesRegex(OSError, 'cannot record frontend'):
+            BINDING.run_session('codex', 'native', self.project, [])
+        process.terminate.assert_called_once()
+        process.wait.assert_called_once_with(timeout=5)
+        release.assert_called_once()
+
+    def test_failed_native_spawn_releases_the_prepared_client_binding(self):
+        ticket = {'token': 'fixture'}
+        with mock.patch.object(BINDING.cli_client, 'prepare', return_value=([], {}, ticket)), \
+                mock.patch.object(BINDING.cli_client, 'release') as release, \
+                mock.patch.object(BINDING.subprocess, 'Popen', side_effect=OSError('missing executable')), \
+                self.assertRaisesRegex(BINDING.StartupBindingError, 'missing executable'):
+            BINDING.run_session('codex', 'native', self.project, [])
+        release.assert_called_once_with(ticket)
+
+    def test_sigint_is_left_to_the_native_child_and_the_supervisor_handler_is_restored(self):
+        process = mock.Mock(pid=4242)
+        process.poll.return_value = None
+
+        def interrupted_wait(*_args, **_kwargs):
+            signal.getsignal(signal.SIGINT)(signal.SIGINT, None)
+            return 0
+
+        process.wait.side_effect = interrupted_wait
+        before = signal.getsignal(signal.SIGINT)
+        with mock.patch.object(BINDING.subprocess, 'Popen', return_value=process), \
+                mock.patch.object(BINDING, '_terminate') as terminate, \
+                mock.patch.object(BINDING.os, 'killpg', create=True) as forward:
+            try:
+                self.assertEqual(0, BINDING.run_session('codex', 'native', self.project, []))
+            except KeyboardInterrupt:
+                self.fail('Supervisor converted a normal native interrupt into termination')
+        terminate.assert_not_called()
+        self.assertEqual(before, signal.getsignal(signal.SIGINT))
+        if os.name != 'nt':
+            forward.assert_called_once_with(4242, signal.SIGINT)
+        else:
+            forward.assert_not_called()
+
+    def test_session_observation_never_blocks_exempt_native_repair_commands(self):
+        for host, arguments in (('codex', ['plugin', 'add', 'base@tj-agents']), ('claude', ['plugin', 'list'])):
+            with self.subTest(host=host), \
+                    mock.patch.object(BINDING.required_plugins, 'check', side_effect=AssertionError('no inventory for maintenance')), \
+                    mock.patch.object(BINDING.subprocess, 'Popen') as native:
+                native.return_value.wait.return_value = 0
+                self.assertEqual(0, BINDING.main(['--host', host, '--project', str(self.project),
+                                                 '--target', sys.executable, '--require-session-start', '--', *arguments]))
+                native.assert_called_once()
+        self.readiness.assert_not_called()
+
+    def test_startup_receipts_cover_all_selected_dispatchers_on_both_hosts(self):
+        names = ('base', 'engineering', 'machine', 'workflow')
+        roots = {name + '@tj-agents': ROOT / 'plugins' / name for name in names}
+        for host in ('codex', 'claude'):
+            with self.subTest(host=host):
+                self.assertEqual(sorted(roots), BINDING.startup_participants(host, roots))
+
+    def test_an_observed_required_startup_failure_stops_the_owned_native_child(self):
+        script = self.project / 'failed startup.py'
+        survived = self.project / 'should-not-run'
+        script.write_text("import os,time\nfrom pathlib import Path\n"
+                          "p=Path(os.environ['TJ_AGENTS_STARTUP_ACK_DIRECTORY'])\n"
+                          "token=os.environ['TJ_AGENTS_STARTUP_ACK_TOKEN']\n"
+                          "(p/(token+'.failed')).write_text('required fixture hook failed')\n"
+                          f"time.sleep(3)\nPath({str(survived)!r}).write_text('ordinary work')\n", encoding='utf-8')
+        for host in ('codex', 'claude'):
+            with self.subTest(host=host), self.assertRaisesRegex(BINDING.StartupBindingError, 'fixture hook failed'):
+                BINDING.run_session(host, sys.executable, self.project, [str(script)], require_session_start=True)
+            self.assertFalse(survived.exists())
+
     def test_unverifiable_codex_override_never_reaches_optional_refresh_or_native_start(self):
         selection = self.project / ".agents/plugins.json"
         selection.parent.mkdir()

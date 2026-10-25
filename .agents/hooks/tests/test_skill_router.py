@@ -89,8 +89,8 @@ class SkillRouterTests(unittest.TestCase):
         return env
 
     def load_router(self):
-        sys.path.insert(0, str(HOOKS))
-        self.addCleanup(sys.path.remove, str(HOOKS))
+        sys.path.insert(0, str(self.router.parent))
+        self.addCleanup(sys.path.remove, str(self.router.parent))
         spec = importlib.util.spec_from_file_location(f"router_{uuid.uuid4().hex}", self.router)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -176,6 +176,29 @@ class SkillRouterTests(unittest.TestCase):
         outcomes = self.load_router().transcript_skill_outcomes(transcript)
         self.assertEqual(outcomes["stackx:style"], True)
         self.assertNotIn("acme-stackx:style", outcomes)
+
+    def test_codex_native_command_completion_proves_only_successful_matching_read(self):
+        transcript = self.base / "native-command.jsonl"
+        body = "---\nname: style\ndescription: Company style.\n---\nCompany body."
+        skill = [("acme-stackx:style", self.base / "style/SKILL.md", body)]
+        for status, code, plugin, output, expected in (
+            ("completed", 0, "acme-stackx", body, True),
+            ("completed", 1, "acme-stackx", body, False),
+            ("failed", 0, "acme-stackx", body, False),
+            ("inProgress", None, "acme-stackx", body, False),
+            ("completed", 0, "stackx", body, False),
+            ("completed", 0, "acme-stackx", "error reading file", False),
+        ):
+            with self.subTest(status=status, code=code, plugin=plugin, output=output):
+                entry = {"type": "event_msg", "payload": {"type": "item_completed", "item": {
+                    "type": "CommandExecution", "id": "native-command", "status": status,
+                    "exit_code": code, "command": ["pwsh", "-Command", "Get-Content "
+                        + f"C:/cache/{plugin}/local/skills/style/SKILL.md"],
+                    "aggregated_output": output,
+                }}}
+                transcript.write_text(json.dumps(entry), encoding="utf-8")
+                outcomes = self.load_router().transcript_skill_outcomes(transcript, skill)
+                self.assertEqual(expected, outcomes.get("acme-stackx:style", False))
 
     def test_native_discovery_failures_are_typed_and_cached(self):
         cases = (
