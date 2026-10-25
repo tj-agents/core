@@ -71,8 +71,8 @@ class RefreshCliTests(unittest.TestCase):
         self.readiness = readiness.start()
         self.addCleanup(readiness.stop)
 
-        for method in ("check", "converge"):
-            patcher = mock.patch.object(REFRESH.plugin_setup, method, return_value=[])
+        for method in ("check_setup", "converge_setup"):
+            patcher = mock.patch.object(REFRESH.required_plugins, method, return_value=[])
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -120,24 +120,25 @@ class RefreshCliTests(unittest.TestCase):
                 mock.patch("sys.stdout"), mock.patch("sys.stderr"):
             self.assertEqual(1, REFRESH.main(["--host", "codex"]))
         self.readiness.assert_called_once()
+        REFRESH.required_plugins.converge_setup.assert_not_called()
 
     def test_default_early_return_converges_plugin_setup_before_success(self):
         with mock.patch.object(REFRESH.launch_check, "check", return_value="current"), \
-                mock.patch.object(REFRESH.plugin_setup, "converge", return_value=[]) as converge, \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup", return_value=[]) as converge, \
                 mock.patch("sys.stdout"), mock.patch("sys.stderr"):
             self.assertEqual(0, REFRESH.main(["--host", "codex"]))
         self.assertEqual((ROOT, ("codex",), {"codex": None}, False), converge.call_args.args)
 
     def test_failed_launch_or_refresh_never_applies_plugin_setup(self):
         with mock.patch.object(REFRESH.launch_check, "check", return_value="failed"), \
-                mock.patch.object(REFRESH.plugin_setup, "converge") as converge, \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
                 mock.patch("sys.stdout"), mock.patch("sys.stderr"):
             self.assertEqual(1, REFRESH.main(["--host", "codex"]))
         converge.assert_not_called()
 
         with mock.patch.object(REFRESH, "selection", return_value=({}, [])), \
                 mock.patch.object(REFRESH, "refresh", side_effect=REFRESH.RefreshError("failed refresh")), \
-                mock.patch.object(REFRESH.plugin_setup, "converge") as converge, \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
                 mock.patch("sys.stdout"), mock.patch("sys.stderr"):
             self.assertEqual(1, REFRESH.main(["--host", "codex", "--all"]))
         converge.assert_not_called()
@@ -146,8 +147,8 @@ class RefreshCliTests(unittest.TestCase):
         with mock.patch.object(REFRESH, "executable_for", return_value="codex"), \
                 mock.patch.object(REFRESH, "selection", return_value=({}, [])), \
                 mock.patch.object(REFRESH, "verify", return_value={"host": "codex", "plugins": [], "problems": []}), \
-                mock.patch.object(REFRESH.plugin_setup, "check", return_value=[]) as check, \
-                mock.patch.object(REFRESH.plugin_setup, "converge") as converge, \
+                mock.patch.object(REFRESH.required_plugins, "check_setup", return_value=[]) as check, \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
                 mock.patch("sys.stdout"), mock.patch("sys.stderr"):
             self.assertEqual(0, REFRESH.main(["--host", "codex", "--verify-only"]))
         check.assert_called_once_with(ROOT, ("codex",), {"codex": None})
