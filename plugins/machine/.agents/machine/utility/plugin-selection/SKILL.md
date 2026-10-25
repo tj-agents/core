@@ -55,8 +55,11 @@ python -B '<skill-directory>\scripts\adopt_plugins.py' --root C:\path\to\reposit
 ```
 
 A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `python`, `github-actions`,
-`plugin-repository`) resolves to its plugins through `scripts/plugin_roster.json`, so nobody guesses which
-plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Required plugins are added and
+`plugin-repository`) resolves through `scripts/plugin_stacks.json`; plugin names and required packages come
+from the offline `scripts/marketplace_catalog.lock.json` snapshot generated from
+[`tj-agents/marketplace/catalog.json`](https://github.com/tj-agents/marketplace/blob/main/catalog.json).
+Update that snapshot through Core's `scripts/update_marketplace_catalog.py` using a Marketplace checkout;
+never edit its plugin entries here. Repeat `--stack`, or add `--plugin <name>`. Required plugins are added and
 existing selections are kept. With no requested stack or plugin, a new selection uses Agent, Agent Store, Base,
 Engineering, Machine and Workflow. `preview` lists the changed files, `write` applies them together, and `check`
 exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.

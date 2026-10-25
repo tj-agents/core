@@ -26,7 +26,8 @@ FAMILIES = {
     "plugin-adoption": {
         "sources": {
             ".agents/machine/utility/plugin-selection/scripts/adopt_plugins.py",
-            ".agents/machine/utility/plugin-selection/scripts/plugin_roster.json",
+            ".agents/machine/utility/plugin-selection/scripts/marketplace_catalog.lock.json",
+            ".agents/machine/utility/plugin-selection/scripts/plugin_stacks.json",
         },
         "tests": {".agents/hooks/tests/test_adopt_plugins.py"},
     },
