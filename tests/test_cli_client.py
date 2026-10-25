@@ -116,6 +116,23 @@ class BindingTests(unittest.TestCase):
 
 
 class ClientResolutionTests(unittest.TestCase):
+    def test_client_helper_resolves_only_shipped_resources_in_every_layout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for relative, resource in (
+                ('source/.agents/machine/utility/peer-cli/scripts', 'source/.agents/machine/scripts'),
+                ('package/.agents/machine/utility/peer-cli/scripts', 'package/resources/machine/scripts'),
+                ('package/codex-skills/peer-cli/scripts', 'package/resources/machine/scripts'),
+                ('package/skills/peer-cli/scripts', 'package/resources/machine/scripts'),
+                ('staged', 'staged'),
+            ):
+                script = root / relative / 'session_close.py'
+                helper = root / resource / 'cli_client.py'
+                helper.parent.mkdir(parents=True, exist_ok=True)
+                helper.touch()
+                with self.subTest(layout=relative), mock.patch.object(close, '__file__', str(script)):
+                    self.assertEqual(helper.resolve(), close.client_runtime_path())
+
     def test_native_thread_reattachment_preserves_its_stop_and_shared_backend_peer(self):
         with tempfile.TemporaryDirectory() as directory, \
                 mock.patch.dict(os.environ, {'AGENT_STATE_DIRECTORY': directory, 'CODEX_THREAD_ID': 'own'}):

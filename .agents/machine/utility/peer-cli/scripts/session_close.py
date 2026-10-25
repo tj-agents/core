@@ -50,6 +50,8 @@ def client_runtime_path():
     here = Path(__file__).resolve().parent
     candidates = [here / "cli_client.py", here.parents[2] / "scripts/cli_client.py",
                   here.parents[2] / "resources/machine/scripts/cli_client.py"]
+    if len(here.parents) > 4 and here.parents[3].name == ".agents":
+        candidates.append(here.parents[4] / "resources/machine/scripts/cli_client.py")
     for path in candidates:
         if path.is_file():
             return path
