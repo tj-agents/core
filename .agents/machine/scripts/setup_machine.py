@@ -16,6 +16,7 @@ import importlib.util
 import os
 from pathlib import Path
 import secrets
+import shlex
 import shutil
 import subprocess
 import sys
@@ -228,10 +229,9 @@ def powershell_block(python: str, script: Path, loader: Path | None, newline: st
             f"    if (-not $tjAgentsTarget) {{ Write-Error '{name} was not found on PATH'; return }}",
             f"    if (-not (Test-Path -LiteralPath {quoted(python)})) {{ Write-Error 'Standards verifier Python is unavailable'; $global:LASTEXITCODE = 1; return }}",
             f"    try {{ $env:{launch_check.HOST_VARIABLE} = '{name}';"
-            f" & {quoted(python)} -I -B {quoted(script)} --host {name} --target $tjAgentsTarget.Source -- @args }}"
+            f" & {quoted(python)} -I -B {quoted(script)} --host {name} --project (Get-Location).Path"
+            " --target $tjAgentsTarget.Source --require-session-start -- @args }"
             f" finally {{ Remove-Item Env:{launch_check.HOST_VARIABLE} -ErrorAction SilentlyContinue }}",
-            "    if ($LASTEXITCODE -ne 0) { return }",
-            "    & $tjAgentsTarget.Source @args",
             "}",
         ]
     return newline.join([*lines, PROFILE_END])
@@ -241,9 +241,9 @@ def posix_block(python: str, script: Path) -> str:
     def quoted(value: object) -> str:
         return "'" + str(value).replace("'", "'\\''") + "'"
 
-    return "\n".join([PROFILE_START, *(
+    return "\n".join([PROFILE_START, f'export PATH={quoted(script.parent)}:"$PATH"', *(
         f'{name}() {{ [ -x {quoted(python)} ] || {{ printf "%s\\n" "Standards verifier Python is unavailable" >&2; return 1; }}; '
-        f'{launch_check.HOST_VARIABLE}={name} {quoted(python)} -I -B {quoted(script)} --host {name} --target "$(command -v {name})" -- "$@" || return $?; command {name} "$@"; }}'
+        f'{launch_check.HOST_VARIABLE}={name} {quoted(python)} -I -B {quoted(script)} --host {name} --project "$PWD" --target "$(command -v {name})" --require-session-start -- "$@"; }}'
         for name in HOSTS), PROFILE_END])
 
 
@@ -306,7 +306,7 @@ def profile_loader(context: Context) -> Path | None:
 
 
 def launch_script(context: Context) -> Path:
-    return context.state_directory / "bin" / "launch_check.py"
+    return context.state_directory / "bin" / "startup_binding.py"
 
 
 def profile_updates(context: Context) -> tuple[list[tuple[Path, str, str, bool]], list[str]]:
@@ -630,13 +630,27 @@ def runtime_source(context: Context) -> Path:
 def check_runtime(context: Context) -> list[str]:
     directory = launch_script(context).parent
     source = runtime_source(context)
-    return [f"install {directory / name}" for name in plugin_autoupdate.RUNTIME
+    changes = [f"install {directory / name}" for name in plugin_autoupdate.RUNTIME
             if not (directory / name).is_file()
             or (directory / name).read_bytes() != (source / name).read_bytes()]
+    if not context.windows:
+        alias = directory / 'python'
+        if not alias.is_file() or alias.read_text(encoding='utf-8') != python_alias() \
+                or (os.name != 'nt' and not os.access(alias, os.X_OK)):
+            changes.append(f'install Claude hook interpreter {alias}')
+    return changes
+
+
+def python_alias() -> str:
+    return '#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' "$@"\n'
 
 
 def apply_runtime(context: Context) -> list[str]:
     install_runtime(launch_script(context).parent, runtime_source(context))
+    if not context.windows:
+        alias = launch_script(context).parent / 'python'
+        alias.write_text(python_alias(), encoding='utf-8', newline='\n')
+        alias.chmod(0o755)
     return [f"installed the launch-check runtime in {launch_script(context).parent}"]
 
 

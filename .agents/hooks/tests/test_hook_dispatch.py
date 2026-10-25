@@ -136,7 +136,7 @@ class HookDispatchTests(unittest.TestCase):
     def test_failed_required_startup_never_acknowledges_readiness(self):
         token = "verified-startup-token-that-is-long-enough"
         environment = dict(os.environ, TJ_AGENTS_STARTUP_ACK_DIRECTORY=self.temp.name,
-                           TJ_AGENTS_STARTUP_ACK_TOKEN=token)
+                           TJ_AGENTS_STARTUP_ACK_TOKEN=token, TJ_AGENTS_STARTUP_REQUIRED_HOOKS='[]')
         for failed in ("crash.py", "missing.py"):
             with self.subTest(failed=failed):
                 result = subprocess.run(
@@ -147,6 +147,39 @@ class HookDispatchTests(unittest.TestCase):
                 self.assertEqual(0, result.returncode)
                 self.assertFalse(json.loads(result.stdout)["continue"])
                 self.assertFalse((Path(self.temp.name) / token).exists())
+
+    def test_one_successful_startup_hook_cannot_conceal_a_required_sibling_failure(self):
+        token = 'aggregate-startup-token-that-is-long-enough'
+        environment = dict(os.environ, TJ_AGENTS_STARTUP_ACK_DIRECTORY=self.temp.name,
+                           TJ_AGENTS_STARTUP_ACK_TOKEN=token,
+                           TJ_AGENTS_STARTUP_REQUIRED_HOOKS=json.dumps(['base@tj-agents', 'workflow@tj-agents']))
+        for name, gate in [('base', 'plain.py'), ('workflow', 'crash.py')]:
+            plugin = Path(self.temp.name) / name
+            shutil.copytree(self.hooks, plugin / 'hooks')
+            (plugin / 'harness.json').write_text(json.dumps({'plugin': 'tj-agents/' + name}), encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B', str(plugin / 'hooks/hook_dispatch.py'),
+                                     '--hook', gate], input=json.dumps({'hook_event_name': 'SessionStart'}),
+                                    capture_output=True, text=True, env=environment, timeout=20)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertFalse((Path(self.temp.name) / token).exists())
+        failure = (Path(self.temp.name) / (token + '.failed')).read_text(encoding='utf-8')
+        self.assertIn('workflow@tj-agents', failure)
+        self.assertIn('gate exploded', failure)
+
+    def test_startup_acknowledgement_waits_for_every_required_dispatcher(self):
+        token = 'complete-startup-token-that-is-long-enough'
+        environment = dict(os.environ, TJ_AGENTS_STARTUP_ACK_DIRECTORY=self.temp.name,
+                           TJ_AGENTS_STARTUP_ACK_TOKEN=token,
+                           TJ_AGENTS_STARTUP_REQUIRED_HOOKS=json.dumps(['base@tj-agents', 'workflow@tj-agents']))
+        for index, name in enumerate(('base', 'workflow')):
+            plugin = Path(self.temp.name) / name
+            shutil.copytree(self.hooks, plugin / 'hooks')
+            (plugin / 'harness.json').write_text(json.dumps({'plugin': 'tj-agents/' + name}), encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B', str(plugin / 'hooks/hook_dispatch.py'),
+                                     '--hook', 'plain.py'], input=json.dumps({'hook_event_name': 'SessionStart'}),
+                                    capture_output=True, text=True, env=environment, timeout=20)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertEqual(index == 1, (Path(self.temp.name) / token).exists())
 
     def test_a_gate_raising_a_base_exception_is_a_crash_not_an_overrun(self):
         for deadline in ([], ["--deadline", "20"]):
@@ -358,6 +391,11 @@ class PackagedDispatchTests(unittest.TestCase):
             os.environ, CLAUDE_PLUGIN_ROOT=str(self.plugin), TEMP=self.temp.name,
             TMP=self.temp.name, TMPDIR=self.temp.name,
         )
+        if os.name != 'nt':
+            interpreter = self.cwd / 'bin/python'
+            interpreter.parent.mkdir()
+            interpreter.symlink_to(sys.executable)
+            self.environment['PATH'] = str(interpreter.parent) + os.pathsep + self.environment.get('PATH', '')
 
     def run_registration(self, event, payload):
         hook = self.manifest["hooks"][event][0]["hooks"][0]

@@ -23,6 +23,26 @@ SPEC.loader.exec_module(BINDING)
 
 
 class StartupBindingTests(unittest.TestCase):
+    def test_startup_receipts_cover_all_selected_dispatchers_on_both_hosts(self):
+        names = ('base', 'engineering', 'machine', 'workflow')
+        roots = {name + '@tj-agents': ROOT / 'plugins' / name for name in names}
+        for host in ('codex', 'claude'):
+            with self.subTest(host=host):
+                self.assertEqual(sorted(roots), BINDING.startup_participants(host, roots))
+
+    def test_an_observed_required_startup_failure_stops_the_owned_native_child(self):
+        script = self.project / 'failed startup.py'
+        survived = self.project / 'should-not-run'
+        script.write_text("import os,time\nfrom pathlib import Path\n"
+                          "p=Path(os.environ['TJ_AGENTS_STARTUP_ACK_DIRECTORY'])\n"
+                          "token=os.environ['TJ_AGENTS_STARTUP_ACK_TOKEN']\n"
+                          "(p/(token+'.failed')).write_text('required fixture hook failed')\n"
+                          f"time.sleep(3)\nPath({str(survived)!r}).write_text('ordinary work')\n", encoding='utf-8')
+        for host in ('codex', 'claude'):
+            with self.subTest(host=host), self.assertRaisesRegex(BINDING.StartupBindingError, 'fixture hook failed'):
+                BINDING.run_session(host, sys.executable, self.project, [str(script)], require_session_start=True)
+            self.assertFalse(survived.exists())
+
     def test_unverifiable_codex_override_never_reaches_optional_refresh_or_native_start(self):
         selection = self.project / ".agents/plugins.json"
         selection.parent.mkdir()

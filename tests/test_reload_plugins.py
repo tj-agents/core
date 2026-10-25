@@ -409,6 +409,10 @@ class RefreshCliTests(unittest.TestCase):
                             REFRESH.selection("claude", "claude", root)
 
     def test_external_publisher_packages_are_verified_at_the_declared_revision(self):
+        clean_git = {key: value for key, value in os.environ.items() if not key.startswith('GIT_CONFIG_')}
+        environment = mock.patch.dict(os.environ, clean_git, clear=True)
+        environment.start()
+        self.addCleanup(environment.stop)
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             publisher = root / "publisher"
@@ -512,6 +516,38 @@ class ClaudeHome:
 
 
 class HeadReconcileTests(unittest.TestCase):
+    def test_missing_declared_plugin_is_installed_without_a_new_publish_event(self):
+        project = self.home.project('new-project', 'settings.json', 'base@tj-agents')
+        self.home.installed()
+        calls = []
+
+        def native(command, cwd):
+            calls.append(command)
+            if command[1:3] == ['plugin', 'list']:
+                return json.dumps([{'id': 'base@tj-agents', 'scope': 'project',
+                                    'projectPath': str(project), 'enabled': True, 'version': 'v1'}])
+            return ''
+
+        with mock.patch.object(REFRESH, 'run', side_effect=native):
+            self.assertEqual(['base@tj-agents'], REFRESH.reconcile_claude(project))
+        self.assertIn(['claude', 'plugin', 'install', 'base@tj-agents', '--scope', 'project'], calls)
+
+    def test_missing_installation_that_does_not_persist_fails_refresh(self):
+        project = self.home.project('new-project', 'settings.json', 'base@tj-agents')
+        self.home.installed()
+        with mock.patch.object(REFRESH, 'run', return_value='[]'), \
+                self.assertRaisesRegex(REFRESH.RefreshError, 'did not persist enabled'):
+            REFRESH.reconcile_claude(project)
+
+    def test_repair_never_enables_a_plugin_excluded_from_native_selection(self):
+        for host in ('claude', 'codex'):
+            with self.subTest(host=host), mock.patch.object(REFRESH, 'executable_for', return_value='native'), \
+                    mock.patch.object(REFRESH, 'selection', return_value=({}, [])), \
+                    mock.patch.object(REFRESH, 'run') as native, \
+                    self.assertRaisesRegex(REFRESH.RefreshError, 'not enabled'):
+                REFRESH.repair_missing(host, self.home.root, ['base@tj-agents'])
+            native.assert_not_called()
+
     def setUp(self):
         self.home = ClaudeHome(self)
         patcher = mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude")
