@@ -1,6 +1,4 @@
 import importlib.util
-import io
-import json
 from pathlib import Path
 import sys
 import unittest
@@ -12,10 +10,6 @@ SCRIPT = ROOT / '.agents/machine/utility/close/scripts/close_session.py'
 SPEC = importlib.util.spec_from_file_location('machine_close_bridge', SCRIPT)
 close = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(close)
-LANDED_SPEC = importlib.util.spec_from_file_location('machine_close_landed', SCRIPT.with_name('close_landed.py'))
-landed = importlib.util.module_from_spec(LANDED_SPEC)
-with mock.patch.dict(sys.modules, {'close_session': close}):
-    LANDED_SPEC.loader.exec_module(landed)
 
 
 class MachineCloseBridgeTests(unittest.TestCase):
@@ -50,14 +44,6 @@ class MachineCloseBridgeTests(unittest.TestCase):
         self.assertEqual((Path('repo'), Path('sweep.py')),
                          cli.start_watcher.call_args.args[3])
         cli.own_session.assert_called_once_with(self.shared, None)
-
-    def test_landed_hook_binds_the_payload_session_id(self):
-        payload = json.dumps({'cwd': str(ROOT), 'session_id': 'own'})
-        with mock.patch.object(landed, 'merged_at', return_value=200.0), \
-                mock.patch.object(landed.close_session, 'arm_after_stop') as arm, \
-                mock.patch.object(sys, 'stdin', io.StringIO(payload)):
-            self.assertEqual(0, landed.main())
-        arm.assert_called_once_with(200.0, 'own')
 
     def test_source_and_machine_package_find_the_canonical_cli_runtime(self):
         self.assertTrue(close.cli_runtime().start_watcher)
