@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 from unittest import mock
 
@@ -60,8 +61,14 @@ class ArgumentTests(unittest.TestCase):
                                     "--settings", "s.json"])
         self.addCleanup(process.wait)
         self.addCleanup(process.kill)
+        arguments = []
+        for _ in range(20):
+            arguments = RELAUNCH.host_arguments(process.pid)
+            if arguments:
+                break
+            time.sleep(0.05)
         self.assertEqual(["--add-dir", "C:/extra dir", "--settings", "s.json"],
-                         RELAUNCH.preserved_arguments(RELAUNCH.host_arguments(process.pid)))
+                         RELAUNCH.preserved_arguments(arguments))
 
 
 class StalenessTests(State):
