@@ -222,6 +222,11 @@
       "destination": "resources/machine/scripts/repository_configuration.py"
     },
     {
+      "plugin": "machine",
+      "source": ".agents/machine/utility/peer-cli/scripts/register_session.py",
+      "destination": "resources/machine/scripts/register_session.py"
+    },
+    {
       "plugin": "engineering",
       "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
       "destination": "workflows/host_coverage.py"
