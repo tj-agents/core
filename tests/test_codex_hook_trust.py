@@ -39,6 +39,7 @@ class HookTrustTests(unittest.TestCase):
             "sourcePath": str(self.cache / "hooks/codex.json"),
             "key": "base@tj-agents:hooks/codex.json:session_start:0:0",
             "currentHash": "sha256:" + "a" * 64,
+            "eventName": "sessionStart", "matcher": None, "handlerType": "command", "command": "python startup.py",
         }
         self.archive = patch.object(TRUST, "committed_files", return_value=TRUST.package_files(self.source))
         self.archive.start()
@@ -200,11 +201,16 @@ class HookTrustTests(unittest.TestCase):
     def test_native_batch_write_only_upserts_selected_hashes(self, runner, server_class):
         runner.return_value = json.dumps({"installed": []})
         server = server_class.return_value.__enter__.return_value
-        server.request.return_value = {"data": [{"hooks": [self.hook]}]}
+        trusted = dict(self.hook, trustStatus="trusted")
+        server.request.side_effect = lambda method, params: (
+            {"config": {}} if method == "config/read" else
+            {"data": [{"cwd": str(self.cwd), "hooks": [trusted if server.request.call_count > 3 else self.hook]}]}
+            if method == "hooks/list" else {}
+        )
         selected = {self.hook["key"]: {"trusted_hash": self.hook["currentHash"]}}
         with patch.object(TRUST, "trust_updates", return_value=selected):
             self.assertEqual(selected, TRUST.apply_trust("codex", self.cwd))
-        server.request.assert_called_with("config/batchWrite", {
+        server.request.assert_any_call("config/batchWrite", {
             "edits": [{"keyPath": "hooks.state", "value": selected, "mergeStrategy": "upsert"}],
             "reloadUserConfig": True,
         })
@@ -214,15 +220,95 @@ class HookTrustTests(unittest.TestCase):
     def test_preview_does_not_write_config(self, runner, server_class):
         runner.return_value = json.dumps({"installed": []})
         server = server_class.return_value.__enter__.return_value
-        server.request.return_value = {"data": [{"hooks": [self.hook]}]}
+        trusted = dict(self.hook, trustStatus="trusted")
+        server.request.side_effect = lambda method, params: (
+            {"config": {}} if method == "config/read" else
+            {"data": [{"cwd": str(self.cwd), "hooks": [trusted if server.request.call_count > 3 else self.hook]}]}
+            if method == "hooks/list" else {}
+        )
         with patch.object(TRUST, "trust_updates", return_value={"hook": {"trusted_hash": "hash"}}):
             TRUST.apply_trust("codex", self.cwd, preview=True)
-        server.request.assert_called_once_with("hooks/list", {"cwds": [str(self.cwd)]})
+        self.assertEqual(["config/read", "hooks/list"], [call.args[0] for call in server.request.call_args_list])
+
+    def test_readiness_rejects_missing_inventory_loading_errors_and_disabled_required_hooks(self):
+        for listing in (
+            {"data": []},
+            {"data": [{"cwd": str(self.cwd), "hooks": []}]},
+            {"data": [{"cwd": str(self.cwd), "errors": ["unreadable hook"], "hooks": []}]},
+            {"data": [{"cwd": str(self.cwd), "hooks": [dict(self.hook, enabled=False)]}]},
+            {"data": [{"cwd": str(self.cwd), "hooks": [self.hook]}]},
+        ):
+            with self.subTest(listing=listing), self.assertRaises(RuntimeError):
+                TRUST.require_ready(listing, self.cwd, required={"base@tj-agents": [TRUST.signature(self.hook)]})
+
+    def test_one_present_hook_does_not_mask_a_missing_required_definition(self):
+        trusted = dict(self.hook, trustStatus="trusted")
+        listing = {"data": [{"cwd": str(self.cwd), "hooks": [trusted]}]}
+        definitions = [TRUST.signature(trusted), ("preToolUse", "Write", "command", "python gate.py")]
+        with self.assertRaisesRegex(RuntimeError, "definitions missing"):
+            TRUST.require_ready(listing, self.cwd, required={"base@tj-agents": definitions})
+        with self.assertRaisesRegex(RuntimeError, "definitions missing"):
+            TRUST.require_ready(listing, self.cwd, required={"base@tj-agents": [TRUST.signature(trusted)] * 2})
+
+    @patch.object(TRUST, "AppServer")
+    def test_unrelated_untrusted_hooks_are_neither_approved_nor_required(self, server_class):
+        trusted = dict(self.hook, trustStatus="trusted")
+        unrelated = dict(self.hook, pluginId="other@publisher", key="other@publisher:hook")
+        server = server_class.return_value.__enter__.return_value
+        server.request.side_effect = lambda method, params: (
+            {"config": {}} if method == "config/read" else
+            {"data": [{"cwd": str(self.cwd), "hooks": [trusted, unrelated]}]}
+        )
+        with patch.object(TRUST, "trust_updates") as updates:
+            self.assertEqual({}, TRUST.apply_trust("codex", self.cwd,
+                             required={"base@tj-agents": [TRUST.signature(trusted)]}))
+        updates.assert_not_called()
+
+    def test_required_definitions_resolve_platform_commands_and_keep_duplicate_slots(self):
+        (self.cache / ".codex-plugin/plugin.json").write_text('{"hooks":"hooks/codex.json"}')
+        handler = {"type": "command", "command": "python ${PLUGIN_ROOT}/start.py",
+                   "commandWindows": "python ${PLUGIN_ROOT}/win.py"}
+        (self.cache / "hooks/codex.json").write_text(json.dumps({"hooks": {
+            "SessionStart": [{"hooks": [handler, handler]}],
+        }}))
+        import os
+        name = "win.py" if os.name == "nt" else "start.py"
+        self.assertEqual([("sessionStart", None, "command", f"python {self.cache}/{name}")] * 2,
+                         TRUST.required_definitions(self.cache, "base@tj-agents"))
+
+    def test_readiness_rejects_hash_changes_after_the_verified_write(self):
+        listing = {"data": [{"cwd": str(self.cwd), "hooks": [dict(self.hook, trustStatus="trusted")]}]}
+        with self.assertRaisesRegex(RuntimeError, "contents changed"):
+            TRUST.require_ready(listing, self.cwd, expected={self.hook["key"]: {"trusted_hash": "new"}})
+
+    @patch.object(TRUST, "AppServer")
+    @patch.object(TRUST, "run")
+    def test_a_successful_config_write_with_untrusted_readback_is_a_failure(self, runner, server_class):
+        runner.return_value = json.dumps({"installed": []})
+        server = server_class.return_value.__enter__.return_value
+        server.request.side_effect = lambda method, params: (
+            {"config": {}} if method == "config/read" else
+            {"data": [{"cwd": str(self.cwd), "hooks": [self.hook]}]} if method == "hooks/list" else {}
+        )
+        with patch.object(TRUST, "trust_updates", return_value={
+            self.hook["key"]: {"trusted_hash": self.hook["currentHash"]},
+        }), self.assertRaisesRegex(RuntimeError, "not ready"):
+            TRUST.apply_trust("codex", self.cwd)
+
+    @patch.object(TRUST, "AppServer")
+    def test_disabled_effective_hooks_are_not_silently_enabled(self, server_class):
+        server = server_class.return_value.__enter__.return_value
+        server.request.return_value = {"config": {"features": {"hooks": False}}}
+        with self.assertRaisesRegex(RuntimeError, "disabled"):
+            TRUST.apply_trust("codex", self.cwd)
+        self.assertEqual(["config/read"], [call.args[0] for call in server.request.call_args_list])
 
     @patch.object(TRUST, "AppServer")
     def test_uses_the_remaining_preflight_deadline_for_app_server_requests(self, server_class):
         server = server_class.return_value.__enter__.return_value
-        server.request.return_value = {"data": []}
+        server.request.side_effect = lambda method, params: (
+            {"config": {}} if method == "config/read" else {"data": [{"cwd": str(self.cwd), "hooks": []}]}
+        )
         self.assertEqual({}, TRUST.apply_trust("codex", self.cwd, timeout=7))
         self.assertEqual(server_class.call_args.kwargs["timeout"], 7)
 
