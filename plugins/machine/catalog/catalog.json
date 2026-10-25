@@ -387,6 +387,7 @@
         "address-debt",
         "address-mistake",
         "address-review",
+        "branching",
         "bugfix",
         "commit",
         "commit-all",
@@ -398,7 +399,6 @@
         "failure-provenance",
         "feature",
         "git-auth",
-        "git-branching",
         "guide",
         "guide-build",
         "incremental-review",
@@ -455,7 +455,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:8e0235ad1e80438bf29fe1855a0a0eceb26f1c4a7f309ac698a7dd9b8f6613dc",
+      "digest": "sha256:703c4757ea1fca16744b0e3ffc26b73a24b2dd164fb01e35ad35a4d764233998",
       "harness": {
         "marketplaces": [
           {
