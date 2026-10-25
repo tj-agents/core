@@ -46,7 +46,7 @@ class PluginSetupTests(unittest.TestCase):
         self.addCleanup(self.environment.stop)
 
     def roots(self):
-        return mock.patch.object(required_plugins, "check", return_value=(self.runtime,))
+        return mock.patch.object(required_plugins, "check", return_value={"selected@publisher": self.runtime})
 
     def test_check_is_read_only_and_apply_converges(self):
         with self.roots():
@@ -66,7 +66,7 @@ class PluginSetupTests(unittest.TestCase):
         unrelated.mkdir()
         (unrelated / "harness.json").write_text(json.dumps({"plugin": "publisher/other", "requires": {
             "setup": {"script": "missing.py"}}}), encoding="utf-8")
-        with mock.patch.object(required_plugins, "check", return_value=(self.runtime, unrelated)):
+        with mock.patch.object(required_plugins, "check", return_value={"selected@publisher": self.runtime}):
             self.assertEqual([], required_plugins.converge_setup(self.project, ("codex",), {"codex": None}))
         self.assertEqual("setup", self.state.read_text(encoding="utf-8"))
 
@@ -93,7 +93,7 @@ class PluginSetupTests(unittest.TestCase):
         harness = other / "harness.json"
         harness.write_text((self.runtime / "harness.json").read_text(encoding="utf-8"),
                            encoding="utf-8")
-        with mock.patch.object(required_plugins, "check", side_effect=((self.runtime,), (other,))):
+        with mock.patch.object(required_plugins, "check", side_effect=({"selected@publisher": self.runtime}, {"selected@publisher": other})):
             errors = required_plugins.converge_setup(self.project, ("claude", "codex"), {"claude": None, "codex": None})
         self.assertIn("runtimes disagree", errors[0])
 
@@ -104,7 +104,7 @@ class PluginSetupTests(unittest.TestCase):
         (other / "host-adapter.txt").write_text("different host payload", encoding="utf-8")
         (other / "harness.json").write_text((self.runtime / "harness.json").read_text(encoding="utf-8"),
                                               encoding="utf-8")
-        with mock.patch.object(required_plugins, "check", side_effect=((self.runtime,), (other,))):
+        with mock.patch.object(required_plugins, "check", side_effect=({"selected@publisher": self.runtime}, {"selected@publisher": other})):
             self.assertEqual([], required_plugins.converge_setup(self.project, ("claude", "codex"),
                                                        {"claude": None, "codex": None}))
 
@@ -115,7 +115,7 @@ class PluginSetupTests(unittest.TestCase):
         (other / "scripts/descriptor.json").write_text('{"different": true}', encoding="utf-8")
         (other / "harness.json").write_text((self.runtime / "harness.json").read_text(encoding="utf-8"),
                                               encoding="utf-8")
-        with mock.patch.object(required_plugins, "check", side_effect=((self.runtime,), (other,))), \
+        with mock.patch.object(required_plugins, "check", side_effect=({"selected@publisher": self.runtime}, {"selected@publisher": other})), \
                 mock.patch.object(required_plugins, "invoke") as invoke:
             errors = required_plugins.converge_setup(self.project, ("claude", "codex"), {"claude": None, "codex": None})
         self.assertIn("runtimes disagree", errors[0])
@@ -126,7 +126,7 @@ class PluginSetupTests(unittest.TestCase):
         other.mkdir()
         (other / "harness.json").write_text(json.dumps({"plugin": "publisher/selected", "requires": {}}),
                                               encoding="utf-8")
-        with mock.patch.object(required_plugins, "check", side_effect=((self.runtime,), (other,))), \
+        with mock.patch.object(required_plugins, "check", side_effect=({"selected@publisher": self.runtime}, {"selected@publisher": other})), \
                 mock.patch.object(required_plugins, "invoke") as invoke:
             errors = required_plugins.converge_setup(self.project, ("claude", "codex"), {"claude": None, "codex": None})
         self.assertIn("setup declarations disagree", errors[0])

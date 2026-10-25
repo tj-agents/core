@@ -168,7 +168,7 @@ def enabled_roots(host: str, project: Path, entries: list) -> dict[str, Path]:
 
 
 def check(project: Path, host: str, executable: str | None = None,
-          inventory_options: tuple[str, ...] = ()) -> tuple[Path, ...] | None:
+          inventory_options: tuple[str, ...] = ()) -> dict[str, Path] | None:
     launch_directory = project.resolve()
     project = project_root(launch_directory)
     required = selected(project)
@@ -217,7 +217,7 @@ def check(project: Path, host: str, executable: str | None = None,
             "Repair repository selection/native installation, then start a fresh session. "
             "Cached files from another host do not establish activation."
         )
-    return tuple(roots.values())
+    return {identity: roots[identity] for identity in required}
 
 
 CHECK_TIMEOUT_SECONDS = 90
@@ -329,21 +329,15 @@ def targets(project: Path, host: str, executable: str | None) -> list[Target]:
     identities = selected(project_root(project))
     found = []
     for identity in identities:
-        for root in roots:
-            if not (root / "harness.json").exists():
-                continue
-            try:
-                document, declared = harness_document(root)
-                if declared != identity:
-                    continue
-                target = declaration(root, identity, document)
-            except PluginSetupError:
-                raise
-            if target is not None:
-                found.append(target)
-            break
-        else:
-            raise PluginSetupError(f"{identity}: verified native installation did not provide its harness")
+        root = roots.get(identity)
+        if root is None:
+            raise PluginSetupError(f"{identity}: verified native installation is unavailable")
+        document, declared = harness_document(root)
+        if declared != identity:
+            raise PluginSetupError(f"{identity}: harness identity does not match the selected plugin")
+        target = declaration(root, identity, document)
+        if target is not None:
+            found.append(target)
     return found
 
 

@@ -495,13 +495,13 @@ def main(argv: list[str] | None = None) -> int:
                                     host=None if arguments.host == "both" else arguments.host)
         if result != "unconfigured":
             summary = {"check": result}
-            if "codex" in hosts and result in {"current", "updated"}:
+            if "codex" in hosts and result in {"current", "updated", "offline"}:
                 try:
                     launch_check.ensure_hooks(project)
                 except Exception as error:
                     summary["hook_readiness_error"] = str(error)
                     result = "failed"
-            setup_errors = (converge_plugin_setup() if result not in {"failed", "offline", "busy"}
+            setup_errors = (converge_plugin_setup() if result not in {"failed", "busy"}
                             else [f"skipped because launch check is {result}"])
             summary["plugin setup"] = setup_errors
             relaunched = relaunch_session(project, updated) if relaunch_allowed and result != "failed" and not setup_errors else None

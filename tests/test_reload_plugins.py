@@ -143,6 +143,22 @@ class RefreshCliTests(unittest.TestCase):
             self.assertEqual(1, REFRESH.main(["--host", "codex", "--all"]))
         converge.assert_not_called()
 
+    def test_offline_event_still_checks_hook_readiness_and_allows_explicit_onboarding(self):
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="offline"), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup", return_value=[]) as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex", "--onboard"]))
+        self.readiness.assert_called_once()
+        self.assertEqual((ROOT, ("codex",), {"codex": None}, True), converge.call_args.args)
+
+    def test_offline_event_with_unready_hooks_blocks_setup(self):
+        self.readiness.side_effect = RuntimeError("required hook needs review")
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="offline"), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex", "--onboard"]))
+        converge.assert_not_called()
+
     def test_verify_only_checks_plugin_setup_without_applying_or_onboarding(self):
         with mock.patch.object(REFRESH, "executable_for", return_value="codex"), \
                 mock.patch.object(REFRESH, "selection", return_value=({}, [])), \
