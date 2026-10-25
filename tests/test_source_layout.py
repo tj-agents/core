@@ -123,16 +123,16 @@ class SourceLayoutTests(unittest.TestCase):
         engineering = next(package for package in catalog["packages"] if package["id"] == "tj-agents/engineering")
         self.assertEqual(
             ["tj-agents/base", "tj-agents/workflow", "tj-agents/machine",
-             "tj-agents/agent-store", "tj-agents/agent", "tj-agents/codex", "tj-agents/cc", "tj-agents/cli"],
+             "tj-agents/agent-store", "tj-agents/agent", "tj-agents/cli"],
             engineering["dependencies"]["required"],
         )
         self.assertEqual(
-            ["tj-agents/agent-store", "tj-agents/agent", "tj-agents/codex", "tj-agents/cc", "tj-agents/cli"],
+            ["tj-agents/agent-store", "tj-agents/agent", "tj-agents/cli"],
             [entry["id"] for entry in engineering["external_dependencies"]["required"]],
         )
         harness = json.loads(output["plugins/engineering/harness.json"].decode("utf-8"))
         self.assertEqual([{"id": "tj-agents", "repository": "tj-agents/marketplace"}], harness["requires"]["marketplaces"])
-        self.assertEqual(["tj-agents/agent", "tj-agents/agent-store", "tj-agents/base", "tj-agents/cc", "tj-agents/cli", "tj-agents/codex", "tj-agents/engineering", "tj-agents/machine", "tj-agents/workflow"], harness["requires"]["plugins"])
+        self.assertEqual(["tj-agents/agent", "tj-agents/agent-store", "tj-agents/base", "tj-agents/cli", "tj-agents/engineering", "tj-agents/machine", "tj-agents/workflow"], harness["requires"]["plugins"])
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertEqual(engineering["external_dependencies"]["required"], selection["external_prerequisites"])
 

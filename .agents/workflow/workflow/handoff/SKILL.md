@@ -10,7 +10,7 @@ domain: process
 An explicit request to hand off means performing the transfer, even when the current session could do the
 work. Without an explicit request, hand off only when the work needs a separate session. Preparing a
 pointer alone does not complete a handoff. Respect an explicitly named target harness; otherwise select
-Codex through `codex:handoff`. The Agent publisher and that launcher's documented platform and CLI
+Codex through `agent:handoff --host codex`. The Agent publisher and that launcher's documented platform and CLI
 prerequisites must be available. Resolve the selected launcher through native discovery and load its
 instructions; do not guess a sibling-plugin or author-checkout path.
 
