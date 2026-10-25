@@ -37,7 +37,7 @@ class RecoveryTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="CLI refresh ")
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        self.root = Path(temporary.name).resolve()
         self.state = self.root / "state"
         environment = {key: value for key, value in os.environ.items()
                        if not key.startswith(("CLAUDE", "CODEX_THREAD", "CODEX_SESSION"))}
@@ -91,9 +91,44 @@ class RecoveryTests(unittest.TestCase):
             return {"status": close_status, "session_id": SESSION}
 
         close.arm.side_effect = arm_close
-        result = RELAUNCH.relaunch(self.root, {}, shared=shared, close=close,
-                                   arguments=lambda _: ["--no-daemon", "-m", "existing-model"], host="codex")
+        with mock.patch.object(RELAUNCH, "codex_preflight"):
+            result = RELAUNCH.relaunch(self.root, {}, shared=shared, close=close,
+                                       arguments=lambda _: ["--no-daemon", "-m", "existing-model"], host="codex")
         return result, events
+
+    def test_managed_frontend_options_can_reenter_real_native_admission(self):
+        import cli_client
+
+        original = ["--no-daemon", "-sread-only", "-c", "model_reasoning_effort=high"]
+        prepared, _, ticket = cli_client.prepare("codex", original, self.root, {}, executable="native")
+        self.addCleanup(cli_client.release, ticket)
+        replay = RELAUNCH.codex_arguments(prepared)
+        self.assertEqual(original, replay)
+        required = RELAUNCH.required_plugins
+        with mock.patch.object(required, "selected", return_value=("base@tj-agents",)), \
+                mock.patch.object(required, "enabled_roots", return_value={"base@tj-agents": self.root}), \
+                mock.patch.object(required.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, '{"installed":[]}', '')):
+            required.check_launch(self.root, "codex", "native", [*replay, "resume", SESSION, "Continue."])
+
+    def test_other_activation_overrides_are_preserved_and_admission_still_rejects_them(self):
+        original = ["--config", 'shell_environment_policy.set.CODEX_TUI_RECORD_SESSION="different"']
+        replay = RELAUNCH.codex_arguments(original)
+        self.assertEqual(original, replay)
+        required = RELAUNCH.required_plugins
+        with mock.patch.object(required, "selected", return_value=("base@tj-agents",)), \
+                self.assertRaisesRegex(required.RequiredPluginsError, "activation overrides"):
+            required.check_launch(self.root, "codex", "native", replay)
+
+    def test_failed_recovery_admission_prevents_both_watchers_and_closure(self):
+        shared, close = mock.Mock(), mock.Mock()
+        shared.own_host_and_entry.return_value = {
+            "host": "codex", "session_id": SESSION, "pid": 4242, "launch_cwd": str(self.root)}
+        with mock.patch.object(RELAUNCH, "codex_preflight", side_effect=RuntimeError("admission failed")), \
+                self.assertRaisesRegex(RuntimeError, "admission failed"):
+            RELAUNCH.relaunch(self.root, {}, shared=shared, close=close, arguments=lambda _: [], host="codex")
+        shared.start_detached.assert_not_called()
+        close.arm.assert_not_called()
+        self.assertFalse(RELAUNCH.record_path(SESSION).exists())
 
     def test_codex_arm_binds_host_profile_checkout_and_fresh_close(self):
         result, events = self.arm()
