@@ -25,14 +25,14 @@ FAMILIES = {
     },
     "plugin-adoption": {
         "sources": {
-            ".agents/machine/utility/plugin-selection/scripts/adopt_plugins.py",
-            ".agents/machine/utility/plugin-selection/scripts/marketplace_catalog.lock.json",
-            ".agents/machine/utility/plugin-selection/scripts/plugin_stacks.json",
+            ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/adopt_plugins.py",
+            ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/marketplace_catalog.lock.json",
+            ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/plugin_stacks.json",
         },
         "tests": {".agents/hooks/tests/test_adopt_plugins.py"},
     },
     "machine-verification": {
-        "sources": {".agents/machine/utility/plugin-selection/scripts/verify_machine.py"},
+        "sources": {".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/verify_machine.py"},
         "tests": {".agents/hooks/tests/test_verify_machine.py"},
     },
     "handoff-transfer": {

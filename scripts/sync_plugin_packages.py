@@ -12,7 +12,7 @@ import sys
 
 
 FRONTMATTER = re.compile(r"\A---\n(?P<header>.*?)\n---\n(?P<body>.*)\Z", re.DOTALL)
-DEFAULT_HANDOFF_SKILLS = frozenset({"cd", "handoff", "handoff-codex"})
+DEFAULT_HANDOFF_SKILLS = frozenset({"cd", "handoff"})
 
 
 def read(path: Path) -> str:
@@ -621,7 +621,7 @@ def validate_adapters(root: Path, config: dict, skills: dict[str, dict]) -> dict
     if unknown_extended:
         raise ValueError(f"Unknown extended host adapters: {sorted(unknown_extended)}")
     lane_tables = {
-        host: load(root / f".agents/lanes/{host}.json") for host in ("codex", "claude")
+        host: load(root / f".agents/dependencies/agent/.agents/agent/resources/lanes/{host}.json") for host in ("codex", "claude")
     }
     for host, adapter_root_value in config["host_adapter_roots"].items():
         adapter_root = inside(root, adapter_root_value)
@@ -742,10 +742,10 @@ def emit_workflow_agents(root: Path, config: dict, emit):
                 agent_payload(role, body, host),
             )
 
-    lane_body = read(root / ".agents/lanes/agent-body.md").strip()
-    handoff_body = read(root / ".agents/lanes/handoff-agent-body.md").strip()
+    lane_body = read(root / ".agents/dependencies/agent/.agents/agent/resources/lanes/agent-body.md").strip()
+    handoff_body = read(root / ".agents/dependencies/agent/.agents/agent/resources/lanes/handoff-agent-body.md").strip()
     for host in ("claude", "codex"):
-        table = load(root / f".agents/lanes/{host}.json")
+        table = load(root / f".agents/dependencies/agent/.agents/agent/resources/lanes/{host}.json")
         for lane, rung in table["lanes"].items():
             body = lane_body
             if rung.get("handoff"):

@@ -10,7 +10,7 @@ domain: process
 An explicit request to hand off means performing the transfer, even when the current session could do the
 work. Without an explicit request, hand off only when the work needs a separate session. Preparing a
 pointer alone does not complete a handoff. Respect an explicitly named target harness; otherwise select
-Codex through `machine:handoff-codex`. The machine plugin and that launcher's documented platform and CLI
+Codex through `codex:handoff`. The Agent publisher and that launcher's documented platform and CLI
 prerequisites must be available. Resolve the selected launcher through native discovery and load its
 instructions; do not guess a sibling-plugin or author-checkout path.
 
@@ -36,7 +36,7 @@ action, create duplicate writers, or hand off work that overlaps the original ch
 
 Prompt-only requests remain prompt-only. They return a self-contained pointer or prompt without launching or
 reserving an executor. Preserve a user-selected model, effort, frontier, or harness choice. Otherwise select
-the appropriate lane through `machine:lanes`; L7 is in-session only and cannot launch either handoff tool.
+the appropriate lane through `agent:lanes`; L7 is in-session only and cannot launch either handoff tool.
 Claude launch requires an explicit L1-L6 lane, frontier tier, or non-Haiku model. Record the chosen lane and
 one-line reason beside the next action when a lane is selected.
 
@@ -205,7 +205,7 @@ transfer, reconcile the completed attempt and current owner before recording a n
    workstream and returns its outcome; it does not adopt, close, or rewrite the originating goal.
 3. Write the self-contained side-workstream prompt to UTF-8 and invoke the selected launcher once. An
    explicit prompt-only request returns that prompt without launching. Preserve an explicit model, effort,
-   frontier, or harness request; otherwise select a lane under `machine:lanes` when remaining work warrants
+   frontier, or harness request; otherwise select a lane under `agent:lanes` when remaining work warrants
    it.
 4. Verify submission. Success proves launch, not that the successor has read its goal. Release only the
    side-workstream writer lease, retain the original task's writer lease, and continue the original task.

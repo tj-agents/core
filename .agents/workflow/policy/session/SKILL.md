@@ -22,7 +22,7 @@ evidence or a stated user decision, and say what changed.
 
 Required hooks gate ordinary work and delivery. Failure, timeout, skipping, a missing verdict or trust
 review permits only bounded diagnosis and authorized repair. For stale plugin contents, run
-`machine:sync-plugins` once. Resume only after affected hooks succeed; refresh or trust alone proves no
+`agent:refresh` once. Resume only after affected hooks succeed; refresh or trust alone proves no
 execution. Otherwise remain blocked and report the hook, cause, resolver and exact recovery command.
 Never bypass trust, disable hooks, suppress failures or change executor to evade the gate.
 
@@ -35,7 +35,7 @@ Authorized sustained or multi-phase work selects `workflow:run`; read the existi
 edits and keep it current. Planning selects `workflow:plan`, without implementation authority. Questions
 and reviews alone grant none. Answer status questions before continuing authorized execution.
 
-Use `machine:lanes` to match substantive work to suitable capability. Reuse its loaded contract;
+Use `agent:lanes` to match substantive work to suitable capability. Reuse its loaded contract;
 routine commands and phase labels do not require another read or lane rationale. Keep cheap leaf lanes
 for clerical work and delegate useful batches under that contract. Reconsider the
 selection when the work's judgment or capability requirements change. The lane contract owns execution
@@ -67,7 +67,7 @@ never grants permission to start implementation.
 When preparation or approved design has resolved the next action, enter that action through the owning
 lifecycle.
 
-At normal start, read `machine:recover-agents`' linked command contract and inspect `status`. For a new
+At normal start, read `agent:recover`'s linked command contract and inspect `status`. For a new
 planning task, `item <feature>/<item> --status proposed --title '<useful title>'`; for new authorized
 execution, `claim <feature>/<item> --host <actual host> --role owner --status active --title '<useful title>'`.
 Use `--plan-path` only for an existing repo-relative plan. Questions need no registration; chores need no
@@ -81,11 +81,11 @@ remain prompt-only. Missing runtime capabilities must be reported accurately, no
 
 ## Finish the session
 
-Before returning a completed outcome, select `machine:close` and apply its completion decision. It owns
+Before returning a completed outcome, select `agent:close` and apply its completion decision. It owns
 the final-action ordering, keep-open requests and terminal closure. A new mistake callout is answered
 and corrected first; completion is then reassessed.
 
 ```text
-Delivery and validation complete, no owned wait: apply machine:close before the final reply.
+Delivery and validation complete, no owned wait: apply agent:close before the final reply.
 User calls out a mistake: answer and correct the active task, then reassess completion.
 ```

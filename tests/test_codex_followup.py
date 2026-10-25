@@ -245,10 +245,10 @@ class FollowupTests(unittest.TestCase):
         self.assertEqual('unavailable', result['status'])
         self.assertLess(
             result['next_action'].index('task-specific authority evidence'),
-            result['next_action'].index('machine:open-codex'),
+            result['next_action'].index('codex:open'),
         )
         self.assertLess(
-            result['next_action'].index('machine:open-codex'),
+            result['next_action'].index('codex:open'),
             result['next_action'].index('provide the message'),
         )
         self.assertIn('unavailable or ineligible', result['next_action'])
@@ -277,10 +277,10 @@ class FollowupTests(unittest.TestCase):
         self.assertEqual('rejected', result['status'])
         self.assertLess(
             result['next_action'].index('task-specific authority evidence'),
-            result['next_action'].index('machine:open-codex'),
+            result['next_action'].index('codex:open'),
         )
         self.assertLess(
-            result['next_action'].index('machine:open-codex'),
+            result['next_action'].index('codex:open'),
             result['next_action'].index('provide the message'),
         )
         self.assertIn('unavailable or ineligible', result['next_action'])

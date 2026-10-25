@@ -13,7 +13,7 @@
               "--deadline",
               "8",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py"
+              "${CLAUDE_PLUGIN_ROOT}/.agents/agent/utility/peer/scripts/register_session.py"
             ]
           },
           {
@@ -22,7 +22,7 @@
             "command": "python",
             "args": [
               "-B",
-              "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/reap_orphans.py",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/agent/runtime/reap_orphans.py",
               "--notice"
             ]
           }
@@ -44,6 +44,11 @@
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/.agents/agent-store/runtime/session_store.py",
               "hook",
+              "prompt",
+              "--host",
+              "claude",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/agent/runtime/close_lifecycle.py",
               "prompt",
               "--host",
               "claude"
@@ -71,7 +76,10 @@
               "--host",
               "claude",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_landed.py"
+              "${CLAUDE_PLUGIN_ROOT}/.agents/agent/runtime/close_lifecycle.py",
+              "stop",
+              "--host",
+              "claude"
             ]
           }
         ]

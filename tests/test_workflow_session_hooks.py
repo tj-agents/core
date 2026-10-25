@@ -11,7 +11,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ".agents/workflow/policy/session/scripts/session-context.py"
-REMINDER = "Nothing owned left to do before this reply? Select `machine:close`."
+REMINDER = "Nothing owned left to do before this reply? Select `agent:close`."
 
 
 class PackagedSessionLifecycleHook(unittest.TestCase):
@@ -43,7 +43,7 @@ class PackagedSessionLifecycleHook(unittest.TestCase):
                           '## A task has an owning lifecycle — load it before the first edit',
                           '## Finish the session'],
                          [line for line in context.splitlines() if line.startswith('## ')])
-        self.assertIn('Before returning a completed outcome, select `machine:close`', context)
+        self.assertIn('Before returning a completed outcome, select `agent:close`', context)
         self.assertLess(len(context), 2500)
         self.assertEqual([], list(self.cwd.iterdir()))
 

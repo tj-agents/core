@@ -106,7 +106,7 @@ Bind every remote wait through the shared reconnect-safe monitor before leaving 
 python .agents/workflows/workflow_ops.py --workflow-run-id <id> monitor --kind run --id <run-id> --head <full-sha> --workflow <name> --attempt <n>
 ```
 
-Use `--kind pr --id <pr-number>` for a PR or queue transition. Invoke `agent:background-listener`
+Use `--kind pr --id <pr-number>` for a PR or queue transition. Invoke `agent:listen`
 with that exact command for the current conversation's completion notification. The monitor persists repository, worktree, branch, head,
 target, workflow, attempt, last state, and timing before waiting. Re-run the same command after process loss,
 session resume, or machine suspension; it reconnects to the same identity and observes a run that completed
@@ -115,7 +115,7 @@ bounded timeout. Direct `gh run watch`, ad hoc sleeping forge loops, and model-t
 
 ### Notify before parking a listener
 
-Invoke `agent:background-listener` with the existing bound monitor. That skill owns the generic
+Invoke `agent:listen` with the existing bound monitor. That skill owns the generic
 execution and native completion callback; `engineering:persistent-workflow` owns durable delivery.
 
 Read forge status for a PR, head, or run once, again only after a real wake or observed state change, and

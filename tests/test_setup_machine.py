@@ -3,6 +3,7 @@ import io
 import json
 import os
 from pathlib import Path, PurePosixPath
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,6 +15,7 @@ if sys.version_info < (3, 11):
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / ".agents/machine/scripts"
+AGENT_STAGE = ROOT / ".agents/dependencies/agent/.agents/agent"
 sys.path.insert(0, str(SCRIPTS))
 import setup_machine as setup  # noqa: E402
 import tomllib  # noqa: E402
@@ -24,6 +26,14 @@ BOM = b"\xef\xbb\xbf"
 def snapshot(root: Path) -> dict[str, bytes]:
     return {path.relative_to(root).as_posix(): path.read_bytes()
             for path in sorted(root.rglob("*")) if path.is_file()}
+
+
+def stage_agent_setup_closure(root: Path) -> Path:
+    """Install the exact Agent inputs that a source checkout consumes."""
+    stage = root / ".agents/dependencies/agent/.agents/agent"
+    for relative in (Path("runtime"), Path("utility/plugins/scripts")):
+        shutil.copytree(AGENT_STAGE / relative, stage / relative)
+    return stage
 
 
 def completed(returncode=0, stdout="", stderr=""):
@@ -444,18 +454,19 @@ class PermissionStepTests(Machine):
 
         self.assertEqual(["Bash(mine)", "Bash(shipped)"], json.loads(settings.read_text(encoding="utf-8"))["permissions"]["allow"])
 
-    def test_the_permission_sync_module_is_loaded_beside_the_running_script(self):
+    def test_the_permission_sync_module_is_loaded_from_the_staged_agent_closure(self):
         running = self.root / "running" / "machine" / "scripts"
-        running_scripts = running.parent / "utility" / "plugin-selection" / "scripts"
-        running_scripts.mkdir(parents=True)
-        (running_scripts / "harness_permissions_sync.py").write_text("SOURCE = 'running'\n", encoding="utf-8")
+        running.mkdir(parents=True)
+        staged = stage_agent_setup_closure(self.root)
+        helper = staged / "utility/plugins/scripts/harness_permissions_sync.py"
+        helper.write_text("SOURCE = 'staged'\n", encoding="utf-8")
         context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
                                 run=self.unexpected_run, which=lambda name: None, documents=self.documents,
                                 script_directory=running)
 
         module = setup.permission_sync(context)
 
-        self.assertEqual("running", module.SOURCE)
+        self.assertEqual("staged", module.SOURCE)
 
     def test_a_missing_permission_sync_module_is_reported(self):
         context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
@@ -490,13 +501,13 @@ class RuntimeTests(Machine):
     def test_the_launch_check_runtime_is_installed_once(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
         for name in setup.plugin_autoupdate.RUNTIME:
-            self.assertEqual((SCRIPTS / name).read_bytes(), (self.home / ".agents-state" / "bin" / name).read_bytes())
+            self.assertEqual((AGENT_STAGE / "runtime" / name).read_bytes(),
+                             (self.home / ".agents-state" / "bin" / name).read_bytes())
 
-    def test_the_runtime_is_installed_from_the_running_scripts_directory(self):
-        running = self.root / "running" / "scripts"
+    def test_the_runtime_is_installed_from_the_staged_agent_closure(self):
+        running = self.root / "running" / "machine" / "scripts"
         running.mkdir(parents=True)
-        for name in setup.plugin_autoupdate.RUNTIME:
-            (running / name).write_text("running script copy\n", encoding="utf-8")
+        staged = stage_agent_setup_closure(self.root)
         context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
                                 run=self.unexpected_run, which=lambda name: None, documents=self.documents,
                                 script_directory=running)
@@ -504,7 +515,7 @@ class RuntimeTests(Machine):
         setup.apply_runtime(context)
 
         for name in setup.plugin_autoupdate.RUNTIME:
-            self.assertEqual((running / name).read_bytes(),
+            self.assertEqual((staged / "runtime" / name).read_bytes(),
                              (self.home / ".agents-state" / "bin" / name).read_bytes())
 
 

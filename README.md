@@ -2,13 +2,12 @@
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
 The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core).
-Select `base@tj-agents`, `agent-store@tj-agents`, `agent@tj-agents`, `machine@tj-agents`,
-`workflow@tj-agents` and `engineering@tj-agents` from
+Select Core's `base@tj-agents`, `machine@tj-agents`, `workflow@tj-agents` and
+`engineering@tj-agents`, plus their declared Agent, Agent Store, Codex, Claude and CLI prerequisites, from
 [`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
-The repository publishes Base, Agent Store, Agent, Machine, CLI, Workflow and Engineering packages.
-Agent owns shared execution and background completion across hosts. Agent Store owns recorded
-execution/session state; Machine observes and operates native hosts; CLI owns closure and closeout;
-Engineering owns code work and delivery.
+The repository publishes Base, Machine, Workflow and Engineering packages. Agent owns shared execution,
+runtime and background completion across hosts; Agent Store owns recorded execution/session state; CLI owns
+closure and closeout; Machine owns only native Core integration and clipboard support.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
 
@@ -74,7 +73,7 @@ immediate explicit refresh from the Core checkout, run:
 ./sync.sh --verify
 ```
 
-`machine:sync-plugins` owns adoption in a running session, including resuming the same conversation when
+`agent:refresh` owns adoption in a running session, including resuming the same conversation when
 native reload is unavailable. The agent runs explicit sync whenever an immediate refresh is needed.
 For a running Codex daemon conversation, sync also requests native runtime reload and verifies the
 required hook definitions in that existing daemon. Checking a separate fresh process does not establish
@@ -97,8 +96,9 @@ The richer planning workflows are selected engineering conventions, not prerequi
 Known bugs, mistakes and debt follow the selected problem-record profile.
 The [recording contract](.agents/workflow/resources/problem-records.md) routes remote work-item
 operations to the repository's explicitly selected profile. Personal owns GitHub records; Infonetica owns
-Azure Boards records and native type policy. Core publishes the shared SQLite registry as Agent Store, generic work status as Workflow, and reusable
-engineering lifecycles as Engineering. Installing Engineering does not select or install a recording
+Azure Boards records and native type policy. Agent publishes the shared SQLite registry as Agent Store;
+Core publishes generic work status as Workflow and reusable engineering lifecycles as Engineering.
+Installing Engineering does not select or install a recording
 profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
 registers remain evidence only.
 Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.9+
@@ -121,7 +121,7 @@ retains that boundary without Base64 or explicit `exec`. These checks do not pro
 who can modify the user's trusted configuration or race files inside the same user's temporary/snapshot
 directories, and source tests do not establish antivirus acceptance.
 
-Use `machine:hook-control` for reversible Codex hook controls on the active user profile.
+Use `codex:hooks` for reversible Codex hook controls on the active user profile.
 Add `--scope project --project <repository>` for a trusted repository's `.codex/config.toml`.
 The utility requires Python 3.11+. `off` writes the native
 [`features.hooks = false` gate](https://learn.chatgpt.com/docs/hooks#turn-hooks-off), which prevents ordinary
@@ -137,19 +137,19 @@ independent user and repository setting; adding a marketplace does not select it
 
 ## Agent Store ownership
 
-[Agent Store inspection](.agents/agent-store/utility/inspect/SKILL.md) reads recorded work items,
+`agent-store:inspect` reads recorded work items,
 sessions, owners and external references without creating or migrating the database. Its JSON labels
 process liveness as unobserved. Machine's native recovery checks processes and worktrees before opening
 a session; the store serializes ownership changes and preserves the existing schema and identities.
 
-The store runtime is authored once under `.agents/agent-store/runtime/`. Agent Store, Machine and
+The store runtime is authored once by Agent. Machine and
 Engineering receive generated package-local copies through the [resource contract](PACKAGING.md).
 A package never imports a sibling plugin installation. Machine's hooks remain the native event adapters.
 
 ```text
 Machine -> Base + Agent Store
-CLI -> Base + Agent Store + Machine
-Engineering -> Base + Agent Store + Machine
+Workflow -> Base + Machine + Agent Store + Agent
+Engineering -> Base + Workflow + Machine + Agent Store + Agent + Codex + Claude + CLI
 Agent Store inspection -> existing sessions.db, read-only JSON
 ```
 
@@ -157,12 +157,9 @@ These are source package relationships. The central marketplace roster and nativ
 also contain a package before a selected host can discover it; successful source generation is not
 installed activation.
 
-The CLI package is published and available for explicit selection. Existing sessions use `machine:close`,
-which shares the CLI package's verified frontend closure runtime through a generated Machine-local copy.
-
-`cli:close` closes only the current terminal tab after the final reply and preserves unfinished work.
-`machine:close` finishes the authorized workflow, then uses the same closure primitive and the
-proof-guarded worktree sweep. An explicit request to dismiss a CLI can select `cli:close` when installed.
+`agent:close` prepares workflow completion and invokes the explicit CLI terminal operation.
+`cli:close` closes only the current terminal tab after the final reply and preserves unfinished work;
+`cli:closeout` is the pure removal-and-close command, not a workflow interpreter.
 
 For shared Codex backends, a resumed frontend is bound to its exact native launch receipt, child PID/start
 time and terminal observation captured by the launcher. The watcher waits for that frontend to exit,
@@ -208,8 +205,8 @@ gate. Source verification does not establish installed-host trust or acceptance.
 
 ## Layout
 
-- `.agents/` is the canonical host-neutral source. Base, Agent Store, Machine, CLI, Workflow and Engineering ownership is expressed
-  below it alongside shared workflows, hooks, schemas, tests and resources.
+- `.agents/` is the canonical host-neutral source. Core expresses Base, Machine, Workflow and Engineering
+  ownership below it; staged external publisher exports supply Agent, Agent Store and CLI runtime material.
 - `.codex/` contains only Codex entry points and host configuration. `.claude/` contains only Claude
   entry points and host configuration. Their skills reference canonical `.agents/` definitions rather
   than maintaining copied instruction bodies.
@@ -271,7 +268,7 @@ classification or any selected job fails, disappears, is cancelled or skips. Con
 to require this check when enabling server-side enforcement. Existing all-checks merge validation also
 consumes its result. Selection never cancels a prior run or transfers a previous head's test success.
 
-The `machine:plugin-selection` skill creates a repository's `.agents/plugins.json` and generates the committed
+The `agent:plugins` skill creates a repository's `.agents/plugins.json` and generates the committed
 Claude and Codex plugin settings from it, so a fresh clone installs exactly what it selects from rolling main.
 Selections can combine `tj-agents` and `Concertable` marketplaces without revision pins.
 
@@ -371,7 +368,7 @@ this project's Claude installs with the recorded heads from local files only, an
 when its plugin directory differs at the head; each install is tried at most once per head, so a failure waits
 for the next head. A project install is skipped when a nested worktree's install below it is listed first,
 because Claude's CLI then updates the nested one. Codex re-adds a plugin only when its directory changed. Without GitHub content, both compare commits.
-`machine:sync-plugins` runs the same check in a running session.
+`agent:refresh` runs the same check in a running session.
 
 Main-branch callers publish events through the shared
 `tj-agents/github-actions/.github/actions/machine-events` publisher. Setup reuses or creates the
@@ -397,7 +394,7 @@ The generic service scaffold does not generate it. GitHub Free's repository rule
 apply to private repositories.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
-loaded; follow `machine:sync-plugins` for adoption and the required recovery verification.
+loaded; follow `agent:refresh` for adoption and the required recovery verification.
 
 ### Refresh and repository boundaries
 
@@ -418,7 +415,7 @@ configuration does not establish personal scope. Infonetica is work scope, inclu
 there. Read the target repository's README.md and AGENTS.md before choosing its policy profiles.
 
 Repository plugin adoption follows
-[machine:plugin-selection](.agents/machine/utility/plugin-selection/SKILL.md). Employer-project agent
+`agent:plugins`. Employer-project agent
 settings use its local scope and Git metadata exclusions. The local writer resolves the exact checkout
 and `git rev-parse --git-path info/exclude`, including shared Git metadata for linked worktrees; it refuses
 tracked local targets. A home directory, current branch or linked worktree is not permission to adopt a
@@ -436,7 +433,7 @@ A hook repair reaches a machine after it merges, the `regenerate` job publishes 
 automatic update installs it. Codex launch and refresh verify published package contents, apply trust only
 to verified current hook hashes, and read back required-hook readiness. Failed readiness blocks ordinary
 work; native plugin maintenance remains available for recovery. A running session keeps the hook bytes it
-loaded. Use `machine:sync-plugins` to recover, and verify the affected hooks actually execute successfully.
+loaded. Use `agent:refresh` to recover, and verify the affected hooks actually execute successfully.
 If native reload is unavailable, resume the same conversation by its exact session ID and directory.
 Keep ownership and leave the conversation open for that user action; do not launch a successor merely
 to change directory or reload hooks. `base:cd` owns the native directory-change fallback.
@@ -445,7 +442,7 @@ Never edit an installed plugin cache, disable hooks, or rewrite continuation sta
 
 ## Repository plugin selection
 
-Use `machine:plugin-selection` to commit `.agents/plugins.json`, `.claude/settings.json` and
+Use `agent:plugins` to commit `.agents/plugins.json`, `.claude/settings.json` and
 `.codex/config.toml`. Claude declares `extraKnownMarketplaces` with `autoUpdate: true` and
 `enabledPlugins`. Codex declares `[marketplaces]` and `[plugins]` in trusted project configuration.
 Native admission, installation, credentials and caches remain host responsibilities.

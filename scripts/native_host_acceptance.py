@@ -20,7 +20,7 @@ from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = ("base", "agent-store", "agent", "machine", "cli", "workflow", "engineering")
+PACKAGES = ("base", "machine", "workflow", "engineering")
 IDENTITIES = tuple(f"{package}@tj-agents" for package in PACKAGES)
 
 
@@ -550,8 +550,8 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
         errors = []
         start_line_reader(process.stdout, messages, parse_json=True, completion=completed)
         start_line_reader(process.stderr, errors)
-        store = load_module("native_acceptance_claude_store", root / ".agents" / "agent-store" / "runtime" / "session_store.py")
-        register = load_module("native_acceptance_claude_register", root / ".agents" / "machine" / "utility" / "peer-cli" / "scripts" / "register_session.py")
+        store = load_module("native_acceptance_claude_store", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py")
+        register = load_module("native_acceptance_claude_register", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "utility" / "peer" / "scripts" / "register_session.py")
         deadline = time.monotonic() + timeout
         request_id = "native-acceptance-1"
         process.stdin.write(json.dumps({
@@ -640,9 +640,9 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
 
 def accept_codex(root, marketplace, executable, project, environment, artifacts, timeout):
     install_codex_plugins(executable, marketplace, project, environment, timeout)
-    trust = load_module("native_acceptance_trust", root / ".agents" / "machine" / "scripts" / "codex_hook_trust.py")
-    store = load_module("native_acceptance_store", root / ".agents" / "agent-store" / "runtime" / "session_store.py")
-    register = load_module("native_acceptance_register", root / ".agents" / "machine" / "utility" / "peer-cli" / "scripts" / "register_session.py")
+    trust = load_module("native_acceptance_trust", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime" / "codex_hook_trust.py")
+    store = load_module("native_acceptance_store", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py")
+    register = load_module("native_acceptance_register", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "utility" / "peer" / "scripts" / "register_session.py")
     with AppServer(executable, project, environment, timeout) as server:
         hooks = server.request("hooks/list", {"cwds": [str(project)]})
         require_startup_hooks(hooks)

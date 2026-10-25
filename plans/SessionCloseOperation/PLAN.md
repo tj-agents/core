@@ -19,7 +19,7 @@ Core #285 merged source head `a8d716be16cb1f067b899e4a4f8b7b2bec2876f4` as
 `16d0d994b42664fb727b2518bcf605fcd006b5a2`. The merge-triggered regeneration job published
 `8ecfe3e9c8626638b7c5c5a1637f94c74c4a80f1` with the shared skill and both host mappings.
 
-- `machine:close` prepares before the report, routes at Stop, and completes in the foreground after
+- `agent:close` prepares before the report, routes at Stop, and completes in the foreground after
   other Stop-gate feedback permits closure. Stop itself never signals a process.
 - Base guidance applies it to all completed CLI-owned work. Code and documentation delivery select
   the same owner; peer-cli's self-close helpers remain its underlying runtime.
@@ -55,7 +55,7 @@ repositories pick up the new shared operation through their normal rolling sessi
   "acceptance": [
     {
       "id": "public-operation",
-      "criterion": "A shipped machine:close operation is discoverable on both hosts",
+      "criterion": "A shipped agent:close operation is discoverable on both hosts",
       "evidence": [
         {
           "source": "https://github.com/tj-agents/core/pull/285",
@@ -71,7 +71,7 @@ repositories pick up the new shared operation through their normal rolling sessi
       "evidence": [
         {
           "source": ".agents/base/policy/goal-continuation/SKILL.md and merge/merge-docs/peer-cli guidance",
-          "result": "Shared policy and terminal owners select machine:close without requiring a PR or plan."
+          "result": "Shared policy and terminal owners select agent:close without requiring a PR or plan."
         }
       ],
       "owner": null,

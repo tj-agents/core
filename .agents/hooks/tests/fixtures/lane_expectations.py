@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 
 
-LANES = Path(__file__).resolve().parents[3] / "lanes"
+LANES = Path(__file__).resolve().parents[4] / ".agents/dependencies/agent/.agents/agent/resources/lanes"
 
 
 def _table(host):

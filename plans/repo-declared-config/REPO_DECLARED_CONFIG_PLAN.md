@@ -10,7 +10,7 @@ Every repository commits its marketplace sources and selected plugins. Claude us
 Codex uses trusted-project `.codex/config.toml` where supported. Native installation, trust,
 credentials and derived caches remain host responsibilities. Record unsupported host behavior.
 
-Use the existing `machine:plugin-selection` generator and Template's new-repository integration.
+Use the existing `agent:plugins` generator and Template's new-repository integration.
 No new skill, hook, gate or launch-time installer. Automatic updates use Claude's native updater
 and core PR #320's scheduled Codex updater. One-time machine setup belongs in `setup.ps1`.
 

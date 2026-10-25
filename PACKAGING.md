@@ -23,7 +23,7 @@ one authored owner and are covered by each package fingerprint. Runtime referenc
 another plugin or depend on the author checkout.
 
 ```json
-{"plugin":"machine","source":".agents/agent-store/runtime","destination":".agents/agent-store/runtime"}
+{"plugin":"machine","source":".agents/dependencies/agent/.agents/agent-store/runtime","destination":".agents/agent-store/runtime"}
 ```
 
 Machine loads this embedded store implementation from its own package. Agent Store owns the source,

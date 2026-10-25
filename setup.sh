@@ -1,2 +1,4 @@
 #!/usr/bin/env bash
-exec python3 -B "$(dirname "$0")/.agents/machine/scripts/setup_machine.py" "$@"
+root="$(dirname "$0")"
+python3 -B "$root/scripts/runtime_sources.py" || exit $?
+exec python3 -B "$root/.agents/machine/scripts/setup_machine.py" "$@"

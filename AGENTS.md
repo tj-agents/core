@@ -42,9 +42,10 @@ Result: copying a cached skill onto that laptop alone does not complete the repa
 Global design and cross-repository plans belong in [`tj-agents/docs`](https://github.com/tj-agents/docs).
 Keep core implementation plans here and link to shared designs instead of copying them.
 
-`.agents/` is the only canonical home for host-neutral capability definitions, workflow contracts,
-shared hooks, schemas, tests and resources. Logical Base, Agent Store, Agent, Engineering and Machine ownership lives below
-that directory; it must not be recreated as authored top-level source trees.
+`.agents/` is the only canonical home for Core host-neutral capability definitions, workflow contracts,
+shared hooks, schemas, tests and resources. Core's Base, Engineering, Workflow and Machine ownership lives
+below that directory; external Agent, Agent Store, Codex, Claude and CLI definitions arrive only through
+declared staged publisher exports and must not be recreated as authored Core source.
 
 `.codex/` contains Codex-only entry points, adapters, agent definitions and configuration. `.claude/`
 contains Claude-only equivalents. Authored host manifests and hook wiring live under
@@ -66,8 +67,8 @@ See [`PACKAGING.md`](PACKAGING.md).
 For machine setup, event handling or repository adoption, read the
 [refresh and repository boundaries](README.md#refresh-and-repository-boundaries) before changing them.
 Preserve the separation with the [machine event fixtures](tests/test_machine_events.py); repository
-adoption and local exclusions follow [machine:plugin-selection](.agents/machine/utility/plugin-selection/SKILL.md).
-Consumer validation and native refresh share `.agents/machine/scripts/plugin_autoupdate.py`.
+adoption and local exclusions follow `agent:plugins`.
+Consumer validation and native refresh share the staged Agent `plugin_autoupdate.py` runtime.
 Follow the [shared catalog's identity policy](https://github.com/tj-agents/marketplace#readme)
 when changing marketplace declarations or installed-registration cleanup.
 

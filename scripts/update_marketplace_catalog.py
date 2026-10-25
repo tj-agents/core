@@ -11,7 +11,8 @@ import subprocess
 import sys
 
 
-TARGET = (Path(__file__).resolve().parents[1] / ".agents/machine/utility/plugin-selection/scripts/marketplace_catalog.lock.json")
+TARGET = (Path(__file__).resolve().parents[1]
+          / ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/marketplace_catalog.lock.json")
 
 
 def git(source: Path, *args: str) -> str:
