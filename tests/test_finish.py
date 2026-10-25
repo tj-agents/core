@@ -41,23 +41,23 @@ class HostFallbackTests(unittest.TestCase):
 
 
     def test_unregistered_attachment_refuses_an_unsafe_close(self):
-        host = session_close.register_session.ProcessInfo(10, 1, "codex.exe", 20.0)
+        host = session_close.register_session.ProcessInfo(10, 1, "claude.exe", 20.0)
         with mock.patch.object(session_close.os, "getppid", return_value=10), \
                 mock.patch.object(session_close, "process_info", return_value=host), \
-                mock.patch.object(session_close.register_session, "read_host_names", return_value={"codex"}), \
+                mock.patch.object(session_close.register_session, "read_host_names", return_value={"claude"}), \
                 mock.patch.object(session_close, "entries", return_value=[]):
             with self.assertRaisesRegex(session_close.Refusal, "do not force-close the host"):
                 session_close.own_host_and_entry(Path.cwd())
 
     def test_attachment_resolves_under_the_launch_directory_after_the_registry_moved(self):
-        host = session_close.register_session.ProcessInfo(10, 1, "codex.exe", 20.0)
+        host = session_close.register_session.ProcessInfo(10, 1, "claude.exe", 20.0)
         launch = Path.cwd().parent
-        entry = {"host": "codex", "session_id": "own", "pid": 10, "pid_started_at": 20.0, "started_at": 30.0,
+        entry = {"host": "claude", "session_id": "own", "pid": 10, "pid_started_at": 20.0, "started_at": 30.0,
                  "cwd": str(launch / "elsewhere"), "launch_cwd": str(launch)}
         with mock.patch.object(session_close.os, "getppid", return_value=10), \
                 mock.patch.object(session_close, "process_info", return_value=host), \
                 mock.patch.object(session_close, "verified_live", return_value=True), \
-                mock.patch.object(session_close.register_session, "read_host_names", return_value={"codex"}):
+                mock.patch.object(session_close.register_session, "read_host_names", return_value={"claude"}):
             with mock.patch.object(session_close, "entries", return_value=[("own.json", entry)]):
                 self.assertEqual(entry, session_close.own_host_and_entry(Path.cwd()))
             moved_only = {key: value for key, value in entry.items() if key != "launch_cwd"}

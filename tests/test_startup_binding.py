@@ -57,7 +57,7 @@ class StartupBindingTests(unittest.TestCase):
         # These fixtures run Python in place of the native CLI. Native config binding is
         # exercised separately; Python itself cannot accept Codex's --config argument.
         prepare = mock.patch.object(BINDING.cli_client, 'prepare',
-                                    side_effect=lambda host, args, project, env: (list(args), dict(env), None))
+                                    side_effect=lambda host, args, project, env, **kwargs: (list(args), dict(env), None))
         prepare.start()
         self.addCleanup(prepare.stop)
         readiness = mock.patch.object(BINDING.launch_check, "ensure_hooks")
