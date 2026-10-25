@@ -1437,7 +1437,7 @@ def main():
         sys.stderr.write(f"SKILL ROUTER - {error}\nThis tool call was NOT run.\n")
         sys.exit(2)
     if verified is not None:
-        VERIFIED_PLUGIN_ROOTS[harness] = verified
+        VERIFIED_PLUGIN_ROOTS[harness] = tuple(verified.values())
     try:
         routes = load_routes(root)
     except RoutesUnusable as error:

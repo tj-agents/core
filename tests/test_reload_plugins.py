@@ -71,6 +71,11 @@ class RefreshCliTests(unittest.TestCase):
         self.readiness = readiness.start()
         self.addCleanup(readiness.stop)
 
+        for method in ("check_setup", "converge_setup"):
+            patcher = mock.patch.object(REFRESH.required_plugins, method, return_value=[])
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     def test_current_plugins_still_require_live_hook_reload(self):
         with mock.patch.object(REFRESH.launch_check, "check", return_value="current"), \
                 mock.patch("sys.stdout"), mock.patch("sys.stderr"):
@@ -137,6 +142,55 @@ class RefreshCliTests(unittest.TestCase):
                 mock.patch("sys.stdout"), mock.patch("sys.stderr"):
             self.assertEqual(1, REFRESH.main(["--host", "codex"]))
         self.readiness.assert_called_once()
+        REFRESH.required_plugins.converge_setup.assert_not_called()
+
+    def test_default_early_return_converges_plugin_setup_before_success(self):
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="current"), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup", return_value=[]) as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(0, REFRESH.main(["--host", "codex"]))
+        self.assertEqual((ROOT, ("codex",), {"codex": None}, False), converge.call_args.args)
+
+    def test_failed_launch_or_refresh_never_applies_plugin_setup(self):
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="failed"), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex"]))
+        converge.assert_not_called()
+
+        with mock.patch.object(REFRESH, "selection", return_value=({}, [])), \
+                mock.patch.object(REFRESH, "refresh", side_effect=REFRESH.RefreshError("failed refresh")), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex", "--all"]))
+        converge.assert_not_called()
+
+    def test_offline_event_still_checks_hook_readiness_and_allows_explicit_onboarding(self):
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="offline"), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup", return_value=[]) as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex", "--onboard"]))
+        self.readiness.assert_called_once()
+        self.assertEqual((ROOT, ("codex",), {"codex": None}, True), converge.call_args.args)
+
+    def test_offline_event_with_unready_hooks_blocks_setup(self):
+        self.readiness.side_effect = RuntimeError("required hook needs review")
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="offline"), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex", "--onboard"]))
+        converge.assert_not_called()
+
+    def test_verify_only_checks_plugin_setup_without_applying_or_onboarding(self):
+        with mock.patch.object(REFRESH, "executable_for", return_value="codex"), \
+                mock.patch.object(REFRESH, "selection", return_value=({}, [])), \
+                mock.patch.object(REFRESH, "verify", return_value={"host": "codex", "plugins": [], "problems": []}), \
+                mock.patch.object(REFRESH.required_plugins, "check_setup", return_value=[]) as check, \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(0, REFRESH.main(["--host", "codex", "--verify-only"]))
+        check.assert_called_once_with(ROOT, ("codex",), {"codex": None})
+        converge.assert_not_called()
 
     def test_refresh_updates_applicable_claude_local_installations(self):
         fake = FakeClaude([

@@ -28,7 +28,7 @@ git log --oneline -5                        # the repo's message style
 git branch --show-current
 ```
 
-- **Never commit on the default branch.** Branch first, per `engineering:git-branching`, unless the
+- **Never commit on the default branch.** Branch first, per `engineering:branching`, unless the
   user explicitly says otherwise.
 - **A non-empty index is a signal, not an accident.** If a prior session deliberately staged a curated set,
   treat it as its own commit candidate. Do not `git add` over it and fuse it with unrelated work.

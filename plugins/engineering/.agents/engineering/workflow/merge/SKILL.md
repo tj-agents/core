@@ -229,7 +229,7 @@ Before removing persistent state, inspect the completed delivery binding. A stan
 continuation. A plan-managed binding with a workflow handoff keeps the one existing continuation, closes only
 the merged PR binding, checkpoints the merge, and transfers to the recorded `workflow:run` stage. That
 stage reconciles an existing successor layer or starts the next branch in a checkout selected under
-`engineering:git-branching`, before rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
+`engineering:branching`, before rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
 watermark or delivery binding into the successor; the successor re-resolves merge authorization from the
 goal's recorded authorization (`engineering:merging`).
 
@@ -261,7 +261,7 @@ the sweep kept and why; never force a removal.
 
 If plan work remains, reconcile and continue an existing successor stack layer, including its base,
 head, review evidence and delivery binding. When no successor exists, start the next branch from the
-updated base and select its checkout under `engineering:git-branching`; resume the same ledger. Remote
+updated base and select its checkout under `engineering:branching`; resume the same ledger. Remote
 observation alone needs no new checkout. Select a checkout when a substantive close-out edit is required.
 
 ### 6. Follow the publish and version-sync consequence to a terminal state
@@ -311,7 +311,7 @@ merge caused, and a causally linked red one is never left behind. The mechanics:
   build to discover the rest rather than starting a full local solution build. Record the red state once as a
   blocker, then commit fixes locally, run targeted builds, and make one stable push. GitHub retains replacement
   checks and merge evidence. Never push the source plan's recovery commits to either PR.
-- **Close plan-managed delivery from a checkout selected under `engineering:git-branching`.** Before
+- **Close plan-managed delivery from a checkout selected under `engineering:branching`.** Before
   deleting the goal, run the fresh completion check above. A missing, invalid, or failing record leaves the
   plan and its owned actions in place. Once
   publication and sync are terminal, reconcile the linked selected item through

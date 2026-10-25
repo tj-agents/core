@@ -314,6 +314,12 @@ The full setup enables Claude's native auto-update, copies the launch-check runt
 adds `claude` and `codex` functions to the PowerShell profiles (and `~/.bashrc` or `~/.zshrc` on
 Linux) inside one marked block, keeping a `.pre-tj-agents.bak` copy. Nothing runs in the background.
 
+After native installations are verified, setup also runs each selected plugin's declared `requires.setup` helper.
+Its `setup --check` is always read-only; ordinary setup may converge a ready installation, while a browser or human
+enrollment helper runs only with explicit `./setup.ps1 --onboard` or `./setup.sh --onboard`. `--onboard` and
+`--check` are mutually exclusive. Explicit sync also converges selected setup; use `./sync.ps1 --onboard`
+or `./sync.sh --onboard` for enrollment. `--verify-only` checks without applying setup and rejects `--onboard`.
+
 Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: one non-blocking ntfy.sh
 poll for events since the saved cursor; offline it starts anyway. Events name the publishing repositories.
 
