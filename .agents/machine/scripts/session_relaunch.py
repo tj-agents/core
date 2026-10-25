@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resume the calling Claude session in a fresh process once it has closed (Python 3.9+)."""
+"""Resume the verified calling CLI in a fresh process once it has closed (Python 3.9+)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,9 @@ import time
 
 HERE = Path(__file__).resolve().parent
 IN_USE = ".in_use"
-PROMPT = "Plugins were refreshed and this conversation resumed in a fresh process. Continue the requested work."
+PROMPT = ("This same conversation was automatically resumed to adopt refreshed plugins. "
+          "Verify required startup hooks executed successfully, read the current task's recovery "
+          "checkpoint, and continue its authorized work. Do not repeat the completed investigation.")
 WAIT_SECONDS = 960
 VARIADIC = {"--add-dir", "--mcp-config"}
 SINGLE = {"--settings", "--plugin-dir", "--setting-sources", "--permission-mode", "--model"}
@@ -66,6 +68,33 @@ def preserved_arguments(argv: list[str]) -> list[str]:
                 index += 1
             if values:
                 kept += [token, *values]
+    return kept
+
+
+def codex_arguments(argv: list[str]) -> list[str]:
+    kept, index = [], 0
+    single = {"--config", "-c", "--model", "-m", "--profile", "-p", "--sandbox", "-s",
+              "--ask-for-approval", "-a", "--add-dir", "--enable", "--disable",
+              "--remote", "--remote-auth-token-env", "--local-provider"}
+    flags = {"--no-daemon", "--no-alt-screen", "--search", "--oss", "--strict-config",
+             "--approve-for-me", "--dangerously-bypass-approvals-and-sandbox"}
+    while index < len(argv):
+        token = argv[index]
+        name, equals, _ = token.partition("=")
+        index += 1
+        if token == "--" or not token.startswith("-"):
+            break
+        if name in flags and not equals:
+            kept.append(token)
+        elif name in single and equals:
+            kept.append(token)
+        elif name in single and index < len(argv):
+            kept += [token, argv[index]]
+            index += 1
+        elif name in {"--cd", "-C", "--image", "-i"} and not equals:
+            index += 1
+        elif name == "--dangerously-bypass-hook-trust":
+            raise RuntimeError("Refusing to carry a hook-trust bypass into recovery")
     return kept
 
 
@@ -135,7 +164,9 @@ def stale_plugins(pid: int, project: Path, identities: list[str], installed: dic
 
 def utility_script(skill: str, name: str) -> Path:
     root = HERE.parents[2] if len(HERE.parents) > 2 else HERE
-    for path in (HERE.parent / "utility" / skill / "scripts" / name, root / "skills" / skill / "scripts" / name,
+    for path in (HERE.parents[1] / "cli/utility" / skill / "scripts" / name,
+                 root / ".agents/cli/utility" / skill / "scripts" / name,
+                 HERE.parent / "utility" / skill / "scripts" / name, root / "skills" / skill / "scripts" / name,
                  root / "codex-skills" / skill / "scripts" / name,
                  root / ".agents/machine/utility" / skill / "scripts" / name):
         if path.is_file():
@@ -162,26 +193,40 @@ def recovery_script(project: Path, installed: dict) -> Path:
     return HERE / "agent_recovery.py"
 
 
-def relaunch(project: Path, installed: dict, shared=None, close=None, arguments=host_arguments) -> dict:
+def relaunch(project: Path, installed: dict, shared=None, close=None, arguments=host_arguments,
+             host="claude") -> dict:
     shared = shared or load(utility_script("peer-cli", "session_close.py"), "session_close")
     close = close or load(utility_script("close", "close_session.py"), "close_session")
     entry = shared.own_host_and_entry()
-    if entry.get("host") != "claude":
-        raise RuntimeError("the calling session is not a registered Claude session")
+    if host not in {"claude", "codex"} or entry.get("host") != host:
+        raise RuntimeError("the calling session is not the expected registered CLI")
+    if host == "codex" and Path(entry.get("launch_cwd", "")).resolve() != project.resolve():
+        raise RuntimeError("the refresh checkout does not match this Codex client's checkout")
     session_id = entry["session_id"]
-    native = preserved_arguments(arguments(entry["pid"]))
+    native = (codex_arguments if host == "codex" else preserved_arguments)(arguments(entry["pid"]))
     token = secrets.token_hex(16)
     record = record_path(session_id)
     write_json(record, {"state": "waiting", "token": token, "session_id": session_id, "pid": entry["pid"],
+                        "host": host, "profile": entry.get("profile"), "cwd": str(project.resolve()),
                         "native_arguments": native, "at": time.time()})
-    options = ["--session-id", session_id, "--pid", str(entry["pid"]),
+    profile = entry.get("profile") or os.environ.get("CODEX_HOME" if host == "codex" else "CLAUDE_CONFIG_DIR")
+    options = ["--host", host, "--session-id", session_id, "--pid", str(entry["pid"]),
                "--pid-started-at", repr(entry["pid_started_at"]), "--record", str(record), "--token", token,
-               "--recovery", str(recovery_script(project, installed)), "--title", entry.get("title") or "Claude",
+               "--recovery", str(recovery_script(project, installed)), "--title", entry.get("title") or host.title(),
                "--prompt", PROMPT, "--timeout", str(WAIT_SECONDS),
                *[f"--native-argument={value}" for value in native]]
+    if profile:
+        options += ["--profile", str(profile)]
     try:
         shared.start_detached(HERE / "relaunch_watcher.py", options)
         armed = close.arm()
+        if armed.get("status") != "armed":
+            raise RuntimeError("the verified frontend close was not armed")
+        close_record = read_json(state_directory() / "session-close" / f"{session_id}.armed.json")
+        if host == "codex":
+            if not isinstance(close_record.get("armed_at"), (int, float)):
+                raise RuntimeError("the verified frontend close has no arm receipt")
+            write_json(record, {**read_json(record), "close_armed_at": close_record["armed_at"]})
     except Exception as error:
         write_json(record, {**read_json(record), "state": "cancelled", "reason": str(error), "at": time.time()})
         raise RuntimeError(f"relaunch was not armed: {error}") from error
