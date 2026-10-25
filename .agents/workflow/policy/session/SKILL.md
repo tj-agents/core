@@ -73,7 +73,7 @@ coordination with a verified responsible recipient; do not add a confirmation st
 
 Correct a mistaken route in the original recipient's conversation by identifying and retracting the earlier
 assignment. That correction does not assign it the repair. Resolve the actual owner before routing work again.
-`machine:followup-codex` implements admission and delivery evidence for independent Codex sessions; native
+`agent:message` implements admission and delivery evidence for independent Codex sessions; native
 in-conversation messaging follows the same responsibility decision.
 
 ```text
