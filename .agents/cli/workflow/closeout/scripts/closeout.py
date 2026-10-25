@@ -57,7 +57,7 @@ def cleanup(shared):
 def arm():
     shared = close_session.runtime()
     entry, activity = close_session.own_session(shared)
-    if activity.get('turn_state') != 'working':
+    if entry['host'] != 'codex' and activity.get('turn_state') != 'working':
         raise shared.Refusal('this session has no active turn to close after')
     return close_session.start_watcher(shared, entry, time.time(), cleanup(shared))
 
@@ -66,6 +66,11 @@ def arm_after_stop(landed_at, session_id=None):
     """Arm from a Stop hook that runs after the session store recorded this turn's stop."""
     shared = close_session.runtime()
     entry, activity = close_session.own_session(shared, session_id)
+    if entry['host'] == 'codex':
+        started = close_session.session_activity(shared, entry).get('started_at')
+        if not shared.finite_positive(started) or started >= landed_at:
+            raise shared.Refusal('the delivery landed before this session started')
+        return close_session.start_watcher(shared, entry, time.time(), cleanup(shared))
     stopped = activity.get('last_activity_at')
     if activity.get('turn_state') != 'awaiting_input' or not shared.finite_positive(stopped):
         raise shared.Refusal('this session has no recorded stop to close after')

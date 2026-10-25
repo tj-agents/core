@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest import mock
@@ -105,7 +106,7 @@ class FrontendBindingTests(unittest.TestCase):
                 mock.patch.object(watcher, 'registered_entry', return_value=target), \
                 mock.patch.object(watcher.close, 'close_host') as close, \
                 mock.patch.object(session_close, 'verified_exited', side_effect=lambda pid, _start: pid == 21) as exited:
-            watcher.close_session(args, 206.0)
+            watcher.close_session(args, SimpleNamespace(entry=target, poll=lambda: True))
         self.assertEqual(21, close.call_args.args[0]['pid'])
         exited.assert_called_once_with(21, 202.0)
         self.assertIn(10, self.processes)
