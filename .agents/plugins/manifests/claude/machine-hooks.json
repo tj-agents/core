@@ -71,7 +71,7 @@
               "--host",
               "claude",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/close_landed.py"
+              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_landed.py"
             ]
           }
         ]

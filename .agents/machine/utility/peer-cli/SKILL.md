@@ -94,7 +94,7 @@ Its two refusals both exist because they were broken first:
   a kill or cleanup. Force can select an explicit stale terminal target, but never bypasses pid/start-time
   verification for a process signal.
 
-Closing *this* session is `cli:close`'s job. Its watcher reuses `close.py`'s verified host close.
+Closing *this* session is `machine:close`'s job. Its watcher reuses `close.py`'s verified host close.
 
 ## Closing a peer
 

@@ -264,7 +264,6 @@
           "tj-agents/base",
           "tj-agents/agent-store",
           "tj-agents/machine",
-          "tj-agents/cli",
           "tj-agents/agent"
         ],
         "optional": []
@@ -288,7 +287,6 @@
           "tj-agents/agent",
           "tj-agents/agent-store",
           "tj-agents/base",
-          "tj-agents/cli",
           "tj-agents/machine",
           "tj-agents/workflow"
         ],
@@ -408,7 +406,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:8cc4e972a7dfdb9c6fe0a9690dfa0e511a7f6bf0b6cc36586235b05d0f011f06",
+      "digest": "sha256:4532b5596b16a925c5f790142e7ce871587f4b94de8bc89fc4229ac74e9e9d7e",
       "harness": {
         "marketplaces": [
           {
@@ -594,7 +592,6 @@
           "tj-agents/workflow",
           "tj-agents/agent-store",
           "tj-agents/machine",
-          "tj-agents/cli",
           "tj-agents/agent"
         ],
         "optional": []
@@ -622,7 +619,6 @@
           "tj-agents/agent",
           "tj-agents/agent-store",
           "tj-agents/base",
-          "tj-agents/cli",
           "tj-agents/engineering",
           "tj-agents/machine",
           "tj-agents/workflow"
@@ -878,6 +874,7 @@
       "skills": [
         "auto-memory",
         "clip",
+        "close",
         "followup-codex",
         "handoff-claude",
         "handoff-codex",
@@ -914,7 +911,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:2f5ee7c73463330aa0e42c267d209a18579ac6901b79e8d33703af6ddbe374e2",
+      "digest": "sha256:df46cb2f62946cf8ca59b1ec3bac206ed9baa7472f363111fa1260ec393dc648",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -939,7 +936,7 @@
             ]
           },
           {
-            "path": ".agents/cli/workflow/closeout/scripts/close_landed.py",
+            "path": ".agents/machine/utility/close/scripts/close_landed.py",
             "hosts": [
               "claude",
               "codex"
@@ -1033,6 +1030,14 @@
             "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
             "Bash(python -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
             "PowerShell(python -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
@@ -1466,6 +1471,44 @@
                   "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/other.py",
                   "--root",
                   "/workspace/project"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
+                  "${PLUGIN_ROOT}/skills/close/scripts/close_session.py",
+                  "${PLUGIN_ROOT}/codex-skills/close/scripts/close_session.py"
+                ],
+                "arm"
+              ],
+              "justification": "Arm a watcher that closes only this verified CLI after its final reply",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
+                  "arm"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
+                  "hook"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/other.py",
+                  "arm"
                 ]
               ]
             },
