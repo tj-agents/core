@@ -18,7 +18,9 @@
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/idea-initialization/scripts/session-context.py",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/project-setup/scripts/session-context.py",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/solution-assessment/scripts/session-context.py",
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/task-routing/scripts/session-context.py"
             ]

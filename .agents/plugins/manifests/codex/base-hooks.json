@@ -5,9 +5,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context --hook \"${PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/idea-initialization/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/task-routing/scripts/session-context.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context --hook \"${PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/idea-initialization/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/task-routing/scripts/session-context.py\"",
-            "timeout": 10
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 25 --hook \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context --hook \"${PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/project-setup/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/solution-assessment/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/task-routing/scripts/session-context.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 25 --hook \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context --hook \"${PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/project-setup/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/solution-assessment/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/.agents/base/policy/task-routing/scripts/session-context.py\"",
+            "timeout": 30
           }
         ]
       }
