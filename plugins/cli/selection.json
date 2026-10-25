@@ -1,0 +1,16 @@
+{
+  "plugin": "cli",
+  "payloads": [
+    "cli"
+  ],
+  "prerequisites": [
+    "base",
+    "agent-store",
+    "machine"
+  ],
+  "external_prerequisites": [],
+  "skills": [
+    "close",
+    "closeout"
+  ]
+}
