@@ -11,7 +11,7 @@ from unittest import mock
 
 SCRIPTS = Path(__file__).resolve().parents[1] / ".agents/machine/scripts"
 sys.path.insert(0, str(SCRIPTS))
-import plugin_setup
+import required_plugins
 
 
 SCRIPT = """import os
@@ -46,19 +46,19 @@ class PluginSetupTests(unittest.TestCase):
         self.addCleanup(self.environment.stop)
 
     def roots(self):
-        return mock.patch.object(plugin_setup.required_plugins, "check", return_value=(self.runtime,))
+        return mock.patch.object(required_plugins, "check", return_value=(self.runtime,))
 
     def test_check_is_read_only_and_apply_converges(self):
         with self.roots():
             self.assertEqual(["selected@publisher: setup --check failed: exit 1"],
-                             plugin_setup.check(self.project, ("codex",), {"codex": None}))
+                             required_plugins.check_setup(self.project, ("codex",), {"codex": None}))
             self.assertFalse(self.state.exists())
-            self.assertEqual([], plugin_setup.converge(self.project, ("codex",), {"codex": None}))
+            self.assertEqual([], required_plugins.converge_setup(self.project, ("codex",), {"codex": None}))
             self.assertEqual("setup", self.state.read_text(encoding="utf-8"))
 
     def test_onboarding_is_passed_only_when_explicitly_requested(self):
         with self.roots():
-            self.assertEqual([], plugin_setup.converge(self.project, ("codex",), {"codex": None}, onboard=True))
+            self.assertEqual([], required_plugins.converge_setup(self.project, ("codex",), {"codex": None}, onboard=True))
         self.assertEqual("--onboard", self.state.read_text(encoding="utf-8"))
 
     def test_unselected_runtime_is_not_examined_or_executed(self):
@@ -66,15 +66,15 @@ class PluginSetupTests(unittest.TestCase):
         unrelated.mkdir()
         (unrelated / "harness.json").write_text(json.dumps({"plugin": "publisher/other", "requires": {
             "setup": {"script": "missing.py"}}}), encoding="utf-8")
-        with mock.patch.object(plugin_setup.required_plugins, "check", return_value=(self.runtime, unrelated)):
-            self.assertEqual([], plugin_setup.converge(self.project, ("codex",), {"codex": None}))
+        with mock.patch.object(required_plugins, "check", return_value=(self.runtime, unrelated)):
+            self.assertEqual([], required_plugins.converge_setup(self.project, ("codex",), {"codex": None}))
         self.assertEqual("setup", self.state.read_text(encoding="utf-8"))
 
     def test_valid_harness_without_setup_is_not_an_error(self):
         (self.runtime / "harness.json").write_text(json.dumps({"plugin": "publisher/selected", "requires": {}}),
                                                    encoding="utf-8")
         with self.roots():
-            self.assertEqual([], plugin_setup.converge(self.project, ("codex",), {"codex": None}))
+            self.assertEqual([], required_plugins.converge_setup(self.project, ("codex",), {"codex": None}))
         self.assertFalse(self.state.exists())
 
     def test_malformed_declaration_fails_without_success(self):
@@ -82,7 +82,7 @@ class PluginSetupTests(unittest.TestCase):
         harness.write_text(json.dumps({"plugin": "publisher/selected", "requires": {"setup": {"script": "../bad.py"}}}),
                            encoding="utf-8")
         with self.roots():
-            errors = plugin_setup.converge(self.project, ("codex",), {"codex": None})
+            errors = required_plugins.converge_setup(self.project, ("codex",), {"codex": None})
         self.assertTrue(errors)
         self.assertFalse(self.state.exists())
 
@@ -93,8 +93,8 @@ class PluginSetupTests(unittest.TestCase):
         harness = other / "harness.json"
         harness.write_text((self.runtime / "harness.json").read_text(encoding="utf-8"),
                            encoding="utf-8")
-        with mock.patch.object(plugin_setup.required_plugins, "check", side_effect=((self.runtime,), (other,))):
-            errors = plugin_setup.converge(self.project, ("claude", "codex"), {"claude": None, "codex": None})
+        with mock.patch.object(required_plugins, "check", side_effect=((self.runtime,), (other,))):
+            errors = required_plugins.converge_setup(self.project, ("claude", "codex"), {"claude": None, "codex": None})
         self.assertIn("runtimes disagree", errors[0])
 
     def test_host_adapter_differences_do_not_conflict_when_setup_runtime_matches(self):
@@ -104,8 +104,8 @@ class PluginSetupTests(unittest.TestCase):
         (other / "host-adapter.txt").write_text("different host payload", encoding="utf-8")
         (other / "harness.json").write_text((self.runtime / "harness.json").read_text(encoding="utf-8"),
                                               encoding="utf-8")
-        with mock.patch.object(plugin_setup.required_plugins, "check", side_effect=((self.runtime,), (other,))):
-            self.assertEqual([], plugin_setup.converge(self.project, ("claude", "codex"),
+        with mock.patch.object(required_plugins, "check", side_effect=((self.runtime,), (other,))):
+            self.assertEqual([], required_plugins.converge_setup(self.project, ("claude", "codex"),
                                                        {"claude": None, "codex": None}))
 
     def test_same_script_with_a_different_runtime_sibling_is_rejected_before_execution(self):
@@ -115,9 +115,9 @@ class PluginSetupTests(unittest.TestCase):
         (other / "scripts/descriptor.json").write_text('{"different": true}', encoding="utf-8")
         (other / "harness.json").write_text((self.runtime / "harness.json").read_text(encoding="utf-8"),
                                               encoding="utf-8")
-        with mock.patch.object(plugin_setup.required_plugins, "check", side_effect=((self.runtime,), (other,))), \
-                mock.patch.object(plugin_setup, "invoke") as invoke:
-            errors = plugin_setup.converge(self.project, ("claude", "codex"), {"claude": None, "codex": None})
+        with mock.patch.object(required_plugins, "check", side_effect=((self.runtime,), (other,))), \
+                mock.patch.object(required_plugins, "invoke") as invoke:
+            errors = required_plugins.converge_setup(self.project, ("claude", "codex"), {"claude": None, "codex": None})
         self.assertIn("runtimes disagree", errors[0])
         invoke.assert_not_called()
 
@@ -126,9 +126,9 @@ class PluginSetupTests(unittest.TestCase):
         other.mkdir()
         (other / "harness.json").write_text(json.dumps({"plugin": "publisher/selected", "requires": {}}),
                                               encoding="utf-8")
-        with mock.patch.object(plugin_setup.required_plugins, "check", side_effect=((self.runtime,), (other,))), \
-                mock.patch.object(plugin_setup, "invoke") as invoke:
-            errors = plugin_setup.converge(self.project, ("claude", "codex"), {"claude": None, "codex": None})
+        with mock.patch.object(required_plugins, "check", side_effect=((self.runtime,), (other,))), \
+                mock.patch.object(required_plugins, "invoke") as invoke:
+            errors = required_plugins.converge_setup(self.project, ("claude", "codex"), {"claude": None, "codex": None})
         self.assertIn("setup declarations disagree", errors[0])
         invoke.assert_not_called()
 
@@ -146,7 +146,7 @@ class PluginSetupTests(unittest.TestCase):
         if result.returncode:
             self.skipTest("cannot create a Windows junction")
         with self.roots():
-            errors = plugin_setup.converge(self.project, ("codex",), {"codex": None})
+            errors = required_plugins.converge_setup(self.project, ("codex",), {"codex": None})
         self.assertIn("unsafe", errors[0])
 
 

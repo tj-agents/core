@@ -20,7 +20,7 @@ import agent_cli
 from codex_hook_trust import AppServer, github_repository
 import launch_check
 import plugin_autoupdate
-import plugin_setup
+import required_plugins
 
 TIMEOUT = 300
 IN_USE = ".in_use"
@@ -485,8 +485,8 @@ def main(argv: list[str] | None = None) -> int:
     updated: set[str] = set()
     def converge_plugin_setup() -> list[str]:
         executables = {host: None for host in hosts}
-        return plugin_setup.check(project, hosts, executables) if arguments.verify_only \
-            else plugin_setup.converge(project, hosts, executables, arguments.onboard)
+        return required_plugins.check_setup(project, hosts, executables) if arguments.verify_only \
+            else required_plugins.converge_setup(project, hosts, executables, arguments.onboard)
     relaunch_allowed = "claude" in hosts and not arguments.no_relaunch and not arguments.verify_only
     if not (arguments.all or arguments.verify or arguments.verify_only):
         result = launch_check.check(project, update=lambda host, repositories, root:

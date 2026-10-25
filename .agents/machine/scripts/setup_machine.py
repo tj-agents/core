@@ -25,7 +25,7 @@ import launch_check
 import plugin_autoupdate
 import machine_events
 import host_permissions
-import plugin_setup
+import required_plugins
 
 COMMAND_TIMEOUT_SECONDS = 60
 INSTALLER_TIMEOUT_SECONDS = 600
@@ -729,11 +729,11 @@ def plugin_setup_executables(context: Context) -> dict[str, str | None]:
 
 
 def check_plugin_setup(context: Context) -> list[str]:
-    return plugin_setup.check(plugin_setup_project(context), HOSTS, plugin_setup_executables(context))
+    return required_plugins.check_setup(plugin_setup_project(context), HOSTS, plugin_setup_executables(context))
 
 
 def apply_plugin_setup(context: Context) -> list[str]:
-    errors = plugin_setup.converge(plugin_setup_project(context), HOSTS, plugin_setup_executables(context), context.onboard)
+    errors = required_plugins.converge_setup(plugin_setup_project(context), HOSTS, plugin_setup_executables(context), context.onboard)
     if errors:
         raise SetupError("; ".join(errors))
     return []
