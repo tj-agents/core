@@ -34,7 +34,7 @@ def _configuration_reader():
     script = Path(__file__).resolve()
     candidates = (
         script.parents[1] / "resources" / "agent" / "runtime" / "repository_configuration.py",
-        script.parents[2] / "dependencies" / "agent" / ".agents" / "agent" / "runtime" / "repository_configuration.py",
+        script.parents[1] / "dependencies" / "agent" / ".agents" / "agent" / "runtime" / "repository_configuration.py",
     )
     path = next((candidate for candidate in candidates if candidate.is_file()), None)
     if path is None:

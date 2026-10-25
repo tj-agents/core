@@ -15,7 +15,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
-    "work_item_sessions", ROOT / ".agents/machine/scripts/work_item_sessions.py"
+    "work_item_sessions", ROOT / ".agents/dependencies/agent/.agents/agent/runtime/work_item_sessions.py"
 )
 WIS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(WIS)
@@ -116,20 +116,16 @@ class WorkItemSessionsTests(unittest.TestCase):
     def _connection(self):
         return STORE.connect()
 
-    def test_peer_cli_loader_finds_a_packaged_session_close(self):
-        for layout in ("skills", "codex-skills"):
-            with self.subTest(layout=layout):
-                package_root = self.root / f"machine-package-{layout}"
-                packaged_here = package_root / "resources" / "machine" / "scripts"
-                candidate = package_root / layout / "peer-cli" / "scripts" / "session_close.py"
-                packaged_here.mkdir(parents=True)
-                candidate.parent.mkdir(parents=True)
-                candidate.touch()
-                with mock.patch.object(WIS, "HERE", packaged_here):
-                    self.assertEqual(candidate, WIS._peer_cli_script("session_close"))
+    def test_peer_loader_finds_a_packaged_session_close(self):
+        package_root = self.root / "agent-package"
+        candidate = package_root / ".agents" / "agent" / "utility" / "peer" / "scripts" / "session_close.py"
+        candidate.parent.mkdir(parents=True)
+        candidate.touch()
+        with mock.patch.object(WIS, "_package_root", return_value=package_root):
+            self.assertEqual(candidate, WIS._peer_cli_script("session_close"))
 
     def test_recover_agents_facade_exposes_the_native_session_cli(self):
-        facade = ROOT / ".agents/machine/utility/recover-agents/scripts/work_item_sessions.py"
+        facade = ROOT / ".agents/dependencies/agent/.agents/agent/utility/recover/scripts/work_item_sessions.py"
         result = subprocess.run(
             [sys.executable, str(facade), "--help"], capture_output=True, text=True, timeout=15,
             env=_git_environment(),

@@ -1,6 +1,5 @@
 from contextlib import ExitStack
 import io
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -14,65 +13,19 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-REAPER = ROOT / ".agents/machine/utility/peer-cli/scripts/finish_reaper.py"
-CLOSE = ROOT / ".agents/machine/utility/peer-cli/scripts/close.py"
-CLOSE_SESSION = ROOT / ".agents/machine/utility/close/scripts/close_session.py"
+REAPER = ROOT / ".agents/dependencies/agent/.agents/agent/utility/peer/scripts/finish_reaper.py"
+CLOSE = ROOT / ".agents/dependencies/agent/.agents/agent/utility/peer/scripts/close.py"
 sys.path.insert(0, str(REAPER.parent))
 import session_close
 import finish_reaper
 import close as own_close
 
 
-def load_close_session(path):
-    spec = importlib.util.spec_from_file_location("close_session_under_test", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-class HostFallbackTests(unittest.TestCase):
+class PeerCloseSafetyTests(unittest.TestCase):
     def setUp(self):
         environment = mock.patch.dict(os.environ, {'CODEX_THREAD_ID': '', 'CLAUDE_CODE_SESSION_ID': ''})
         environment.start()
         self.addCleanup(environment.stop)
-
-    def assert_sweep_script(self, script_path, updater_path, expected):
-        script_path.parent.mkdir(parents=True)
-        updater_path.parent.mkdir(parents=True)
-        script_path.write_text(CLOSE_SESSION.read_text(encoding="utf-8"), encoding="utf-8")
-        updater_path.write_text(
-            "def load_codex_config():\n    return None\n"
-            f"def sweep_script(config):\n    return {expected!r}\n",
-            encoding="utf-8",
-        )
-        self.assertEqual(expected, load_close_session(script_path).sweep_script(None))
-
-    def test_sweep_script_uses_the_source_machine_root(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            self.assert_sweep_script(
-                root / ".agents/machine/utility/close/scripts/close_session.py",
-                root / ".agents/machine/scripts/plugin_autoupdate.py",
-                "source",
-            )
-
-    def test_sweep_script_uses_the_packaged_machine_root(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            self.assert_sweep_script(
-                root / ".agents/machine/utility/close/scripts/close_session.py",
-                root / "resources/machine/scripts/plugin_autoupdate.py",
-                "canonical",
-            )
-
-    def test_sweep_script_uses_the_skills_machine_root(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            self.assert_sweep_script(
-                root / "skills/close/scripts/close_session.py",
-                root / "resources/machine/scripts/plugin_autoupdate.py",
-                "skills",
-            )
 
     def test_unregistered_attachment_refuses_an_unsafe_close(self):
         host = session_close.register_session.ProcessInfo(10, 1, "codex.exe", 20.0)
@@ -209,14 +162,18 @@ class FinishReaperProcessTests(unittest.TestCase):
             worktree = root / "worktree"
             state = root / "state"
             host_executable, host_name = self.fixture_host(root)
-            subprocess.run(["git", "init", "-q", "-b", "main", str(worktree)], check=True)
-            subprocess.run(["git", "-C", str(worktree), "config", "user.email", "t@example.com"], check=True)
-            subprocess.run(["git", "-C", str(worktree), "config", "user.name", "t"], check=True)
+            environment = {
+                key: value for key, value in os.environ.items()
+                if not key.startswith("GIT_CONFIG_")
+            }
+            subprocess.run(["git", "init", "-q", "-b", "main", str(worktree)], check=True, env=environment)
+            subprocess.run(["git", "-C", str(worktree), "config", "user.email", "t@example.com"], check=True, env=environment)
+            subprocess.run(["git", "-C", str(worktree), "config", "user.name", "t"], check=True, env=environment)
             (worktree / "base").write_text("base\n", encoding="utf-8")
-            subprocess.run(["git", "-C", str(worktree), "add", "."], check=True)
-            subprocess.run(["git", "-C", str(worktree), "commit", "-q", "-m", "base"], check=True)
-            env = dict(
-                os.environ,
+            subprocess.run(["git", "-C", str(worktree), "add", "."], check=True, env=environment)
+            subprocess.run(["git", "-C", str(worktree), "commit", "-q", "-m", "base"], check=True, env=environment)
+            env = dict(environment)
+            env.update(
                 AGENT_STATE_DIRECTORY=str(state),
                 AGENT_CLI_HOST_NAMES=host_name,
                 AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
@@ -258,65 +215,6 @@ class FinishReaperProcessTests(unittest.TestCase):
                 self.assertEqual("ours", result["session_id"])
                 self.assertTrue(worktree.is_dir())
                 self.wait_for_observer_exit(result)
-            finally:
-                if host.poll() is None:
-                    host.kill()
-                host.wait(timeout=5)
-
-    def test_armed_close_without_terminal_preserves_its_disposable_host(self):
-        operation = ROOT / '.agents/machine/utility/close/scripts/close_session.py'
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            worktree, state = root / 'consumer', root / 'state'
-            subprocess.run(['git', 'init', '-q', '-b', 'main', str(worktree)], check=True)
-            executable, host_name = self.fixture_host(root)
-            runner = root / 'run.py'
-            runner.write_text(
-                'import subprocess, sys, time\n'
-                'from pathlib import Path\n'
-                'while not Path(sys.argv[2]).exists(): time.sleep(.01)\n'
-                'subprocess.run([sys.executable, sys.argv[1], "arm"], check=True)\n'
-                'Path(sys.argv[3]).write_text("armed")\n'
-                'time.sleep(120)\n',
-                encoding='utf-8')
-            env = dict(os.environ, AGENT_STATE_DIRECTORY=str(state), AGENT_CLI_HOST_NAMES=host_name)
-            host = subprocess.Popen([str(executable), str(runner), str(operation), str(root / 'start'),
-                                     str(root / 'armed')], cwd=worktree, env=env)
-            try:
-                started = self.process_started_at(host.pid)
-                sessions = state / 'cli-sessions'
-                sessions.mkdir(parents=True)
-                (sessions / 'ours.json').write_text(json.dumps({
-                    'session_id': 'ours', 'cwd': str(worktree), 'pid': host.pid,
-                    'pid_started_at': started, 'started_at': time.time(), 'host': host_name,
-                }), encoding='utf-8')
-                store = session_close.register_session._load_session_store()
-                connection = store.connect(state / 'sessions.db')
-                handle = store.start_session(connection, host_name, 'ours', worktree, pid=host.pid,
-                                             pid_started_at=started)
-                (root / 'start').touch()
-                for _ in range(500):
-                    if (root / 'armed').exists() or host.poll() is not None:
-                        break
-                    time.sleep(.02)
-                self.assertTrue((root / 'armed').exists())
-                time.sleep(1)
-                self.assertIsNone(host.poll(), 'arming must not close before the turn ends')
-                store.record_stop(connection, handle, worktree)
-                connection.close()
-                outcome = state / 'session-close' / 'ours.json'
-                for _ in range(600):
-                    if outcome.exists():
-                        break
-                    time.sleep(.05)
-                self.assertIn('refused: no native terminal identity',
-                              json.loads(outcome.read_text(encoding='utf-8'))['status'])
-                self.wait_for_observer_exit(json.loads(outcome.read_text(encoding='utf-8')))
-                self.assertIsNone(host.poll())
-                connection = store.connect(state / 'sessions.db')
-                self.assertIsNone(store.get_session(connection, handle)['ended_at'])
-                connection.close()
-                self.assertTrue(worktree.is_dir(), 'closing never removes the checkout')
             finally:
                 if host.poll() is None:
                     host.kill()
@@ -499,7 +397,7 @@ class WindowsObserverTaskTests(unittest.TestCase):
         self.addCleanup(self.restore_state)
         self.platform = mock.patch.object(
             session_close, "os", SimpleNamespace(
-                name="nt", environ=os.environ, fdopen=os.fdopen, close=os.close,
+                name="nt", environ=os.environ, fdopen=os.fdopen, close=os.close, replace=os.replace,
             ),
         )
         self.platform.start()

@@ -12,7 +12,7 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("agent_recovery", ROOT / ".agents/machine/scripts/agent_recovery.py")
+SPEC = importlib.util.spec_from_file_location("agent_recovery", ROOT / ".agents/dependencies/agent/.agents/agent/runtime/agent_recovery.py")
 RECOVERY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RECOVERY)
 AWAIT_PICKUP = RECOVERY.await_pickup
@@ -20,7 +20,7 @@ AWAIT_PICKUP = RECOVERY.await_pickup
 
 class RecoveryTests(unittest.TestCase):
     def test_store_loader_requires_the_canonical_runtime(self):
-        with mock.patch.object(RECOVERY, "HERE", Path("staging")):
+        with mock.patch.object(RECOVERY, "_package_root", return_value=Path("staging")):
             with self.assertRaisesRegex(RuntimeError, "session_store.py"):
                 RECOVERY._script_path("session_store")
 
@@ -202,7 +202,7 @@ class RecoveryTests(unittest.TestCase):
                                       "terminal": terminal, "title": "exact frontend"}), encoding="utf-8")
         processes = {41: SimpleNamespace(started_at=5.0), 42: SimpleNamespace(started_at=6.0)}
         identity = RECOVERY._wrapper_identity(status, processes.get)
-        self.assertEqual(terminal, identity['terminal'])
+        self.assertEqual({**terminal, 'binding': {'pid': 41, 'started_at': 5.0}}, identity['terminal'])
         self.assertEqual('exact frontend', identity['title'])
 
     def test_untracked_receipt_is_released_only_by_confirmation_after_pending_settles(self):
@@ -238,7 +238,7 @@ class RecoveryTests(unittest.TestCase):
         registry.write_text(json.dumps({"pid": 999999, "pid_started_at": 2, "host": "codex", "started_at": created + 1}), encoding="utf-8")
         code = "import importlib.util,sys; p=sys.argv[1]; s=importlib.util.spec_from_file_location('r',p); m=importlib.util.module_from_spec(s); s.loader.exec_module(m);\ntry: m._claim('codex','race_id','profile'); print('ok')\nexcept ValueError: print('blocked')"
         env = dict(os.environ)
-        commands = [[sys.executable, "-c", code, str(ROOT / ".agents/machine/scripts/agent_recovery.py")] for _ in range(2)]
+        commands = [[sys.executable, "-c", code, str(ROOT / ".agents/dependencies/agent/.agents/agent/runtime/agent_recovery.py")] for _ in range(2)]
         results = [subprocess.Popen(command, stdout=subprocess.PIPE, text=True, env=env) for command in commands]
         output = [process.communicate(timeout=20)[0].strip() for process in results]
         self.assertEqual(sorted(output), ["blocked", "ok"])
