@@ -52,6 +52,66 @@ class Server:
 
 
 class LaunchCheckTests(unittest.TestCase):
+    def test_missing_selected_installation_is_repaired_before_launch_is_rechecked(self):
+        import required_plugins
+        import reload_plugins
+
+        missing = required_plugins.MissingRequiredPluginsError('missing base', self.state, ['base@tj-agents'])
+        with mock.patch.object(required_plugins, 'check_launch', side_effect=[missing, self.state]) as admission, \
+                mock.patch.object(reload_plugins, 'repair_missing') as repair:
+            self.assertEqual(self.state, CHECK.prepare_launch(self.state, 'claude', 'native-cli', ['prompt']))
+        repair.assert_called_once_with('claude', self.state, ('base@tj-agents',), 'native-cli')
+        self.assertEqual(2, admission.call_count)
+
+    def test_failed_repair_or_invalid_override_never_retries_as_a_different_launch(self):
+        import required_plugins
+        import reload_plugins
+
+        for failure in (required_plugins.RequiredPluginsError('unverifiable override'),
+                        required_plugins.MissingRequiredPluginsError('missing', self.state, ['base@tj-agents'])):
+            with self.subTest(failure=failure), \
+                    mock.patch.object(required_plugins, 'check_launch', side_effect=failure) as admission, \
+                    mock.patch.object(reload_plugins, 'repair_missing', side_effect=RuntimeError('repair failed')) as repair:
+                with self.assertRaises(RuntimeError):
+                    CHECK.prepare_launch(self.state, 'codex', 'native-cli', ['prompt'])
+                self.assertEqual(1, admission.call_count)
+                self.assertEqual(isinstance(failure, required_plugins.MissingRequiredPluginsError), repair.called)
+
+    def test_unselected_project_does_not_require_an_uninstalled_codex(self):
+        import agent_cli
+        import codex_hook_trust
+
+        with mock.patch.object(agent_cli, "resolve_codex_executable", side_effect=AssertionError("Codex is absent")), \
+                mock.patch.object(codex_hook_trust, "apply_trust") as trust:
+            load("launch_check").ensure_hooks(self.state)
+        trust.assert_not_called()
+
+    def test_readiness_uses_only_selected_plugins_and_all_their_definitions(self):
+        import codex_hook_trust
+        import required_plugins
+
+        selected = self.state / ".agents/plugins.json"
+        selected.parent.mkdir()
+        selected.write_text('{"schema_version":1,"plugins":["base@tj-agents"]}', encoding="utf-8")
+        base = self.state / "plugins/cache/tj-agents/base/local"
+        other = self.state / "plugins/cache/publisher/other/local"
+        definitions = [("sessionStart", None, "command", "python start.py")]
+        with mock.patch.object(required_plugins, "check", return_value={"base@tj-agents": base}), \
+                mock.patch.object(codex_hook_trust, "required_definitions", return_value=definitions) as expected, \
+                mock.patch.object(codex_hook_trust, "apply_trust") as trust, \
+                mock.patch.object(codex_hook_trust, "reload_running") as reload:
+            # Call the implementation, bypassing only this test class's readiness stub.
+            load("launch_check").ensure_hooks(self.state, "native-cli")
+        expected.assert_called_once_with(base, "base@tj-agents")
+        trust.assert_called_once_with("native-cli", self.state.resolve(), required={"base@tj-agents": definitions})
+        reload.assert_not_called()
+        with mock.patch.object(required_plugins, "check", return_value={"base@tj-agents": base}), \
+                mock.patch.object(codex_hook_trust, "required_definitions", return_value=definitions), \
+                mock.patch.object(codex_hook_trust, "apply_trust"), \
+                mock.patch.object(codex_hook_trust, "reload_running") as reload:
+            load("launch_check").ensure_hooks(self.state, "native-cli", running_session=True)
+        reload.assert_called_once_with("native-cli", self.state.resolve(), required={"base@tj-agents": definitions})
+
     def test_shell_admission_refuses_unverifiable_codex_override_before_optional_updates(self):
         selection = self.state / ".agents/plugins.json"
         selection.parent.mkdir()
@@ -67,6 +127,12 @@ class LaunchCheckTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory(prefix="launch check ")
         self.addCleanup(temp.cleanup)
         self.state = Path(temp.name)
+        readiness = mock.patch.object(CHECK, "ensure_hooks")
+        self.readiness = readiness.start()
+        self.addCleanup(readiness.stop)
+        reconciliation = mock.patch.object(CHECK, 'reconcile_installs', return_value=[])
+        reconciliation.start()
+        self.addCleanup(reconciliation.stop)
         patcher = mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state),
                                                "CLAUDE_CONFIG_DIR": str(self.state / "claude")})
         patcher.start()
@@ -121,7 +187,7 @@ class LaunchCheckTests(unittest.TestCase):
     def test_a_codex_launch_leaves_claude_installs_alone(self):
         self.cursor.write_text(json.dumps({"since": "abc"}), encoding="utf-8")
         for value, host in (("codex", "codex"), (" Codex ", "codex"), ("cursor", None)):
-            with self.subTest(value=value), mock.patch.object(CHECK, "check") as check,                     mock.patch.dict(os.environ, {CHECK.HOST_VARIABLE: value}):
+            with self.subTest(value=value), mock.patch.object(CHECK, "check", return_value="current") as check, mock.patch.dict(os.environ, {CHECK.HOST_VARIABLE: value}):
                 self.assertEqual(0, CHECK.main(["--project", str(ROOT)]))
                 self.assertEqual(host, check.call_args.kwargs["host"])
         self.assertEqual("current", CHECK.check(ROOT, fetch=Server(), update=self.update(), host="codex",
@@ -134,6 +200,25 @@ class LaunchCheckTests(unittest.TestCase):
         server = Server()
         self.assertEqual("unconfigured", CHECK.check(ROOT, fetch=server, update=self.update()))
         self.assertEqual([], server.paths)
+
+    def test_unconfigured_or_failed_updates_block_normal_launches(self):
+        for host in ("codex", "claude"):
+            for result in ("unconfigured", "failed", "busy", None):
+                with self.subTest(host=host, result=result), mock.patch.object(CHECK, "check", return_value=result), mock.patch.object(sys, "stderr", io.StringIO()):
+                    self.assertEqual(1, CHECK.main(["--host", host, "--project", str(self.state)]))
+        self.readiness.assert_not_called()
+
+    def test_directory_override_is_used_for_refresh_and_required_hooks(self):
+        destination = self.state / "destination"
+        destination.mkdir()
+        import required_plugins
+        with mock.patch.object(required_plugins, "check"), mock.patch.object(CHECK, "check", return_value="current") as update:
+            self.assertEqual(0, CHECK.main([
+                "--host", "codex", "--project", str(self.state), "--target", "codex",
+                "--", "--cd", str(destination),
+            ]))
+        update.assert_called_once_with(destination.resolve(), host="codex")
+        self.readiness.assert_called_once_with(destination.resolve(), "codex")
 
     def test_offline_starts_anyway_with_one_line_and_keeps_the_cursor(self):
         self.cursor.write_text(json.dumps({"since": "abc"}), encoding="utf-8")
@@ -242,13 +327,13 @@ class LaunchCheckTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is not installed")
 class TerminalFunctionTests(unittest.TestCase):
-    def test_powershell_functions_check_first_then_pass_arguments_and_exit_code_through(self):
+    def test_powershell_functions_delegate_once_to_owned_startup_and_preserve_exit_code(self):
         with tempfile.TemporaryDirectory(prefix="terminal ") as temp:
             directory = Path(temp)
             log = directory / "log.jsonl"
             check = directory / "launch_check.py"
             check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
-                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
+                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\nraise SystemExit(7)\n", encoding="utf-8")
             echo = directory / "echo.py"
             echo.write_text(f"import json, sys\nopen({str(log)!r}, 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
                             "raise SystemExit(7)\n", encoding="utf-8")
@@ -274,7 +359,7 @@ class TerminalFunctionTests(unittest.TestCase):
                         capture_output=True, text=True, timeout=60)
                     self.assertEqual(7, result.returncode, result.stderr)
                     target = bin_directory / (f"{name}.cmd" if os.name == "nt" else name)
-                    self.assertEqual([f"check --host {name} --target {target} -- two words --flag {name}", json.dumps(["two words", "--flag"])],
+                    self.assertEqual([f"check --host {name} --project {Path.cwd()} --target {target} --require-session-start -- two words --flag {name}"],
                                      log.read_text(encoding="utf-8").splitlines())
                     previous = log.read_text(encoding="utf-8")
                     check.write_text("raise SystemExit(2)\n", encoding="utf-8")
@@ -286,18 +371,18 @@ class TerminalFunctionTests(unittest.TestCase):
                     self.assertEqual(2, blocked.returncode, blocked.stderr)
                     self.assertEqual(previous, log.read_text(encoding="utf-8"))
                     check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
-                                     f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
+                                     f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\nraise SystemExit(7)\n", encoding="utf-8")
 
 
 @unittest.skipIf(os.name == "nt" or not shutil.which("bash"), "POSIX bash is required")
 class PosixFunctionTests(unittest.TestCase):
-    def test_bash_functions_check_first_then_pass_arguments_and_exit_code_through(self):
+    def test_bash_functions_delegate_once_to_owned_startup_and_preserve_exit_code(self):
         with tempfile.TemporaryDirectory(prefix="terminal ") as temp:
             directory = Path(temp)
             log = directory / "log"
             check = directory / "launch_check.py"
             check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
-                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
+                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\nraise SystemExit(7)\n", encoding="utf-8")
             bin_directory = directory / "bin"
             bin_directory.mkdir()
             target = bin_directory / "claude"
@@ -309,7 +394,7 @@ class PosixFunctionTests(unittest.TestCase):
                                     env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(7, result.returncode, result.stderr)
-            self.assertEqual("check --host claude --target claude -- two words --flag claude\ntwo words|--flag|", log.read_text(encoding="utf-8"))
+            self.assertEqual(f"check --host claude --project {Path.cwd()} --target claude --require-session-start -- two words --flag claude\n", log.read_text(encoding="utf-8"))
             previous = log.read_text(encoding="utf-8")
             check.write_text("raise SystemExit(2)\n", encoding="utf-8")
             blocked = subprocess.run(["bash", "-c", f". '{rc}'; claude 'two words' --flag"],

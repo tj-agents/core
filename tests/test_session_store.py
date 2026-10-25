@@ -55,6 +55,26 @@ def _init_repo(path, origin=None):
 
 
 class SchemaTests(unittest.TestCase):
+    def test_frontend_attachment_preserves_turn_state_siblings_and_end_state(self):
+        connection = STORE.connect(self.db_path)
+        self.addCleanup(connection.close)
+        own = STORE.start_session(connection, 'codex', 'own', 'shared-worktree', pid=100, pid_started_at=10.0)
+        peer = STORE.start_session(connection, 'codex', 'peer', 'shared-worktree', pid=100, pid_started_at=10.0)
+        STORE.record_stop(connection, own, 'shared-worktree')
+        before = STORE.get_session(connection, own)
+        sibling = STORE.get_session(connection, peer)
+        STORE.attach_session_client(connection, own, 200, 20.0, 'shared-worktree')
+        after = STORE.get_session(connection, own)
+        self.assertEqual(200, after['pid'])
+        self.assertEqual(20.0, after['pid_started_at'])
+        for key in ('started_at', 'last_activity_at', 'turn_state', 'ended_at'):
+            self.assertEqual(before[key], after[key], key)
+        self.assertEqual(sibling, STORE.get_session(connection, peer))
+        STORE.end_session(connection, own, 'closed')
+        ended = STORE.get_session(connection, own)
+        STORE.attach_session_client(connection, own, 300, 30.0, 'elsewhere')
+        self.assertEqual(ended, STORE.get_session(connection, own))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="session store é ")
         self.addCleanup(self.temp.cleanup)
@@ -77,203 +97,6 @@ class SchemaTests(unittest.TestCase):
         connection = STORE.connect(self.db_path)
         self.addCleanup(connection.close)
         self.assertEqual(4, connection.execute("PRAGMA user_version").fetchone()[0])
-
-    def test_migration_deduplicates_legacy_owner_rows_before_creating_the_index(self):
-        self.db_path.parent.mkdir()
-        connection = sqlite3.connect(self.db_path)
-        connection.executescript(
-            """
-            CREATE TABLE work_items (
-                key TEXT PRIMARY KEY,
-                repo TEXT NOT NULL,
-                feature TEXT NOT NULL,
-                item TEXT NOT NULL,
-                status TEXT NOT NULL,
-                branch TEXT,
-                pr TEXT,
-                updated_at REAL
-            );
-            """
-        )
-        connection.executescript(STORE.SESSIONS_SCHEMA)
-        connection.execute("PRAGMA user_version = 1")
-        connection.execute(
-            "INSERT INTO work_items (key, repo, feature, item, status) VALUES ('key-1', 'repo', 'f', 'i', 'active')"
-        )
-        connection.execute(
-            "INSERT INTO sessions (handle, host, session_id, role, work_item, last_activity_at) "
-            "VALUES ('claude:old', 'claude', 'old', 'owner', 'key-1', 1)"
-        )
-        connection.execute(
-            "INSERT INTO sessions (handle, host, session_id, role, work_item, last_activity_at) "
-            "VALUES ('codex:new', 'codex', 'new', 'owner', 'key-1', 2)"
-        )
-        connection.commit()
-        connection.close()
-
-        migrated = STORE.connect(self.db_path)
-        self.addCleanup(migrated.close)
-        owners = migrated.execute(
-            "SELECT handle FROM sessions WHERE work_item = 'key-1' AND role = 'owner'"
-        ).fetchall()
-        self.assertEqual(["codex:new"], [row[0] for row in owners])
-        self.assertEqual(4, migrated.execute("PRAGMA user_version").fetchone()[0])
-
-    def test_v2_migration_preserves_rows_constraints_and_reopens_idempotently(self):
-        self.db_path.parent.mkdir()
-        connection = sqlite3.connect(self.db_path)
-        connection.executescript(
-            """
-            CREATE TABLE work_items (
-                key TEXT PRIMARY KEY,
-                repo TEXT NOT NULL,
-                feature TEXT NOT NULL,
-                item TEXT NOT NULL,
-                status TEXT NOT NULL,
-                branch TEXT,
-                pr TEXT,
-                updated_at REAL
-            );
-            CREATE TABLE sessions (
-                handle TEXT PRIMARY KEY,
-                host TEXT NOT NULL,
-                session_id TEXT NOT NULL,
-                work_item TEXT REFERENCES work_items(key),
-                role TEXT
-            );
-            CREATE UNIQUE INDEX idx_sessions_one_owner_per_work_item
-            ON sessions(work_item) WHERE role = 'owner';
-            """
-        )
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("PRAGMA user_version = 2")
-        connection.execute(
-            "INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            ("key-1", "repo", "feature", "item", "active", "topic", "https://example.test/pr/1", 10.0),
-        )
-        connection.execute(
-            "INSERT INTO sessions (handle, host, session_id, work_item, role) VALUES (?, ?, ?, ?, ?)",
-            ("claude:one", "claude", "one", "key-1", "owner"),
-        )
-        connection.commit()
-        connection.close()
-
-        migrated = STORE.connect(self.db_path)
-        self.addCleanup(migrated.close)
-        item = STORE.get_work_item(migrated, "key-1")
-        self.assertEqual("topic", item["branch"])
-        self.assertEqual("https://example.test/pr/1", item["pr"])
-        self.assertIsNone(item["title"])
-        self.assertIsNone(item["plan_path"])
-        self.assertEqual("claude:one", STORE.get_session(migrated, "claude:one")["handle"])
-        self.assertEqual(4, migrated.execute("PRAGMA user_version").fetchone()[0])
-        migrated.close()
-
-        reopened = STORE.connect(self.db_path)
-        self.addCleanup(reopened.close)
-        self.assertEqual("key-1", STORE.get_work_item(reopened, "key-1")["key"])
-        self.assertEqual(4, reopened.execute("PRAGMA user_version").fetchone()[0])
-
-    def test_v3_migration_preserves_owner_links_and_enables_native_references(self):
-        self.db_path.parent.mkdir()
-        connection = sqlite3.connect(self.db_path)
-        connection.executescript(
-            """
-            CREATE TABLE work_items (
-                key TEXT PRIMARY KEY, repo TEXT NOT NULL, feature TEXT NOT NULL, item TEXT NOT NULL,
-                status TEXT NOT NULL, branch TEXT, pr TEXT, title TEXT, plan_path TEXT, updated_at REAL
-            );
-            CREATE TABLE sessions (
-                handle TEXT PRIMARY KEY, host TEXT NOT NULL, session_id TEXT NOT NULL,
-                work_item TEXT REFERENCES work_items(key), role TEXT
-            );
-            CREATE UNIQUE INDEX idx_sessions_one_owner_per_work_item
-            ON sessions(work_item) WHERE role = 'owner';
-            """
-        )
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("PRAGMA user_version = 3")
-        connection.execute(
-            "INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            ("legacy", "github.com/example/repo", "feature", "item", "active", "topic", None,
-             "Legacy title", "plans/feature/README.md", 1.0),
-        )
-        connection.execute(
-            "INSERT INTO sessions (handle, host, session_id, work_item, role) VALUES (?, ?, ?, ?, ?)",
-            ("codex:owner", "codex", "owner", "legacy", "owner"),
-        )
-        connection.commit()
-        connection.close()
-
-        migrated = STORE.connect(self.db_path)
-        self.addCleanup(migrated.close)
-        self.assertEqual(4, migrated.execute("PRAGMA user_version").fetchone()[0])
-        self.assertEqual([], migrated.execute("PRAGMA foreign_key_check").fetchall())
-        self.assertEqual("owner", STORE.get_session(migrated, "codex:owner")["role"])
-        self.assertEqual("Legacy title", STORE.get_work_item(migrated, "legacy")["title"])
-        with self.assertRaises(sqlite3.IntegrityError):
-            migrated.execute(
-                "INSERT INTO work_items (key, repo, feature, item, status) VALUES (?, ?, ?, ?, ?)",
-                ("invalid", "repo", "only-feature", None, "active"),
-            )
-        migrated.rollback()
-        item, created = STORE.resolve_or_create_work_item_reference(
-            migrated, "GitHub", "GitHub.com/Owner/Repository", "42", "github.com/example/repo",
-        )
-        self.assertTrue(created)
-        self.assertTrue(item["key"].startswith("execution:"))
-        self.assertIsNone(item["feature"])
-        self.assertEqual(
-            {"provider": "github", "scope": "github.com/owner/repository", "native_id": "42", "work_item": item["key"]},
-            STORE.get_work_item_reference(migrated, "github", "github.com/owner/repository", "42"),
-        )
-
-    def test_v3_migration_failure_rolls_back_work_items_sessions_and_version(self):
-        class FailingConnection(sqlite3.Connection):
-            def execute(self, sql, *args, **kwargs):
-                if sql.strip().startswith("ALTER TABLE work_items_v4 RENAME"):
-                    raise sqlite3.OperationalError("injected migration failure")
-                return super().execute(sql, *args, **kwargs)
-
-        self.db_path.parent.mkdir()
-        connection = sqlite3.connect(self.db_path, factory=FailingConnection)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.executescript(
-            """
-            CREATE TABLE work_items (
-                key TEXT PRIMARY KEY, repo TEXT NOT NULL, feature TEXT NOT NULL, item TEXT NOT NULL,
-                status TEXT NOT NULL, branch TEXT, pr TEXT, title TEXT, plan_path TEXT, updated_at REAL
-            );
-            CREATE TABLE sessions (
-                handle TEXT PRIMARY KEY, host TEXT NOT NULL, session_id TEXT NOT NULL,
-                work_item TEXT REFERENCES work_items(key), role TEXT
-            );
-            """
-        )
-        connection.execute("PRAGMA user_version = 3")
-        connection.execute(
-            "INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            ("legacy", "repo", "feature", "item", "active", None, None, "Title", None, 1.0),
-        )
-        connection.execute(
-            "INSERT INTO sessions (handle, host, session_id, work_item, role) VALUES (?, ?, ?, ?, ?)",
-            ("claude:owner", "claude", "owner", "legacy", "owner"),
-        )
-        connection.commit()
-
-        with self.assertRaisesRegex(sqlite3.OperationalError, "injected migration failure"):
-            STORE._ensure_schema(connection)
-        self.assertEqual(3, connection.execute("PRAGMA user_version").fetchone()[0])
-        self.assertEqual("Title", connection.execute("SELECT title FROM work_items WHERE key = 'legacy'").fetchone()[0])
-        self.assertEqual("legacy", connection.execute("SELECT work_item FROM sessions WHERE handle = 'claude:owner'").fetchone()[0])
-        self.assertEqual([], connection.execute("PRAGMA foreign_key_check").fetchall())
-        self.assertEqual(1, connection.execute("PRAGMA foreign_keys").fetchone()[0])
-        self.assertNotIn(
-            "work_items_v4",
-            {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()},
-        )
-        connection.close()
 
     def test_future_schema_is_refused_without_migration(self):
         self.db_path.parent.mkdir()

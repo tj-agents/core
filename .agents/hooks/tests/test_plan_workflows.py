@@ -170,7 +170,7 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
             with self.subTest(skill=name):
                 self.assertEqual(ROOT / relative, authored_skill(name))
                 for host in ("claude", "codex"):
-                    adapter = ROOT / f".{host}" / "skills" / name / "SKILL.md"
+                    adapter = ROOT / f".{host}" / "skills" / "workflow" / name / "SKILL.md"
                     self.assertIn("canonical shared definition", adapter.read_text(encoding="utf-8"))
 
     def test_trusted_continuation_resumes_without_reading_the_plan_corpus(self):

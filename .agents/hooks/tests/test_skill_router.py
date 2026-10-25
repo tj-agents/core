@@ -89,8 +89,8 @@ class SkillRouterTests(unittest.TestCase):
         return env
 
     def load_router(self):
-        sys.path.insert(0, str(HOOKS))
-        self.addCleanup(sys.path.remove, str(HOOKS))
+        sys.path.insert(0, str(self.router.parent))
+        self.addCleanup(sys.path.remove, str(self.router.parent))
         spec = importlib.util.spec_from_file_location(f"router_{uuid.uuid4().hex}", self.router)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -177,6 +177,29 @@ class SkillRouterTests(unittest.TestCase):
         self.assertEqual(outcomes["stackx:style"], True)
         self.assertNotIn("acme-stackx:style", outcomes)
 
+    def test_codex_native_command_completion_proves_only_successful_matching_read(self):
+        transcript = self.base / "native-command.jsonl"
+        body = "---\nname: style\ndescription: Company style.\n---\nCompany body."
+        skill = [("acme-stackx:style", self.base / "style/SKILL.md", body)]
+        for status, code, plugin, output, expected in (
+            ("completed", 0, "acme-stackx", body, True),
+            ("completed", 1, "acme-stackx", body, False),
+            ("failed", 0, "acme-stackx", body, False),
+            ("inProgress", None, "acme-stackx", body, False),
+            ("completed", 0, "stackx", body, False),
+            ("completed", 0, "acme-stackx", "error reading file", False),
+        ):
+            with self.subTest(status=status, code=code, plugin=plugin, output=output):
+                entry = {"type": "event_msg", "payload": {"type": "item_completed", "item": {
+                    "type": "CommandExecution", "id": "native-command", "status": status,
+                    "exit_code": code, "command": ["pwsh", "-Command", "Get-Content "
+                        + f"C:/cache/{plugin}/local/skills/style/SKILL.md"],
+                    "aggregated_output": output,
+                }}}
+                transcript.write_text(json.dumps(entry), encoding="utf-8")
+                outcomes = self.load_router().transcript_skill_outcomes(transcript, skill)
+                self.assertEqual(expected, outcomes.get("acme-stackx:style", False))
+
     def test_native_discovery_failures_are_typed_and_cached(self):
         cases = (
             (None, None, "unavailable"),
@@ -233,22 +256,6 @@ class SkillRouterTests(unittest.TestCase):
             self.assertIsNotNone(module.resolved_skill("engineering:feature", "codex"))
             self.assertIsNotNone(module.resolved_skill("linked", "codex"))
 
-    def test_local_alias_resolves_after_cached_native_discovery_failure(self):
-        module = self.load_router()
-        with patch.dict(os.environ, self.environment()), patch.object(
-            module.shutil, "which", return_value=None
-        ) as which, patch.object(module, "skill_aliases", return_value={
-            "base:feature": "engineering:feature", "base:never-shipped": "engineering:never-shipped"
-        }):
-            for _ in range(2):
-                self.assertIsNotNone(module.resolved_skill("base:feature", "codex"))
-            with self.assertRaises(module.NativePluginDiscoveryError) as original:
-                module.native_install_roots("codex")
-            with self.assertRaises(module.NativePluginDiscoveryError) as missing:
-                module.resolved_skill("base:never-shipped", "codex")
-            self.assertIs(original.exception, missing.exception)
-            which.assert_called_once_with("codex")
-
     def test_native_enabled_plugin_skills_resolve_for_both_harnesses(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["installed:native"]}]})
         for harness in ("codex", "claude"):
@@ -275,7 +282,8 @@ class SkillRouterTests(unittest.TestCase):
                     self.set_inventory(harness, value)
                     for arguments, payload in (
                         (("--verify-install", harness), None),
-                        ((), {"tool_name": "apply_patch" if harness == "codex" else "Write",
+                        (("--harness", harness), {
+                              "tool_name": "apply_patch" if harness == "codex" else "Write",
                               "cwd": str(self.repo), "session_id": str(uuid.uuid4()),
                               "tool_input": {"file_path": "src/item.py", "content": "value = 2\n"}}),
                     ):
@@ -393,6 +401,7 @@ class SkillRouterTests(unittest.TestCase):
     def test_write_outside_repo_does_not_consult_its_broken_routes(self):
         (self.repo / ".agents" / "skill-routes.json").write_text("{", encoding="utf-8")
         result = self.run_router(
+            ("--harness", "claude"),
             payload={
                 "hook_event_name": "PreToolUse",
                 "tool_use_id": str(uuid.uuid4()),
@@ -407,6 +416,7 @@ class SkillRouterTests(unittest.TestCase):
 
     def test_first_routed_write_blocks_with_the_owning_skill(self):
         result = self.run_router(
+            ("--harness", "claude"),
             payload={
                 "hook_event_name": "PreToolUse",
                 "tool_use_id": str(uuid.uuid4()),
@@ -422,6 +432,7 @@ class SkillRouterTests(unittest.TestCase):
 
     def test_shell_read_of_a_routed_path_is_not_treated_as_a_write(self):
         result = self.run_router(
+            ("--harness", "claude"),
             payload={
                 "hook_event_name": "PreToolUse",
                 "tool_use_id": str(uuid.uuid4()),
@@ -436,6 +447,7 @@ class SkillRouterTests(unittest.TestCase):
 
     def test_quoted_arrow_in_inline_python_is_not_a_redirect(self):
         result = self.run_router(
+            ("--harness", "claude"),
             payload={
                 "hook_event_name": "PreToolUse",
                 "tool_use_id": str(uuid.uuid4()),
@@ -450,6 +462,7 @@ class SkillRouterTests(unittest.TestCase):
 
     def test_redirect_in_inline_shell_still_routes_the_write(self):
         result = self.run_router(
+            ("--harness", "claude"),
             payload={
                 "hook_event_name": "PreToolUse",
                 "tool_use_id": str(uuid.uuid4()),
@@ -465,6 +478,7 @@ class SkillRouterTests(unittest.TestCase):
     def test_repository_without_a_route_table_is_silent(self):
         (self.repo / ".agents" / "skill-routes.json").unlink()
         result = self.run_router(
+            ("--harness", "claude"),
             payload={
                 "hook_event_name": "PreToolUse",
                 "tool_use_id": str(uuid.uuid4()),
@@ -478,7 +492,7 @@ class SkillRouterTests(unittest.TestCase):
 
     def test_missing_marketplace_blocks_unrouted_claude_write(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["missing-marketplace:never-shipped"]}]})
-        result = self.run_router(payload={
+        result = self.run_router(("--harness", "claude"), payload={
             "hook_event_name": "PreToolUse",
             "tool_use_id": str(uuid.uuid4()),
             "session_id": str(uuid.uuid4()),
@@ -491,7 +505,7 @@ class SkillRouterTests(unittest.TestCase):
 
     def test_missing_marketplace_blocks_nested_codex_edit(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["missing-marketplace:never-shipped"]}]})
-        result = self.run_router(payload={
+        result = self.run_router(("--harness", "codex"), payload={
             "hook_event_name": "PreToolUse",
             "tool_use_id": str(uuid.uuid4()),
             "session_id": str(uuid.uuid4()),
@@ -503,7 +517,7 @@ class SkillRouterTests(unittest.TestCase):
         self.assertIn("missing-marketplace:never-shipped", result.stderr)
 
     def test_nested_codex_shell_write_needs_skill_proof(self):
-        result = self.run_router(payload={
+        result = self.run_router(("--harness", "codex"), payload={
             "hook_event_name": "PreToolUse",
             "tool_use_id": str(uuid.uuid4()),
             "session_id": str(uuid.uuid4()),
@@ -516,7 +530,7 @@ class SkillRouterTests(unittest.TestCase):
 
     def test_codex_canonical_bash_uses_codex_registry(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["missing-marketplace:never-shipped"]}]})
-        result = self.run_router(payload={
+        result = self.run_router(("--harness", "codex"), payload={
             "hook_event_name": "PreToolUse",
             "tool_use_id": str(uuid.uuid4()),
             "session_id": str(uuid.uuid4()),
@@ -531,7 +545,7 @@ class SkillRouterTests(unittest.TestCase):
     def test_missing_transcript_never_trusts_a_repeated_routed_write(self):
         session = str(uuid.uuid4())
         for _ in range(2):
-            result = self.run_router(payload={
+            result = self.run_router(("--harness", "claude"), payload={
                 "hook_event_name": "PreToolUse",
                 "tool_use_id": str(uuid.uuid4()),
                 "session_id": session,
@@ -543,18 +557,14 @@ class SkillRouterTests(unittest.TestCase):
             self.assertIn("readable session transcript", result.stderr)
 
 
-    def aliases(self, mapping):
-        (self.plugin / "hooks" / "compatibility.json").write_text(
-            json.dumps({"skills": mapping}), encoding="utf-8"
-        )
-
-    def test_a_moved_qualified_name_needs_an_explicit_alias(self):
+    def test_a_moved_qualified_name_stays_unresolved(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["base:feature"]}]})
 
         result = self.run_router(["--verify-install", "claude"])
 
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         write = self.run_router(
+            ("--harness", "claude"),
             payload={
                 "hook_event_name": "PreToolUse",
                 "tool_use_id": str(uuid.uuid4()),
@@ -566,15 +576,6 @@ class SkillRouterTests(unittest.TestCase):
         )
         self.assertEqual(2, write.returncode, write.stderr)
         self.assertIn("base:feature", write.stderr)
-
-    def test_the_alias_table_resolves_it_to_the_plugin_that_now_owns_it(self):
-        self.routes({"routes": [{"path": "^src/", "skills": ["base:feature"]}]})
-        self.aliases({"base:feature": "engineering:feature"})
-
-        result = self.run_router(["--verify-install", "claude"])
-
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertIn("resolves all 1 routed skill", result.stdout)
 
     def test_a_qualified_name_with_two_other_providers_stays_unresolved(self):
         import importlib.util
@@ -595,15 +596,6 @@ class SkillRouterTests(unittest.TestCase):
             roots.append(root)
         with patch.object(module, "skill_search_dirs", return_value=roots):
             self.assertIsNone(module.resolved_skill("missing:feature", "claude"))
-
-    def test_an_alias_to_a_skill_that_is_genuinely_absent_still_reports_missing(self):
-        self.routes({"routes": [{"path": "^src/", "skills": ["base:feature"]}]})
-        self.aliases({"base:feature": "engineering:never-shipped"})
-
-        result = self.run_router(["--verify-install", "claude"])
-
-        self.assertEqual(2, result.returncode)
-        self.assertIn("base:feature", result.stdout)
 
     def test_stale_codex_cache_does_not_count_as_an_enabled_plugin(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["disabled:feature"]}]})
@@ -631,35 +623,6 @@ class SkillRouterTests(unittest.TestCase):
 
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         self.assertIn("disabled:feature", result.stdout)
-
-    def test_an_alias_chain_is_followed_exactly_one_hop(self):
-        self.routes({"routes": [{"path": "^src/", "skills": ["oldest:feature"]}]})
-        self.aliases({"oldest:feature": "base:feature", "base:feature": "engineering:feature"})
-
-        result = self.run_router(["--verify-install", "claude"])
-
-        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-
-    def test_an_unreadable_alias_table_leaves_resolution_where_it_was(self):
-        self.routes({"routes": [{"path": "^src/", "skills": ["engineering:feature"]}]})
-        (self.plugin / "hooks" / "compatibility.json").write_text("{not json", encoding="utf-8")
-
-        result = self.run_router(["--verify-install", "claude"])
-
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_shipped_table_does_not_retain_retired_skill_aliases(self):
-        import importlib.util
-
-        sys.path.insert(0, str(HOOKS))
-        self.addCleanup(sys.path.remove, str(HOOKS))
-        spec = importlib.util.spec_from_file_location("router_under_test", ROUTER)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        aliases = module.skill_aliases()
-
-        self.assertEqual({}, aliases)
 
     def install_stack_tier(self):
         (self.repo / ".agents" / "skill-routes.json").unlink()
@@ -906,7 +869,7 @@ class SkillRouterTests(unittest.TestCase):
         hook = group["hooks"][0]
         self.assertEqual("block", hook["onFailure"])
         arguments = hook["args"]
-        self.assertEqual(["--deny-on-timeout", "--hook", "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py",
+        self.assertEqual(["--hook", "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py",
                           "--harness", "claude"], arguments[4:])
         local_arguments = [str(self.router) if value.endswith("/skill_router.py") else
                            str(HOOKS / Path(value).name) if value.startswith("${CLAUDE_PLUGIN_ROOT}/hooks/") else value

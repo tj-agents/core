@@ -34,7 +34,7 @@ class NativeLayerNamesTheHostReviewer(unittest.TestCase):
         if packaged:
             tree = "skills" if host == "claude" else "codex-skills"
             return " ".join((PACKAGE / tree / "review" / "SKILL.md").read_text(encoding="utf-8").split())
-        return " ".join((ROOT / f".{host}" / "skills" / "review" / "SKILL.md").read_text(encoding="utf-8").split())
+        return " ".join((ROOT / f".{host}" / "skills" / "engineering" / "review" / "SKILL.md").read_text(encoding="utf-8").split())
 
     def test_the_shared_stages_name_no_host_and_defer_to_the_host_entry_point(self):
         text = body("review")

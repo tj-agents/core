@@ -37,8 +37,7 @@ class HiddenCommandTests(unittest.TestCase):
 
 
 SKILL_ROUTER = HOOK_ROOT / "skill_router.py"
-MERGE_GATE = HOOK_ROOT / "merge_review_gate.py"
-M = "gh pr " + "merge"
+GIT_AUTH_SCOPE_GATE = HOOK_ROOT / "git_auth_scope_gate.py"
 
 
 class PayloadRootResolutionTests(unittest.TestCase):
@@ -109,9 +108,9 @@ class DuplicateRegistrationTests(unittest.TestCase):
         (self.root / ".agents").mkdir()
         self.session = str(uuid.uuid4())
 
-    def run_hook(self, hook, payload, environment=None):
+    def run_hook(self, hook, payload, environment=None, arguments=()):
         return subprocess.run(
-            [sys.executable, str(hook)],
+            [sys.executable, str(hook), *arguments],
             input=json.dumps(payload),
             capture_output=True,
             text=True,
@@ -126,13 +125,13 @@ class DuplicateRegistrationTests(unittest.TestCase):
         for source in (SKILL_ROUTER, HOOK_ROOT / "hook_runtime.py", HOOK_ROOT / "tier_gate.py"):
             shutil.copy2(source, hooks / source.name)
         shutil.copy2(HOOK_ROOT.parent / "machine/scripts/required_plugins.py", hooks / "required_plugins.py")
-        skill = plugin / "skills" / "git-branching"
+        skill = plugin / "skills" / "branching"
         skill.mkdir(parents=True)
         (skill / "SKILL.md").write_text(
-            "---\nname: git-branching\ndescription: Branch rules.\n---\n", encoding="utf-8"
+            "---\nname: branching\ndescription: Branch rules.\n---\n", encoding="utf-8"
         )
         (self.root / ".agents" / "skill-routes.json").write_text(
-            json.dumps({"routes": [{"path": r"\.cs$", "skills": ["git-branching"]}]}),
+            json.dumps({"routes": [{"path": r"\.cs$", "skills": ["branching"]}]}),
             encoding="utf-8",
         )
         payload = {
@@ -156,17 +155,16 @@ class DuplicateRegistrationTests(unittest.TestCase):
         environment["AGENT_STANDARDS_STATE_DIRECTORY"] = str(state)
         environment["PLUGIN_ROOT"] = str(plugin)
 
-        first = self.run_hook(hooks / "skill_router.py", payload, environment)
-        second = self.run_hook(hooks / "skill_router.py", payload, environment)
+        first = self.run_hook(hooks / "skill_router.py", payload, environment,
+                              arguments=("--harness", "claude"))
+        second = self.run_hook(hooks / "skill_router.py", payload, environment,
+                               arguments=("--harness", "claude"))
 
         self.assertEqual(2, first.returncode, first.stdout + first.stderr)
         self.assertEqual(0, second.returncode, second.stdout + second.stderr)
         self.assertEqual("", second.stderr)
 
-    def test_duplicate_merge_gate_registration_blocks_once(self):
-        (self.root / ".agents" / "merge-gate.json").write_text(
-            json.dumps({"security_paths": []}), encoding="utf-8"
-        )
+    def test_duplicate_git_auth_scope_gate_registration_blocks_once(self):
         payload = {
             "hook_event_name": "PreToolUse",
             "session_id": self.session,
@@ -174,11 +172,11 @@ class DuplicateRegistrationTests(unittest.TestCase):
             "tool_use_id": "call-2",
             "tool_name": "Bash",
             "cwd": str(self.root),
-            "tool_input": {"command": M + " 1 --auto"},
+            "tool_input": {"command": "gh auth refresh -s admin:org"},
         }
 
-        first = self.run_hook(MERGE_GATE, payload)
-        second = self.run_hook(MERGE_GATE, payload)
+        first = self.run_hook(GIT_AUTH_SCOPE_GATE, payload)
+        second = self.run_hook(GIT_AUTH_SCOPE_GATE, payload)
 
         self.assertEqual(2, first.returncode)
         self.assertEqual(0, second.returncode)
@@ -191,7 +189,7 @@ class DuplicateRegistrationTests(unittest.TestCase):
                     "routes": [
                         {
                             "path": r"\.cs$",
-                            "skills": ["git-branching"],
+                            "skills": ["branching"],
                             "deny": [{"pattern": "forbidden", "reason": "forbidden test input"}],
                         }
                     ]
@@ -205,8 +203,8 @@ class DuplicateRegistrationTests(unittest.TestCase):
             "tool_input": {"file_path": str(self.root / "a.cs"), "content": "forbidden"},
         }
 
-        first = self.run_hook(SKILL_ROUTER, payload)
-        second = self.run_hook(SKILL_ROUTER, payload)
+        first = self.run_hook(SKILL_ROUTER, payload, arguments=("--harness", "claude"))
+        second = self.run_hook(SKILL_ROUTER, payload, arguments=("--harness", "claude"))
 
         self.assertEqual(2, first.returncode)
         self.assertEqual(2, second.returncode)

@@ -27,8 +27,8 @@ the row and clears `ended_at`/`end_reason`, because a resumed session is alive a
 sets `turn_state: working`. Stop sets `turn_state: awaiting_input` and refreshes cwd/branch/head. Claude
 SessionEnd sets `ended_at` and keeps an earlier end reason, else `closed`. Codex has no SessionEnd hook,
 so a hand-closed Codex tab reads as interrupted. Start and Stop attach an unclaimed session to a work item
-when exactly one non-`done` work item in the same repo records the current branch. `finish.py`/`close.py`
-best-effort record `finished`/`closed` for their own session before closing it; their exit observer
+when exactly one non-`done` work item in the same repo records the current branch. `close.py`/`machine:close`
+best-effort record `closed` for their own session before closing it; their exit observer
 deletes the row once the host has exited. Marking a work item `done` deletes its other ended
 sessions, and those on this machine whose process has exited; live ones, running ones on other machines and
 the caller's stay until their own closeout.
@@ -61,7 +61,7 @@ python -B '<skill-directory>/scripts/work_item_sessions.py' register --provider 
   reference must first be registered. For an existing item, omitted status and metadata preserve their
   stored values. New local items require a non-empty `--title`.
   `--plan-path` must be an existing file within the current repository, written relative to its root with
-  `/`; legacy `GOAL.md` paths are valid. A successful `owner` claim fills a still-`NULL` branch, in the
+  `/`; `GOAL.md` paths are valid. A successful `owner` claim fills a still-`NULL` branch, in the
   same transaction, when the current branch is not the default. Refuses a second live owner unless
   `--predecessor` names the live owner's handle, which hands its ownership off. Claiming `owner` runs one
   transaction that also clears `role` on every other owner row for the key, so at most one row owns a
@@ -90,8 +90,3 @@ python -B '<skill-directory>/scripts/work_item_sessions.py' register --provider 
 - `bind [<feature>/<item>|--execution-key execution:<uuid>] --provider <provider> --scope <scope> --native-id <id>`:
   atomically binds an existing execution. Repeating the same binding succeeds unchanged; a reference already bound to
   another execution is refused. Binding does not change sessions, owners, status or branch.
-
-## Rollout
-
-Schema 4 writers require active host readers that accept schema 4. Older installed Machine snapshots still reject it,
-so source and generated-package checks do not authorize opening the live session store with this writer.

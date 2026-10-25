@@ -18,7 +18,8 @@
       "skills": [
         "agent-files",
         "cd",
-        "idea-initialization",
+        "project-setup",
+        "solution-assessment",
         "task-routing"
       ],
       "dependencies": {
@@ -31,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:c6472b75fdf7b9488d314175b51f4bd14b96f600275d736825436020d1015a8b",
+      "digest": "sha256:2c369f6ffece99af57b8dbf47c2f0e1e499d712da9b55f35a70a8092f1557e08",
       "harness": {
         "marketplaces": [
           {
@@ -51,7 +52,14 @@
             ]
           },
           {
-            "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
+            "path": ".agents/base/policy/project-setup/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/base/policy/solution-assessment/scripts/session-context.py",
             "hosts": [
               "claude",
               "codex"
@@ -124,7 +132,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:96624176d1f4eb56d1e77f04f77672e2f255ba1af5494fd7d32b12fd51c88505",
+      "digest": "sha256:46ad8c197424d2f1369262ef8a744e97058b319de3e791a3fac89453854f9548",
       "harness": {
         "marketplaces": [
           {
@@ -196,6 +204,51 @@
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
       "marketplace": "tj-agents",
+      "id": "tj-agents/agent",
+      "name": "agent",
+      "package_path": "plugins/agent",
+      "description": "Shared agent execution and background completion across native hosts.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "background-listener"
+      ],
+      "dependencies": {
+        "required": [
+          "tj-agents/base"
+        ],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [],
+        "optional": []
+      },
+      "digest": "sha256:dc005d70d7cf88164ce67d11716ef088f1e4d042d461a3600adae7fa14488e84",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/agent",
+          "tj-agents/base"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [],
+          "codex_prefix_rules": []
+        }
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
       "id": "tj-agents/workflow",
       "name": "workflow",
       "package_path": "plugins/workflow",
@@ -211,13 +264,15 @@
         "plan-artifacts",
         "resume",
         "run",
+        "session",
         "status"
       ],
       "dependencies": {
         "required": [
           "tj-agents/base",
           "tj-agents/agent-store",
-          "tj-agents/machine"
+          "tj-agents/machine",
+          "tj-agents/agent"
         ],
         "optional": []
       },
@@ -228,7 +283,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:46faaf6df05de438ff0e25cdac838e29043e4b76dc5749ef4b803f5ab606cbe5",
+      "digest": "sha256:63289c6ee313efe79cf107b1415bb32ba7c0a7b07ad00d6981745a923cb74642",
       "harness": {
         "marketplaces": [
           {
@@ -237,12 +292,28 @@
           }
         ],
         "plugins": [
+          "tj-agents/agent",
           "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/machine",
           "tj-agents/workflow"
         ],
-        "hooks": [],
+        "hooks": [
+          {
+            "path": ".agents/workflow/policy/session/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/hook_dispatch.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          }
+        ],
         "permissions": {
           "claude_allow": [
             "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
@@ -310,6 +381,158 @@
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
       "marketplace": "tj-agents",
+      "id": "tj-agents/cli",
+      "name": "cli",
+      "package_path": "plugins/cli",
+      "description": "Close CLI tabs or finish their workflows before closing.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "close",
+        "closeout"
+      ],
+      "dependencies": {
+        "required": [
+          "tj-agents/base",
+          "tj-agents/agent-store",
+          "tj-agents/machine"
+        ],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "python>=3.9"
+        ],
+        "optional": [
+          "exe:powershell",
+          "exe:codex",
+          "exe:claude",
+          "windows-terminal",
+          "python>=3.11"
+        ]
+      },
+      "digest": "sha256:afb4739691c0e1189b64975bb3e6ac83f53f118426570b28f4c400b42e2773f2",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/agent-store",
+          "tj-agents/base",
+          "tj-agents/cli",
+          "tj-agents/machine"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
+                  "${PLUGIN_ROOT}/skills/close/scripts/close_session.py",
+                  "${PLUGIN_ROOT}/codex-skills/close/scripts/close_session.py"
+                ],
+                "arm"
+              ],
+              "justification": "Arm a watcher that closes only this verified CLI after its final reply",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
+                  "arm"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
+                  "hook"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/other.py",
+                  "arm"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
+                  "${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py",
+                  "${PLUGIN_ROOT}/codex-skills/closeout/scripts/closeout.py"
+                ],
+                "arm"
+              ],
+              "justification": "Arm a watcher that closes only this verified CLI after its final reply",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
+                  "arm"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
+                  "hook"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/other.py",
+                  "arm"
+                ]
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
       "id": "tj-agents/engineering",
       "name": "engineering",
       "package_path": "plugins/engineering",
@@ -324,6 +547,7 @@
         "address-debt",
         "address-mistake",
         "address-review",
+        "branching",
         "bugfix",
         "commit",
         "commit-all",
@@ -335,7 +559,6 @@
         "failure-provenance",
         "feature",
         "git-auth",
-        "git-branching",
         "guide",
         "guide-build",
         "incremental-review",
@@ -376,7 +599,8 @@
           "tj-agents/base",
           "tj-agents/workflow",
           "tj-agents/agent-store",
-          "tj-agents/machine"
+          "tj-agents/machine",
+          "tj-agents/agent"
         ],
         "optional": []
       },
@@ -391,7 +615,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:f9df3ee5899efc093424ee65aad41df00cf6d84cd760da6a5061e71f2b5ad250",
+      "digest": "sha256:3297dac259807a5f68b0e1f7db2c23cdec21b32de48a723e131cb3b4c2d38272",
       "harness": {
         "marketplaces": [
           {
@@ -400,6 +624,7 @@
           }
         ],
         "plugins": [
+          "tj-agents/agent",
           "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/engineering",
@@ -444,10 +669,6 @@
         ],
         "permissions": {
           "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
             "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
             "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
@@ -468,45 +689,6 @@
             "PowerShell(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)"
           ],
           "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                "--clear"
-              ],
-              "justification": "Records an evidenced retention disposition for the exact merged checkout after validating the real close refusal and separate fallback; pending cleanup remains incomplete",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                  "--clear",
-                  "${PROJECT_ROOT}",
-                  "--reason",
-                  "capability",
-                  "--evidence",
-                  "evidence.json"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
-                ],
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                  "--clear"
-                ]
-              ]
-            },
             {
               "pattern": [
                 [
@@ -737,7 +919,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:d2e44e92a25327a94bc37e5c42b7cc98b0ba55cb638f282aacd492f526047052",
+      "digest": "sha256:d529042b506a6f68640a02a6416b1798578d4bdba920fba5301bdbc611074b7e",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -756,6 +938,13 @@
         "hooks": [
           {
             "path": ".agents/agent-store/runtime/session_store.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/cli/workflow/closeout/scripts/close_landed.py",
             "hosts": [
               "claude",
               "codex"
@@ -785,14 +974,6 @@
         ],
         "permissions": {
           "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
             "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
@@ -879,40 +1060,6 @@
             "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)"
           ],
           "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py",
-                  "${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py",
-                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
-                ]
-              ],
-              "justification": "engineering:merge Step 5: after cleanup_proof.py, a delivered report and unchanged verified idle session permit finish to remove its merged worktree",
-              "match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/other.py"
-                ]
-              ]
-            },
             {
               "pattern": [
                 [

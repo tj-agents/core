@@ -63,7 +63,13 @@ def exact_local_identity(root, binding):
 def green_exact_head(value, head):
     if str(value.get("state", "")).lower() != "open" or value.get("isDraft") is not False:
         raise AutoMergeError("PR is not open and ready")
-    if str(value.get("mergeStateStatus", "")).lower() != "clean":
+    merge_state = str(value.get("mergeStateStatus", "")).upper()
+    awaiting_review = (
+        merge_state == "BLOCKED"
+        and value.get("reviewDecision") == "REVIEW_REQUIRED"
+        and value.get("mergeable") == "MERGEABLE"
+    )
+    if merge_state != "CLEAN" and not awaiting_review:
         raise AutoMergeError("PR base is not eligible for merge")
     if value.get("headRefOid") != head:
         raise AutoMergeError("PR head does not match the binding")
@@ -126,7 +132,7 @@ def current_review(root, binding, changed):
         review = evidence["body"]
     except workflow_ops.review_evidence.ReviewEvidenceError as error:
         raise AutoMergeError(str(error)) from error
-    if merge_review_gate.review_completion_problem(review, strict=evidence["private"]):
+    if merge_review_gate.review_completion_problem(review):
         raise AutoMergeError("review work order is incomplete")
     reviewed = merge_review_gate.work_order_sha_field(review, "Reviewed up to commit")
     head = binding["remote_head_sha"]

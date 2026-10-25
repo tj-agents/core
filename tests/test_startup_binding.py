@@ -23,6 +23,100 @@ SPEC.loader.exec_module(BINDING)
 
 
 class StartupBindingTests(unittest.TestCase):
+    def test_verified_launch_binds_the_exact_child_and_propagates_exit(self):
+        process = mock.Mock(pid=4242)
+        process.wait.return_value = 7
+        process.poll.return_value = 7
+        ticket = {'token': 'fixture'}
+        with mock.patch.object(BINDING.cli_client, 'prepare', return_value=(['prepared'], {'ENV': 'value'}, ticket)), \
+                mock.patch.object(BINDING.cli_client, 'attach') as attach, \
+                mock.patch.object(BINDING.cli_client, 'release') as release, \
+                mock.patch.object(BINDING, 'command_for_target', return_value=['native', 'original']), \
+                mock.patch.object(BINDING.subprocess, 'Popen', return_value=process) as spawn:
+            self.assertEqual(7, BINDING.run_session('codex', 'native', self.project, ['original']))
+        spawn.assert_called_once_with(['native', 'prepared'], cwd=self.project, env={'ENV': 'value'},
+                                      start_new_session=os.name != 'nt')
+        attach.assert_called_once_with(ticket, 4242)
+        release.assert_called_once_with(ticket)
+        process.terminate.assert_not_called()
+
+    def test_failed_identity_recording_stops_only_the_child_and_releases_binding(self):
+        process = mock.Mock(pid=4242)
+        process.poll.return_value = None
+        with mock.patch.object(BINDING.cli_client, 'prepare', return_value=([], {}, {'token': 'fixture'})), \
+                mock.patch.object(BINDING.cli_client, 'attach', side_effect=OSError('cannot record frontend')), \
+                mock.patch.object(BINDING.cli_client, 'release') as release, \
+                mock.patch.object(BINDING.subprocess, 'Popen', return_value=process), \
+                self.assertRaisesRegex(OSError, 'cannot record frontend'):
+            BINDING.run_session('codex', 'native', self.project, [])
+        process.terminate.assert_called_once()
+        process.wait.assert_called_once_with(timeout=5)
+        release.assert_called_once()
+
+    def test_failed_native_spawn_releases_the_prepared_client_binding(self):
+        ticket = {'token': 'fixture'}
+        with mock.patch.object(BINDING.cli_client, 'prepare', return_value=([], {}, ticket)), \
+                mock.patch.object(BINDING.cli_client, 'release') as release, \
+                mock.patch.object(BINDING.subprocess, 'Popen', side_effect=OSError('missing executable')), \
+                self.assertRaisesRegex(BINDING.StartupBindingError, 'missing executable'):
+            BINDING.run_session('codex', 'native', self.project, [])
+        release.assert_called_once_with(ticket)
+
+    def test_sigint_is_left_to_the_native_child_and_the_supervisor_handler_is_restored(self):
+        process = mock.Mock(pid=4242)
+        process.poll.return_value = None
+
+        def interrupted_wait(*_args, **_kwargs):
+            signal.getsignal(signal.SIGINT)(signal.SIGINT, None)
+            return 0
+
+        process.wait.side_effect = interrupted_wait
+        before = signal.getsignal(signal.SIGINT)
+        with mock.patch.object(BINDING.subprocess, 'Popen', return_value=process), \
+                mock.patch.object(BINDING, '_terminate') as terminate, \
+                mock.patch.object(BINDING.os, 'killpg', create=True) as forward:
+            try:
+                self.assertEqual(0, BINDING.run_session('codex', 'native', self.project, []))
+            except KeyboardInterrupt:
+                self.fail('Supervisor converted a normal native interrupt into termination')
+        terminate.assert_not_called()
+        self.assertEqual(before, signal.getsignal(signal.SIGINT))
+        if os.name != 'nt':
+            forward.assert_called_once_with(4242, signal.SIGINT)
+        else:
+            forward.assert_not_called()
+
+    def test_session_observation_never_blocks_exempt_native_repair_commands(self):
+        for host, arguments in (('codex', ['plugin', 'add', 'base@tj-agents']), ('claude', ['plugin', 'list'])):
+            with self.subTest(host=host), \
+                    mock.patch.object(BINDING.required_plugins, 'check', side_effect=AssertionError('no inventory for maintenance')), \
+                    mock.patch.object(BINDING.subprocess, 'Popen') as native:
+                native.return_value.wait.return_value = 0
+                self.assertEqual(0, BINDING.main(['--host', host, '--project', str(self.project),
+                                                 '--target', sys.executable, '--require-session-start', '--', *arguments]))
+                native.assert_called_once()
+        self.readiness.assert_not_called()
+
+    def test_startup_receipts_cover_all_selected_dispatchers_on_both_hosts(self):
+        names = ('base', 'engineering', 'machine', 'workflow')
+        roots = {name + '@tj-agents': ROOT / 'plugins' / name for name in names}
+        for host in ('codex', 'claude'):
+            with self.subTest(host=host):
+                self.assertEqual(sorted(roots), BINDING.startup_participants(host, roots))
+
+    def test_an_observed_required_startup_failure_stops_the_owned_native_child(self):
+        script = self.project / 'failed startup.py'
+        survived = self.project / 'should-not-run'
+        script.write_text("import os,time\nfrom pathlib import Path\n"
+                          "p=Path(os.environ['TJ_AGENTS_STARTUP_ACK_DIRECTORY'])\n"
+                          "token=os.environ['TJ_AGENTS_STARTUP_ACK_TOKEN']\n"
+                          "(p/(token+'.failed')).write_text('required fixture hook failed')\n"
+                          f"time.sleep(3)\nPath({str(survived)!r}).write_text('ordinary work')\n", encoding='utf-8')
+        for host in ('codex', 'claude'):
+            with self.subTest(host=host), self.assertRaisesRegex(BINDING.StartupBindingError, 'fixture hook failed'):
+                BINDING.run_session(host, sys.executable, self.project, [str(script)], require_session_start=True)
+            self.assertFalse(survived.exists())
+
     def test_unverifiable_codex_override_never_reaches_optional_refresh_or_native_start(self):
         selection = self.project / ".agents/plugins.json"
         selection.parent.mkdir()
@@ -54,15 +148,26 @@ class StartupBindingTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="startup binding ")
         self.addCleanup(self.temp.cleanup)
         self.project = Path(self.temp.name)
+        # These fixtures run Python in place of the native CLI. Native config binding is
+        # exercised separately; Python itself cannot accept Codex's --config argument.
+        prepare = mock.patch.object(BINDING.cli_client, 'prepare',
+                                    side_effect=lambda host, args, project, env, **kwargs: (list(args), dict(env), None))
+        prepare.start()
+        self.addCleanup(prepare.stop)
+        readiness = mock.patch.object(BINDING.launch_check, "ensure_hooks")
+        self.readiness = readiness.start()
+        self.addCleanup(readiness.stop)
         patcher = mock.patch.object(BINDING.launch_check, "check", return_value="current")
         self.check = patcher.start()
         self.addCleanup(patcher.stop)
 
-    def test_plugin_check_runs_after_the_claim_and_before_the_native_cli_and_never_blocks_it(self):
+    def test_plugin_check_runs_after_the_claim_and_before_the_native_cli(self):
         status = self.project / "launch.status.json"
         order = []
-        self.check.side_effect = lambda project, host: order.append(
-            ("check", project, host, json.loads(status.read_text(encoding="utf-8"))["phase"]))
+        def check(project, host):
+            order.append(("check", project, host, json.loads(status.read_text(encoding="utf-8"))["phase"]))
+            return "current"
+        self.check.side_effect = check
 
         def run(*_args, **_kwargs):
             order.append("native")
@@ -76,8 +181,29 @@ class StartupBindingTests(unittest.TestCase):
             status.unlink()
             self.check.side_effect = RuntimeError("broken check")
             with mock.patch("sys.stderr"):
-                self.assertEqual(0, BINDING.main(arguments))
-        self.assertEqual("native", order[-1])
+                self.assertEqual(1, BINDING.main(arguments))
+        self.assertEqual(1, order.count("native"))
+
+    def test_incomplete_or_failed_update_checks_block_both_hosts(self):
+        for host in ("codex", "claude"):
+            for result in ("unconfigured", "failed", "busy", None):
+                with self.subTest(host=host, result=result), mock.patch.object(BINDING, "run_session") as native, mock.patch("sys.stderr"):
+                    self.check.return_value = result
+                    self.assertEqual(1, BINDING.main([
+                        "--host", host, "--project", str(self.project), "--target", host,
+                    ]))
+                    native.assert_not_called()
+
+    def test_readiness_and_refresh_use_the_native_directory_override(self):
+        destination = self.project / "destination"
+        destination.mkdir()
+        with mock.patch.object(BINDING.required_plugins, "check"), mock.patch.object(BINDING, "run_session", return_value=0):
+            self.assertEqual(0, BINDING.main([
+                "--host", "codex", "--project", str(self.project), "--target", "codex",
+                "--", "-C", str(destination),
+            ]))
+        self.check.assert_called_once_with(destination.resolve(), host="codex")
+        self.readiness.assert_called_once_with(destination.resolve(), "codex")
 
     def test_status_file_reports_preparation_failure_and_exit(self):
         status = self.project / "launch.status.json"
@@ -110,6 +236,29 @@ class StartupBindingTests(unittest.TestCase):
         self.assertEqual({"state": "exited", "returncode": 0},
                          {key: value for key, value in json.loads(status.read_text(encoding="utf-8")).items()
                           if key in {"state", "returncode"}})
+
+    def test_current_plugins_do_not_allow_launch_with_unready_hooks(self):
+        status = self.project / "unready-hooks.json"
+        self.readiness.side_effect = RuntimeError("base hook still modified")
+        with mock.patch.object(BINDING, "run_session") as native, mock.patch("sys.stderr"):
+            self.assertEqual(1, BINDING.main([
+                "--host", "codex", "--project", str(self.project), "--target", "codex",
+                "--status-file", str(status),
+            ]))
+        native.assert_not_called()
+        saved = json.loads(status.read_text(encoding="utf-8"))
+        self.assertEqual("failed", saved["state"])
+        self.assertIn("base hook still modified", saved["error"])
+
+    def test_plugin_repair_commands_remain_available_without_running_an_agent(self):
+        self.readiness.side_effect = RuntimeError("unready hooks")
+        with mock.patch.object(BINDING, "run_session", return_value=0) as native:
+            self.assertEqual(0, BINDING.main([
+                "--host", "codex", "--project", str(self.project), "--target", "codex",
+                "--", "plugin", "list", "--json",
+            ]))
+        self.readiness.assert_not_called()
+        native.assert_called_once()
 
     def test_handoff_failure_retains_native_debug_destination_and_last_phase(self):
         status = self.project / "handoff.json"
@@ -182,24 +331,14 @@ class StartupBindingTests(unittest.TestCase):
                                                require_session_start=True, on_running=running))
         running.assert_called_once()
 
-    @unittest.skipUnless(os.name == "nt", "Windows taskkill fallback")
-    def test_taskkill_failure_falls_back_to_direct_termination(self):
-        for error in (OSError("unavailable"), subprocess.TimeoutExpired("taskkill", 10)):
-            with self.subTest(error=error):
-                process = mock.Mock(pid=4242)
-                with mock.patch.object(BINDING.subprocess, "run", side_effect=error):
-                    BINDING._terminate(process)
-                process.kill.assert_called_once()
-                process.wait.assert_called_once_with(timeout=5)
-
-    @unittest.skipIf(os.name == "nt", "POSIX process groups")
-    def test_termination_escalates_to_the_entire_process_group(self):
+    def test_termination_escalates_only_for_the_launched_client(self):
         process = mock.Mock(pid=4242)
         process.wait.side_effect = [subprocess.TimeoutExpired("native", 5), 0]
-        with mock.patch.object(BINDING.os, "killpg") as killpg:
+        with mock.patch.object(BINDING.subprocess, 'run') as external:
             BINDING._terminate(process)
-        self.assertEqual([mock.call(4242, signal.SIGTERM), mock.call(4242, signal.SIGKILL)], killpg.call_args_list)
-        process.kill.assert_not_called()
+        process.terminate.assert_called_once()
+        process.kill.assert_called_once()
+        external.assert_not_called()
 
     def test_missing_acknowledgement_preserves_the_child_and_its_exit_code(self):
         survived = self.project / "survived.json"
@@ -260,6 +399,19 @@ class StartupBindingTests(unittest.TestCase):
         final = json.loads(status.read_text(encoding="utf-8"))
         self.assertEqual("exited", final["state"])
         self.assertNotIn("running_at", final)
+
+
+class PackagedStartupBindingTests(unittest.TestCase):
+    def test_packaged_entrypoints_resolve_their_own_peer_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for package in ('machine', 'cli'):
+                with self.subTest(package=package):
+                    script = ROOT / 'plugins' / package / 'resources/machine/scripts/startup_binding.py'
+                    result = subprocess.run([sys.executable, '-I', '-B', str(script), '--help'],
+                                            cwd=directory, capture_output=True, text=True,
+                                            encoding='utf-8', timeout=20, check=False)
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertIn('--require-session-start', result.stdout)
 
 
 if __name__ == "__main__":

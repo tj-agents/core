@@ -3,6 +3,7 @@
   "plugin": "tj-agents/workflow",
   "source_roots": [
     ".agents/agent-store/runtime",
+    ".agents/hooks/hook_dispatch.py",
     ".agents/hooks/problem_records.py",
     ".agents/tiers/workflow.json",
     ".agents/workflow",
@@ -17,12 +18,28 @@
       }
     ],
     "plugins": [
+      "tj-agents/agent",
       "tj-agents/agent-store",
       "tj-agents/base",
       "tj-agents/machine",
       "tj-agents/workflow"
     ],
-    "hooks": [],
+    "hooks": [
+      {
+        "path": ".agents/workflow/policy/session/scripts/session-context.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/hook_dispatch.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      }
+    ],
     "permissions": {
       "claude_allow": [
         "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",

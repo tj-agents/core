@@ -30,7 +30,7 @@ MARKETPLACE_REPOSITORY = IDENTITY_RULES.MARKETPLACE_REPOSITORY
 SELECTION_NAME = "plugins.json"
 SCHEMA_VERSION = 1
 ALLOWED_OWNERS = ("tj-agents", "Concertable")
-CORE_PLUGINS = ("agent-store", "base", "engineering", "machine", "workflow")
+CORE_PLUGINS = ("agent", "agent-store", "base", "engineering", "machine", "workflow")
 NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
 REPOSITORY = re.compile(r"(?P<owner>[A-Za-z0-9-]+)/(?P<name>[A-Za-z0-9_][A-Za-z0-9_.-]*)\Z")
 GIT_SUFFIX = ".git"
@@ -115,59 +115,3 @@ def validate(lock: dict) -> tuple[dict, list[str]]:
     return dict(sorted(marketplaces.items())), sorted(identities)
 
 
-def without_producer_marketplaces(sources: dict, identities: list) -> tuple[dict, list]:
-    if not isinstance(sources, dict):
-        raise lock_io.LockError("Migration marketplaces must be an object")
-    for name, value in sources.items():
-        validate_marketplace_source(name, value)
-    retired = {name for name, value in sources.items() if IDENTITY_RULES.producer_repository(value["repository"])}
-    if not retired or not isinstance(identities, list):
-        return sources, identities
-    known = lock_io.load_json(Path(__file__).with_name("plugin_roster.json"))["plugins"]
-    migrated = []
-    for identity in identities:
-        name, marketplace = split(identity) if isinstance(identity, str) else ("", "")
-        if marketplace in retired:
-            if name not in known:
-                raise lock_io.LockError(f"Legacy plugin {identity} has no {MARKETPLACE_NAME} replacement")
-            identity = plugin_id(name)
-        if identity not in migrated:
-            migrated.append(identity)
-    sources = {name: value for name, value in sources.items() if name not in retired}
-    sources.setdefault(MARKETPLACE_NAME, {"repository": MARKETPLACE_REPOSITORY})
-    return sources, migrated
-
-
-def migrate(lock: dict) -> dict:
-    if is_current(lock):
-        if set(lock) != {"schema_version", "marketplaces", "plugins"}:
-            raise lock_io.LockError("Current selection has invalid fields")
-        sources, identities = without_producer_marketplaces(lock["marketplaces"], lock["plugins"])
-        document = {"schema_version": SCHEMA_VERSION, "marketplaces": sources, "plugins": identities}
-        validate(document)
-        return document
-    if not isinstance(lock, dict) or lock.get("schema_version") not in {2, 3}:
-        raise lock_io.LockError("Migration accepts only schema_version 2 or 3 plugin locks")
-    if lock["schema_version"] == 2:
-        if set(lock) != {"schema_version", "marketplace", "plugins"}:
-            raise lock_io.LockError("Legacy lock has invalid fields")
-        marketplaces = {MARKETPLACE_NAME: lock["marketplace"]}
-        names = lock["plugins"]
-        if not isinstance(names, list) or any(not isinstance(name, str) or not NAME.fullmatch(name) for name in names):
-            raise lock_io.LockError("Legacy lock plugins must be plugin names")
-        identities = [plugin_id(name) for name in names]
-    else:
-        if set(lock) != {"schema_version", "marketplaces", "plugins"}:
-            raise lock_io.LockError("Legacy lock has invalid fields")
-        marketplaces, identities = lock["marketplaces"], lock["plugins"]
-    if not isinstance(marketplaces, dict):
-        raise lock_io.LockError("Legacy lock marketplaces must be an object")
-    sources = {}
-    for name, value in marketplaces.items():
-        if not isinstance(value, dict) or set(value) != {"repository", "revision"} or not isinstance(value["revision"], str) or not value["revision"]:
-            raise lock_io.LockError(f"Legacy marketplace {name} has invalid fields")
-        sources[name] = {"repository": value["repository"]}
-    sources, identities = without_producer_marketplaces(sources, identities)
-    document = {"schema_version": SCHEMA_VERSION, "marketplaces": sources, "plugins": identities}
-    validate(document)
-    return document

@@ -61,7 +61,8 @@ class CodexHookSnapshotTests(unittest.TestCase):
             environment = dict(os.environ, PLUGIN_DATA=str(temporary / "data"),
                                AGENT_STATE_DIRECTORY=str(temporary / "state"),
                                TJ_AGENTS_STARTUP_ACK_DIRECTORY=str(temporary),
-                               TJ_AGENTS_STARTUP_ACK_TOKEN=token)
+                               TJ_AGENTS_STARTUP_ACK_TOKEN=token,
+                               TJ_AGENTS_STARTUP_REQUIRED_HOOKS=json.dumps(['machine@tj-agents']))
             result = subprocess.run(
                 command, shell=True, cwd=temporary, env=environment,
                 input=json.dumps({"hook_event_name": "SessionStart", "session_id": "fixture-session",
@@ -377,8 +378,10 @@ class CodexHookSnapshotTests(unittest.TestCase):
             self.assertEqual(recovered.returncode, 0, recovered.stderr)
             first_context = json.loads(first.stdout)["hookSpecificOutput"]["additionalContext"]
             recovered_context = json.loads(recovered.stdout)["hookSpecificOutput"]["additionalContext"]
-            self.assertIn("base:idea-initialization", first_context)
-            self.assertIn("base:idea-initialization", recovered_context)
+            self.assertIn("base:project-setup", first_context)
+            self.assertIn("base:project-setup", recovered_context)
+            self.assertIn("base:solution-assessment", first_context)
+            self.assertIn("base:solution-assessment", recovered_context)
 
             (snapshot / "hooks" / "hook_runtime.py").write_text("changed", encoding="utf-8")
             rejected = subprocess.run(

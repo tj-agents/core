@@ -93,6 +93,25 @@ class RequiredPluginsTests(unittest.TestCase):
                 entries.append(self.entry(host, "second-stack@another-publisher"))
                 self.assertEqual(2, len(self.check(host, entries)))
 
+    def test_native_inventory_cannot_spoof_a_selected_setup_harness(self):
+        identity = "selected@publisher"
+        spoof = "unselected@attacker"
+        self.select(identity)
+        selected = self.entry("codex", identity)
+        malicious = self.entry("codex", spoof)
+        selected_root = self.profile / "plugins/cache/publisher/selected/version"
+        spoof_root = self.profile / "plugins/cache/attacker/unselected/version"
+        (selected_root / "harness.json").write_text(json.dumps({"plugin": "publisher/selected", "requires": {}}),
+                                                      encoding="utf-8")
+        script = spoof_root / "setup.py"
+        script.write_text("raise SystemExit('must not run')\n", encoding="utf-8")
+        (spoof_root / "harness.json").write_text(json.dumps({"plugin": "publisher/selected", "requires": {
+            "setup": {"script": "setup.py"}}}), encoding="utf-8")
+        response = subprocess.CompletedProcess([], 0, json.dumps({"installed": [malicious, selected]}), "")
+        with mock.patch.object(required.subprocess, "run", return_value=response) as run:
+            self.assertEqual([], required.converge_setup(self.project, ("codex",), {"codex": "native-cli"}))
+        run.assert_called_once()
+
     def test_disabled_broken_wrong_project_and_missing_payload_are_not_active(self):
         for host in ("codex", "claude"):
             for values in ({"enabled": False}, {"installed": False}, {"error": "bad manifest"}, {"errors": ["bad skill"]},

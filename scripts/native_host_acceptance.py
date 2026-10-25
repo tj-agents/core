@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import importlib.util
 import json
 import math
@@ -20,7 +22,7 @@ from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = ("base", "agent-store", "machine", "workflow", "engineering")
+PACKAGES = ("base", "agent-store", "agent", "machine", "cli", "workflow", "engineering")
 IDENTITIES = tuple(f"{package}@tj-agents" for package in PACKAGES)
 
 
@@ -33,12 +35,53 @@ def load_module(name, path):
     if specification is None or specification.loader is None:
         raise AcceptanceError(f"cannot load {path}")
     module = importlib.util.module_from_spec(specification)
+    sys.modules[name] = module
     specification.loader.exec_module(module)
     return module
 
 
 def native_command(executable, arguments=()):
     return [str(Path(executable).resolve(strict=True)), *arguments]
+
+
+def observed_command(host, executable, project, receipt, arguments):
+    return [sys.executable, '-B', str(ROOT / 'scripts/native_startup_observer.py'),
+            '--host', host, '--target', str(executable), '--project', str(project),
+            '--receipt', str(receipt), '--', *arguments]
+
+
+def terminate_owned(process):
+    if os.name == 'nt':
+        subprocess.run(['taskkill.exe', '/PID', str(process.pid), '/T', '/F'],
+                       capture_output=True, timeout=10, check=False)
+    else:
+        process.terminate()
+
+
+def require_observer(path, state):
+    try:
+        value = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError) as error:
+        raise AcceptanceError(f'native startup observer has no valid receipt: {path}') from error
+    if value.get('state') != state:
+        raise AcceptanceError(f'native startup observer expected {state}: {value}')
+    return value
+
+
+def require_failure_probe(host, evidence, operation):
+    path = evidence / (host + '-startup-observer.json')
+    path.unlink(missing_ok=True)
+    try:
+        operation()
+    except AcceptanceError:
+        pass
+    else:
+        raise AcceptanceError(f'{host} accepted a deliberately failed required startup hook')
+    receipt = require_observer(path, 'failed')
+    if 'workflow@tj-agents' not in receipt.get('error', '') \
+            or 'native-required-hook-failure-probe' not in receipt.get('error', ''):
+        raise AcceptanceError(f'{host} failed for a different reason: {receipt}')
+    return receipt
 
 
 def diagnostic(lines):
@@ -153,10 +196,12 @@ def start_line_reader(stream, destination, parse_json=False, completion=None):
 
 
 class AppServer:
-    def __init__(self, executable, cwd, environment, timeout, popen=subprocess.Popen):
+    def __init__(self, executable, cwd, environment, timeout, popen=subprocess.Popen, observer_receipt=None):
         self.timeout = timeout
+        self.observed = observer_receipt is not None
         self.process = popen(
-            [*native_command(executable), "app-server"], cwd=cwd, env=environment,
+            (observed_command('codex', executable, cwd, observer_receipt, ['app-server']) if self.observed
+             else [*native_command(executable), 'app-server']), cwd=cwd, env=environment,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding="utf-8", bufsize=1,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
@@ -216,7 +261,7 @@ class AppServer:
 
     def close(self):
         if self.process.poll() is None:
-            self.process.terminate()
+            terminate_owned(self.process) if self.observed else self.process.terminate()
         try:
             self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
@@ -535,11 +580,12 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
     claude_environment = dict(environment)
     claude_environment["CLAUDE_CODE_ENTRYPOINT"] = "sdk-py"
     claude_environment.pop("CLAUDECODE", None)
+    observer = artifacts / 'claude-startup-observer.json'
     process = subprocess.Popen(
-        [
-            *native_command(executable), "--output-format", "stream-json", "--verbose",
+        observed_command('claude', executable, project, observer, [
+            "--output-format", "stream-json", "--verbose",
             "--input-format", "stream-json", "--debug-file", str(debug),
-        ],
+        ]),
         cwd=project, env=claude_environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, encoding="utf-8", bufsize=1,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
@@ -627,10 +673,11 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
         if "SessionStart" not in trace:
             raise AcceptanceError("Claude debug artifact has no SessionStart marker")
         require_base_evidence(trace, marketplace / "plugins" / "base", "Claude debug artifact")
+        require_observer(observer, 'confirmed')
         return session_id
     finally:
         if process.poll() is None:
-            process.terminate()
+            terminate_owned(process)
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
@@ -649,7 +696,8 @@ def accept_codex(root, marketplace, executable, project, environment, artifacts,
         verified_roots = verify_installed_roots(hooks, trust, marketplace)
     with AppServer(executable, project, environment, timeout) as server:
         startup_hashes = trust_current_hooks(server, trust, executable, project, environment, verified_roots, timeout)
-    with AppServer(executable, project, environment, timeout) as server:
+    observer = artifacts / 'codex-startup-observer.json'
+    with AppServer(executable, project, environment, timeout, observer_receipt=observer) as server:
         hooks = server.request("hooks/list", {"cwds": [str(project)]})
         require_startup_hooks(hooks, trusted=True, trusted_hashes=startup_hashes)
         startup = server.request("thread/start", {
@@ -675,6 +723,7 @@ def accept_codex(root, marketplace, executable, project, environment, artifacts,
         )
         skills = server.request("skills/list", {"cwds": [str(project)], "forceReload": True})
         require_discovery(skills, "Codex skills/list")
+        require_observer(observer, 'confirmed')
     return session_id
 
 
@@ -683,7 +732,35 @@ def accept_claude(root, marketplace, executable, project, environment, artifacts
     return accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout)
 
 
-def isolated_environment(temporary_root, codex, claude):
+@contextmanager
+def authentication_failure_endpoint():
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get('Content-Length', '0')))
+            body = b'{"error":{"message":"native acceptance unauthenticated","type":"authentication_error"}}'
+            self.send_response(401)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        do_GET = do_POST
+
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        yield f'http://127.0.0.1:{server.server_port}/v1'
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=5)
+
+
+def isolated_environment(temporary_root, codex, claude, endpoint):
     codex_path = Path(codex).resolve(strict=True)
     claude_path = Path(claude).resolve(strict=True)
     home = temporary_root / "home"
@@ -702,9 +779,9 @@ def isolated_environment(temporary_root, codex, claude):
         'hooks = true\n\n'
         '[model_providers.native_startup]\n'
         'name = "OpenAI"\n'
-        'base_url = "https://api.openai.com/v1"\n'
+        'base_url = ' + json.dumps(endpoint) + '\n'
         'wire_api = "responses"\n'
-        'requires_openai_auth = true\n'
+        'requires_openai_auth = false\n'
         'supports_websockets = false\n',
         encoding="utf-8",
     )
@@ -734,6 +811,13 @@ def isolated_environment(temporary_root, codex, claude):
         AGENT_STATE_DIRECTORY=str(state),
         PATH=os.pathsep.join([*directories, inherited]) if inherited else os.pathsep.join(directories),
     )
+    sys.path.insert(0, str(ROOT / '.agents/machine/scripts'))
+    setup = load_module('native_acceptance_setup', ROOT / '.agents/machine/scripts/setup_machine.py')
+    context = setup.Context(home=home, checkout=None, environ=environment, windows=os.name == 'nt')
+    setup.apply_runtime(context)
+    if setup.check_runtime(context):
+        raise AcceptanceError('isolated setup runtime did not converge')
+    environment['PATH'] = os.pathsep.join([*directories, str(state / 'bin'), inherited])
     return environment
 
 
@@ -742,13 +826,41 @@ def accept(root, marketplace, codex, claude, artifacts, timeout):
     marketplace = marketplace.resolve(strict=True)
     if not (marketplace / "plugins").is_dir():
         raise AcceptanceError("candidate marketplace has no generated plugin packages")
-    with tempfile.TemporaryDirectory(prefix="tj-agents-native-acceptance-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="tj-agents-native-acceptance-") as temporary, \
+            authentication_failure_endpoint() as endpoint:
         temporary_root = Path(temporary)
-        environment = isolated_environment(temporary_root, codex, claude)
+        environment = isolated_environment(temporary_root, codex, claude, endpoint)
         project = write_fixture(temporary_root / "fixture", environment)
         codex_session = accept_codex(root, marketplace, codex, project, environment, artifacts, timeout)
         claude_session = accept_claude(root, marketplace, claude, project, environment, artifacts, timeout)
-    return {"claude_session": claude_session, "codex_session": codex_session, "plugins": list(IDENTITIES)}
+        failed_marketplace = failure_marketplace(root, temporary_root / 'failure-marketplace')
+        failures = {}
+        for host, executable, operation in (('codex', codex, accept_codex), ('claude', claude, accept_claude)):
+            case = temporary_root / ('failure-' + host)
+            probe_environment = isolated_environment(case, codex, claude, endpoint)
+            probe_project = write_fixture(case / 'fixture', probe_environment)
+            evidence = artifacts / ('failure-' + host)
+            failures[host] = require_failure_probe(host, evidence, lambda: operation(
+                root, failed_marketplace, executable, probe_project, probe_environment, evidence, timeout))
+    return {"claude_session": claude_session, "codex_session": codex_session,
+            "plugins": list(IDENTITIES), 'required_hook_failure_probes': failures}
+
+
+def failure_marketplace(root, directory):
+    generator = load_module('native_failure_package_generator', root / 'scripts/sync_plugin_packages.py')
+    _, output, _, _ = generator.build(root, validate_catalog_digests=False)
+    output['plugins/workflow/.agents/workflow/policy/session/scripts/session-context.py'] = (
+        b"raise RuntimeError('native-required-hook-failure-probe')\n"
+    )
+    output['plugins/workflow/hooks/codex.json'] = (
+        root / '.agents/plugins/manifests/codex/workflow-hooks.json'
+    ).read_bytes()
+    generator.bind_codex_hook_snapshots(root, output, {'workflow'})
+    for relative, content in output.items():
+        target = directory / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+    return directory
 
 
 def main(argv=None):
@@ -762,6 +874,8 @@ def main(argv=None):
     arguments = parser.parse_args(argv)
     if arguments.timeout <= 0:
         raise SystemExit("--timeout must be positive")
+    arguments.artifacts.mkdir(parents=True, exist_ok=True)
+    (arguments.artifacts / 'native-host-acceptance.failure.log').unlink(missing_ok=True)
     try:
         result = accept(
             arguments.root, arguments.marketplace, arguments.codex, arguments.claude,

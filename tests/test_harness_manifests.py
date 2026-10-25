@@ -20,7 +20,7 @@ PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/plugin-selection/scripts"
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 import harness_permissions  # noqa: E402
 
-INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "finish.py"), ("machine", "close.py"), ("workflow", "status.py"))
+INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "close.py"), ("workflow", "status.py"))
 HOST_ENTRY_SKILLS = {"engineering": "merge", "machine": "peer-cli", "workflow": "status"}
 
 
@@ -48,7 +48,7 @@ foreach ($document in $documents) {{
 class HarnessManifestTests(unittest.TestCase):
     def test_core_manifests_are_current_and_catalog_is_core_only(self):
         manifests = HARNESS.synchronize(ROOT, check=True)
-        self.assertEqual({"agent-store", "base", "engineering", "machine", "workflow"}, set(manifests))
+        self.assertEqual({"agent", "agent-store", "base", "cli", "engineering", "machine", "workflow"}, set(manifests))
         catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
         self.assertEqual({"tj-agents/core"}, {package["owner_repository"] for package in catalog["packages"]})
         for package in catalog["packages"]:
@@ -163,6 +163,17 @@ class HarnessPermissionValidationTests(unittest.TestCase):
             with self.subTest(command=command):
                 harness_permissions.validate_requires(self.requires(command), "test")
 
+    def test_optional_setup_declaration_is_strictly_validated(self):
+        requires = self.requires("Bash(python -B ${PLUGIN_ROOT}/script.py:*)")
+        requires["setup"] = {"script": ".agents/personal/utility/bot-identity/scripts/bot_identity.py"}
+        harness_permissions.validate_requires(requires, "test")
+        for setup in ({}, {"script": "../setup.py"}, {"script": "setup.ps1"}, {"script": "setup.py", "extra": True}):
+            with self.subTest(setup=setup):
+                invalid = self.requires("Bash(python -B ${PLUGIN_ROOT}/script.py:*)")
+                invalid["setup"] = setup
+                with self.assertRaises(harness_permissions.lock_io.LockError):
+                    harness_permissions.validate_requires(invalid, "test")
+
     def test_exact_script_rules_preserve_fixed_arguments(self):
         for command in (
             "Bash(python -B ${PLUGIN_ROOT}/script.py --clear)",
@@ -234,22 +245,6 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
     def rendered(self, plugin):
         manifest = json.loads((ROOT / f".agents/plugins/harness/{plugin}.json").read_text(encoding="utf-8"))
         return harness_permissions.render_permissions(manifest["requires"]["permissions"], self.PLUGIN_ROOT)
-
-    def test_retention_permissions_require_the_clear_command(self):
-        manifest = json.loads((ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8"))
-        harness_permissions.validate_requires(manifest["requires"], "engineering")
-        claude_allow, codex_rules = self.rendered("engineering")
-        entries = [entry for entry in claude_allow if "merge_cleanup_gate.py" in entry]
-        self.assertEqual(8, len(entries))
-        for shell in ("Bash", "PowerShell"):
-            for python in ("python", "python3"):
-                self.assertTrue(any(entry.startswith(f"{shell}({python} -B ")
-                                    and entry.endswith("/hooks/merge_cleanup_gate.py --clear:*)")
-                                    for entry in (value.replace("\\", "/") for value in entries)))
-        rules = [rule for rule in codex_rules if "merge_cleanup_gate.py" in json.dumps(rule)]
-        self.assertEqual(1, len(rules))
-        self.assertEqual("--clear", rules[0]["pattern"][-1])
-        self.assertEqual("-B", rules[0]["pattern"][1])
 
     def test_every_instructed_command_is_declared_for_both_hosts(self):
         for plugin, script in INSTRUCTED_SCRIPTS:

@@ -16,11 +16,25 @@
       "domain": "process"
     },
     {
+      "name": "agent",
+      "root": ".agents/agent",
+      "layout": "kind",
+      "plugin": "agent",
+      "domain": "process"
+    },
+    {
       "name": "machine",
       "root": ".agents/machine",
       "layout": "kind",
       "plugin": "machine",
       "domain": "machine"
+    },
+    {
+      "name": "cli",
+      "root": ".agents/cli",
+      "layout": "kind",
+      "plugin": "cli",
+      "domain": "cli"
     },
     {
       "name": "workflow",
@@ -57,12 +71,18 @@
     "machine": {
       "codex": ".agents/plugins/manifests/codex/machine-hooks.json",
       "claude": ".agents/plugins/manifests/claude/machine-hooks.json"
+    },
+    "workflow": {
+      "codex": ".agents/plugins/manifests/codex/workflow-hooks.json",
+      "claude": ".agents/plugins/manifests/claude/workflow-hooks.json"
     }
   },
   "generated_roots": [
     "plugins/base",
     "plugins/agent-store",
+    "plugins/agent",
     "plugins/machine",
+    "plugins/cli",
     "plugins/workflow",
     "plugins/engineering",
     "plugins/publication.json",
@@ -75,6 +95,11 @@
       "plugin": "base",
       "source": ".agents/machine/scripts/required_plugins.py",
       "destination": "hooks/required_plugins.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/delivery_binding_gate.py",
+      "destination": "hooks/delivery_binding_gate.py"
     },
     {
       "plugin": "engineering",
@@ -125,11 +150,6 @@
       "plugin": "base",
       "source": ".agents/hooks/hook_dispatch.py",
       "destination": "hooks/hook_dispatch.py"
-    },
-    {
-      "plugin": "base",
-      "source": ".agents/plugins/compatibility.json",
-      "destination": "hooks/compatibility.json"
     },
     {
       "plugin": "engineering",
@@ -202,6 +222,11 @@
       "destination": "resources/machine/scripts/repository_configuration.py"
     },
     {
+      "plugin": "machine",
+      "source": ".agents/machine/utility/peer-cli/scripts/register_session.py",
+      "destination": "resources/machine/scripts/register_session.py"
+    },
+    {
       "plugin": "engineering",
       "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
       "destination": "workflows/host_coverage.py"
@@ -218,33 +243,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/plugins/compatibility.json",
-      "destination": "hooks/compatibility.json"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/compact_output_gate.py",
-      "destination": "hooks/compact_output_gate.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/hooks/problem_records.py",
       "destination": "hooks/problem_records.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/continuation_stop.py",
-      "destination": "hooks/continuation_stop.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/delivery_binding_gate.py",
-      "destination": "hooks/delivery_binding_gate.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/forge_poll_gate.py",
-      "destination": "hooks/forge_poll_gate.py"
     },
     {
       "plugin": "engineering",
@@ -263,53 +263,13 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/repo-owners.json",
-      "destination": "hooks/repo-owners.json"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/harness_grant.py",
-      "destination": "hooks/harness_grant.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/denial_prompt.py",
-      "destination": "hooks/denial_prompt.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/hooks/merge_review_gate.py",
       "destination": "hooks/merge_review_gate.py"
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/merge_cleanup_gate.py",
-      "destination": "hooks/merge_cleanup_gate.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/persistent_workflow_merge_gate.py",
-      "destination": "hooks/persistent_workflow_merge_gate.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/hooks/plan_graph.py",
       "destination": "hooks/plan_graph.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/worktree_cleanup_gate.py",
-      "destination": "hooks/worktree_cleanup_gate.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/worktree_placement_gate.py",
-      "destination": "hooks/worktree_placement_gate.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/continuation_receipts.py",
-      "destination": "hooks/continuation_receipts.py"
     },
     {
       "plugin": "engineering",
@@ -325,11 +285,6 @@
       "plugin": "engineering",
       "source": ".codex/adapters/pre_tool_use.py",
       "destination": "hooks/pre_tool_use_adapter.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/red_run_gate.py",
-      "destination": "hooks/red_run_gate.py"
     },
     {
       "plugin": "engineering",
@@ -430,6 +385,46 @@
       "plugin": "workflow",
       "source": ".agents/tiers/workflow.json",
       "destination": "tier.json"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/hooks/hook_dispatch.py",
+      "destination": "hooks/hook_dispatch.py"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/hooks/codex_hook_snapshot.py",
+      "destination": "hooks/codex_hook_snapshot.py"
+    },
+    {
+      "plugin": "cli",
+      "source": ".agents/machine/utility/peer-cli/scripts",
+      "destination": ".agents/machine/utility/peer-cli/scripts"
+    },
+    {
+      "plugin": "cli",
+      "source": ".agents/machine/scripts",
+      "destination": "resources/machine/scripts"
+    },
+    {
+      "plugin": "cli",
+      "source": ".agents/agent-store/runtime",
+      "destination": ".agents/agent-store/runtime"
+    },
+    {
+      "plugin": "cli",
+      "source": ".agents/tiers/cli.json",
+      "destination": "tier.json"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/cli",
+      "destination": ".agents/cli"
+    },
+    {
+      "plugin": "agent",
+      "source": ".agents/tiers/agent.json",
+      "destination": "tier.json"
     }
   ],
   "prerequisites": {
@@ -442,13 +437,23 @@
     "workflow": [
       "base",
       "agent-store",
-      "machine"
+      "machine",
+      "agent"
     ],
     "engineering": [
       "base",
       "workflow",
       "agent-store",
+      "machine",
+      "agent"
+    ],
+    "cli": [
+      "base",
+      "agent-store",
       "machine"
+    ],
+    "agent": [
+      "base"
     ]
   },
   "external_prerequisites": {
@@ -456,12 +461,15 @@
     "agent-store": [],
     "machine": [],
     "workflow": [],
-    "engineering": []
+    "engineering": [],
+    "cli": [],
+    "agent": []
   },
   "extended_host_adapters": [
-    "persistent-workflow",
-    "review",
-    "sync-plugins"
+    "agent:background-listener",
+    "engineering:persistent-workflow",
+    "engineering:review",
+    "machine:sync-plugins"
   ],
   "host_only_terms": {
     "claude": [

@@ -8,7 +8,6 @@ import subprocess
 import sys
 import tempfile
 import textwrap
-import time
 import unittest
 from unittest import mock
 
@@ -57,18 +56,15 @@ class ArgumentTests(unittest.TestCase):
                          RELAUNCH.preserved_arguments(argv))
 
     def test_a_dummy_process_command_line_is_read_back(self):
-        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", "--add-dir", "C:/extra dir",
-                                    "--settings", "s.json"])
+        process = subprocess.Popen([sys.executable, "-c", "import time; print('ready', flush=True); time.sleep(30)",
+                                    "--add-dir", "C:/extra dir", "--settings", "s.json"], stdout=subprocess.PIPE,
+                                   text=True)
+        self.addCleanup(process.stdout.close)
         self.addCleanup(process.wait)
         self.addCleanup(process.kill)
-        arguments = []
-        for _ in range(20):
-            arguments = RELAUNCH.host_arguments(process.pid)
-            if arguments:
-                break
-            time.sleep(0.05)
+        self.assertEqual("ready\n", process.stdout.readline())
         self.assertEqual(["--add-dir", "C:/extra dir", "--settings", "s.json"],
-                         RELAUNCH.preserved_arguments(arguments))
+                         RELAUNCH.preserved_arguments(RELAUNCH.host_arguments(process.pid)))
 
 
 class StalenessTests(State):
@@ -196,7 +192,6 @@ class SyncTests(State):
         relaunched = mock.Mock(return_value=relaunch or {"relaunch": "armed", "session_id": SESSION})
         with mock.patch.dict(os.environ, environment), \
                 mock.patch.object(REFRESH.launch_check, "check", return_value=result), \
-                mock.patch.object(REFRESH, "review_legacy", return_value=([], {})), \
                 mock.patch.object(REFRESH, "selection", return_value=({}, ["machine@tj-agents"])), \
                 mock.patch.object(RELAUNCH, "stale_plugins", return_value=list(stale)), \
                 mock.patch.object(RELAUNCH, "relaunch", relaunched), \
@@ -215,7 +210,7 @@ class SyncTests(State):
 
     def test_a_current_session_is_left_alone(self):
         code, summary, relaunched = self.run_sync(result="current", stale=())
-        self.assertEqual((0, {"check": "current"}), (code, summary))
+        self.assertEqual((0, {"check": "current", "plugin setup": []}), (code, summary))
         relaunched.assert_not_called()
 
     def test_a_child_session_never_relaunches_its_parent(self):
@@ -227,7 +222,6 @@ class SyncTests(State):
         relaunched = mock.Mock(side_effect=RuntimeError("relaunch was not armed: refused"))
         with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": SESSION, "CLAUDE_PID": "4242"}), \
                 mock.patch.object(REFRESH.launch_check, "check", return_value="updated"), \
-                mock.patch.object(REFRESH, "review_legacy", return_value=([], {})), \
                 mock.patch.object(REFRESH, "selection", return_value=({}, ["machine@tj-agents"])), \
                 mock.patch.object(RELAUNCH, "stale_plugins", return_value=["machine@tj-agents"]), \
                 mock.patch.object(RELAUNCH, "relaunch", relaunched), \
