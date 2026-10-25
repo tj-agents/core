@@ -475,8 +475,14 @@ def close_entry(entry, force=False):
             matches = [target for target in targets
                        if target["identity"].get("automation_id") == tab_id]
         else:
-            registered = [item for _path, item in session_close.entries()
-                          if item.get("title") == title]
+            registered = []
+            for _path, item in session_close.entries():
+                try:
+                    observed = session_close.close_target(item)
+                except session_close.Refusal:
+                    observed = item
+                if observed.get("title") == title:
+                    registered.append(observed)
             if not title or len(registered) != 1:
                 raise TerminalRefusal("Windows Terminal fallback requires a unique registered tab title")
             matches = [target for target in targets if target["title"] == title]
