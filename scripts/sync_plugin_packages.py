@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -144,6 +145,9 @@ def catalog_marketplaces(packages: dict[str, dict]) -> dict[str, dict[str, str]]
     marketplaces: dict[str, dict[str, str]] = {}
 
     def claim(marketplace: str, owner_repository: str, source: str) -> None:
+        if marketplace == "tj-agents":
+            owner_repository = "tj-agents/marketplace"
+            source = "https://github.com/tj-agents/marketplace.git"
         owner = {"owner_repository": owner_repository, "source": source}
         if marketplaces.setdefault(marketplace, owner) != owner:
             raise ValueError(f"Catalog marketplace has inconsistent ownership: {marketplace}")
@@ -788,6 +792,10 @@ def emit_workflow_agents(root: Path, config: dict, emit):
 
 def build(root: Path, validate_catalog_digests: bool = True, catalog=None):
     root = root.resolve()
+    runtime_spec = importlib.util.spec_from_file_location("core_runtime_sources", Path(__file__).with_name("runtime_sources.py"))
+    runtime_sources = importlib.util.module_from_spec(runtime_spec)
+    runtime_spec.loader.exec_module(runtime_sources)
+    runtime_sources.ensure(root)
     config = load(root / ".agents/plugins/sources.json")
     payloads = load(root / ".agents/plugins/payloads.json")["payloads"]
     compatibility = load(root / ".agents/plugins/compatibility.json")

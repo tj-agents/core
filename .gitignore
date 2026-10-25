@@ -6,4 +6,5 @@ deployment-backups/
 *.tmp
 shell/hidden-bash*.exe
 .agents/continuation/
+.agents/dependencies/
 .agents/persistent-workflow-binding.json
