@@ -12,12 +12,12 @@ This entry point adds only Codex's mechanism.
 
 ## Codex
 
-Sync reloads hook runtime settings in the existing Codex daemon through its native configuration API,
-then verifies every required hook definition and its trust state for the calling conversation's exact
-checkout. It connects to the existing daemon without starting a replacement, changing hook trust or
-closing other sessions. A failed live reload fails sync; a fresh-process inventory alone is insufficient.
+Sync attempts native hook reload for the calling conversation's exact checkout. If live reload is
+unavailable, including a standalone `--no-daemon` client absent from the shared daemon, it automatically
+arms verified closure and same-conversation resumption through the existing relaunch watcher. A shared
+daemon lookup is not proof that a standalone client adopted anything. Required hook trust is verified
+before arming; execution is verified in the fresh managed client.
 
-Runtime hook reload does not replace instruction text already in model context. If the conversation
-needs updated instructions, or its native process cannot be reloaded, preserve the current conversation
-and follow the canonical same-conversation resume procedure with its exact ID and absolute directory.
-New sessions load current instructions through normal startup.
+When the result is `relaunch: armed`, preserve the checkpoint and end the turn so the watcher can resume
+this exact conversation automatically. No user-run restart or `continue` is required. Runtime reload
+does not replace instructions already in model context; fresh native startup performs session adoption.
