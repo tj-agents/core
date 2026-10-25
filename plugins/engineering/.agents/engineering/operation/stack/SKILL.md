@@ -1,13 +1,13 @@
 ---
 name: stack
-description: Maintain a required stack when work must build on an unmerged PR. Covers the concrete reason for overlap, verified parent branches, parent-targeted child PRs, cumulative validation and prompt bottom-up landing. Sequential delivery and checkout allocation follow delivery-slices.
+description: Maintain a required stack when work must build on an unmerged PR. Covers the concrete reason for overlap, verified parent branches, parent-targeted child PRs, cumulative validation and prompt bottom-up landing. Sequential delivery and checkout allocation follow branching.
 kind: operation
 domain: process
 ---
 
 # Stacked pull requests
 
-`engineering:delivery-slices` owns the decision to overlap dependent work. Sequential delivery is the
+`engineering:branching` owns the decision to overlap dependent work. Sequential delivery is the
 default; use this procedure whenever a PR must build on an unmerged parent. Record the concrete reason
 the child must proceed before the parent lands in the existing plan or ledger. Preserve the full goal,
 parent/head identities, slice sizes and validation gates there.

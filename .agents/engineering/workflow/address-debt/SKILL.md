@@ -30,12 +30,12 @@ repository's record operation; retain unsent facts under the shared guidance.
    and no such child repos beside it is neither mode — not a valid invocation; say so and stop.
 
    - **Single-repo mode:** survey the repository, then start the selected focused slice from the current
-     remote default. Select or reuse an available checkout under `engineering:delivery-slices`; use
+     remote default. Select or reuse an available checkout under `engineering:branching`; use
      `open-worktree` when concurrent work or necessary isolation requires another checkout. Each active
      writer has one owning branch and checkout.
    - **Polyrepo-root mode:** run Step 2's survey across every child repository's selected debt items as one
      combined list. Once the primary item is selected, its child repo owns this run. Select the branch
-     and checkout there under the same `delivery-slices` and `open-worktree` rules as single-repo mode. A second item may join the bundle only if it also lives in that same child
+     and checkout there under the same `branching` and `open-worktree` rules as single-repo mode. A second item may join the bundle only if it also lives in that same child
      repo, on top of passing the Step 2 bundling test below — a PR belongs to one repo, so cross-repo
      bundling doesn't exist. Every other child repo stays untouched; picking from more than one of them is a
      future run, not this one.
@@ -98,7 +98,7 @@ Git.
 Each delivery slice keeps its branch, selected checkout, commits and PR through these stages. When the
 work needs multiple PRs, resolve and validate Workflow v2 repository state, promote it through
 `engineering:plans`, and checkpoint under `engineering:plans`. Deliver the remaining slices
-under `engineering:delivery-slices`, resuming from the entry and ledger rather than this session.
+under `engineering:branching`, resuming from the entry and ledger rather than this session.
 
 ## Example
 

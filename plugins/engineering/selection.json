@@ -7,7 +7,8 @@
     "base",
     "workflow",
     "agent-store",
-    "machine"
+    "machine",
+    "agent"
   ],
   "external_prerequisites": [],
   "skills": [
@@ -15,12 +16,12 @@
     "address-debt",
     "address-mistake",
     "address-review",
+    "branching",
     "bugfix",
     "commit",
     "commit-all",
     "commit-push",
     "committing",
-    "delivery-slices",
     "docs",
     "docs-review",
     "failing-tests",

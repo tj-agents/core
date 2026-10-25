@@ -196,6 +196,13 @@ def main():
             return deny(failure)
         code, stdout, stderr = result
         if code == 0:
+            if stdout.strip():
+                try:
+                    document = json.loads(stdout)
+                    if not isinstance(document, dict):
+                        raise ValueError("expected a JSON object")
+                except (ValueError, UnicodeError) as error:
+                    return deny(f"The Codex pre-tool hook {args.script} returned invalid output: {error}")
             sys.stdout.buffer.write(stdout)
             sys.stdout.buffer.flush()
             sys.stderr.buffer.write(stderr)

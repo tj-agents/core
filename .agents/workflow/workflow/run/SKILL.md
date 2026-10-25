@@ -32,6 +32,9 @@ declaring a capability missing or asking the user for a machine. When a selected
 use it while retaining its authentication, trust, and authority constraints; independent authorized work
 continues.
 
+For a deferred command or condition, invoke `agent:background-listener` before parking or moving to
+independent work. It owns deterministic background waiting and the native result notification.
+
 Use only a supported host continuation. Do not claim unattended execution before owner, foreground lease, and
 wake are initialized and observed. `engineering:persistent-workflow` is only a software remote-delivery
 adapter. Foreground execution remains valid without unattended capability. After exhausting independent
@@ -43,5 +46,6 @@ pushed branch, open pull request, phase, or context boundary is not terminal whi
 ```text
 Goal: deliver the approved migration.
 Current slice: ask engineering:feature to add the bounded parser change and return tests.
-Next action: reconcile the returned evidence, then continue the same goal.
+Deferred result: give the bounded watcher command to agent:background-listener before parking.
+Next action: consume its completion result, then continue the same goal.
 ```
