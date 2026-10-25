@@ -108,8 +108,9 @@ Add `--lane '<L1..L6>'` (or `--frontier`) to have the launcher resolve model and
 gets. The launcher rejects `--lane L7` before launch, with no terminal opened: that rung is for
 in-session clerical work and cannot open a handoff.
 
-Use `--bypass-hook-trust` for Tommy's personal repositories. Omit it for an untrusted checkout or when the
-user has not authorized repository hooks.
+The normal launch path verifies required hook readiness after refresh. Preserve native hook trust;
+personal scope does not authorize bypassing it. A hook that cannot be verified blocks the launch with
+its recovery action.
 
 ## Which executable it starts, and why the choice is not free
 

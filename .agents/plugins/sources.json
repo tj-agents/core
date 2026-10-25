@@ -16,6 +16,13 @@
       "domain": "process"
     },
     {
+      "name": "agent",
+      "root": ".agents/agent",
+      "layout": "kind",
+      "plugin": "agent",
+      "domain": "process"
+    },
+    {
       "name": "machine",
       "root": ".agents/machine",
       "layout": "kind",
@@ -73,6 +80,7 @@
   "generated_roots": [
     "plugins/base",
     "plugins/agent-store",
+    "plugins/agent",
     "plugins/machine",
     "plugins/cli",
     "plugins/workflow",
@@ -407,6 +415,11 @@
       "plugin": "machine",
       "source": ".agents/cli",
       "destination": ".agents/cli"
+    },
+    {
+      "plugin": "agent",
+      "source": ".agents/tiers/agent.json",
+      "destination": "tier.json"
     }
   ],
   "prerequisites": {
@@ -420,19 +433,24 @@
       "base",
       "agent-store",
       "machine",
-      "cli"
+      "cli",
+      "agent"
     ],
     "engineering": [
       "base",
       "workflow",
       "agent-store",
       "machine",
-      "cli"
+      "cli",
+      "agent"
     ],
     "cli": [
       "base",
       "agent-store",
       "machine"
+    ],
+    "agent": [
+      "base"
     ]
   },
   "external_prerequisites": {
@@ -441,9 +459,11 @@
     "machine": [],
     "workflow": [],
     "engineering": [],
-    "cli": []
+    "cli": [],
+    "agent": []
   },
   "extended_host_adapters": [
+    "agent:background-listener",
     "engineering:persistent-workflow",
     "engineering:review",
     "machine:sync-plugins"

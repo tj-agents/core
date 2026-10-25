@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+from contextvars import ContextVar
 import fnmatch
 import json
 import os
@@ -602,7 +603,21 @@ def project_root(payload):
     return Path.cwd()
 
 
+GIT_RESULTS = ContextVar("tier_git_results", default=None)
+
+
 def _git(root, arguments):
+    cache = GIT_RESULTS.get()
+    key = (str(root), tuple(arguments))
+    if cache is not None and key in cache:
+        return cache[key]
+    result = _run_git(root, arguments)
+    if cache is not None:
+        cache[key] = result
+    return result
+
+
+def _run_git(root, arguments):
     try:
         completed = subprocess.run(
             ["git", "-C", str(root), *arguments],
@@ -774,6 +789,14 @@ def declaration_diagnostics(declaration):
 
 
 def assess(root, found=None, facts=None, contexts=None):
+    token = GIT_RESULTS.set({})
+    try:
+        return _assess(root, found, facts, contexts)
+    finally:
+        GIT_RESULTS.reset(token)
+
+
+def _assess(root, found=None, facts=None, contexts=None):
     diagnostics = []
     selections = []
     found = list(declarations(project=root) if found is None else found)
@@ -1021,5 +1044,6 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except SystemExit:
         raise
-    except Exception:
-        raise SystemExit(0)
+    except Exception as error:
+        print(f"tier gate failed: {error}", file=sys.stderr)
+        raise SystemExit(1)

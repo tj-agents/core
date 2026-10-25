@@ -23,4 +23,16 @@ reports `current` but a plugin is still stale, rerun with `--all` (optionally `-
 It fails loudly on a native update that did not persist and a plugin the host lists with errors; report
 those.
 
+Treat missing, failed, timed-out or untrusted required hooks as a stop on ordinary work. A refresh must
+verify installed publisher bytes, trust only the verified current hook hashes through Codex's native
+configuration API, and read back hook readiness before reporting success. Never bypass hook trust or
+disable a required hook to complete a refresh. Run the affected hooks and verify their successful
+execution before resuming; hash trust establishes permission to run, not execution. If recovery cannot
+be verified, retain the current owner and report the failed hook and exact recovery action.
+
 The host entry point names how this session adopts the result.
+
+Keep the same conversation through recovery. If the host cannot reload a running session's hook
+definitions, checkpoint the current task and give the exact native resume command for its existing
+session ID and absolute directory, then ask the user to say `continue`. Keep the session open while
+waiting for that action. Missing reload access does not authorize a successor or a new conversation.

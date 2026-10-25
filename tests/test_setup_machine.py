@@ -467,6 +467,26 @@ class PermissionStepTests(Machine):
 
 
 class RuntimeTests(Machine):
+    def test_installed_runtime_can_load_live_proxy_transport_without_source_checkout(self):
+        self.converge(step("launch-check runtime"), self.context(windows=False))
+        installed = self.home / ".agents-state/bin"
+        probe = self.root / "runtime_probe.py"
+        probe.write_text(
+            "import sys\nfrom unittest.mock import patch\n"
+            "sys.path.insert(0, sys.argv[1])\nimport codex_hook_trust\nimport codex_websocket\n"
+            "assert codex_websocket.__file__.startswith(sys.argv[1])\n"
+            "with patch.object(codex_hook_trust.subprocess, 'Popen', side_effect=RuntimeError('transport-loaded')):\n"
+            "    try:\n        codex_hook_trust.AppServer('unused',sys.argv[1],existing=True)\n"
+            "    except RuntimeError as error:\n"
+            "        if str(error) != 'transport-loaded':\n            raise\n"
+            "        print('transport-loaded')\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run([sys.executable, "-I", "-B", str(probe), str(installed)],
+                                cwd=self.root, capture_output=True, timeout=15)
+        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
+        self.assertEqual(b"transport-loaded", result.stdout.strip())
+
     def test_the_launch_check_runtime_is_installed_once(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
         for name in setup.plugin_autoupdate.RUNTIME:
@@ -568,6 +588,8 @@ class RunStepsTests(Machine):
              ["preconditions", "launch-check runtime", "shell profiles"]),
             (["--check", "--step", "shell profiles", "--step", "launch-check runtime"],
              ["preconditions", "launch-check runtime", "shell profiles"]),
+            (["--step", "plugin setup"],
+             ["preconditions", "plugin and merge-policy catch-up", "harness permissions", "plugin setup"]),
         )
         for arguments, expected in cases:
             with mock.patch.object(setup, "main_checkout", return_value=self.checkout), \
@@ -643,6 +665,16 @@ class RunStepsTests(Machine):
                                             io.StringIO(), io.StringIO()))
         later.assert_not_called()
 
+    def test_failed_catchup_skips_plugin_setup_even_when_scoped(self):
+        catchup = setup.Step("plugin and merge-policy catch-up", mock.Mock(side_effect=RuntimeError("offline")), mock.Mock())
+        permissions = setup.Step("harness permissions", mock.Mock(return_value=[]), mock.Mock())
+        plugin = setup.Step("plugin setup", mock.Mock(return_value=["needed"]), mock.Mock())
+        out, err = io.StringIO(), io.StringIO()
+        self.assertEqual(2, setup.run_steps([catchup, permissions, plugin], self.context(), False, out, err))
+        plugin.check.assert_not_called()
+        plugin.apply.assert_not_called()
+        self.assertIn("prerequisite setup step failed", out.getvalue())
+
     def test_windows_only_steps_skip_on_linux_without_running_anything(self):
         out = io.StringIO()
         self.assertEqual(0, setup.run_steps([step("hidden Git Bash for Claude")], self.context(windows=False), True, out))
@@ -653,6 +685,7 @@ class RunStepsTests(Machine):
             "preconditions", "native permission defaults", "event channel and publishers",
             "Claude marketplace auto-update", "launch-check runtime", "shell profiles", "hidden Git Bash for Claude",
             "Codex profile agents", "plugin and merge-policy catch-up", "harness permissions",
+            "plugin setup",
         ], [item.name for item in setup.STEPS])
 
 

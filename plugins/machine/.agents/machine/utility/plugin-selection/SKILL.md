@@ -34,7 +34,8 @@ settings are current, not that native trust, installation or session loading suc
  "marketplaces": {
    "tj-agents": {"repository": "tj-agents/marketplace"},
    "agents": {"repository": "Concertable/agents"}},
- "plugins": ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents",
+ "plugins": ["agent@tj-agents", "agent-store@tj-agents", "base@tj-agents",
+             "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents",
              "dotnet@tj-agents", "concertable@agents"]}
 ```
 
@@ -56,8 +57,8 @@ python -B '<skill-directory>\scripts\adopt_plugins.py' --root C:\path\to\reposit
 A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `python`, `github-actions`,
 `plugin-repository`) resolves to its plugins through `scripts/plugin_roster.json`, so nobody guesses which
 plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Required plugins are added and
-existing selections are kept. With no requested stack or plugin, a new selection uses the default base,
-engineering and machine packages. `preview` lists the changed files, `write` applies them together, and `check`
+existing selections are kept. With no requested stack or plugin, a new selection uses Agent, Agent Store, Base,
+Engineering, Machine and Workflow. `preview` lists the changed files, `write` applies them together, and `check`
 exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
 
 Personal is only for personal projects explicitly adopting `personal@tj-agents`. Read the repository's
