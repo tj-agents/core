@@ -90,7 +90,9 @@ stay here; shared plans link to their source owners.
 
 `workflow:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
 `base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
-[`base:idea-initialization`](.agents/base/policy/idea-initialization/SKILL.md) owns the once-per-idea
+[`base:project-setup`](.agents/base/policy/project-setup/SKILL.md) owns standards selection for new
+repositories and new technology stacks, including the personal/work scope question.
+[`base:solution-assessment`](.agents/base/policy/solution-assessment/SKILL.md) owns the once-per-idea
 assessment of existing capabilities and solutions; [`workflow:run`](.agents/workflow/workflow/run/SKILL.md)
 owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.

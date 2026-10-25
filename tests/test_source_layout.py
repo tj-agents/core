@@ -59,7 +59,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(84, len(skills))
+        self.assertEqual(85, len(skills))
         self.assertEqual("machine", skills["machine:hook-control"]["plugin"])
         self.assertEqual("agent", skills["agent:background-listener"]["plugin"])
         self.assertNotIn("machine:background-listener", skills)
@@ -94,7 +94,8 @@ class SourceLayoutTests(unittest.TestCase):
         )
         self.assertIn("plugins/base/.agents/base/policy/agent-files/SKILL.md", output)
         self.assertIn("plugins/base/.agents/base/policy/task-routing/SKILL.md", output)
-        self.assertIn("plugins/base/.agents/base/policy/idea-initialization/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/policy/project-setup/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/policy/solution-assessment/SKILL.md", output)
 
     def test_problem_record_consumers_and_shared_contract_ship_for_both_hosts(self):
         _, output, skills, _ = SYNC.build(self.root)
@@ -212,7 +213,8 @@ class SourceLayoutTests(unittest.TestCase):
         _, output, _, _ = SYNC.build(self.root)
         for relative in (
             "plugins/base/skills/agent-files/scripts/session-context.py",
-            "plugins/base/skills/idea-initialization/scripts/session-context.py",
+            "plugins/base/skills/project-setup/scripts/session-context.py",
+            "plugins/base/skills/solution-assessment/scripts/session-context.py",
             "plugins/base/skills/task-routing/scripts/session-context.py",
             "plugins/workflow/codex-skills/plan-artifacts/templates/PLAN.md",
             "plugins/machine/skills/handoff-codex/scripts/launch_codex.py",
