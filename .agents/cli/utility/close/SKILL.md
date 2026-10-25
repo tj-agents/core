@@ -31,6 +31,10 @@ the CLI open with a refusal. Closure requires verified frontend exit.
 
 Managed Codex launches record native submitted-input IDs in a private temporary file and match the latest
 one against native thread history. A new input or recorded view switch invalidates the pending close.
+Arming freezes that input, native turn and rollout identity. The watcher reads native `task_complete`
+for that exact turn and rechecks the binding immediately before signaling; stale or unavailable Stop-hook
+turn state does not prevent refresh closure. A newer native turn, peer input, abort or changed rollout
+cancels closure. Agent Store is never changed to manufacture idle evidence.
 The launcher removes its recording when the frontend exits. Unmanaged clients without this evidence
 remain open; report the exact managed resume command. In-harness subagents return to their parent and
 have no separate CLI to close. Archiving a thread alone does not establish client exit.
