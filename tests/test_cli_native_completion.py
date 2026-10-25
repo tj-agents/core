@@ -153,8 +153,10 @@ class NativeCompletionTests(unittest.TestCase):
     def test_replaced_truncated_foreign_or_unattributed_rollout_refuses(self):
         self.arm()
         original = self.rollout.read_bytes()
-        self.rollout.unlink()
-        self.rollout.write_bytes(original)
+        replacement = self.rollout.with_name('replacement.jsonl')
+        replacement.write_bytes(original)
+        self.assertNotEqual(self.rollout.stat().st_ino, replacement.stat().st_ino)
+        os.replace(replacement, self.rollout)
         with self.assertRaisesRegex(RuntimeError, 'replaced or truncated'):
             self.wait()
         self.arm()
