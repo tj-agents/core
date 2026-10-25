@@ -27,7 +27,7 @@ The user explicitly requires autonomous recovery instead of manual directory/res
 
 ## Reviews
 
-Full native and independent process-safety review of `fe14c6fc` completed with one grouped finding: options after resume and compact short options were dropped. The parser is corrected and 19 recovery regressions now pass on both Windows and Ubuntu, including sandbox restrictions. Fresh incremental review remains required. Draft PR: https://github.com/tj-agents/core/pull/491.
+Full and first incremental native/independent review completed. R1 fixed resume/compact option preservation. R2 found that inherited launcher recording overrides failed managed admission after closure. R2 now removes only the exact launcher-owned empty overrides and runs real recovery admission before either watcher can start. All22 recovery regressions pass on Windows and Ubuntu; actual current-client recovery admission also passes without closing or launching a client. Fresh incremental review remains required. Draft PR: https://github.com/tj-agents/core/pull/491.
 
 ## Implementation checkpoint
 
@@ -38,6 +38,10 @@ Windows and Ubuntu pass the new 16-test recovery suite, existing 14-test relaunc
 Native verification from this session's actual app cwd identified managed frontend PID44204, exact thread `01a1747a-bfbd-7fa1-8a29-e8e931e06da1`, current input binding, expected profile and checkout. No client has been restarted yet. Generated outputs and catalog digests stay uncommitted.
 
 Full plan-graph validation reports six existing errors in unrelated legacy MACHINE_EVENTS_PROGRESS and REPO_DECLARED_CONFIG_PROGRESS documents. This goal's host-coverage validation passes. Do not absorb unrelated baseline repairs.
+
+PR491's initial Windows CI failed only two test comparisons of short versus resolved temporary paths; normalize the fixture root with `Path.resolve`, retaining the same assertions. Linux passed. Send the stable reviewed repair head to the same PR once ready; do not retry the failed old head.
+
+The skill-ownership cutover owner acknowledged verified delivery of the repair evidence. It explicitly retains PR491 as runtime owner and will propagate the delivered runtime plus automatic `agent:refresh` guidance in its existing reviewed Agent change. Do not add another refresh skill or edit its checkout. The caller's original npm CLI failed messaging to a standalone peer; using the verified target shared-daemon executable delivered the coordination to the desktop owner. No terminal or peer restart was used.
 
 ```agent-host-coverage
 {
