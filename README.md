@@ -157,13 +157,12 @@ These are source package relationships. The central marketplace roster and nativ
 also contain a package before a selected host can discover it; successful source generation is not
 installed activation.
 
-The CLI package is staged for Marketplace publication. Until its catalog entry and Core selection are
-updated, existing sessions continue to use `machine:close`.
+The CLI package is published and available for explicit selection. Existing sessions use `machine:close`,
+which shares the CLI package's verified frontend closure runtime through a generated Machine-local copy.
 
 `cli:close` closes only the current terminal tab after the final reply and preserves unfinished work.
-`cli:closeout` first finishes the authorized workflow, then uses the same closure primitive and the
-proof-guarded worktree sweep. The later adoption change will route workflow completion and automatic
-closure after a landed delivery through closeout.
+`machine:close` finishes the authorized workflow, then uses the same closure primitive and the
+proof-guarded worktree sweep. An explicit request to dismiss a CLI can select `cli:close` when installed.
 
 For shared Codex backends, a resumed frontend is bound to its exact native launch receipt, child PID/start
 time and terminal observation captured by the launcher. The watcher waits for that frontend to exit,

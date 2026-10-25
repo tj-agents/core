@@ -5,6 +5,7 @@
     ".agents/agent-store/runtime",
     ".agents/catalog/catalog.schema.json",
     ".agents/catalog/plugins.schema.json",
+    ".agents/cli",
     ".agents/hooks/hook_dispatch.py",
     ".agents/machine",
     ".agents/machine/scripts/machine_events.py",
