@@ -759,7 +759,11 @@ def run_steps(steps, context: Context, check_only: bool, out=sys.stdout, err=sys
     print(f"main checkout: {context.checkout or 'none (checkout-based steps are skipped)'}", file=out)
     drift = False
     failed = False
+    failed_steps = set()
     for step in steps:
+        if step.name == "plugin setup" and failed_steps & {"plugin and merge-policy catch-up", "harness permissions"}:
+            print("n/a    plugin setup: prerequisite setup step failed", file=out)
+            continue
         try:
             reason = step.skip(context)
             if reason:
@@ -779,6 +783,7 @@ def run_steps(steps, context: Context, check_only: bool, out=sys.stdout, err=sys
         except Exception as error:  # noqa: BLE001
             print(f"failed {step.name}: {error}", file=err)
             failed = True
+            failed_steps.add(step.name)
             if step.required:
                 return 2
     if failed:
@@ -833,6 +838,8 @@ def main(argv: list[str] | None = None) -> int:
     selected = set(parsed.step or ())
     if "shell profiles" in selected:
         selected.add("launch-check runtime")
+    if "plugin setup" in selected:
+        selected.update({"plugin and merge-policy catch-up", "harness permissions"})
     steps = tuple(step for step in STEPS if not selected or step.required or step.name in selected)
     context = machine_context(checkout)
     context.onboard = parsed.onboard

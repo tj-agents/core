@@ -71,7 +71,7 @@ class LaunchCheckTests(unittest.TestCase):
         base = self.state / "plugins/cache/tj-agents/base/local"
         other = self.state / "plugins/cache/publisher/other/local"
         definitions = [("sessionStart", None, "command", "python start.py")]
-        with mock.patch.object(required_plugins, "check", return_value=(base, other)), \
+        with mock.patch.object(required_plugins, "check", return_value={"base@tj-agents": base}), \
                 mock.patch.object(codex_hook_trust, "required_definitions", return_value=definitions) as expected, \
                 mock.patch.object(codex_hook_trust, "apply_trust") as trust:
             # Call the implementation, bypassing only this test class's readiness stub.
