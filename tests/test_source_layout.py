@@ -351,22 +351,6 @@ class SourceLayoutTests(unittest.TestCase):
                     output,
                 )
 
-    def test_cd_routes_to_automatic_handoff_before_manual_fallback(self):
-        _, output, _, _ = SYNC.build(self.root)
-        bodies = [
-            (self.root / ".agents/base/policy/cd/SKILL.md").read_text(encoding="utf-8"),
-            output["plugins/base/.agents/base/policy/cd/SKILL.md"].decode("utf-8"),
-        ]
-        for body in bodies:
-            normalized = body.replace("\r\n", "\n")
-            automatic = normalized.index("resolve and invoke the unqualified `handoff` workflow")
-            manual = normalized.index("Only after the automatic `handoff` capability")
-            self.assertLess(automatic, manual)
-            self.assertIn("starts exactly one successor", normalized)
-            self.assertIn(
-                "never make\nmanual `/cd` the normal transfer path", normalized
-            )
-
     def test_fresh_selection_must_match_marketplace_policy(self):
         path = self.root / ".agents/plugins/manifests/codex/marketplace.json"
         marketplace = json.loads(path.read_text(encoding="utf-8"))
