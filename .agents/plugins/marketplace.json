@@ -53,6 +53,18 @@
       "category": "Productivity"
     },
     {
+      "name": "cli",
+      "source": {
+        "source": "local",
+        "path": "./plugins/cli"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
       "name": "workflow",
       "source": {
         "source": "local",

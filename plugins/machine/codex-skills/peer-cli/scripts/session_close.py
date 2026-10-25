@@ -323,7 +323,7 @@ def attached_to(cwd, entry):
                for root in (entry.get("cwd"), entry.get("launch_cwd")))
 
 
-def own_host_and_entry(cwd=None):
+def own_host_and_entry(cwd=None, session_id=None):
     cwd = Path(cwd or os.getcwd()).resolve()
     host_names = register_session.read_host_names()
     seen = set()
@@ -343,8 +343,13 @@ def own_host_and_entry(cwd=None):
     if nearest is None:
         raise Refusal("current process is not attached to a recognized registered host")
     matches = []
+    native_session = session_id or (os.environ.get("CODEX_THREAD_ID")
+                                    if register_session.stem(nearest.name) == "codex"
+                                    else os.environ.get("CLAUDE_CODE_SESSION_ID"))
     for _path, entry in entries():
         if not valid_entry(entry) or not attached_to(cwd, entry):
+            continue
+        if native_session and entry["session_id"] != native_session:
             continue
         if (entry["pid"] == nearest.pid
                 and entry["host"] == register_session.stem(nearest.name)
@@ -352,6 +357,8 @@ def own_host_and_entry(cwd=None):
                 and verified_live(entry["pid"], entry["pid_started_at"])):
             matches.append(entry)
     if matches:
+        if not native_session and len(matches) > 1:
+            raise Refusal("multiple registry attachments share this host; an exact native session id is required")
         latest = max(item["started_at"] for item in matches)
         recent = [item for item in matches if item["started_at"] == latest]
         if len(recent) == 1:
@@ -361,6 +368,46 @@ def own_host_and_entry(cwd=None):
         "cannot resolve a verified registry attachment for this host and current directory; "
         "do not force-close the host"
     )
+
+
+def close_target(entry):
+    """Resolve a dedicated frontend from an exact-session native launch receipt."""
+    if not valid_entry(entry):
+        raise Refusal("invalid session registry entry cannot resolve a frontend")
+    shared = any(other.get("pid") == entry["pid"]
+                 and other.get("pid_started_at") == entry["pid_started_at"]
+                 and other.get("session_id") != entry["session_id"] for _path, other in entries())
+    directory = state_directory() / "recovery-launches"
+    receipts = [read_json(path) for path in directory.glob("*.json")] if directory.is_dir() else []
+    receipts = [receipt for receipt in receipts if isinstance(receipt, dict)
+                and receipt.get("host") == entry["host"] and receipt.get("session") == entry["session_id"]
+                and receipt.get("state") == "launched"]
+    if len(receipts) > 1:
+        raise Refusal("multiple frontend launch receipts match this session")
+    if receipts:
+        receipt = receipts[0]
+        wrapper = receipt.get("wrapper")
+        wrapper = wrapper if isinstance(wrapper, dict) else {}
+        child = wrapper.get("child")
+        child = child if isinstance(child, dict) else {}
+        terminal = wrapper.get("terminal")
+        if isinstance(terminal, dict) and terminal.get("kind"):
+            process = process_info(child.get("pid")) if valid_identity(child.get("pid"), child.get("started_at")) else None
+            parent = process_info(wrapper.get("pid")) if valid_identity(wrapper.get("pid"), wrapper.get("started_at")) else None
+            if (process is None or parent is None or process.ppid != parent.pid
+                    or process.started_at != child["started_at"] or parent.started_at != wrapper["started_at"]
+                    or register_session.stem(process.name) != entry["host"]
+                    or not finite_positive(receipt.get("created_at"))
+                    or not receipt["created_at"] <= parent.started_at <= process.started_at
+                    or entry["started_at"] < process.started_at):
+                raise Refusal("the dedicated frontend launch identity is stale or unverifiable")
+            return {**entry, "pid": child["pid"], "pid_started_at": child["started_at"],
+                    "terminal": terminal, "title": wrapper.get("title")}
+    if shared:
+        raise Refusal("registered host is shared by multiple session identities; an exact frontend launch binding is required")
+    if entry["host"] == "codex":
+        raise Refusal("an exact frontend launch binding is required for Codex; registration alone cannot identify its frontend")
+    return entry
 
 
 def same_session_process(left, right):
