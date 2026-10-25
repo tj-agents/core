@@ -1,14 +1,13 @@
 """Close one armed session once its turn has ended and stayed idle (Python 3.9+).
 
 Started detached by `close_session.py arm`. A new prompt, an ended or replaced session, or the timeout
-cancels it without closing anything. After a close it runs the worktree sweep for the session's repository.
+cancels it without closing anything. It preserves the shared backend, terminal and checkout.
 """
 
 import argparse
 import json
 import os
 import sqlite3
-import subprocess
 import sys
 import time
 
@@ -18,7 +17,6 @@ from session_close import Refusal
 
 POLL_SECONDS = 0.25
 EXIT_WAIT_SECONDS = 30.0
-SWEEP_TIMEOUT_SECONDS = 1800
 
 
 def arguments(argv=None):
@@ -30,8 +28,6 @@ def arguments(argv=None):
     parser.add_argument("--armed-at", type=float, required=True)
     parser.add_argument("--idle", type=float, default=3.0)
     parser.add_argument("--timeout", type=float, default=900.0)
-    parser.add_argument("--repo")
-    parser.add_argument("--sweep")
     parser.add_argument("--state-directory")
     parser.add_argument("--host-names")
     parser.add_argument("--transcript")
@@ -142,30 +138,14 @@ def close_session(args, activity):
     entry = registered_entry(args)
     if entry is None:
         raise Refusal("the armed session is no longer registered")
-    wrapper = session_close.qualified_windows_wrapper(entry)
     session_close.awaiting_input_activity(entry, activity)
+    close.close_host(entry, lambda: session_close.awaiting_input_activity(entry, activity))
+    deadline = time.time() + EXIT_WAIT_SECONDS
+    while not session_close.verified_exited(entry["pid"], entry["pid_started_at"]):
+        if time.time() >= deadline:
+            raise Refusal("CLI client exit was not confirmed")
+        time.sleep(POLL_SECONDS)
     session_close._record_own_end(entry, "closed")
-    try:
-        close.close_host(entry, wrapper)
-        deadline = time.time() + EXIT_WAIT_SECONDS
-        while not session_close.verified_exited(entry["pid"], entry["pid_started_at"]):
-            if time.time() >= deadline:
-                raise Refusal("terminal tab closed but registered host exit was not confirmed")
-            time.sleep(POLL_SECONDS)
-    except Exception:
-        session_close._reopen_own_end(entry, "closed")
-        raise
-
-
-def sweep(args):
-    if not (args.sweep and args.repo):
-        return
-    try:
-        subprocess.run([sys.executable, "-B", args.sweep, "--repo", args.repo], stdin=subprocess.DEVNULL,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=SWEEP_TIMEOUT_SECONDS,
-                       check=False)
-    except (OSError, subprocess.SubprocessError):
-        pass
 
 
 def outcome_path(session_id):
@@ -193,9 +173,11 @@ def main(argv=None):
         status = "refused: " + str(error)
     if status == "cancelled" and superseded(args):
         return 0
-    session_close.write_json(outcome_path(args.session_id), {"status": status, "at": time.time()})
-    if status == "closed":
-        sweep(args)
+    process = session_close.process_info(os.getpid())
+    session_close.write_json(outcome_path(args.session_id), {
+        "status": status, "at": time.time(), "watcher_pid": os.getpid(),
+        "watcher_started_at": process.started_at if process else None,
+    })
     return 0 if status in ("closed", "cancelled") else 2
 
 

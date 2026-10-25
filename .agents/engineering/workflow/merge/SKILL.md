@@ -254,7 +254,7 @@ It removes each merged linked worktree once `cleanup_proof.py` proves its PR mer
 with the merge commit on `origin/<default>`, archiving any leftovers under `<state>/merge-cleanup/set-aside/`
 first. It keeps a worktree while a registered session still works inside it, while an open PR is based on
 its branch, or when the proof refuses, and prints why. A worktree kept because this session is inside it
-is removed by the sweep that runs once the session closes. For a branch developed in the primary
+is retained after CLI closure; remove it in a later explicit cleanup operation. For a branch developed in the primary
 checkout, the checkout-and-fast-forward above replaces removal; delete the old local branch with
 `git -C <primary-checkout> branch -d <branch>`, or `-D` once the proof covers a squash merge. Report what
 the sweep kept and why; never force a removal.
