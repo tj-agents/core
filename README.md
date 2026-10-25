@@ -3,7 +3,7 @@
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
 The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core).
 Select Core's `base@tj-agents`, `machine@tj-agents`, `workflow@tj-agents` and
-`engineering@tj-agents`, plus their declared Agent, Agent Store, Codex, Claude and CLI prerequisites, from
+`engineering@tj-agents`, plus their declared Agent, Agent Store, and CLI prerequisites, from
 [`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
 The repository publishes Base, Machine, Workflow and Engineering packages. Agent owns shared execution,
 runtime and background completion across hosts; Agent Store owns recorded execution/session state; CLI owns
@@ -12,7 +12,7 @@ Stack standards remain in their stack plugins; Concertable policy stays with Con
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
 
 Marketplace owns the canonical plugin roster and dependency graph in
-[`catalog.json`](https://github.com/tj-agents/marketplace/blob/main/catalog.json). Machine's selector ships a
+[`catalog.json`](https://github.com/tj-agents/marketplace/blob/main/catalog.json). Agent's selector ships a
 pinned offline snapshot of that catalog and owns only curated stack choices and project settings generation.
 After a Marketplace catalog change, Agent's publisher runtime maintains its own selector snapshot and
 publication receipt. Core verifies the staged export but never mutates it. Do not edit plugin names or

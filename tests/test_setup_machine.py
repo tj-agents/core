@@ -778,6 +778,22 @@ class SetupWrapperTests(unittest.TestCase):
         shutil.copy2(source, target)
         return target
 
+    def python_shim(self, name, *, posix=False):
+        if os.name == "nt" and not posix:
+            shim = self.bin / f"{name}.cmd"
+            shim.write_text(
+                "@echo off\r\necho %*>> \"%SETUP_WRAPPER_LOG%\"\r\nexit /b 0\r\n",
+                encoding="utf-8",
+            )
+        else:
+            shim = self.bin / name
+            shim.write_text(
+                "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$SETUP_WRAPPER_LOG\"\n",
+                encoding="utf-8",
+            )
+            shim.chmod(0o755)
+        return shim
+
     def assert_checked_without_mutating_the_existing_stage(self, command, expected_calls=2):
         before = snapshot(self.stage)
         result = subprocess.run(command, cwd=self.root, env=self.environment, text=True,
@@ -797,36 +813,20 @@ class SetupWrapperTests(unittest.TestCase):
         powershell = shutil.which("pwsh")
         if powershell is None:
             self.skipTest("pwsh is unavailable")
-        (self.bin / "python.cmd").write_text(
-            "@echo off\r\necho %*>> \"%SETUP_WRAPPER_LOG%\"\r\nexit /b 0\r\n",
-            encoding="utf-8",
-        )
+        self.python_shim("python" if os.name == "nt" else "python3")
         script = self.wrapper("setup.ps1")
         self.assert_checked_without_mutating_the_existing_stage(
             [powershell, "-NoProfile", "-File", str(script), "--check"],
         )
 
     def test_shell_check_forwards_read_only_runtime_source_verification(self):
-        bash = shutil.which("bash")
+        git_bash = Path(os.environ.get("ProgramFiles", r"C:\\Program Files")) / "Git" / "bin" / "bash.exe"
+        bash = str(git_bash) if os.name == "nt" and git_bash.is_file() else shutil.which("bash")
         if bash is None:
             self.skipTest("bash is unavailable")
-        python = self.bin / "python3"
-        python.write_text(
-            "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$SETUP_WRAPPER_LOG\"\n",
-            encoding="utf-8",
-        )
-        python.chmod(0o755)
-        setup_script = self.root / ".agents/machine/scripts/setup_machine.py"
-        setup_script.parent.mkdir(parents=True)
-        setup_script.write_text(
-            "import sys\n"
-            "from pathlib import Path\n"
-            "with (Path(__file__).resolve().parents[3] / 'calls.log').open('a', encoding='utf-8') as stream:\n"
-            "    stream.write(' '.join(sys.argv) + '\\n')\n",
-            encoding="utf-8",
-        )
+        self.python_shim("python3", posix=True)
         self.wrapper("setup.sh")
-        self.assert_checked_without_mutating_the_existing_stage([bash, "./setup.sh", "--check"], expected_calls=1)
+        self.assert_checked_without_mutating_the_existing_stage([bash, "./setup.sh", "--check"])
 
 
 if __name__ == "__main__":
