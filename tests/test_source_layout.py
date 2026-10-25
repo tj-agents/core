@@ -57,7 +57,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(62, len(skills))
+        self.assertEqual(63, len(skills))
         self.assertEqual("machine", skills["machine:clip"]["plugin"])
         self.assertNotIn("agent:background-listener", skills)
         for tree in ("skills", "codex-skills"):
@@ -91,7 +91,8 @@ class SourceLayoutTests(unittest.TestCase):
         )
         self.assertIn("plugins/base/.agents/base/policy/agent-files/SKILL.md", output)
         self.assertIn("plugins/base/.agents/base/policy/task-routing/SKILL.md", output)
-        self.assertIn("plugins/base/.agents/base/policy/idea-initialization/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/policy/project-setup/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/policy/solution-assessment/SKILL.md", output)
 
     def test_problem_record_consumers_and_shared_contract_ship_for_both_hosts(self):
         _, output, skills, _ = SYNC.build(self.root)
@@ -202,7 +203,8 @@ class SourceLayoutTests(unittest.TestCase):
         _, output, _, _ = SYNC.build(self.root)
         for relative in (
             "plugins/base/skills/agent-files/scripts/session-context.py",
-            "plugins/base/skills/idea-initialization/scripts/session-context.py",
+            "plugins/base/skills/project-setup/scripts/session-context.py",
+            "plugins/base/skills/solution-assessment/scripts/session-context.py",
             "plugins/base/skills/task-routing/scripts/session-context.py",
             "plugins/workflow/codex-skills/plan-artifacts/templates/PLAN.md",
             "plugins/machine/.agents/agent/runtime/launch_check.py",
@@ -501,7 +503,7 @@ class SourceLayoutTests(unittest.TestCase):
         path = self.root / ".agents/catalog/catalog.json"
         catalog = json.loads(path.read_text(encoding="utf-8"))
         machine = next(package for package in catalog["packages"] if package["id"] == "tj-agents/machine")
-        machine["digest_excludes"].append("codex-skills/plugin-selection/SKILL.md")
+        machine["digest_excludes"].append("codex-skills/clip/SKILL.md")
         path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "digest exclusion drift"):
             SYNC.build(self.root, validate_catalog_digests=False)

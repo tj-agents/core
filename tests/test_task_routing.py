@@ -22,7 +22,7 @@ def snapshot(root):
 
 
 class PolicyContextTests(unittest.TestCase):
-    policies = ("task-routing", "idea-initialization")
+    policies = ("task-routing", "project-setup", "solution-assessment")
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="policy context ")

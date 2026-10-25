@@ -1,13 +1,11 @@
 ---
-name: idea-initialization
-description: Initialize a new idea with one recorded assessment of existing capabilities and credible solutions before choosing an implementation. Use when introducing a project, reusable tool, infrastructure capability, or general technical mechanism.
+name: solution-assessment
+description: Assess existing capabilities and credible solutions once before choosing an implementation. Use when introducing a project, reusable tool, infrastructure capability, or general technical mechanism.
 kind: policy
 domain: behavior
 ---
 
-# Initialize a new idea
-
-When creating a repository or adding a technology stack, identify its owning standards packages and inject them into that repository through `agent:plugins`. Complete the utility's project write and passing check before writing governed code or claiming the operation is finished. This requirement applies even when the idea assessment is already complete. If the injector or current publisher sources are unavailable, keep governed writes pending and report the missing capability.
+# Assess a solution
 
 When a new idea is introduced, first consult that same idea's recorded assessment before doing
 research. If it is complete, carry its decision forward. Otherwise, once before choosing an

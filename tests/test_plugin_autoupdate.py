@@ -381,7 +381,8 @@ class RefreshTests(unittest.TestCase):
                                 stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
 
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn('base:idea-initialization', result.stdout)
+        self.assertIn('base:project-setup', result.stdout)
+        self.assertIn('base:solution-assessment', result.stdout)
 
     def test_an_unchanged_marketplace_never_asks_whether_sessions_are_running(self):
         busy = mock.Mock(return_value=True)
