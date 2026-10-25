@@ -1,0 +1,23 @@
+{
+  "name": "cli",
+  "description": "Close CLI tabs or finish their workflows before closing.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tj-agents/core",
+  "keywords": [
+    "cli",
+    "sessions",
+    "closeout"
+  ],
+  "skills": "./codex-skills/",
+  "interface": {
+    "displayName": "CLI lifecycle",
+    "shortDescription": "Close CLI tabs or finish their workflows before closing.",
+    "longDescription": "Close CLI tabs or finish their workflows before closing.",
+    "developerName": "Tommy Seery",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the selected capability for this task."
+  }
+}

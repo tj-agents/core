@@ -2,9 +2,9 @@
 
 import argparse
 import importlib
+import importlib.util
 import json
 import math
-import os
 from pathlib import Path
 import sys
 import time
@@ -25,51 +25,58 @@ def runtime():
 
 
 def verified_entry(shared, session_id=None):
-    return shared.own_host_and_entry(**({'session_id': session_id} if session_id else {}))
+    return cli_runtime().verified_entry(shared, session_id)
 
 
-def claude_transcript(session_id):
-    home = Path(os.environ.get('CLAUDE_CONFIG_DIR') or Path.home() / '.claude')
-    matches = list((home / 'projects').glob('*/' + session_id + '.jsonl'))
-    return matches[0] if len(matches) == 1 else None
+def cli_runtime():
+    here = Path(__file__).resolve()
+    anchor = here.parents[4] if here.parents[4].name == '.agents' else here.parents[3] / '.agents'
+    script = anchor / 'cli/utility/close/scripts/close_session.py'
+    if not script.is_file():
+        raise RuntimeError('machine:close cannot locate its shipped CLI close runtime')
+    spec = importlib.util.spec_from_file_location('machine_cli_close_runtime', script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def primary_checkout(shared):
+    code, common, _error = shared.git(Path.cwd(), 'rev-parse', '--path-format=absolute', '--git-common-dir')
+    if code:
+        return None
+    common = Path(common)
+    return common.parent if common.name == '.git' else None
+
+
+def sweep_script(shared):
+    here = Path(__file__).resolve()
+    if here.parents[2].name in {'skills', 'codex-skills'}:
+        candidates = [here.parents[3] / 'resources/machine/scripts/plugin_autoupdate.py']
+    else:
+        candidates = [
+            here.parents[4] / 'machine/scripts/plugin_autoupdate.py',
+            here.parents[5] / 'resources/machine/scripts/plugin_autoupdate.py',
+        ]
+    script = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if script is None:
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location('close_plugin_autoupdate', script)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.sweep_script(module.load_codex_config())
+    except Exception:
+        return None
 
 
 def own_session(shared, session_id=None):
-    entry = verified_entry(shared, session_id)
-    store = shared.register_session._load_session_store()
-    if store is None:
-        raise shared.Refusal('session turn store is unavailable')
-    connection = store.connect()
-    try:
-        activity = store.get_session(connection, store.session_handle(entry['host'], entry['session_id']))
-    finally:
-        connection.close()
-    if not isinstance(activity, dict) or activity.get('ended_at') is not None:
-        raise shared.Refusal('this session has no active turn to close after')
-    if activity.get('pid') != entry['pid'] or activity.get('pid_started_at') != entry['pid_started_at']:
-        raise shared.Refusal('the CLI client attachment is not recorded in Agent Store; sync Machine and Agent Store')
-    return entry, activity
-
-
-def armed_path(shared, session_id):
-    return shared.state_directory() / 'session-close' / (session_id + '.armed.json')
+    return cli_runtime().own_session(shared, session_id)
 
 
 def start_watcher(shared, entry, armed_at):
-    arguments = ['--host', entry['host'], '--session-id', entry['session_id'], '--pid', str(entry['pid']),
-                 '--pid-started-at', repr(entry['pid_started_at']), '--armed-at', repr(armed_at),
-                 '--state-directory', str(shared.state_directory()),
-                 '--host-names', os.environ.get('AGENT_CLI_HOST_NAMES', '')]
-    transcript = claude_transcript(entry['session_id']) if entry['host'] == 'claude' else None
-    if transcript:
-        arguments += ['--transcript', str(transcript), '--transcript-offset', str(transcript.stat().st_size)]
-    shared.write_json(armed_path(shared, entry['session_id']), {'armed_at': armed_at})
-    here = Path(__file__).resolve()
-    scripts = peer_scripts()
-    shared.start_detached(here.with_name('close_watcher.py'), arguments,
-                          [scripts / 'close.py', shared.client_runtime_path()])
-    return {'operation': 'session-close', 'status': 'armed', 'session_id': entry['session_id'],
-            'transcript_checked': transcript is not None}
+    primary, sweep = primary_checkout(shared), sweep_script(shared)
+    cleanup = (primary, sweep) if primary and sweep else None
+    return cli_runtime().start_watcher(shared, entry, armed_at, cleanup)
 
 
 def arm():

@@ -2,7 +2,6 @@
 
 import json
 import math
-from datetime import datetime
 import os
 from pathlib import Path
 import re
@@ -123,18 +122,20 @@ def prepare(host, arguments, project, environment, executable=None):
         if compared in (RECORD_ENV, RECORD_PATH_ENV):
             values.pop(key)
     arguments = list(arguments)
-    if host != 'codex' or not is_session(arguments) or '--no-daemon' in arguments:
+    if host != 'codex' or not is_session(arguments):
         return arguments, values, None
     if not executable:
         raise RuntimeError('Native Codex executable is required for a managed frontend')
-    with tempfile.TemporaryFile(mode='w+', encoding='utf-8', errors='replace') as diagnostic:
-        result = subprocess.run([executable, 'app-server', 'daemon', 'start'], cwd=project, env=dict(values),
-                                stdin=subprocess.DEVNULL, stdout=diagnostic, stderr=diagnostic, timeout=45)
-        if result.returncode:
-            diagnostic.seek(0)
-            detail = diagnostic.read().strip()[-1000:] or f'exit {result.returncode}'
-            raise RuntimeError('Cannot start the native Codex daemon: ' + detail)
-    backend = daemon_identity(values)
+    backend = None
+    if '--no-daemon' not in arguments:
+        with tempfile.TemporaryFile(mode='w+', encoding='utf-8', errors='replace') as diagnostic:
+            result = subprocess.run([executable, 'app-server', 'daemon', 'start'], cwd=project, env=dict(values),
+                                    stdin=subprocess.DEVNULL, stdout=diagnostic, stderr=diagnostic, timeout=45)
+            if result.returncode:
+                diagnostic.seek(0)
+                detail = diagnostic.read().strip()[-1000:] or f'exit {result.returncode}'
+                raise RuntimeError('Cannot start the native Codex daemon: ' + detail)
+        backend = daemon_identity(values)
     token = secrets.token_hex(32)
     path = binding_path(token)
     path.parent.mkdir(parents=True, mode=0o700, exist_ok=False)
@@ -181,7 +182,7 @@ def release(ticket):
         pass
 
 
-def latest_input(path, since=0):
+def latest_input(path):
     latest = None
     headers = 0
     with Path(path).open('r', encoding='utf-8') as stream:
@@ -206,9 +207,8 @@ def latest_input(path, since=0):
                 payload = row.get('payload')
                 turn = payload.get('UserTurn') if isinstance(payload, dict) else None
                 if isinstance(turn, dict):
-                    stamp = datetime.fromisoformat(row['ts'].replace('Z', '+00:00')).timestamp()
                     identity = turn.get('client_user_message_id')
-                    latest = identity if isinstance(identity, str) and identity and stamp >= since else None
+                    latest = identity if isinstance(identity, str) and identity else None
     if headers != 1:
         raise RuntimeError('Native frontend recording has no unique startup header')
     return latest
@@ -241,15 +241,17 @@ def current_input(server, session_id):
     raise RuntimeError('This native thread has no attributable frontend input')
 
 
-def recorded_client(session_id, nearest, lookup, table, since):
+def recorded_client(session_id, nearest, lookup, table):
     if sys.version_info < (3, 11):
-        raise RuntimeError('Shared Codex frontend attribution requires Python 3.11 or newer')
-    backend = daemon_identity(expected_pid=nearest.pid)
+        raise RuntimeError('Codex frontend attribution requires Python 3.11 or newer')
+    arguments = process_arguments(nearest.pid)
+    private = bool(arguments and is_session(arguments[1:]) and '--no-daemon' in arguments)
+    backend = None if private else daemon_identity(expected_pid=nearest.pid)
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import codex_hook_trust
 
-    executable = process_arguments(nearest.pid)[0]
-    with codex_hook_trust.AppServer(executable, Path.cwd(), existing=True, timeout=15) as server:
+    executable = arguments[0]
+    with codex_hook_trust.AppServer(executable, Path.cwd(), existing=not private, timeout=15) as server:
         identity = current_input(server, session_id)
     state = Path(os.environ.get('AGENT_STATE_DIRECTORY') or Path.home() / '.agents-state')
     matches = []
@@ -263,6 +265,8 @@ def recorded_client(session_id, nearest, lookup, table, since):
             info = lookup(record['pid'])
             if info is None or Path(info.name).stem.casefold() != 'codex':
                 continue
+            if private and info.pid != nearest.pid:
+                continue
             times = [record.get(key) for key in ('created_at', 'recorded_at')]
             if (not all(type(value) in (int, float) and math.isfinite(value) and value > 0 for value in times)
                     or not times[0] <= times[1] or not times[0] - 2 <= info.started_at <= times[1] + 2):
@@ -274,7 +278,8 @@ def recorded_client(session_id, nearest, lookup, table, since):
                     or Path(context['profile']) != profile_directory()):
                 continue
             arguments = process_arguments(info.pid)
-            if not arguments or not is_session(arguments[1:]) or latest_input(event_path, since) != identity:
+            if (not arguments or not is_session(arguments[1:])
+                    or ('--no-daemon' in arguments) != private or latest_input(event_path) != identity):
                 continue
             for other in table.values():
                 if other.pid == info.pid or Path(other.name).stem.casefold() != 'codex':

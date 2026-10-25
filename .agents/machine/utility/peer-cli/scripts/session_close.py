@@ -68,23 +68,8 @@ def client_runtime():
 
 def current_codex_client(session_id, nearest):
     client = client_runtime()
-    if nearest is not None and register_session.stem(nearest.name) == "codex":
-        arguments = client.process_arguments(nearest.pid)
-        if arguments and client.command_name(arguments[1:]) not in client.OTHER_COMMANDS:
-            return nearest, {"client_identity": "native-ancestor", "title": os.environ.get(register_session.TITLE_ENV),
-                             "terminal": register_session.terminal_identity()}
-    store = register_session._load_session_store()
-    if store is None:
-        raise Refusal('Native session-start evidence is unavailable')
-    connection = store.connect()
-    try:
-        row = store.get_session(connection, store.session_handle('codex', session_id))
-    finally:
-        connection.close()
-    if not isinstance(row, dict) or not finite_positive(row.get('started_at')):
-        raise Refusal('Native session-start evidence is unavailable')
     info, record = client.recorded_client(session_id, nearest, process_info,
-                                          register_session.process_table(), row['started_at'])
+                                          register_session.process_table())
     return info, {'client_identity': 'managed-input', 'launch_cwd': record['launch_cwd'],
                   'title': record.get('title'), 'client_message_id': record['client_message_id'],
                   'recording_path': record['recording_path'], 'backend': record['backend'], 'profile': record['profile'],
@@ -159,8 +144,9 @@ def stop_cli_client(entry, before_signal=lambda: None):
             context = client.process_context(entry['pid'])
             if (context.get(client.RECORD_PATH_ENV) != entry['recording_path']
                     or Path(context['profile']) != Path(entry['profile'])
-                    or client.daemon_identity({'CODEX_HOME': entry['profile']},
-                                              expected_pid=entry['backend']['pid']) != entry['backend']
+                    or (entry.get('backend') is not None
+                        and client.daemon_identity({'CODEX_HOME': entry['profile']},
+                                                  expected_pid=entry['backend']['pid']) != entry['backend'])
                     or client.latest_input(entry['recording_path']) != entry['client_message_id']):
                 raise Refusal('The frontend input or backend binding changed before close')
         before_signal()
@@ -479,10 +465,13 @@ def own_host_and_entry(cwd=None, session_id=None):
             client={"pid": client.pid, "host": "codex", "pid_started_at": client.started_at, **details},
         )
     matches = []
+    native_session = session_id or (os.environ.get("CODEX_THREAD_ID")
+                                    if register_session.stem(nearest.name) == "codex"
+                                    else os.environ.get("CLAUDE_CODE_SESSION_ID"))
     for _path, entry in entries():
         if not valid_entry(entry) or not attached_to(cwd, entry):
             continue
-        if session_id is not None and entry['session_id'] != session_id:
+        if native_session and entry["session_id"] != native_session:
             continue
         if (entry["pid"] == nearest.pid
                 and entry["host"] == register_session.stem(nearest.name)
@@ -490,6 +479,8 @@ def own_host_and_entry(cwd=None, session_id=None):
                 and verified_live(entry["pid"], entry["pid_started_at"])):
             matches.append(entry)
     if matches:
+        if not native_session and len(matches) > 1:
+            raise Refusal("multiple registry attachments share this host; an exact native session id is required")
         latest = max(item["started_at"] for item in matches)
         recent = [item for item in matches if item["started_at"] == latest]
         if len(recent) == 1:
@@ -499,6 +490,46 @@ def own_host_and_entry(cwd=None, session_id=None):
         "cannot resolve a verified registry attachment for this host and current directory; "
         "do not force-close the host"
     )
+
+
+def close_target(entry):
+    """Resolve a dedicated frontend from an exact-session native launch receipt."""
+    if not valid_entry(entry):
+        raise Refusal("invalid session registry entry cannot resolve a frontend")
+    shared = any(other.get("pid") == entry["pid"]
+                 and other.get("pid_started_at") == entry["pid_started_at"]
+                 and other.get("session_id") != entry["session_id"] for _path, other in entries())
+    directory = state_directory() / "recovery-launches"
+    receipts = [read_json(path) for path in directory.glob("*.json")] if directory.is_dir() else []
+    receipts = [receipt for receipt in receipts if isinstance(receipt, dict)
+                and receipt.get("host") == entry["host"] and receipt.get("session") == entry["session_id"]
+                and receipt.get("state") == "launched"]
+    if len(receipts) > 1:
+        raise Refusal("multiple frontend launch receipts match this session")
+    if receipts:
+        receipt = receipts[0]
+        wrapper = receipt.get("wrapper")
+        wrapper = wrapper if isinstance(wrapper, dict) else {}
+        child = wrapper.get("child")
+        child = child if isinstance(child, dict) else {}
+        terminal = wrapper.get("terminal")
+        if isinstance(terminal, dict) and terminal.get("kind"):
+            process = process_info(child.get("pid")) if valid_identity(child.get("pid"), child.get("started_at")) else None
+            parent = process_info(wrapper.get("pid")) if valid_identity(wrapper.get("pid"), wrapper.get("started_at")) else None
+            if (process is None or parent is None or process.ppid != parent.pid
+                    or process.started_at != child["started_at"] or parent.started_at != wrapper["started_at"]
+                    or register_session.stem(process.name) != entry["host"]
+                    or not finite_positive(receipt.get("created_at"))
+                    or not receipt["created_at"] <= parent.started_at <= process.started_at
+                    or entry["started_at"] < process.started_at):
+                raise Refusal("the dedicated frontend launch identity is stale or unverifiable")
+            return {**entry, "pid": child["pid"], "pid_started_at": child["started_at"],
+                    "terminal": terminal, "title": wrapper.get("title")}
+    if shared:
+        raise Refusal("registered host is shared by multiple session identities; an exact frontend launch binding is required")
+    if entry["host"] == "codex":
+        raise Refusal("an exact frontend launch binding is required for Codex; registration alone cannot identify its frontend")
+    return entry
 
 
 def same_session_process(left, right):

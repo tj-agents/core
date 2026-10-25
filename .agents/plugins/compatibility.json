@@ -4,6 +4,7 @@
     "agent-store@tj-agents",
     "agent@tj-agents",
     "machine@tj-agents",
+    "cli@tj-agents",
     "workflow@tj-agents",
     "engineering@tj-agents"
   ],

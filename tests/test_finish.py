@@ -16,7 +16,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 REAPER = ROOT / ".agents/machine/utility/peer-cli/scripts/finish_reaper.py"
 CLOSE = ROOT / ".agents/machine/utility/peer-cli/scripts/close.py"
-CLOSE_SESSION = ROOT / ".agents/machine/utility/close/scripts/close_session.py"
+CLOSE_SESSION = ROOT / ".agents/cli/utility/close/scripts/close_session.py"
 sys.path.insert(0, str(REAPER.parent))
 import session_close
 import finish_reaper
@@ -32,7 +32,8 @@ def load_close_session(path):
 
 class HostFallbackTests(unittest.TestCase):
     def setUp(self):
-        environment = mock.patch.dict(os.environ, {'CODEX_THREAD_ID': '', 'CODEX_SESSION_ID': ''})
+        environment = mock.patch.dict(os.environ, {'CODEX_THREAD_ID': '', 'CODEX_SESSION_ID': '',
+                                                  'CLAUDE_CODE_SESSION_ID': ''})
         environment.start()
         self.addCleanup(environment.stop)
 
@@ -118,7 +119,7 @@ class FinishReaperProcessTests(unittest.TestCase):
 
 
     def test_armed_close_without_terminal_exits_only_its_disposable_client(self):
-        operation = ROOT / '.agents/machine/utility/close/scripts/close_session.py'
+        operation = CLOSE_SESSION
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             worktree, state = root / 'consumer', root / 'state'

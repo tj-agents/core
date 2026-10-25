@@ -95,7 +95,7 @@ class ClientMetadataTests(unittest.TestCase):
                         mock.patch.object(close, 'process_info', return_value=backend), \
                         mock.patch.object(close.register_session, 'read_host_names', return_value={'codex'}), \
                         mock.patch.object(close, 'current_codex_client',
-                                          return_value=(frontend, {'client_identity': 'native-ancestor'})):
+                                          return_value=(frontend, {'client_identity': 'managed-input'})):
                     entry = close.own_host_and_entry(root)
                 self.assertEqual('own', entry['session_id'])
                 self.assertEqual(200, entry['pid'])
@@ -156,15 +156,18 @@ class KernelCloseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as profile:
             environment = {key: value for key, value in os.environ.items() if key.casefold() != 'codex_home'}
             environment['Codex_Home' if os.name == 'nt' else 'CODEX_HOME'] = profile
-            process = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(120)', 'sentinel ü'],
-                                       env=environment)
+            code = 'import time; print("ready", flush=True); time.sleep(120)'
+            process = subprocess.Popen([sys.executable, '-c', code, 'sentinel ü'], env=environment,
+                                       stdout=subprocess.PIPE, text=True, encoding='utf-8')
             try:
+                self.assertEqual('ready', process.stdout.readline().strip())
                 self.assertEqual(Path(profile).resolve(), client.process_profile(process.pid))
-                self.assertIn('import time; time.sleep(120)', client.process_arguments(process.pid))
+                self.assertIn(code, client.process_arguments(process.pid))
                 self.assertIn('sentinel ü', client.process_arguments(process.pid))
             finally:
                 process.kill()
                 process.wait(timeout=5)
+                process.stdout.close()
 
 
 
