@@ -120,6 +120,13 @@ class ArmTests(unittest.TestCase):
         self.assertEqual(math.nextafter(1005.0, 0.0), armed_at)
         self.assertEqual({'armed_at': armed_at}, self.shared.write_json.call_args.args[1])
 
+    def test_codex_post_land_eligibility_uses_preserved_session_start_not_reattachment_time(self):
+        self.entry.update(host='codex', started_at=3000.0)
+        self.shared.finite_positive = watcher.session_close.finite_positive
+        self.store.get_session.return_value.update(started_at=100.0, turn_state='working', last_activity_at=100.0)
+        self.assertEqual('armed', self.arm_after_stop(landed_at=2000.0)['status'])
+        self.shared.start_detached.assert_called_once()
+
     def test_arm_after_stop_refuses_mid_turn_or_a_delivery_that_landed_before_the_session(self):
         self.shared.finite_positive = watcher.session_close.finite_positive
         for row, reason in (({'turn_state': 'working', 'last_activity_at': 1005.0, 'started_at': 100.0}, 'no recorded stop'),
