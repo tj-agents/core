@@ -184,7 +184,8 @@ python -B <engineering-package-root>/workflows/auto_merge.py --root <absolute-wo
 ```
 
 When the repository's `.github/merge-policy.json` sets `agents_may_merge: false`, the merge needs the
-owner's approval of the latest push. Enable auto-merge as above, request the owner's review
+owner's PR approval under [github-actions:merge-policy](https://github.com/tj-agents/github-actions/blob/main/.agents/github-actions/utility/merge-policy/SKILL.md).
+Enable auto-merge as above, request the owner's review
 (`gh pr edit <n> --add-reviewer <owner>`), report that the PR waits on that approval, and keep the 4b monitor
 running; GitHub merges once the approval and checks are in. Never use `--admin` or merge by another route.
 
