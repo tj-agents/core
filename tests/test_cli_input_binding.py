@@ -218,6 +218,28 @@ class RecorderTests(unittest.TestCase):
             client.current_input(server, 'child')
         server.request.assert_called_once_with('thread/read', {'threadId': 'child', 'includeTurns': False})
 
+    def test_newer_unattributed_input_never_falls_back_to_an_older_frontend(self):
+        server = mock.Mock()
+        for identity in (None, '', 123, False):
+            with self.subTest(identity=identity):
+                server.request.side_effect = [
+                    {'thread': {'source': 'cli'}}, {'data': [{'id': 'new'}, {'id': 'old'}]},
+                    {'data': [{'item': {'type': 'userMessage', 'clientId': identity}},
+                              {'item': {'type': 'userMessage', 'clientId': 'old-input'}}]},
+                ]
+                with self.assertRaisesRegex(RuntimeError, 'latest native input'):
+                    client.current_input(server, 'thread')
+
+    def test_exhausted_latest_turn_scan_cannot_select_an_older_turn(self):
+        server = mock.Mock()
+        server.request.side_effect = [
+            {'thread': {'source': 'cli'}}, {'data': [{'id': 'new'}, {'id': 'old'}]},
+            *({'data': [{'item': {'type': 'commandExecution'}}], 'nextCursor': str(index)}
+              for index in range(128)),
+        ]
+        with self.assertRaisesRegex(RuntimeError, 'scan limit'):
+            client.current_input(server, 'thread')
+
 
 class DaemonSafetyTests(unittest.TestCase):
     def test_inherited_recording_daemon_refuses_even_after_a_second_writer_has_exited(self):
