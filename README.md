@@ -149,8 +149,7 @@ A package never imports a sibling plugin installation. Machine's hooks remain th
 ```text
 Machine -> Base + Agent Store
 CLI -> Base + Agent Store + Machine
-Workflow -> Base + Agent Store + Machine + CLI
-Engineering -> Base + Agent Store + Machine + CLI + Workflow
+Engineering -> Base + Agent Store + Machine
 Agent Store inspection -> existing sessions.db, read-only JSON
 ```
 
@@ -158,13 +157,12 @@ These are source package relationships. The central marketplace roster and nativ
 also contain a package before a selected host can discover it; successful source generation is not
 installed activation.
 
-The CLI package is registered in Marketplace and selected by this repository. Fresh sessions use its
-exact-tab close operations.
+The CLI package is published and available for explicit selection. Existing sessions use `machine:close`,
+which shares the CLI package's verified frontend closure runtime through a generated Machine-local copy.
 
 `cli:close` closes only the current terminal tab after the final reply and preserves unfinished work.
-`cli:closeout` first finishes the authorized workflow, then uses the same closure primitive and the
-proof-guarded worktree sweep. Workflow completion and automatic closure after a landed delivery use
-closeout.
+`machine:close` finishes the authorized workflow, then uses the same closure primitive and the
+proof-guarded worktree sweep. An explicit request to dismiss a CLI can select `cli:close` when installed.
 
 For shared Codex backends, a resumed frontend is bound to its exact native launch receipt, child PID/start
 time and terminal observation captured by the launcher. The watcher waits for that frontend to exit,
@@ -239,7 +237,6 @@ on Windows and Linux. Install the current coordinator with:
 ```text
 codex plugin marketplace add https://github.com/tj-agents/marketplace.git
 codex plugin add machine@tj-agents
-codex plugin add cli@tj-agents
 ```
 
 Claude Code can open a visible Git Bash window for each hook. On Windows, run

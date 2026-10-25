@@ -433,7 +433,6 @@
       "base",
       "agent-store",
       "machine",
-      "cli",
       "agent"
     ],
     "engineering": [
@@ -441,7 +440,6 @@
       "workflow",
       "agent-store",
       "machine",
-      "cli",
       "agent"
     ],
     "cli": [
