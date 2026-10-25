@@ -47,6 +47,10 @@ def native_target_for_shim(target: str) -> str:
 def command_for_target(target: str, arguments: list[str]) -> list[str]:
     """Build the platform-required argument list without changing the typed arguments."""
     suffix = Path(target).suffix.casefold()
+    resolved_target = Path(shutil.which(target) or target)
+    if os.name != "nt" and Path(target).name == "codex" and resolved_target.resolve().suffix == ".js":
+        resolved, _version = agent_cli.resolve_codex_executable()
+        return [resolved, *arguments]
     if os.name == "nt" and native_shim_kind(target):
         return [native_target_for_shim(target), *arguments]
     if os.name == "nt" and suffix == ".ps1":
@@ -63,6 +67,7 @@ def command_for_target(target: str, arguments: list[str]) -> list[str]:
 BINDING_STATE_VARIABLES = (
     "TJ_AGENTS_STARTUP_ACK_DIRECTORY",
     "TJ_AGENTS_STARTUP_ACK_TOKEN",
+    "TJ_AGENTS_STARTUP_REQUIRED_HOOKS",
     "TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY",
 )
 

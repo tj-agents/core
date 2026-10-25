@@ -9,7 +9,7 @@ domain: process
 # Worktree commands
 
 Use [engineering:open-worktree](../../operation/open-worktree/SKILL.md) for checkout selection, creation,
-inspection and safe closure. `engineering:git-branching` owns sequential delivery and required stacks.
+inspection and safe closure. `engineering:branching` owns sequential delivery and required stacks.
 An extra checkout serves active execution or isolation needs; branch count does not select checkout count.
 
 | Invocation | Canonical operation |
@@ -20,3 +20,8 @@ An extra checkout serves active execution or isolation needs; branch count does 
 
 When the invocation includes a task, continue the authorized work in the selected checkout in the same
 session. Creation is setup; the task continues under its owning workflow.
+
+```text
+Request: Create a worktree for Feature/MapIndex and implement the index.
+Action: Select the checkout through open-worktree, then implement on Feature/MapIndex.
+```

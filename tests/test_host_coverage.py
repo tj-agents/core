@@ -23,14 +23,14 @@ def record(stage="plan"):
             {
                 "host": "claude",
                 "behavior": "loads the shared plan contract",
-                "source": ".claude/skills/plan-artifacts/SKILL.md",
+                "source": ".claude/skills/workflow/plan-artifacts/SKILL.md",
                 "mapping": "plugins/workflow/skills/plan-artifacts/SKILL.md",
                 "verification": {"level": "planned", "result": "pending", "evidence": "focused command is recorded"},
             },
             {
                 "host": "codex",
                 "behavior": "loads the shared plan contract",
-                "source": ".codex/skills/plan-artifacts/SKILL.md",
+                "source": ".codex/skills/workflow/plan-artifacts/SKILL.md",
                 "mapping": "plugins/workflow/codex-skills/plan-artifacts/SKILL.md",
                 "verification": {"level": "planned", "result": "pending", "evidence": "focused command is recorded"},
             },

@@ -5,6 +5,7 @@
     ".agents/agent-store/runtime",
     ".agents/catalog/catalog.schema.json",
     ".agents/catalog/plugins.schema.json",
+    ".agents/cli",
     ".agents/hooks/hook_dispatch.py",
     ".agents/machine",
     ".agents/machine/scripts/machine_events.py",
@@ -27,6 +28,13 @@
     "hooks": [
       {
         "path": ".agents/agent-store/runtime/session_store.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": ".agents/cli/workflow/closeout/scripts/close_landed.py",
         "hosts": [
           "claude",
           "codex"
@@ -56,14 +64,6 @@
     ],
     "permissions": {
       "claude_allow": [
-        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-        "Bash(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
         "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
         "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
@@ -150,40 +150,6 @@
         "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)"
       ],
       "codex_prefix_rules": [
-        {
-          "pattern": [
-            [
-              "python",
-              "python3"
-            ],
-            "-B",
-            [
-              "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py",
-              "${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py",
-              "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
-            ]
-          ],
-          "justification": "engineering:merge Step 5: after cleanup_proof.py, a delivered report and unchanged verified idle session permit finish to remove its merged worktree",
-          "match": [
-            [
-              "python3",
-              "-B",
-              "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py"
-            ],
-            [
-              "python",
-              "-B",
-              "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
-            ]
-          ],
-          "not_match": [
-            [
-              "python3",
-              "-B",
-              "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/other.py"
-            ]
-          ]
-        },
         {
           "pattern": [
             [

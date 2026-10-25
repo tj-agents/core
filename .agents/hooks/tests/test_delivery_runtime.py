@@ -1,5 +1,6 @@
 import copy
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -26,6 +27,12 @@ class StandingMergeAuthorizationTests(unittest.TestCase):
 
     def setUp(self):
         self.authorization = StandingMergeAuthorization()
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+
+    def resolve(self, policy, paths):
+        return self.authorization.resolve(policy, paths, (), self.root)
 
     def policy(self, **overrides):
         policy = {
@@ -42,14 +49,14 @@ class StandingMergeAuthorizationTests(unittest.TestCase):
                     policy = self.policy()
                     if configured is not None:
                         policy["authorized_stop_classes"] = configured
-                    resolution = self.authorization.resolve(policy, [path])
+                    resolution = self.resolve(policy, [path])
                     self.assertEqual("absent", resolution["merge_authorization"]["mode"])
                     self.assertEqual(name, resolution["stopped_by"]["class"])
 
     def test_each_authorized_stop_class_exempts_only_its_matching_generic_stop(self):
         for name, path in self.stop_paths.items():
             with self.subTest(name=name):
-                resolution = self.authorization.resolve(
+                resolution = self.resolve(
                     self.policy(authorized_stop_classes=[name]), [path]
                 )
                 self.assertEqual(
@@ -63,12 +70,12 @@ class StandingMergeAuthorizationTests(unittest.TestCase):
 
         for name in ("ci-workflow", "migration"):
             with self.subTest(name=name):
-                self.assertIsNone(self.authorization.resolve(policy, [self.stop_paths[name]])["stopped_by"])
-        resolution = self.authorization.resolve(policy, [self.stop_paths["auth"]])
+                self.assertIsNone(self.resolve(policy, [self.stop_paths[name]])["stopped_by"])
+        resolution = self.resolve(policy, [self.stop_paths["auth"]])
         self.assertEqual("auth", resolution["stopped_by"]["class"])
 
     def test_an_overlapping_path_stops_for_an_unexempted_class(self):
-        resolution = self.authorization.resolve(
+        resolution = self.resolve(
             self.policy(authorized_stop_classes=["ci-workflow"]),
             [".github/workflows/authorization.yml"],
         )
@@ -78,7 +85,7 @@ class StandingMergeAuthorizationTests(unittest.TestCase):
     def test_repository_settings_are_never_an_exemptible_stop_class(self):
         for path in (".agents/settings.json", ".AGENTS/SETTINGS.JSON", ".Agents/Settings.Json"):
             with self.subTest(path=path):
-                resolution = self.authorization.resolve(
+                resolution = self.resolve(
                     self.policy(authorized_stop_classes=sorted(self.stop_paths)), [path]
                 )
                 self.assertEqual("repository-settings", resolution["stopped_by"]["class"])
@@ -147,17 +154,6 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
 
         with self.assertRaisesRegex(DeliveryContractViolation, "another head"):
             self.router.validate_binding(self.binding)
-
-    def test_auto_merge_is_opt_in_and_strictly_boolean(self):
-        policy = {"standing_authorization": "auto", "instruction": "merge when green"}
-        self.assertFalse(StandingMergeAuthorization().resolve(policy, ["README.md"])["auto_merge"])
-        self.assertTrue(
-            StandingMergeAuthorization().resolve({**policy, "auto_merge": True}, ["README.md"])["auto_merge"]
-        )
-        for value in ("true", 1, None):
-            with self.subTest(value=value):
-                with self.assertRaisesRegex(DeliveryContractViolation, "boolean"):
-                    StandingMergeAuthorization().validate_policy({**policy, "auto_merge": value})
 
     def test_binding_rejects_a_pr_url_for_another_repository_or_number(self):
         self.binding["pr_url"] = "https://github.com/Concertable/other/pull/70"

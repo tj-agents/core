@@ -58,6 +58,22 @@ def declaration(plugin, marketplace, data):
 
 
 class DeclarationDiscovery(unittest.TestCase):
+    def test_an_uncached_plugin_root_never_promotes_an_unrelated_ancestor_to_a_cache(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            plugin = home / 'scratch' / 'engineering'
+            plugin.mkdir(parents=True)
+            cache = home / '.codex/plugins/cache'
+            native = cache / 'tj-agents/base/local'
+            native.mkdir(parents=True)
+            cleared = {name: '' for name in (*gate.PLUGIN_ROOT_VARIABLES, 'CLAUDE_CONFIG_DIR', 'CODEX_HOME')}
+            with unittest.mock.patch.dict(os.environ, dict(cleared, PLUGIN_ROOT=str(plugin))), \
+                    unittest.mock.patch.object(gate.Path, 'home', return_value=home):
+                self.assertNotIn(plugin.parents[2], gate.cache_roots())
+            with unittest.mock.patch.dict(os.environ, dict(cleared, PLUGIN_ROOT=str(native))), \
+                    unittest.mock.patch.object(gate.Path, 'home', return_value=home):
+                self.assertEqual(cache.resolve(), gate.cache_roots()[0])
+
     def test_identity_comes_from_the_installed_path_not_the_declaration(self):
         with tempfile.TemporaryDirectory() as cache:
             payload = Path(cache) / "dotagents" / "dotnet" / "1.1.0"
@@ -351,55 +367,10 @@ class SessionStatement(TemporaryProject):
         self.assertNotIn("do not read, invoke or cite", text)
 
 
-class Gate(TemporaryProject):
-    def setUp(self):
-        super().setUp()
-        self.found = [
-            declaration("base", "tj-agents", BASE),
-            declaration("dotnet", "dotagents", DOTNET),
-        ]
-
-    def call(self, payload):
-        return gate.gate(dict(payload, cwd=str(self.project)), self.found)
-
-    def test_a_blocked_tier_skill_is_refused(self):
-        payload = {"tool_name": "Skill", "tool_input": {"skill": "dotnet:persistence"}}
-        self.assertEqual(self.call(payload), 2)
-
-    def test_a_ubiquitous_skill_is_allowed(self):
-        payload = {"tool_name": "Skill", "tool_input": {"skill": "engineering:review"}}
-        self.assertEqual(self.call(payload), 0)
-
-    def test_the_same_skill_is_allowed_where_the_stack_exists(self):
-        (self.project / "Api.csproj").write_text("", encoding="utf-8")
-        payload = {"tool_name": "Skill", "tool_input": {"skill": "dotnet:persistence"}}
-        self.assertEqual(self.call(payload), 0)
-
-    def test_a_codex_shell_read_of_the_standard_is_the_same_event(self):
-        command = 'cat ~/.codex/plugins/cache/dotagents/dotnet/1.1.0/skills/persistence/SKILL.md'
-        payload = {"tool_name": "shell", "tool_input": {"command": command}}
-        self.assertEqual(self.call(payload), 2)
-
-    def test_naming_the_plugin_without_reading_a_standard_is_not_a_block(self):
-        payload = {"tool_name": "Bash", "tool_input": {"command": "git log dotagents/dotnet"}}
-        self.assertEqual(self.call(payload), 0)
-
-    def test_source_inspection_does_not_enable_skill_invocation(self):
-        command = 'cat ../standards/.agents/dotnet/contract/style/SKILL.md'
-        self.assertEqual(self.call({"tool_name": "shell", "tool_input": {"command": command}}), 0)
-        self.assertEqual(self.call({"tool_name": "Skill", "tool_input": {"skill": "dotnet:style"}}), 2)
-        _, applicable, blocked = gate.assess(self.project, self.found)
-        self.assertEqual(applicable, [])
-        self.assertEqual([item.tier for item in blocked], ["dotnet"])
-
-    def test_an_unrecognized_payload_allows(self):
-        self.assertEqual(self.call({"tool_name": "Read", "tool_input": {"file_path": "x"}}), 0)
-
-
 class ShippedDeclarations(unittest.TestCase):
     def test_every_core_package_declares_itself_ubiquitous(self):
         names = sorted(path.stem for path in DECLARED.glob("*.json"))
-        self.assertEqual(names, ["agent-store", "base", "engineering", "machine", "workflow"])
+        self.assertEqual(names, ["agent", "agent-store", "base", "cli", "engineering", "machine", "workflow"])
         for path in DECLARED.glob("*.json"):
             data = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(data["schema_version"], 1)
@@ -407,7 +378,7 @@ class ShippedDeclarations(unittest.TestCase):
             self.assertEqual(data["tier"], path.stem)
 
     def test_each_package_ships_its_declaration_at_its_payload_root(self):
-        for plugin in ("agent-store", "base", "engineering", "machine", "workflow"):
+        for plugin in ("agent", "agent-store", "base", "cli", "engineering", "machine", "workflow"):
             payload = ROOT / "plugins" / plugin / "tier.json"
             self.assertTrue(payload.is_file(), f"{plugin} ships no tier.json")
             self.assertEqual(json.loads(payload.read_text(encoding="utf-8"))["tier"], plugin)

@@ -15,11 +15,23 @@ Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
 
 Recorded agent executions, sessions, ownership and references.
 
+## tj-agents/agent
+
+Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
+
+Shared agent execution and background completion across native hosts.
+
 ## tj-agents/workflow
 
 Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
 
 Goal lifecycle and recorded work status.
+
+## tj-agents/cli
+
+Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
+
+Close CLI tabs or finish their workflows before closing.
 
 ## tj-agents/engineering
 

@@ -1,6 +1,7 @@
 """Shared verified-session and cleanup primitives for peer-cli (Python 3.9+)."""
 
 import csv
+import importlib.util
 import json
 import math
 import os
@@ -17,7 +18,6 @@ from pathlib import Path
 import register_session
 
 
-RECEIPT_MAX_AGE_SECONDS = 3600.0
 IDENTITY_TOLERANCE_SECONDS = 2.0
 SUBPROCESS_TIMEOUT_SECONDS = 20
 DEFAULT_TIMEOUTS = {
@@ -44,6 +44,114 @@ ET.register_namespace("", TASK_SCHEDULER_NAMESPACE)
 
 class Refusal(RuntimeError):
     pass
+
+
+def client_runtime_path():
+    here = Path(__file__).resolve().parent
+    candidates = [here / "cli_client.py", here.parents[2] / "scripts/cli_client.py",
+                  here.parents[2] / "resources/machine/scripts/cli_client.py"]
+    if len(here.parents) > 4 and here.parents[3].name == ".agents":
+        candidates.append(here.parents[4] / "resources/machine/scripts/cli_client.py")
+    for path in candidates:
+        if path.is_file():
+            return path
+    raise Refusal("The shipped CLI client runtime is unavailable")
+
+
+def client_runtime():
+    path = client_runtime_path()
+    spec = importlib.util.spec_from_file_location("session_close_cli_client", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def current_codex_client(session_id, nearest):
+    client = client_runtime()
+    info, record = client.recorded_client(session_id, nearest, process_info,
+                                          register_session.process_table())
+    return info, {'client_identity': 'managed-input', 'launch_cwd': record['launch_cwd'],
+                  'title': record.get('title'), 'client_message_id': record['client_message_id'],
+                  'recording_path': record['recording_path'], 'backend': record['backend'], 'profile': record['profile'],
+                  'terminal': register_session.terminal_identity(record.get('terminal_environment', {}))}
+
+
+def stop_verified_process(pid, started_at, before_signal=lambda: None):
+    if not valid_identity(pid, started_at):
+        raise Refusal("CLI client process identity is invalid")
+    if os.name != "nt":
+        import select
+        import signal
+
+        if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
+            raise Refusal("Safe CLI closure requires Linux pidfd support")
+        descriptor = os.pidfd_open(pid)
+        try:
+            info = process_info(pid)
+            if info is None or abs(info.started_at - started_at) > 0.001:
+                raise Refusal("CLI client process identity changed before close")
+            before_signal()
+            signal.pidfd_send_signal(descriptor, signal.SIGTERM)
+            if not select.select([descriptor], [], [], 5)[0]:
+                signal.pidfd_send_signal(descriptor, signal.SIGKILL)
+                if not select.select([descriptor], [], [], 5)[0]:
+                    raise Refusal("CLI client exit was not confirmed")
+        finally:
+            os.close(descriptor)
+        return
+    import ctypes
+    from ctypes import wintypes
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel.GetProcessTimes.argtypes = [wintypes.HANDLE, *([ctypes.POINTER(wintypes.FILETIME)] * 4)]
+    kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    handle = kernel.OpenProcess(0x100001 | 0x1000, False, pid)
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        created, exited, kernel_time, user_time = (wintypes.FILETIME() for _ in range(4))
+        if not kernel.GetProcessTimes(handle, ctypes.byref(created), ctypes.byref(exited),
+                                      ctypes.byref(kernel_time), ctypes.byref(user_time)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        actual = ((created.dwHighDateTime << 32) + created.dwLowDateTime) / 10_000_000 - 11644473600
+        if abs(actual - started_at) > 0.001:
+            raise Refusal("CLI client process identity changed before close")
+        before_signal()
+        if not kernel.TerminateProcess(handle, 0):
+            raise ctypes.WinError(ctypes.get_last_error())
+        if kernel.WaitForSingleObject(handle, 10000) != 0:
+            raise Refusal("CLI client exit was not confirmed")
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def stop_cli_client(entry, before_signal=lambda: None):
+    info = process_info(entry["pid"])
+    if (info is None or register_session.stem(info.name) != entry["host"]
+            or not verified_live(entry["pid"], entry["pid_started_at"])):
+        raise Refusal("CLI client identity is no longer live")
+    if entry["host"] == "codex":
+        client = client_runtime()
+        arguments = client.process_arguments(entry["pid"])
+        if not arguments or client.command_name(arguments[1:]) in client.OTHER_COMMANDS:
+            raise Refusal("The registered Codex process is a backend or maintenance process, not a CLI client")
+    def revalidate():
+        if entry.get('client_identity') == 'managed-input':
+            context = client.process_context(entry['pid'])
+            if (context.get(client.RECORD_PATH_ENV) != entry['recording_path']
+                    or Path(context['profile']) != Path(entry['profile'])
+                    or (entry.get('backend') is not None
+                        and client.daemon_identity({'CODEX_HOME': entry['profile']},
+                                                  expected_pid=entry['backend']['pid']) != entry['backend'])
+                    or client.latest_input(entry['recording_path']) != entry['client_message_id']):
+                raise Refusal('The frontend input or backend binding changed before close')
+        before_signal()
+    stop_verified_process(entry['pid'], entry['pid_started_at'], revalidate)
+
 
 
 def _update_own_end(entry, operation, reason):
@@ -324,7 +432,7 @@ def attached_to(cwd, entry):
                for root in (entry.get("cwd"), entry.get("launch_cwd")))
 
 
-def own_host_and_entry(cwd=None):
+def own_host_and_entry(cwd=None, session_id=None):
     cwd = Path(cwd or os.getcwd()).resolve()
     host_names = register_session.read_host_names()
     seen = set()
@@ -343,9 +451,27 @@ def own_host_and_entry(cwd=None):
         current = info.ppid
     if nearest is None:
         raise Refusal("current process is not attached to a recognized registered host")
+    if register_session.stem(nearest.name) == 'codex' and not session_id:
+        session_id = os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID")
+        if not session_id:
+            raise Refusal('Native Codex thread identity is unavailable; preserve the frontend and backend')
+    if session_id and register_session.stem(nearest.name) == "codex":
+        try:
+            client, details = current_codex_client(session_id, nearest)
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
+            raise Refusal(str(error)) from error
+        return register_session.record(
+            {"session_id": session_id, "cwd": str(cwd)},
+            client={"pid": client.pid, "host": "codex", "pid_started_at": client.started_at, **details},
+        )
     matches = []
+    native_session = session_id or (os.environ.get("CODEX_THREAD_ID")
+                                    if register_session.stem(nearest.name) == "codex"
+                                    else os.environ.get("CLAUDE_CODE_SESSION_ID"))
     for _path, entry in entries():
         if not valid_entry(entry) or not attached_to(cwd, entry):
+            continue
+        if native_session and entry["session_id"] != native_session:
             continue
         if (entry["pid"] == nearest.pid
                 and entry["host"] == register_session.stem(nearest.name)
@@ -353,6 +479,8 @@ def own_host_and_entry(cwd=None):
                 and verified_live(entry["pid"], entry["pid_started_at"])):
             matches.append(entry)
     if matches:
+        if not native_session and len(matches) > 1:
+            raise Refusal("multiple registry attachments share this host; an exact native session id is required")
         latest = max(item["started_at"] for item in matches)
         recent = [item for item in matches if item["started_at"] == latest]
         if len(recent) == 1:
@@ -362,6 +490,46 @@ def own_host_and_entry(cwd=None):
         "cannot resolve a verified registry attachment for this host and current directory; "
         "do not force-close the host"
     )
+
+
+def close_target(entry):
+    """Resolve a dedicated frontend from an exact-session native launch receipt."""
+    if not valid_entry(entry):
+        raise Refusal("invalid session registry entry cannot resolve a frontend")
+    shared = any(other.get("pid") == entry["pid"]
+                 and other.get("pid_started_at") == entry["pid_started_at"]
+                 and other.get("session_id") != entry["session_id"] for _path, other in entries())
+    directory = state_directory() / "recovery-launches"
+    receipts = [read_json(path) for path in directory.glob("*.json")] if directory.is_dir() else []
+    receipts = [receipt for receipt in receipts if isinstance(receipt, dict)
+                and receipt.get("host") == entry["host"] and receipt.get("session") == entry["session_id"]
+                and receipt.get("state") == "launched"]
+    if len(receipts) > 1:
+        raise Refusal("multiple frontend launch receipts match this session")
+    if receipts:
+        receipt = receipts[0]
+        wrapper = receipt.get("wrapper")
+        wrapper = wrapper if isinstance(wrapper, dict) else {}
+        child = wrapper.get("child")
+        child = child if isinstance(child, dict) else {}
+        terminal = wrapper.get("terminal")
+        if isinstance(terminal, dict) and terminal.get("kind"):
+            process = process_info(child.get("pid")) if valid_identity(child.get("pid"), child.get("started_at")) else None
+            parent = process_info(wrapper.get("pid")) if valid_identity(wrapper.get("pid"), wrapper.get("started_at")) else None
+            if (process is None or parent is None or process.ppid != parent.pid
+                    or process.started_at != child["started_at"] or parent.started_at != wrapper["started_at"]
+                    or register_session.stem(process.name) != entry["host"]
+                    or not finite_positive(receipt.get("created_at"))
+                    or not receipt["created_at"] <= parent.started_at <= process.started_at
+                    or entry["started_at"] < process.started_at):
+                raise Refusal("the dedicated frontend launch identity is stale or unverifiable")
+            return {**entry, "pid": child["pid"], "pid_started_at": child["started_at"],
+                    "terminal": terminal, "title": wrapper.get("title")}
+    if shared:
+        raise Refusal("registered host is shared by multiple session identities; an exact frontend launch binding is required")
+    if entry["host"] == "codex":
+        raise Refusal("an exact frontend launch binding is required for Codex; registration alone cannot identify its frontend")
+    return entry
 
 
 def same_session_process(left, right):
@@ -374,18 +542,6 @@ def same_session_process(left, right):
         and left.get("pid") == right.get("pid")
         and left.get("pid_started_at") == right.get("pid_started_at")
     )
-
-
-def other_live_claimant(worktree, own_entry):
-    for _path, entry in entries():
-        if same_session_process(entry, own_entry):
-            continue
-        if not nonempty_string(entry.get("cwd")) or not under_or_equal(entry["cwd"], worktree):
-            continue
-        # Unknown inspection is not evidence that an attached session is dead.
-        if identity_status(entry.get("pid"), entry.get("pid_started_at")) not in {"exited", "reused"}:
-            return entry
-    return None
 
 
 def git(cwd, *arguments):
@@ -404,87 +560,6 @@ def worktree_from_cwd(cwd=None):
     if code:
         raise Refusal("the current directory is not inside a Git worktree")
     return Path(output).resolve()
-
-
-def worktree_registrations(primary):
-    code, output, error = git(primary, "worktree", "list", "--porcelain")
-    if code:
-        raise Refusal("could not enumerate Git worktrees: " + error)
-    records = []
-    for block in output.split("\n\n"):
-        fields = {}
-        detached = False
-        for line in block.splitlines():
-            if line == "detached":
-                detached = True
-            elif " " in line:
-                key, value = line.split(" ", 1)
-                fields[key] = value
-        if fields.get("worktree"):
-            records.append({
-                "worktree": Path(fields["worktree"]).resolve(),
-                "head": fields.get("HEAD"),
-                "branch": fields.get("branch"),
-                "detached": detached,
-            })
-    if not records:
-        raise Refusal("Git returned no worktree registrations")
-    return records
-
-
-def matching_receipt(worktree):
-    best = None
-    directory = state_directory() / "merge-cleanup" / "receipts"
-    for path in directory.glob("*.json") if directory.is_dir() else ():
-        receipt = read_json(path)
-        if receipt and nonempty_string(receipt.get("worktree")) and path_key(receipt["worktree"]) == path_key(worktree):
-            recorded_at = receipt.get("recorded_at")
-            if not finite_positive(recorded_at):
-                continue
-            if best is None or recorded_at > best[1].get("recorded_at", 0):
-                best = path, receipt
-    if best is None:
-        raise Refusal("no cleanup_proof.py receipt recorded for this worktree")
-    return best[1]
-
-
-def fresh_removable_receipt(worktree):
-    receipt = matching_receipt(worktree)
-    required = ("worktree", "primary", "branch", "head", "default", "verdict", "recorded_at")
-    if any(not nonempty_string(receipt.get(key)) for key in required if key != "recorded_at"):
-        raise Refusal("the cleanup receipt is incomplete")
-    if receipt.get("verdict") != "removable":
-        raise Refusal("the cleanup receipt is not removable")
-    if (not finite_positive(receipt.get("recorded_at")) or
-            receipt["recorded_at"] > now() + IDENTITY_TOLERANCE_SECONDS or
-            now() - receipt["recorded_at"] > RECEIPT_MAX_AGE_SECONDS):
-        raise Refusal("the cleanup receipt is stale; run cleanup_proof.py again")
-    target = Path(worktree).resolve()
-    primary = Path(receipt["primary"]).resolve()
-    if path_key(receipt["worktree"]) != path_key(target):
-        raise Refusal("the cleanup receipt target no longer matches this worktree")
-    if target == primary:
-        raise Refusal("the primary checkout cannot be removed; use close.py")
-    if not primary.is_dir() or not target.is_dir():
-        raise Refusal("the cleanup receipt names a missing worktree or primary checkout")
-    records = worktree_registrations(primary)
-    if records[0]["worktree"] != primary:
-        raise Refusal("the cleanup receipt primary is not the main checkout")
-    matching = [record for record in records if record["worktree"] == target]
-    expected_ref = "refs/heads/" + receipt["branch"]
-    if (len(matching) != 1 or matching[0]["detached"]
-            or matching[0]["branch"] != expected_ref
-            or matching[0]["head"] != receipt["head"]):
-        raise Refusal("the cleanup target is not the registered receipt worktree")
-    code, head, _ = git(target, "rev-parse", "HEAD")
-    branch_code, branch, _ = git(target, "symbolic-ref", "--quiet", "--short", "HEAD")
-    if code or branch_code or head != receipt.get("head") or branch != receipt.get("branch"):
-        raise Refusal("worktree HEAD/branch no longer match the cleanup receipt")
-    return receipt
-
-
-def observer_path():
-    return Path(__file__).with_name("finish_reaper.py")
 
 
 def scheduler_diagnostic(completed):

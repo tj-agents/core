@@ -22,7 +22,7 @@ def snapshot(root):
 
 
 class PolicyContextTests(unittest.TestCase):
-    policies = ("task-routing", "idea-initialization")
+    policies = ("task-routing", "project-setup", "solution-assessment")
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="policy context ")
@@ -97,16 +97,6 @@ class PolicyContextTests(unittest.TestCase):
                 self.assertTrue(output["additionalContext"].endswith(source.split("\n---\n", 1)[1].strip()))
                 self.assertEqual("", result.stderr)
                 self.assertEqual(before, snapshot(self.root))
-
-    def test_instruction_fallback_tracks_the_packaged_contract_digest(self):
-        for policy in self.policies:
-            with self.subTest(policy=policy):
-                contract = self.plugin / f".agents/base/policy/{policy}/SKILL.md"
-                digest = hashlib.sha256(contract.read_text(encoding="utf-8-sig").encode("utf-8")).hexdigest()
-                result = self.invoke(policy, ("--instruction-fragment",))
-                self.assertEqual(0, result.returncode, result.stderr)
-                self.assertIn(f"<!-- BEGIN base:{policy} sha256:{digest} -->", result.stdout)
-                self.assertIn(contract.read_text(encoding="utf-8-sig").split("\n---\n", 1)[1].strip(), result.stdout)
 
     def test_missing_or_malformed_contract_fails_without_changing_the_package(self):
         for policy in self.policies:

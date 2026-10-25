@@ -414,7 +414,7 @@ class GateSubprocessTests(unittest.TestCase):
         }
         if codex:
             payload["turn_id"] = uuid.uuid4().hex
-        scripts = [str(HOOK.parent / "hook_dispatch.py"), str(HOOK)] if dispatch else [str(HOOK)]
+        scripts = [str(HOOK.parent / "hook_dispatch.py"), "--hook", str(HOOK)] if dispatch else [str(HOOK)]
         return subprocess.run(
             [sys.executable, *scripts], input=json.dumps(payload),
             capture_output=True, text=True, cwd=str(self.repo), env=env,
@@ -440,7 +440,9 @@ class GateSubprocessTests(unittest.TestCase):
         )
 
     def test_explicit_false_is_bound_separately_from_merge_authorization(self):
-        self.write_policy(auto_merge=False)
+        (self.repo / ".agents" / "settings.json").write_text(
+            json.dumps({"configuration": {"core": {"auto_merge": False}}}), encoding="utf-8"
+        )
         result = self.run_hook()
         self.assertEqual(2, result.returncode, result.stderr)
         self.assertFalse(self.binding()["auto_merge"])

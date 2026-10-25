@@ -53,13 +53,5 @@
   "fixture": {
     "skill_template": "../../fixtures/workflow-contract-fixture.template.md",
     "role_manifest": "../../fixtures/role.json"
-  },
-  "release": "A",
-  "compatibility_entries": {
-    "staged-review-all": {
-      "kind": "driver",
-      "status": "retained",
-      "replacement": "staged-review"
-    }
   }
 }

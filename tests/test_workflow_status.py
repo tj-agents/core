@@ -103,15 +103,17 @@ class WorkflowStatusHarness(unittest.TestCase):
             connection.executescript(
                 'CREATE TABLE work_items (key TEXT PRIMARY KEY, repo TEXT NOT NULL, '
                 'feature TEXT NOT NULL, item TEXT NOT NULL, status TEXT NOT NULL, '
-                'branch TEXT, pr TEXT, updated_at REAL);'
-                'CREATE TABLE sessions (handle TEXT PRIMARY KEY, repo TEXT, branch TEXT, cwd TEXT, '
-                'work_item TEXT, role TEXT, ended_at REAL);'
-                'PRAGMA user_version = 2;'
+                'branch TEXT, pr TEXT, title TEXT, plan_path TEXT, updated_at REAL);'
+                'CREATE TABLE sessions (handle TEXT PRIMARY KEY, host TEXT NOT NULL, session_id TEXT NOT NULL, '
+                'repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);'
+                'CREATE TABLE work_item_references (provider TEXT NOT NULL, scope TEXT NOT NULL, '
+                'native_id TEXT NOT NULL, work_item TEXT NOT NULL, PRIMARY KEY (provider, scope, native_id));'
+                'PRAGMA user_version = 4;'
             )
             key = 'github.com/example/demo:%s/%s' % (feature, item)
             connection.execute(
-                'INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                (key, 'github.com/example/demo', feature, item, status, None, None, 0),
+                'INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                (key, 'github.com/example/demo', feature, item, status, None, None, None, None, 0),
             )
         connection.commit()
         connection.close()
@@ -391,7 +393,7 @@ class WorkItemStatusTests(WorkflowStatusHarness):
             'CREATE TABLE work_items (key TEXT, status TEXT);'
             'CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, '
             'role TEXT, ended_at REAL);'
-            'PRAGMA user_version = 2;'
+            'PRAGMA user_version = 4;'
         )
         connection.close()
         output = self.board()
@@ -577,10 +579,10 @@ class WorkItemStatusTests(WorkflowStatusHarness):
         database = self.state_directory / 'sessions.db'
         connection = sqlite3.connect(database)
         connection.execute('DELETE FROM work_items')
-        connection.execute('INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        connection.execute('INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                            ('github.com/example/résumé:reader-bridge/status-reader',
                             'github.com/example/résumé', 'reader-bridge', 'status-reader',
-                            'active', None, None, 0))
+                            'active', None, None, None, None, 0))
         connection.commit()
         connection.close()
         self.assertIn('active', self.board())
