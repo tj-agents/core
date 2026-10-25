@@ -73,6 +73,8 @@ def preserved_arguments(argv: list[str]) -> list[str]:
 
 def codex_arguments(argv: list[str]) -> list[str]:
     kept, index = [], 0
+    selector = False
+    subcommand = False
     single = {"--config", "-c", "--model", "-m", "--profile", "-p", "--sandbox", "-s",
               "--ask-for-approval", "-a", "--add-dir", "--enable", "--disable",
               "--remote", "--remote-auth-token-env", "--local-provider"}
@@ -82,8 +84,18 @@ def codex_arguments(argv: list[str]) -> list[str]:
         token = argv[index]
         name, equals, _ = token.partition("=")
         index += 1
-        if token == "--" or not token.startswith("-"):
+        if token == "--":
             break
+        if not token.startswith("-"):
+            if token in {"resume", "fork"} and not subcommand:
+                subcommand, selector = True, True
+                continue
+            if selector:
+                selector = False
+                continue
+            break
+        if len(token) > 2 and token[:2] in {"-c", "-m", "-p", "-s", "-a", "-C", "-i"}:
+            name, equals = token[:2], True
         if name in flags and not equals:
             kept.append(token)
         elif name in single and equals:
@@ -95,6 +107,8 @@ def codex_arguments(argv: list[str]) -> list[str]:
             index += 1
         elif name == "--dangerously-bypass-hook-trust":
             raise RuntimeError("Refusing to carry a hook-trust bypass into recovery")
+        elif name == "--last":
+            selector = False
     return kept
 
 
