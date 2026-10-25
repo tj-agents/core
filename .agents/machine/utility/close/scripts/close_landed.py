@@ -1,8 +1,8 @@
 """Stop hook: close a session once the pull request it worked on merged at its worktree's head (Python 3.9+).
 
 Runs after the session store records the stop. It arms only for a clean linked worktree whose branch has a
-pull request merged at exactly its HEAD after this session started; the watcher then closes the tab and the
-worktree sweep removes the checkout only with its own proof.
+pull request merged at exactly its HEAD after this session started; the watcher then closes only that CLI
+client. Checkout cleanup remains an explicit engineering operation.
 """
 
 from datetime import datetime
