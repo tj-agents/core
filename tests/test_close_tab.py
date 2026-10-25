@@ -35,7 +35,7 @@ class CloseTabTests(unittest.TestCase):
         entry = {"session_id": "stale", "pid": 10, "pid_started_at": 1.0,
                  "title": "same", "terminal": identity}
         target = {"title": "same", "identity": {"kind": "windows-terminal",
-                  "automation_id": "tab-2"}}
+                  "runtime_id": "tab-2"}}
         with mock.patch.object(close_tab, "is_windows", return_value=True), \
                 mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
                 mock.patch.object(close_tab.session_close, "entries", return_value=[(Path("stale"), entry)]), \
@@ -44,7 +44,7 @@ class CloseTabTests(unittest.TestCase):
             close_tab.close_stale_entry(entry)
             closer.assert_called_once_with(target, fallback_entry=entry)
         for recorded, targets in ((identity, [target, target]),
-                                  ({**identity, "automation_id": "tab-1"}, [target])):
+                                  ({**identity, "runtime_id": "tab-1"}, [target])):
             with self.subTest(recorded=recorded, targets=targets), \
                     mock.patch.object(close_tab, "windows_inventory", return_value=targets), \
                     mock.patch.object(close_tab.session_close, "entries", return_value=[(Path("stale"), entry)]), \
@@ -59,11 +59,11 @@ class CloseTabTests(unittest.TestCase):
             "pid": 10,
             "pid_started_at": 1.0,
             "title": "old tab",
-            "terminal": {"kind": "windows-terminal", "automation_id": "tab-2"},
+            "terminal": {"kind": "windows-terminal", "runtime_id": "tab-2"},
         }
         target = {
             "title": "old tab",
-            "identity": {"kind": "windows-terminal", "automation_id": "tab-2"},
+            "identity": {"kind": "windows-terminal", "runtime_id": "tab-2"},
             "actual": True,
         }
         with mock.patch.object(close_tab, "is_windows", return_value=True), \
@@ -81,11 +81,11 @@ class CloseTabTests(unittest.TestCase):
             "pid": 10,
             "pid_started_at": 1.0,
             "title": "old tab",
-            "terminal": {"kind": "windows-terminal", "automation_id": "tab-2"},
+            "terminal": {"kind": "windows-terminal", "runtime_id": "tab-2"},
         }
         target = {
             "title": "old tab",
-            "identity": {"kind": "windows-terminal", "automation_id": "tab-2"},
+            "identity": {"kind": "windows-terminal", "runtime_id": "tab-2"},
             "actual": True,
         }
         with mock.patch.object(close_tab, "is_windows", return_value=True), \
@@ -101,11 +101,11 @@ class CloseTabTests(unittest.TestCase):
             "pid": 10,
             "pid_started_at": 1.0,
             "title": "live tab",
-            "terminal": {"kind": "windows-terminal", "automation_id": "tab-2"},
+            "terminal": {"kind": "windows-terminal", "runtime_id": "tab-2"},
         }
         target = {
             "title": "live tab",
-            "identity": {"kind": "windows-terminal", "automation_id": "tab-2"},
+            "identity": {"kind": "windows-terminal", "runtime_id": "tab-2"},
             "actual": True,
         }
         with mock.patch.object(close_tab, "is_windows", return_value=True), \
@@ -121,7 +121,7 @@ class CloseTabTests(unittest.TestCase):
         stale = {"session_id": "old", "title": "old title",
                  "terminal": {"kind": "windows-terminal"}}
         successor = {"session_id": "new", "title": "new title",
-                     "terminal": {"kind": "windows-terminal", "automation_id": "tab-2"}}
+                     "terminal": {"kind": "windows-terminal", "runtime_id": "tab-2"}}
         target = {"title": "old title", "identity": successor["terminal"]}
         for state in (True, None):
             with self.subTest(state=state), \
@@ -141,7 +141,7 @@ class CloseTabTests(unittest.TestCase):
         live = {"session_id": "live", "title": "same",
                 "terminal": {"kind": "windows-terminal", "wt_session": "current"}}
         target = {"title": "same", "identity": {"kind": "windows-terminal",
-                  "automation_id": "live-tab"}}
+                  "runtime_id": "live-tab"}}
         for state in (True, None, False):
             with self.subTest(other_peer_liveness=state), \
                     mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
@@ -205,7 +205,7 @@ class CloseTabTests(unittest.TestCase):
     def test_stale_close_rechecks_a_successor_registered_after_the_first_guard(self):
         for kind, inventory, identity in (
                 ("tmux", "tmux_inventory", {"pane_id": "%1", "socket": "/tmp/tmux"}),
-                ("windows-terminal", "windows_inventory", {"automation_id": "tab-2"}),
+                ("windows-terminal", "windows_inventory", {"runtime_id": "tab-2"}),
         ):
             with self.subTest(kind=kind):
                 recorded = {"kind": kind, **({} if kind == "windows-terminal" else identity)}
@@ -238,8 +238,8 @@ class CloseTabTests(unittest.TestCase):
         self.assertNotIn("SendKeys", source)
 
     def test_windows_inventory_accepts_zero_one_and_many_tabs(self):
-        payloads = ("[]", '[{"title":"one","automationId":"a"}]',
-                    '[{"title":"one","automationId":"a"},{"title":"two","automationId":"b"}]')
+        payloads = ("[]", '[{"title":"one","runtimeId":"a"}]',
+                    '[{"title":"one","runtimeId":"a"},{"title":"two","runtimeId":"b"}]')
         for payload, count in zip(payloads, (0, 1, 2)):
             with self.subTest(payload=payload):
                 with mock.patch.object(close_tab, "is_windows", return_value=True), \
@@ -247,12 +247,12 @@ class CloseTabTests(unittest.TestCase):
                         mock.patch.object(close_tab, "run", return_value=completed(payload)):
                     self.assertEqual(len(close_tab.windows_inventory()), count)
 
-    def test_windows_inventory_keeps_nonempty_titles_without_automation_ids(self):
+    def test_windows_inventory_keeps_nonempty_titles_without_runtime_ids(self):
         payload = json.dumps([
-            {"title": "fallback", "automationId": ""},
+            {"title": "fallback", "runtimeId": ""},
             {"title": "also fallback"},
-            {"title": "", "automationId": ""},
-            {"title": "identified", "automationId": "tab-1"},
+            {"title": "", "runtimeId": ""},
+            {"title": "identified", "runtimeId": "tab-1"},
         ])
         with mock.patch.object(close_tab, "is_windows", return_value=True), \
                 mock.patch.object(Path, "is_file", return_value=True), \
@@ -263,9 +263,9 @@ class CloseTabTests(unittest.TestCase):
         self.assertEqual(targets[0]["identity"],
                          {"kind": "windows-terminal", "title": "fallback"})
         self.assertEqual(targets[2]["identity"],
-                         {"kind": "windows-terminal", "automation_id": "tab-1"})
+                         {"kind": "windows-terminal", "runtime_id": "tab-1"})
 
-    def test_windows_missing_automation_ids_match_only_the_same_fallback_title(self):
+    def test_windows_missing_runtime_ids_match_only_the_same_fallback_title(self):
         first = {"kind": "windows-terminal", "title": "first"}
         second = {"kind": "windows-terminal", "title": "second"}
         missing = {"kind": "windows-terminal"}
@@ -274,8 +274,8 @@ class CloseTabTests(unittest.TestCase):
         self.assertFalse(close_tab.same_target(missing, missing))
         self.assertTrue(close_tab.same_target(first, dict(first)))
 
-    def test_windows_automation_id_never_falls_back_to_a_matching_title(self):
-        identified = {"kind": "windows-terminal", "automation_id": "tab-1",
+    def test_windows_runtime_id_never_falls_back_to_a_matching_title(self):
+        identified = {"kind": "windows-terminal", "runtime_id": "tab-1",
                       "title": "same"}
         fallback = {"kind": "windows-terminal", "title": "same"}
         self.assertFalse(close_tab.same_target(identified, fallback))
@@ -297,7 +297,7 @@ class CloseTabTests(unittest.TestCase):
         residuals = (
             target,
             {"title": "fallback", "identity": {"kind": "windows-terminal",
-             "automation_id": "tab-1"}, "actual": True},
+             "runtime_id": "tab-1"}, "actual": True},
         )
         for residual in residuals:
             with self.subTest(residual=residual), \
@@ -437,11 +437,11 @@ class CloseTabTests(unittest.TestCase):
             with self.assertRaisesRegex(close_tab.TerminalRefusal, "ambiguous"):
                 close_tab.close_entry(entry)
 
-    def test_windows_automation_id_requires_one_uia_tab_across_all_windows(self):
+    def test_windows_runtime_id_requires_one_uia_tab_across_all_windows(self):
         entry = {"title": "peer", "pid": 7, "pid_started_at": 2.0,
-                 "terminal": {"kind": "windows-terminal", "automation_id": "tab-7"}}
+                 "terminal": {"kind": "windows-terminal", "runtime_id": "tab-7"}}
         tabs = [{"title": "peer", "identity": {"kind": "windows-terminal",
-                 "automation_id": "tab-7"}, "actual": True}]
+                 "runtime_id": "tab-7"}, "actual": True}]
         with mock.patch.object(close_tab, "is_windows", return_value=True), \
                 mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
                 mock.patch.object(close_tab, "windows_inventory", return_value=tabs), \
@@ -516,13 +516,13 @@ class FocusEntryTests(unittest.TestCase):
             with self.assertRaises(close_tab.TerminalRefusal):
                 close_tab.focus_entry(self.entry({"kind": "tmux", "pane_id": "%1"}))
 
-    def test_windows_terminal_focuses_exact_automation_id_tab(self):
-        target = {"title": "tab", "identity": {"kind": "windows-terminal", "automation_id": "tab-1"}}
+    def test_windows_terminal_focuses_exact_runtime_id_tab(self):
+        target = {"title": "tab", "identity": {"kind": "windows-terminal", "runtime_id": "tab-1"}}
         with mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
                 mock.patch.object(close_tab, "is_windows", return_value=True), \
                 mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
                 mock.patch.object(close_tab, "run", return_value=completed()) as run:
-            close_tab.focus_entry(self.entry({"kind": "windows-terminal", "automation_id": "tab-1"}))
+            close_tab.focus_entry(self.entry({"kind": "windows-terminal", "runtime_id": "tab-1"}))
         command = run.call_args.args[0]
         self.assertEqual(["-TabId", "tab-1", "-Focus"], command[-3:])
 
@@ -532,7 +532,7 @@ class FocusEntryTests(unittest.TestCase):
                 mock.patch.object(close_tab, "windows_inventory", return_value=[]), \
                 mock.patch.object(close_tab, "run") as run:
             with self.assertRaises(close_tab.TerminalRefusal):
-                close_tab.focus_entry(self.entry({"kind": "windows-terminal", "automation_id": "tab-1"}))
+                close_tab.focus_entry(self.entry({"kind": "windows-terminal", "runtime_id": "tab-1"}))
         run.assert_not_called()
 
     def test_tmux_selects_the_exact_window_and_pane(self):

@@ -72,7 +72,7 @@ class PeerCloseSafetyTests(unittest.TestCase):
 
     def test_windows_terminal_absent_or_ambiguous_target_preserves_host(self):
         entry = {"pid": 30, "pid_started_at": 3.0, "title": "own",
-                 "terminal": {"kind": "windows-terminal", "automation_id": "tab-1"}}
+                 "terminal": {"kind": "windows-terminal", "runtime_id": "tab-1"}}
         target = {"title": "own", "identity": entry["terminal"]}
         for inventory in ([], [target, target]):
             for module in (own_close,):
