@@ -2,11 +2,9 @@
 
 import importlib.util
 import json
-import os
 from pathlib import Path
 import posixpath
 import shutil
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -59,12 +57,11 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(84, len(skills))
-        self.assertEqual("machine", skills["machine:hook-control"]["plugin"])
-        self.assertEqual("agent", skills["agent:background-listener"]["plugin"])
-        self.assertNotIn("machine:background-listener", skills)
+        self.assertEqual(62, len(skills))
+        self.assertEqual("machine", skills["machine:clip"]["plugin"])
+        self.assertNotIn("agent:background-listener", skills)
         for tree in ("skills", "codex-skills"):
-            self.assertIn(f"plugins/agent/{tree}/background-listener/SKILL.md", output)
+            self.assertIn(f"plugins/machine/{tree}/clip/SKILL.md", output)
             self.assertNotIn(f"plugins/machine/{tree}/background-listener/SKILL.md", output)
         self.assertEqual("session", skills["workflow:session"]["name"])
         self.assertEqual("session", skills["engineering:session"]["name"])
@@ -119,17 +116,24 @@ class SourceLayoutTests(unittest.TestCase):
                 resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
                 self.assertEqual(resource, resolved)
 
-    def test_engineering_leaves_recording_profile_selection_to_the_repository(self):
+    def test_engineering_declares_external_runtime_publishers(self):
         _, output, _, _ = SYNC.build(self.root)
         catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
         engineering = next(package for package in catalog["packages"] if package["id"] == "tj-agents/engineering")
-        self.assertEqual(["tj-agents/base", "tj-agents/workflow", "tj-agents/agent-store", "tj-agents/machine", "tj-agents/agent"], engineering["dependencies"]["required"])
-        self.assertEqual([], engineering["external_dependencies"]["required"])
+        self.assertEqual(
+            ["tj-agents/base", "tj-agents/workflow", "tj-agents/machine",
+             "tj-agents/agent-store", "tj-agents/agent", "tj-agents/codex", "tj-agents/claude", "tj-agents/cli"],
+            engineering["dependencies"]["required"],
+        )
+        self.assertEqual(
+            ["tj-agents/agent-store", "tj-agents/agent", "tj-agents/codex", "tj-agents/claude", "tj-agents/cli"],
+            [entry["id"] for entry in engineering["external_dependencies"]["required"]],
+        )
         harness = json.loads(output["plugins/engineering/harness.json"].decode("utf-8"))
         self.assertEqual([{"id": "tj-agents", "repository": "tj-agents/marketplace"}], harness["requires"]["marketplaces"])
-        self.assertEqual(["tj-agents/agent", "tj-agents/agent-store", "tj-agents/base", "tj-agents/engineering", "tj-agents/machine", "tj-agents/workflow"], harness["requires"]["plugins"])
+        self.assertEqual(["tj-agents/agent", "tj-agents/agent-store", "tj-agents/base", "tj-agents/claude", "tj-agents/cli", "tj-agents/codex", "tj-agents/engineering", "tj-agents/machine", "tj-agents/workflow"], harness["requires"]["plugins"])
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
-        self.assertEqual([], selection["external_prerequisites"])
+        self.assertEqual(engineering["external_dependencies"]["required"], selection["external_prerequisites"])
 
     def test_external_dependencies_are_validated_per_owner(self):
         catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
@@ -166,7 +170,7 @@ class SourceLayoutTests(unittest.TestCase):
         conflicting = json.loads(json.dumps(catalog))
         machine = next(package for package in conflicting["packages"] if package["id"] == "tj-agents/machine")
         machine["dependencies"]["optional"].append(external)
-        machine["external_dependencies"] = {"required": [], "optional": [
+        machine["external_dependencies"] = {"required": machine["external_dependencies"]["required"], "optional": [
             {"id": external, "marketplace": "personal-agents", "repository": "someone/else"}]}
         with self.assertRaisesRegex(ValueError, "inconsistent ownership: personal-agents"):
             SYNC.catalog_index(conflicting)
@@ -177,27 +181,13 @@ class SourceLayoutTests(unittest.TestCase):
         )
         self.assertEqual(set(packages), set(SYNC.catalog_index(catalog)))
 
-    def test_task_recovery_contract_ships_for_both_hosts(self):
+    def test_agent_task_recovery_resource_is_embedded_for_machine_consumers(self):
         _, output, skills, _ = SYNC.build(self.root)
-        canonical = {
-            "open-codex": "utility/open-codex",
-            "open-claude": "utility/open-claude",
-            "followup-codex": "utility/followup-codex",
-        }
-        resource = "plugins/machine/.agents/machine/resources/task-recovery.md"
-        self.assertIn(resource, output)
-        for name, relative in canonical.items():
-            with self.subTest(skill=name):
-                self.assertEqual("machine", skills[f"machine:{name}"]["plugin"])
-                for tree in ("skills", "codex-skills"):
-                    adapter = output[f"plugins/machine/{tree}/{name}/SKILL.md"].decode("utf-8")
-                    self.assertIn(f"](../../.agents/machine/{relative}/SKILL.md)", adapter)
-                canonical_path = f"plugins/machine/.agents/machine/{relative}/SKILL.md"
-                canonical_body = output[canonical_path].decode("utf-8")
-                link = "../../resources/task-recovery.md"
-                self.assertIn(f"]({link})", canonical_body)
-                resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
-                self.assertEqual(resource, resolved)
+        resource = "plugins/machine/.agents/agent/resources/task-recovery.md"
+        staged = self.root / ".agents/dependencies/agent/.agents/agent/resources/task-recovery.md"
+        self.assertEqual(SYNC.canonical_output_bytes(staged.read_bytes()), output[resource])
+        for name in ("agent:open", "agent:message", "agent:recover"):
+            self.assertNotIn(name, skills)
 
     def test_authored_host_manifests_have_one_canonical_owner(self):
         for host in ("codex", "claude"):
@@ -215,14 +205,9 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/base/skills/idea-initialization/scripts/session-context.py",
             "plugins/base/skills/task-routing/scripts/session-context.py",
             "plugins/workflow/codex-skills/plan-artifacts/templates/PLAN.md",
-            "plugins/machine/skills/handoff-codex/scripts/launch_codex.py",
-            "plugins/machine/codex-skills/handoff-claude/scripts/launch_claude.py",
-            "plugins/machine/resources/machine/scripts/history.py",
-            "plugins/machine/skills/followup-codex/scripts/codex_followup.py",
-            "plugins/machine/codex-skills/followup-codex/scripts/codex_followup.py",
-            "plugins/machine/skills/plugin-selection/scripts/repo_config.py",
-            "plugins/machine/skills/hook-control/scripts/hook_control.py",
-            "plugins/machine/codex-skills/hook-control/scripts/hook_control.py",
+            "plugins/machine/.agents/agent/runtime/launch_check.py",
+            "plugins/machine/.agents/agent/utility/plugins/scripts/repo_config.py",
+            "plugins/machine/.agents/agent/resources/lanes/resolve.py",
             "plugins/machine/catalog/catalog.json",
             "plugins/machine/catalog/plugins.schema.json",
             "plugins/workflow/skills/status/scripts/status.py",
@@ -230,26 +215,24 @@ class SourceLayoutTests(unittest.TestCase):
             "CAPABILITIES.md",
         ):
             self.assertIn(relative, output)
-        self.assertEqual(
-            output["plugins/machine/skills/handoff-codex/scripts/launch_codex.py"],
-            SYNC.canonical_output_bytes(
-                (self.root / ".agents/machine/utility/handoff-codex/scripts/launch_codex.py").read_bytes()
-            ),
-        )
+        self.assertEqual(output["plugins/machine/.agents/agent/runtime/launch_check.py"],
+                         SYNC.canonical_output_bytes(
+                             (self.root / ".agents/dependencies/agent/.agents/agent/runtime/launch_check.py").read_bytes()))
 
-    def test_agent_store_inspection_runs_from_each_isolated_host_package(self):
+    def test_agent_store_runtime_is_embedded_in_each_core_consumer(self):
         _, output, _, _ = SYNC.build(self.root)
         runtime = ".agents/agent-store/runtime"
-        for plugin in ("agent-store", "machine", "workflow", "engineering"):
+        staged = self.root / ".agents/dependencies/agent/.agents/agent-store/runtime"
+        for plugin in ("machine", "workflow", "engineering"):
             for name in ("session_store.py", "repository_identity.py", "reader.py"):
                 self.assertEqual(
-                    SYNC.canonical_output_bytes((self.root / runtime / name).read_bytes()),
+                    SYNC.canonical_output_bytes((staged / name).read_bytes()),
                     output[f"plugins/{plugin}/{runtime}/{name}"],
                 )
         isolated = self.root / "isolated package \u00e9"
         for relative, body in output.items():
-            if relative.startswith("plugins/agent-store/"):
-                destination = isolated / relative.removeprefix("plugins/agent-store/")
+            if relative.startswith("plugins/machine/"):
+                destination = isolated / relative.removeprefix("plugins/machine/")
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_bytes(body)
         spec = importlib.util.spec_from_file_location(
@@ -268,23 +251,14 @@ class SourceLayoutTests(unittest.TestCase):
         finally:
             connection.close()
         before = database.read_bytes()
-        environment = os.environ.copy()
-        environment["AGENT_STATE_DIRECTORY"] = str(self.root / "unused state")
-        for entry in ("skills", "codex-skills"):
-            with self.subTest(host=entry):
-                result = subprocess.run(
-                    [sys.executable, "-I", "-B", str(isolated / entry / "inspect/scripts/inspect.py"),
-                     "--database", str(database)],
-                    cwd=isolated, env=environment, capture_output=True, text=True,
-                    encoding="utf-8", timeout=15,
-                )
-                self.assertEqual(0, result.returncode, result.stderr)
-                payload = json.loads(result.stdout)
-                self.assertEqual("recorded", payload["state_kind"])
-                self.assertEqual("not-observed", payload["liveness"])
-                self.assertEqual("Fixture execution", payload["work_items"][0]["title"])
-                self.assertEqual(before, database.read_bytes())
-        self.assertFalse((self.root / "unused state").exists())
+        reader_spec = importlib.util.spec_from_file_location(
+            "isolated_reader", isolated / runtime / "reader.py"
+        )
+        reader = importlib.util.module_from_spec(reader_spec)
+        reader_spec.loader.exec_module(reader)
+        payload = reader.ReadOnlyWorkItemStore(database).inspect("github.com/example/repo:fixture/task")
+        self.assertEqual("Fixture execution", payload["work_items"][0]["title"])
+        self.assertEqual(before, database.read_bytes())
 
     def test_generated_text_bytes_are_stable_across_checkout_line_endings(self):
         source = self.root / ".agents/workflow/contract/plan-artifacts/templates/PLAN.md"
@@ -315,7 +289,7 @@ class SourceLayoutTests(unittest.TestCase):
             for entry in compatibility["fresh_selection"]
         ]
 
-        self.assertEqual(["base", "agent-store", "agent", "machine", "cli", "workflow", "engineering"], fresh_plugins)
+        self.assertEqual(["base", "machine", "workflow", "engineering"], fresh_plugins)
         self.assertEqual(fresh_plugins, default_plugins)
         self.assertEqual(
             fresh_plugins,
@@ -340,14 +314,14 @@ class SourceLayoutTests(unittest.TestCase):
             catalog_skills.update(catalog["skills"])
 
         workflow_selection = json.loads(output["plugins/workflow/selection.json"].decode("utf-8"))
-        self.assertEqual(["base", "agent-store", "machine", "agent"], workflow_selection["prerequisites"])
+        self.assertEqual(["base", "machine"], workflow_selection["prerequisites"])
         self.assertNotIn("engineering", workflow_selection["prerequisites"])
         engineering_selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertIn("workflow", engineering_selection["prerequisites"])
 
         required = set(compatibility["fresh_required_skills"])
         owners = {skill["name"]: skill["plugin"] for skill in skills.values()}
-        self.assertEqual({"cd", "handoff", "handoff-codex"}, required)
+        self.assertEqual({"cd", "handoff"}, required)
         self.assertLessEqual(required, catalog_skills)
         for tree in ("skills", "codex-skills"):
             for name in required:
@@ -392,8 +366,8 @@ class SourceLayoutTests(unittest.TestCase):
             "missing": None,
             "empty": [],
             "wrong-type": "cd",
-            "incomplete": ["cd", "handoff"],
-            "expanded": ["cd", "handoff", "handoff-codex", "missing-skill"],
+            "incomplete": ["cd"],
+            "expanded": ["cd", "handoff", "handoff-codex"],
         }
         for name, required in cases.items():
             with self.subTest(name=name):

@@ -56,7 +56,7 @@ git log --all --since="$SINCE" --name-only --pretty=format: -- 'plans/**' '**/*.
 ```
 
 5. **Optional conversation enrichment.** When the user authorized history access and the machine plugin
-   is selected, load `machine:last-conversation` to attach native resume commands. Otherwise complete the
+   is selected, load `agent:recent` to attach native resume commands. Otherwise complete the
    Git-only summary using branch/worktree/plan pointers. Missing history never blocks the Git result.
    Follow project-owned policy for generated dependency-update branches; generic Git inventory does not
    infer a product's current pin or declare old update branches superseded.
@@ -134,7 +134,7 @@ branch far ahead with no PR. Skip the heading entirely if nothing qualifies.
   (a `(Phase 6.2)` commit means Phase 6 is in progress, Phase 5 shipped); don't infer beyond them.
 - `gh` may be absent or the repo non-GitHub — the PR/sync steps fail quietly; carry on with git-only
   data and say PR state was unavailable rather than inventing it.
-- The optional resume step depends on the selected `machine:last-conversation` capability. If it's missing or
+- The optional resume step depends on the selected `agent:recent` capability. If it's missing or
   returns nothing for this project, drop the `codex resume` bit and fall back to `git switch` —
   don't guess a session id.
 - Keep it tight — this is a standup-style recap, not a report. No preamble.

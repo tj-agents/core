@@ -30,7 +30,7 @@ from workflow_runtime import (
 )
 import workflow_runtime
 READER_SPEC = importlib.util.spec_from_file_location(
-    "agent_store_reader", ROOT / ".agents" / "agent-store" / "runtime" / "reader.py"
+    "agent_store_reader", ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "reader.py"
 )
 READER = importlib.util.module_from_spec(READER_SPEC)
 READER_SPEC.loader.exec_module(READER)
@@ -392,7 +392,7 @@ class WorkflowGenerationTests(unittest.TestCase):
 
     def test_extended_host_adapter_preserves_one_public_identity(self):
         config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
-        self.assertEqual(["agent:background-listener", "engineering:persistent-workflow", "engineering:review", "machine:sync-plugins"],
+        self.assertEqual(["engineering:persistent-workflow", "engineering:review"],
                          config["extended_host_adapters"])
         for identity in config["extended_host_adapters"]:
             plugin, skill = identity.split(":")

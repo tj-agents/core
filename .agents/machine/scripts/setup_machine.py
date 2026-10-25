@@ -21,6 +21,15 @@ import subprocess
 import sys
 from typing import Callable
 
+ROOT = Path(__file__).resolve().parents[3]
+for candidate in (
+    ROOT / ".agents" / "agent" / "runtime",
+    ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime",
+):
+    if candidate.is_dir():
+        sys.path.insert(0, str(candidate))
+        break
+
 import launch_check
 import plugin_autoupdate
 import machine_events
@@ -480,10 +489,15 @@ def apply_codex_agents(context: Context) -> list[str]:
 
 
 def permission_sync(context: Context):
-    directory = context.script_directory.parent / "utility" / "plugin-selection" / "scripts"
+    root = context.script_directory.parents[2]
+    directories = (
+        root / ".agents" / "agent" / "utility" / "plugins" / "scripts",
+        root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "utility" / "plugins" / "scripts",
+    )
+    directory = next((candidate for candidate in directories if (candidate / "harness_permissions_sync.py").is_file()), None)
+    if directory is None:
+        raise SetupError("the packaged Agent harness_permissions_sync.py is unavailable")
     path = directory / "harness_permissions_sync.py"
-    if not path.is_file():
-        raise SetupError("harness_permissions_sync.py is not available beside setup_machine.py")
     if str(directory) not in sys.path:
         sys.path.insert(0, str(directory))
     spec = importlib.util.spec_from_file_location("tj_agents_harness_permissions_sync", path)
@@ -624,6 +638,13 @@ def install_runtime(directory: Path, source: Path = Path(__file__).resolve().par
 
 
 def runtime_source(context: Context) -> Path:
+    root = context.script_directory.parents[2]
+    candidate = root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime"
+    if candidate.is_dir():
+        return candidate
+    candidate = root / ".agents" / "agent" / "runtime"
+    if candidate.is_dir():
+        return candidate
     return context.script_directory
 
 
