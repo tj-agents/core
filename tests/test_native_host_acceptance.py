@@ -183,7 +183,7 @@ class NativeHostAcceptanceTests(unittest.TestCase):
         codex.write_text("", encoding="utf-8")
         claude.write_text("", encoding="utf-8")
         temporary = self.root / "temporary"
-        environment = NATIVE.isolated_environment(temporary, codex, claude)
+        environment = NATIVE.isolated_environment(temporary, codex, claude, 'http://127.0.0.1:1/v1')
         self.assertEqual([str(codex.resolve().parent), str(claude.resolve().parent)], environment["PATH"].split(__import__("os").pathsep)[:2])
         self.assertEqual(Path(environment["HOME"]), self.root / "temporary" / "home")
         self.assertEqual(Path(environment["USERPROFILE"]), self.root / "temporary" / "home")
