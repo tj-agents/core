@@ -52,6 +52,48 @@ class Server:
 
 
 class LaunchCheckTests(unittest.TestCase):
+    def test_verified_shell_launch_binds_the_exact_child_and_propagates_exit(self):
+        import cli_client
+        import required_plugins
+        import terminal_command
+
+        process = mock.Mock(pid=4242)
+        process.wait.return_value = 7
+        process.poll.return_value = 7
+        ticket = {'token': 'fixture'}
+        with mock.patch.object(required_plugins, 'check_launch', return_value=self.state), \
+                mock.patch.object(CHECK, 'check', return_value='current'), \
+                mock.patch.object(cli_client, 'prepare', return_value=(['prepared'], {'ENV': 'value'}, ticket)), \
+                mock.patch.object(cli_client, 'attach') as attach, \
+                mock.patch.object(cli_client, 'release') as release, \
+                mock.patch.object(terminal_command, 'command_for_target', return_value=['native', 'prepared']), \
+                mock.patch.object(subprocess, 'Popen', return_value=process) as spawn:
+            self.assertEqual(7, CHECK.main(['--host', 'codex', '--target', 'native', '--launch', '--', 'resume', 'own']))
+        spawn.assert_called_once_with(['native', 'prepared'], env={'ENV': 'value'})
+        attach.assert_called_once_with(ticket, 4242)
+        release.assert_called_once_with(ticket)
+        process.terminate.assert_not_called()
+
+    def test_failed_identity_recording_stops_only_the_child_and_releases_binding(self):
+        import cli_client
+        import required_plugins
+        import terminal_command
+
+        process = mock.Mock(pid=4242)
+        process.poll.return_value = None
+        with mock.patch.object(required_plugins, 'check_launch', return_value=self.state), \
+                mock.patch.object(CHECK, 'check', return_value='current'), \
+                mock.patch.object(cli_client, 'prepare', return_value=([], {}, {'token': 'fixture'})), \
+                mock.patch.object(cli_client, 'attach', side_effect=OSError('cannot record frontend')), \
+                mock.patch.object(cli_client, 'release') as release, \
+                mock.patch.object(terminal_command, 'command_for_target', return_value=['native']), \
+                mock.patch.object(subprocess, 'Popen', return_value=process), \
+                self.assertRaisesRegex(OSError, 'cannot record frontend'):
+            CHECK.main(['--host', 'codex', '--target', 'native', '--launch'])
+        process.terminate.assert_called_once()
+        process.wait.assert_called_once_with(timeout=5)
+        release.assert_called_once()
+
     def test_unselected_project_does_not_require_an_uninstalled_codex(self):
         import agent_cli
         import codex_hook_trust
@@ -297,6 +339,20 @@ class LaunchCheckTests(unittest.TestCase):
         self.assertEqual({"since": "m2", "since_at": 1234}, self.saved())
 
 
+def launcher_fixture(log):
+    return (
+        "import os,sys,subprocess,shutil\nfrom pathlib import Path\n"
+        f"open({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
+        f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n"
+        "if '--launch' in sys.argv:\n"
+        "    args = sys.argv[sys.argv.index('--')+1:]\n"
+        "    target = sys.argv[sys.argv.index('--target')+1]\n"
+        "    command = ([sys.executable, str(Path(__file__).with_name('echo.py'))] if os.name == 'nt' "
+        "else [shutil.which(target) or target])\n"
+        "    raise SystemExit(subprocess.call([*command, *args]))\n"
+    )
+
+
 @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is not installed")
 class TerminalFunctionTests(unittest.TestCase):
     def test_powershell_functions_check_first_then_pass_arguments_and_exit_code_through(self):
@@ -304,8 +360,7 @@ class TerminalFunctionTests(unittest.TestCase):
             directory = Path(temp)
             log = directory / "log.jsonl"
             check = directory / "launch_check.py"
-            check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
-                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
+            check.write_text(launcher_fixture(log), encoding="utf-8")
             echo = directory / "echo.py"
             echo.write_text(f"import json, sys\nopen({str(log)!r}, 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
                             "raise SystemExit(7)\n", encoding="utf-8")
@@ -331,7 +386,7 @@ class TerminalFunctionTests(unittest.TestCase):
                         capture_output=True, text=True, timeout=60)
                     self.assertEqual(7, result.returncode, result.stderr)
                     target = bin_directory / (f"{name}.cmd" if os.name == "nt" else name)
-                    self.assertEqual([f"check --host {name} --target {target} -- two words --flag {name}", json.dumps(["two words", "--flag"])],
+                    self.assertEqual([f"check --host {name} --target {target} --launch -- two words --flag {name}", json.dumps(["two words", "--flag"])],
                                      log.read_text(encoding="utf-8").splitlines())
                     previous = log.read_text(encoding="utf-8")
                     check.write_text("raise SystemExit(2)\n", encoding="utf-8")
@@ -342,8 +397,7 @@ class TerminalFunctionTests(unittest.TestCase):
                         capture_output=True, text=True, timeout=60)
                     self.assertEqual(2, blocked.returncode, blocked.stderr)
                     self.assertEqual(previous, log.read_text(encoding="utf-8"))
-                    check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
-                                     f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
+                    check.write_text(launcher_fixture(log), encoding="utf-8")
 
 
 @unittest.skipIf(os.name == "nt" or not shutil.which("bash"), "POSIX bash is required")
@@ -353,8 +407,7 @@ class PosixFunctionTests(unittest.TestCase):
             directory = Path(temp)
             log = directory / "log"
             check = directory / "launch_check.py"
-            check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
-                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
+            check.write_text(launcher_fixture(log), encoding="utf-8")
             bin_directory = directory / "bin"
             bin_directory.mkdir()
             target = bin_directory / "claude"
@@ -366,7 +419,7 @@ class PosixFunctionTests(unittest.TestCase):
                                     env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(7, result.returncode, result.stderr)
-            self.assertEqual("check --host claude --target claude -- two words --flag claude\ntwo words|--flag|", log.read_text(encoding="utf-8"))
+            self.assertEqual("check --host claude --target claude --launch -- two words --flag claude\ntwo words|--flag|", log.read_text(encoding="utf-8"))
             previous = log.read_text(encoding="utf-8")
             check.write_text("raise SystemExit(2)\n", encoding="utf-8")
             blocked = subprocess.run(["bash", "-c", f". '{rc}'; claude 'two words' --flag"],

@@ -55,6 +55,26 @@ def _init_repo(path, origin=None):
 
 
 class SchemaTests(unittest.TestCase):
+    def test_frontend_attachment_preserves_turn_state_siblings_and_end_state(self):
+        connection = STORE.connect(self.db_path)
+        self.addCleanup(connection.close)
+        own = STORE.start_session(connection, 'codex', 'own', 'shared-worktree', pid=100, pid_started_at=10.0)
+        peer = STORE.start_session(connection, 'codex', 'peer', 'shared-worktree', pid=100, pid_started_at=10.0)
+        STORE.record_stop(connection, own, 'shared-worktree')
+        before = STORE.get_session(connection, own)
+        sibling = STORE.get_session(connection, peer)
+        STORE.attach_session_client(connection, own, 200, 20.0, 'shared-worktree')
+        after = STORE.get_session(connection, own)
+        self.assertEqual(200, after['pid'])
+        self.assertEqual(20.0, after['pid_started_at'])
+        for key in ('started_at', 'last_activity_at', 'turn_state', 'ended_at'):
+            self.assertEqual(before[key], after[key], key)
+        self.assertEqual(sibling, STORE.get_session(connection, peer))
+        STORE.end_session(connection, own, 'closed')
+        ended = STORE.get_session(connection, own)
+        STORE.attach_session_client(connection, own, 300, 30.0, 'elsewhere')
+        self.assertEqual(ended, STORE.get_session(connection, own))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="session store é ")
         self.addCleanup(self.temp.cleanup)
