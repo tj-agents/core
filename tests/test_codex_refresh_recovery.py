@@ -57,6 +57,24 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(ROOT / ".agents/cli/utility/close/scripts/close_session.py",
                          RELAUNCH.utility_script("close", "close_session.py"))
 
+    def test_resume_options_keep_restrictions_and_model_before_the_old_prompt(self):
+        options = ["--no-daemon", "--sandbox", "read-only", "-a", "on-request", "-m", "chosen-model",
+                   "-c", "model_reasoning_effort=high", "--add-dir", "extra dir"]
+        for command in ("resume", "fork"):
+            with self.subTest(command=command):
+                self.assertEqual(options, RELAUNCH.codex_arguments(
+                    [command, SESSION, *options, "old prompt", "--sandbox", "danger-full-access"]))
+
+    def test_compact_native_short_options_preserve_permission_and_reasoning_settings(self):
+        options = ["-sread-only", "-aon-request", "-mchosen-model", "-cmodel_reasoning_effort=high",
+                   "-pnamed-profile", "--no-daemon"]
+        self.assertEqual(options, RELAUNCH.codex_arguments(["resume", SESSION, *options, "old prompt"]))
+        self.assertEqual(["-mchosen-model"], RELAUNCH.codex_arguments(["-Cprevious-dir", "-mchosen-model"]))
+
+    def test_resume_last_keeps_options_but_excludes_old_prompt(self):
+        self.assertEqual(["--no-daemon", "-sread-only"], RELAUNCH.codex_arguments(
+            ["resume", "--last", "--no-daemon", "-sread-only", "old prompt", "--no-daemon"]))
+
     def arm(self, entry=None, close_status="armed"):
         entry = entry or {"host": "codex", "session_id": SESSION, "pid": 4242,
                           "pid_started_at": 1000.5, "launch_cwd": str(self.root),
