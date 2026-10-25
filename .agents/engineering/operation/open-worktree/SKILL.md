@@ -9,7 +9,7 @@ lane: L7
 
 # Checkout isolation for active work
 
-`engineering:delivery-slices` owns sequential delivery, required stack relationships and checkout allocation.
+`engineering:branching` owns sequential delivery, required stack relationships and checkout allocation.
 Reuse an available checkout for sequential work after preserving its previous work and verifying that no
 writer, build, monitor or active session still owns it. Create a separate worktree when concurrent execution,
 necessary isolation or an explicit request requires one. A branch or open PR can exist without its own
@@ -29,7 +29,7 @@ stopping after the checkout exists is the failure this sentence prevents.
 | Intent | Procedure |
 |---|---|
 | Planning-only authoring with no delivery branch | Use the normal checkout; **do not create a worktree** |
-| Continue sequential work in an available checkout | Verify ownership, clean/preserved status and task binding; switch branches under `engineering:delivery-slices` |
+| Continue sequential work in an available checkout | Verify ownership, clean/preserved status and task binding; switch branches under `engineering:branching` |
 | Create or restore an actively needed isolated checkout | **Create**, below |
 | Resume plan-managed work | The repository's plan floor — its ledger owns the branch, PR and worktree identity |
 | Read-only inventory | `./scripts/worktrees.ps1 audit` when the repository ships it; otherwise `git worktree list --porcelain` and each entry's `git -C "<worktree>" status --porcelain` |
@@ -47,7 +47,7 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
    matches the current branch directly, or is branch-local work because it changes code not yet on the default
    branch. Verify against the dirty paths and the other registered worktrees rather than matching on a shared
    refactor name. A necessary dependent slice also matches: record why it must precede the parent's
-   merge, then branch from that parent's tip under `engineering:delivery-slices`. Do not treat all unmerged feature code as
+   merge, then branch from that parent's tip under `engineering:branching`. Do not treat all unmerged feature code as
    one mandatory PR. **If none of these bases holds, stop and resolve ownership.** A planning-only task
    never reaches this creation procedure; active delivery continues in the ledger's recorded slice.
 2. **Confirm no open red generated-sync PR before starting new work** — `engineering:merging` owns
@@ -62,7 +62,7 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
 
 4. **Fetch with pruning. Independent branches start at the fetched remote default; dependent stack
    layers start at their recorded parent's current tip. Never start from a stale local default**,
-   which is routinely stale. Naming is `engineering:delivery-slices`'s: the repository's capitalized
+   which is routinely stale. Naming is `engineering:branching`'s: the repository's capitalized
    `<Type>/<Name>` form, and **never a second casing of an existing name** — a case-insensitive filesystem
    cannot hold both, and the remote then breaks fetch for everyone. Match an existing branch's casing rather
    than creating a variant.

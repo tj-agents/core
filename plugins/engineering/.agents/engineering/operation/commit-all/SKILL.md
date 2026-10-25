@@ -37,7 +37,7 @@ ceremony is exactly what the user declined by reaching for this rather than `eng
 ## What still holds
 
 - **Never commit on the default branch.** If you are on it, branch first per
-  `engineering:delivery-slices`, then stage and commit.
+  `engineering:branching`, then stage and commit.
 - **Never `--no-verify`**, and never bypass commit signing. A failing pre-commit hook is a cause to fix, not a
   step to skip.
 - **No AI-attribution trailer**, for any agent.

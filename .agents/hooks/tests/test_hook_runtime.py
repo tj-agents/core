@@ -125,13 +125,13 @@ class DuplicateRegistrationTests(unittest.TestCase):
         for source in (SKILL_ROUTER, HOOK_ROOT / "hook_runtime.py", HOOK_ROOT / "tier_gate.py"):
             shutil.copy2(source, hooks / source.name)
         shutil.copy2(HOOK_ROOT.parent / "machine/scripts/required_plugins.py", hooks / "required_plugins.py")
-        skill = plugin / "skills" / "delivery-slices"
+        skill = plugin / "skills" / "branching"
         skill.mkdir(parents=True)
         (skill / "SKILL.md").write_text(
-            "---\nname: delivery-slices\ndescription: Branch rules.\n---\n", encoding="utf-8"
+            "---\nname: branching\ndescription: Branch rules.\n---\n", encoding="utf-8"
         )
         (self.root / ".agents" / "skill-routes.json").write_text(
-            json.dumps({"routes": [{"path": r"\.cs$", "skills": ["delivery-slices"]}]}),
+            json.dumps({"routes": [{"path": r"\.cs$", "skills": ["branching"]}]}),
             encoding="utf-8",
         )
         payload = {
@@ -189,7 +189,7 @@ class DuplicateRegistrationTests(unittest.TestCase):
                     "routes": [
                         {
                             "path": r"\.cs$",
-                            "skills": ["delivery-slices"],
+                            "skills": ["branching"],
                             "deny": [{"pattern": "forbidden", "reason": "forbidden test input"}],
                         }
                     ]

@@ -1427,6 +1427,74 @@ class MonitorTests(RepositoryFixture):
         self.assertEqual("success", second["observation"]["conclusion"])
         self.assertGreaterEqual(second["timing"]["suspended_offline_seconds"], suspension["minimum_offline_seconds"])
 
+    def test_completed_run_emits_on_its_first_observation(self):
+        result = ops.monitor_remote(
+            self.root, "run-1", "run", "42", "HEAD", "ci", 1, 0.001, 2,
+            self.observer([{"state": "completed", "conclusion": "success"}]),
+        )
+        self.assertTrue(result["terminal"])
+        self.assertEqual(1, result["queries"])
+
+    def ready_pr(self, **changes):
+        value = {
+            "state": "open", "merge_state": "blocked", "auto_merge": False,
+            "review_decision": "review_required", "check_count": 2,
+            "pending_items": [], "failing_items": [], "merge_group_failures": [],
+        }
+        value.update(changes)
+        return value
+
+    def test_initial_green_pr_emits_once_before_human_review(self):
+        result = ops.monitor_remote(
+            self.root, "run-1", "pr", "42", "HEAD", None, None, 0.001, 0.2,
+            self.observer([self.ready_pr()]),
+        )
+        self.assertEqual("material-transition", result["transition"])
+        self.assertFalse(result["terminal"])
+        self.assertEqual(1, result["queries"])
+        state = json.loads(Path(result["state_artifact"]).read_text(encoding="utf-8"))
+        self.assertEqual(result["observation"], state["last_observation"])
+
+    def test_reconnect_does_not_repeat_initial_green_pr_notification(self):
+        ready = self.ready_pr()
+        first = ops.monitor_remote(
+            self.root, "run-1", "pr", "42", "HEAD", None, None, 0.001, 0.2,
+            self.observer([ready]),
+        )
+        second = ops.monitor_remote(
+            self.root, "run-1", "pr", "42", "HEAD", None, None, 0.001, 2,
+            self.observer([ready, ready, self.ready_pr(state="merged")]),
+        )
+        self.assertEqual("material-transition", first["transition"])
+        self.assertEqual(first["monitor_id"], second["monitor_id"])
+        self.assertTrue(second["reconnected"])
+        self.assertEqual("merged", second["observation"]["state"])
+        self.assertEqual(4, second["queries"])
+
+    def test_empty_or_pending_checks_do_not_emit_initial_readiness(self):
+        for changes in ({"check_count": 0}, {"pending_items": ["windows"]}):
+            with self.subTest(changes=changes):
+                target = "43" if changes.get("check_count") == 0 else "44"
+                result = ops.monitor_remote(
+                    self.root, "run-1", "pr", target, "HEAD", None, None, 0.001, 2,
+                    self.observer([self.ready_pr(**changes), self.ready_pr(state="merged")]),
+                )
+                self.assertEqual("merged", result["observation"]["state"])
+                self.assertEqual(2, result["queries"])
+
+    def test_pr_observer_retains_nonempty_check_evidence(self):
+        identity = ops.remote_identity(self.root, "pr", "42", "HEAD", None, None)
+        pr = {
+            "headRefOid": identity["head"], "state": "OPEN", "mergeStateStatus": "BLOCKED",
+            "reviewDecision": "REVIEW_REQUIRED", "autoMergeRequest": None,
+            "statusCheckRollup": [{"name": "ci", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+        }
+        queue = {"data": {"repository": {"pullRequest": {"mergeQueueEntry": None}}}}
+        responses = [subprocess.CompletedProcess([], 0, json.dumps(value), "") for value in (pr, queue, [])]
+        with mock.patch.object(ops, "run_process", side_effect=responses):
+            observed = ops.forge_observation(self.root, identity)
+        self.assertEqual(1, observed["check_count"])
+
     def head_or_base(self):
         return self.git("rev-parse", "HEAD")
 

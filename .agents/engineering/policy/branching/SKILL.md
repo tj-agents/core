@@ -1,12 +1,12 @@
 ---
-name: delivery-slices
-description: Define reviewable delivery slices and their branches, stacks and checkouts. Use when choosing a delivery branch or worktree, sizing a PR, or deciding whether dependent work needs a stack.
+name: branching
+description: Choose branches, worktrees and stacks for reviewable engineering work. Use when starting or reusing a delivery branch, sizing a PR, or arranging dependent work.
 
 kind: policy
 domain: process
 ---
 
-# Delivery slices
+# Branching
 
 ## Resolve the work before choosing its branch
 
