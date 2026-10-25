@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 import os
+import sqlite3
 from pathlib import Path
 import subprocess
 import sys
@@ -21,6 +22,7 @@ FOLLOWUP = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(FOLLOWUP)
 THREAD = '00000000-0000-4000-8000-000000000001'
 CLIENT = '00000000-0000-4000-8000-000000000002'
+EXECUTION = 'execution:00000000-0000-4000-8000-000000000010'
 
 
 class Session:
@@ -80,7 +82,22 @@ class FollowupTests(unittest.TestCase):
         self.receipt = {'version': 1, 'thread_id': THREAD, 'client_id': CLIENT,
                         'cwd': FOLLOWUP.path_key(self.root),
                         'codex_home': FOLLOWUP.path_key(self.root),
-                        'message_sha256': hashlib.sha256(b'exact message').hexdigest()}
+                        'message_sha256': hashlib.sha256(b'exact message').hexdigest(),
+                        'routing': {'execution_key': EXECUTION, 'reason': 'Evidence changes the owned repair'}}
+        environment = patch.dict(os.environ, {'AGENT_STATE_DIRECTORY': str(self.root)})
+        environment.start()
+        self.addCleanup(environment.stop)
+        with contextlib.closing(sqlite3.connect(self.root / 'sessions.db')) as database, database:
+            database.executescript('''PRAGMA user_version = 4;
+                CREATE TABLE work_items (key TEXT, status TEXT, pr TEXT);
+                CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT,
+                    work_item TEXT, role TEXT, ended_at REAL, profile TEXT);
+                CREATE TABLE work_item_references (provider TEXT, scope TEXT, native_id TEXT, work_item TEXT);
+            ''')
+            database.execute('INSERT INTO work_items VALUES (?, ?, NULL)', (EXECUTION, 'active'))
+            database.execute('INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, NULL, ?)',
+                             ('codex:' + THREAD, 'github.com/acme/source', 'Fix/Repair',
+                              str(self.root), EXECUTION, 'owner', str(self.root)))
 
     def submit(self, proxy):
         return FOLLOWUP.send(proxy, self.receipt, self.receipt_path, 'exact message')
@@ -120,6 +137,52 @@ class FollowupTests(unittest.TestCase):
                     self.submit(proxy)
                 self.assertFalse(proxy.submitted)
                 self.assertFalse(self.receipt_path.exists())
+
+    def test_unrelated_unknown_or_ended_responsibility_never_sends(self):
+        for change in ("work_item = 'unrelated'", "role = NULL", "ended_at = 1",
+                       "profile = 'another-profile'"):
+            with self.subTest(change=change):
+                with contextlib.closing(sqlite3.connect(self.root / 'sessions.db')) as database:
+                    original = database.execute('SELECT * FROM sessions').fetchone()
+                    database.execute('UPDATE sessions SET ' + change)
+                    database.commit()
+                    proxy = Session(self.receipt)
+                    with self.assertRaisesRegex(FOLLOWUP.FollowupError, 'no verified responsibility'):
+                        self.submit(proxy)
+                    self.assertFalse(proxy.submitted)
+                    self.assertFalse(self.receipt_path.exists())
+                    database.execute('DELETE FROM sessions')
+                    database.execute('INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?, ?)', original)
+                    database.commit()
+
+    def test_unknown_execution_is_rejected_before_connecting_to_recipient(self):
+        args = self.arguments()
+        args[args.index('--execution-key') + 1] = 'unknown-execution'
+        with patch.object(FOLLOWUP, 'Proxy') as proxy, contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(2, FOLLOWUP.main(args))
+        proxy.assert_not_called()
+        self.assertFalse(self.receipt_path.exists())
+
+    def test_correction_requires_observed_original_delivery_to_same_recipient(self):
+        original = dict(self.receipt, client_id='00000000-0000-4000-8000-000000000003')
+        original_path = self.root / 'original.json'
+        original_path.write_text(json.dumps(original), encoding='utf-8')
+        self.receipt['routing'] = {'corrects': str(original_path), 'reason': 'Retract mistaken assignment'}
+        for variant in ('unverified', 'wrong-recipient', 'delivered'):
+            with self.subTest(variant=variant):
+                self.receipt_path.unlink(missing_ok=True)
+                original_path.write_text(json.dumps(dict(original, thread_id=CLIENT)
+                                         if variant == 'wrong-recipient' else original), encoding='utf-8')
+                proxy = Session(self.receipt, delivered=variant != 'unverified')
+                proxy.item_client = original['client_id']
+                if variant == 'delivered':
+                    self.assertEqual('delivered', self.submit(proxy)['status'])
+                    self.assertTrue(proxy.submitted)
+                else:
+                    with self.assertRaises(FOLLOWUP.FollowupError):
+                        self.submit(proxy)
+                    self.assertFalse(proxy.submitted)
+                    self.assertFalse(self.receipt_path.exists())
 
     def test_unloaded_or_unsupported_recipient_cannot_create_an_owner(self):
         for variant in ('unloaded', 'unsupported', 'missing-capability', 'bad-status'):
@@ -214,7 +277,8 @@ class FollowupTests(unittest.TestCase):
     def arguments(self):
         return ['--timeout', '0.1', 'send', '--thread', THREAD, '--cwd', str(self.root),
                 '--codex-home', str(self.root), '--message-file', str(self.message),
-                '--receipt', str(self.receipt_path)]
+                '--receipt', str(self.receipt_path), '--execution-key', EXECUTION,
+                '--reason', 'Evidence changes the owned repair']
 
     def test_cli_retry_checks_history_without_writing_again(self):
         self.receipt_path.write_text(json.dumps(self.receipt))
@@ -421,11 +485,13 @@ for line in sys.stdin:
 
         output = io.StringIO()
         with patch.object(FOLLOWUP, 'Proxy', side_effect=proxy_with_caller_deadline), \
+                patch.object(FOLLOWUP, 'responsibility', return_value='owner'), \
                 patch.object(proxy, '_write', wraps=proxy._write) as write, \
                 contextlib.redirect_stdout(output):
             code = FOLLOWUP.main(['send', '--thread', THREAD, '--cwd', str(root),
                                   '--codex-home', str(root), '--message-file', str(message),
-                                  '--receipt', str(receipt)])
+                                  '--receipt', str(receipt), '--execution-key', EXECUTION,
+                                  '--reason', 'Evidence changes the owned repair'])
         self.assertEqual(2, code)
         self.assertEqual('unverified', json.loads(output.getvalue())['status'])
         self.assertTrue(receipt.is_file())
@@ -483,11 +549,13 @@ for line in sys.stdin:
         proxy = self.create_proxy('import time; time.sleep(30)', timeout=0.2)
         output = io.StringIO()
         with patch.object(FOLLOWUP, 'Proxy', return_value=proxy), \
+                patch.object(FOLLOWUP, 'responsibility', return_value='owner'), \
                 patch.object(proxy.process.stdin, 'close', side_effect=BrokenPipeError('broken')), \
                 contextlib.redirect_stdout(output):
             code = FOLLOWUP.main(['send', '--thread', THREAD, '--cwd', str(root),
                                   '--codex-home', str(root), '--message-file', str(message),
-                                  '--receipt', str(receipt)])
+                                  '--receipt', str(receipt), '--execution-key', EXECUTION,
+                                  '--reason', 'Evidence changes the owned repair'])
         result = json.loads(output.getvalue())
         self.assertEqual(2, code)
         self.assertIn(result['status'], ('unverified', 'unavailable'))
