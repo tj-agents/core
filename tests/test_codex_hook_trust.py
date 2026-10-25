@@ -45,6 +45,52 @@ class HookTrustTests(unittest.TestCase):
         self.archive.start()
         self.addCleanup(self.archive.stop)
 
+    @patch.object(TRUST, "AppServer")
+    def test_live_reload_rejects_unloaded_or_wrong_checkout_without_writing(self, app):
+        for loaded, directory in (([], self.cwd), (["current"], self.cwd / "other")):
+            with self.subTest(loaded=loaded, directory=directory):
+                server = app.return_value.__enter__.return_value
+                server.request.reset_mock()
+                server.request.side_effect = [
+                    {"data": loaded}, {"thread": {"id": "current", "cwd": str(directory)}},
+                ]
+                with self.assertRaises(RuntimeError):
+                    TRUST.reload_running("native", self.cwd, {"base@tj-agents": []}, session_id="current")
+                self.assertNotIn("config/batchWrite", [call.args[0] for call in server.request.call_args_list])
+
+    @patch.object(TRUST, "AppServer")
+    def test_live_reload_uses_native_no_edit_reload_then_waits_for_complete_definitions(self, app):
+        hook = dict(self.hook, trustStatus="trusted")
+        listing = {"data": [{"cwd": str(self.cwd), "errors": [], "hooks": [hook]}]}
+        server = app.return_value.__enter__.return_value
+        server.request.side_effect = [
+            {"data": ["current"]}, {"thread": {"id": "current", "cwd": str(self.cwd)}},
+            {"status": "ok"}, {"data": [{"cwd": str(self.cwd), "errors": [], "hooks": []}]}, listing,
+        ]
+        required = {"base@tj-agents": [TRUST.signature(hook)]}
+        with patch.object(TRUST.time, "sleep"):
+            TRUST.reload_running("native", self.cwd, required, session_id="current")
+        app.assert_called_once_with("native", self.cwd, timeout=45, existing=True)
+        server.request.assert_any_call("config/batchWrite", {"edits": [], "reloadUserConfig": True})
+        self.assertEqual(2, sum(call.args[0] == "hooks/list" for call in server.request.call_args_list))
+
+    @patch.object(TRUST, "AppServer")
+    def test_live_reload_does_not_accept_modified_hooks(self, app):
+        server = app.return_value.__enter__.return_value
+        server.request.side_effect = [
+            {"data": ["current"]}, {"thread": {"id": "current", "cwd": str(self.cwd)}},
+            {"status": "ok"}, {"data": [{"cwd": str(self.cwd), "errors": [], "hooks": [self.hook]}]},
+        ]
+        with self.assertRaisesRegex(RuntimeError, "modified"):
+            TRUST.reload_running("native", self.cwd, {"base@tj-agents": [TRUST.signature(self.hook)]},
+                                 session_id="current", timeout=0)
+
+    @patch.object(TRUST, "AppServer")
+    def test_terminal_refresh_without_native_thread_does_not_start_daemon(self, app):
+        with patch.dict(TRUST.os.environ, {}, clear=True):
+            TRUST.reload_running("native", self.cwd, {"base@tj-agents": []})
+        app.assert_not_called()
+
     def updates(self, *hooks):
         return TRUST.trust_updates(
             {"installed": [self.plugin]},
