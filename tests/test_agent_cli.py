@@ -15,7 +15,7 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location('agent_cli', ROOT / '.agents/machine/scripts/agent_cli.py')
+SPEC = importlib.util.spec_from_file_location('agent_cli', ROOT / '.agents/dependencies/agent/.agents/agent/runtime/agent_cli.py')
 CLI = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = CLI
 SPEC.loader.exec_module(CLI)
@@ -324,7 +324,7 @@ class CodexExecutableTests(unittest.TestCase):
 
 class LaneModelTests(unittest.TestCase):
     def table(self, harness):
-        return json.loads((ROOT / '.agents/lanes' / f'{harness}.json').read_text(encoding='utf-8-sig'))
+        return json.loads((ROOT / '.agents/dependencies/agent/.agents/agent/resources/lanes' / f'{harness}.json').read_text(encoding='utf-8-sig'))
 
     def test_a_lane_resolves_to_its_tables_model_and_effort(self):
         for harness in ('claude', 'codex'):

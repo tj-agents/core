@@ -16,7 +16,7 @@ EXPECTED = {
         ('.agents/base/policy/task-routing/scripts/session-context.py', []),
     ]),
     'machine': (10, 7, [
-        ('.agents/machine/utility/peer-cli/scripts/register_session.py', []),
+        ('.agents/dependencies/agent/.agents/agent/utility/peer/scripts/register_session.py', []),
         ('resources/machine/scripts/reap_orphans.py', ['--notice']),
     ]),
 }

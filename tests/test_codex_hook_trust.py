@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
-    "codex_hook_trust", ROOT / ".agents/machine/scripts/codex_hook_trust.py",
+    "codex_hook_trust", ROOT / ".agents/dependencies/agent/.agents/agent/runtime/codex_hook_trust.py",
 )
 TRUST = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(TRUST)

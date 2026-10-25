@@ -751,5 +751,83 @@ class NativePermissionsTests(Machine):
         self.assertTrue(json.loads(app.read_text(encoding="utf-8"))["saved-during-shutdown"])
 
 
+class SetupWrapperTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="setup-wrapper-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name) / "checkout"
+        self.root.mkdir()
+        self.stage = self.root / ".agents/dependencies/agent"
+        shutil.copytree(ROOT / ".agents/dependencies/agent", self.stage)
+        shutil.copytree(ROOT / ".agents/dependencies/cli", self.root / ".agents/dependencies/cli")
+        declaration = self.root / ".agents/plugins/runtime-sources.json"
+        declaration.parent.mkdir(parents=True)
+        shutil.copy2(ROOT / ".agents/plugins/runtime-sources.json", declaration)
+        runtime_sources = self.root / "scripts/runtime_sources.py"
+        runtime_sources.parent.mkdir()
+        shutil.copy2(ROOT / "scripts/runtime_sources.py", runtime_sources)
+        self.bin = self.root / "fixture-bin"
+        self.bin.mkdir()
+        self.log = self.root / "calls.log"
+        self.environment = dict(os.environ, SETUP_WRAPPER_LOG=str(self.log))
+        self.environment["PATH"] = str(self.bin) + os.pathsep + self.environment.get("PATH", "")
+
+    def wrapper(self, name):
+        source = ROOT / name
+        target = self.root / name
+        shutil.copy2(source, target)
+        return target
+
+    def assert_checked_without_mutating_the_existing_stage(self, command, expected_calls=2):
+        before = snapshot(self.stage)
+        result = subprocess.run(command, cwd=self.root, env=self.environment, text=True,
+                                encoding="utf-8", capture_output=True, timeout=20)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(before, snapshot(self.stage))
+        calls = self.log.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(expected_calls, len(calls))
+        if expected_calls == 2:
+            self.assertIn("scripts", calls[0])
+            self.assertIn("runtime_sources.py", calls[0])
+            self.assertIn("--check", calls[0])
+        self.assertIn("setup_machine.py", calls[-1])
+        self.assertIn("--check", calls[-1])
+
+    def test_powershell_check_forwards_read_only_runtime_source_verification(self):
+        powershell = shutil.which("pwsh")
+        if powershell is None:
+            self.skipTest("pwsh is unavailable")
+        (self.bin / "python.cmd").write_text(
+            "@echo off\r\necho %*>> \"%SETUP_WRAPPER_LOG%\"\r\nexit /b 0\r\n",
+            encoding="utf-8",
+        )
+        script = self.wrapper("setup.ps1")
+        self.assert_checked_without_mutating_the_existing_stage(
+            [powershell, "-NoProfile", "-File", str(script), "--check"],
+        )
+
+    def test_shell_check_forwards_read_only_runtime_source_verification(self):
+        bash = shutil.which("bash")
+        if bash is None:
+            self.skipTest("bash is unavailable")
+        python = self.bin / "python3"
+        python.write_text(
+            "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$SETUP_WRAPPER_LOG\"\n",
+            encoding="utf-8",
+        )
+        python.chmod(0o755)
+        setup_script = self.root / ".agents/machine/scripts/setup_machine.py"
+        setup_script.parent.mkdir(parents=True)
+        setup_script.write_text(
+            "import sys\n"
+            "from pathlib import Path\n"
+            "with (Path(__file__).resolve().parents[3] / 'calls.log').open('a', encoding='utf-8') as stream:\n"
+            "    stream.write(' '.join(sys.argv) + '\\n')\n",
+            encoding="utf-8",
+        )
+        self.wrapper("setup.sh")
+        self.assert_checked_without_mutating_the_existing_stage([bash, "./setup.sh", "--check"], expected_calls=1)
+
+
 if __name__ == "__main__":
     unittest.main()

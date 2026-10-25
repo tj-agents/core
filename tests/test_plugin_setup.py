@@ -9,7 +9,7 @@ import unittest
 from unittest import mock
 
 
-SCRIPTS = Path(__file__).resolve().parents[1] / ".agents/machine/scripts"
+SCRIPTS = Path(__file__).resolve().parents[1] / ".agents/dependencies/agent/.agents/agent/runtime"
 sys.path.insert(0, str(SCRIPTS))
 import required_plugins
 

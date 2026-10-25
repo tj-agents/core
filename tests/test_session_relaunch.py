@@ -12,8 +12,8 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / ".agents/machine/scripts"
-PEER = ROOT / ".agents/machine/utility/peer-cli/scripts"
+SCRIPTS = ROOT / ".agents/dependencies/agent/.agents/agent/runtime"
+PEER = ROOT / ".agents/dependencies/agent/.agents/agent/utility/peer/scripts"
 for path in (SCRIPTS, PEER):
     sys.path.insert(0, str(path))
 
