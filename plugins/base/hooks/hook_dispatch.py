@@ -10,6 +10,7 @@ still running then is reported, and every finished gate's verdict is kept.
 from __future__ import annotations
 
 import io
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -243,21 +244,42 @@ def main(argv: list[str]) -> int:
         data = {}
     event = data.get("hook_event_name") or data.get("hookEventName") or ""
 
-    def acknowledge() -> None:
+    def acknowledge(succeeded: bool, detail: str) -> None:
         if event != "SessionStart":
             return
         directory = os.environ.get("TJ_AGENTS_STARTUP_ACK_DIRECTORY")
         token = os.environ.get("TJ_AGENTS_STARTUP_ACK_TOKEN")
-        if directory and token and len(token) >= 32 and all(value.isalnum() or value in "-_" for value in token):
+        required = os.environ.get("TJ_AGENTS_STARTUP_REQUIRED_HOOKS")
+        if directory and token and required is not None and len(token) >= 32 and all(value.isalnum() or value in "-_" for value in token):
             path = Path(directory) / token
             try:
+                identities = json.loads(required)
+                if not isinstance(identities, list) or not all(isinstance(value, str) for value in identities):
+                    return
+                if identities:
+                    harness = json.loads((Path(__file__).resolve().parents[1] / 'harness.json').read_text(encoding='utf-8'))
+                    marketplace, _, name = harness['plugin'].partition('/')
+                    identity = name + '@' + marketplace
+                    if identity not in identities:
+                        return
+                    if not succeeded:
+                        path.with_name(token + '.failed').write_text(
+                            f"Required startup hook {identity} failed: {detail}", encoding='utf-8')
+                        return
+                    receipt = path.with_name(token + '.' + hashlib.sha256(identity.encode()).hexdigest())
+                    receipt.write_text(token, encoding='utf-8')
+                    if not all(path.with_name(token + '.' + hashlib.sha256(value.encode()).hexdigest()).is_file()
+                               for value in identities):
+                        return
+                if not succeeded or path.with_name(token + '.failed').exists():
+                    return
                 if path.parent.is_dir() and path.parent.resolve() == Path(directory).resolve():
                     descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
                     with os.fdopen(descriptor, "w", encoding="utf-8") as output:
                         output.write(token)
             except FileExistsError:
                 pass
-            except OSError:
+            except (OSError, ValueError, KeyError, TypeError):
                 pass
     if arguments[0] != "--hook":
         stderr.write("hook-dispatch: use --hook <script> [arguments...] groups.\n")
@@ -292,9 +314,9 @@ def main(argv: list[str]) -> int:
     merged, diagnostics = merge(event, finished)
     if overrun:
         merged = overrun_notice(event, merged, deadline, names[len(finished):])
-    elif not any(code for _, code, _, _ in finished) and merged.get("continue") is not False \
-            and merged.get("decision") != "block":
-        acknowledge()
+    succeeded = not overrun and not any(code for _, code, _, _ in finished) \
+        and merged.get("continue") is not False and merged.get("decision") != "block"
+    acknowledge(succeeded, diagnostics or merged.get('stopReason') or str(merged))
     if diagnostics:
         stderr.write(diagnostics + "\n")
     if merged:
