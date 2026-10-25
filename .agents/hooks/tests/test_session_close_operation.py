@@ -24,7 +24,8 @@ WATCHER_SPEC.loader.exec_module(watcher)
 sys.path.insert(0, str(SCRIPT.parent))
 LANDED_SPEC = importlib.util.spec_from_file_location('close_landed', SCRIPT.with_name('close_landed.py'))
 landed = importlib.util.module_from_spec(LANDED_SPEC)
-LANDED_SPEC.loader.exec_module(landed)
+with mock.patch.dict(sys.modules, {'close_session': close}):
+    LANDED_SPEC.loader.exec_module(landed)
 
 
 class ArmTests(unittest.TestCase):
