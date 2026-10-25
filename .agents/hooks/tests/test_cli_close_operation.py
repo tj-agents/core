@@ -39,11 +39,12 @@ class ArmTests(unittest.TestCase):
         self.shared.Refusal = RuntimeError
         self.shared.state_directory.return_value = Path('state')
         self.shared.own_host_and_entry.return_value = self.entry
-        self.shared.close_target.return_value = self.entry
         self.shared.entries.return_value = [('own.json', self.entry)]
         self.shared.git.return_value = (1, '', '')
         self.store = self.shared.register_session._load_session_store.return_value
-        self.store.get_session.return_value = {'ended_at': None, 'turn_state': 'working', 'last_activity_at': 100}
+        self.store.get_session.return_value = {'ended_at': None, 'turn_state': 'working', 'last_activity_at': 100,
+                                               'pid': 123, 'pid_started_at': 100.5}
+        self.shared.client_runtime_path.return_value = ROOT / '.agents/machine/scripts/cli_client.py'
 
     def arm(self):
         with mock.patch.object(close, 'runtime', return_value=self.shared):
@@ -55,17 +56,18 @@ class ArmTests(unittest.TestCase):
         script, arguments, extra = self.shared.start_detached.call_args.args
         self.assertEqual('close_watcher.py', script.name)
         self.assertEqual(['codex', 'own', '123', '100.5'], [arguments[i] for i in (1, 3, 5, 7)])
-        self.assertEqual({'close.py', 'close_tab.py', 'windows_terminal_uia.ps1'}, {path.name for path in extra})
+        self.assertEqual({'close.py', 'cli_client.py'}, {path.name for path in extra})
         self.assertTrue(all(path.is_file() for path in extra))
 
-    def test_literal_close_never_resolves_git_or_sweeps(self):
-        self.shared.git.side_effect = AssertionError('literal close must not inspect Git')
+    def test_arm_has_no_terminal_or_checkout_cleanup_dependency(self):
+        self.shared.git.return_value = (0, str(ROOT / '.git'), '')
         self.arm()
         arguments = self.shared.start_detached.call_args.args[1]
         self.assertNotIn('--repo', arguments)
         self.assertNotIn('--sweep', arguments)
+        self.shared.git.assert_not_called()
 
-    def test_closeout_passes_the_primary_checkout_and_sweep(self):
+    def test_only_closeout_supplies_optional_checkout_cleanup(self):
         self.shared.git.return_value = (0, str(ROOT / '.git'), '')
         with mock.patch.object(close, 'runtime', return_value=self.shared), \
                 mock.patch.object(closeout, 'sweep_script', return_value=Path('sweep.py')):
@@ -87,19 +89,21 @@ class ArmTests(unittest.TestCase):
         self.assertEqual('3', arguments[arguments.index('--transcript-offset') + 1])
 
     def test_arm_refuses_without_an_active_turn(self):
-        for row in (None, {'ended_at': 5, 'turn_state': 'working'}, {'ended_at': None, 'turn_state': 'awaiting_input'}):
+        for row in (None, {'ended_at': 5, 'turn_state': 'working'},
+                    {**self.store.get_session.return_value, 'turn_state': 'awaiting_input'}):
             self.store.get_session.return_value = row
             with self.assertRaisesRegex(RuntimeError, 'no active turn'):
                 self.arm()
         self.shared.start_detached.assert_not_called()
 
     def arm_after_stop(self, landed_at=2000.0):
-        with mock.patch.object(close, 'runtime', return_value=self.shared),                 mock.patch.object(closeout, 'sweep_script', return_value=None):
+        with mock.patch.object(close, 'runtime', return_value=self.shared), \
+                mock.patch.object(closeout, 'sweep_script', return_value=None):
             return closeout.arm_after_stop(landed_at)
 
     def test_arm_after_stop_binds_the_watcher_to_the_recorded_stop(self):
         self.shared.finite_positive = watcher.session_close.finite_positive
-        self.store.get_session.return_value = {'ended_at': None, 'turn_state': 'awaiting_input',
+        self.store.get_session.return_value = {**self.store.get_session.return_value, 'turn_state': 'awaiting_input',
                                                'last_activity_at': 1005.0, 'started_at': 100.0}
         self.assertEqual('armed', self.arm_after_stop()['status'])
         arguments = self.shared.start_detached.call_args.args[1]
@@ -111,14 +115,19 @@ class ArmTests(unittest.TestCase):
         self.shared.finite_positive = watcher.session_close.finite_positive
         for row, reason in (({'turn_state': 'working', 'last_activity_at': 1005.0, 'started_at': 100.0}, 'no recorded stop'),
                             ({'turn_state': 'awaiting_input', 'last_activity_at': 1005.0, 'started_at': 2500.0}, 'before this session')):
-            self.store.get_session.return_value = {'ended_at': None, **row}
+            self.store.get_session.return_value = {**self.store.get_session.return_value, **row}
             with self.assertRaisesRegex(RuntimeError, reason):
                 self.arm_after_stop()
         self.shared.start_detached.assert_not_called()
 
-    def test_multiplexed_host_cannot_arm(self):
-        self.shared.close_target.side_effect = RuntimeError('shared by multiple session identities')
-        with self.assertRaisesRegex(RuntimeError, 'shared by multiple'):
+    def test_sibling_registration_does_not_prevent_attributed_client_arming(self):
+        self.shared.entries.return_value.append(('peer.json', {**self.entry, 'session_id': 'peer'}))
+        self.assertEqual('armed', self.arm()['status'])
+        self.shared.start_detached.assert_called_once()
+
+    def test_store_must_match_the_frontend_attachment(self):
+        self.store.get_session.return_value['pid'] = 999
+        with self.assertRaisesRegex(RuntimeError, 'attachment is not recorded'):
             self.arm()
         self.shared.start_detached.assert_not_called()
 
@@ -157,9 +166,6 @@ class WatcherTests(unittest.TestCase):
                                        '--pid-started-at', '100.5', '--armed-at', '1000', '--timeout', '60'])
         self.clock = Clock()
         self.rows = []
-        target = mock.patch.object(watcher.session_close, 'close_target', side_effect=lambda entry: entry)
-        target.start()
-        self.addCleanup(target.stop)
         live = mock.patch.object(watcher.session_close, 'verified_live', return_value=True)
         live.start()
         self.addCleanup(live.stop)
@@ -291,82 +297,65 @@ class WatcherTests(unittest.TestCase):
             connection.rollback()
             connection.close()
 
-    def test_refused_close_is_recorded_and_never_sweeps(self):
+    def close_main(self):
+        return watcher.main(['--host', 'claude', '--session-id', 'own', '--pid', '123',
+                             '--pid-started-at', '100.5', '--armed-at', '1000'])
+
+    def test_refused_close_is_recorded_without_ending_the_session(self):
         with mock.patch.object(watcher, 'wait_for_idle', return_value=1005), \
                 mock.patch.object(watcher, 'registered_entry', return_value=None), \
-                mock.patch.object(watcher, 'sweep') as sweep:
-            self.assertEqual(2, watcher.main(['--host', 'claude', '--session-id', 'own', '--pid', '123',
-                                              '--pid-started-at', '100.5', '--armed-at', '1000']))
-        sweep.assert_not_called()
+                mock.patch.object(watcher.session_close, '_record_own_end') as ended:
+            self.assertEqual(2, self.close_main())
+        ended.assert_not_called()
         self.assertIn('no longer registered', watcher.session_close.read_json(watcher.outcome_path('own'))['status'])
 
-    def test_close_records_the_end_closes_the_host_then_sweeps(self):
+    def test_close_confirms_client_exit_before_recording_the_end(self):
         entry = {'host': 'claude', 'session_id': 'own', 'pid': 123, 'pid_started_at': 100.5}
         calls = []
+        def stop(selected, before_signal):
+            self.assertIs(entry, selected)
+            before_signal()
+            calls.append('close')
         with mock.patch.object(watcher, 'wait_for_idle', return_value=1005), \
                 mock.patch.object(watcher, 'registered_entry', return_value=entry), \
                 mock.patch.object(watcher.session_close, 'awaiting_input_activity') as idle, \
-                mock.patch.object(watcher.session_close, 'qualified_windows_wrapper', return_value=None), \
                 mock.patch.object(watcher.session_close, '_record_own_end', side_effect=lambda *a: calls.append('end')), \
-                mock.patch.object(watcher.close, 'close_host', side_effect=lambda *a: calls.append('close')), \
-                mock.patch.object(watcher.session_close, 'verified_exited', return_value=True), \
-                mock.patch.object(watcher.subprocess, 'run', return_value=SimpleNamespace(returncode=0)) as run:
-            self.assertEqual(0, watcher.main(['--host', 'claude', '--session-id', 'own', '--pid', '123',
-                                              '--pid-started-at', '100.5', '--armed-at', '1000',
-                                              '--repo', 'primary', '--sweep', 'sweep.py']))
-        idle.assert_called_once_with(entry, 1005)
-        self.assertEqual(['end', 'close'], calls)
-        self.assertEqual(['sweep.py', '--repo', 'primary'], run.call_args.args[0][2:])
+                mock.patch.object(watcher.close, 'close_host', side_effect=stop), \
+                mock.patch.object(watcher.session_close, 'verified_exited', return_value=True):
+            self.assertEqual(0, self.close_main())
+        self.assertEqual([mock.call(entry, 1005)] * 2, idle.call_args_list)
+        self.assertEqual(['close', 'end'], calls)
 
-    def test_failed_close_reopens_the_session(self):
+    def test_failed_or_unconfirmed_exit_never_marks_the_session_ended(self):
         entry = {'host': 'claude', 'session_id': 'own', 'pid': 123, 'pid_started_at': 100.5}
-        with mock.patch.object(watcher, 'registered_entry', return_value=entry), \
-                mock.patch.object(watcher.session_close, 'awaiting_input_activity'), \
-                mock.patch.object(watcher.session_close, 'qualified_windows_wrapper', return_value=None), \
-                mock.patch.object(watcher.session_close, '_record_own_end'), \
-                mock.patch.object(watcher.session_close, '_reopen_own_end') as reopen, \
-                mock.patch.object(watcher.close, 'close_host', side_effect=RuntimeError('tab refused')), \
-                self.assertRaisesRegex(RuntimeError, 'tab refused'):
-            watcher.close_session(self.args, 1005)
-        reopen.assert_called_once_with(entry, 'closed')
+        for failure, message in ((RuntimeError('identity changed'), 'identity changed'),
+                                 (None, 'CLI client exit was not confirmed')):
+            with self.subTest(message=message), \
+                    mock.patch.object(watcher, 'wait_for_idle', return_value=1005), \
+                    mock.patch.object(watcher, 'registered_entry', return_value=entry), \
+                    mock.patch.object(watcher.session_close, 'awaiting_input_activity'), \
+                    mock.patch.object(watcher.session_close, '_record_own_end') as ended, \
+                    mock.patch.object(watcher.close, 'close_host', side_effect=failure), \
+                    mock.patch.object(watcher.session_close, 'verified_exited', return_value=False), \
+                    mock.patch.object(watcher, 'EXIT_WAIT_SECONDS', 0):
+                self.assertEqual(2, self.close_main())
+            ended.assert_not_called()
+            self.assertIn(message, watcher.session_close.read_json(watcher.outcome_path('own'))['status'])
 
-    def test_unconfirmed_host_exit_is_refused_reopened_and_never_swept(self):
+    def test_activity_is_rechecked_at_the_signal_boundary(self):
         entry = {'host': 'claude', 'session_id': 'own', 'pid': 123, 'pid_started_at': 100.5}
+        def stop(selected, before_signal):
+            before_signal()
+            self.fail('a new prompt must prevent signalling')
         with mock.patch.object(watcher, 'wait_for_idle', return_value=1005), \
                 mock.patch.object(watcher, 'registered_entry', return_value=entry), \
-                mock.patch.object(watcher.session_close, 'awaiting_input_activity'), \
-                mock.patch.object(watcher.session_close, 'qualified_windows_wrapper', return_value=None), \
-                mock.patch.object(watcher.session_close, '_record_own_end'), \
-                mock.patch.object(watcher.session_close, '_reopen_own_end') as reopen, \
-                mock.patch.object(watcher.close, 'close_host'), \
-                mock.patch.object(watcher.session_close, 'verified_exited', return_value=False), \
-                mock.patch.object(watcher, 'EXIT_WAIT_SECONDS', 0), \
-                mock.patch.object(watcher, 'sweep') as sweep:
-            self.assertEqual(2, watcher.main(['--host', 'claude', '--session-id', 'own', '--pid', '123',
-                                              '--pid-started-at', '100.5', '--armed-at', '1000']))
-        reopen.assert_called_once_with(entry, 'closed')
-        sweep.assert_not_called()
-        self.assertIn('frontend exit was not confirmed',
-                      watcher.session_close.read_json(watcher.outcome_path('own'))['status'])
-
-    def test_tab_refusal_reaches_the_receipt_without_signalling_or_sweeping(self):
-        entry = {'host': 'claude', 'session_id': 'own', 'pid': 123, 'pid_started_at': 100.5}
-        with mock.patch.object(watcher, 'wait_for_idle', return_value=1005), \
-                mock.patch.object(watcher, 'registered_entry', return_value=entry), \
-                mock.patch.object(watcher.session_close, 'awaiting_input_activity'), \
-                mock.patch.object(watcher.session_close, 'qualified_windows_wrapper', return_value=None), \
-                mock.patch.object(watcher.session_close, '_record_own_end'), \
-                mock.patch.object(watcher.session_close, '_reopen_own_end') as reopen, \
-                mock.patch.object(watcher.close.close_tab, 'close_entry',
-                                  side_effect=watcher.close.close_tab.TerminalRefusal('tab ambiguous')), \
-                mock.patch.object(watcher.close.os, 'kill') as killer, \
-                mock.patch.object(watcher, 'sweep') as sweep:
-            self.assertEqual(2, watcher.main(['--host', 'claude', '--session-id', 'own', '--pid', '123',
-                                              '--pid-started-at', '100.5', '--armed-at', '1000']))
-        reopen.assert_called_once_with(entry, 'closed')
-        killer.assert_not_called()
-        sweep.assert_not_called()
-        self.assertEqual('refused: tab ambiguous',
+                mock.patch.object(watcher.session_close, 'awaiting_input_activity',
+                                  side_effect=[1005, RuntimeError('activity changed')]), \
+                mock.patch.object(watcher.session_close, '_record_own_end') as ended, \
+                mock.patch.object(watcher.close, 'close_host', side_effect=stop):
+            self.assertEqual(2, self.close_main())
+        ended.assert_not_called()
+        self.assertEqual('refused: activity changed',
                          watcher.session_close.read_json(watcher.outcome_path('own'))['status'])
 
 
@@ -409,7 +398,9 @@ class LandedTests(unittest.TestCase):
     def test_hook_arms_only_a_landed_delivery_and_never_raises(self):
         payload = json.dumps({'hook_event_name': 'Stop', 'session_id': 'own', 'cwd': str(self.linked)})
         for landed_at, failure in ((None, None), (1792843200.0, None), (1792843200.0, RuntimeError('refused'))):
-            with mock.patch.object(landed, 'merged_at', return_value=landed_at),                     mock.patch.object(landed.closeout, 'arm_after_stop', side_effect=failure) as arm,                     mock.patch.object(sys, 'stdin', io.StringIO(payload)):
+            with mock.patch.object(landed, 'merged_at', return_value=landed_at), \
+                    mock.patch.object(landed.closeout, 'arm_after_stop', side_effect=failure) as arm, \
+                    mock.patch.object(sys, 'stdin', io.StringIO(payload)):
                 self.assertEqual(0, landed.main())
             self.assertEqual(landed_at is not None, arm.called)
 
@@ -425,6 +416,15 @@ class LandedTests(unittest.TestCase):
                 mock.patch.object(sys, 'stdin', io.StringIO(payload)):
             self.assertEqual(0, landed.main())
         merged.assert_not_called()
+
+    def test_both_hosts_wire_the_guarded_cli_hook(self):
+        target = '.agents/cli/workflow/closeout/scripts/close_landed.py'
+        for host in ('claude', 'codex'):
+            with self.subTest(host=host):
+                path = ROOT / f'.agents/plugins/manifests/{host}/machine-hooks.json'
+                stop = json.dumps(json.loads(path.read_text(encoding='utf-8'))['hooks']['Stop'])
+                self.assertIn(target, stop)
+                self.assertNotIn('.agents/machine/utility/close/scripts/close_landed.py', stop)
 
 
 if __name__ == '__main__':

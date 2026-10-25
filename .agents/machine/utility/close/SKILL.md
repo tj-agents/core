@@ -26,22 +26,21 @@ workflow:session; when engineering is selected, apply engineering:self-repair's 
 authority decision only for a suspected reusable tooling defect.
 ```
 
-Close with the host's own close capability if it exposes one (a tool that archives or settles the current
-thread). Otherwise, as your last command, run:
+Use the host's own capability only if it verifiably closes this client. Archiving or settling a thread
+alone does not establish client exit. Otherwise, as your last command, run:
 
 ```text
 python -B <skill-directory>/scripts/close_session.py arm      # Windows
 python3 -B <skill-directory>/scripts/close_session.py arm     # Linux/macOS
 ```
 
-Then give the final reply and end the turn. A detached watcher closes this session's tab and process once
+Then give the final reply and end the turn. A detached watcher closes this session's frontend once
 the turn has ended and stayed idle for about 3 seconds. A new prompt before then cancels it. Arming does
 not prove closure; a refusal leaves the session open, and its reason is recorded in
 `~/.agents-state/session-close/<session-id>.json`.
 
-Closure means the exact terminal tab is gone and its dedicated frontend has exited. A shared backend
-may remain alive for other sessions. If an exact frontend launch receipt or tab ownership cannot be
-verified, preserve the session and report the refusal. Never substitute backend exit for tab closure.
+`cli:close` owns frontend attribution and verified client exit. Preserve shared backends, other clients
+and the containing terminal. Missing or ambiguous frontend evidence leaves this session open.
 
 A session in a linked worktree also closes itself, unarmed, when a turn ends with its tree clean and its
 branch's pull request merged at HEAD during the session.

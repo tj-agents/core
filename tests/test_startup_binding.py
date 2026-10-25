@@ -23,6 +23,45 @@ SPEC.loader.exec_module(BINDING)
 
 
 class StartupBindingTests(unittest.TestCase):
+    def test_verified_launch_binds_the_exact_child_and_propagates_exit(self):
+        process = mock.Mock(pid=4242)
+        process.wait.return_value = 7
+        process.poll.return_value = 7
+        ticket = {'token': 'fixture'}
+        with mock.patch.object(BINDING.cli_client, 'prepare', return_value=(['prepared'], {'ENV': 'value'}, ticket)), \
+                mock.patch.object(BINDING.cli_client, 'attach') as attach, \
+                mock.patch.object(BINDING.cli_client, 'release') as release, \
+                mock.patch.object(BINDING, 'command_for_target', return_value=['native', 'original']), \
+                mock.patch.object(BINDING.subprocess, 'Popen', return_value=process) as spawn:
+            self.assertEqual(7, BINDING.run_session('codex', 'native', self.project, ['original']))
+        spawn.assert_called_once_with(['native', 'prepared'], cwd=self.project, env={'ENV': 'value'},
+                                      start_new_session=os.name != 'nt')
+        attach.assert_called_once_with(ticket, 4242)
+        release.assert_called_once_with(ticket)
+        process.terminate.assert_not_called()
+
+    def test_failed_identity_recording_stops_only_the_child_and_releases_binding(self):
+        process = mock.Mock(pid=4242)
+        process.poll.return_value = None
+        with mock.patch.object(BINDING.cli_client, 'prepare', return_value=([], {}, {'token': 'fixture'})), \
+                mock.patch.object(BINDING.cli_client, 'attach', side_effect=OSError('cannot record frontend')), \
+                mock.patch.object(BINDING.cli_client, 'release') as release, \
+                mock.patch.object(BINDING.subprocess, 'Popen', return_value=process), \
+                self.assertRaisesRegex(OSError, 'cannot record frontend'):
+            BINDING.run_session('codex', 'native', self.project, [])
+        process.terminate.assert_called_once()
+        process.wait.assert_called_once_with(timeout=5)
+        release.assert_called_once()
+
+    def test_failed_native_spawn_releases_the_prepared_client_binding(self):
+        ticket = {'token': 'fixture'}
+        with mock.patch.object(BINDING.cli_client, 'prepare', return_value=([], {}, ticket)), \
+                mock.patch.object(BINDING.cli_client, 'release') as release, \
+                mock.patch.object(BINDING.subprocess, 'Popen', side_effect=OSError('missing executable')), \
+                self.assertRaisesRegex(BINDING.StartupBindingError, 'missing executable'):
+            BINDING.run_session('codex', 'native', self.project, [])
+        release.assert_called_once_with(ticket)
+
     def test_sigint_is_left_to_the_native_child_and_the_supervisor_handler_is_restored(self):
         process = mock.Mock(pid=4242)
         process.poll.return_value = None
@@ -109,6 +148,12 @@ class StartupBindingTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="startup binding ")
         self.addCleanup(self.temp.cleanup)
         self.project = Path(self.temp.name)
+        # These fixtures run Python in place of the native CLI. Native config binding is
+        # exercised separately; Python itself cannot accept Codex's --config argument.
+        prepare = mock.patch.object(BINDING.cli_client, 'prepare',
+                                    side_effect=lambda host, args, project, env, **kwargs: (list(args), dict(env), None))
+        prepare.start()
+        self.addCleanup(prepare.stop)
         readiness = mock.patch.object(BINDING.launch_check, "ensure_hooks")
         self.readiness = readiness.start()
         self.addCleanup(readiness.stop)
@@ -286,24 +331,14 @@ class StartupBindingTests(unittest.TestCase):
                                                require_session_start=True, on_running=running))
         running.assert_called_once()
 
-    @unittest.skipUnless(os.name == "nt", "Windows taskkill fallback")
-    def test_taskkill_failure_falls_back_to_direct_termination(self):
-        for error in (OSError("unavailable"), subprocess.TimeoutExpired("taskkill", 10)):
-            with self.subTest(error=error):
-                process = mock.Mock(pid=4242)
-                with mock.patch.object(BINDING.subprocess, "run", side_effect=error):
-                    BINDING._terminate(process)
-                process.kill.assert_called_once()
-                process.wait.assert_called_once_with(timeout=5)
-
-    @unittest.skipIf(os.name == "nt", "POSIX process groups")
-    def test_termination_escalates_to_the_entire_process_group(self):
+    def test_termination_escalates_only_for_the_launched_client(self):
         process = mock.Mock(pid=4242)
         process.wait.side_effect = [subprocess.TimeoutExpired("native", 5), 0]
-        with mock.patch.object(BINDING.os, "killpg") as killpg:
+        with mock.patch.object(BINDING.subprocess, 'run') as external:
             BINDING._terminate(process)
-        self.assertEqual([mock.call(4242, signal.SIGTERM), mock.call(4242, signal.SIGKILL)], killpg.call_args_list)
-        process.kill.assert_not_called()
+        process.terminate.assert_called_once()
+        process.kill.assert_called_once()
+        external.assert_not_called()
 
     def test_missing_acknowledgement_preserves_the_child_and_its_exit_code(self):
         survived = self.project / "survived.json"

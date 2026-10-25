@@ -1,7 +1,7 @@
 """Close one armed session once its turn has ended and stayed idle (Python 3.9+).
 
 Started detached by `close_session.py arm`. A new prompt, an ended or replaced session, or the timeout
-cancels it without closing anything. Only a closeout supplies the optional cleanup command.
+cancels it without closing anything. It preserves the shared backend, terminal and checkout.
 """
 
 import argparse
@@ -36,7 +36,6 @@ def arguments(argv=None):
     parser.add_argument("--host-names")
     parser.add_argument("--transcript")
     parser.add_argument("--transcript-offset", type=int, default=0)
-    parser.add_argument("--target", type=json.loads)
     return parser.parse_args(argv)
 
 
@@ -143,37 +142,29 @@ def close_session(args, activity):
     entry = registered_entry(args)
     if entry is None:
         raise Refusal("the armed session is no longer registered")
-    target = session_close.close_target(entry)
-    if args.target is not None and args.target != target:
-        raise Refusal("the armed frontend or terminal binding changed before close")
-    wrapper = session_close.qualified_windows_wrapper(target)
     session_close.awaiting_input_activity(entry, activity)
+    close.close_host(entry, lambda: session_close.awaiting_input_activity(entry, activity))
+    deadline = time.time() + EXIT_WAIT_SECONDS
+    while not session_close.verified_exited(entry["pid"], entry["pid_started_at"]):
+        if time.time() >= deadline:
+            raise Refusal("CLI client exit was not confirmed")
+        time.sleep(POLL_SECONDS)
     session_close._record_own_end(entry, "closed")
-    try:
-        close.close_host(target, wrapper)
-        deadline = time.time() + EXIT_WAIT_SECONDS
-        while not session_close.verified_exited(target["pid"], target["pid_started_at"]):
-            if time.time() >= deadline:
-                raise Refusal("terminal tab closed but dedicated frontend exit was not confirmed")
-            time.sleep(POLL_SECONDS)
-    except Exception:
-        session_close._reopen_own_end(entry, "closed")
-        raise
+
+
+def outcome_path(session_id):
+    return session_close.state_directory() / "session-close" / (session_id + ".json")
 
 
 def sweep(args):
     if not (args.sweep and args.repo):
         return
     try:
-        subprocess.run([sys.executable, "-B", args.sweep, "--repo", args.repo], stdin=subprocess.DEVNULL,
+        subprocess.run([sys.executable, '-B', args.sweep, '--repo', args.repo], stdin=subprocess.DEVNULL,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=SWEEP_TIMEOUT_SECONDS,
                        check=False)
     except (OSError, subprocess.SubprocessError):
         pass
-
-
-def outcome_path(session_id):
-    return session_close.state_directory() / "session-close" / (session_id + ".json")
 
 
 def armed_path(session_id):
@@ -197,12 +188,12 @@ def main(argv=None):
         status = "refused: " + str(error)
     if status == "cancelled" and superseded(args):
         return 0
-    observer = session_close.process_info(os.getpid())
+    process = session_close.process_info(os.getpid())
     session_close.write_json(outcome_path(args.session_id), {
-        "status": status, "at": time.time(), "observer_pid": os.getpid(),
-        "observer_started_at": observer.started_at if observer is not None else None,
+        "status": status, "at": time.time(), "watcher_pid": os.getpid(),
+        "watcher_started_at": process.started_at if process else None,
     })
-    if status == "closed":
+    if status == 'closed':
         sweep(args)
     return 0 if status in ("closed", "cancelled") else 2
 

@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import launch_check
 import launch_status
+import cli_client
 import required_plugins
 from terminal_command import command_for_target, without_binding_state
 
@@ -63,21 +64,11 @@ def startup_participants(host: str, roots) -> list[str]:
 
 
 def _terminate(process: subprocess.Popen) -> None:
-    if os.name == "nt":
-        try:
-            subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
-                           capture_output=True, timeout=10, check=False)
-        except (OSError, subprocess.TimeoutExpired):
-            process.kill()
-    else:
-        os.killpg(process.pid, signal.SIGTERM)
+    process.terminate()
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
-        if os.name == "nt":
-            process.kill()
-        else:
-            os.killpg(process.pid, signal.SIGKILL)
+        process.kill()
         process.wait(timeout=5)
 
 
@@ -106,12 +97,10 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
             roots = required_plugins.check(hook_project or project, host, target)
             environment[REQUIRED_HOOKS_ENV] = json.dumps(startup_participants(host, roots))
         phase("starting-native")
-        try:
-            process = subprocess.Popen(command_for_target(target, list(arguments)),
-                                       cwd=project, env=environment, start_new_session=os.name != "nt")
-        except OSError as error:
-            raise StartupBindingError(f"native {host} could not start: {error}") from error
-
+        command = command_for_target(target, list(arguments))
+        arguments, environment, ticket = cli_client.prepare(host, command[1:], project, environment,
+                                                           executable=command[0])
+        process = None
         def interrupt(signum, _frame):
             if os.name != 'nt' and process.poll() is None:
                 try:
@@ -119,8 +108,15 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 except ProcessLookupError:
                     pass
 
-        previous_interrupt = signal.signal(signal.SIGINT, interrupt)
+        previous_interrupt = None
         try:
+            try:
+                process = subprocess.Popen([command[0], *arguments],
+                                           cwd=project, env=environment, start_new_session=os.name != "nt")
+            except OSError as error:
+                raise StartupBindingError(f"native {host} could not start: {error}") from error
+            previous_interrupt = signal.signal(signal.SIGINT, interrupt)
+            cli_client.attach(ticket, process.pid)
             if require_session_start:
                 phase("waiting-session-start")
                 deadline = time.monotonic() + timeout
@@ -141,14 +137,16 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
             running(process.pid)
             return process.wait()
         except BaseException:
-            if process.poll() is None:
+            if process is not None and process.poll() is None:
                 try:
                     _terminate(process)
                 except (OSError, subprocess.SubprocessError) as error:
                     print(f"launch: native child cleanup failed: {error}", file=sys.stderr)
             raise
         finally:
-            signal.signal(signal.SIGINT, previous_interrupt)
+            if previous_interrupt is not None:
+                signal.signal(signal.SIGINT, previous_interrupt)
+            cli_client.release(ticket)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -236,7 +234,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                                  on_unconfirmed=lambda child_pid: report("unconfirmed", child_pid=child_pid),
                                  on_running=(lambda child_pid=None: report("running", running_at=time.time(), child_pid=child_pid))
                                  if effective_project is not None else (lambda child_pid=None: None))
-    except (StartupBindingError, required_plugins.RequiredPluginsError, OSError, ValueError) as error:
+    except (RuntimeError, OSError, ValueError) as error:
         message = f"launch: {parsed.host} launch failed: {error}"
         print(message, file=sys.stderr)
         report("failed", error=message)

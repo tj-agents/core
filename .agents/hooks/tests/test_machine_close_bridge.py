@@ -1,6 +1,4 @@
 import importlib.util
-import io
-import json
 from pathlib import Path
 import sys
 import unittest
@@ -12,10 +10,6 @@ SCRIPT = ROOT / '.agents/machine/utility/close/scripts/close_session.py'
 SPEC = importlib.util.spec_from_file_location('machine_close_bridge', SCRIPT)
 close = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(close)
-LANDED_SPEC = importlib.util.spec_from_file_location('machine_close_landed', SCRIPT.with_name('close_landed.py'))
-landed = importlib.util.module_from_spec(LANDED_SPEC)
-with mock.patch.dict(sys.modules, {'close_session': close}):
-    LANDED_SPEC.loader.exec_module(landed)
 
 
 class MachineCloseBridgeTests(unittest.TestCase):
@@ -29,16 +23,18 @@ class MachineCloseBridgeTests(unittest.TestCase):
         self.store.get_session.return_value = {'ended_at': None, 'turn_state': 'working'}
 
     def test_arm_requires_the_exact_frontend_before_starting_a_watcher(self):
-        self.shared.close_target.side_effect = RuntimeError('exact frontend binding required')
+        cli = mock.Mock()
+        cli.own_session.side_effect = RuntimeError('exact frontend binding required')
         with mock.patch.object(close, 'runtime', return_value=self.shared), \
-                mock.patch.object(close, 'cli_runtime') as cli:
+                mock.patch.object(close, 'cli_runtime', return_value=cli):
             with self.assertRaisesRegex(RuntimeError, 'exact frontend binding required'):
                 close.arm()
-        cli.assert_not_called()
-        self.shared.own_host_and_entry.assert_called_once_with(session_id=None)
+        cli.start_watcher.assert_not_called()
+        cli.own_session.assert_called_once_with(self.shared, None)
 
     def test_arm_delegates_to_the_shared_cli_watcher_with_closeout_cleanup(self):
         cli = mock.Mock()
+        cli.own_session.return_value = (self.entry, {'turn_state': 'working'})
         cli.start_watcher.return_value = {'status': 'armed'}
         with mock.patch.object(close, 'runtime', return_value=self.shared), \
                 mock.patch.object(close, 'cli_runtime', return_value=cli), \
@@ -47,15 +43,7 @@ class MachineCloseBridgeTests(unittest.TestCase):
             self.assertEqual({'status': 'armed'}, close.arm())
         self.assertEqual((Path('repo'), Path('sweep.py')),
                          cli.start_watcher.call_args.args[3])
-        self.shared.close_target.assert_called_once_with(self.entry)
-
-    def test_landed_hook_binds_the_payload_session_id(self):
-        payload = json.dumps({'cwd': str(ROOT), 'session_id': 'own'})
-        with mock.patch.object(landed, 'merged_at', return_value=200.0), \
-                mock.patch.object(landed.close_session, 'arm_after_stop') as arm, \
-                mock.patch.object(sys, 'stdin', io.StringIO(payload)):
-            self.assertEqual(0, landed.main())
-        arm.assert_called_once_with(200.0, 'own')
+        cli.own_session.assert_called_once_with(self.shared, None)
 
     def test_source_and_machine_package_find_the_canonical_cli_runtime(self):
         self.assertTrue(close.cli_runtime().start_watcher)
