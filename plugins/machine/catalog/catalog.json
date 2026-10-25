@@ -31,7 +31,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:ac8e825712ae031624946ada04c0222df7ab4b4163aff17bfcf306a1c845efb2",
+      "digest": "sha256:ce394c6aadc5838eae0256d766f624f59ac75775753c8f768375780097d265ae",
       "harness": {
         "marketplaces": [
           {
@@ -196,6 +196,51 @@
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
       "marketplace": "tj-agents",
+      "id": "tj-agents/agent",
+      "name": "agent",
+      "package_path": "plugins/agent",
+      "description": "Shared agent execution and background completion across native hosts.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "background-listener"
+      ],
+      "dependencies": {
+        "required": [
+          "tj-agents/base"
+        ],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [],
+        "optional": []
+      },
+      "digest": "sha256:dc005d70d7cf88164ce67d11716ef088f1e4d042d461a3600adae7fa14488e84",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/agent",
+          "tj-agents/base"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [],
+          "codex_prefix_rules": []
+        }
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
       "id": "tj-agents/workflow",
       "name": "workflow",
       "package_path": "plugins/workflow",
@@ -218,7 +263,8 @@
         "required": [
           "tj-agents/base",
           "tj-agents/agent-store",
-          "tj-agents/machine"
+          "tj-agents/machine",
+          "tj-agents/agent"
         ],
         "optional": []
       },
@@ -229,7 +275,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:5127e775eec03fe20c89208a499502d24886c7808d10ab15a401e50a6fb0acdb",
+      "digest": "sha256:bfb3cf679c508aa94f26f1fdf582116849c2d4f03fc7961bc688ee90cead9b74",
       "harness": {
         "marketplaces": [
           {
@@ -238,6 +284,7 @@
           }
         ],
         "plugins": [
+          "tj-agents/agent",
           "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/machine",
@@ -340,12 +387,12 @@
         "address-debt",
         "address-mistake",
         "address-review",
+        "branching",
         "bugfix",
         "commit",
         "commit-all",
         "commit-push",
         "committing",
-        "delivery-slices",
         "docs",
         "docs-review",
         "failing-tests",
@@ -392,7 +439,8 @@
           "tj-agents/base",
           "tj-agents/workflow",
           "tj-agents/agent-store",
-          "tj-agents/machine"
+          "tj-agents/machine",
+          "tj-agents/agent"
         ],
         "optional": []
       },
@@ -407,7 +455,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:4b7325da4429aa1419298b8b617e9849d7d9556c2a1136abd816f4e964b8146e",
+      "digest": "sha256:0669eed8078f31b3d23d94250d748277e445e1afbb03ee6b3e144a60cdd9a585",
       "harness": {
         "marketplaces": [
           {
@@ -416,6 +464,7 @@
           }
         ],
         "plugins": [
+          "tj-agents/agent",
           "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/engineering",
@@ -710,7 +759,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:97a5d1c93577b376e4b654952674048828c97ae42db3093f8605ec6def08d53d",
+      "digest": "sha256:8ba327294a8e5a212025ad6626761297f026d12e508fc275d370bd7a5b6cfc46",
       "digest_excludes": [
         "catalog/catalog.json"
       ],

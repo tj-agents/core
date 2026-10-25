@@ -21,6 +21,18 @@ checker = load("check_tier_payload")
 
 
 class Predicates(unittest.TestCase):
+    def test_one_assessment_reuses_identical_git_queries_without_stale_later_results(self):
+        found = [gate.Declaration(name, "tj-agents", {
+            "schema_version": 1, "tier": name, "stack": "Rust", "applies": "stack-present",
+            "detect": {"globs": ["*.rs"]},
+        }) for name in ("rust-one", "rust-two")]
+        with patch.object(gate, "_run_git", return_value="") as git:
+            self.assertEqual(2, len(gate.assess(self.root, found).blocked))
+            self.assertEqual(1, git.call_count)
+            git.return_value = "src/main.rs\0"
+            self.assertEqual(2, len(gate.assess(self.root, found).applicable))
+            self.assertEqual(2, git.call_count)
+
     def setUp(self):
         holder = tempfile.TemporaryDirectory()
         self.addCleanup(holder.cleanup)

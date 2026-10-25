@@ -34,7 +34,7 @@ def project_root(project: Path) -> Path:
     return project
 
 
-def check_launch(project: Path, host: str, executable: str | None, arguments) -> None:
+def check_launch(project: Path, host: str, executable: str | None, arguments) -> Path | None:
     original_project = project
     value_options = {
         "-C", "--cd", "-c", "--config", "-m", "--model", "-p", "--profile",
@@ -59,9 +59,9 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
         if argument == "--":
             break
         if argument in ("--help", "-h", "--version", "-V" if host == "codex" else "-v"):
-            return
+            return None
         if not command_seen and argument in MAINTENANCE_COMMANDS[host]:
-            return
+            return None
         option, separator, value = argument.partition("=")
         if host == "codex" and len(argument) > 2 and argument[:2] in value_options:
             option, separator, value = argument[:2], "=", argument[2:].removeprefix("=")
@@ -82,6 +82,7 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
         check(project, host, executable, inventory_options=tuple(inventory_options))
     else:
         check(project, host, executable)
+    return project.resolve()
 
 
 def readable_payload(path: Path, host: str, name: str) -> bool:

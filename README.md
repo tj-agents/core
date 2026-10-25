@@ -2,12 +2,71 @@
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
 The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core).
-Select `base@tj-agents`, `agent-store@tj-agents`, `machine@tj-agents`, `workflow@tj-agents` and `engineering@tj-agents` from
+Select `base@tj-agents`, `agent-store@tj-agents`, `agent@tj-agents`, `machine@tj-agents`, `workflow@tj-agents` and `engineering@tj-agents` from
 [`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
-The repository publishes Base, Agent Store, Machine, Workflow and Engineering packages. Agent Store owns recorded
+The repository publishes Base, Agent Store, Agent, Machine, Workflow and Engineering packages. Agent owns shared
+execution and background completion across hosts. Agent Store owns recorded
 execution/session state; Machine observes and operates native hosts; Engineering owns code work and delivery.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
+
+## Required setup on every machine
+
+For authorized machine setup or Core delivery, the agent owns this procedure through execution and
+verification, including post-merge publication, setup and sync. Run the supported commands, repair failed
+steps and report observed results; handing Tommy commands to execute does not complete work the agent
+can perform. A genuinely user-owned credential or native trust action retains its existing control;
+keep the remaining deployment work owned and resume it when that dependency is resolved.
+
+Installing the plugins or cloning this repository does **not** complete machine setup. From a current
+primary Core checkout, run the full setup on each PC before relying on automatic plugin refresh:
+
+```powershell
+# Windows, from the Core checkout
+./setup.ps1
+./setup.ps1 --check
+```
+
+```bash
+# Linux, from the Core checkout
+./setup.sh
+./setup.sh --check
+```
+
+Both commands must finish successfully. A permissions-only `--step` run is a scoped repair, not full
+setup. Full setup owns the event channel, publisher configuration, launch runtime, shell profiles and
+catch-up. Wrapper files alone do not prove the event channel is configured.
+
+Open a fresh terminal so its profile loads. In PowerShell, `Get-Command claude,codex` must resolve the
+managed functions; in bash/zsh, `type claude codex` must show the managed shell functions. Verify the
+installed launch check without starting an agent, from a repository that selects its standards:
+
+```powershell
+python -B "$HOME/.agents-state/bin/launch_check.py" --host codex --project (Get-Location).Path
+python -B "$HOME/.agents-state/bin/launch_check.py" --host claude --project (Get-Location).Path
+```
+
+On Linux, use `python3` and `--project "$PWD"`. Setup is complete only when the full `--check` exits zero,
+both fresh-terminal launch checks succeed, and required hooks execute successfully. A version string or
+an `unconfigured` update check is not completion evidence. If setup or verification fails, keep ordinary
+work blocked, diagnose the failed step and rerun the supported setup; do not silently continue on stale
+machine state. [Machine setup and updates](#machine-setup-and-updates) explains the owned steps and scope.
+
+After a Core change merges, wait for the post-merge regeneration job to publish its packages on `main`,
+update the primary Core checkout, then rerun the full setup and verification above to deploy machine
+runtime changes. Normal `claude` and `codex` launches check for published updates automatically. For an
+immediate explicit refresh from the Core checkout, run:
+
+```powershell
+./sync.ps1 --verify
+```
+
+```bash
+./sync.sh --verify
+```
+
+`machine:sync-plugins` owns adoption in a running session, including resuming the same conversation when
+native reload is unavailable. The agent runs explicit sync whenever an immediate refresh is needed.
 
 `engineering:skill-authoring` owns skill selection triggers, names, and sizing; the
 [`template:check` validator](https://github.com/tj-agents/template) owns required skill content and layout
@@ -140,7 +199,7 @@ gate. Source verification does not establish installed-host trust or acceptance.
   selected host adapter. Nothing under it is an authored source.
 - `shell/` owns the PowerShell profile, one concern per file.
 - `cli-session-recovery/` owns save/restore scripts and their regression suite.
-- install.ps1 installs the PowerShell profile; cli-session-recovery provides its own installer.
+- setup.ps1 and setup.sh install the machine runtime and shell profiles; cli-session-recovery provides its own installer.
 
 ### Windows CLI hook windows
 
@@ -236,12 +295,8 @@ For example, a saved `guardian-approvals` mode must not keep new chats restricte
 Native settings: [Codex](https://developers.openai.com/codex/config-reference/),
 [Claude Code](https://code.claude.com/docs/en/permissions).
 
-Run once per machine. Rerunning setup converges on the same channel and launch configuration:
-
-```text
-./setup.ps1          # Windows (PowerShell)
-./setup.sh           # Linux (bash and python3)
-```
+Follow [Required setup on every machine](#required-setup-on-every-machine) for the full installation and
+fresh-terminal verification. Rerunning setup converges on the same channel and launch configuration.
 
 Repeat `--step` to select existing setup steps for a scoped repair. They retain their declared order
 and always include required preconditions. Selecting shell profiles also includes their launch-check
@@ -311,7 +366,7 @@ The generic service scaffold does not generate it. GitHub Free's repository rule
 apply to private repositories.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
-loaded; new sessions pick up the update. `install.ps1` still wires the Windows `shell/` profile.
+loaded; follow `machine:sync-plugins` for adoption and the required recovery verification.
 
 ### Refresh and repository boundaries
 
@@ -347,8 +402,13 @@ requirements. The machine event fixtures cover both event and catch-up paths wit
 ### Recover from a faulty installed hook
 
 A hook repair reaches a machine after it merges, the `regenerate` job publishes it to `main`, and the next
-automatic update installs it. On Codex, a changed package digest changes the hook definition, so the hook
-needs trust review again. A running session keeps the hook bytes it loaded; start a new session.
+automatic update installs it. Codex launch and refresh verify published package contents, apply trust only
+to verified current hook hashes, and read back required-hook readiness. Failed readiness blocks ordinary
+work; native plugin maintenance remains available for recovery. A running session keeps the hook bytes it
+loaded. Use `machine:sync-plugins` to recover, and verify the affected hooks actually execute successfully.
+If native reload is unavailable, resume the same conversation by its exact session ID and directory.
+Keep ownership and leave the conversation open for that user action; do not launch a successor merely
+to change directory or reload hooks. `base:cd` owns the native directory-change fallback.
 
 Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.
 
@@ -359,9 +419,10 @@ Use `machine:plugin-selection` to commit `.agents/plugins.json`, `.claude/settin
 `enabledPlugins`. Codex declares `[marketplaces]` and `[plugins]` in trusted project configuration.
 Native admission, installation, credentials and caches remain host responsibilities.
 
-Handoff, open and recovery launchers start the native CLI without refreshing plugins, generating
-packages or rewriting host configuration. They retain handoff startup acknowledgement and recovery
-pickup verification. Running sessions retain the instructions they already loaded.
+Shell, handoff, open and recovery launchers use the shared launch check before starting the native CLI.
+They do not independently generate packages or rewrite repository configuration. Handoff startup
+acknowledgement and recovery pickup verification remain separate from refresh and required-hook
+readiness. Running sessions retain the instructions and hook definitions they already loaded.
 
 On Codex 0.163.0-alpha.1, declarations make a plugin discoverable but do not install it in an empty
 profile. `codex plugin add <plugin>@<marketplace>` installs the native cache and writes a user enabled
@@ -369,17 +430,10 @@ entry. An installed cache can subsequently load solely from trusted project decl
 settings alone do not prove fresh-machine installation. See the current
 [cutover acceptance record](plans/repo-declared-config/CUTOVER.md).
 
-Automatic updates belong to Claude's native updater and the background updater installed by `setup.ps1`.
-The scheduled Codex updater also installs missing declared plugins after a repository has native trust.
-Its native `plugin add` commands maintain the host's required user installation entries automatically;
-repository settings remain the authored selection. Codex currently provides no cache-only install scope.
-Nothing updates packages in the launch path.
+The [machine setup and update flow](#machine-setup-and-updates) owns automatic launch checks and explicit
+refresh. Codex's native `plugin add` commands maintain required user installation entries; repository
+settings remain the authored selection. Codex currently provides no cache-only install scope.
 
-For an explicit native refresh use `machine:sync-plugins`. Its default performs native marketplace
-and plugin updates; remote revision verification is opt-in and prints progress. `/sync-plugins`
-adopts updates in an open Claude session; start a new Codex session to load updated packages.
-
-Codex does not load agent definitions directly from plugins. Its engineering package supplies
-`scripts/install-codex-agents.ps1` for explicit profile delivery; launcher startup no longer copies
-agents or records hook trust. Native hook trust review still applies. Claude loads the package's
-`agents/` payload directly.
+Codex does not load agent definitions directly from plugins. Core setup owns their profile installation;
+Claude loads the package's `agents/` payload directly. Codex launch and refresh verify required hook trust
+as described under [faulty-hook recovery](#recover-from-a-faulty-installed-hook).
