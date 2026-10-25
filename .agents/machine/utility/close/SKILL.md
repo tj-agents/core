@@ -25,27 +25,34 @@ workflow:session; when engineering is selected, apply engineering:self-repair's 
 authority decision only for a suspected reusable tooling defect.
 ```
 
-Close with the host's own close capability if it exposes one (a tool that archives or settles the current
-thread). Otherwise, as your last command, run:
+Close with the host's own capability if it verifiably closes only this CLI client. Archiving or settling
+a thread alone does not establish client exit. Otherwise, as your last command, run:
 
 ```text
 python -B <skill-directory>/scripts/close_session.py arm      # Windows
 python3 -B <skill-directory>/scripts/close_session.py arm     # Linux/macOS
 ```
 
-Then give the final reply and end the turn. A detached watcher closes this session's tab and process once
+Then give the final reply and end the turn. A detached watcher closes this session's CLI client once
 the turn has ended and stayed idle for about 3 seconds. A new prompt before then cancels it. Arming does
 not prove closure; a refusal leaves the session open, and its reason is recorded in
 `~/.agents-state/session-close/<session-id>.json`.
 
-Closure means the exact terminal tab is gone and the registered host has exited. If tab ownership or
-closure cannot be verified, preserve the session and report the refusal. Never substitute process exit
-for tab closure.
+Closure means the verified frontend process has exited. Preserve shared backend processes, other CLI
+clients, and the terminal containing this CLI. Worktree sharing does not prevent independent CLI closure.
+If the individual client cannot be attributed and verified, preserve it and report the refusal. Never
+terminate a shared backend or process tree to close one conversation.
+
+```text
+Two Codex clients use the same backend and worktree:
+Close the verified frontend for this conversation. The other client and backend stay alive;
+the terminal returns to its shell and the worktree remains on disk.
+```
 
 A session in a linked worktree also closes itself, unarmed, when a turn ends with its tree clean and its
 branch's pull request merged at HEAD during the session.
 
-Closing never removes a worktree. After closing, the watcher runs the worktree sweep, which removes the
-checkout only if its PR merged and nothing is left in it.
+Closing never removes a worktree or runs a worktree sweep. Checkout cleanup is a separate explicit
+operation owned by `engineering:prune-worktrees` or `engineering:open-worktree`.
 
 `peer-cli` closes other sessions.
