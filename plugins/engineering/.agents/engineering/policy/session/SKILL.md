@@ -39,6 +39,16 @@ A bounded behavior change selects `engineering:feature`; a defect selects `engin
 Creating a PR or editing its description enters `engineering:open-pr` before the forge write; use its
 proposed-body validation and authoritative readback for CLI and connector writes.
 
+## Start repository work from a current base
+
+Before starting or resuming a substantive work item, including planning, fetch the remote and identify its
+current default branch. Check the checkout against that fetched base, or against the recorded parent when
+working on a stack. Start new delivery branches from the fetched base and bring an existing delivery branch
+up to date before working when its tree is clean; `engineering:delivery-slices` owns the branch procedure.
+For planning-only work, use the fetched base as the current source of truth even when no delivery branch is
+needed. Preserve uncommitted changes: resolve a dirty checkout or use another checkout before a sync that
+would alter it. Perform this check at the work-item boundary, not for every prompt within the same work.
+
 ## Repository routine-decision delegation
 
 Read routine delegation from the actual checkout's `.agents/settings.json`. Within
@@ -52,7 +62,7 @@ no merge, publication, installation, permission, or other external authority.
 ## Keep large changes reviewable
 
 Before implementing or expanding a large refactor or multi-concern change, apply
-`engineering:git-branching` to define and measure PR-sized delivery slices. Deliver one slice at a time
+`engineering:delivery-slices` to define and measure PR-sized delivery slices. Deliver one slice at a time
 by default: validate, review and merge when ready and authorized, then start the next from the updated
 base. When work must build on an unmerged PR, maintain a proper stack. Allocate worktrees for active
 execution needs independently of the number of branches. One goal may span many PRs. A phase label or

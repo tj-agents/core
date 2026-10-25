@@ -345,13 +345,13 @@
         "commit-all",
         "commit-push",
         "committing",
+        "delivery-slices",
         "docs",
         "docs-review",
         "failing-tests",
         "failure-provenance",
         "feature",
         "git-auth",
-        "git-branching",
         "guide",
         "guide-build",
         "incremental-review",
@@ -407,7 +407,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:dca0c69f05fcb181e02526ed434cd8e0ab4c3b93b9e8aeedfd73f7656d541339",
+      "digest": "sha256:4b7325da4429aa1419298b8b617e9849d7d9556c2a1136abd816f4e964b8146e",
       "harness": {
         "marketplaces": [
           {

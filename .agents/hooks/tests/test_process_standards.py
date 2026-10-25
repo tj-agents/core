@@ -286,7 +286,7 @@ class ProcessStandardsTests(unittest.TestCase):
         flat = " ".join(body.split())
 
         self.assertIn("Single-repo mode:** survey the repository", flat)
-        self.assertIn("Select or reuse an available checkout under `engineering:git-branching`", flat)
+        self.assertIn("Select or reuse an available checkout under `engineering:delivery-slices`", flat)
         self.assertIn("Polyrepo-root mode:** run Step 2's survey across every child repo", flat)
         self.assertIn("Once the primary item is selected, its child repo owns this run", flat)
         self.assertIn("Pick the item(s) fast", flat)
