@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 import sys
 
 import lock_io
@@ -13,14 +14,42 @@ import plugin_selection
 import repo_config
 
 
-ROSTER = Path(__file__).resolve().parent / "plugin_roster.json"
+CATALOG = Path(__file__).resolve().parent / "marketplace_catalog.lock.json"
+STACKS = Path(__file__).resolve().parent / "plugin_stacks.json"
 
 
 def load_roster() -> dict:
-    roster = lock_io.load_json(ROSTER)
-    if roster.get("schema_version") != 1 or set(roster) != {"schema_version", "plugins", "stacks"}:
-        raise lock_io.LockError(f"{ROSTER}: invalid plugin roster")
-    return roster
+    snapshot = lock_io.load_json(CATALOG)
+    revision = snapshot.get("revision")
+    if (set(snapshot) != {"repository", "revision", "catalog"}
+            or snapshot["repository"] != plugin_selection.MARKETPLACE_REPOSITORY
+            or not isinstance(revision, str) or re.fullmatch(r"[0-9a-f]{40}", revision) is None):
+        raise lock_io.LockError(f"{CATALOG}: invalid marketplace snapshot")
+    catalog = snapshot["catalog"]
+    if not isinstance(catalog, dict) or catalog.get("name") != plugin_selection.MARKETPLACE_NAME:
+        raise lock_io.LockError(f"{CATALOG}: invalid marketplace catalog")
+    entries = catalog.get("plugins")
+    if not isinstance(entries, list):
+        raise lock_io.LockError(f"{CATALOG}: plugins must be a list")
+    plugins = {}
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
+            raise lock_io.LockError(f"{CATALOG}: invalid plugin entry")
+        name = entry["name"]
+        if name in plugins:
+            raise lock_io.LockError(f"{CATALOG}: duplicate plugin: {name}")
+        plugins[name] = lock_io.require_string_list(entry.get("requires", []), f"{name}.requires")
+    for name, required in plugins.items():
+        if any(dependency not in plugins for dependency in required):
+            raise lock_io.LockError(f"{CATALOG}: unknown dependency in {name}")
+    stacks = lock_io.load_json(STACKS)
+    if stacks.get("schema_version") != 1 or set(stacks) != {"schema_version", "stacks"} or not isinstance(stacks["stacks"], dict):
+        raise lock_io.LockError(f"{STACKS}: invalid stack choices")
+    for stack, selected in stacks["stacks"].items():
+        lock_io.require_string_list(selected, f"{stack}.plugins")
+        if any(name not in plugins for name in selected):
+            raise lock_io.LockError(f"{STACKS}: unknown plugin in stack {stack}")
+    return {"plugins": plugins, "stacks": stacks["stacks"]}
 
 
 def expand(requested: set[str], roster: dict) -> list[str]:
