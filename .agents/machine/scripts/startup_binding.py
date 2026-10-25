@@ -111,6 +111,15 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                                        cwd=project, env=environment, start_new_session=os.name != "nt")
         except OSError as error:
             raise StartupBindingError(f"native {host} could not start: {error}") from error
+
+        def interrupt(signum, _frame):
+            if os.name != 'nt' and process.poll() is None:
+                try:
+                    os.killpg(process.pid, signum)
+                except ProcessLookupError:
+                    pass
+
+        previous_interrupt = signal.signal(signal.SIGINT, interrupt)
         try:
             if require_session_start:
                 phase("waiting-session-start")
@@ -138,6 +147,8 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 except (OSError, subprocess.SubprocessError) as error:
                     print(f"launch: native child cleanup failed: {error}", file=sys.stderr)
             raise
+        finally:
+            signal.signal(signal.SIGINT, previous_interrupt)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -217,12 +228,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
 
     try:
-        options = {"require_session_start": True, "hook_project": effective_project} if parsed.require_session_start else {}
+        observe = parsed.require_session_start and effective_project is not None
+        options = {"require_session_start": True, "hook_project": effective_project} if observe else {}
         if parsed.status_file is not None:
             options["on_phase"] = phase
         returncode = run_session(parsed.host, parsed.target, parsed.project, arguments, **options,
                                  on_unconfirmed=lambda child_pid: report("unconfirmed", child_pid=child_pid),
-                                 on_running=lambda child_pid=None: report("running", running_at=time.time(), child_pid=child_pid))
+                                 on_running=(lambda child_pid=None: report("running", running_at=time.time(), child_pid=child_pid))
+                                 if effective_project is not None else (lambda child_pid=None: None))
     except (StartupBindingError, required_plugins.RequiredPluginsError, OSError, ValueError) as error:
         message = f"launch: {parsed.host} launch failed: {error}"
         print(message, file=sys.stderr)

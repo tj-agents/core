@@ -2,11 +2,12 @@
 
 import argparse
 import json
+import os
 import signal
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '.agents/machine/scripts'))
+sys.path.insert(0, str(Path(os.environ['AGENT_STATE_DIRECTORY']) / 'bin'))
 import startup_binding
 
 
@@ -18,6 +19,7 @@ def main():
     parser.add_argument('--receipt', required=True, type=Path)
     parser.add_argument('arguments', nargs=argparse.REMAINDER)
     arguments = parser.parse_args()
+    arguments.receipt.unlink(missing_ok=True)
 
     def report(state, **details):
         arguments.receipt.parent.mkdir(parents=True, exist_ok=True)

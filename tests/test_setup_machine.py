@@ -501,7 +501,16 @@ class RuntimeTests(Machine):
     def test_the_launch_check_runtime_is_installed_once(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
         for name in setup.plugin_autoupdate.RUNTIME:
-            self.assertEqual((SCRIPTS / name).read_bytes(), (self.home / ".agents-state" / "bin" / name).read_bytes())
+            self.assertEqual(setup.plugin_autoupdate.runtime_file(SCRIPTS, name).read_bytes(),
+                             (self.home / ".agents-state" / "bin" / name).read_bytes())
+
+    def test_installed_shell_entry_point_resolves_its_complete_dependency_closure(self):
+        context = self.context(windows=os.name == 'nt')
+        setup.apply_runtime(context)
+        result = subprocess.run([sys.executable, '-I', '-B', str(setup.launch_script(context)), '--help'],
+                                cwd=self.root, capture_output=True, text=True, timeout=15)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn('--require-session-start', result.stdout)
 
     def test_the_runtime_is_installed_from_the_running_scripts_directory(self):
         running = self.root / "running" / "scripts"

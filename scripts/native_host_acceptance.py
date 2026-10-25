@@ -68,6 +68,22 @@ def require_observer(path, state):
     return value
 
 
+def require_failure_probe(host, evidence, operation):
+    path = evidence / (host + '-startup-observer.json')
+    path.unlink(missing_ok=True)
+    try:
+        operation()
+    except AcceptanceError:
+        pass
+    else:
+        raise AcceptanceError(f'{host} accepted a deliberately failed required startup hook')
+    receipt = require_observer(path, 'failed')
+    if 'workflow@tj-agents' not in receipt.get('error', '') \
+            or 'native-required-hook-failure-probe' not in receipt.get('error', ''):
+        raise AcceptanceError(f'{host} failed for a different reason: {receipt}')
+    return receipt
+
+
 def diagnostic(lines):
     return "\n".join(lines[-40:])[-4000:]
 
@@ -824,17 +840,8 @@ def accept(root, marketplace, codex, claude, artifacts, timeout):
             probe_environment = isolated_environment(case, codex, claude, endpoint)
             probe_project = write_fixture(case / 'fixture', probe_environment)
             evidence = artifacts / ('failure-' + host)
-            try:
-                operation(root, failed_marketplace, executable, probe_project, probe_environment, evidence, timeout)
-            except AcceptanceError:
-                pass
-            else:
-                raise AcceptanceError(f'{host} accepted a deliberately failed required startup hook')
-            receipt = require_observer(evidence / (host + '-startup-observer.json'), 'failed')
-            if 'workflow@tj-agents' not in receipt.get('error', '') \
-                    or 'native-required-hook-failure-probe' not in receipt.get('error', ''):
-                raise AcceptanceError(f'{host} failed for a different reason: {receipt}')
-            failures[host] = receipt
+            failures[host] = require_failure_probe(host, evidence, lambda: operation(
+                root, failed_marketplace, executable, probe_project, probe_environment, evidence, timeout))
     return {"claude_session": claude_session, "codex_session": codex_session,
             "plugins": list(IDENTITIES), 'required_hook_failure_probes': failures}
 
@@ -867,6 +874,8 @@ def main(argv=None):
     arguments = parser.parse_args(argv)
     if arguments.timeout <= 0:
         raise SystemExit("--timeout must be positive")
+    arguments.artifacts.mkdir(parents=True, exist_ok=True)
+    (arguments.artifacts / 'native-host-acceptance.failure.log').unlink(missing_ok=True)
     try:
         result = accept(
             arguments.root, arguments.marketplace, arguments.codex, arguments.claude,

@@ -618,7 +618,7 @@ def install_runtime(directory: Path, source: Path = Path(__file__).resolve().par
     for name in plugin_autoupdate.RUNTIME:
         target = directory / name
         temporary = target.with_suffix(".next")
-        shutil.copyfile(source / name, temporary)
+        shutil.copyfile(plugin_autoupdate.runtime_file(source, name), temporary)
         os.replace(temporary, target)
     return directory / "launch_check.py"
 
@@ -632,7 +632,7 @@ def check_runtime(context: Context) -> list[str]:
     source = runtime_source(context)
     changes = [f"install {directory / name}" for name in plugin_autoupdate.RUNTIME
             if not (directory / name).is_file()
-            or (directory / name).read_bytes() != (source / name).read_bytes()]
+            or (directory / name).read_bytes() != plugin_autoupdate.runtime_file(source, name).read_bytes()]
     if not context.windows:
         alias = directory / 'python'
         if not alias.is_file() or alias.read_text(encoding='utf-8') != python_alias() \

@@ -23,6 +23,41 @@ SPEC.loader.exec_module(BINDING)
 
 
 class StartupBindingTests(unittest.TestCase):
+    def test_sigint_is_left_to_the_native_child_and_the_supervisor_handler_is_restored(self):
+        process = mock.Mock(pid=4242)
+        process.poll.return_value = None
+
+        def interrupted_wait(*_args, **_kwargs):
+            signal.getsignal(signal.SIGINT)(signal.SIGINT, None)
+            return 0
+
+        process.wait.side_effect = interrupted_wait
+        before = signal.getsignal(signal.SIGINT)
+        with mock.patch.object(BINDING.subprocess, 'Popen', return_value=process), \
+                mock.patch.object(BINDING, '_terminate') as terminate, \
+                mock.patch.object(BINDING.os, 'killpg', create=True) as forward:
+            try:
+                self.assertEqual(0, BINDING.run_session('codex', 'native', self.project, []))
+            except KeyboardInterrupt:
+                self.fail('Supervisor converted a normal native interrupt into termination')
+        terminate.assert_not_called()
+        self.assertEqual(before, signal.getsignal(signal.SIGINT))
+        if os.name != 'nt':
+            forward.assert_called_once_with(4242, signal.SIGINT)
+        else:
+            forward.assert_not_called()
+
+    def test_session_observation_never_blocks_exempt_native_repair_commands(self):
+        for host, arguments in (('codex', ['plugin', 'add', 'base@tj-agents']), ('claude', ['plugin', 'list'])):
+            with self.subTest(host=host), \
+                    mock.patch.object(BINDING.required_plugins, 'check', side_effect=AssertionError('no inventory for maintenance')), \
+                    mock.patch.object(BINDING.subprocess, 'Popen') as native:
+                native.return_value.wait.return_value = 0
+                self.assertEqual(0, BINDING.main(['--host', host, '--project', str(self.project),
+                                                 '--target', sys.executable, '--require-session-start', '--', *arguments]))
+                native.assert_called_once()
+        self.readiness.assert_not_called()
+
     def test_startup_receipts_cover_all_selected_dispatchers_on_both_hosts(self):
         names = ('base', 'engineering', 'machine', 'workflow')
         roots = {name + '@tj-agents': ROOT / 'plugins' / name for name in names}
