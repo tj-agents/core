@@ -9,8 +9,9 @@ route: infer
 # Close the finished session
 
 Close when every outcome you own is finished: delivery, validation and handoffs are done, and nothing
-waits on an answer, approval or check. A PR waiting only for the user's review or merge is finished work. Honor an
-explicit keep-open request. Do not offer optional follow-ups to avoid closing.
+waits on an answer, approval or check. An open PR remains owned until its authorized delivery is complete
+or a real user-owned gate has been reported and the continuation is preserved. Honor an explicit keep-open
+request. Do not offer optional follow-ups to avoid closing.
 
 A user callout about a mistake opens an unresolved repair outcome. Answer the direct question and preserve
 the repair outcome until its current owner resolves it before reassessing completion.
@@ -38,9 +39,9 @@ the turn has ended and stayed idle for about 3 seconds. A new prompt before then
 not prove closure; a refusal leaves the session open, and its reason is recorded in
 `~/.agents-state/session-close/<session-id>.json`.
 
-Closure means the exact terminal tab is gone and the registered host has exited. If tab ownership or
-closure cannot be verified, preserve the session and report the refusal. Never substitute process exit
-for tab closure.
+Closure means the exact terminal tab is gone and its dedicated frontend has exited. A shared backend
+may remain alive for other sessions. If an exact frontend launch receipt or tab ownership cannot be
+verified, preserve the session and report the refusal. Never substitute backend exit for tab closure.
 
 A session in a linked worktree also closes itself, unarmed, when a turn ends with its tree clean and its
 branch's pull request merged at HEAD during the session.

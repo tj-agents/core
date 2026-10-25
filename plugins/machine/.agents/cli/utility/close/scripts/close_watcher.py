@@ -1,7 +1,7 @@
 """Close one armed session once its turn has ended and stayed idle (Python 3.9+).
 
 Started detached by `close_session.py arm`. A new prompt, an ended or replaced session, or the timeout
-cancels it without closing anything. After a close it runs the worktree sweep for the session's repository.
+cancels it without closing anything. Only a closeout supplies the optional cleanup command.
 """
 
 import argparse
@@ -36,6 +36,7 @@ def arguments(argv=None):
     parser.add_argument("--host-names")
     parser.add_argument("--transcript")
     parser.add_argument("--transcript-offset", type=int, default=0)
+    parser.add_argument("--target", type=json.loads)
     return parser.parse_args(argv)
 
 
@@ -142,15 +143,18 @@ def close_session(args, activity):
     entry = registered_entry(args)
     if entry is None:
         raise Refusal("the armed session is no longer registered")
-    wrapper = session_close.qualified_windows_wrapper(entry)
+    target = session_close.close_target(entry)
+    if args.target is not None and args.target != target:
+        raise Refusal("the armed frontend or terminal binding changed before close")
+    wrapper = session_close.qualified_windows_wrapper(target)
     session_close.awaiting_input_activity(entry, activity)
     session_close._record_own_end(entry, "closed")
     try:
-        close.close_host(entry, wrapper)
+        close.close_host(target, wrapper)
         deadline = time.time() + EXIT_WAIT_SECONDS
-        while not session_close.verified_exited(entry["pid"], entry["pid_started_at"]):
+        while not session_close.verified_exited(target["pid"], target["pid_started_at"]):
             if time.time() >= deadline:
-                raise Refusal("terminal tab closed but registered host exit was not confirmed")
+                raise Refusal("terminal tab closed but dedicated frontend exit was not confirmed")
             time.sleep(POLL_SECONDS)
     except Exception:
         session_close._reopen_own_end(entry, "closed")
@@ -193,7 +197,11 @@ def main(argv=None):
         status = "refused: " + str(error)
     if status == "cancelled" and superseded(args):
         return 0
-    session_close.write_json(outcome_path(args.session_id), {"status": status, "at": time.time()})
+    observer = session_close.process_info(os.getpid())
+    session_close.write_json(outcome_path(args.session_id), {
+        "status": status, "at": time.time(), "observer_pid": os.getpid(),
+        "observer_started_at": observer.started_at if observer is not None else None,
+    })
     if status == "closed":
         sweep(args)
     return 0 if status in ("closed", "cancelled") else 2
