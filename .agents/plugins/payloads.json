@@ -15,6 +15,9 @@
     "engineering": [
       "process"
     ],
+    "cli": [
+      "cli"
+    ],
     "agent": [
       "process"
     ]

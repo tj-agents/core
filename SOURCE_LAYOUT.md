@@ -5,7 +5,7 @@ This repository has one shared source and two host-specific adapter trees.
 ## Canonical shared source
 
 `.agents/` owns every host-neutral capability definition and its shared runtime material. The logical
-Base, Agent Store, Machine, Workflow and Engineering packages are classifications inside `.agents/`; they are not authored
+Base, Agent Store, Machine, CLI, Workflow and Engineering packages are classifications inside `.agents/`; they are not authored
 top-level repository trees. Shared workflow contracts, hooks, schemas, tests and resources also remain
 under `.agents/`.
 

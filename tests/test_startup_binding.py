@@ -311,5 +311,18 @@ class StartupBindingTests(unittest.TestCase):
         self.assertNotIn("running_at", final)
 
 
+class PackagedStartupBindingTests(unittest.TestCase):
+    def test_packaged_entrypoints_resolve_their_own_peer_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for package in ('machine', 'cli'):
+                with self.subTest(package=package):
+                    script = ROOT / 'plugins' / package / 'resources/machine/scripts/startup_binding.py'
+                    result = subprocess.run([sys.executable, '-I', '-B', str(script), '--help'],
+                                            cwd=directory, capture_output=True, text=True,
+                                            encoding='utf-8', timeout=20, check=False)
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertIn('--require-session-start', result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
