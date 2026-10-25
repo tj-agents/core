@@ -16,6 +16,17 @@ specification.loader.exec_module(NATIVE)
 
 
 class NativeHostAcceptanceTests(unittest.TestCase):
+    def test_an_early_failure_cannot_reuse_a_previous_failed_observer_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence = Path(temporary)
+            receipt = evidence / 'codex-startup-observer.json'
+            receipt.write_text(json.dumps({'state': 'failed', 'error':
+                'workflow@tj-agents native-required-hook-failure-probe'}), encoding='utf-8')
+            operation = mock.Mock(side_effect=NATIVE.AcceptanceError('installation failed before launch'))
+            with self.assertRaisesRegex(NATIVE.AcceptanceError, 'no valid receipt'):
+                NATIVE.require_failure_probe('codex', evidence, operation)
+            self.assertFalse(receipt.exists())
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
