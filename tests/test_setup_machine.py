@@ -536,8 +536,11 @@ class RuntimeTests(Machine):
         target.write_text('changed', encoding='utf-8')
         before = snapshot(self.root)
         changes = setup.check_runtime(context)
-        self.assertIn(f'install {target}', changes)
-        self.assertEqual({f'remove retired runtime {path}' for path in retired}, set(changes) - {f'install {target}'})
+        self.assertIn('install Agent runtime: managed runtime file differs: '
+                      '.agents/agent/runtime/startup_binding.py', changes)
+        self.assertEqual({f'remove retired runtime {path}' for path in retired},
+                         set(changes) - {'install Agent runtime: managed runtime file differs: '
+                                         '.agents/agent/runtime/startup_binding.py'})
         self.assertEqual(before, snapshot(self.root))
         setup.apply_runtime(context)
         self.assertTrue(unrelated.is_file())
