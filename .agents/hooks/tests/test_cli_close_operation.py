@@ -33,7 +33,7 @@ LANDED_SPEC.loader.exec_module(landed)
 
 class ArmTests(unittest.TestCase):
     def setUp(self):
-        self.entry = {'host': 'codex', 'session_id': 'own', 'pid': 123, 'pid_started_at': 100.5,
+        self.entry = {'host': 'claude', 'session_id': 'own', 'pid': 123, 'pid_started_at': 100.5,
                       'cwd': str(Path.cwd()), 'started_at': 100}
         self.shared = mock.Mock()
         self.shared.Refusal = RuntimeError
@@ -55,7 +55,7 @@ class ArmTests(unittest.TestCase):
         self.shared.start_detached.assert_called_once()
         script, arguments, extra = self.shared.start_detached.call_args.args
         self.assertEqual('close_watcher.py', script.name)
-        self.assertEqual(['codex', 'own', '123', '100.5'], [arguments[i] for i in (1, 3, 5, 7)])
+        self.assertEqual(['claude', 'own', '123', '100.5'], [arguments[i] for i in (1, 3, 5, 7)])
         self.assertEqual({'close.py', 'cli_client.py'}, {path.name for path in extra})
         self.assertTrue(all(path.is_file() for path in extra))
 
@@ -66,6 +66,15 @@ class ArmTests(unittest.TestCase):
         self.assertNotIn('--repo', arguments)
         self.assertNotIn('--sweep', arguments)
         self.shared.git.assert_not_called()
+
+    def test_codex_arm_freezes_native_binding_without_requiring_hook_state(self):
+        self.entry['host'] = 'codex'
+        self.shared.client_runtime.return_value.NativeCompletion.return_value.pin.return_value = {'identity': [1, 2]}
+        self.assertEqual('armed', self.arm()['status'])
+        self.store.get_session.assert_not_called()
+        receipt = self.shared.write_json.call_args.args[1]
+        self.assertEqual(self.entry, receipt['entry'])
+        self.assertEqual({'identity': [1, 2]}, receipt['rollout'])
 
     def test_only_closeout_supplies_optional_checkout_cleanup(self):
         self.shared.git.return_value = (0, str(ROOT / '.git'), '')
@@ -110,6 +119,13 @@ class ArmTests(unittest.TestCase):
         armed_at = float(arguments[arguments.index('--armed-at') + 1])
         self.assertEqual(math.nextafter(1005.0, 0.0), armed_at)
         self.assertEqual({'armed_at': armed_at}, self.shared.write_json.call_args.args[1])
+
+    def test_codex_post_land_eligibility_uses_preserved_session_start_not_reattachment_time(self):
+        self.entry.update(host='codex', started_at=3000.0)
+        self.shared.finite_positive = watcher.session_close.finite_positive
+        self.store.get_session.return_value.update(started_at=100.0, turn_state='working', last_activity_at=100.0)
+        self.assertEqual('armed', self.arm_after_stop(landed_at=2000.0)['status'])
+        self.shared.start_detached.assert_called_once()
 
     def test_arm_after_stop_refuses_mid_turn_or_a_delivery_that_landed_before_the_session(self):
         self.shared.finite_positive = watcher.session_close.finite_positive

@@ -47,7 +47,8 @@ class InputBindingTests(unittest.TestCase):
         ):
             patch.start()
             self.addCleanup(patch.stop)
-        self.native_input = mock.patch.object(client, 'current_input', return_value='own-input')
+        self.native_input = mock.patch.object(client, 'current_turn', return_value={
+            'client_message_id': 'own-input', 'native_turn_id': 'turn', 'native_rollout': 'rollout.jsonl'})
         self.input = self.native_input.start()
         self.addCleanup(self.native_input.stop)
         self.nearest = SimpleNamespace(pid=1, name='codex.exe')
@@ -170,7 +171,7 @@ class InputBindingTests(unittest.TestCase):
         self.nearest = self.infos[123]
         with self.assertRaisesRegex(RuntimeError, 'Cannot attribute'):
             self.resolve()
-        self.input.return_value = 'displayed-thread-input'
+        self.input.return_value = {**self.input.return_value, 'client_message_id': 'displayed-thread-input'}
         self.assertEqual(123, self.resolve()[0].pid)
         self.assertFalse(codex_hook_trust.AppServer.call_args.kwargs['existing'])
 
@@ -200,7 +201,7 @@ class RecorderTests(unittest.TestCase):
         server = mock.Mock()
         def request(method, params):
             if method == 'thread/read':
-                return {'thread': {'source': 'cli'}}
+                return {'thread': {'source': 'cli', 'path': 'rollout.jsonl'}}
             if method == 'thread/turns/list':
                 return {'data': [{'id': 'turn'}]}
             if 'cursor' not in params:
@@ -208,14 +209,15 @@ class RecorderTests(unittest.TestCase):
             return {'data': [{'item': {'type': 'userMessage', 'clientId': 'steering-input'}},
                              {'item': {'type': 'userMessage', 'clientId': 'first-input'}}], 'nextCursor': None}
         server.request.side_effect = request
-        self.assertEqual('steering-input', client.current_input(server, 'thread'))
+        self.assertEqual({'client_message_id': 'steering-input', 'native_turn_id': 'turn',
+                          'native_rollout': 'rollout.jsonl'}, client.current_turn(server, 'thread'))
         self.assertEqual('desc', server.request.call_args.args[1]['sortDirection'])
 
     def test_background_thread_with_copied_parent_input_never_owns_a_frontend(self):
         server = mock.Mock()
         server.request.return_value = {'thread': {'source': {'subAgent': {'parentThreadId': 'parent'}}}}
         with self.assertRaisesRegex(RuntimeError, 'background agent'):
-            client.current_input(server, 'child')
+            client.current_turn(server, 'child')
         server.request.assert_called_once_with('thread/read', {'threadId': 'child', 'includeTurns': False})
 
     def test_newer_unattributed_input_never_falls_back_to_an_older_frontend(self):
@@ -228,7 +230,7 @@ class RecorderTests(unittest.TestCase):
                               {'item': {'type': 'userMessage', 'clientId': 'old-input'}}]},
                 ]
                 with self.assertRaisesRegex(RuntimeError, 'latest native input'):
-                    client.current_input(server, 'thread')
+                    client.current_turn(server, 'thread')
 
     def test_exhausted_latest_turn_scan_cannot_select_an_older_turn(self):
         server = mock.Mock()
@@ -238,7 +240,7 @@ class RecorderTests(unittest.TestCase):
               for index in range(128)),
         ]
         with self.assertRaisesRegex(RuntimeError, 'scan limit'):
-            client.current_input(server, 'thread')
+            client.current_turn(server, 'thread')
 
 
 class DaemonSafetyTests(unittest.TestCase):
