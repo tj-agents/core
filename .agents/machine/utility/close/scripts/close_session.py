@@ -24,8 +24,8 @@ def runtime():
     return importlib.import_module('session_close')
 
 
-def verified_entry(shared):
-    return shared.own_host_and_entry()
+def verified_entry(shared, session_id=None):
+    return shared.own_host_and_entry(**({'session_id': session_id} if session_id else {}))
 
 
 def claude_transcript(session_id):
@@ -34,8 +34,8 @@ def claude_transcript(session_id):
     return matches[0] if len(matches) == 1 else None
 
 
-def own_session(shared):
-    entry = verified_entry(shared)
+def own_session(shared, session_id=None):
+    entry = verified_entry(shared, session_id)
     store = shared.register_session._load_session_store()
     if store is None:
         raise shared.Refusal('session turn store is unavailable')
@@ -80,10 +80,10 @@ def arm():
     return start_watcher(shared, entry, time.time())
 
 
-def arm_after_stop(landed_at):
+def arm_after_stop(landed_at, session_id=None):
     """Arm from a Stop hook that runs after the session store recorded this turn's stop."""
     shared = runtime()
-    entry, activity = own_session(shared)
+    entry, activity = own_session(shared, session_id)
     stopped = activity.get('last_activity_at')
     if activity.get('turn_state') != 'awaiting_input' or not shared.finite_positive(stopped):
         raise shared.Refusal('this session has no recorded stop to close after')

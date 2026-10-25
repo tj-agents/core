@@ -57,7 +57,7 @@ def main():
     try:
         landed = merged_at(Path(cwd), close_session.runtime().git)
         if landed is not None:
-            close_session.arm_after_stop(landed)
+            close_session.arm_after_stop(landed, session_id=data.get('session_id'))
     except Exception:
         pass
     return 0

@@ -18,6 +18,8 @@ the repair outcome until its current owner resolves it before reassessing comple
 `engineering:self-repair` owns eligibility for a separate standards repair. A question about missed
 close-out does not instruct you to close immediately.
 
+An in-harness subagent returns its result to its parent; it has no separate CLI to close.
+
 ```text
 User: "Why didn't you close when the work was done?"
 Action: explain the omission and keep the repair outcome active. Assess the active task under
@@ -42,6 +44,12 @@ Closure means the verified frontend process has exited. Preserve shared backend 
 clients, and the terminal containing this CLI. Worktree sharing does not prevent independent CLI closure.
 If the individual client cannot be attributed and verified, preserve it and report the refusal. Never
 terminate a shared backend or process tree to close one conversation.
+
+Managed Codex launches bind native submitted-input IDs to their individual frontend. Temporary native
+recordings stay in the user state directory and are removed when that frontend exits. A newly submitted
+input or recorded session switch invalidates a pending close. Older unmanaged shared-daemon clients have
+no such evidence; preserve them and report the exact managed resume command. An initial command-line
+resume ID alone does not prove which conversation the frontend now displays.
 
 ```text
 Two Codex clients use the same backend and worktree:

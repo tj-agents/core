@@ -73,26 +73,22 @@ def current_codex_client(session_id, nearest):
         if arguments and client.command_name(arguments[1:]) not in client.OTHER_COMMANDS:
             return nearest, {"client_identity": "native-ancestor", "title": os.environ.get(register_session.TITLE_ENV),
                              "terminal": register_session.terminal_identity()}
-    token = os.environ.get(client.TOKEN_ENV)
-    if token:
-        info, record = client.resolve(token, process_info, client.process_arguments)
-        return info, {"client_identity": "managed-launch", "launch_cwd": record["launch_cwd"],
-                      "title": record.get("title"),
-                      "terminal": register_session.terminal_identity(record.get("terminal_environment", {}))}
-    matches = []
-    for info in register_session.process_table().values():
-        if register_session.stem(info.name) != "codex":
-            continue
-        try:
-            arguments = client.process_arguments(info.pid)
-        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError):
-            continue
-        if client.resumed_session(arguments) == session_id:
-            if client.process_profile(info.pid) == client.profile_directory():
-                matches.append(info)
-    if len(matches) != 1:
-        raise Refusal("Cannot attribute this native thread to one Codex frontend; the shared backend must remain running")
-    return matches[0], {"client_identity": "native-resume"}
+    store = register_session._load_session_store()
+    if store is None:
+        raise Refusal('Native session-start evidence is unavailable')
+    connection = store.connect()
+    try:
+        row = store.get_session(connection, store.session_handle('codex', session_id))
+    finally:
+        connection.close()
+    if not isinstance(row, dict) or not finite_positive(row.get('started_at')):
+        raise Refusal('Native session-start evidence is unavailable')
+    info, record = client.recorded_client(session_id, nearest, process_info,
+                                          register_session.process_table(), row['started_at'])
+    return info, {'client_identity': 'managed-input', 'launch_cwd': record['launch_cwd'],
+                  'title': record.get('title'), 'client_message_id': record['client_message_id'],
+                  'recording_path': record['recording_path'], 'backend': record['backend'], 'profile': record['profile'],
+                  'terminal': register_session.terminal_identity(record.get('terminal_environment', {}))}
 
 
 def stop_verified_process(pid, started_at, before_signal=lambda: None):
@@ -158,7 +154,18 @@ def stop_cli_client(entry, before_signal=lambda: None):
         arguments = client.process_arguments(entry["pid"])
         if not arguments or client.command_name(arguments[1:]) in client.OTHER_COMMANDS:
             raise Refusal("The registered Codex process is a backend or maintenance process, not a CLI client")
-    stop_verified_process(entry["pid"], entry["pid_started_at"], before_signal)
+    def revalidate():
+        if entry.get('client_identity') == 'managed-input':
+            context = client.process_context(entry['pid'])
+            if (context.get(client.RECORD_PATH_ENV) != entry['recording_path']
+                    or Path(context['profile']) != Path(entry['profile'])
+                    or client.daemon_identity({'CODEX_HOME': entry['profile']},
+                                              expected_pid=entry['backend']['pid']) != entry['backend']
+                    or client.latest_input(entry['recording_path']) != entry['client_message_id']):
+                raise Refusal('The frontend input or backend binding changed before close')
+        before_signal()
+    stop_verified_process(entry['pid'], entry['pid_started_at'], revalidate)
+
 
 
 def _update_own_end(entry, operation, reason):
@@ -439,7 +446,7 @@ def attached_to(cwd, entry):
                for root in (entry.get("cwd"), entry.get("launch_cwd")))
 
 
-def own_host_and_entry(cwd=None):
+def own_host_and_entry(cwd=None, session_id=None):
     cwd = Path(cwd or os.getcwd()).resolve()
     host_names = register_session.read_host_names()
     seen = set()
@@ -458,7 +465,10 @@ def own_host_and_entry(cwd=None):
         current = info.ppid
     if nearest is None:
         raise Refusal("current process is not attached to a recognized registered host")
-    session_id = os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID")
+    if register_session.stem(nearest.name) == 'codex' and not session_id:
+        session_id = os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID")
+        if not session_id:
+            raise Refusal('Native Codex thread identity is unavailable; preserve the frontend and backend')
     if session_id and register_session.stem(nearest.name) == "codex":
         try:
             client, details = current_codex_client(session_id, nearest)
@@ -471,6 +481,8 @@ def own_host_and_entry(cwd=None):
     matches = []
     for _path, entry in entries():
         if not valid_entry(entry) or not attached_to(cwd, entry):
+            continue
+        if session_id is not None and entry['session_id'] != session_id:
             continue
         if (entry["pid"] == nearest.pid
                 and entry["host"] == register_session.stem(nearest.name)

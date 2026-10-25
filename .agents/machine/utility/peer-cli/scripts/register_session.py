@@ -418,6 +418,9 @@ def record(data, lookup=None, host_names=None, client=None):
     if client is not None:
         entry["client_identity"] = client["client_identity"]
         entry["launch_cwd"] = client.get("launch_cwd", cwd)
+        for key in ("client_message_id", "recording_path", "backend", "profile"):
+            if key in client:
+                entry[key] = client[key]
     destination = state_directory() / f"{session}.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     staging = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")

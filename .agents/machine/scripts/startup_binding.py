@@ -65,10 +65,12 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
             environment[ACK_DIRECTORY_ENV] = str(directory)
             environment[ACK_TOKEN_ENV] = token
         phase("starting-native")
-        arguments, environment, ticket = cli_client.prepare(host, arguments, project, environment)
+        command = command_for_target(target, list(arguments))
+        arguments, environment, ticket = cli_client.prepare(host, command[1:], project, environment,
+                                                           executable=command[0])
         process = None
         try:
-            process = subprocess.Popen(command_for_target(target, list(arguments)),
+            process = subprocess.Popen([command[0], *arguments],
                                        cwd=project, env=environment, start_new_session=os.name != "nt")
         except OSError as error:
             raise StartupBindingError(f"native {host} could not start: {error}") from error
