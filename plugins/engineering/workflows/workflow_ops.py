@@ -1408,6 +1408,7 @@ def forge_observation(root, identity):
         "state": str(value.get("state") or "unknown").lower(),
         "merge_state": str(value.get("mergeStateStatus") or "unknown").lower(),
         "auto_merge": value.get("autoMergeRequest") is not None,
+        "check_count": len(value.get("statusCheckRollup") or []),
         "queue_state": str(queue_entry.get("state")).lower() if queue_entry else None,
         "failing_items": failures,
         "pending_items": pending,
@@ -1500,7 +1501,16 @@ def monitor_remote_owned(root, workflow_run_id, target_kind, poll_seconds, timeo
         state["active_execution_seconds"] += time.monotonic() - query_started
         state["queries"] += 1
         signature = observation_tuple(observation)
-        changed = state["last_signature"] is not None and signature != state["last_signature"]
+        initial_ready = (
+            state["last_signature"] is None
+            and target_kind == "pr"
+            and observation.get("state") == "open"
+            and observation.get("check_count", 0) > 0
+            and not observation.get("pending_items")
+            and not observation.get("failing_items")
+            and not observation.get("merge_group_failures")
+        )
+        changed = initial_ready or (state["last_signature"] is not None and signature != state["last_signature"])
         terminal = observation_terminal(target_kind, observation) or observation.get("state") == "query-error"
         if (
             target_kind == "pr"
