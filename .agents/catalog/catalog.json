@@ -18,7 +18,8 @@
       "skills": [
         "agent-files",
         "cd",
-        "idea-initialization",
+        "project-setup",
+        "solution-assessment",
         "task-routing"
       ],
       "dependencies": {
@@ -51,7 +52,14 @@
             ]
           },
           {
-            "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
+            "path": ".agents/base/policy/project-setup/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/base/policy/solution-assessment/scripts/session-context.py",
             "hosts": [
               "claude",
               "codex"
