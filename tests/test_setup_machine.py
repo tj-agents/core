@@ -526,18 +526,41 @@ class RuntimeTests(Machine):
         installed = context.state_directory / 'bin'
         unrelated = installed / 'keep-me.txt'
         unrelated.write_text('keep', encoding='utf-8')
-        retired = installed / 'launch_check.py'
-        retired.write_text('retired', encoding='utf-8')
+        bot_identity = installed / 'bot-identity' / 'identity.json'
+        bot_identity.parent.mkdir()
+        bot_identity.write_text('keep', encoding='utf-8')
+        retired = [installed / name for name in setup.MANAGED_LEGACY_RUNTIME]
+        for path in retired:
+            path.write_text('retired', encoding='utf-8')
         target = setup.launch_script(context)
         target.write_text('changed', encoding='utf-8')
         before = snapshot(self.root)
         changes = setup.check_runtime(context)
         self.assertIn(f'install {target}', changes)
-        self.assertIn(f'remove retired runtime {retired}', changes)
+        self.assertEqual({f'remove retired runtime {path}' for path in retired}, set(changes) - {f'install {target}'})
         self.assertEqual(before, snapshot(self.root))
         setup.apply_runtime(context)
         self.assertTrue(unrelated.is_file())
-        self.assertFalse(retired.exists())
+        self.assertTrue(bot_identity.is_file())
+        self.assertEqual(setup.python_alias(), (installed / 'python').read_text(encoding='utf-8'))
+        self.assertTrue(all(not path.exists() for path in retired))
+
+    def test_malformed_runtime_receipts_fail_closed_without_writing(self):
+        running = self.root / 'running' / '.agents' / 'machine' / 'scripts'
+        source = running.parents[2] / '.agents' / 'dependencies' / 'agent'
+        source.mkdir(parents=True)
+        context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
+                                run=self.unexpected_run, which=lambda name: None, documents=self.documents,
+                                script_directory=running)
+        for value in (None, [], 'receipt', {'exports': {'not': 'a list'}},
+                      {'repository': 'tj-agents/agent', 'revision': 'x',
+                       'exports': [{'not': 'a string'}], 'sha256': '0' * 64}):
+            with self.subTest(value=value):
+                (source / 'source.json').write_text(json.dumps(value), encoding='utf-8')
+                before = snapshot(self.root)
+                with self.assertRaises(setup.SetupError):
+                    setup.check_runtime(context)
+                self.assertEqual(before, snapshot(self.root))
 
 
 class CatchUpTests(Machine):

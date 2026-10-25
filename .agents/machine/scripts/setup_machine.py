@@ -633,6 +633,7 @@ def apply_autoupdate(context: Context) -> list[str]:
 MANAGED_LEGACY_RUNTIME = (
     "plugin_autoupdate.py", "machine_events.py", "launch_check.py", "reload_plugins.py",
     "agent_cli.py", "codex_hook_trust.py", "codex_websocket.py", "required_plugins.py",
+    "startup_binding.py", "launch_status.py", "terminal_command.py", "register_session.py", "cli_client.py",
 )
 
 
@@ -646,15 +647,20 @@ def runtime_manifest(source: Path) -> dict:
         value = json.loads(receipt.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise SetupError(f"missing or invalid staged Agent receipt: {receipt}") from error
-    exports = value.get("exports") if isinstance(value, dict) else None
-    valid_export = lambda item: isinstance(item, str) and item.startswith(".agents/") \
-        and "\\" not in item and not PurePosixPath(item).is_absolute() and ".." not in PurePosixPath(item).parts
+    if not isinstance(value, dict):
+        raise SetupError(f"invalid staged Agent receipt: {receipt}")
+    repository = value.get("repository")
+    revision = value.get("revision")
+    exports = value.get("exports")
     digest = value.get("sha256")
-    if value.get("repository") != "tj-agents/agent" or not isinstance(value.get("revision"), str) \
-            or not value["revision"] or not isinstance(exports, list) or not exports \
-            or len(exports) != len(set(exports)) or not all(valid_export(item) for item in exports) \
-            or not isinstance(digest, str) or not all(character in "0123456789abcdef" for character in digest) \
-            or len(digest) != 64:
+    if repository != "tj-agents/agent" or not isinstance(revision, str) or not revision \
+            or not isinstance(exports, list) or not exports or not all(isinstance(item, str) for item in exports) \
+            or not isinstance(digest, str):
+        raise SetupError(f"invalid staged Agent receipt: {receipt}")
+    if len(exports) != len(set(exports)) or not all(item.startswith(".agents/") and "\\" not in item
+                                                   and not PurePosixPath(item).is_absolute()
+                                                   and ".." not in PurePosixPath(item).parts for item in exports) \
+            or len(digest) != 64 or not all(character in "0123456789abcdef" for character in digest):
         raise SetupError(f"invalid staged Agent receipt: {receipt}")
     return value
 
