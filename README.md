@@ -2,13 +2,22 @@
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
 The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core).
-Select `base@tj-agents`, `agent-store@tj-agents`, `agent@tj-agents`, `machine@tj-agents`, `workflow@tj-agents` and `engineering@tj-agents` from
+Select `base@tj-agents`, `agent-store@tj-agents`, `agent@tj-agents`, `machine@tj-agents`,
+`workflow@tj-agents` and `engineering@tj-agents` from
 [`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
-The repository publishes Base, Agent Store, Agent, Machine, Workflow and Engineering packages. Agent owns shared
-execution and background completion across hosts. Agent Store owns recorded
-execution/session state; Machine observes and operates native hosts; Engineering owns code work and delivery.
+The repository publishes Base, Agent Store, Agent, Machine, CLI, Workflow and Engineering packages.
+Agent owns shared execution and background completion across hosts. Agent Store owns recorded
+execution/session state; Machine observes and operates native hosts; CLI owns closure and closeout;
+Engineering owns code work and delivery.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
+
+Marketplace owns the canonical plugin roster and dependency graph in
+[`catalog.json`](https://github.com/tj-agents/marketplace/blob/main/catalog.json). Machine's selector ships a
+pinned offline snapshot of that catalog and owns only curated stack choices and project settings generation.
+After a Marketplace catalog change, refresh the snapshot from a Marketplace checkout with
+`python -B scripts/update_marketplace_catalog.py --source <marketplace-checkout>` (use `python3` on Linux),
+then verify it with `--check`. Do not edit plugin names or dependencies in Core.
 
 ## Required setup on every machine
 
@@ -67,7 +76,7 @@ immediate explicit refresh from the Core checkout, run:
 
 `machine:sync-plugins` owns adoption in a running session, including resuming the same conversation when
 native reload is unavailable. The agent runs explicit sync whenever an immediate refresh is needed.
-Fresh managed launches also establish [individual CLI close bindings](.agents/machine/utility/close/SKILL.md);
+Fresh managed launches also establish [individual CLI close bindings](.agents/cli/utility/close/SKILL.md);
 setup cannot add native frontend evidence to an already running unmanaged CLI.
 For a running Codex daemon conversation, sync also requests native runtime reload and verifies the
 required hook definitions in that existing daemon. Checking a separate fresh process does not establish
@@ -141,6 +150,7 @@ A package never imports a sibling plugin installation. Machine's hooks remain th
 
 ```text
 Machine -> Base + Agent Store
+CLI -> Base + Agent Store + Machine
 Engineering -> Base + Agent Store + Machine
 Agent Store inspection -> existing sessions.db, read-only JSON
 ```
@@ -148,6 +158,18 @@ Agent Store inspection -> existing sessions.db, read-only JSON
 These are source package relationships. The central marketplace roster and native installation must
 also contain a package before a selected host can discover it; successful source generation is not
 installed activation.
+
+The CLI package is published and available for explicit selection. Existing sessions use `machine:close`,
+which shares the CLI package's verified frontend closure runtime through a generated Machine-local copy.
+
+`cli:close` closes only the current terminal tab after the final reply and preserves unfinished work.
+`machine:close` finishes the authorized workflow, then uses the same closure primitive and the
+proof-guarded worktree sweep. An explicit request to dismiss a CLI can select `cli:close` when installed.
+
+For shared Codex backends, a resumed frontend is bound to its exact native launch receipt, child PID/start
+time and terminal observation captured by the launcher. The watcher waits for that frontend to exit,
+leaving the shared backend alive. A session without an exact frontend/tab binding stays open and records
+the refusal; older receipts are not upgraded using inferred titles or process names.
 
 ## Repository auto-merge
 
@@ -188,7 +210,7 @@ gate. Source verification does not establish installed-host trust or acceptance.
 
 ## Layout
 
-- `.agents/` is the canonical host-neutral source. Base, Agent Store, Machine, Workflow and Engineering ownership is expressed
+- `.agents/` is the canonical host-neutral source. Base, Agent Store, Machine, CLI, Workflow and Engineering ownership is expressed
   below it alongside shared workflows, hooks, schemas, tests and resources.
 - `.codex/` contains only Codex entry points and host configuration. `.claude/` contains only Claude
   entry points and host configuration. Their skills reference canonical `.agents/` definitions rather

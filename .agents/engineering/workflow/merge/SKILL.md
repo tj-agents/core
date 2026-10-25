@@ -184,7 +184,8 @@ python -B <engineering-package-root>/workflows/auto_merge.py --root <absolute-wo
 ```
 
 When the repository's `.github/merge-policy.json` sets `agents_may_merge: false`, the merge needs the
-owner's approval of the latest push. Enable auto-merge as above, request the owner's review
+owner's PR approval under [github-actions:merge-policy](https://github.com/tj-agents/github-actions/blob/main/.agents/github-actions/utility/merge-policy/SKILL.md).
+Enable auto-merge as above, request the owner's review
 (`gh pr edit <n> --add-reviewer <owner>`), report that the PR waits on that approval, and keep the 4b monitor
 running; GitHub merges once the approval and checks are in. Never use `--admin` or merge by another route.
 
@@ -254,7 +255,7 @@ It removes each merged linked worktree once `cleanup_proof.py` proves its PR mer
 with the merge commit on `origin/<default>`, archiving any leftovers under `<state>/merge-cleanup/set-aside/`
 first. It keeps a worktree while a registered session still works inside it, while an open PR is based on
 its branch, or when the proof refuses, and prints why. A worktree kept because this session is inside it
-is retained after CLI closure; remove it in a later explicit cleanup operation. For a branch developed in the primary
+is removed by the sweep that runs once the session closes. For a branch developed in the primary
 checkout, the checkout-and-fast-forward above replaces removal; delete the old local branch with
 `git -C <primary-checkout> branch -d <branch>`, or `-D` once the proof covers a squash merge. Report what
 the sweep kept and why; never force a removal.

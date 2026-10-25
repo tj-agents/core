@@ -408,7 +408,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "archiving any leftovers under `<state>/merge-cleanup/set-aside/` first",
             "while a registered session still works inside it",
             "while an open PR is based on its branch",
-            "retained after CLI closure; remove it in a later explicit cleanup operation",
+            "removed by the sweep that runs once the session closes",
             "never force a removal",
         ):
             with self.subTest(required=required):

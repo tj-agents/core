@@ -55,9 +55,12 @@ def main():
     if not isinstance(cwd, str) or not cwd:
         return 0
     try:
+        session_id = data.get('session_id') or data.get('sessionId')
+        if not isinstance(session_id, str) or not session_id:
+            return 0
         landed = merged_at(Path(cwd), close_session.runtime().git)
         if landed is not None:
-            close_session.arm_after_stop(landed)
+            close_session.arm_after_stop(landed, session_id)
     except Exception:
         pass
     return 0
