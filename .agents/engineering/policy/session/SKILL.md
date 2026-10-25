@@ -43,11 +43,19 @@ proposed-body validation and authoritative readback for CLI and connector writes
 
 Before starting or resuming a substantive work item, including planning, fetch the remote and identify its
 current default branch. Check the checkout against that fetched base, or against the recorded parent when
-working on a stack. Start new delivery branches from the fetched base and bring an existing delivery branch
-up to date before working when its tree is clean; `engineering:branching` owns the branch procedure.
-For planning-only work, use the fetched base as the current source of truth even when no delivery branch is
-needed. Preserve uncommitted changes: resolve a dirty checkout or use another checkout before a sync that
-would alter it. Perform this check at the work-item boundary, not for every prompt within the same work.
+working on a stack. Start an independent new delivery branch from the fetched remote default; start a
+dependent stack branch from its verified parent tip. Bring an existing delivery branch up to date before
+working when its tree is clean; `engineering:branching` owns the branch procedure.
+For planning-only work in the normal checkout, fast-forward a clean default branch to the fetched remote
+default before editing, or use another checkout already current with that base. Preserve uncommitted changes:
+resolve a dirty checkout or use another current checkout before a sync that would alter it. Perform this
+check at the work-item boundary, not for every prompt within the same work.
+
+```text
+Planning on clean local main, two commits behind origin/main: fetch and fast-forward before editing.
+New independent Feature/MapIndex: branch from the fetched remote default.
+Dependent Feature/MapUi: branch from its verified parent Feature/MapIndex tip.
+```
 
 ## Repository routine-decision delegation
 
