@@ -51,7 +51,7 @@ worktree and branch. **The bypass skips the queue, so this is the only gate the 
 A capitalized `<Type>/<Name>` branch already cut from the remote base is fine as it stands — do
 not create a second branch solely to change the type prefix to `Docs`. From the default branch or an
 unrelated checkout, create a `Docs/<Name>` branch from the fetched remote base. Select or reuse an
-available checkout under `engineering:git-branching`; a dirty or actively owned checkout requires
+available checkout under `engineering:delivery-slices`; a dirty or actively owned checkout requires
 preservation and appropriate isolation through `engineering:open-worktree`.
 
 ```bash

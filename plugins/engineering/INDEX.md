@@ -11,13 +11,13 @@ Generated from canonical `.agents/` definitions.
 - `commit-all` — operation — `.agents/engineering/operation/commit-all/SKILL.md`
 - `commit-push` — utility — `.agents/engineering/utility/commit-push/SKILL.md`
 - `committing` — contract — `.agents/engineering/contract/committing/SKILL.md`
+- `delivery-slices` — policy — `.agents/engineering/policy/delivery-slices/SKILL.md`
 - `docs` — convention — `.agents/engineering/convention/docs/SKILL.md`
 - `docs-review` — workflow — `.agents/engineering/workflow/docs-review/SKILL.md`
 - `failing-tests` — workflow — `.agents/engineering/workflow/failing-tests/SKILL.md`
 - `failure-provenance` — contract — `.agents/engineering/contract/failure-provenance/SKILL.md`
 - `feature` — workflow — `.agents/engineering/workflow/feature/SKILL.md`
 - `git-auth` — policy — `.agents/engineering/policy/git-auth/SKILL.md`
-- `git-branching` — policy — `.agents/engineering/policy/git-branching/SKILL.md`
 - `guide` — convention — `.agents/engineering/convention/guide/SKILL.md`
 - `guide-build` — utility — `.agents/engineering/utility/guide-build/SKILL.md`
 - `incremental-review` — workflow — `.agents/engineering/workflow/incremental-review/SKILL.md`

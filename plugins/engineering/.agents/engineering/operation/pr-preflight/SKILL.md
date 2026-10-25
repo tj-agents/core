@@ -50,7 +50,7 @@ execution branch, upstream, base currency, dirtiness and review reconciliation i
 The `ownership.action` routes the next step: `update` uses that review, `integrate` returns corrections
 to its branch, `create` continues an assessed slice recorded as `PR: not opened`, and `reconcile-review`
 resolves a closed or fork review before publication. `assess-scope` means no recorded owner or branch
-review was found: apply `engineering:git-branching` using the request, goal, handoff and history, then
+review was found: apply `engineering:delivery-slices` using the request, goal, handoff and history, then
 record the resolved review or separate slice. Standalone work can perform these checks inline and
 keep the assessment in its existing goal; a ledger is not required just to publish it.
 
@@ -64,7 +64,7 @@ commit ancestry, nor intercept arbitrary forge commands. The slice assessment be
    ```
 
    The default branch → **blocker** (nothing to PR; branch first). Not `<Type>/<Name>` with a capitalized
-   prefix → warn; `engineering:git-branching` owns the naming rule.
+   prefix → warn; `engineering:delivery-slices` owns the naming rule.
 
 2. **Local in sync with its own remote.**
 
@@ -92,7 +92,7 @@ commit ancestry, nor intercept arbitrary forge commands. The slice assessment be
    markdown, plans or scratch docs dirty → fine; say "docs ride along" and move on without fuss.
 
 5. **Owning review resolved.** Use the runtime's ownership result, or perform the same resolution inline
-   under `engineering:git-branching`. Confirm the recorded review's repository, state, head and base.
+   under `engineering:delivery-slices`. Confirm the recorded review's repository, state, head and base.
    A correction branch's missing PR leaves that review unchanged. A closed review needs reconciliation
    with the requested scope before a new slice is selected.
 
@@ -115,7 +115,7 @@ commit ancestry, nor intercept arbitrary forge commands. The slice assessment be
    mandatory exact-head CI. **Do not run a full solution build or integration matrix here** — exact-head PR
    CI owns those, per `engineering:remote-validation`.
 
-9. **A reviewable delivery slice.** Apply `engineering:git-branching` to the measured diff against the
+9. **A reviewable delivery slice.** Apply `engineering:delivery-slices` to the measured diff against the
    actual PR base. An oversized or multi-concern candidate without a recorded split assessment and
    justified exception permitted by that contract (atomicity or frozen-scope recovery) is a blocker:
    decompose and validate it before adding scope or requesting
