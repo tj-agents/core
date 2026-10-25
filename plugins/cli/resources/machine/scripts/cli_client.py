@@ -214,7 +214,7 @@ def latest_input(path):
     return latest
 
 
-def current_input(server, session_id):
+def current_turn(server, session_id):
     thread = server.request('thread/read', {'threadId': session_id, 'includeTurns': False})['thread']
     if isinstance(thread.get('source'), dict) or thread.get('threadSource') in ('agent', 'subagent'):
         raise RuntimeError('A background agent thread does not own a CLI frontend')
@@ -234,7 +234,8 @@ def current_input(server, session_id):
                     identity = item.get('clientId')
                     if not isinstance(identity, str) or not identity:
                         raise RuntimeError('The latest native input has no attributable frontend identity')
-                    return identity
+                    return {'client_message_id': identity, 'native_turn_id': turn['id'],
+                            'native_rollout': thread.get('path')}
             cursor = page.get('nextCursor')
             if cursor is None:
                 break
@@ -257,7 +258,8 @@ def recorded_client(session_id, nearest, lookup, table):
 
     executable = arguments[0]
     with codex_hook_trust.AppServer(executable, Path.cwd(), existing=not private, timeout=15) as server:
-        identity = current_input(server, session_id)
+        turn = current_turn(server, session_id)
+        identity = turn['client_message_id']
     state = Path(os.environ.get('AGENT_STATE_DIRECTORY') or Path.home() / '.agents-state')
     matches = []
     for path in (state / 'cli-clients').glob('*/client.json'):
@@ -305,7 +307,92 @@ def recorded_client(session_id, nearest, lookup, table):
         raise RuntimeError('Cannot attribute this input to one managed Codex frontend; preserve the shared backend. '
                            'Resume this conversation from a fresh managed terminal: ' + command)
     info, record = matches[0]
-    return info, {**record, 'client_message_id': identity}
+    return info, {**record, **turn}
+
+
+class NativeCompletion:
+    """Follow one verified native turn without depending on hook-fed turn state."""
+
+    def __init__(self, entry, expected=None):
+        if not isinstance(entry, dict) or any(not isinstance(entry.get(key), str) or not entry[key] for key in (
+                'native_rollout', 'profile', 'native_turn_id', 'client_message_id', 'session_id', 'recording_path')):
+            raise RuntimeError('Native completion requires an exact frontend, profile and turn binding')
+        self.entry = entry
+        self.path = Path(entry['native_rollout'])
+        sessions = Path(entry['profile']).resolve() / 'sessions'
+        resolved = self.path.resolve(strict=True)
+        if (not self.path.is_absolute() or resolved != self.path
+                or sessions not in resolved.parents
+                or not entry.get('native_turn_id') or not entry.get('client_message_id')):
+            raise RuntimeError('Native rollout is outside the verified profile or has no bound turn')
+        stat = self.path.stat()
+        self.identity = [stat.st_dev, stat.st_ino]
+        self.minimum_size = stat.st_size
+        if expected is not None and (expected['identity'] != self.identity
+                                     or stat.st_size < expected['minimum_size']):
+            raise RuntimeError('Native rollout was replaced or truncated after arming')
+        self.offset = 0
+        self.metadata = False
+        self.started = False
+        self.input_seen = False
+        self.finished = False
+
+    def pin(self):
+        return {'identity': self.identity, 'minimum_size': self.minimum_size}
+
+    def poll(self):
+        if latest_input(self.entry['recording_path']) != self.entry['client_message_id']:
+            raise RuntimeError('The frontend input changed after arming')
+        stat = self.path.stat()
+        if ([stat.st_dev, stat.st_ino] != self.identity or stat.st_size < max(self.offset, self.minimum_size)
+                or self.path.resolve(strict=True) != self.path):
+            raise RuntimeError('Native rollout was replaced or truncated after arming')
+        partial = False
+        with self.path.open('rb') as stream:
+            opened = os.fstat(stream.fileno())
+            if [opened.st_dev, opened.st_ino] != self.identity:
+                raise RuntimeError('Native rollout changed while opening it')
+            stream.seek(self.offset)
+            while True:
+                line = stream.readline(8 * 1024 * 1024 + 1)
+                if not line:
+                    break
+                if len(line) > 8 * 1024 * 1024:
+                    raise RuntimeError('Native rollout record is oversized')
+                if not line.endswith(b'\n'):
+                    partial = True
+                    break
+                row = json.loads(line)
+                self.offset = stream.tell()
+                payload = row.get('payload')
+                if not isinstance(payload, dict):
+                    raise RuntimeError('Native rollout record is invalid')
+                if row.get('type') == 'session_meta':
+                    if (self.metadata or payload.get('id') != self.entry['session_id']
+                            or payload.get('source') not in ('cli', 'vscode')
+                            or payload.get('thread_source', 'user') != 'user'):
+                        raise RuntimeError('Native rollout does not belong to this CLI conversation')
+                    self.metadata = True
+                elif row.get('type') == 'event_msg':
+                    kind, turn = payload.get('type'), payload.get('turn_id')
+                    if kind == 'task_started':
+                        if self.started:
+                            raise RuntimeError('A new native turn started after arming')
+                        self.started = turn == self.entry['native_turn_id']
+                    elif self.started and kind == 'item_completed':
+                        item = payload.get('item', {})
+                        if item.get('type') == 'UserMessage':
+                            identity = item.get('client_id')
+                            if self.input_seen or not isinstance(identity, str) or not identity:
+                                raise RuntimeError('New or unattributed native input invalidated closure')
+                            self.input_seen = identity == self.entry['client_message_id']
+                    elif self.started and kind in ('task_complete', 'turn_aborted'):
+                        if turn != self.entry['native_turn_id'] or kind != 'task_complete' or self.finished:
+                            raise RuntimeError('The bound native turn did not complete normally')
+                        self.finished = True
+        if not self.metadata:
+            raise RuntimeError('Native rollout has no session identity')
+        return self.finished and self.input_seen and not partial
 
 
 def process_arguments(pid):

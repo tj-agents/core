@@ -104,6 +104,8 @@ def superseded(args):
 
 def wait_for_idle(args, clock=time.time, sleep=time.sleep):
     """Return the idle turn's activity token, or None when the close is cancelled or re-armed."""
+    if args.host == 'codex':
+        return wait_for_native_completion(args, clock, sleep)
     deadline = clock() + args.timeout
     stopped, since, settled = None, None, None
     while clock() < deadline:
@@ -138,12 +140,49 @@ def wait_for_idle(args, clock=time.time, sleep=time.sleep):
     return None
 
 
+def native_guard(args):
+    receipt = session_close.read_json(armed_path(args.session_id)) or {}
+    entry = receipt.get('entry')
+    if (receipt.get('armed_at') != args.armed_at or not isinstance(entry, dict)
+            or entry.get('host') != args.host or entry.get('session_id') != args.session_id
+            or entry.get('pid') != args.pid or entry.get('pid_started_at') != args.pid_started_at
+            or entry.get('client_identity') != 'managed-input'):
+        raise Refusal('the native close binding is missing or changed')
+    return session_close.client_runtime().NativeCompletion(entry, receipt['rollout'])
+
+
+def wait_for_native_completion(args, clock, sleep):
+    guard = native_guard(args)
+    deadline, since = clock() + args.timeout, None
+    while clock() < deadline:
+        if superseded(args) or not session_close.verified_live(args.pid, args.pid_started_at):
+            return None
+        if guard.poll():
+            if since is None:
+                since = clock()
+            elif clock() - since >= args.idle:
+                return guard
+        else:
+            since = None
+        sleep(POLL_SECONDS)
+    return None
+
+
 def close_session(args, activity):
     entry = registered_entry(args)
     if entry is None:
         raise Refusal("the armed session is no longer registered")
-    session_close.awaiting_input_activity(entry, activity)
-    close.close_host(entry, lambda: session_close.awaiting_input_activity(entry, activity))
+    if args.host == 'codex':
+        def before_signal():
+            if superseded(args) or entry != activity.entry or registered_entry(args) != activity.entry:
+                raise Refusal('the native close binding changed before closure')
+            if not activity.poll():
+                raise Refusal('the bound native turn is no longer complete')
+    else:
+        def before_signal():
+            session_close.awaiting_input_activity(entry, activity)
+    before_signal()
+    close.close_host(entry, before_signal)
     deadline = time.time() + EXIT_WAIT_SECONDS
     while not session_close.verified_exited(entry["pid"], entry["pid_started_at"]):
         if time.time() >= deadline:
