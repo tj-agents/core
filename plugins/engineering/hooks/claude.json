@@ -26,6 +26,7 @@
         "hooks": [
           {
             "type": "command",
+            "onFailure": "block",
             "timeout": 30,
             "command": "python",
             "args": [
@@ -33,7 +34,6 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
               "--deadline",
               "25",
-              "--deny-on-timeout",
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py",
               "--hook",

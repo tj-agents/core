@@ -1,13 +1,13 @@
 ---
 name: stack
-description: Maintain a required stack when work must build on an unmerged PR. Covers the concrete reason for overlap, verified parent branches, parent-targeted child PRs, cumulative validation and prompt bottom-up landing. Sequential delivery and checkout allocation follow git-branching.
+description: Maintain a required stack when work must build on an unmerged PR. Covers the concrete reason for overlap, verified parent branches, parent-targeted child PRs, cumulative validation and prompt bottom-up landing. Sequential delivery and checkout allocation follow branching.
 kind: operation
 domain: process
 ---
 
 # Stacked pull requests
 
-`engineering:git-branching` owns the decision to overlap dependent work. Sequential delivery is the
+`engineering:branching` owns the decision to overlap dependent work. Sequential delivery is the
 default; use this procedure whenever a PR must build on an unmerged parent. Record the concrete reason
 the child must proceed before the parent lands in the existing plan or ledger. Preserve the full goal,
 parent/head identities, slice sizes and validation gates there.
@@ -16,6 +16,12 @@ Create each dependent branch from its recorded parent's verified current tip. Us
 `engineering:open-worktree` only when active execution needs another checkout; inactive layers can remain
 Git branches. Use `engineering:open-pr` to open every child against its immediate parent branch. Review
 the child-only delta and validate its cumulative tree. Every unmerged PR dependency uses this relationship.
+
+```text
+Parent PR #120: Feature/Api targets main.
+Child PR #121: Feature/Ui branches from and targets Feature/Api.
+Review #121 against Feature/Api; validate Feature/Ui with both layers present.
+```
 
 Keep the stack limited to necessary active work and land each ready, authorized parent promptly.
 

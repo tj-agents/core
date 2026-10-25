@@ -7,7 +7,8 @@
     "base",
     "workflow",
     "agent-store",
-    "machine"
+    "machine",
+    "agent"
   ],
   "external_prerequisites": [],
   "skills": [
@@ -15,6 +16,7 @@
     "address-debt",
     "address-mistake",
     "address-review",
+    "branching",
     "bugfix",
     "commit",
     "commit-all",
@@ -26,7 +28,6 @@
     "failure-provenance",
     "feature",
     "git-auth",
-    "git-branching",
     "guide",
     "guide-build",
     "incremental-review",

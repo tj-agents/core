@@ -33,9 +33,9 @@ direct GitHub MCP create/update calls. They do not inspect a connector hidden in
 tool that emits no corresponding hook event; the preflight and authoritative readback still apply there.
 The PR-write registration excludes merge commands and changes no merge authorization.
 
-Resolve the work and its owning review under `engineering:git-branching`. **During implementation, open a draft PR at the first stable
+Resolve the work and its owning review under `engineering:branching`. **During implementation, open a draft PR at the first stable
 candidate that needs remote validation**; later stable candidates within that slice push to the same
-PR. A new substantive slice gets its own PR under `engineering:git-branching`, stacked when dependent.
+PR. A new substantive slice gets its own PR under `engineering:branching`, stacked when dependent.
 An existing draft is not permission to keep expanding its scope. This procedure does
 **not** enqueue, choose the end-to-end tier, or wait for a merge — that is
 `engineering:merge`.
@@ -170,6 +170,9 @@ artifact; `engineering:persistent-delivery` owns what that means. Enter the
 harness's `persistent-workflow` skill to give that binding a continuation.
 
 ### 7. Report and continue
+
+For pending CI, invoke `agent:background-listener` with the bound monitor before reporting the wait.
+On its completion event, report readiness or the next required action through this reporting contract.
 
 When the canonical goal has a fenced `completion` record, retain every unchecked PR task there with the
 PR's repository, number, full head SHA, task text, owner, and next action. Keep those entries until a fresh

@@ -7,7 +7,8 @@
       "workflow",
       "agent-store",
       "machine",
-      "cli"
+      "cli",
+      "agent"
     ],
     "machine": [
       "base",
@@ -69,12 +70,16 @@
       "base",
       "agent-store",
       "machine",
-      "cli"
+      "cli",
+      "agent"
     ],
     "cli": [
       "base",
       "agent-store",
       "machine"
+    ],
+    "agent": [
+      "base"
     ]
   },
   "stacks": {

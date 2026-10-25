@@ -65,7 +65,7 @@ out, every test in a suite failing at once) rather than as the defect itself.
 
 ## The delivery loop
 
-1. Implement in the branch's owning checkout, selected under `engineering:git-branching`.
+1. Implement in the branch's owning checkout, selected under `engineering:branching`.
 2. Run the cheapest checks that directly cover the changed code: required generators and invariants, the
    smallest buildable project or surface, focused unit tests. **Coverage is set by what consumes the change,
    not by the files you opened.** A changed signature is covered only by building its construction sites, a
@@ -106,8 +106,8 @@ Bind every remote wait through the shared reconnect-safe monitor before leaving 
 python .agents/workflows/workflow_ops.py --workflow-run-id <id> monitor --kind run --id <run-id> --head <full-sha> --workflow <name> --attempt <n>
 ```
 
-Use `--kind pr --id <pr-number>` for a PR or queue transition. Start it through the harness's background
-notification or scheduled continuation primitive. The monitor persists repository, worktree, branch, head,
+Use `--kind pr --id <pr-number>` for a PR or queue transition. Invoke `agent:background-listener`
+with that exact command for the current conversation's completion notification. The monitor persists repository, worktree, branch, head,
 target, workflow, attempt, last state, and timing before waiting. Re-run the same command after process loss,
 session resume, or machine suspension; it reconnects to the same identity and observes a run that completed
 while disconnected. It emits compact JSON only for a material transition, terminal result, query error, or
@@ -115,30 +115,8 @@ bounded timeout. Direct `gh run watch`, ad hoc sleeping forge loops, and model-t
 
 ### Notify before parking a listener
 
-Before the model parks on a silent process, wire its completion notification. **Do not spend later model turns
-polling a listener handle with `write_stdin`, `functions.wait`, status, or tail calls.** A background relay may
-read one already-bound monitor session and notify only for nonempty output or a terminal result; an empty,
-still-running read does not wake the model.
-
-When a host documents `functions.exec`, start its documented background cell only after binding the monitor
-session. Replace `12345` with the `session_id` returned for that existing bound monitor; cells do not share
-local variables. Inside the cell, use the documented `tools.write_stdin` and `notify` globals directly. This
-body does not start a second monitor or invent a durable continuation API:
-
-```js
-const sessionId = 12345; // Existing bound monitor session_id.
-for (;;) {
-  const update = await tools.write_stdin({session_id: sessionId, chars: "", yield_time_ms: 30_000});
-  const terminal = update.exit_code !== undefined;
-  const hasOutput = typeof update.output === "string" && update.output.trim() !== "";
-  if (hasOutput || terminal) notify(JSON.stringify({output: update.output, terminal}));
-  if (terminal) break;
-}
-```
-
-Other hosts use their supported `persistent-workflow` notification or wake mechanism. This policy does not
-define a universal listener API or a durable continuation; `persistent-workflow` owns those host-specific
-details.
+Invoke `agent:background-listener` with the existing bound monitor. That skill owns the generic
+execution and native completion callback; `engineering:persistent-workflow` owns durable delivery.
 
 Read forge status for a PR, head, or run once, again only after a real wake or observed state change, and
 keep one shared monitor per identity.

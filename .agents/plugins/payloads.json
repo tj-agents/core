@@ -17,6 +17,9 @@
     ],
     "cli": [
       "cli"
+    ],
+    "agent": [
+      "process"
     ]
   }
 }

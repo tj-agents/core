@@ -1,0 +1,15 @@
+{
+  "name": "agent",
+  "description": "Shared agent execution and background completion across native hosts.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tj-agents/core",
+  "keywords": [
+    "agents",
+    "execution",
+    "background"
+  ],
+  "displayName": "Agent",
+  "skills": "./skills/"
+}

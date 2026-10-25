@@ -210,7 +210,7 @@ class SyncTests(State):
 
     def test_a_current_session_is_left_alone(self):
         code, summary, relaunched = self.run_sync(result="current", stale=())
-        self.assertEqual((0, {"check": "current"}), (code, summary))
+        self.assertEqual((0, {"check": "current", "plugin setup": []}), (code, summary))
         relaunched.assert_not_called()
 
     def test_a_child_session_never_relaunches_its_parent(self):

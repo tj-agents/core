@@ -78,6 +78,22 @@ delivery wait; it does not establish durable unattended continuation. Apply `wor
 before ending at a genuine boundary for the remaining whole goal. A completed slice or unavailable
 scheduler does not establish goal completion or a whole-goal blocker.
 
+## Listen for the next result
+
+Use `agent:background-listener` for this conversation's deferred result and completion notification.
+It owns generic background execution, the host callback and existing desktop alerts. The scheduled
+continuation below owns durable work separately. Keep the exact delivery identity from this workflow.
+
+The bound run monitor returns immediately for an already-completed run. The PR monitor emits one initial
+readiness observation when its nonempty exact-head check rollup is green, then suppresses unchanged
+reconnects. That signal grants no review or merge approval. On a wake, route the bound result through
+`persistent-delivery` and report the next gate through `engineering:open-pr`.
+
+```text
+Pending CI: give its exact-head monitor command to agent:background-listener.
+Completion: route the returned bound result, report the PR's next gate and continue the same goal.
+```
+
 ## Initialize one owner
 
 Use the packaged `<engineering-package-root>/workflows/continuation_runtime.py` module from an installed

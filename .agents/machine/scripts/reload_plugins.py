@@ -20,10 +20,11 @@ import agent_cli
 from codex_hook_trust import AppServer, github_repository
 import launch_check
 import plugin_autoupdate
+import required_plugins
 
 TIMEOUT = 300
 IN_USE = ".in_use"
-ADOPTION = "Codex adopts updates when the conversation resumes in a new process."
+ADOPTION = "Updated instruction text may require resuming the same Codex conversation; daemon hook reload is checked during sync."
 
 
 class RefreshError(RuntimeError):
@@ -475,10 +476,17 @@ def main(argv: list[str] | None = None) -> int:
     modes.add_argument("--all", action="store_true", help="Refresh every selected plugin, not only published changes")
     modes.add_argument("--verify", action="store_true", help="Refresh, then inspect native installations and remote main revisions")
     modes.add_argument("--verify-only", action="store_true", help="Inspect without changing plugins")
+    parser.add_argument("--onboard", action="store_true", help="allow explicitly requested plugin enrollment")
     arguments = parser.parse_args(argv)
+    if arguments.verify_only and arguments.onboard:
+        parser.error("--verify-only cannot be used with --onboard")
     project = arguments.project.resolve()
     hosts = ("claude", "codex") if arguments.host == "both" else (arguments.host,)
     updated: set[str] = set()
+    def converge_plugin_setup() -> list[str]:
+        executables = {host: None for host in hosts}
+        return required_plugins.check_setup(project, hosts, executables) if arguments.verify_only \
+            else required_plugins.converge_setup(project, hosts, executables, arguments.onboard)
     relaunch_allowed = "claude" in hosts and not arguments.no_relaunch and not arguments.verify_only
     if not (arguments.all or arguments.verify or arguments.verify_only):
         result = launch_check.check(project, update=lambda host, repositories, root:
@@ -487,14 +495,23 @@ def main(argv: list[str] | None = None) -> int:
                                     host=None if arguments.host == "both" else arguments.host)
         if result != "unconfigured":
             summary = {"check": result}
-            relaunched = relaunch_session(project, updated) if relaunch_allowed and result != "failed" else None
+            if "codex" in hosts and result in {"current", "updated", "offline"}:
+                try:
+                    launch_check.ensure_hooks(project, running_session=True)
+                except Exception as error:
+                    summary["hook_readiness_error"] = str(error)
+                    result = "failed"
+            setup_errors = (converge_plugin_setup() if result not in {"failed", "busy"}
+                            else [f"skipped because launch check is {result}"])
+            summary["plugin setup"] = setup_errors
+            relaunched = relaunch_session(project, updated) if relaunch_allowed and result != "failed" and not setup_errors else None
             if relaunched:
                 summary["claude"] = relaunched
             print(json.dumps(summary, indent=2))
             if result == "updated":
                 print(ADOPTION, file=sys.stderr)
             failed = bool(relaunched and relaunched["relaunch"] == "failed")
-            return int(result in {"failed", "offline", "busy"} or failed)
+            return int(result in {"failed", "offline", "busy"} or failed or bool(setup_errors))
     reports = []
     for host in hosts:
         try:
@@ -504,16 +521,20 @@ def main(argv: list[str] | None = None) -> int:
             updated.update(changed)
             report = (verify(host, executable, project, marketplaces, plugins)
                       if arguments.verify or arguments.verify_only else {"host": host, "plugins": plugins, "problems": []})
+            if host == "codex" and not arguments.verify_only and not report["problems"]:
+                launch_check.ensure_hooks(project, executable, running_session=True)
         except (RefreshError, agent_cli.LaunchError, OSError, ValueError, RuntimeError, KeyError, TypeError, subprocess.TimeoutExpired) as error:
             report = {"host": host, "problems": [str(error)]}
-        refreshed = not report["problems"]
-        if host == "claude" and relaunch_allowed and refreshed:
-            relaunched = relaunch_session(project, updated)
-            if relaunched:
-                report["relaunch"] = relaunched
-                if relaunched["relaunch"] == "failed":
-                    report["problems"].append("relaunch failed: " + relaunched["error"])
         reports.append(report)
+    setup_errors = (converge_plugin_setup() if not any(report["problems"] for report in reports)
+                    else ["skipped because plugin refresh or verification failed"])
+    if setup_errors:
+        reports.append({"host": "plugin setup", "plugins": [], "problems": setup_errors})
+    if "claude" in hosts and relaunch_allowed and not any(report["problems"] for report in reports):
+        relaunched = relaunch_session(project, updated)
+        if relaunched:
+            reports.append({"host": "claude relaunch", "plugins": [], "problems":
+                            [] if relaunched["relaunch"] != "failed" else ["relaunch failed: " + relaunched["error"]]})
     print(json.dumps(reports, indent=2))
     for report in reports:
         for problem in report["problems"]:

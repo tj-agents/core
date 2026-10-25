@@ -21,6 +21,7 @@
       }
     ],
     "plugins": [
+      "tj-agents/agent",
       "tj-agents/agent-store",
       "tj-agents/base",
       "tj-agents/cli",

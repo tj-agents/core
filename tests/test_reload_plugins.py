@@ -66,6 +66,38 @@ class FakeClaude:
 
 
 class RefreshCliTests(unittest.TestCase):
+    def setUp(self):
+        readiness = mock.patch.object(REFRESH.launch_check, "ensure_hooks")
+        self.readiness = readiness.start()
+        self.addCleanup(readiness.stop)
+
+        for method in ("check_setup", "converge_setup"):
+            patcher = mock.patch.object(REFRESH.required_plugins, method, return_value=[])
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_current_plugins_still_require_live_hook_reload(self):
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="current"), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(0, REFRESH.main(["--host", "codex"]))
+        self.readiness.assert_called_once_with(Path.cwd().resolve(), running_session=True)
+
+    def test_live_hook_reload_failure_fails_current_refresh(self):
+        self.readiness.side_effect = RuntimeError("Live hooks still modified")
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="current"), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex"]))
+
+    def test_live_hook_reload_failure_fails_verified_refresh(self):
+        self.readiness.side_effect = RuntimeError("Live hooks still modified")
+        with mock.patch.object(REFRESH.agent_cli, "resolve_codex_executable", return_value=("codex", "version")), \
+                mock.patch.object(REFRESH, "selection", return_value=({}, [])), \
+                mock.patch.object(REFRESH, "refresh", return_value=[]), \
+                mock.patch.object(REFRESH, "verify", return_value={"problems": []}), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex", "--verify"]))
+        self.readiness.assert_called_once_with(Path.cwd().resolve(), "codex", running_session=True)
+
     def test_default_uses_native_commands_without_verification_or_bound_launch(self):
         with mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude"), \
                 mock.patch.object(REFRESH, "selection", return_value=({"tj-agents": "tj-agents/marketplace"}, ["machine@tj-agents"])), \
@@ -103,6 +135,62 @@ class RefreshCliTests(unittest.TestCase):
             self.assertEqual("codex", check.call_args.kwargs["host"])
             REFRESH.main([])
             self.assertIsNone(check.call_args.kwargs["host"])
+
+    def test_current_packages_do_not_make_a_sync_successful_with_unready_hooks(self):
+        self.readiness.side_effect = RuntimeError("required hook needs review")
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="current"), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex"]))
+        self.readiness.assert_called_once()
+        REFRESH.required_plugins.converge_setup.assert_not_called()
+
+    def test_default_early_return_converges_plugin_setup_before_success(self):
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="current"), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup", return_value=[]) as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(0, REFRESH.main(["--host", "codex"]))
+        self.assertEqual((ROOT, ("codex",), {"codex": None}, False), converge.call_args.args)
+
+    def test_failed_launch_or_refresh_never_applies_plugin_setup(self):
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="failed"), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex"]))
+        converge.assert_not_called()
+
+        with mock.patch.object(REFRESH, "selection", return_value=({}, [])), \
+                mock.patch.object(REFRESH, "refresh", side_effect=REFRESH.RefreshError("failed refresh")), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex", "--all"]))
+        converge.assert_not_called()
+
+    def test_offline_event_still_checks_hook_readiness_and_allows_explicit_onboarding(self):
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="offline"), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup", return_value=[]) as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex", "--onboard"]))
+        self.readiness.assert_called_once()
+        self.assertEqual((ROOT, ("codex",), {"codex": None}, True), converge.call_args.args)
+
+    def test_offline_event_with_unready_hooks_blocks_setup(self):
+        self.readiness.side_effect = RuntimeError("required hook needs review")
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="offline"), \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex", "--onboard"]))
+        converge.assert_not_called()
+
+    def test_verify_only_checks_plugin_setup_without_applying_or_onboarding(self):
+        with mock.patch.object(REFRESH, "executable_for", return_value="codex"), \
+                mock.patch.object(REFRESH, "selection", return_value=({}, [])), \
+                mock.patch.object(REFRESH, "verify", return_value={"host": "codex", "plugins": [], "problems": []}), \
+                mock.patch.object(REFRESH.required_plugins, "check_setup", return_value=[]) as check, \
+                mock.patch.object(REFRESH.required_plugins, "converge_setup") as converge, \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(0, REFRESH.main(["--host", "codex", "--verify-only"]))
+        check.assert_called_once_with(ROOT, ("codex",), {"codex": None})
+        converge.assert_not_called()
 
     def test_refresh_updates_applicable_claude_local_installations(self):
         fake = FakeClaude([

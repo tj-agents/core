@@ -20,11 +20,20 @@ evidence or a stated user decision, and say what changed.
 
 ## A task has an owning lifecycle — load it before the first edit
 
-Authorized long-term or multi-phase work selects `workflow:run`, even when the user does
-not name a plan or skill. Read an existing canonical goal before edits and keep its progress current.
-Planning-only work selects `workflow:plan` and does not authorize implementation.
-A question or review request alone grants no implementation authority. A status question during already
-authorized execution should be answered before that execution continues.
+Required hooks gate ordinary work and delivery. Failure, timeout, skipping, a missing verdict or trust
+review permits only bounded diagnosis and authorized repair. For stale plugin contents, run
+`machine:sync-plugins` once. Resume only after affected hooks succeed; refresh or trust alone proves no
+execution. Otherwise remain blocked and report the hook, cause, resolver and exact recovery command.
+Never bypass trust, disable hooks, suppress failures or change executor to evade the gate.
+
+```text
+Base startup timed out: stop app writes, repair, verify successful hook execution, then resume.
+Unconfigured refresh: run Core's full setup and --check.
+```
+
+Authorized sustained or multi-phase work selects `workflow:run`; read the existing canonical goal before
+edits and keep it current. Planning selects `workflow:plan`, without implementation authority. Questions
+and reviews alone grant none. Answer status questions before continuing authorized execution.
 
 Use `machine:lanes` to match substantive work to suitable capability. Reuse its loaded contract;
 routine commands and phase labels do not require another read or lane rationale. Keep cheap leaf lanes

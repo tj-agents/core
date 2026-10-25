@@ -12,6 +12,12 @@ This entry point adds only Codex's mechanism.
 
 ## Codex
 
-Codex has no in-session reload. When this session needs the change now, the conversation resumes in a
-fresh process: ask the user to exit and run `codex resume <this-session-id>`. New sessions load it on
-their own.
+Sync reloads hook runtime settings in the existing Codex daemon through its native configuration API,
+then verifies every required hook definition and its trust state for the calling conversation's exact
+checkout. It connects to the existing daemon without starting a replacement, changing hook trust or
+closing other sessions. A failed live reload fails sync; a fresh-process inventory alone is insufficient.
+
+Runtime hook reload does not replace instruction text already in model context. If the conversation
+needs updated instructions, or its native process cannot be reloaded, preserve the current conversation
+and follow the canonical same-conversation resume procedure with its exact ID and absolute directory.
+New sessions load current instructions through normal startup.
