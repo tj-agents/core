@@ -4,7 +4,6 @@ import argparse
 import importlib
 import importlib.util
 import json
-import math
 from pathlib import Path
 import sys
 import time
@@ -25,9 +24,7 @@ def runtime():
 
 
 def verified_entry(shared, session_id=None):
-    entry = shared.own_host_and_entry(session_id=session_id)
-    shared.close_target(entry)
-    return entry
+    return cli_runtime().verified_entry(shared, session_id)
 
 
 def cli_runtime():
@@ -72,18 +69,7 @@ def sweep_script(shared):
 
 
 def own_session(shared, session_id=None):
-    entry = verified_entry(shared, session_id)
-    store = shared.register_session._load_session_store()
-    if store is None:
-        raise shared.Refusal('session turn store is unavailable')
-    connection = store.connect()
-    try:
-        activity = store.get_session(connection, store.session_handle(entry['host'], entry['session_id']))
-    finally:
-        connection.close()
-    if not isinstance(activity, dict) or activity.get('ended_at') is not None:
-        raise shared.Refusal('this session has no active turn to close after')
-    return entry, activity
+    return cli_runtime().own_session(shared, session_id)
 
 
 def start_watcher(shared, entry, armed_at):
@@ -98,19 +84,6 @@ def arm():
     if activity.get('turn_state') != 'working':
         raise shared.Refusal('this session has no active turn to close after')
     return start_watcher(shared, entry, time.time())
-
-
-def arm_after_stop(landed_at, session_id=None):
-    """Arm from a Stop hook that runs after the session store recorded this turn's stop."""
-    shared = runtime()
-    entry, activity = own_session(shared, session_id)
-    stopped = activity.get('last_activity_at')
-    if activity.get('turn_state') != 'awaiting_input' or not shared.finite_positive(stopped):
-        raise shared.Refusal('this session has no recorded stop to close after')
-    started = activity.get('started_at')
-    if not shared.finite_positive(started) or started >= landed_at:
-        raise shared.Refusal('the delivery landed before this session started')
-    return start_watcher(shared, entry, math.nextafter(stopped, 0.0))
 
 
 def main(argv=None):

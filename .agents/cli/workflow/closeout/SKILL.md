@@ -28,21 +28,21 @@ authority decision only for a suspected reusable tooling defect.
 
 Finish the authorized owning workflow before closing. Preserve any required user decision and report it;
 do not manufacture completion, merge authority, or an approval. Once all owned outcomes are finished,
-use the same exact-tab primitive as `cli:close`. As your last command, run:
+use the same verified frontend primitive as `cli:close`. As your last command, run:
 
 ```text
 python -B <skill-directory>/scripts/closeout.py arm      # Windows
 python3 -B <skill-directory>/scripts/closeout.py arm     # Linux/macOS
 ```
 
-Then give the final reply and end the turn. A detached watcher closes this session's tab and process once
+Then give the final reply and end the turn. A detached watcher closes this session's frontend once
 the turn has ended and stayed idle for about 3 seconds. A new prompt before then cancels it. Arming does
 not prove closure; a refusal leaves the session open, and its reason is recorded in
 `~/.agents-state/session-close/<session-id>.json`.
 
-Closure means the exact terminal tab is gone and its dedicated frontend has exited. If tab ownership or
-closure cannot be verified, preserve the session and report the refusal. Never substitute process exit
-for tab closure.
+Closure means its verified frontend has exited. Preserve the shared backend, other clients and the
+containing terminal. If frontend ownership or exit cannot be verified, preserve the session and report
+the refusal. `cli:close` owns native input attribution and frontend safety.
 
 A session in a linked worktree also closes itself, unarmed, when a turn ends with its tree clean and its
 branch's pull request merged at HEAD during the session.
@@ -50,5 +50,5 @@ branch's pull request merged at HEAD during the session.
 Closing never removes a worktree. After closing, the watcher runs the worktree sweep, which removes the
 checkout only if its PR merged and nothing is left in it.
 
-`cli:close` closes this tab immediately after the final reply, preserving unfinished work and skipping cleanup.
+`cli:close` closes this client after the final reply, preserving unfinished work and skipping cleanup.
 `machine:peer-cli` closes other sessions.

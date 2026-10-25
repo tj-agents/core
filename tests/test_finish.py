@@ -16,7 +16,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 REAPER = ROOT / ".agents/machine/utility/peer-cli/scripts/finish_reaper.py"
 CLOSE = ROOT / ".agents/machine/utility/peer-cli/scripts/close.py"
-CLOSE_SESSION = ROOT / ".agents/machine/utility/close/scripts/close_session.py"
+CLOSE_SESSION = ROOT / ".agents/cli/utility/close/scripts/close_session.py"
 sys.path.insert(0, str(REAPER.parent))
 import session_close
 import finish_reaper
@@ -32,66 +32,33 @@ def load_close_session(path):
 
 class HostFallbackTests(unittest.TestCase):
     def setUp(self):
-        environment = mock.patch.dict(os.environ, {'CODEX_THREAD_ID': '', 'CLAUDE_CODE_SESSION_ID': ''})
+        environment = mock.patch.dict(os.environ, {'CODEX_THREAD_ID': '', 'CODEX_SESSION_ID': '',
+                                                  'CLAUDE_CODE_SESSION_ID': ''})
         environment.start()
         self.addCleanup(environment.stop)
 
-    def assert_sweep_script(self, script_path, updater_path, expected):
-        script_path.parent.mkdir(parents=True)
-        updater_path.parent.mkdir(parents=True)
-        script_path.write_text(CLOSE_SESSION.read_text(encoding="utf-8"), encoding="utf-8")
-        updater_path.write_text(
-            "def load_codex_config():\n    return None\n"
-            f"def sweep_script(config):\n    return {expected!r}\n",
-            encoding="utf-8",
-        )
-        self.assertEqual(expected, load_close_session(script_path).sweep_script(None))
 
-    def test_sweep_script_uses_the_source_machine_root(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            self.assert_sweep_script(
-                root / ".agents/machine/utility/close/scripts/close_session.py",
-                root / ".agents/machine/scripts/plugin_autoupdate.py",
-                "source",
-            )
 
-    def test_sweep_script_uses_the_packaged_machine_root(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            self.assert_sweep_script(
-                root / ".agents/machine/utility/close/scripts/close_session.py",
-                root / "resources/machine/scripts/plugin_autoupdate.py",
-                "canonical",
-            )
 
-    def test_sweep_script_uses_the_skills_machine_root(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            self.assert_sweep_script(
-                root / "skills/close/scripts/close_session.py",
-                root / "resources/machine/scripts/plugin_autoupdate.py",
-                "skills",
-            )
 
     def test_unregistered_attachment_refuses_an_unsafe_close(self):
-        host = session_close.register_session.ProcessInfo(10, 1, "codex.exe", 20.0)
+        host = session_close.register_session.ProcessInfo(10, 1, "claude.exe", 20.0)
         with mock.patch.object(session_close.os, "getppid", return_value=10), \
                 mock.patch.object(session_close, "process_info", return_value=host), \
-                mock.patch.object(session_close.register_session, "read_host_names", return_value={"codex"}), \
+                mock.patch.object(session_close.register_session, "read_host_names", return_value={"claude"}), \
                 mock.patch.object(session_close, "entries", return_value=[]):
             with self.assertRaisesRegex(session_close.Refusal, "do not force-close the host"):
                 session_close.own_host_and_entry(Path.cwd())
 
     def test_attachment_resolves_under_the_launch_directory_after_the_registry_moved(self):
-        host = session_close.register_session.ProcessInfo(10, 1, "codex.exe", 20.0)
+        host = session_close.register_session.ProcessInfo(10, 1, "claude.exe", 20.0)
         launch = Path.cwd().parent
-        entry = {"host": "codex", "session_id": "own", "pid": 10, "pid_started_at": 20.0, "started_at": 30.0,
+        entry = {"host": "claude", "session_id": "own", "pid": 10, "pid_started_at": 20.0, "started_at": 30.0,
                  "cwd": str(launch / "elsewhere"), "launch_cwd": str(launch)}
         with mock.patch.object(session_close.os, "getppid", return_value=10), \
                 mock.patch.object(session_close, "process_info", return_value=host), \
                 mock.patch.object(session_close, "verified_live", return_value=True), \
-                mock.patch.object(session_close.register_session, "read_host_names", return_value={"codex"}):
+                mock.patch.object(session_close.register_session, "read_host_names", return_value={"claude"}):
             with mock.patch.object(session_close, "entries", return_value=[("own.json", entry)]):
                 self.assertEqual(entry, session_close.own_host_and_entry(Path.cwd()))
             moved_only = {key: value for key, value in entry.items() if key != "launch_cwd"}
@@ -99,62 +66,9 @@ class HostFallbackTests(unittest.TestCase):
                     self.assertRaisesRegex(session_close.Refusal, "cannot resolve a verified registry attachment"):
                 session_close.own_host_and_entry(Path.cwd())
 
-    def test_terminal_refusal_preserves_host_and_wrapper(self):
-        entry = {"pid": 30, "pid_started_at": 3.0}
-        wrapper = {"pid": 20, "started_at": 2.0}
-        for refusal in (
-                own_close.close_tab.TerminalUnavailable("unavailable"),
-                own_close.close_tab.TerminalRefusal("absent or ambiguous"),
-        ):
-            for module in (own_close,):
-                for mode in ("", "process"):
-                    with self.subTest(module=module.__name__, refusal=type(refusal).__name__, mode=mode), \
-                            mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": mode}), \
-                            mock.patch.object(session_close, "verified_live", return_value=True), \
-                            mock.patch.object(module.close_tab, "close_entry", side_effect=refusal), \
-                            mock.patch.object(module.os, "kill") as killer:
-                        with self.assertRaises(type(refusal)):
-                            module.close_host(entry, wrapper)
-                        killer.assert_not_called()
 
-    def test_windows_terminal_absent_or_ambiguous_target_preserves_host(self):
-        entry = {"pid": 30, "pid_started_at": 3.0, "title": "own",
-                 "terminal": {"kind": "windows-terminal", "automation_id": "tab-1"}}
-        target = {"title": "own", "identity": entry["terminal"]}
-        for inventory in ([], [target, target]):
-            for module in (own_close,):
-                with self.subTest(module=module.__name__, inventory=inventory), \
-                        mock.patch.object(session_close, "verified_live", return_value=True), \
-                        mock.patch.object(session_close, "liveness", return_value=True), \
-                        mock.patch.object(module.close_tab, "is_windows", return_value=True), \
-                        mock.patch.object(module.close_tab, "windows_inventory", return_value=inventory), \
-                        mock.patch.object(module.os, "kill") as killer:
-                    with self.assertRaisesRegex(module.close_tab.TerminalRefusal, "absent or ambiguous"):
-                        module.close_host(entry)
-                    killer.assert_not_called()
 
-    def test_verified_terminal_close_never_signals_a_process(self):
-        entry = {"pid": 30, "pid_started_at": 3.0}
-        for module in (own_close,):
-            with self.subTest(module=module.__name__), \
-                    mock.patch.object(session_close, "verified_live", return_value=True), \
-                    mock.patch.object(module.close_tab, "close_entry") as closer, \
-                    mock.patch.object(module.os, "kill") as killer:
-                module.close_host(entry)
-                closer.assert_called_once_with(entry)
-                killer.assert_not_called()
 
-    def test_unknown_host_refuses_before_terminal_close_or_signal(self):
-        entry = {"pid": 30, "pid_started_at": 3.0}
-        for module in (own_close,):
-            with self.subTest(module=module.__name__), \
-                    mock.patch.object(session_close, "verified_live", return_value=False), \
-                    mock.patch.object(module.close_tab, "close_entry") as closer, \
-                    mock.patch.object(module.os, "kill") as killer:
-                with self.assertRaisesRegex(session_close.Refusal, "identity changed before close"):
-                    module.close_host(entry)
-                closer.assert_not_called()
-                killer.assert_not_called()
 
 
 class CloseRefusalCaptureTests(unittest.TestCase):
@@ -203,68 +117,9 @@ class FinishReaperProcessTests(unittest.TestCase):
         self.assertIsNotNone(store)
         self.assertTrue(hasattr(store, "delete_session"))
 
-    def test_close_entrypoint_records_verified_session_exit_without_removing_checkout(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            worktree = root / "worktree"
-            state = root / "state"
-            host_executable, host_name = self.fixture_host(root)
-            subprocess.run(["git", "init", "-q", "-b", "main", str(worktree)], check=True)
-            subprocess.run(["git", "-C", str(worktree), "config", "user.email", "t@example.com"], check=True)
-            subprocess.run(["git", "-C", str(worktree), "config", "user.name", "t"], check=True)
-            (worktree / "base").write_text("base\n", encoding="utf-8")
-            subprocess.run(["git", "-C", str(worktree), "add", "."], check=True)
-            subprocess.run(["git", "-C", str(worktree), "commit", "-q", "-m", "base"], check=True)
-            env = dict(
-                os.environ,
-                AGENT_STATE_DIRECTORY=str(state),
-                AGENT_CLI_HOST_NAMES=host_name,
-                AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
-            )
-            host = subprocess.Popen([
-                str(host_executable), "-c",
-                "import os, subprocess, sys, time; "
-                "\nwhile not os.path.exists(sys.argv[2]): time.sleep(.01)"
-                "\nraise SystemExit(subprocess.call([sys.executable, sys.argv[3], sys.argv[1]]))",
-                str(CLOSE), str(root / "start"), str(self.terminal_fixture(root)),
-            ], cwd=worktree, env=env)
-            try:
-                started = self.process_started_at(host.pid)
-                sessions = state / "cli-sessions"
-                sessions.mkdir(parents=True)
-                (sessions / "ours.json").write_text(json.dumps({
-                    "session_id": "ours", "cwd": str(worktree), "pid": host.pid,
-                    "pid_started_at": started, "started_at": time.time(),
-                    "host": host_name,
-                }), encoding="utf-8")
-                self.record_idle_session(state, host_name, "ours", worktree, host.pid, started)
-                (root / "start").touch()
-                result_directory = state / "merge-cleanup/results"
-                for _ in range(300):
-                    results = list(result_directory.glob("*.json")) if result_directory.exists() else []
-                    if results:
-                        break
-                    time.sleep(.05)
-                self.assertTrue(results)
-                result_path = results[0]
-                host.wait(timeout=session_close.DEFAULT_TIMEOUTS["AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS"])
-                for _ in range(300):
-                    result = session_close.read_json(result_path) or {}
-                    if result.get("status") == "session-closed":
-                        break
-                    time.sleep(.05)
-                self.assertEqual("session-closed", result.get("status"), result)
-                self.assertTrue(result["session_exited"])
-                self.assertEqual("ours", result["session_id"])
-                self.assertTrue(worktree.is_dir())
-                self.wait_for_observer_exit(result)
-            finally:
-                if host.poll() is None:
-                    host.kill()
-                host.wait(timeout=5)
 
-    def test_armed_close_without_terminal_preserves_its_disposable_host(self):
-        operation = ROOT / '.agents/machine/utility/close/scripts/close_session.py'
+    def test_armed_close_without_terminal_exits_only_its_disposable_client(self):
+        operation = CLOSE_SESSION
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             worktree, state = root / 'consumer', root / 'state'
@@ -309,12 +164,16 @@ class FinishReaperProcessTests(unittest.TestCase):
                     if outcome.exists():
                         break
                     time.sleep(.05)
-                self.assertIn('refused: no native terminal identity',
-                              json.loads(outcome.read_text(encoding='utf-8'))['status'])
-                self.wait_for_observer_exit(json.loads(outcome.read_text(encoding='utf-8')))
-                self.assertIsNone(host.poll())
+                result = json.loads(outcome.read_text(encoding='utf-8'))
+                self.assertEqual('closed', result['status'])
+                host.wait(timeout=5)
+                for _ in range(200):
+                    if session_close.verified_exited(result['watcher_pid'], result['watcher_started_at']):
+                        break
+                    time.sleep(.025)
+                self.assertTrue(session_close.verified_exited(result['watcher_pid'], result['watcher_started_at']))
                 connection = store.connect(state / 'sessions.db')
-                self.assertIsNone(store.get_session(connection, handle)['ended_at'])
+                self.assertIsNotNone(store.get_session(connection, handle)['ended_at'])
                 connection.close()
                 self.assertTrue(worktree.is_dir(), 'closing never removes the checkout')
             finally:
@@ -322,30 +181,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                     host.kill()
                 host.wait(timeout=5)
 
-    def wait_for_observer_exit(self, result):
-        # A final result precedes observer exit; Windows holds its cwd until that exact process exits.
-        for _ in range(200):
-            status = session_close.identity_status(result['observer_pid'], result['observer_started_at'])
-            if status in ('exited', 'reused'):
-                break
-            time.sleep(.025)
-        self.assertIn(status, ('exited', 'reused'))
 
-    @staticmethod
-    def terminal_fixture(root):
-        runner = root / "terminal_fixture.py"
-        runner.write_text(
-            "import os, runpy, signal, sys\n"
-            "from pathlib import Path\n"
-            "target = sys.argv.pop(1)\n"
-            "sys.path.insert(0, str(Path(target).parent))\n"
-            "import close_tab\n"
-            "close_tab.close_entry = lambda entry: os.kill(entry['pid'], signal.SIGTERM)\n"
-            "sys.argv[0] = target\n"
-            "runpy.run_path(target, run_name='__main__')\n",
-            encoding="utf-8",
-        )
-        return runner
 
     @staticmethod
     def fixture_host(root):
@@ -702,8 +538,8 @@ class EndReasonRecordingTests(unittest.TestCase):
         store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
         connection = mock.Mock()
         store.connect.return_value = connection
-        with mock.patch.object(own_close.register_session, "_load_session_store", return_value=store):
-            own_close._record_own_end(self.entry, "closed")
+        with mock.patch.object(session_close.register_session, "_load_session_store", return_value=store):
+            session_close._record_own_end(self.entry, "closed")
         store.end_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "closed")
         connection.close.assert_called_once()
 
@@ -712,21 +548,21 @@ class EndReasonRecordingTests(unittest.TestCase):
         store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
         connection = mock.Mock()
         store.connect.return_value = connection
-        with mock.patch.object(own_close.register_session, "_load_session_store", return_value=store):
-            own_close._reopen_own_end(self.entry, "closed")
+        with mock.patch.object(session_close.register_session, "_load_session_store", return_value=store):
+            session_close._reopen_own_end(self.entry, "closed")
         store.reopen_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "closed")
         connection.close.assert_called_once()
 
     def test_recording_never_raises_when_the_store_is_unavailable(self):
-        with mock.patch.object(own_close.register_session, "_load_session_store", return_value=None):
-            own_close._record_own_end(self.entry, "closed")
-        with mock.patch.object(own_close.register_session, "_load_session_store", side_effect=RuntimeError("boom")):
-            own_close._record_own_end(self.entry, "closed")
+        with mock.patch.object(session_close.register_session, "_load_session_store", return_value=None):
+            session_close._record_own_end(self.entry, "closed")
+        with mock.patch.object(session_close.register_session, "_load_session_store", side_effect=RuntimeError("boom")):
+            session_close._record_own_end(self.entry, "closed")
 
     def test_recording_is_skipped_without_a_known_host_or_session(self):
         store = mock.Mock()
-        with mock.patch.object(own_close.register_session, "_load_session_store", return_value=store):
-            own_close._record_own_end({"pid": 1, "pid_started_at": 1.0}, "closed")
+        with mock.patch.object(session_close.register_session, "_load_session_store", return_value=store):
+            session_close._record_own_end({"pid": 1, "pid_started_at": 1.0}, "closed")
         store.connect.assert_not_called()
 
 
@@ -775,49 +611,28 @@ class SelfCloseActivityGuardTests(unittest.TestCase):
             with self.assertRaisesRegex(session_close.Refusal, "activity changed"):
                 session_close.awaiting_input_activity(self.entry, 39.0)
 
-    def test_first_guard_refuses_before_cleanup_observer_end_record_or_signal(self):
-        for module in (own_close,):
-            with self.subTest(module=module.__name__), \
-                    mock.patch.object(module.session_close, "own_host_and_entry", return_value=self.entry), \
-                    mock.patch.object(module.session_close, "worktree_from_cwd", return_value=self.cwd), \
-                    mock.patch.object(module.session_close, "under_or_equal", return_value=True), \
-                    mock.patch.object(module.session_close, "awaiting_input_activity", side_effect=session_close.Refusal("session is not awaiting input")), \
-                    mock.patch.object(module.session_close, "start_observer") as observer, \
-                    mock.patch.object(module, "_record_own_end") as end_record, \
-                    mock.patch.object(module, "close_host") as closer:
-                with self.assertRaisesRegex(session_close.Refusal, "not awaiting input"):
-                    module.main([])
-                observer.assert_not_called()
-                end_record.assert_not_called()
-                closer.assert_not_called()
+    def test_first_guard_refuses_before_end_record_or_signal(self):
+        with mock.patch.object(session_close, 'attached_to', return_value=True), \
+                mock.patch.object(session_close, 'awaiting_input_activity', side_effect=session_close.Refusal('not awaiting input')), \
+                mock.patch.object(session_close, '_record_own_end') as ended, \
+                mock.patch.object(own_close, 'close_host') as closer:
+            with self.assertRaisesRegex(session_close.Refusal, 'not awaiting input'):
+                own_close.close_session(self.entry)
+        ended.assert_not_called()
+        closer.assert_not_called()
 
     def test_prompt_then_stop_with_a_new_idle_token_refuses_before_end_or_signal(self):
-        for module in (own_close,):
-            with self.subTest(module=module.__name__), ExitStack() as stack:
-                stack.enter_context(mock.patch.object(module.session_close, "own_host_and_entry", return_value=self.entry))
-                stack.enter_context(mock.patch.object(module.session_close, "worktree_from_cwd", return_value=self.cwd))
-                stack.enter_context(mock.patch.object(module.session_close, "under_or_equal", return_value=True))
-                stack.enter_context(mock.patch.object(
-                    module.session_close, "awaiting_input_activity",
-                    side_effect=[40.0, session_close.Refusal("session activity changed before close")],
-                ))
-                stack.enter_context(mock.patch.object(module.session_close, "git", return_value=(0, "", "")))
-                stack.enter_context(mock.patch.object(module.session_close, "results_path", return_value=self.state / "result.json"))
-                stack.enter_context(mock.patch.object(module.session_close, "qualified_windows_wrapper", return_value=None))
-                stack.enter_context(mock.patch.object(module.session_close, "start_observer", return_value=20))
-                stack.enter_context(mock.patch.object(module.session_close, "wait_for_record", side_effect=[{"reaper_pid": 20, "reaper_started_at": 30.0}, {"armed": 50.0}]))
-                stack.enter_context(mock.patch.object(module.session_close, "valid_observer_start", return_value=True))
-                stack.enter_context(mock.patch.object(module.session_close, "valid_armed", return_value=True))
-                stack.enter_context(mock.patch.object(module.session_close, "write_json"))
-                cancel = stack.enter_context(mock.patch.object(module.session_close, "cancel_observer"))
-                stack.enter_context(mock.patch.object(module, "refresh_attachment", return_value=None, create=True))
-                end_record = stack.enter_context(mock.patch.object(module, "_record_own_end"))
-                closer = stack.enter_context(mock.patch.object(module, "close_host"))
-                with self.assertRaisesRegex(session_close.Refusal, "activity changed"):
-                    module.main([])
-                end_record.assert_not_called()
-                closer.assert_not_called()
-                cancel.assert_called_once()
+        def stop(entry, before_signal):
+            before_signal()
+            self.fail('new prompt must prevent signalling')
+        with mock.patch.object(session_close, 'attached_to', return_value=True), \
+                mock.patch.object(session_close, 'awaiting_input_activity',
+                                  side_effect=[40.0, session_close.Refusal('activity changed')]), \
+                mock.patch.object(session_close, '_record_own_end') as ended, \
+                mock.patch.object(own_close, 'close_host', side_effect=stop):
+            with self.assertRaisesRegex(session_close.Refusal, 'activity changed'):
+                own_close.close_session(self.entry)
+        ended.assert_not_called()
 
     def test_a_session_that_moved_checkout_still_matches_its_attachment_after_stop(self):
         moved = Path(self.temp.name) / "moved worktree"
