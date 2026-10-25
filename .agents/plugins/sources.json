@@ -412,6 +412,11 @@
       "destination": "tier.json"
     },
     {
+      "plugin": "machine",
+      "source": ".agents/cli",
+      "destination": ".agents/cli"
+    },
+    {
       "plugin": "agent",
       "source": ".agents/tiers/agent.json",
       "destination": "tier.json"
@@ -428,6 +433,7 @@
       "base",
       "agent-store",
       "machine",
+      "cli",
       "agent"
     ],
     "engineering": [
@@ -435,6 +441,7 @@
       "workflow",
       "agent-store",
       "machine",
+      "cli",
       "agent"
     ],
     "cli": [

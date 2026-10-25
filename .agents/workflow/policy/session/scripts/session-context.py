@@ -12,7 +12,7 @@ SESSION_START_HEADINGS = (
     "## A task has an owning lifecycle — load it before the first edit",
     "## Finish the session",
 )
-FINISH_REMINDER = "Nothing owned left to do before this reply? Select `machine:close`."
+FINISH_REMINDER = "Nothing owned left to do before this reply? Select `cli:closeout`."
 
 
 def section(body, heading):

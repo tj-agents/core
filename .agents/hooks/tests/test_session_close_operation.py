@@ -13,7 +13,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[3]
-SCRIPT = ROOT / '.agents/machine/utility/close/scripts/close_session.py'
+SCRIPT = ROOT / '.agents/cli/utility/close/scripts/close_session.py'
 SPEC = importlib.util.spec_from_file_location('completed_session_close', SCRIPT)
 close = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(close)
@@ -22,10 +22,13 @@ WATCHER_SPEC = importlib.util.spec_from_file_location('close_watcher', SCRIPT.wi
 watcher = importlib.util.module_from_spec(WATCHER_SPEC)
 WATCHER_SPEC.loader.exec_module(watcher)
 sys.path.insert(0, str(SCRIPT.parent))
-LANDED_SPEC = importlib.util.spec_from_file_location('close_landed', SCRIPT.with_name('close_landed.py'))
+CLOSEOUT = ROOT / '.agents/cli/workflow/closeout/scripts'
+sys.path.insert(0, str(CLOSEOUT))
+import closeout
+closeout.close_session = close
+LANDED_SPEC = importlib.util.spec_from_file_location('close_landed', CLOSEOUT / 'close_landed.py')
 landed = importlib.util.module_from_spec(LANDED_SPEC)
-with mock.patch.dict(sys.modules, {'close_session': close}):
-    LANDED_SPEC.loader.exec_module(landed)
+LANDED_SPEC.loader.exec_module(landed)
 
 
 class ArmTests(unittest.TestCase):
@@ -36,14 +39,14 @@ class ArmTests(unittest.TestCase):
         self.shared.Refusal = RuntimeError
         self.shared.state_directory.return_value = Path('state')
         self.shared.own_host_and_entry.return_value = self.entry
+        self.shared.close_target.return_value = self.entry
         self.shared.entries.return_value = [('own.json', self.entry)]
         self.shared.git.return_value = (1, '', '')
         self.store = self.shared.register_session._load_session_store.return_value
         self.store.get_session.return_value = {'ended_at': None, 'turn_state': 'working', 'last_activity_at': 100}
 
     def arm(self):
-        with mock.patch.object(close, 'runtime', return_value=self.shared), \
-                mock.patch.object(close, 'sweep_script', return_value=None):
+        with mock.patch.object(close, 'runtime', return_value=self.shared):
             return close.arm()
 
     def test_arm_starts_one_detached_watcher_bound_to_this_exact_host(self):
@@ -55,11 +58,18 @@ class ArmTests(unittest.TestCase):
         self.assertEqual({'close.py', 'close_tab.py', 'windows_terminal_uia.ps1'}, {path.name for path in extra})
         self.assertTrue(all(path.is_file() for path in extra))
 
-    def test_arm_passes_the_primary_checkout_and_sweep_when_both_resolve(self):
+    def test_literal_close_never_resolves_git_or_sweeps(self):
+        self.shared.git.side_effect = AssertionError('literal close must not inspect Git')
+        self.arm()
+        arguments = self.shared.start_detached.call_args.args[1]
+        self.assertNotIn('--repo', arguments)
+        self.assertNotIn('--sweep', arguments)
+
+    def test_closeout_passes_the_primary_checkout_and_sweep(self):
         self.shared.git.return_value = (0, str(ROOT / '.git'), '')
         with mock.patch.object(close, 'runtime', return_value=self.shared), \
-                mock.patch.object(close, 'sweep_script', return_value=Path('sweep.py')):
-            close.arm()
+                mock.patch.object(closeout, 'sweep_script', return_value=Path('sweep.py')):
+            closeout.arm()
         arguments = self.shared.start_detached.call_args.args[1]
         self.assertEqual(str(ROOT), arguments[arguments.index('--repo') + 1])
         self.assertEqual('sweep.py', arguments[arguments.index('--sweep') + 1])
@@ -84,8 +94,8 @@ class ArmTests(unittest.TestCase):
         self.shared.start_detached.assert_not_called()
 
     def arm_after_stop(self, landed_at=2000.0):
-        with mock.patch.object(close, 'runtime', return_value=self.shared),                 mock.patch.object(close, 'sweep_script', return_value=None):
-            return close.arm_after_stop(landed_at)
+        with mock.patch.object(close, 'runtime', return_value=self.shared),                 mock.patch.object(closeout, 'sweep_script', return_value=None):
+            return closeout.arm_after_stop(landed_at)
 
     def test_arm_after_stop_binds_the_watcher_to_the_recorded_stop(self):
         self.shared.finite_positive = watcher.session_close.finite_positive
@@ -107,7 +117,7 @@ class ArmTests(unittest.TestCase):
         self.shared.start_detached.assert_not_called()
 
     def test_multiplexed_host_cannot_arm(self):
-        self.shared.entries.return_value.append(('peer.json', {**self.entry, 'session_id': 'peer'}))
+        self.shared.close_target.side_effect = RuntimeError('shared by multiple session identities')
         with self.assertRaisesRegex(RuntimeError, 'shared by multiple'):
             self.arm()
         self.shared.start_detached.assert_not_called()
@@ -115,9 +125,9 @@ class ArmTests(unittest.TestCase):
     def test_runtime_resolves_from_source_and_both_packaged_entries(self):
         self.assertTrue((close.peer_scripts() / 'close.py').is_file())
         for directory in ('skills', 'codex-skills'):
-            entry = ROOT / 'plugins/machine' / directory / 'close/scripts/close_session.py'
+            entry = ROOT / 'plugins/cli' / directory / 'close/scripts/close_session.py'
             with mock.patch.object(close, '__file__', str(entry)):
-                self.assertEqual(entry.parents[2] / 'peer-cli/scripts', close.peer_scripts())
+                self.assertEqual(entry.parents[3] / '.agents/machine/utility/peer-cli/scripts', close.peer_scripts())
 
     def test_missing_packaged_dependency_cannot_fall_back_to_the_author_checkout(self):
         missing = ROOT / 'plugins/missing-package/codex-skills/close/scripts/close_session.py'
@@ -147,6 +157,9 @@ class WatcherTests(unittest.TestCase):
                                        '--pid-started-at', '100.5', '--armed-at', '1000', '--timeout', '60'])
         self.clock = Clock()
         self.rows = []
+        target = mock.patch.object(watcher.session_close, 'close_target', side_effect=lambda entry: entry)
+        target.start()
+        self.addCleanup(target.stop)
         live = mock.patch.object(watcher.session_close, 'verified_live', return_value=True)
         live.start()
         self.addCleanup(live.stop)
@@ -333,7 +346,7 @@ class WatcherTests(unittest.TestCase):
                                               '--pid-started-at', '100.5', '--armed-at', '1000']))
         reopen.assert_called_once_with(entry, 'closed')
         sweep.assert_not_called()
-        self.assertIn('host exit was not confirmed',
+        self.assertIn('frontend exit was not confirmed',
                       watcher.session_close.read_json(watcher.outcome_path('own'))['status'])
 
     def test_tab_refusal_reaches_the_receipt_without_signalling_or_sweeping(self):
@@ -396,9 +409,22 @@ class LandedTests(unittest.TestCase):
     def test_hook_arms_only_a_landed_delivery_and_never_raises(self):
         payload = json.dumps({'hook_event_name': 'Stop', 'session_id': 'own', 'cwd': str(self.linked)})
         for landed_at, failure in ((None, None), (1792843200.0, None), (1792843200.0, RuntimeError('refused'))):
-            with mock.patch.object(landed, 'merged_at', return_value=landed_at),                     mock.patch.object(landed.close_session, 'arm_after_stop', side_effect=failure) as arm,                     mock.patch.object(sys, 'stdin', io.StringIO(payload)):
+            with mock.patch.object(landed, 'merged_at', return_value=landed_at),                     mock.patch.object(landed.closeout, 'arm_after_stop', side_effect=failure) as arm,                     mock.patch.object(sys, 'stdin', io.StringIO(payload)):
                 self.assertEqual(0, landed.main())
             self.assertEqual(landed_at is not None, arm.called)
+
+    def test_automatic_closeout_cannot_replace_an_explicit_literal_close(self):
+        shared = mock.Mock()
+        shared.state_directory.return_value = Path('state')
+        shared.finite_positive = watcher.session_close.finite_positive
+        shared.read_json.side_effect = [{'armed_at': 1000.0}, None]
+        payload = json.dumps({'session_id': 'own', 'cwd': str(self.linked)})
+        with mock.patch.object(close, 'runtime', return_value=shared), \
+                mock.patch.object(landed.time, 'time', return_value=1002.0), \
+                mock.patch.object(landed, 'merged_at') as merged, \
+                mock.patch.object(sys, 'stdin', io.StringIO(payload)):
+            self.assertEqual(0, landed.main())
+        merged.assert_not_called()
 
 
 if __name__ == '__main__':
