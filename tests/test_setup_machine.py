@@ -467,6 +467,26 @@ class PermissionStepTests(Machine):
 
 
 class RuntimeTests(Machine):
+    def test_installed_runtime_can_load_live_proxy_transport_without_source_checkout(self):
+        self.converge(step("launch-check runtime"), self.context(windows=False))
+        installed = self.home / ".agents-state/bin"
+        probe = self.root / "runtime_probe.py"
+        probe.write_text(
+            "import sys\nfrom unittest.mock import patch\n"
+            "sys.path.insert(0, sys.argv[1])\nimport codex_hook_trust\nimport codex_websocket\n"
+            "assert codex_websocket.__file__.startswith(sys.argv[1])\n"
+            "with patch.object(codex_hook_trust.subprocess, 'Popen', side_effect=RuntimeError('transport-loaded')):\n"
+            "    try:\n        codex_hook_trust.AppServer('unused',sys.argv[1],existing=True)\n"
+            "    except RuntimeError as error:\n"
+            "        if str(error) != 'transport-loaded':\n            raise\n"
+            "        print('transport-loaded')\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run([sys.executable, "-I", "-B", str(probe), str(installed)],
+                                cwd=self.root, capture_output=True, timeout=15)
+        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
+        self.assertEqual(b"transport-loaded", result.stdout.strip())
+
     def test_the_launch_check_runtime_is_installed_once(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
         for name in setup.plugin_autoupdate.RUNTIME:
