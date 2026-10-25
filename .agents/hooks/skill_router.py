@@ -717,6 +717,21 @@ def transcript_skill_outcomes(transcript_path, codex_skills=(), read_skills=()):
                 except ValueError:
                     continue
                 payload = entry.get("payload") or {}
+                if entry.get("type") == "event_msg" and isinstance(payload, dict) \
+                        and payload.get("type") == "item_completed":
+                    item = payload.get("item") or {}
+                    if isinstance(item, dict) and item.get("type") == "CommandExecution" \
+                            and item.get("status") == "completed" and item.get("exit_code") == 0:
+                        command = item.get("command")
+                        output = item.get("aggregated_output")
+                        if isinstance(command, list) and all(isinstance(part, str) for part in command) \
+                                and isinstance(output, str):
+                            command = normalized_path(" ".join(command))
+                            output = output.replace("\r\n", "\n")
+                            for name, segment, plugin_segment, (head, tail) in codex_proofs:
+                                if segment in command and plugin_segment in command \
+                                        and head and (head in output or tail in output):
+                                    outcomes[name] = True
                 if entry.get("type") == "response_item" and isinstance(payload, dict):
                     payload_type = payload.get("type")
                     if payload_type == "custom_tool_call" and payload.get("name") == "exec":

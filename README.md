@@ -45,16 +45,25 @@ Both commands must finish successfully. A permissions-only `--step` run is a sco
 setup. Full setup owns the event channel, publisher configuration, launch runtime, shell profiles and
 catch-up. Wrapper files alone do not prove the event channel is configured.
 
+Setup wires normal shell launches through the same startup observer as handoffs. It repairs a selected,
+enabled plugin whose native installation is missing, then verifies that installation again. Disabled
+selections and trust controls retain their existing gates. On Linux, setup also installs the `python`
+binding used by Claude hook manifests and exposes it to managed launches.
+
+For selected Core hooks that use the shared dispatcher, startup confirmation waits for every selected
+dispatcher. An observed failure stops the newly launched child with the failing hook's diagnostic.
+Hooks outside that dispatcher and native paths that skip hooks remain host enforcement limitations;
+a successful startup receipt cannot establish a universal write boundary.
+
 Open a fresh terminal so its profile loads. In PowerShell, `Get-Command claude,codex` must resolve the
 managed functions; in bash/zsh, `type claude codex` must show the managed shell functions. Verify the
-installed launch check without starting an agent, from a repository that selects its standards:
+installed Agent startup binding without starting an agent, from a repository that selects its standards:
 
 ```powershell
-python -B "$HOME/.agents-state/bin/launch_check.py" --host codex --project (Get-Location).Path
-python -B "$HOME/.agents-state/bin/launch_check.py" --host claude --project (Get-Location).Path
+python -I -B "$HOME/.agents-state/bin/.agents/agent/runtime/startup_binding.py" --help
 ```
 
-On Linux, use `python3` and `--project "$PWD"`. Setup is complete only when the full `--check` exits zero,
+On Linux, use `python3`. Setup is complete only when the full `--check` exits zero,
 both fresh-terminal launch checks succeed, and required hooks execute successfully. A version string or
 an `unconfigured` update check is not completion evidence. If setup or verification fails, keep ordinary
 work blocked, diagnose the failed step and rerun the supported setup; do not silently continue on stale

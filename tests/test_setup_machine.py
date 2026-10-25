@@ -3,7 +3,6 @@ import io
 import json
 import os
 from pathlib import Path, PurePosixPath
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -15,7 +14,6 @@ if sys.version_info < (3, 11):
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / ".agents/machine/scripts"
-AGENT_STAGE = ROOT / ".agents/dependencies/agent/.agents/agent"
 sys.path.insert(0, str(SCRIPTS))
 import setup_machine as setup  # noqa: E402
 import tomllib  # noqa: E402
@@ -26,14 +24,6 @@ BOM = b"\xef\xbb\xbf"
 def snapshot(root: Path) -> dict[str, bytes]:
     return {path.relative_to(root).as_posix(): path.read_bytes()
             for path in sorted(root.rglob("*")) if path.is_file()}
-
-
-def stage_agent_setup_closure(root: Path) -> Path:
-    """Install the exact Agent inputs that a source checkout consumes."""
-    stage = root / ".agents/dependencies/agent/.agents/agent"
-    for relative in (Path("runtime"), Path("utility/plugins/scripts")):
-        shutil.copytree(AGENT_STAGE / relative, stage / relative)
-    return stage
 
 
 def completed(returncode=0, stdout="", stderr=""):
@@ -56,6 +46,17 @@ class FakeUserEnvironment:
 
 
 class Machine(unittest.TestCase):
+    def test_posix_setup_supplies_the_interpreter_named_by_claude_hooks(self):
+        context = self.context(windows=False)
+        self.converge(step('launch-check runtime'), context)
+        alias = context.state_directory / 'bin' / 'python'
+        self.assertEqual(setup.python_alias(), alias.read_text(encoding='utf-8'))
+        self.assertIn(str(alias.parent), setup.posix_block(sys.executable, setup.launch_script(context)))
+        if os.name != 'nt':
+            result = subprocess.run([str(alias), '-c', 'print("hook-interpreter-ready")'],
+                                    capture_output=True, text=True, timeout=10, check=True)
+            self.assertEqual('hook-interpreter-ready', result.stdout.strip())
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix="setup machine ü ")
         self.addCleanup(temp.cleanup)
@@ -167,7 +168,7 @@ class ProfileTests(Machine):
         return [self.documents / name / "Microsoft.PowerShell_profile.ps1" for name in setup.PROFILE_NAMES]
 
     def script(self):
-        return self.home / ".agents-state" / "bin" / "launch_check.py"
+        return self.home / ".agents-state" / "bin" / ".agents" / "agent" / "runtime" / "startup_binding.py"
 
     def block(self, newline="\r\n", loader=None):
         loader = loader or self.checkout / "shell" / "profile.ps1"
@@ -178,6 +179,17 @@ class ProfileTests(Machine):
         for path in self.profiles():
             self.assertEqual(BOM + (self.block() + "\r\n").encode("utf-8"), path.read_bytes())
             self.assertEqual([], list(path.parent.glob("*.bak")))
+
+    def test_host_launchers_bind_the_current_project_and_native_target_without_a_legacy_flag(self):
+        powershell = self.block()
+        posix = setup.posix_block(sys.executable, self.script())
+        for block in (powershell, posix):
+            self.assertIn("startup_binding.py", block)
+            self.assertIn("--target", block)
+            self.assertIn("--require-session-start", block)
+            self.assertNotIn("--launch", block)
+        self.assertIn("--project (Get-Location).Path", powershell)
+        self.assertIn('--project "$PWD"', posix)
 
     def test_an_existing_block_for_another_checkout_is_rewired(self):
         path = self.profiles()[1]
@@ -454,19 +466,19 @@ class PermissionStepTests(Machine):
 
         self.assertEqual(["Bash(mine)", "Bash(shipped)"], json.loads(settings.read_text(encoding="utf-8"))["permissions"]["allow"])
 
-    def test_the_permission_sync_module_is_loaded_from_the_staged_agent_closure(self):
-        running = self.root / "running" / "machine" / "scripts"
-        running.mkdir(parents=True)
-        staged = stage_agent_setup_closure(self.root)
-        helper = staged / "utility/plugins/scripts/harness_permissions_sync.py"
-        helper.write_text("SOURCE = 'staged'\n", encoding="utf-8")
+    def test_the_permission_sync_module_is_loaded_from_the_staged_agent_receipt(self):
+        running = self.root / "running" / ".agents" / "machine" / "scripts"
+        running_scripts = running.parents[2] / ".agents" / "dependencies" / "agent" / \
+            ".agents" / "agent" / "utility" / "plugins" / "scripts"
+        running_scripts.mkdir(parents=True)
+        (running_scripts / "harness_permissions_sync.py").write_text("SOURCE = 'staged-agent'\n", encoding="utf-8")
         context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
                                 run=self.unexpected_run, which=lambda name: None, documents=self.documents,
                                 script_directory=running)
 
         module = setup.permission_sync(context)
 
-        self.assertEqual("staged", module.SOURCE)
+        self.assertEqual("staged-agent", module.SOURCE)
 
     def test_a_missing_permission_sync_module_is_reported(self):
         context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
@@ -478,45 +490,54 @@ class PermissionStepTests(Machine):
 
 
 class RuntimeTests(Machine):
-    def test_installed_runtime_can_load_live_proxy_transport_without_source_checkout(self):
+    def test_installed_runtime_preserves_the_agent_package_closure_without_source_checkout(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
         installed = self.home / ".agents-state/bin"
-        probe = self.root / "runtime_probe.py"
-        probe.write_text(
-            "import sys\nfrom unittest.mock import patch\n"
-            "sys.path.insert(0, sys.argv[1])\nimport codex_hook_trust\nimport codex_websocket\n"
-            "assert codex_websocket.__file__.startswith(sys.argv[1])\n"
-            "with patch.object(codex_hook_trust.subprocess, 'Popen', side_effect=RuntimeError('transport-loaded')):\n"
-            "    try:\n        codex_hook_trust.AppServer('unused',sys.argv[1],existing=True)\n"
-            "    except RuntimeError as error:\n"
-            "        if str(error) != 'transport-loaded':\n            raise\n"
-            "        print('transport-loaded')\n",
-            encoding="utf-8",
-        )
-        result = subprocess.run([sys.executable, "-I", "-B", str(probe), str(installed)],
-                                cwd=self.root, capture_output=True, timeout=15)
-        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
-        self.assertEqual(b"transport-loaded", result.stdout.strip())
+        self.assertEqual((setup.runtime_source(self.context()) / 'source.json').read_bytes(),
+                         (installed / 'source.json').read_bytes())
+        for relative in (Path('.agents/agent/runtime/startup_binding.py'),
+                         Path('.agents/agent/resources/lanes/resolve.py'),
+                         Path('.agents/agent/utility/peer/scripts/register_session.py'),
+                         Path('.agents/agent-store/runtime/session_store.py')):
+            self.assertTrue((installed / relative).is_file(), relative)
+        result = subprocess.run([sys.executable, "-I", "-B", str(setup.launch_script(self.context())), "--help"],
+                                cwd=self.root, capture_output=True, text=True, timeout=15)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn('--require-session-start', result.stdout)
 
-    def test_the_launch_check_runtime_is_installed_once(self):
+    def test_the_agent_runtime_receipt_and_exports_are_installed_once(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
-        for name in setup.plugin_autoupdate.RUNTIME:
-            self.assertEqual((AGENT_STAGE / "runtime" / name).read_bytes(),
-                             (self.home / ".agents-state" / "bin" / name).read_bytes())
+        source = setup.runtime_source(self.context())
+        installed = self.home / '.agents-state/bin'
+        for relative in setup.runtime_files(source):
+            self.assertEqual((source / relative).read_bytes(), (installed / relative).read_bytes())
 
-    def test_the_runtime_is_installed_from_the_staged_agent_closure(self):
-        running = self.root / "running" / "machine" / "scripts"
-        running.mkdir(parents=True)
-        staged = stage_agent_setup_closure(self.root)
-        context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
-                                run=self.unexpected_run, which=lambda name: None, documents=self.documents,
-                                script_directory=running)
-
+    def test_installed_shell_entry_point_resolves_its_complete_dependency_closure(self):
+        context = self.context(windows=os.name == 'nt')
         setup.apply_runtime(context)
+        result = subprocess.run([sys.executable, '-I', '-B', str(setup.launch_script(context)), '--help'],
+                                cwd=self.root, capture_output=True, text=True, timeout=15)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn('--require-session-start', result.stdout)
 
-        for name in setup.plugin_autoupdate.RUNTIME:
-            self.assertEqual((staged / "runtime" / name).read_bytes(),
-                             (self.home / ".agents-state" / "bin" / name).read_bytes())
+    def test_runtime_check_detects_export_drift_without_writing_and_preserves_unrelated_files(self):
+        context = self.context(windows=False)
+        setup.apply_runtime(context)
+        installed = context.state_directory / 'bin'
+        unrelated = installed / 'keep-me.txt'
+        unrelated.write_text('keep', encoding='utf-8')
+        retired = installed / 'launch_check.py'
+        retired.write_text('retired', encoding='utf-8')
+        target = setup.launch_script(context)
+        target.write_text('changed', encoding='utf-8')
+        before = snapshot(self.root)
+        changes = setup.check_runtime(context)
+        self.assertIn(f'install {target}', changes)
+        self.assertIn(f'remove retired runtime {retired}', changes)
+        self.assertEqual(before, snapshot(self.root))
+        setup.apply_runtime(context)
+        self.assertTrue(unrelated.is_file())
+        self.assertFalse(retired.exists())
 
 
 class CatchUpTests(Machine):
@@ -749,84 +770,6 @@ class NativePermissionsTests(Machine):
         with mock.patch.object(setup.host_permissions, "desktop_running", side_effect=closed):
             setup.apply_native_permissions(context)
         self.assertTrue(json.loads(app.read_text(encoding="utf-8"))["saved-during-shutdown"])
-
-
-class SetupWrapperTests(unittest.TestCase):
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory(prefix="setup-wrapper-")
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name) / "checkout"
-        self.root.mkdir()
-        self.stage = self.root / ".agents/dependencies/agent"
-        shutil.copytree(ROOT / ".agents/dependencies/agent", self.stage)
-        shutil.copytree(ROOT / ".agents/dependencies/cli", self.root / ".agents/dependencies/cli")
-        declaration = self.root / ".agents/plugins/runtime-sources.json"
-        declaration.parent.mkdir(parents=True)
-        shutil.copy2(ROOT / ".agents/plugins/runtime-sources.json", declaration)
-        runtime_sources = self.root / "scripts/runtime_sources.py"
-        runtime_sources.parent.mkdir()
-        shutil.copy2(ROOT / "scripts/runtime_sources.py", runtime_sources)
-        self.bin = self.root / "fixture-bin"
-        self.bin.mkdir()
-        self.log = self.root / "calls.log"
-        self.environment = dict(os.environ, SETUP_WRAPPER_LOG=str(self.log))
-        self.environment["PATH"] = str(self.bin) + os.pathsep + self.environment.get("PATH", "")
-
-    def wrapper(self, name):
-        source = ROOT / name
-        target = self.root / name
-        shutil.copy2(source, target)
-        return target
-
-    def python_shim(self, name, *, posix=False):
-        if os.name == "nt" and not posix:
-            shim = self.bin / f"{name}.cmd"
-            shim.write_text(
-                "@echo off\r\necho %*>> \"%SETUP_WRAPPER_LOG%\"\r\nexit /b 0\r\n",
-                encoding="utf-8",
-            )
-        else:
-            shim = self.bin / name
-            shim.write_text(
-                "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$SETUP_WRAPPER_LOG\"\n",
-                encoding="utf-8",
-            )
-            shim.chmod(0o755)
-        return shim
-
-    def assert_checked_without_mutating_the_existing_stage(self, command, expected_calls=2):
-        before = snapshot(self.stage)
-        result = subprocess.run(command, cwd=self.root, env=self.environment, text=True,
-                                encoding="utf-8", capture_output=True, timeout=20)
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertEqual(before, snapshot(self.stage))
-        calls = self.log.read_text(encoding="utf-8").splitlines()
-        self.assertEqual(expected_calls, len(calls))
-        if expected_calls == 2:
-            self.assertIn("scripts", calls[0])
-            self.assertIn("runtime_sources.py", calls[0])
-            self.assertIn("--check", calls[0])
-        self.assertIn("setup_machine.py", calls[-1])
-        self.assertIn("--check", calls[-1])
-
-    def test_powershell_check_forwards_read_only_runtime_source_verification(self):
-        powershell = shutil.which("pwsh")
-        if powershell is None:
-            self.skipTest("pwsh is unavailable")
-        self.python_shim("python" if os.name == "nt" else "python3")
-        script = self.wrapper("setup.ps1")
-        self.assert_checked_without_mutating_the_existing_stage(
-            [powershell, "-NoProfile", "-File", str(script), "--check"],
-        )
-
-    def test_shell_check_forwards_read_only_runtime_source_verification(self):
-        git_bash = Path(os.environ.get("ProgramFiles", r"C:\\Program Files")) / "Git" / "bin" / "bash.exe"
-        bash = str(git_bash) if os.name == "nt" and git_bash.is_file() else shutil.which("bash")
-        if bash is None:
-            self.skipTest("bash is unavailable")
-        self.python_shim("python3", posix=True)
-        self.wrapper("setup.sh")
-        self.assert_checked_without_mutating_the_existing_stage([bash, "./setup.sh", "--check"])
 
 
 if __name__ == "__main__":
