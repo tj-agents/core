@@ -57,8 +57,17 @@ def expected_hooks(root: Path, config: dict, plugin: str) -> list[dict]:
 
 
 def validate_requires(root: Path, config: dict, catalog: dict, plugin: str, requires: dict) -> None:
-    if set(requires) != REQUIRED_KEYS:
+    if set(requires) not in (REQUIRED_KEYS, REQUIRED_KEYS | {"setup"}):
         raise ValueError(f"{plugin}: harness requires fields must be {sorted(REQUIRED_KEYS)}")
+    if "setup" in requires:
+        setup = requires["setup"]
+        if not isinstance(setup, dict) or set(setup) != {"script"} or not isinstance(setup["script"], str):
+            raise ValueError(f"{plugin}: invalid setup declaration")
+        script = PurePosixPath(setup["script"])
+        if script.is_absolute() or ".." in script.parts or script.suffix != ".py" or not setup["script"]:
+            raise ValueError(f"{plugin}: invalid setup declaration")
+        if not inside(root, setup["script"]).is_file():
+            raise ValueError(f"{plugin}: setup script is unavailable")
     required_marketplaces = requires["marketplaces"]
     marketplace_name = PACKAGES.core_marketplace(root, config)
     entries = PACKAGES.catalog_index(catalog)

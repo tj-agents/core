@@ -163,6 +163,17 @@ class HarnessPermissionValidationTests(unittest.TestCase):
             with self.subTest(command=command):
                 harness_permissions.validate_requires(self.requires(command), "test")
 
+    def test_optional_setup_declaration_is_strictly_validated(self):
+        requires = self.requires("Bash(python -B ${PLUGIN_ROOT}/script.py:*)")
+        requires["setup"] = {"script": ".agents/personal/utility/bot-identity/scripts/bot_identity.py"}
+        harness_permissions.validate_requires(requires, "test")
+        for setup in ({}, {"script": "../setup.py"}, {"script": "setup.ps1"}, {"script": "setup.py", "extra": True}):
+            with self.subTest(setup=setup):
+                invalid = self.requires("Bash(python -B ${PLUGIN_ROOT}/script.py:*)")
+                invalid["setup"] = setup
+                with self.assertRaises(harness_permissions.lock_io.LockError):
+                    harness_permissions.validate_requires(invalid, "test")
+
     def test_exact_script_rules_preserve_fixed_arguments(self):
         for command in (
             "Bash(python -B ${PLUGIN_ROOT}/script.py --clear)",

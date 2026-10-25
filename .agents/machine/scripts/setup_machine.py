@@ -25,6 +25,7 @@ import launch_check
 import plugin_autoupdate
 import machine_events
 import host_permissions
+import required_plugins
 
 COMMAND_TIMEOUT_SECONDS = 60
 INSTALLER_TIMEOUT_SECONDS = 600
@@ -54,6 +55,7 @@ class Context:
     user_environment: object = None
     script_directory: Path = Path(__file__).resolve().parent
     cache: dict = field(default_factory=dict)
+    onboard: bool = False
 
     def path_from(self, variable: str, default: Path) -> Path:
         configured = self.environ.get(variable)
@@ -717,6 +719,25 @@ def apply_native_permissions(context: Context) -> list[str]:
     return [f"updated native permission defaults in {path}" for path in targets]
 
 
+def plugin_setup_project(context: Context) -> Path:
+    return context.checkout or Path.cwd().resolve()
+
+
+def plugin_setup_executables(context: Context) -> dict[str, str | None]:
+    return {host: context.which(host) for host in HOSTS}
+
+
+def check_plugin_setup(context: Context) -> list[str]:
+    return required_plugins.check_setup(plugin_setup_project(context), HOSTS, plugin_setup_executables(context))
+
+
+def apply_plugin_setup(context: Context) -> list[str]:
+    errors = required_plugins.converge_setup(plugin_setup_project(context), HOSTS, plugin_setup_executables(context), context.onboard)
+    if errors:
+        raise SetupError("; ".join(errors))
+    return []
+
+
 STEPS = (
     Step("preconditions", check_preconditions, nothing, required=True),
     Step("native permission defaults", check_native_permissions, apply_native_permissions),
@@ -729,6 +750,7 @@ STEPS = (
     Step("plugin and merge-policy catch-up", check_catch_up, apply_catch_up),
     Step("harness permissions", lambda context: synchronize_permissions(context, "check"),
          lambda context: synchronize_permissions(context, "apply")),
+    Step("plugin setup", check_plugin_setup, apply_plugin_setup),
 )
 
 
@@ -736,7 +758,11 @@ def run_steps(steps, context: Context, check_only: bool, out=sys.stdout, err=sys
     print(f"main checkout: {context.checkout or 'none (checkout-based steps are skipped)'}", file=out)
     drift = False
     failed = False
+    failed_steps = set()
     for step in steps:
+        if step.name == "plugin setup" and failed_steps & {"plugin and merge-policy catch-up", "harness permissions"}:
+            print("n/a    plugin setup: prerequisite setup step failed", file=out)
+            continue
         try:
             reason = step.skip(context)
             if reason:
@@ -756,6 +782,7 @@ def run_steps(steps, context: Context, check_only: bool, out=sys.stdout, err=sys
         except Exception as error:  # noqa: BLE001
             print(f"failed {step.name}: {error}", file=err)
             failed = True
+            failed_steps.add(step.name)
             if step.required:
                 return 2
     if failed:
@@ -801,15 +828,21 @@ def main(argv: list[str] | None = None) -> int:
     if delegated is not None:
         return delegated
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="report drift, write nothing, exit 1 on drift")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--check", action="store_true", help="report drift, write nothing, exit 1 on drift")
+    modes.add_argument("--onboard", action="store_true", help="allow explicitly requested plugin enrollment")
     parser.add_argument("--step", action="append", choices=[step.name for step in STEPS],
                         help="run named steps with their dependencies and required preconditions; repeat to select several")
     parsed = parser.parse_args(arguments)
     selected = set(parsed.step or ())
     if "shell profiles" in selected:
         selected.add("launch-check runtime")
+    if "plugin setup" in selected:
+        selected.update({"plugin and merge-policy catch-up", "harness permissions"})
     steps = tuple(step for step in STEPS if not selected or step.required or step.name in selected)
-    return run_steps(steps, machine_context(checkout), parsed.check)
+    context = machine_context(checkout)
+    context.onboard = parsed.onboard
+    return run_steps(steps, context, parsed.check)
 
 
 if __name__ == "__main__":
