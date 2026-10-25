@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / ".agents/machine/scripts"))
+sys.path.insert(0, str(ROOT / ".agents/dependencies/agent/.agents/agent/runtime"))
 import host_permissions
 
 
@@ -127,7 +127,7 @@ trust_level = "trusted"
             self.assertEqual("{}", claude.read_text(encoding="utf-8"))
 
     def test_project_generation_defaults_to_bypass_and_round_trips_standard(self):
-        scripts = ROOT / ".agents/machine/utility/plugin-selection/scripts"
+        scripts = ROOT / ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts"
         sys.path.insert(0, str(scripts))
         spec = importlib.util.spec_from_file_location("permissions_repo_config", scripts / "repo_config.py")
         config = importlib.util.module_from_spec(spec)

@@ -15,7 +15,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
-    "session_store", ROOT / ".agents/agent-store/runtime/session_store.py"
+    "session_store", ROOT / ".agents/dependencies/agent/.agents/agent-store/runtime/session_store.py"
 )
 STORE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(STORE)

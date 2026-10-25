@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 
 SPEC = importlib.util.spec_from_file_location(
-    "codex_websocket", Path(__file__).resolve().parents[1] / ".agents/machine/scripts/codex_websocket.py",
+    "codex_websocket", Path(__file__).resolve().parents[1] / ".agents/dependencies/agent/.agents/agent/runtime/codex_websocket.py",
 )
 WS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(WS)

@@ -15,7 +15,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / '.agents/machine/scripts'
+SCRIPTS = ROOT / '.agents/dependencies/agent/.agents/agent/runtime'
 sys.path.insert(0, str(SCRIPTS))
 
 
