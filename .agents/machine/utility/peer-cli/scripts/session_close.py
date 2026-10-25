@@ -372,6 +372,8 @@ def own_host_and_entry(cwd=None, session_id=None):
 
 def close_target(entry):
     """Resolve a dedicated frontend from an exact-session native launch receipt."""
+    if not valid_entry(entry):
+        raise Refusal("invalid session registry entry cannot resolve a frontend")
     shared = any(other.get("pid") == entry["pid"]
                  and other.get("pid_started_at") == entry["pid_started_at"]
                  and other.get("session_id") != entry["session_id"] for _path, other in entries())
