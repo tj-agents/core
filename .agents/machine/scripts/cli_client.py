@@ -230,14 +230,19 @@ def current_input(server, session_id):
             page = server.request('thread/items/list', params)
             for value in page['data']:
                 item = value['item']
-                if item.get('type') == 'userMessage' and item.get('clientId'):
-                    return item['clientId']
+                if item.get('type') == 'userMessage':
+                    identity = item.get('clientId')
+                    if not isinstance(identity, str) or not identity:
+                        raise RuntimeError('The latest native input has no attributable frontend identity')
+                    return identity
             cursor = page.get('nextCursor')
             if cursor is None:
                 break
             if not isinstance(cursor, str) or cursor in seen:
                 raise RuntimeError('Native input pagination did not advance')
             seen.add(cursor)
+        else:
+            raise RuntimeError('Native input history exceeds the attribution scan limit')
     raise RuntimeError('This native thread has no attributable frontend input')
 
 

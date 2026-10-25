@@ -404,6 +404,28 @@ class LandedTests(unittest.TestCase):
                 self.assertEqual(0, landed.main())
             self.assertEqual(landed_at is not None, arm.called)
 
+    def test_automatic_closeout_cannot_replace_an_explicit_literal_close(self):
+        shared = mock.Mock()
+        shared.state_directory.return_value = Path('state')
+        shared.finite_positive = watcher.session_close.finite_positive
+        shared.read_json.side_effect = [{'armed_at': 1000.0}, None]
+        payload = json.dumps({'session_id': 'own', 'cwd': str(self.linked)})
+        with mock.patch.object(close, 'runtime', return_value=shared), \
+                mock.patch.object(landed.time, 'time', return_value=1002.0), \
+                mock.patch.object(landed, 'merged_at') as merged, \
+                mock.patch.object(sys, 'stdin', io.StringIO(payload)):
+            self.assertEqual(0, landed.main())
+        merged.assert_not_called()
+
+    def test_both_hosts_wire_the_guarded_cli_hook(self):
+        target = '.agents/cli/workflow/closeout/scripts/close_landed.py'
+        for host in ('claude', 'codex'):
+            with self.subTest(host=host):
+                path = ROOT / f'.agents/plugins/manifests/{host}/machine-hooks.json'
+                stop = json.dumps(json.loads(path.read_text(encoding='utf-8'))['hooks']['Stop'])
+                self.assertIn(target, stop)
+                self.assertNotIn('.agents/machine/utility/close/scripts/close_landed.py', stop)
+
 
 if __name__ == '__main__':
     unittest.main()

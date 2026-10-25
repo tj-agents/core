@@ -4,7 +4,6 @@ import argparse
 import importlib
 import importlib.util
 import json
-import math
 from pathlib import Path
 import sys
 import time
@@ -85,19 +84,6 @@ def arm():
     if activity.get('turn_state') != 'working':
         raise shared.Refusal('this session has no active turn to close after')
     return start_watcher(shared, entry, time.time())
-
-
-def arm_after_stop(landed_at, session_id=None):
-    """Arm from a Stop hook that runs after the session store recorded this turn's stop."""
-    shared = runtime()
-    entry, activity = own_session(shared, session_id)
-    stopped = activity.get('last_activity_at')
-    if activity.get('turn_state') != 'awaiting_input' or not shared.finite_positive(stopped):
-        raise shared.Refusal('this session has no recorded stop to close after')
-    started = activity.get('started_at')
-    if not shared.finite_positive(started) or started >= landed_at:
-        raise shared.Refusal('the delivery landed before this session started')
-    return start_watcher(shared, entry, math.nextafter(stopped, 0.0))
 
 
 def main(argv=None):
