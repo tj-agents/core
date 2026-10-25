@@ -24,7 +24,7 @@ import required_plugins
 
 TIMEOUT = 300
 IN_USE = ".in_use"
-ADOPTION = "Codex adopts updates when the conversation resumes in a new process."
+ADOPTION = "Updated instruction text may require resuming the same Codex conversation; daemon hook reload is checked during sync."
 
 
 class RefreshError(RuntimeError):
@@ -497,7 +497,7 @@ def main(argv: list[str] | None = None) -> int:
             summary = {"check": result}
             if "codex" in hosts and result in {"current", "updated", "offline"}:
                 try:
-                    launch_check.ensure_hooks(project)
+                    launch_check.ensure_hooks(project, running_session=True)
                 except Exception as error:
                     summary["hook_readiness_error"] = str(error)
                     result = "failed"
@@ -522,7 +522,7 @@ def main(argv: list[str] | None = None) -> int:
             report = (verify(host, executable, project, marketplaces, plugins)
                       if arguments.verify or arguments.verify_only else {"host": host, "plugins": plugins, "problems": []})
             if host == "codex" and not arguments.verify_only and not report["problems"]:
-                launch_check.ensure_hooks(project, executable)
+                launch_check.ensure_hooks(project, executable, running_session=True)
         except (RefreshError, agent_cli.LaunchError, OSError, ValueError, RuntimeError, KeyError, TypeError, subprocess.TimeoutExpired) as error:
             report = {"host": host, "problems": [str(error)]}
         reports.append(report)

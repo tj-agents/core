@@ -7,7 +7,8 @@
     "base",
     "workflow",
     "agent-store",
-    "machine"
+    "machine",
+    "agent"
   ],
   "external_prerequisites": [],
   "skills": [
