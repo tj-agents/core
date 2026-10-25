@@ -653,6 +653,7 @@ class RunStepsTests(Machine):
             "preconditions", "native permission defaults", "event channel and publishers",
             "Claude marketplace auto-update", "launch-check runtime", "shell profiles", "hidden Git Bash for Claude",
             "Codex profile agents", "plugin and merge-policy catch-up", "harness permissions",
+            "plugin setup",
         ], [item.name for item in setup.STEPS])
 
 
