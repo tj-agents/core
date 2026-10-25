@@ -9,8 +9,9 @@ route: infer
 # Close the finished session
 
 Close when every outcome you own is finished: delivery, validation and handoffs are done, and nothing
-waits on an answer, approval or check. A PR waiting only for the user's review or merge is finished work. Honor an
-explicit keep-open request. Do not offer optional follow-ups to avoid closing.
+waits on an answer, approval or check. An open PR remains owned until its authorized delivery is complete
+or a real user-owned gate has been reported and the continuation is preserved. Honor an explicit keep-open
+request. Do not offer optional follow-ups to avoid closing.
 
 A user callout about a mistake opens an unresolved repair outcome. Answer the direct question and preserve
 the repair outcome until its current owner resolves it before reassessing completion.

@@ -31,6 +31,11 @@ def load_close_session(path):
 
 
 class HostFallbackTests(unittest.TestCase):
+    def setUp(self):
+        environment = mock.patch.dict(os.environ, {'CODEX_THREAD_ID': '', 'CLAUDE_CODE_SESSION_ID': ''})
+        environment.start()
+        self.addCleanup(environment.stop)
+
     def assert_sweep_script(self, script_path, updater_path, expected):
         script_path.parent.mkdir(parents=True)
         updater_path.parent.mkdir(parents=True)
@@ -306,6 +311,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                     time.sleep(.05)
                 self.assertIn('refused: no native terminal identity',
                               json.loads(outcome.read_text(encoding='utf-8'))['status'])
+                self.wait_for_observer_exit(json.loads(outcome.read_text(encoding='utf-8')))
                 self.assertIsNone(host.poll())
                 connection = store.connect(state / 'sessions.db')
                 self.assertIsNone(store.get_session(connection, handle)['ended_at'])

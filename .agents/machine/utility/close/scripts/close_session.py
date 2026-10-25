@@ -5,7 +5,6 @@ import importlib
 import importlib.util
 import json
 import math
-import os
 from pathlib import Path
 import sys
 import time
@@ -25,14 +24,22 @@ def runtime():
     return importlib.import_module('session_close')
 
 
-def verified_entry(shared):
-    entry = shared.own_host_and_entry()
-    for _path, other in shared.entries():
-        if (isinstance(other, dict) and other.get('pid') == entry['pid']
-                and other.get('pid_started_at') == entry['pid_started_at']
-                and other.get('session_id') != entry['session_id']):
-            raise shared.Refusal('registered host is shared by multiple session identities; do not close it')
+def verified_entry(shared, session_id=None):
+    entry = shared.own_host_and_entry(session_id=session_id)
+    shared.close_target(entry)
     return entry
+
+
+def cli_runtime():
+    here = Path(__file__).resolve()
+    anchor = here.parents[4] if here.parents[4].name == '.agents' else here.parents[3] / '.agents'
+    script = anchor / 'cli/utility/close/scripts/close_session.py'
+    if not script.is_file():
+        raise RuntimeError('machine:close cannot locate its shipped CLI close runtime')
+    spec = importlib.util.spec_from_file_location('machine_cli_close_runtime', script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def primary_checkout(shared):
@@ -64,14 +71,8 @@ def sweep_script(shared):
         return None
 
 
-def claude_transcript(session_id):
-    home = Path(os.environ.get('CLAUDE_CONFIG_DIR') or Path.home() / '.claude')
-    matches = list((home / 'projects').glob('*/' + session_id + '.jsonl'))
-    return matches[0] if len(matches) == 1 else None
-
-
-def own_session(shared):
-    entry = verified_entry(shared)
+def own_session(shared, session_id=None):
+    entry = verified_entry(shared, session_id)
     store = shared.register_session._load_session_store()
     if store is None:
         raise shared.Refusal('session turn store is unavailable')
@@ -85,28 +86,10 @@ def own_session(shared):
     return entry, activity
 
 
-def armed_path(shared, session_id):
-    return shared.state_directory() / 'session-close' / (session_id + '.armed.json')
-
-
 def start_watcher(shared, entry, armed_at):
-    arguments = ['--host', entry['host'], '--session-id', entry['session_id'], '--pid', str(entry['pid']),
-                 '--pid-started-at', repr(entry['pid_started_at']), '--armed-at', repr(armed_at),
-                 '--state-directory', str(shared.state_directory()),
-                 '--host-names', os.environ.get('AGENT_CLI_HOST_NAMES', '')]
-    transcript = claude_transcript(entry['session_id']) if entry['host'] == 'claude' else None
-    if transcript:
-        arguments += ['--transcript', str(transcript), '--transcript-offset', str(transcript.stat().st_size)]
     primary, sweep = primary_checkout(shared), sweep_script(shared)
-    if primary and sweep:
-        arguments += ['--repo', str(primary), '--sweep', str(sweep)]
-    shared.write_json(armed_path(shared, entry['session_id']), {'armed_at': armed_at})
-    here = Path(__file__).resolve()
-    scripts = peer_scripts()
-    shared.start_detached(here.with_name('close_watcher.py'), arguments,
-                          [scripts / 'close.py', scripts / 'close_tab.py', scripts / 'windows_terminal_uia.ps1'])
-    return {'operation': 'session-close', 'status': 'armed', 'session_id': entry['session_id'],
-            'transcript_checked': transcript is not None}
+    cleanup = (primary, sweep) if primary and sweep else None
+    return cli_runtime().start_watcher(shared, entry, armed_at, cleanup)
 
 
 def arm():
@@ -117,10 +100,10 @@ def arm():
     return start_watcher(shared, entry, time.time())
 
 
-def arm_after_stop(landed_at):
+def arm_after_stop(landed_at, session_id=None):
     """Arm from a Stop hook that runs after the session store recorded this turn's stop."""
     shared = runtime()
-    entry, activity = own_session(shared)
+    entry, activity = own_session(shared, session_id)
     stopped = activity.get('last_activity_at')
     if activity.get('turn_state') != 'awaiting_input' or not shared.finite_positive(stopped):
         raise shared.Refusal('this session has no recorded stop to close after')

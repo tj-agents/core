@@ -412,6 +412,11 @@
       "destination": "tier.json"
     },
     {
+      "plugin": "machine",
+      "source": ".agents/cli",
+      "destination": ".agents/cli"
+    },
+    {
       "plugin": "agent",
       "source": ".agents/tiers/agent.json",
       "destination": "tier.json"
