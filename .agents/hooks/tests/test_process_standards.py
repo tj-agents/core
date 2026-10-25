@@ -307,14 +307,8 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("Stop owned-path writes before invoking the launcher", handoff)
         self.assertIn("Preparing a pointer alone does not complete a handoff", handoff)
     def test_planning_to_execution_uses_scale_and_context(self):
-        lanes = " ".join(authored_skill("lanes").read_text(encoding="utf-8").split())
         plans = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
         execution = plans
-        self.assertIn("Lane selection never transfers task ownership", lanes)
-        self.assertIn("On either host the parent does its own work in the same checkout", lanes)
-        self.assertIn("explicit path and responsibility ownership", lanes)
-        self.assertIn("A small follow-up can stay with the parent", lanes)
-        self.assertIn("If delegation is unavailable", lanes)
         self.assertIn("Continue in the current context by default for small and medium plans", plans)
         self.assertIn("The parent retains ownership", plans)
         self.assertIn("massive plan whose design was a substantial phase", plans)
@@ -325,34 +319,6 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("changes owner, repository, worktree, PR, or logical workstream", plans)
         self.assertIn("Do not select a handoff as routine phase-ending ceremony", execution)
         self.assertIn("a massive plan has completed substantial design", execution)
-
-        for host in ("codex", "claude"):
-            with self.subTest(host=host):
-                launcher = (
-                    self.root / f".agents/machine/utility/handoff-{host}/SKILL.md"
-                ).read_text(encoding="utf-8")
-                flat_launcher = " ".join(launcher.split())
-                self.assertNotIn("After a small or medium plan", flat_launcher)
-                self.assertNotIn("After a massive plan", flat_launcher)
-                self.assertNotIn("engineering:plans", launcher)
-                self.assertNotIn("Split a job that designs and then delivers", launcher)
-
-    def test_side_handoff_submission_keeps_the_parent_executing(self):
-        for host in ("codex", "claude"):
-            with self.subTest(host=host):
-                launcher = (
-                    self.root / f".agents/machine/utility/handoff-{host}/SKILL.md"
-                ).read_text(encoding="utf-8")
-                flat_launcher = " ".join(launcher.split())
-                self.assertIn("bounded side-workstream handoff", flat_launcher)
-                self.assertIn("retain the originating goal and foreground writer lease", flat_launcher)
-                self.assertIn("continue its next action in the same turn", flat_launcher)
-                self.assertIn("does not satisfy the originating goal's completion condition", flat_launcher)
-                self.assertIn("Accept an already authorized prepared dispatch", flat_launcher)
-                self.assertIn("The caller owns the checkpoint, release and pickup rules", flat_launcher)
-                self.assertIn("successful submission is not pickup", flat_launcher)
-                self.assertNotIn("engineering:handoff", launcher)
-                self.assertNotIn("the handoff happened. Report it and stop.", launcher)
 
     def test_plan_artifacts_always_reach_merged_default_branch(self):
         plans = authored_skill("plans").read_text(encoding="utf-8")
@@ -431,7 +397,7 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn(
             "the original stops repository-scoped work; a completed delivery closes its own session "
             "through `engineering:merge` Step 5's `finish`; only when that is unavailable does the "
-            "`handoff` successor own the removal, closing the predecessor through `machine:peer-cli`",
+            "`handoff` successor own the removal, closing the predecessor through `agent:peer`",
             cd,
         )
         self.assertIn("follow `engineering:merging` under Transferred checkout cleanup", handoff)

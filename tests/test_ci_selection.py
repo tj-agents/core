@@ -31,7 +31,7 @@ class ClassificationTests(unittest.TestCase):
     def test_known_runtime_families_union_their_regressions_on_both_platforms(self):
         value = CI.classify([
             ".agents/hooks/problem_records.py",
-            ".agents/machine/utility/plugin-selection/scripts/adopt_plugins.py",
+            ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/adopt_plugins.py",
             "README.md",
         ])
         self.assertEqual(value["mode"], "focused")
@@ -52,9 +52,9 @@ class ClassificationTests(unittest.TestCase):
 
     def test_unknown_shared_infrastructure_and_mixed_changes_use_full_coverage(self):
         for path in (".agents/hooks/hook_runtime.py", ".agents/hooks/hook_dispatch.py",
-                     ".agents/machine/utility/plugin-selection/scripts/plugin_selection.py",
-                     ".agents/machine/utility/plugin-selection/scripts/repo_config.py",
-                     ".agents/machine/utility/plugin-selection/scripts/lock_io.py",
+                     ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/plugin_selection.py",
+                     ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/repo_config.py",
+                     ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/lock_io.py",
                      ".agents/plugins/sources.json", "tests/launcher_test_support.py"):
             with self.subTest(path=path):
                 self.assertEqual(CI.classify(["README.md", path])["mode"], "full")
