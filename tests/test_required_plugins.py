@@ -173,7 +173,8 @@ class RequiredPluginsTests(unittest.TestCase):
         binary, log = self.inventory_binary()
         with mock.patch.dict(os.environ, {"REQUIRED_PLUGINS_LOG": str(log)}):
             started = time.monotonic()
-            self.assertEqual((self.profile / "plugins/cache/arbitrary-publisher/arbitrary-stack/version",),
+            self.assertEqual({"arbitrary-stack@arbitrary-publisher":
+                              self.profile / "plugins/cache/arbitrary-publisher/arbitrary-stack/version"},
                              required.check(self.project, "codex", str(binary)))
         self.assertLess(time.monotonic() - started, required.INVENTORY_TIMEOUT_SECONDS)
         self.assertEqual(
