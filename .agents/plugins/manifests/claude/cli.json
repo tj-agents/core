@@ -1,0 +1,15 @@
+{
+  "name": "cli",
+  "description": "Close CLI tabs or finish their workflows before closing.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tj-agents/core",
+  "keywords": [
+    "cli",
+    "sessions",
+    "closeout"
+  ],
+  "displayName": "CLI lifecycle",
+  "skills": "./skills/"
+}
