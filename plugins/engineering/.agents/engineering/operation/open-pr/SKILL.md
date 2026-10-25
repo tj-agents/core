@@ -171,6 +171,9 @@ harness's `persistent-workflow` skill to give that binding a continuation.
 
 ### 7. Report and continue
 
+For pending CI, invoke `agent:background-listener` with the bound monitor before reporting the wait.
+On its completion event, report readiness or the next required action through this reporting contract.
+
 When the canonical goal has a fenced `completion` record, retain every unchecked PR task there with the
 PR's repository, number, full head SHA, task text, owner, and next action. Keep those entries until a fresh
 completion check observes the task resolved.
