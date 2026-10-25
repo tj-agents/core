@@ -588,6 +588,8 @@ class RunStepsTests(Machine):
              ["preconditions", "launch-check runtime", "shell profiles"]),
             (["--check", "--step", "shell profiles", "--step", "launch-check runtime"],
              ["preconditions", "launch-check runtime", "shell profiles"]),
+            (["--step", "plugin setup"],
+             ["preconditions", "plugin and merge-policy catch-up", "harness permissions", "plugin setup"]),
         )
         for arguments, expected in cases:
             with mock.patch.object(setup, "main_checkout", return_value=self.checkout), \
@@ -663,6 +665,16 @@ class RunStepsTests(Machine):
                                             io.StringIO(), io.StringIO()))
         later.assert_not_called()
 
+    def test_failed_catchup_skips_plugin_setup_even_when_scoped(self):
+        catchup = setup.Step("plugin and merge-policy catch-up", mock.Mock(side_effect=RuntimeError("offline")), mock.Mock())
+        permissions = setup.Step("harness permissions", mock.Mock(return_value=[]), mock.Mock())
+        plugin = setup.Step("plugin setup", mock.Mock(return_value=["needed"]), mock.Mock())
+        out, err = io.StringIO(), io.StringIO()
+        self.assertEqual(2, setup.run_steps([catchup, permissions, plugin], self.context(), False, out, err))
+        plugin.check.assert_not_called()
+        plugin.apply.assert_not_called()
+        self.assertIn("prerequisite setup step failed", out.getvalue())
+
     def test_windows_only_steps_skip_on_linux_without_running_anything(self):
         out = io.StringIO()
         self.assertEqual(0, setup.run_steps([step("hidden Git Bash for Claude")], self.context(windows=False), True, out))
@@ -673,6 +685,7 @@ class RunStepsTests(Machine):
             "preconditions", "native permission defaults", "event channel and publishers",
             "Claude marketplace auto-update", "launch-check runtime", "shell profiles", "hidden Git Bash for Claude",
             "Codex profile agents", "plugin and merge-policy catch-up", "harness permissions",
+            "plugin setup",
         ], [item.name for item in setup.STEPS])
 
 

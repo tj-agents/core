@@ -71,7 +71,7 @@ class LaunchCheckTests(unittest.TestCase):
         base = self.state / "plugins/cache/tj-agents/base/local"
         other = self.state / "plugins/cache/publisher/other/local"
         definitions = [("sessionStart", None, "command", "python start.py")]
-        with mock.patch.object(required_plugins, "check", return_value=(base, other)), \
+        with mock.patch.object(required_plugins, "check", return_value={"base@tj-agents": base}), \
                 mock.patch.object(codex_hook_trust, "required_definitions", return_value=definitions) as expected, \
                 mock.patch.object(codex_hook_trust, "apply_trust") as trust, \
                 mock.patch.object(codex_hook_trust, "reload_running") as reload:
@@ -80,7 +80,7 @@ class LaunchCheckTests(unittest.TestCase):
         expected.assert_called_once_with(base, "base@tj-agents")
         trust.assert_called_once_with("native-cli", self.state.resolve(), required={"base@tj-agents": definitions})
         reload.assert_not_called()
-        with mock.patch.object(required_plugins, "check", return_value=(base,)), \
+        with mock.patch.object(required_plugins, "check", return_value={"base@tj-agents": base}), \
                 mock.patch.object(codex_hook_trust, "required_definitions", return_value=definitions), \
                 mock.patch.object(codex_hook_trust, "apply_trust"), \
                 mock.patch.object(codex_hook_trust, "reload_running") as reload:
