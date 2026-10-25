@@ -136,13 +136,19 @@ def stage(root: Path, overrides: dict[str, Path], check: bool = False) -> list[d
             destination.mkdir(parents=True, exist_ok=True)
             previous = files(destination)
             expected = {**contents, "source.json": (json.dumps(receipt, indent=2) + "\n").encode("utf-8")}
+            for path in set(previous) - set(expected):
+                safe_path(destination, path).unlink()
+            directories = sorted((path for path in destination.rglob("*") if path.is_dir()),
+                                 key=lambda path: len(path.parts), reverse=True)
+            for directory in directories:
+                safe_path(destination, directory.relative_to(destination).as_posix())
+                if not any(directory.iterdir()):
+                    directory.rmdir()
             for path, body in expected.items():
                 output = safe_path(destination, path)
                 output.parent.mkdir(parents=True, exist_ok=True)
                 if previous.get(path) != body:
                     output.write_bytes(body)
-            for path in set(previous) - set(expected):
-                (destination / path).unlink()
             results.append({"name": name, "status": "staged", "revision": revision})
     return results
 

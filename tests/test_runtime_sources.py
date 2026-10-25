@@ -63,6 +63,24 @@ class RuntimeSourcesTests(unittest.TestCase):
         self.assertFalse((target / "helper.py").exists())
         self.assertTrue((target / "replacement.py").exists())
 
+    def test_restage_accepts_file_replaced_by_directory_and_back(self):
+        module = self.source / ".agents/agent/runtime/module"
+        module.write_text("old file", encoding="utf-8")
+        self.stage()
+        module.unlink()
+        module.mkdir()
+        nested = module / "helper.py"
+        nested.write_text("nested file", encoding="utf-8")
+        self.stage()
+        staged = self.root / ".agents/dependencies/agent/.agents/agent/runtime/module"
+        self.assertEqual("nested file", (staged / "helper.py").read_text(encoding="utf-8"))
+        nested.unlink()
+        module.rmdir()
+        module.write_text("new file", encoding="utf-8")
+        self.stage()
+        self.assertEqual("new file", staged.read_text(encoding="utf-8"))
+        self.assertEqual("verified", SOURCES.stage(self.root, {}, check=True)[0]["status"])
+
     def test_rejects_undeclared_local_override(self):
         with self.assertRaisesRegex(ValueError, "Undeclared"):
             SOURCES.stage(self.root, {"other": self.source})
