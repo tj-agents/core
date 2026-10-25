@@ -14,9 +14,9 @@ The repository also owns explicit PowerShell profile and CLI session-recovery in
 Marketplace owns the canonical plugin roster and dependency graph in
 [`catalog.json`](https://github.com/tj-agents/marketplace/blob/main/catalog.json). Machine's selector ships a
 pinned offline snapshot of that catalog and owns only curated stack choices and project settings generation.
-After a Marketplace catalog change, refresh the snapshot from a Marketplace checkout with
-`python -B scripts/update_marketplace_catalog.py --source <marketplace-checkout>` (use `python3` on Linux),
-then verify it with `--check`. Do not edit plugin names or dependencies in Core.
+After a Marketplace catalog change, Agent's publisher runtime maintains its own selector snapshot and
+publication receipt. Core verifies the staged export but never mutates it. Do not edit plugin names or
+dependencies in Core.
 
 ## Required setup on every machine
 
