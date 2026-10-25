@@ -101,6 +101,16 @@ class AdoptPluginsTests(unittest.TestCase):
         for plugin in CORE:
             self.assertIn(f'[plugins."{plugin}"]', codex)
 
+    def test_plugins_added_in_marketplace_are_selectable(self):
+        adopt_plugins.run(self.root, [], ["tauri", "rust-sqlx"], "write")
+        self.assertEqual(with_core("rust@tj-agents", "tauri@tj-agents", "rust-sqlx@tj-agents"), self.plugins())
+
+    def test_catalog_snapshot_names_and_dependencies_are_marketplace_owned(self):
+        roster = adopt_plugins.load_roster()
+        self.assertIn("tauri", roster["plugins"])
+        self.assertEqual(["rust"], roster["plugins"]["tauri"])
+        self.assertEqual(["engineering"], roster["plugins"]["azure"])
+
     def test_foreign_selection_requires_a_declared_source_and_survives_later_adoption(self):
         with self.assertRaises(LockError):
             adopt_plugins.run(self.root, [], ["concertable@agents"], "write")
