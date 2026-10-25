@@ -299,12 +299,17 @@ def main(argv: list[str] | None = None) -> int:
 
         if arguments.host not in HOSTS or not arguments.target:
             parser.error("--launch requires --host and --target")
-        prepared, environment, ticket = cli_client.prepare(
-            host, native_arguments, effective_project or arguments.project, os.environ,
-        )
+        try:
+            command = command_for_target(arguments.target, native_arguments)
+            prepared, environment, ticket = cli_client.prepare(
+                host, command[1:], effective_project or arguments.project, os.environ, executable=command[0],
+            )
+        except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+            print(f"launch: native client preparation failed: {error}", file=sys.stderr)
+            return 1
         process = None
         try:
-            process = subprocess.Popen(command_for_target(arguments.target, prepared), env=environment)
+            process = subprocess.Popen([command[0], *prepared], env=environment)
             cli_client.attach(ticket, process.pid)
             return process.wait()
         finally:
