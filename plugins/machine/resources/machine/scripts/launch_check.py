@@ -244,12 +244,10 @@ def ensure_hooks(project: Path, executable: str | None = None, *, running_sessio
     binary = executable or agent_cli.resolve_codex_executable()[0]
     expected = {}
     roots = required_plugins.check(project, "codex", binary)
-    for root in roots or ():
-        identity = f"{root.parent.name}@{root.parent.parent.name}"
-        if identity in required:
-            definitions = codex_hook_trust.required_definitions(root, identity)
-            if definitions:
-                expected[identity] = definitions
+    for identity, root in (roots or {}).items():
+        definitions = codex_hook_trust.required_definitions(root, identity)
+        if definitions:
+            expected[identity] = definitions
     codex_hook_trust.apply_trust(binary, project.resolve(), required=expected)
     if running_session:
         codex_hook_trust.reload_running(binary, project.resolve(), required=expected)
