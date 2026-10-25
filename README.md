@@ -86,6 +86,8 @@ immediate explicit refresh from the Core checkout, run:
 
 `machine:sync-plugins` owns adoption in a running session, including resuming the same conversation when
 native reload is unavailable. The agent runs explicit sync whenever an immediate refresh is needed.
+Fresh managed launches also establish [individual CLI close bindings](.agents/cli/utility/close/SKILL.md);
+setup cannot add native frontend evidence to an already running unmanaged CLI.
 For a running Codex daemon conversation, sync also requests native runtime reload and verifies the
 required hook definitions in that existing daemon. Checking a separate fresh process does not establish
 live-session readiness. A failed live reload blocks sync success; native hook trust remains unchanged.
