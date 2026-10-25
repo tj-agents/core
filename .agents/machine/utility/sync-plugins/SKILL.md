@@ -32,7 +32,20 @@ be verified, retain the current owner and report the failed hook and exact recov
 
 The host entry point names how this session adopts the result.
 
-Keep the same conversation through recovery. If the host cannot reload a running session's hook
-definitions, checkpoint the current task and give the exact native resume command for its existing
-session ID and absolute directory, then ask the user to say `continue`. Keep the session open while
-waiting for that action. Missing reload access does not authorize a successor or a new conversation.
+Keep the same conversation through recovery. Sync verifies installed packages and hook trust before
+attempting live adoption. If Codex cannot reload its owning client, sync arms the existing verified
+close-and-resume mechanism automatically, including standalone `--no-daemon` clients. It waits for the
+current turn to finish, confirms the exact old frontend exited, and resumes the same native conversation,
+profile and checkout through the managed launcher. It preserves peer clients and shared backends.
+
+When sync reports `relaunch: armed`, preserve the current task checkpoint and end the turn. Do not ask
+the user to restart or say `continue`; the resumed client receives the continuation itself. Arming is
+not successful adoption: verify the fresh client executed required startup hooks before ordinary work.
+A new input, refused or cancelled close, changed frontend binding or failed startup leaves recovery
+incomplete. Read the private `session-relaunch/<session-id>.json` receipt for its actual result.
+
+If restart cannot be armed, diagnose and repair that specific ownership or launch failure under the
+existing authorization. Do not focus an existing tab as a substitute for refresh, launch a duplicate live
+writer, change conversation, bypass trust, or turn a capability failure into a routine manual user step.
+Only a demonstrated user-owned credential or trust decision is a human gate. `--no-relaunch` explicitly
+disables automatic restart; verification-only runs never close a client.
