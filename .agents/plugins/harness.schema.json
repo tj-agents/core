@@ -146,7 +146,18 @@
           "type": "array",
           "items": { "$ref": "#/$defs/hook" }
         },
-        "permissions": { "$ref": "#/$defs/permissions" }
+        "permissions": { "$ref": "#/$defs/permissions" },
+        "setup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["script"],
+          "properties": {
+            "script": {
+              "type": "string",
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+\\.py$"
+            }
+          }
+        }
       }
     }
   }
