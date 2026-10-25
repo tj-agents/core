@@ -52,6 +52,31 @@ class Server:
 
 
 class LaunchCheckTests(unittest.TestCase):
+    def test_missing_selected_installation_is_repaired_before_launch_is_rechecked(self):
+        import required_plugins
+        import reload_plugins
+
+        missing = required_plugins.MissingRequiredPluginsError('missing base', self.state, ['base@tj-agents'])
+        with mock.patch.object(required_plugins, 'check_launch', side_effect=[missing, self.state]) as admission, \
+                mock.patch.object(reload_plugins, 'repair_missing') as repair:
+            self.assertEqual(self.state, CHECK.prepare_launch(self.state, 'claude', 'native-cli', ['prompt']))
+        repair.assert_called_once_with('claude', self.state, ('base@tj-agents',), 'native-cli')
+        self.assertEqual(2, admission.call_count)
+
+    def test_failed_repair_or_invalid_override_never_retries_as_a_different_launch(self):
+        import required_plugins
+        import reload_plugins
+
+        for failure in (required_plugins.RequiredPluginsError('unverifiable override'),
+                        required_plugins.MissingRequiredPluginsError('missing', self.state, ['base@tj-agents'])):
+            with self.subTest(failure=failure), \
+                    mock.patch.object(required_plugins, 'check_launch', side_effect=failure) as admission, \
+                    mock.patch.object(reload_plugins, 'repair_missing', side_effect=RuntimeError('repair failed')) as repair:
+                with self.assertRaises(RuntimeError):
+                    CHECK.prepare_launch(self.state, 'codex', 'native-cli', ['prompt'])
+                self.assertEqual(1, admission.call_count)
+                self.assertEqual(isinstance(failure, required_plugins.MissingRequiredPluginsError), repair.called)
+
     def test_unselected_project_does_not_require_an_uninstalled_codex(self):
         import agent_cli
         import codex_hook_trust
@@ -105,6 +130,9 @@ class LaunchCheckTests(unittest.TestCase):
         readiness = mock.patch.object(CHECK, "ensure_hooks")
         self.readiness = readiness.start()
         self.addCleanup(readiness.stop)
+        reconciliation = mock.patch.object(CHECK, 'reconcile_installs', return_value=[])
+        reconciliation.start()
+        self.addCleanup(reconciliation.stop)
         patcher = mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state),
                                                "CLAUDE_CONFIG_DIR": str(self.state / "claude")})
         patcher.start()
@@ -299,13 +327,13 @@ class LaunchCheckTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is not installed")
 class TerminalFunctionTests(unittest.TestCase):
-    def test_powershell_functions_check_first_then_pass_arguments_and_exit_code_through(self):
+    def test_powershell_functions_delegate_once_to_owned_startup_and_preserve_exit_code(self):
         with tempfile.TemporaryDirectory(prefix="terminal ") as temp:
             directory = Path(temp)
             log = directory / "log.jsonl"
             check = directory / "launch_check.py"
             check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
-                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
+                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\nraise SystemExit(7)\n", encoding="utf-8")
             echo = directory / "echo.py"
             echo.write_text(f"import json, sys\nopen({str(log)!r}, 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
                             "raise SystemExit(7)\n", encoding="utf-8")
@@ -331,7 +359,7 @@ class TerminalFunctionTests(unittest.TestCase):
                         capture_output=True, text=True, timeout=60)
                     self.assertEqual(7, result.returncode, result.stderr)
                     target = bin_directory / (f"{name}.cmd" if os.name == "nt" else name)
-                    self.assertEqual([f"check --host {name} --target {target} -- two words --flag {name}", json.dumps(["two words", "--flag"])],
+                    self.assertEqual([f"check --host {name} --project {Path.cwd()} --target {target} --require-session-start -- two words --flag {name}"],
                                      log.read_text(encoding="utf-8").splitlines())
                     previous = log.read_text(encoding="utf-8")
                     check.write_text("raise SystemExit(2)\n", encoding="utf-8")
@@ -343,18 +371,18 @@ class TerminalFunctionTests(unittest.TestCase):
                     self.assertEqual(2, blocked.returncode, blocked.stderr)
                     self.assertEqual(previous, log.read_text(encoding="utf-8"))
                     check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
-                                     f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
+                                     f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\nraise SystemExit(7)\n", encoding="utf-8")
 
 
 @unittest.skipIf(os.name == "nt" or not shutil.which("bash"), "POSIX bash is required")
 class PosixFunctionTests(unittest.TestCase):
-    def test_bash_functions_check_first_then_pass_arguments_and_exit_code_through(self):
+    def test_bash_functions_delegate_once_to_owned_startup_and_preserve_exit_code(self):
         with tempfile.TemporaryDirectory(prefix="terminal ") as temp:
             directory = Path(temp)
             log = directory / "log"
             check = directory / "launch_check.py"
             check.write_text(f"import os, sys\nopen({str(log)!r}, 'a').write(' '.join(['check', *sys.argv[1:], "
-                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\n", encoding="utf-8")
+                             f"os.environ.get({CHECK.HOST_VARIABLE!r}, '')]) + '\\n')\nraise SystemExit(7)\n", encoding="utf-8")
             bin_directory = directory / "bin"
             bin_directory.mkdir()
             target = bin_directory / "claude"
@@ -366,7 +394,7 @@ class PosixFunctionTests(unittest.TestCase):
                                     env=dict(os.environ, PATH=str(bin_directory) + os.pathsep + os.environ["PATH"]),
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(7, result.returncode, result.stderr)
-            self.assertEqual("check --host claude --target claude -- two words --flag claude\ntwo words|--flag|", log.read_text(encoding="utf-8"))
+            self.assertEqual(f"check --host claude --project {Path.cwd()} --target claude --require-session-start -- two words --flag claude\n", log.read_text(encoding="utf-8"))
             previous = log.read_text(encoding="utf-8")
             check.write_text("raise SystemExit(2)\n", encoding="utf-8")
             blocked = subprocess.run(["bash", "-c", f". '{rc}'; claude 'two words' --flag"],
