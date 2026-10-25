@@ -38,7 +38,7 @@ Global design and cross-repository plans belong in [`tj-agents/docs`](https://gi
 Keep core implementation plans here and link to shared designs instead of copying them.
 
 `.agents/` is the only canonical home for host-neutral capability definitions, workflow contracts,
-shared hooks, schemas, tests and resources. Logical Base, Agent Store, Engineering and Machine ownership lives below
+shared hooks, schemas, tests and resources. Logical Base, Agent Store, Agent, Engineering and Machine ownership lives below
 that directory; it must not be recreated as authored top-level source trees.
 
 `.codex/` contains Codex-only entry points, adapters, agent definitions and configuration. `.claude/`
