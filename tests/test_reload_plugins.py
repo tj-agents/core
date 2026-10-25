@@ -66,6 +66,11 @@ class FakeClaude:
 
 
 class RefreshCliTests(unittest.TestCase):
+    def setUp(self):
+        readiness = mock.patch.object(REFRESH.launch_check, "ensure_hooks")
+        self.readiness = readiness.start()
+        self.addCleanup(readiness.stop)
+
     def test_default_uses_native_commands_without_verification_or_bound_launch(self):
         with mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude"), \
                 mock.patch.object(REFRESH, "selection", return_value=({"tj-agents": "tj-agents/marketplace"}, ["machine@tj-agents"])), \
@@ -103,6 +108,13 @@ class RefreshCliTests(unittest.TestCase):
             self.assertEqual("codex", check.call_args.kwargs["host"])
             REFRESH.main([])
             self.assertIsNone(check.call_args.kwargs["host"])
+
+    def test_current_packages_do_not_make_a_sync_successful_with_unready_hooks(self):
+        self.readiness.side_effect = RuntimeError("required hook needs review")
+        with mock.patch.object(REFRESH.launch_check, "check", return_value="current"), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            self.assertEqual(1, REFRESH.main(["--host", "codex"]))
+        self.readiness.assert_called_once()
 
     def test_refresh_updates_applicable_claude_local_installations(self):
         fake = FakeClaude([

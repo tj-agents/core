@@ -487,6 +487,12 @@ def main(argv: list[str] | None = None) -> int:
                                     host=None if arguments.host == "both" else arguments.host)
         if result != "unconfigured":
             summary = {"check": result}
+            if "codex" in hosts and result in {"current", "updated"}:
+                try:
+                    launch_check.ensure_hooks(project)
+                except Exception as error:
+                    summary["hook_readiness_error"] = str(error)
+                    result = "failed"
             relaunched = relaunch_session(project, updated) if relaunch_allowed and result != "failed" else None
             if relaunched:
                 summary["claude"] = relaunched
@@ -504,6 +510,8 @@ def main(argv: list[str] | None = None) -> int:
             updated.update(changed)
             report = (verify(host, executable, project, marketplaces, plugins)
                       if arguments.verify or arguments.verify_only else {"host": host, "plugins": plugins, "problems": []})
+            if host == "codex" and not arguments.verify_only and not report["problems"]:
+                launch_check.ensure_hooks(project, executable)
         except (RefreshError, agent_cli.LaunchError, OSError, ValueError, RuntimeError, KeyError, TypeError, subprocess.TimeoutExpired) as error:
             report = {"host": host, "problems": [str(error)]}
         refreshed = not report["problems"]
