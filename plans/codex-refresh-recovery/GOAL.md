@@ -27,7 +27,7 @@ The user explicitly requires autonomous recovery instead of manual directory/res
 
 ## Reviews
 
-Independent read-only evidence verified the Claude-only relaunch boundary and absence of a native Codex self-relaunch test. Implementation review remains pending.
+Full native and independent process-safety review of `fe14c6fc` completed with one grouped finding: options after resume and compact short options were dropped. The parser is corrected and 19 recovery regressions now pass on both Windows and Ubuntu, including sandbox restrictions. Fresh incremental review remains required. Draft PR: https://github.com/tj-agents/core/pull/491.
 
 ## Implementation checkpoint
 
