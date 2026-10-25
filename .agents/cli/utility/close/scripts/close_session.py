@@ -39,6 +39,10 @@ def own_session(shared, session_id=None):
     entry = verified_entry(shared, session_id)
     if entry['host'] == 'codex':
         return entry, {}
+    return entry, session_activity(shared, entry)
+
+
+def session_activity(shared, entry):
     store = shared.register_session._load_session_store()
     if store is None:
         raise shared.Refusal('session turn store is unavailable')
@@ -51,7 +55,7 @@ def own_session(shared, session_id=None):
         raise shared.Refusal('this session has no active turn to close after')
     if activity.get('pid') != entry['pid'] or activity.get('pid_started_at') != entry['pid_started_at']:
         raise shared.Refusal('the CLI client attachment is not recorded in Agent Store; sync Machine and Agent Store')
-    return entry, activity
+    return activity
 
 
 def armed_path(shared, session_id):

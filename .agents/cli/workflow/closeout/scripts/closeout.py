@@ -67,7 +67,7 @@ def arm_after_stop(landed_at, session_id=None):
     shared = close_session.runtime()
     entry, activity = close_session.own_session(shared, session_id)
     if entry['host'] == 'codex':
-        started = entry.get('started_at')
+        started = close_session.session_activity(shared, entry).get('started_at')
         if not shared.finite_positive(started) or started >= landed_at:
             raise shared.Refusal('the delivery landed before this session started')
         return close_session.start_watcher(shared, entry, time.time(), cleanup(shared))
