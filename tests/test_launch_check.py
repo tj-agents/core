@@ -288,6 +288,25 @@ class LaunchCheckTests(unittest.TestCase):
         self.assertIn("since=all", server.paths[0])
         self.assertEqual({"since": "new", "since_at": CHECK.EXPIRY_SECONDS + 1}, self.saved())
 
+    def test_an_expired_cursor_checks_publishers_even_when_all_notifications_have_expired(self):
+        for host in ("codex", "claude", None):
+            with self.subTest(host=host), mock.patch.object(sys, "stderr", io.StringIO()):
+                self.cursor.write_text(json.dumps({"since": "old", "since_at": 0}), encoding="utf-8")
+                self.updates.clear()
+                self.assertEqual("updated", CHECK.check(ROOT, fetch=Server(), update=self.update(),
+                                                        now=CHECK.EXPIRY_SECONDS + 1, host=host))
+                self.assertEqual({("claude", None), ("codex", None)}, set(self.updates))
+                self.assertEqual({"since": "old", "since_at": CHECK.EXPIRY_SECONDS + 1}, self.saved())
+
+    def test_failed_empty_notification_catchup_keeps_the_cursor_expired_for_retry(self):
+        self.cursor.write_text(json.dumps({"since": "old", "since_at": 0}), encoding="utf-8")
+        with mock.patch.object(sys, "stderr", io.StringIO()):
+            self.assertEqual("failed", CHECK.check(ROOT, fetch=Server(),
+                                                   update=self.update({"claude": False}),
+                                                   now=CHECK.EXPIRY_SECONDS + 1, host="codex"))
+        self.assertEqual(0, self.saved()["since_at"])
+        self.assertEqual("old", self.saved()["since"])
+
     def test_a_cursor_within_the_expiry_window_polls_only_since_the_recorded_event(self):
         self.cursor.write_text(json.dumps({"since": "old", "since_at": 1000}), encoding="utf-8")
         server = Server([hint("old", "tj-agents/kit"), hint("new", "tj-agents/core")])
