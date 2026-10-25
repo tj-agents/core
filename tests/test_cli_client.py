@@ -261,8 +261,10 @@ class KernelCloseTests(unittest.TestCase):
 
     def test_native_metadata_reader_sees_the_exact_child_profile(self):
         with tempfile.TemporaryDirectory() as profile:
+            environment = {key: value for key, value in os.environ.items() if key.casefold() != 'codex_home'}
+            environment['Codex_Home' if os.name == 'nt' else 'CODEX_HOME'] = profile
             process = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(120)'],
-                                       env={**os.environ, 'CODEX_HOME': profile})
+                                       env=environment)
             try:
                 self.assertEqual(Path(profile).resolve(), client.process_profile(process.pid))
                 self.assertIn('import time; time.sleep(120)', client.process_arguments(process.pid))

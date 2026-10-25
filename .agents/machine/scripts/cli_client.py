@@ -231,7 +231,7 @@ def process_profile(pid):
             if not entry:
                 break
             key, separator, value = entry.partition("=")
-            if key == "CODEX_HOME" and separator:
+            if key.casefold() == "codex_home" and separator:
                 return Path(value).resolve()
         return Path.home().joinpath(".codex").resolve()
     finally:
