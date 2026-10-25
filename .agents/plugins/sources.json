@@ -393,8 +393,6 @@
     "engineering": [
       {"id": "tj-agents/agent-store", "marketplace": "tj-agents", "repository": "tj-agents/agent"},
       {"id": "tj-agents/agent", "marketplace": "tj-agents", "repository": "tj-agents/agent"},
-      {"id": "tj-agents/codex", "marketplace": "tj-agents", "repository": "tj-agents/agent"},
-      {"id": "tj-agents/cc", "marketplace": "tj-agents", "repository": "tj-agents/agent"},
       {"id": "tj-agents/cli", "marketplace": "tj-agents", "repository": "tj-agents/cli"}
     ]
   },
