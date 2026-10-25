@@ -73,11 +73,19 @@ class LaunchCheckTests(unittest.TestCase):
         definitions = [("sessionStart", None, "command", "python start.py")]
         with mock.patch.object(required_plugins, "check", return_value=(base, other)), \
                 mock.patch.object(codex_hook_trust, "required_definitions", return_value=definitions) as expected, \
-                mock.patch.object(codex_hook_trust, "apply_trust") as trust:
+                mock.patch.object(codex_hook_trust, "apply_trust") as trust, \
+                mock.patch.object(codex_hook_trust, "reload_running") as reload:
             # Call the implementation, bypassing only this test class's readiness stub.
             load("launch_check").ensure_hooks(self.state, "native-cli")
         expected.assert_called_once_with(base, "base@tj-agents")
         trust.assert_called_once_with("native-cli", self.state.resolve(), required={"base@tj-agents": definitions})
+        reload.assert_not_called()
+        with mock.patch.object(required_plugins, "check", return_value=(base,)), \
+                mock.patch.object(codex_hook_trust, "required_definitions", return_value=definitions), \
+                mock.patch.object(codex_hook_trust, "apply_trust"), \
+                mock.patch.object(codex_hook_trust, "reload_running") as reload:
+            load("launch_check").ensure_hooks(self.state, "native-cli", running_session=True)
+        reload.assert_called_once_with("native-cli", self.state.resolve(), required={"base@tj-agents": definitions})
 
     def test_shell_admission_refuses_unverifiable_codex_override_before_optional_updates(self):
         selection = self.state / ".agents/plugins.json"
