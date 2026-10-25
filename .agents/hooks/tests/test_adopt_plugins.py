@@ -10,7 +10,8 @@ import unittest
 from unittest.mock import patch
 
 
-SCRIPTS = Path(__file__).resolve().parents[2] / "machine" / "utility" / "plugin-selection" / "scripts"
+SCRIPTS = (Path(__file__).resolve().parents[2] / "dependencies" / "agent" / ".agents" /
+           "agent" / "utility" / "plugins" / "scripts")
 sys.path.insert(0, str(SCRIPTS))
 
 
