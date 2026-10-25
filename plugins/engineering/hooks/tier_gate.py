@@ -459,7 +459,7 @@ def cache_roots():
             plugin_root = Path(value).resolve()
         except (OSError, ValueError):
             continue
-        if len(plugin_root.parents) >= 3:
+        if len(plugin_root.parents) >= 3 and plugin_root.parents[2].name == 'cache':
             add(plugin_root.parents[2])
 
     here = Path(__file__).resolve()
