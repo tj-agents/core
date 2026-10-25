@@ -25,9 +25,9 @@ def git(source: Path, *args: str) -> str:
 
 
 def snapshot(source: Path) -> str:
-    revision = git(source, "rev-parse", "HEAD")
+    revision = git(source, "log", "-1", "--format=%H", "HEAD", "--", "catalog.json")
     if re.fullmatch(r"[0-9a-f]{40}", revision) is None:
-        raise ValueError("Marketplace HEAD is not a full commit ID")
+        raise ValueError("Marketplace has no committed catalog.json")
     catalog = json.loads(git(source, "show", f"{revision}:catalog.json"))
     if catalog.get("name") != "tj-agents" or not isinstance(catalog.get("plugins"), list):
         raise ValueError("Marketplace catalog is invalid")
