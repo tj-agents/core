@@ -80,10 +80,14 @@ class FrontendBindingTests(unittest.TestCase):
         self.entries[1][1]['started_at'] = 300.0
         with mock.patch.dict(os.environ, {'CODEX_THREAD_ID': 'own'}), \
                 mock.patch.object(session_close.os, 'getppid', return_value=10), \
+                mock.patch.object(session_close, 'current_codex_client',
+                                  return_value=(self.processes[21], {'client_identity': 'managed-input'})) as client, \
                 mock.patch.object(session_close, 'verified_live', return_value=True):
             self.assertEqual('own', session_close.own_host_and_entry(ROOT)['session_id'])
+            self.assertEqual('own', client.call_args.args[0])
         with mock.patch.dict(os.environ, {'CODEX_THREAD_ID': 'missing'}), \
-                mock.patch.object(session_close.os, 'getppid', return_value=10):
+                mock.patch.object(session_close.os, 'getppid', return_value=10), \
+                mock.patch.object(session_close, 'current_codex_client', side_effect=session_close.Refusal('cannot resolve input')):
             with self.assertRaisesRegex(session_close.Refusal, 'cannot resolve'):
                 session_close.own_host_and_entry(ROOT)
 
@@ -94,11 +98,11 @@ class FrontendBindingTests(unittest.TestCase):
         watcher = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(watcher)
         target = session_close.close_target(self.entry)
-        args = watcher.arguments(['--host', 'codex', '--session-id', 'own', '--pid', '10',
-                                  '--pid-started-at', '100', '--armed-at', '200', '--target', json.dumps(target)])
+        args = watcher.arguments(['--host', 'codex', '--session-id', 'own', '--pid', '21',
+                                  '--pid-started-at', '202', '--armed-at', '200'])
         with mock.patch.object(session_close, 'awaiting_input_activity'), \
                 mock.patch.object(session_close, '_record_own_end'), \
-                mock.patch.object(session_close, 'qualified_windows_wrapper'), \
+                mock.patch.object(watcher, 'registered_entry', return_value=target), \
                 mock.patch.object(watcher.close, 'close_host') as close, \
                 mock.patch.object(session_close, 'verified_exited', side_effect=lambda pid, _start: pid == 21) as exited:
             watcher.close_session(args, 206.0)
