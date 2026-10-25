@@ -26,6 +26,11 @@ standards discovery and the affected behavior in a fresh session on each support
 missing prerequisites or remaining verification explicitly. Keep credentials and native trust decisions
 under their existing controls. See [Machine setup and updates](README.md#machine-setup-and-updates).
 
+Marketplace owns plugin identities, source repositories and dependencies. Machine's offline selector
+snapshot is generated from Marketplace's authored catalog; Core owns stack choices and settings
+generation. Follow the [shared ownership decision](https://github.com/tj-agents/docs/blob/main/PLUGIN_CATALOG.md)
+when changing selection.
+
 ```text
 One laptop is missing Engineering after setup:
 1. Repair the repository-owned selection, installation or injection path that caused the omission.
