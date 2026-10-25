@@ -220,7 +220,8 @@ class SetupTests(unittest.TestCase):
             script = setup.install_runtime(Path(directory))
             self.assertEqual("launch_check.py", script.name)
             for name in events.plugins.RUNTIME:
-                self.assertEqual((SCRIPTS / name).read_bytes(), (Path(directory) / name).read_bytes())
+                self.assertEqual(events.plugins.runtime_file(SCRIPTS, name).read_bytes(),
+                                 (Path(directory) / name).read_bytes())
             result = subprocess.run([sys.executable, "-I", "-B", str(script), "--help"], capture_output=True,
                                     text=True, timeout=30)
             self.assertEqual(0, result.returncode, result.stderr)

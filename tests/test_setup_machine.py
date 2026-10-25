@@ -46,6 +46,17 @@ class FakeUserEnvironment:
 
 
 class Machine(unittest.TestCase):
+    def test_posix_setup_supplies_the_interpreter_named_by_claude_hooks(self):
+        context = self.context(windows=False)
+        self.converge(step('launch-check runtime'), context)
+        alias = setup.launch_script(context).parent / 'python'
+        self.assertEqual(setup.python_alias(), alias.read_text(encoding='utf-8'))
+        self.assertIn(str(alias.parent), setup.posix_block(sys.executable, setup.launch_script(context)))
+        if os.name != 'nt':
+            result = subprocess.run([str(alias), '-c', 'print("hook-interpreter-ready")'],
+                                    capture_output=True, text=True, timeout=10, check=True)
+            self.assertEqual('hook-interpreter-ready', result.stdout.strip())
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix="setup machine ü ")
         self.addCleanup(temp.cleanup)
@@ -157,7 +168,7 @@ class ProfileTests(Machine):
         return [self.documents / name / "Microsoft.PowerShell_profile.ps1" for name in setup.PROFILE_NAMES]
 
     def script(self):
-        return self.home / ".agents-state" / "bin" / "launch_check.py"
+        return self.home / ".agents-state" / "bin" / "startup_binding.py"
 
     def block(self, newline="\r\n", loader=None):
         loader = loader or self.checkout / "shell" / "profile.ps1"
@@ -490,7 +501,16 @@ class RuntimeTests(Machine):
     def test_the_launch_check_runtime_is_installed_once(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
         for name in setup.plugin_autoupdate.RUNTIME:
-            self.assertEqual((SCRIPTS / name).read_bytes(), (self.home / ".agents-state" / "bin" / name).read_bytes())
+            self.assertEqual(setup.plugin_autoupdate.runtime_file(SCRIPTS, name).read_bytes(),
+                             (self.home / ".agents-state" / "bin" / name).read_bytes())
+
+    def test_installed_shell_entry_point_resolves_its_complete_dependency_closure(self):
+        context = self.context(windows=os.name == 'nt')
+        setup.apply_runtime(context)
+        result = subprocess.run([sys.executable, '-I', '-B', str(setup.launch_script(context)), '--help'],
+                                cwd=self.root, capture_output=True, text=True, timeout=15)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn('--require-session-start', result.stdout)
 
     def test_the_runtime_is_installed_from_the_running_scripts_directory(self):
         running = self.root / "running" / "scripts"

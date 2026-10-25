@@ -16,6 +16,17 @@ specification.loader.exec_module(NATIVE)
 
 
 class NativeHostAcceptanceTests(unittest.TestCase):
+    def test_an_early_failure_cannot_reuse_a_previous_failed_observer_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence = Path(temporary)
+            receipt = evidence / 'codex-startup-observer.json'
+            receipt.write_text(json.dumps({'state': 'failed', 'error':
+                'workflow@tj-agents native-required-hook-failure-probe'}), encoding='utf-8')
+            operation = mock.Mock(side_effect=NATIVE.AcceptanceError('installation failed before launch'))
+            with self.assertRaisesRegex(NATIVE.AcceptanceError, 'no valid receipt'):
+                NATIVE.require_failure_probe('codex', evidence, operation)
+            self.assertFalse(receipt.exists())
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -183,7 +194,7 @@ class NativeHostAcceptanceTests(unittest.TestCase):
         codex.write_text("", encoding="utf-8")
         claude.write_text("", encoding="utf-8")
         temporary = self.root / "temporary"
-        environment = NATIVE.isolated_environment(temporary, codex, claude)
+        environment = NATIVE.isolated_environment(temporary, codex, claude, 'http://127.0.0.1:1/v1')
         self.assertEqual([str(codex.resolve().parent), str(claude.resolve().parent)], environment["PATH"].split(__import__("os").pathsep)[:2])
         self.assertEqual(Path(environment["HOME"]), self.root / "temporary" / "home")
         self.assertEqual(Path(environment["USERPROFILE"]), self.root / "temporary" / "home")
