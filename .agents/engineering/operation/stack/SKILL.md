@@ -17,6 +17,12 @@ Create each dependent branch from its recorded parent's verified current tip. Us
 Git branches. Use `engineering:open-pr` to open every child against its immediate parent branch. Review
 the child-only delta and validate its cumulative tree. Every unmerged PR dependency uses this relationship.
 
+```text
+Parent PR #120: Feature/Api targets main.
+Child PR #121: Feature/Ui branches from and targets Feature/Api.
+Review #121 against Feature/Api; validate Feature/Ui with both layers present.
+```
+
 Keep the stack limited to necessary active work and land each ready, authorized parent promptly.
 
 Land from the bottom up through the repository's selected merge workflow. After a parent lands,
