@@ -12,10 +12,13 @@ from __future__ import annotations
 import argparse
 import codecs
 from dataclasses import dataclass, field
+import hashlib
 import importlib.util
+import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import secrets
+import shlex
 import shutil
 import subprocess
 import sys
@@ -237,9 +240,9 @@ def powershell_block(python: str, script: Path, loader: Path | None, newline: st
             f"    if (-not $tjAgentsTarget) {{ Write-Error '{name} was not found on PATH'; return }}",
             f"    if (-not (Test-Path -LiteralPath {quoted(python)})) {{ Write-Error 'Standards verifier Python is unavailable'; $global:LASTEXITCODE = 1; return }}",
             f"    try {{ $env:{launch_check.HOST_VARIABLE} = '{name}';"
-            f" & {quoted(python)} -I -B {quoted(script)} --host {name} --target $tjAgentsTarget.Source --launch -- @args }}"
+            f" & {quoted(python)} -I -B {quoted(script)} --host {name} --project (Get-Location).Path"
+            " --target $tjAgentsTarget.Source --require-session-start -- @args }"
             f" finally {{ Remove-Item Env:{launch_check.HOST_VARIABLE} -ErrorAction SilentlyContinue }}",
-            "    if ($LASTEXITCODE -ne 0) { return }",
             "}",
         ]
     return newline.join([*lines, PROFILE_END])
@@ -249,9 +252,10 @@ def posix_block(python: str, script: Path) -> str:
     def quoted(value: object) -> str:
         return "'" + str(value).replace("'", "'\\''") + "'"
 
-    return "\n".join([PROFILE_START, *(
+    runtime_bin = script.parents[3] if len(script.parents) > 3 else script.parent
+    return "\n".join([PROFILE_START, f'export PATH={quoted(runtime_bin)}:"$PATH"', *(
         f'{name}() {{ [ -x {quoted(python)} ] || {{ printf "%s\\n" "Standards verifier Python is unavailable" >&2; return 1; }}; '
-        f'{launch_check.HOST_VARIABLE}={name} {quoted(python)} -I -B {quoted(script)} --host {name} --target "$(command -v {name})" --launch -- "$@"; }}'
+        f'{launch_check.HOST_VARIABLE}={name} {quoted(python)} -I -B {quoted(script)} --host {name} --project "$PWD" --target "$(command -v {name})" --require-session-start -- "$@"; }}'
         for name in HOSTS), PROFILE_END])
 
 
@@ -314,7 +318,7 @@ def profile_loader(context: Context) -> Path | None:
 
 
 def launch_script(context: Context) -> Path:
-    return context.state_directory / "bin" / "launch_check.py"
+    return context.state_directory / "bin" / ".agents" / "agent" / "runtime" / "startup_binding.py"
 
 
 def profile_updates(context: Context) -> tuple[list[tuple[Path, str, str, bool]], list[str]]:
@@ -626,38 +630,108 @@ def apply_autoupdate(context: Context) -> list[str]:
     return [f"Claude marketplace now auto-updates: {name}" for name in enable_claude_autoupdate(context.claude_home)]
 
 
-def install_runtime(directory: Path, source: Path = Path(__file__).resolve().parent) -> Path:
-    directory.mkdir(parents=True, exist_ok=True)
-    for name in plugin_autoupdate.RUNTIME:
-        target = directory / name
-        temporary = target.with_suffix(".next")
-        shutil.copyfile(source / name, temporary)
-        os.replace(temporary, target)
-    return directory / "launch_check.py"
+MANAGED_LEGACY_RUNTIME = (
+    "plugin_autoupdate.py", "machine_events.py", "launch_check.py", "reload_plugins.py",
+    "agent_cli.py", "codex_hook_trust.py", "codex_websocket.py", "required_plugins.py",
+)
 
 
 def runtime_source(context: Context) -> Path:
-    root = context.script_directory.parents[2]
-    candidate = root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime"
-    if candidate.is_dir():
-        return candidate
-    candidate = root / ".agents" / "agent" / "runtime"
-    if candidate.is_dir():
-        return candidate
-    return context.script_directory
+    return context.script_directory.parents[2] / ".agents" / "dependencies" / "agent"
+
+
+def runtime_manifest(source: Path) -> dict:
+    receipt = source / "source.json"
+    try:
+        value = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise SetupError(f"missing or invalid staged Agent receipt: {receipt}") from error
+    exports = value.get("exports") if isinstance(value, dict) else None
+    valid_export = lambda item: isinstance(item, str) and item.startswith(".agents/") \
+        and "\\" not in item and not PurePosixPath(item).is_absolute() and ".." not in PurePosixPath(item).parts
+    digest = value.get("sha256")
+    if value.get("repository") != "tj-agents/agent" or not isinstance(value.get("revision"), str) \
+            or not value["revision"] or not isinstance(exports, list) or not exports \
+            or len(exports) != len(set(exports)) or not all(valid_export(item) for item in exports) \
+            or not isinstance(digest, str) or not all(character in "0123456789abcdef" for character in digest) \
+            or len(digest) != 64:
+        raise SetupError(f"invalid staged Agent receipt: {receipt}")
+    return value
+
+
+def runtime_digest(source: Path, files: list[Path]) -> str:
+    value = hashlib.sha256()
+    for relative in sorted(files, key=lambda path: path.as_posix()):
+        if relative == Path("source.json"):
+            continue
+        body = (source / relative).read_bytes()
+        name = relative.as_posix().encode("utf-8")
+        value.update(name + b"\0" + str(len(body)).encode("ascii") + b"\0" + body)
+    return value.hexdigest()
+
+
+def runtime_files(source: Path) -> list[Path]:
+    manifest = runtime_manifest(source)
+    files = [Path("source.json")]
+    for export in manifest["exports"]:
+        root = source / export
+        if not root.is_dir() or not root.resolve().is_relative_to(source.resolve()):
+            raise SetupError(f"missing staged Agent export: {root}")
+        files.extend(path.relative_to(source) for path in root.rglob("*") if path.is_file()
+                     and not path.is_symlink() and "__pycache__" not in path.parts and path.suffix != ".pyc")
+    if runtime_digest(source, files) != manifest["sha256"]:
+        raise SetupError(f"staged Agent receipt does not match its exported bytes: {source / 'source.json'}")
+    return files
+
+
+def install_runtime(directory: Path, source: Path) -> Path:
+    files = runtime_files(source)
+    directory.mkdir(parents=True, exist_ok=True)
+    for relative in files:
+        if relative == Path("source.json"):
+            continue
+        target = directory / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_suffix(target.suffix + ".next")
+        shutil.copyfile(source / relative, temporary)
+        os.replace(temporary, target)
+    for name in MANAGED_LEGACY_RUNTIME:
+        (directory / name).unlink(missing_ok=True)
+    receipt = directory / "source.json"
+    temporary = receipt.with_suffix(".next")
+    shutil.copyfile(source / "source.json", temporary)
+    os.replace(temporary, receipt)
+    return directory / ".agents" / "agent" / "runtime" / "startup_binding.py"
 
 
 def check_runtime(context: Context) -> list[str]:
-    directory = launch_script(context).parent
+    directory = context.state_directory / "bin"
     source = runtime_source(context)
-    return [f"install {directory / name}" for name in plugin_autoupdate.RUNTIME
-            if not (directory / name).is_file()
-            or (directory / name).read_bytes() != (source / name).read_bytes()]
+    changes = [f"install {directory / relative}" for relative in runtime_files(source)
+               if not (directory / relative).is_file()
+               or (directory / relative).read_bytes() != (source / relative).read_bytes()]
+    changes.extend(f"remove retired runtime {directory / name}" for name in MANAGED_LEGACY_RUNTIME
+                   if (directory / name).exists())
+    if not context.windows:
+        alias = directory / 'python'
+        if not alias.is_file() or alias.read_text(encoding='utf-8') != python_alias() \
+                or (os.name != 'nt' and not os.access(alias, os.X_OK)):
+            changes.append(f'install Claude hook interpreter {alias}')
+    return changes
+
+
+def python_alias() -> str:
+    return '#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' "$@"\n'
 
 
 def apply_runtime(context: Context) -> list[str]:
-    install_runtime(launch_script(context).parent, runtime_source(context))
-    return [f"installed the launch-check runtime in {launch_script(context).parent}"]
+    directory = context.state_directory / "bin"
+    install_runtime(directory, runtime_source(context))
+    if not context.windows:
+        alias = directory / 'python'
+        alias.write_text(python_alias(), encoding='utf-8', newline='\n')
+        alias.chmod(0o755)
+    return [f"installed the Agent runtime in {directory}"]
 
 
 def stale_repositories(context: Context) -> list[str]:
