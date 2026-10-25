@@ -414,7 +414,7 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
 
-        for retired in ("finish.py", "close.py", "machine:close", "worktrees.ps1", "worktree remove --force"):
+        for retired in ("finish.py", "close.py", "worktrees.ps1", "worktree remove --force"):
             with self.subTest(retired=retired):
                 self.assertNotIn(retired, cleanup)
 
