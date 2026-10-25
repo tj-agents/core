@@ -1,0 +1,13 @@
+{
+  "plugin": "agent",
+  "payloads": [
+    "process"
+  ],
+  "prerequisites": [
+    "base"
+  ],
+  "external_prerequisites": [],
+  "skills": [
+    "background-listener"
+  ]
+}
