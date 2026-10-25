@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import lock_io
@@ -56,8 +56,15 @@ def _has_unbounded_script_arguments(command: str) -> bool:
 
 
 def validate_requires(requires: dict, label: str) -> None:
-    if not isinstance(requires, dict) or set(requires) != {"marketplaces", "plugins", "hooks", "permissions"}:
+    allowed = {"marketplaces", "plugins", "hooks", "permissions"}
+    if not isinstance(requires, dict) or set(requires) not in (allowed, allowed | {"setup"}):
         raise lock_io.LockError(f"{label}: invalid harness requirements")
+    if "setup" in requires:
+        setup = requires["setup"]
+        script = setup.get("script") if isinstance(setup, dict) and set(setup) == {"script"} else None
+        path = Path(*PurePosixPath(script).parts) if isinstance(script, str) else None
+        if not isinstance(script, str) or not script or path.is_absolute() or ".." in path.parts or path.suffix != ".py":
+            raise lock_io.LockError(f"{label}: invalid harness setup")
     if not isinstance(requires["marketplaces"], list) or not isinstance(requires["hooks"], list):
         raise lock_io.LockError(f"{label}: invalid marketplace or hook requirements")
     lock_io.require_string_list(requires["plugins"], f"{label}.plugins")

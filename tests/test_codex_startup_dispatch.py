@@ -9,10 +9,11 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
-    'base': (10, 7, [
+    'base': (30, 25, [
         ('hooks/tier_gate.py', ['--session-context']),
         ('.agents/base/policy/agent-files/scripts/session-context.py', []),
-        ('.agents/base/policy/idea-initialization/scripts/session-context.py', []),
+        ('.agents/base/policy/project-setup/scripts/session-context.py', []),
+        ('.agents/base/policy/solution-assessment/scripts/session-context.py', []),
         ('.agents/base/policy/task-routing/scripts/session-context.py', []),
     ]),
     'machine': (10, 7, [
@@ -64,7 +65,7 @@ class CodexStartupDispatchTests(unittest.TestCase):
             arguments = [arg.replace('${PLUGIN_ROOT}', plugin.as_posix())
                          for arg in shlex.split(command)[1:]]
             result = subprocess.run([sys.executable, *arguments], input=data, capture_output=True,
-                                    text=True, encoding='utf-8', cwd=cwd, timeout=10)
+                                    text=True, encoding='utf-8', cwd=cwd, timeout=35)
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertEqual('', result.stderr)
             output = json.loads(result.stdout)['hookSpecificOutput']

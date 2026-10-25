@@ -6,9 +6,6 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Protocol
 
 CONTRACT_VERSION = "v2"
-RELEASES = ("A", "B", "C")
-ENTRY_KINDS = ("compatibility-entry", "driver")
-ENTRY_STATUSES = ("supported", "deprecated", "retained")
 IDENTITY_FIELDS = ("contract_version", "workflow_id", "workflow_run_id", "stage_id", "dispatch_id")
 WORK_ITEM_STATUSES = ("proposed", "active", "delivery-gated", "blocked", "paused", "done")
 WORK_ITEM_SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
@@ -495,23 +492,6 @@ class WorkflowContract:
         role_body = role_manifest_path.parent / role_manifest["body"]
         if not role_body.is_file():
             raise ContractViolation(f"missing fixture role body {role_manifest['body']}")
-        release = self.compatibility["release"]
-        if release not in RELEASES:
-            raise ContractViolation(f"unknown compatibility release {release}")
-        entries = self.compatibility["compatibility_entries"]
-        for name, entry in entries.items():
-            if entry["kind"] not in ENTRY_KINDS:
-                raise ContractViolation(f"{name} declares an unknown compatibility kind")
-            if entry["status"] not in ENTRY_STATUSES:
-                raise ContractViolation(f"{name} declares an unknown compatibility status")
-            if entry["replacement"] == name:
-                raise ContractViolation(f"{name} cannot replace itself")
-            if entry["replacement"] in entries:
-                raise ContractViolation(f"{name} names another compatibility entry as its replacement")
-            if entry["status"] == "deprecated" and release == "A":
-                raise ContractViolation(f"{name} cannot be deprecated before release B")
-            if entry["kind"] == "driver" and entry["status"] != "retained":
-                raise ContractViolation(f"{name} is a driver and must stay retained")
         discovered_skills = list(self.workflow_root.rglob("SKILL.md"))
         if discovered_skills:
             raise ContractViolation(f"shared workflow resources contain discoverable skills: {discovered_skills!r}")
@@ -525,8 +505,6 @@ class WorkflowContract:
             "decks": len(decks),
             "hosts": len(host_ids),
             "roles": len(role_ids),
-            "release": release,
-            "compatibility_entries": len(entries),
         }
 
 

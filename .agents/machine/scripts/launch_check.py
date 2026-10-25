@@ -222,6 +222,52 @@ def mark_current(fetch=https_get, now: float | None = None) -> bool:
     return True
 
 
+def require_update_check(result: str) -> None:
+    if result == "busy":
+        raise RuntimeError("Another plugin update is still running. Wait for it to finish, then retry the launch.")
+    if result not in {"current", "updated", "offline"}:
+        raise RuntimeError(
+            f"Automatic plugin update check is {result}. Run Core's full setup.ps1 on Windows or "
+            "setup.sh on Linux, then the same command with --check; verify the fresh-terminal "
+            "launch check before continuing ordinary work. A scoped permissions-only setup is incomplete."
+        )
+
+
+def prepare_launch(project, host, executable, arguments):
+    import required_plugins
+
+    try:
+        return required_plugins.check_launch(project, host, executable, arguments)
+    except required_plugins.MissingRequiredPluginsError as error:
+        import reload_plugins
+
+        reload_plugins.repair_missing(host, error.project, error.missing, executable)
+        return required_plugins.check_launch(project, host, executable, arguments)
+
+
+def ensure_hooks(project: Path, executable: str | None = None, *, running_session=False) -> None:
+    import agent_cli
+    import codex_hook_trust
+    import required_plugins
+
+    required = required_plugins.selected(required_plugins.project_root(project))
+    if not required:
+        return
+    binary = executable or agent_cli.resolve_codex_executable()[0]
+    expected = {}
+    roots = required_plugins.check(project, "codex", binary)
+    for identity, root in (roots or {}).items():
+        definitions = codex_hook_trust.required_definitions(root, identity)
+        if definitions:
+            expected[identity] = definitions
+    codex_hook_trust.apply_trust(binary, project.resolve(), required=expected)
+    if running_session:
+        try:
+            codex_hook_trust.reload_running(binary, project.resolve(), required=expected)
+        except (OSError, RuntimeError) as error:
+            raise codex_hook_trust.RestartRequired(str(error)) from error
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
@@ -231,20 +277,35 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--target")
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     arguments = parser.parse_args(argv)
+    effective_project = arguments.project.resolve()
     if arguments.host:
         import required_plugins
 
         try:
             native_arguments = arguments.arguments[1:] if arguments.arguments[:1] == ["--"] else arguments.arguments
-            required_plugins.check_launch(arguments.project.resolve(), arguments.host, arguments.target, native_arguments)
-        except required_plugins.RequiredPluginsError as error:
+            effective_project = prepare_launch(arguments.project.resolve(), arguments.host,
+                                               arguments.target, native_arguments)
+        except (required_plugins.RequiredPluginsError, RuntimeError, OSError) as error:
             print(f"plugins: {error}", file=sys.stderr)
             return 1
     try:
         host = arguments.host or os.environ.get(HOST_VARIABLE, "").strip().casefold()
-        check(arguments.project.resolve(), host=host if host in HOSTS else None)
+        result = check(effective_project or arguments.project.resolve(), host=host if host in HOSTS else None)
     except Exception as error:
         print(f"plugins: update check failed: {error}", file=sys.stderr)
+        result = "failed"
+    if host in HOSTS and effective_project is not None:
+        try:
+            require_update_check(result)
+        except RuntimeError as error:
+            print(f"plugins: {error}", file=sys.stderr)
+            return 1
+    if host == "codex" and effective_project is not None:
+        try:
+            ensure_hooks(effective_project, arguments.target)
+        except Exception as error:
+            print(f"plugins: required hook readiness failed: {error}", file=sys.stderr)
+            return 1
     return 0
 
 

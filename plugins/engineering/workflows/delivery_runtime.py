@@ -20,16 +20,6 @@ class DeliveryContractViolation(ValueError):
     pass
 
 
-STANDING_AUTHORIZATION_FILE = ".agents/delivery-authorization.json"
-AUTHORIZATION_KEYS = {
-    "$comment",
-    "standing_authorization",
-    "instruction",
-    "always_stop_paths",
-    "hold_label",
-    "authorized_stop_classes",
-    "auto_merge",
-}
 # Change classes whose risk neither the hard floor nor the selected end-to-end tier can observe, so a
 # green exact head and a clean review are not evidence about them. These hold in any repository; a
 # repo's own inventory goes in the table's `always_stop_paths`.
@@ -61,20 +51,7 @@ STOP_CLASSES = (
     ),
 )
 
-EXEMPTIBLE_STOP_CLASSES = frozenset(
-    {
-        "ci-workflow",
-        "migration",
-        "auth",
-        "money",
-        "published-contract",
-    }
-)
-
-
 BINDING_FILE = ".agents/persistent-workflow-binding.json"
-# `persistent_workflow_merge_gate.py` reads the artifact by these short names; the in-memory
-# contract binding uses the long ones.
 ARTIFACT_ALIASES = (
     ("repo", "repository"),
     ("pr", "pr_number"),
@@ -142,11 +119,11 @@ class StandingMergeAuthorization:
             patterns.append(("repository-declared", re.compile(entry)))
         return patterns
 
-    def resolve(self, policy, changed_paths, labels=(), root=None):
+    def resolve(self, policy, changed_paths, labels, root):
         self.validate_policy(policy)
         mode = policy["standing_authorization"]
         try:
-            auto_merge = policy.get("auto_merge", False) if root is None else delivery_policy.auto_merge_preference(root, policy)
+            auto_merge = delivery_policy.auto_merge_preference(root)
         except ValueError as error:
             raise DeliveryContractViolation(str(error)) from error
         hold_label = policy.get("hold_label")

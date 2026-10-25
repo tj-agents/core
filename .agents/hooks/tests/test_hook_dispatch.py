@@ -110,44 +110,87 @@ class HookDispatchTests(unittest.TestCase):
         return output, result.stderr
 
     def test_most_restrictive_decision_wins_and_every_context_is_kept(self):
-        output, _ = self.dispatch(["allow.py", "ask.py", "context.py", "deny.py", "echo.py"])
+        output, _ = self.dispatch(["--hook", "allow.py", "--hook", "ask.py", "--hook", "context.py",
+                                   "--hook", "deny.py", "--hook", "echo.py"])
         specific = output["hookSpecificOutput"]
         self.assertEqual("deny", specific["permissionDecision"])
         self.assertEqual("deny reason", specific["permissionDecisionReason"])
         self.assertEqual("context from Bash\n\necho m1", specific["additionalContext"])
 
-        output, _ = self.dispatch(["allow.py", "ask.py"])
+        output, _ = self.dispatch(["--hook", "allow.py", "--hook", "ask.py"])
         self.assertEqual("ask", output["hookSpecificOutput"]["permissionDecision"])
         self.assertEqual("ask reason", output["hookSpecificOutput"]["permissionDecisionReason"])
 
-    def test_tool_matcher_selects_gates_like_the_host(self):
-        output, _ = self.dispatch(["deny.py@Bash|PowerShell", "context.py"], tool="Read")
-        self.assertNotIn("permissionDecision", output["hookSpecificOutput"])
-        self.assertEqual("context from Read", output["hookSpecificOutput"]["additionalContext"])
-        output, _ = self.dispatch([str(self.hooks / "deny.py") + "@Bash|PowerShell"], tool="PowerShell")
-        self.assertEqual("deny", output["hookSpecificOutput"]["permissionDecision"])
-        output, _ = self.dispatch(["deny.py@Bash"], tool="BashOutput")
-        self.assertEqual({}, output)
-
     def test_each_gate_reads_the_full_payload_even_after_a_sibling_rebinds_stdin(self):
-        output, _ = self.dispatch(["rebind.py", "echo.py", "crash.py", "echo.py"])
+        output, _ = self.dispatch(["--hook", "rebind.py", "--hook", "echo.py", "--hook", "crash.py",
+                                   "--hook", "echo.py"])
         self.assertEqual("echo m1\n\necho m1", output["hookSpecificOutput"]["additionalContext"])
 
     def test_a_crashing_gate_is_reported_and_its_siblings_still_run(self):
-        output, stderr = self.dispatch(["crash.py", "context.py"])
+        output, stderr = self.dispatch(["--hook", "crash.py", "--hook", "context.py"])
         self.assertIn("crash.py", stderr)
         self.assertIn("gate exploded", stderr)
         self.assertEqual("context from Bash", output["hookSpecificOutput"]["additionalContext"])
+        self.assertEqual("deny", output["hookSpecificOutput"]["permissionDecision"])
+
+    def test_failed_required_startup_never_acknowledges_readiness(self):
+        token = "verified-startup-token-that-is-long-enough"
+        environment = dict(os.environ, TJ_AGENTS_STARTUP_ACK_DIRECTORY=self.temp.name,
+                           TJ_AGENTS_STARTUP_ACK_TOKEN=token, TJ_AGENTS_STARTUP_REQUIRED_HOOKS='[]')
+        for failed in ("crash.py", "missing.py"):
+            with self.subTest(failed=failed):
+                result = subprocess.run(
+                    [sys.executable, "-B", str(self.hooks / DISPATCH.name), "--hook", failed],
+                    input=json.dumps({"hook_event_name": "SessionStart"}), capture_output=True,
+                    text=True, env=environment, timeout=20,
+                )
+                self.assertEqual(0, result.returncode)
+                self.assertFalse(json.loads(result.stdout)["continue"])
+                self.assertFalse((Path(self.temp.name) / token).exists())
+
+    def test_one_successful_startup_hook_cannot_conceal_a_required_sibling_failure(self):
+        token = 'aggregate-startup-token-that-is-long-enough'
+        environment = dict(os.environ, TJ_AGENTS_STARTUP_ACK_DIRECTORY=self.temp.name,
+                           TJ_AGENTS_STARTUP_ACK_TOKEN=token,
+                           TJ_AGENTS_STARTUP_REQUIRED_HOOKS=json.dumps(['base@tj-agents', 'workflow@tj-agents']))
+        for name, gate in [('base', 'plain.py'), ('workflow', 'crash.py')]:
+            plugin = Path(self.temp.name) / name
+            shutil.copytree(self.hooks, plugin / 'hooks')
+            (plugin / 'harness.json').write_text(json.dumps({'plugin': 'tj-agents/' + name}), encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B', str(plugin / 'hooks/hook_dispatch.py'),
+                                     '--hook', gate], input=json.dumps({'hook_event_name': 'SessionStart'}),
+                                    capture_output=True, text=True, env=environment, timeout=20)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertFalse((Path(self.temp.name) / token).exists())
+        failure = (Path(self.temp.name) / (token + '.failed')).read_text(encoding='utf-8')
+        self.assertIn('workflow@tj-agents', failure)
+        self.assertIn('gate exploded', failure)
+
+    def test_startup_acknowledgement_waits_for_every_required_dispatcher(self):
+        token = 'complete-startup-token-that-is-long-enough'
+        environment = dict(os.environ, TJ_AGENTS_STARTUP_ACK_DIRECTORY=self.temp.name,
+                           TJ_AGENTS_STARTUP_ACK_TOKEN=token,
+                           TJ_AGENTS_STARTUP_REQUIRED_HOOKS=json.dumps(['base@tj-agents', 'workflow@tj-agents']))
+        for index, name in enumerate(('base', 'workflow')):
+            plugin = Path(self.temp.name) / name
+            shutil.copytree(self.hooks, plugin / 'hooks')
+            (plugin / 'harness.json').write_text(json.dumps({'plugin': 'tj-agents/' + name}), encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B', str(plugin / 'hooks/hook_dispatch.py'),
+                                     '--hook', 'plain.py'], input=json.dumps({'hook_event_name': 'SessionStart'}),
+                                    capture_output=True, text=True, env=environment, timeout=20)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertEqual(index == 1, (Path(self.temp.name) / token).exists())
 
     def test_a_gate_raising_a_base_exception_is_a_crash_not_an_overrun(self):
         for deadline in ([], ["--deadline", "20"]):
-            output, stderr = self.dispatch([*deadline, "interrupt.py", "context.py"])
+            output, stderr = self.dispatch([*deadline, "--hook", "interrupt.py", "--hook", "context.py"])
             self.assertIn("gate interrupted", stderr)
             self.assertEqual("context from Bash", output["hookSpecificOutput"]["additionalContext"])
             self.assertNotIn("systemMessage", output)
 
     def test_stop_blocks_combine_exit_code_and_json_reasons(self):
-        output, _ = self.dispatch(["block.py", "deny.py", "imports.py"], event="Stop", tool="")
+        output, _ = self.dispatch(["--hook", "block.py", "--hook", "deny.py", "--hook", "imports.py"],
+                                  event="Stop", tool="")
         self.assertEqual("block", output["decision"])
         self.assertEqual("keep working\n\ndeny reason", output["reason"])
         self.assertEqual("sibling import resolved", output["systemMessage"])
@@ -165,7 +208,8 @@ class HookDispatchTests(unittest.TestCase):
                 for event_field in ("hook_event_name", "hookEventName"):
                     with self.subTest(failed=failed, deadline=deadline, event_field=event_field):
                         output, stderr = self.dispatch(
-                            [*deadline, "block.py", "context.py", "imports.py", failed],
+                            [*deadline, "--hook", "block.py", "--hook", "context.py",
+                             "--hook", "imports.py", "--hook", failed],
                             event="Stop", tool="Bash", event_field=event_field,
                         )
                         self.assertEqual("block", output["decision"])
@@ -178,13 +222,14 @@ class HookDispatchTests(unittest.TestCase):
                         self.assertEqual("sibling import resolved", output["systemMessage"])
 
     def test_stop_deadline_blocks_with_and_without_finished_siblings(self):
-        output, _ = self.dispatch(["--deadline", "1", "hang.py"], event="Stop", tool="")
+        output, _ = self.dispatch(["--deadline", "1", "--hook", "hang.py"], event="Stop", tool="")
         self.assertEqual("block", output["decision"])
         self.assertIn("hang.py did not finish within 1s", output["reason"])
         self.assertIn("hang.py did not finish within 1s", output["systemMessage"])
 
         output, _ = self.dispatch(
-            ["--deadline", "1", "block.py", "context.py", "imports.py", "hang.py", "deny.py"],
+            ["--deadline", "1", "--hook", "block.py", "--hook", "context.py", "--hook", "imports.py",
+             "--hook", "hang.py", "--hook", "deny.py"],
             event="Stop", tool="Bash",
         )
         self.assertEqual("block", output["decision"])
@@ -194,30 +239,31 @@ class HookDispatchTests(unittest.TestCase):
         self.assertEqual("context from Bash", output["hookSpecificOutput"]["additionalContext"])
         self.assertIn("sibling import resolved", output["systemMessage"])
 
-    def test_torn_stop_install_fails_closed_when_continuation_dependencies_are_missing(self):
+    def test_torn_stop_install_fails_closed_when_a_sibling_import_is_missing(self):
         hooks = Path(self.temp.name) / "torn" / "hooks"
         hooks.mkdir(parents=True)
         shutil.copy2(DISPATCH, hooks / DISPATCH.name)
-        shutil.copy2(HOOKS / "continuation_stop.py", hooks / "continuation_stop.py")
+        (hooks / "torn.py").write_text("from missing_dependency import VALUE\n", encoding="utf-8")
         isolated = Path(self.temp.name) / "isolated"
         isolated.mkdir()
         environment = dict(os.environ, PYTHONPATH="")
         result = subprocess.run(
-            [sys.executable, "-B", str(hooks / DISPATCH.name), "continuation_stop.py"],
+            [sys.executable, "-B", str(hooks / DISPATCH.name), "--hook", "torn.py"],
             input=json.dumps({"hookEventName": "Stop", "cwd": str(isolated), "sessionId": "session"}),
             capture_output=True, text=True, encoding="utf-8", cwd=isolated, env=environment, timeout=20,
         )
         self.assertEqual(0, result.returncode, result.stderr)
         output = json.loads(result.stdout)
         self.assertEqual("block", output["decision"])
-        self.assertIn("continuation_stop.py failed with exit status 1", output["reason"])
+        self.assertIn("torn.py failed with exit status 1", output["reason"])
         self.assertIn("Repair the gate and retry this Stop event.", output["reason"])
         self.assertIn("ModuleNotFoundError", result.stderr)
-        self.assertIn("continuation_receipts", result.stderr)
+        self.assertIn("missing_dependency", result.stderr)
 
     def test_a_gate_past_the_deadline_keeps_finished_verdicts_and_reports_the_rest(self):
         started = time.monotonic()
-        output, _ = self.dispatch(["--deadline", "2", "deny.py", "context.py", "hang.py", "ask.py"])
+        output, _ = self.dispatch(["--deadline", "2", "--hook", "deny.py", "--hook", "context.py",
+                                   "--hook", "hang.py", "--hook", "ask.py"])
         self.assertLess(time.monotonic() - started, 30)
         specific = output["hookSpecificOutput"]
         self.assertEqual("deny", specific["permissionDecision"])
@@ -227,9 +273,14 @@ class HookDispatchTests(unittest.TestCase):
         self.assertIn("these gates did not run: ask.py", output["systemMessage"])
 
     def test_silent_gates_produce_no_output(self):
-        output, stderr = self.dispatch(["rebind.py"])
+        output, stderr = self.dispatch(["--hook", "rebind.py"])
         self.assertEqual({}, output)
         self.assertEqual("", stderr)
+
+    def test_malformed_pretool_output_does_not_supply_a_successful_verdict(self):
+        output, stderr = self.dispatch(["--hook", "plain.py", "--hook", "allow.py"])
+        self.assertEqual("deny", output["hookSpecificOutput"]["permissionDecision"])
+        self.assertIn("plain.py", stderr)
 
     def test_hook_groups_preserve_arguments_and_restore_them_for_siblings(self):
         output, stderr = self.dispatch([
@@ -283,40 +334,45 @@ class HookDispatchTests(unittest.TestCase):
         self.assertEqual('PowerShell launcher installed\n\necho m1',
                          output['hookSpecificOutput']['additionalContext'])
 
-    def test_opted_in_timeout_denies_allow_ask_defer_and_missing_decisions(self):
+    def test_required_hook_timeout_denies_allow_ask_defer_and_missing_decisions(self):
         for first in ("allow.py", "ask.py", "defer.py", "context.py"):
             with self.subTest(first=first):
-                output, _ = self.dispatch(["--deadline", "2", "--deny-on-timeout", first, "hang.py"])
+                output, _ = self.dispatch(["--deadline", "2", "--hook", first,
+                                           "--hook", "hang.py"])
                 specific = output["hookSpecificOutput"]
                 self.assertEqual("deny", specific["permissionDecision"])
                 self.assertIn("hang.py", specific["permissionDecisionReason"])
                 self.assertIn("hang.py did not finish within 2s", specific["additionalContext"])
                 self.assertIn("hang.py did not finish within 2s", output["systemMessage"])
 
-    def test_opted_in_timeout_before_deny_names_stalled_and_skipped_gates(self):
-        output, _ = self.dispatch(["--deadline", "2", "--deny-on-timeout", "hang.py", "deny.py"])
+    def test_required_hook_timeout_before_deny_names_stalled_and_skipped_gates(self):
+        output, _ = self.dispatch(["--deadline", "2", "--hook", "hang.py",
+                                   "--hook", "deny.py"])
         specific = output["hookSpecificOutput"]
         self.assertEqual("deny", specific["permissionDecision"])
         self.assertIn("hang.py did not finish", specific["permissionDecisionReason"])
         self.assertIn("these gates did not run: deny.py", specific["permissionDecisionReason"])
 
-    def test_opted_in_timeout_preserves_completed_deny_reason_and_context(self):
-        output, _ = self.dispatch(["--deadline", "2", "--deny-on-timeout", "deny.py", "context.py", "hang.py"])
+    def test_required_hook_timeout_preserves_completed_deny_reason_and_context(self):
+        output, _ = self.dispatch(["--deadline", "2", "--hook", "deny.py",
+                                   "--hook", "context.py", "--hook", "hang.py"])
         specific = output["hookSpecificOutput"]
         self.assertEqual("deny", specific["permissionDecision"])
         self.assertEqual("deny reason", specific["permissionDecisionReason"])
         self.assertIn("context from Bash", specific["additionalContext"])
         self.assertIn("hang.py did not finish within 2s", output["systemMessage"])
 
-    def test_timeout_keeps_default_and_other_events_unchanged(self):
-        output, _ = self.dispatch(["--deadline", "2", "allow.py", "hang.py"])
-        self.assertEqual("allow", output["hookSpecificOutput"]["permissionDecision"])
-        output, _ = self.dispatch(["--deadline", "2", "--deny-on-timeout", "context.py", "hang.py"], event="PostToolUse")
+    def test_timeout_blocks_by_default_and_stops_other_events(self):
+        output, _ = self.dispatch(["--deadline", "2", "--hook", "allow.py", "--hook", "hang.py"])
+        self.assertEqual("deny", output["hookSpecificOutput"]["permissionDecision"])
+        output, _ = self.dispatch(["--deadline", "2", "--hook", "context.py",
+                                   "--hook", "hang.py"], event="PostToolUse")
         specific = output["hookSpecificOutput"]
         self.assertNotIn("permissionDecision", specific)
         self.assertIn("context from Bash", specific["additionalContext"])
         self.assertIn("hang.py did not finish within 2s", output["systemMessage"])
-        output, _ = self.dispatch(["--deadline", "2", "--deny-on-timeout", "allow.py"])
+        self.assertFalse(output["continue"])
+        output, _ = self.dispatch(["--deadline", "2", "--hook", "allow.py"])
         self.assertEqual("allow", output["hookSpecificOutput"]["permissionDecision"])
 
 
@@ -335,6 +391,11 @@ class PackagedDispatchTests(unittest.TestCase):
             os.environ, CLAUDE_PLUGIN_ROOT=str(self.plugin), TEMP=self.temp.name,
             TMP=self.temp.name, TMPDIR=self.temp.name,
         )
+        if os.name != 'nt':
+            interpreter = self.cwd / 'bin/python'
+            interpreter.parent.mkdir()
+            interpreter.symlink_to(sys.executable)
+            self.environment['PATH'] = str(interpreter.parent) + os.pathsep + self.environment.get('PATH', '')
 
     def run_registration(self, event, payload):
         hook = self.manifest["hooks"][event][0]["hooks"][0]
@@ -370,11 +431,6 @@ class PackagedDispatchTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stdout + result.stderr)
 
-    def test_only_engineering_pretooluse_enables_timeout_denial(self):
-        enabled = [event for event, groups in self.manifest["hooks"].items()
-                   for group in groups for hook in group["hooks"]
-                   if "--deny-on-timeout" in hook.get("args", [])]
-        self.assertEqual(["PreToolUse"], enabled)
 
 
 if __name__ == "__main__":

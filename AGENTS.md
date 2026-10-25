@@ -7,8 +7,16 @@ agent configuration do not establish personal scope. Infonetica is work scope, i
 Read the target repository's README.md and AGENTS.md before selecting its policy profiles.
 Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts, hooks, or launchers.
 Install machine state only through `./setup.ps1` or `./setup.sh`; rerunning converges.
+Before relying on machine setup or declaring its repair complete, follow
+[Required setup on every machine](README.md#required-setup-on-every-machine) and its completion evidence.
 Shipped code must run on Windows and Linux; follow
 [Supported platforms](CODE_CONVENTIONS.md#supported-platforms).
+
+```text
+Shell wrappers exist, but the launch check reports unconfigured:
+Agent executes README > Required setup on every machine, repairs failed steps and verifies completion.
+Tommy receives the observed result; the agent retains deployment ownership across a credential wait.
+```
 
 Machine setup and standards injection are reproducible Core deliverables. Implement their behavior in
 repository-owned code reached through the setup and sync entry points, with shared Python logic for
@@ -17,6 +25,11 @@ incomplete: carry it into source, then deploy it through those entry points. Ver
 standards discovery and the affected behavior in a fresh session on each supported platform; report
 missing prerequisites or remaining verification explicitly. Keep credentials and native trust decisions
 under their existing controls. See [Machine setup and updates](README.md#machine-setup-and-updates).
+
+Marketplace owns plugin identities, source repositories and dependencies. Machine's offline selector
+snapshot is generated from Marketplace's authored catalog; Core owns stack choices and settings
+generation. Follow the [shared ownership decision](https://github.com/tj-agents/docs/blob/main/PLUGIN_CATALOG.md)
+when changing selection.
 
 ```text
 One laptop is missing Engineering after setup:
@@ -30,7 +43,7 @@ Global design and cross-repository plans belong in [`tj-agents/docs`](https://gi
 Keep core implementation plans here and link to shared designs instead of copying them.
 
 `.agents/` is the only canonical home for host-neutral capability definitions, workflow contracts,
-shared hooks, schemas, tests and resources. Logical Base, Agent Store, Engineering and Machine ownership lives below
+shared hooks, schemas, tests and resources. Logical Base, Agent Store, Agent, Engineering and Machine ownership lives below
 that directory; it must not be recreated as authored top-level source trees.
 
 `.codex/` contains Codex-only entry points, adapters, agent definitions and configuration. `.claude/`

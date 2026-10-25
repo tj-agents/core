@@ -1,6 +1,4 @@
 import importlib.util
-import contextlib
-import io
 import json
 from pathlib import Path
 import tempfile
@@ -23,6 +21,18 @@ checker = load("check_tier_payload")
 
 
 class Predicates(unittest.TestCase):
+    def test_one_assessment_reuses_identical_git_queries_without_stale_later_results(self):
+        found = [gate.Declaration(name, "tj-agents", {
+            "schema_version": 1, "tier": name, "stack": "Rust", "applies": "stack-present",
+            "detect": {"globs": ["*.rs"]},
+        }) for name in ("rust-one", "rust-two")]
+        with patch.object(gate, "_run_git", return_value="") as git:
+            self.assertEqual(2, len(gate.assess(self.root, found).blocked))
+            self.assertEqual(1, git.call_count)
+            git.return_value = "src/main.rs\0"
+            self.assertEqual(2, len(gate.assess(self.root, found).applicable))
+            self.assertEqual(2, git.call_count)
+
     def setUp(self):
         holder = tempfile.TemporaryDirectory()
         self.addCleanup(holder.cleanup)
@@ -99,7 +109,6 @@ class Predicates(unittest.TestCase):
             result = gate.assess(self.root, [declaration])
         self.assertEqual(result.applicable, [])
         self.assertEqual(result.blocked, [declaration])
-        self.assertNotIn(gate.OVERRIDE_VARIABLE, gate.refusal(declaration, "example", self.root))
 
     def test_session_reports_unknown_configuration(self):
         declaration = gate.Declaration("example", "test", {
@@ -134,12 +143,7 @@ class Predicates(unittest.TestCase):
         registry_path.write_text(json.dumps(registry), encoding="utf-8")
         return cache, payload
 
-    def hook_payloads(self, plugin, payload):
-        return ({"cwd": str(self.root), "tool_name": "Skill", "tool_input": {"skill": plugin + ":rule"}},
-                {"cwd": str(self.root), "tool_name": "PowerShell",
-                 "tool_input": {"command": "Get-Content '" + str(payload / "skills" / "rule" / "SKILL.md") + "'"}})
-
-    def test_invalid_installed_declarations_block_both_hook_paths(self):
+    def test_invalid_installed_declarations_are_diagnosed(self):
         valid = {"schema_version": 3, "tier": "invalid", "applies": "stack-present", "detect": {"all": []}}
         for body in (valid, dict(valid, detect={"not": {"file": "project.csproj"}}),
                      dict(valid, owner_repository=17), dict(valid, schema_version=99), "{", []):
@@ -151,27 +155,6 @@ class Predicates(unittest.TestCase):
                     selection = next(item for item in result.selections if item["plugin_id"] == plugin + "@test-market")
                     self.assertFalse(selection["matched"])
                     self.assertTrue(selection["diagnostics"])
-                    for hook in self.hook_payloads(plugin, payload):
-                        stderr = io.StringIO()
-                        with contextlib.redirect_stderr(stderr):
-                            self.assertEqual(gate.gate(hook), 2)
-                        self.assertIn(str(payload / "tier.json"), stderr.getvalue())
-                        self.assertIn(selection["diagnostics"][0]["message"], stderr.getvalue())
-
-    def test_hook_diagnostics_identify_only_the_requested_plugin(self):
-        for plugin, predicate, message in (("unknown-fact", {"fact": "technology.unknown"}, "Provide scoped evidence for fact"),
-                                           ("unknown-context", {"context": {"key": "missing", "equals": "tommy"}}, "Provide scoped context")):
-            cache, payload = self.install(plugin, {"schema_version": 3, "tier": plugin,
-                                                  "applies": "stack-present", "detect": predicate})
-            with patch.object(gate, "cache_roots", return_value=[cache]):
-                for hook in self.hook_payloads(plugin, payload):
-                    stderr = io.StringIO()
-                    with contextlib.redirect_stderr(stderr):
-                        self.assertEqual(gate.gate(hook), 2)
-                    self.assertIn("Configuration diagnostic for " + plugin + "@test-market: detect:", stderr.getvalue())
-                    self.assertIn(message, stderr.getvalue())
-                    other_message = "Provide scoped context" if plugin == "unknown-fact" else "Provide scoped evidence for fact"
-                    self.assertNotIn(other_message, stderr.getvalue())
 
     def test_mixed_validity_keeps_every_valid_convention_and_ordinary_plugins(self):
         for version in (1, 2, 3):
@@ -180,7 +163,7 @@ class Predicates(unittest.TestCase):
                                                             "applies": "stack-present", "detect": detect})
         self.install("invalid", {"schema_version": 3, "tier": "invalid", "applies": "stack-present", "detect": {"all": []}})
         self.install("unknown", {"schema_version": 3, "tier": "unknown", "applies": "stack-present", "detect": {"fact": "missing"}})
-        _, ordinary = self.install("ordinary", None)
+        self.install("ordinary", None)
         with patch.object(gate, "cache_roots", return_value=[cache]):
             result = gate.assess(self.root)
             self.assertEqual([item.plugin for item, _ in result.applicable], ["valid1", "valid2", "valid3"])
@@ -190,8 +173,6 @@ class Predicates(unittest.TestCase):
             self.assertIn("Provide scoped evidence for fact: missing", listing)
             for version in (1, 2, 3):
                 self.assertIn("Applies here: `valid" + str(version) + ":*`", listing)
-            for hook in self.hook_payloads("ordinary", ordinary):
-                self.assertEqual(gate.gate(hook), 0)
             diagnostics = []
             gate.declarations([cache], diagnostics=diagnostics)
             self.assertFalse(any("ordinary" in item["path"] for item in diagnostics))

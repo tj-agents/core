@@ -7,7 +7,8 @@ domain: machine
 
 # Verified Codex follow-up
 
-Use this only when the user authorized messaging the other session. Keep ownership of the current task.
+Apply [Workflow's coordination decision](../../../workflow/policy/session/SKILL.md#preserve-one-owner-through-completion)
+within the current task's authority. Keep ownership of the current task.
 For a child agent in the current conversation, use the host's native collaboration message tool instead.
 This utility addresses an independent, already running Codex session; it does not perform a handoff.
 
@@ -19,7 +20,9 @@ Missing/older capabilities fail explicitly. Verified against the local 0.157.1 p
 fixture validation is not proof that a particular live session is reachable.
 
 1. Bind the exact thread UUID, expected working directory and Codex profile from the prior launch result
-   or user-authorized session inspection. Never guess the newest conversation, a PID, or a window title.
+   or authorized session inspection. Resolve its actual execution key and concrete reason for delivery.
+   The helper requires a matching unended owner or bounded responsibility in the shipped Agent Store,
+   then independently verifies that same native thread is loaded and accepts input.
 2. Write the exact authorized message to a UTF-8 file. Choose a new receipt path outside version control
    and reuse it for this message. Do not put private message/history data into repository fixtures.
 3. Invoke the shipped helper with properly quoted shell arguments. `--codex` accepts a native executable
@@ -27,7 +30,17 @@ fixture validation is not proof that a particular live session is reachable.
    Use `python` on Windows or `python3` on Linux/macOS for both helper commands below.
 
 ```text
-python -B "<skill-directory>/scripts/codex_followup.py" --codex "<codex-executable>" --timeout 20 send --thread <exact-uuid> --cwd "<expected-directory>" --codex-home "<selected-profile>" --message-file "<message-file>" --receipt "<receipt-file>"
+python -B "<skill-directory>/scripts/codex_followup.py" --codex "<codex-executable>" --timeout 20 send --thread <exact-uuid> --cwd "<expected-directory>" --codex-home "<selected-profile>" --message-file "<message-file>" --receipt "<receipt-file>" --execution-key "<verified-execution-key>" --reason "<decision or action this information supports>"
+```
+
+For a mistaken-route correction, replace `--execution-key` with `--corrects <original-receipt>`.
+The original message must be observable in that exact recipient's history. Use a new message and receipt
+to retract the earlier assignment; correction does not establish responsibility for the repair.
+
+```text
+Repair execution X belongs to A; B owns execution Y in the same repository.
+Send X's diagnostic evidence with A's exact identity and --execution-key X.
+A correction to an earlier mistaken message to B uses B's identity and --corrects that message's receipt.
 ```
 
 The helper checks the server's thread identity, cwd, loaded membership and direct-input capability.

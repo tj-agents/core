@@ -23,7 +23,7 @@ def load(name):
 
 adopt_plugins = load("adopt_plugins")
 LockError = adopt_plugins.lock_io.LockError
-CORE = ["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents"]
+CORE = ["agent-store@tj-agents", "agent@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents"]
 
 
 def with_core(*plugins):
@@ -31,28 +31,6 @@ def with_core(*plugins):
 
 
 class AdoptPluginsTests(unittest.TestCase):
-    def test_retired_tj_publishers_migrate_generically_without_adding_profiles(self):
-        roster = {"schema_version": 1, "plugins": {"python": [], "react": []}, "stacks": {}}
-        fixture = patch.object(adopt_plugins, "load_roster", return_value=roster)
-        fixture.start()
-        self.addCleanup(fixture.stop)
-        self.selection.parent.mkdir()
-        self.selection.write_text(json.dumps({
-            "schema_version": 1,
-            "marketplaces": {"python-agents": {"repository": "tj-agents/python"},
-                             "react-agents": {"repository": "tj-agents/react"},
-                             "foreign": {"repository": "Concertable/agents"}},
-            "plugins": ["python@python-agents", "react@react-agents", "concertable@foreign"],
-        }), encoding="utf-8")
-        adopt_plugins.run(self.root, [], [], "write")
-        self.assertEqual(["concertable@foreign", "python@tj-agents", "react@tj-agents"], self.plugins())
-        selected = json.loads(self.selection.read_text(encoding="utf-8"))
-        self.assertEqual({"foreign", "tj-agents"}, set(selected["marketplaces"]))
-        for path in (self.root / ".codex/config.toml", self.root / ".claude/settings.json"):
-            self.assertNotIn("python-agents", path.read_text(encoding="utf-8"))
-            self.assertNotIn("react-agents", path.read_text(encoding="utf-8"))
-        self.assertEqual([], adopt_plugins.run(self.root, [], [], "check"))
-
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -79,7 +57,7 @@ class AdoptPluginsTests(unittest.TestCase):
         adopt_plugins.run(self.root, ["react"], [], "write")
         self.assertNotIn("personal@tj-agents", self.plugins())
         adopt_plugins.run(self.root, [], ["personal"], "write")
-        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "personal@tj-agents", "react@tj-agents", "workflow@tj-agents"], self.plugins())
+        self.assertEqual(["agent-store@tj-agents", "agent@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "personal@tj-agents", "react@tj-agents", "workflow@tj-agents"], self.plugins())
         self.assertEqual([], adopt_plugins.run(self.root, [], ["personal"], "check"))
         self.assertEqual([], adopt_plugins.run(self.root, [], ["machine"], "check"))
         claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
@@ -90,7 +68,7 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_infonetica_selects_engineering_without_personal(self):
         adopt_plugins.run(self.root, [], ["infonetica"], "write")
-        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "infonetica@tj-agents", "machine@tj-agents", "work@tj-agents", "workflow@tj-agents"], self.plugins())
+        self.assertEqual(["agent-store@tj-agents", "agent@tj-agents", "base@tj-agents", "engineering@tj-agents", "infonetica@tj-agents", "machine@tj-agents", "work@tj-agents", "workflow@tj-agents"], self.plugins())
         claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
         self.assertTrue(claude["enabledPlugins"]["engineering@tj-agents"])
         codex = (self.root / ".codex/config.toml").read_text(encoding="utf-8")
@@ -123,42 +101,15 @@ class AdoptPluginsTests(unittest.TestCase):
         for plugin in CORE:
             self.assertIn(f'[plugins."{plugin}"]', codex)
 
-    def test_schema_two_lock_is_migrated_once_and_discards_its_pin(self):
-        legacy = self.root / ".agents" / "plugins.lock.json"
-        legacy.parent.mkdir()
-        legacy.write_text(json.dumps({"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.2.3"}, "plugins": ["base"]}), encoding="utf-8")
-        adopt_plugins.run(self.root, [], ["react"], "write")
-        selection = json.loads(self.selection.read_text(encoding="utf-8"))
-        self.assertEqual({"repository": "tj-agents/marketplace"}, selection["marketplaces"]["tj-agents"])
-        self.assertNotIn("revision", json.dumps(selection))
-        self.assertFalse(legacy.exists())
-        self.assertEqual([], adopt_plugins.run(self.root, [], ["react"], "check"))
+    def test_plugins_added_in_marketplace_are_selectable(self):
+        adopt_plugins.run(self.root, [], ["tauri", "rust-sqlx"], "write")
+        self.assertEqual(with_core("rust@tj-agents", "tauri@tj-agents", "rust-sqlx@tj-agents"), self.plugins())
 
-    def test_multiple_marketplaces_are_retained_and_schema_three_pins_are_discarded(self):
-        legacy = self.root / ".agents" / "plugins.lock.json"
-        legacy.parent.mkdir()
-        legacy.write_text(json.dumps({
-            "schema_version": 3,
-            "marketplaces": {
-                "tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.2.3"},
-                "agents": {"repository": "Concertable/agents", "revision": "a" * 40},
-            },
-            "plugins": ["base@tj-agents", "concertable@agents"],
-        }), encoding="utf-8")
-        adopt_plugins.run(self.root, [], ["react"], "write")
-        selection = json.loads(self.selection.read_text(encoding="utf-8"))
-        self.assertEqual({"agents": {"repository": "Concertable/agents"},
-                          "tj-agents": {"repository": "tj-agents/marketplace"}}, selection["marketplaces"])
-        self.assertEqual(with_core("concertable@agents", "react@tj-agents"), self.plugins())
-        self.assertNotIn("revision", json.dumps(selection))
-        self.assertFalse(legacy.exists())
-        self.assertEqual([], adopt_plugins.run(self.root, [], ["react"], "check"))
-        claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
-        self.assertEqual("Concertable/agents", claude["extraKnownMarketplaces"]["agents"]["source"]["repo"])
-        codex = (self.root / ".codex/config.toml").read_text(encoding="utf-8")
-        self.assertNotIn("ref =", codex)
-        foreign = codex.split("[marketplaces.agents]", 1)[1].split("[marketplaces.", 1)[0]
-        self.assertNotIn("sparse_paths", foreign)
+    def test_catalog_snapshot_names_and_dependencies_are_marketplace_owned(self):
+        roster = adopt_plugins.load_roster()
+        self.assertIn("tauri", roster["plugins"])
+        self.assertEqual(["rust"], roster["plugins"]["tauri"])
+        self.assertEqual(["engineering"], roster["plugins"]["azure"])
 
     def test_foreign_selection_requires_a_declared_source_and_survives_later_adoption(self):
         with self.assertRaises(LockError):
@@ -173,11 +124,11 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_default_adoption_selects_the_core_packages(self):
         adopt_plugins.run(self.root, [], [], "write")
-        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents"], self.plugins())
+        self.assertEqual(["agent-store@tj-agents", "agent@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents"], self.plugins())
 
     def test_engineering_does_not_select_a_recording_profile(self):
         adopt_plugins.run(self.root, [], ["engineering"], "write")
-        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents"], self.plugins())
+        self.assertEqual(["agent-store@tj-agents", "agent@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents"], self.plugins())
         claude = json.loads((self.root / ".claude" / "settings.json").read_text(encoding="utf-8"))
         self.assertNotIn("work-items@tj-agents", claude["enabledPlugins"])
         self.assertNotIn("personal@tj-agents", claude["enabledPlugins"])
@@ -199,65 +150,12 @@ class AdoptPluginsTests(unittest.TestCase):
         with self.assertRaisesRegex(LockError, "Unknown plugin: cobol"):
             adopt_plugins.run(self.root, [], ["cobol"], "write")
 
-    def test_producer_lock_migration_moves_core_to_the_marketplace_and_discards_pins(self):
-        legacy = self.root / ".agents" / "plugins.lock.json"
-        legacy.parent.mkdir()
-        legacy.write_text(json.dumps({
-            "schema_version": 3,
-            "marketplaces": {
-                "base-agents": {"repository": "tj-agents/core", "revision": "v2.1.18"},
-                "agents": {"repository": "Concertable/agents", "revision": "a" * 40},
-            },
-            "plugins": ["agent-store@base-agents", "base@base-agents", "engineering@base-agents", "machine@base-agents", "workflow@base-agents", "concertable@agents"],
-        }), encoding="utf-8")
-        adopt_plugins.run(self.root, [], [], "write")
-        self.assertFalse(legacy.exists())
-        document = json.loads(self.selection.read_text(encoding="utf-8"))
-        self.assertEqual({"tj-agents": {"repository": "tj-agents/marketplace"}, "agents": {"repository": "Concertable/agents"}},
-                         document["marketplaces"])
-        self.assertNotIn("revision", json.dumps(document))
-        self.assertNotIn("tj-agents/core", json.dumps(document))
-        self.assertEqual(["agent-store@tj-agents", "base@tj-agents", "concertable@agents", "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents"], self.plugins())
-        claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
-        self.assertTrue(claude["enabledPlugins"]["base@tj-agents"])
-        codex = (self.root / ".codex/config.toml").read_text(encoding="utf-8")
-        self.assertIn('[plugins."machine@tj-agents"]', codex)
-        self.assertNotIn("tj-agents/core", codex)
-        adopt_plugins.run(self.root, [], ["react"], "write")
-        self.assertIn("react@tj-agents", self.plugins())
-        self.assertIn("base@tj-agents", self.plugins())
-        self.assertEqual([], adopt_plugins.run(self.root, [], [], "check"))
-
     def test_cli_reports_drift(self):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             self.assertEqual(1, adopt_plugins.main(["--root", str(self.root), "--stack", "react", "--mode", "check"]))
             self.assertEqual(0, adopt_plugins.main(["--root", str(self.root), "--stack", "react", "--mode", "write"]))
         self.assertIn(".agents/plugins.json", output.getvalue())
-
-
-    def test_producer_migration_rewrites_python_and_react_and_deduplicates(self):
-        legacy = self.root / ".agents/plugins.lock.json"
-        legacy.parent.mkdir()
-        legacy.write_text(json.dumps({
-            "schema_version": 3,
-            "marketplaces": {
-                "python-agents": {"repository": "tj-agents/python", "revision": "old"},
-                "react-agents": {"repository": "tj-agents/react", "revision": "old"},
-                "tj-agents": {"repository": "tj-agents/marketplace", "revision": "old"},
-                "agents": {"repository": "Concertable/agents", "revision": "old"},
-            },
-            "plugins": ["python@python-agents", "python@tj-agents", "react@react-agents", "concertable@agents"],
-        }), encoding="utf-8")
-        adopt_plugins.run(self.root, [], [], "write")
-        self.assertEqual(with_core("concertable@agents", "python@tj-agents", "react@tj-agents"), self.plugins())
-        self.assertFalse(legacy.exists())
-        self.assertEqual([], adopt_plugins.run(self.root, [], [], "check"))
-        for path in (self.selection, self.root / ".claude/settings.json", self.root / ".codex/config.toml"):
-            text = path.read_text(encoding="utf-8")
-            self.assertNotIn("python-agents", text)
-            self.assertNotIn("react-agents", text)
-            self.assertIn("concertable@agents", text)
 
 
 if __name__ == "__main__":

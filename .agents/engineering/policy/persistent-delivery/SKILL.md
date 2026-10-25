@@ -80,12 +80,9 @@ approval cannot add exemptions or bypass a stop. **Re-run the binder on every re
 may add a stop path or hold.
 
 The auto-merge preference comes from `.agents/settings.json` in the actual checkout, at
-`configuration.core.auto_merge`, separately from delivery authority. When that file is present, it is
-authoritative: `false` or an omitted `configuration`, `core` or `auto_merge` disables auto-merge and never
-falls back to the legacy declaration, and malformed present settings fail closed. Only when the settings
-file is wholly absent may the validated legacy declaration's `auto_merge: true` enable the
-preference; omitted legacy `auto_merge` means `false`. The settings file itself is always a non-exemptible
-stop. After the normal green exact-head, independent-review and merge-authorization decision, invoke only
+`configuration.core.auto_merge`, separately from delivery authority. An absent file or an omitted
+`configuration`, `core` or `auto_merge` disables auto-merge, and malformed settings fail closed. The
+settings file itself is always a non-exemptible stop. After the normal green exact-head, independent-review and merge-authorization decision, invoke only
 the packaged guarded command:
 
 ```text
@@ -176,6 +173,12 @@ process, hook, or ordinary model turn provides persistence.
 
 Persistent delivery may implement, test, commit, push, diagnose exact-head CI, and obtain the required review.
 It must not merge, enable auto-merge, approve, deploy, delete, or widen scope without the recorded authority.
+An authorized auto-merge request awaiting GitHub's required review stays `waiting`, with its binding and
+scheduled owner intact. The user approves in GitHub; approval alone requires no agent turn. A merge
+observation wakes the same owner to finish the authorized post-merge steps. Report the approval link once;
+do not ask the user to announce approval. A rejected review, changed head, explicit hold or missing task
+authorization retains its existing repair or human-gate behavior.
+
 A merge authorization never covers publishing: releasing to a package feed stays an explicit human call
 whatever the standing instruction says about merging.
 The ordinary review/merge skills remain authoritative. Keep one monitor and one read per wake. Launch

@@ -132,30 +132,6 @@ class InspectTests(unittest.TestCase):
         self.assertEqual(1, unsupported.returncode)
         self.assertIn("unsupported schema version 5", json.loads(unsupported.stderr)["error"])
 
-    def test_older_supported_schemas_report_empty_references_without_writes(self):
-        for version in (2, 3):
-            with self.subTest(version=version):
-                database = Path(self.temporary.name) / f"schema-{version}.db"
-                connection = sqlite3.connect(database)
-                connection.executescript(
-                    "CREATE TABLE work_items (key TEXT PRIMARY KEY, status TEXT, pr TEXT);"
-                    "CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);"
-                    f"PRAGMA user_version = {version};"
-                )
-                connection.commit()
-                connection.close()
-                before = database.read_bytes()
-                result = subprocess.run(
-                    [sys.executable, "-B", str(INSPECT), "--database", str(database)],
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    timeout=15,
-                )
-                self.assertEqual(0, result.returncode, result.stderr)
-                self.assertEqual([], json.loads(result.stdout)["references"])
-                self.assertEqual(before, database.read_bytes())
-
     def test_inspection_uses_one_read_snapshot(self):
         connection = sqlite3.connect(self.database)
         connection.execute("PRAGMA journal_mode = WAL")
@@ -163,7 +139,7 @@ class InspectTests(unittest.TestCase):
         reader = load_reader().ReadOnlyWorkItemStore(self.database)
         references = reader._references
 
-        def add_reference(connection, version, clause="", arguments=()):
+        def add_reference(connection, clause="", arguments=()):
             writer = sqlite3.connect(self.database)
             writer.execute(
                 "INSERT INTO work_item_references VALUES (?, ?, ?, ?)",
@@ -171,7 +147,7 @@ class InspectTests(unittest.TestCase):
             )
             writer.commit()
             writer.close()
-            return references(connection, version, clause, arguments)
+            return references(connection, clause, arguments)
 
         reader._references = add_reference
         value = reader.inspect()

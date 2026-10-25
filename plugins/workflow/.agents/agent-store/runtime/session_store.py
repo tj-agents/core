@@ -167,113 +167,24 @@ def connect(path=None):
 
 def _ensure_schema(connection):
     version = connection.execute("PRAGMA user_version").fetchone()[0]
-    if version > SCHEMA_VERSION:
+    if version not in (0, SCHEMA_VERSION):
         raise RuntimeError(f"session store has unsupported schema version {version}")
-    foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()[0]
-    foreign_keys_disabled = version < 4
-    if foreign_keys_disabled:
-        connection.execute("PRAGMA foreign_keys = OFF")
     connection.execute("BEGIN IMMEDIATE")
     try:
         version = connection.execute("PRAGMA user_version").fetchone()[0]
-        if version > SCHEMA_VERSION:
+        if version not in (0, SCHEMA_VERSION):
             raise RuntimeError(f"session store has unsupported schema version {version}")
-        migrating_to_v4 = version < 4
         connection.execute(WORK_ITEMS_SCHEMA)
         connection.execute(SESSIONS_SCHEMA)
-        if version < 2:
-            _deduplicate_owner_rows(connection)
         connection.execute(SESSIONS_ONE_OWNER_INDEX)
-        if version < 3:
-            _add_work_item_metadata_columns(connection)
-        if migrating_to_v4:
-            _migrate_work_items_to_v4(connection)
         connection.execute(WORK_ITEM_REFERENCES_SCHEMA)
         connection.execute(WORK_ITEM_REFERENCES_ITEM_INDEX)
-        if version < SCHEMA_VERSION:
+        if version != SCHEMA_VERSION:
             connection.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
-        if migrating_to_v4:
-            violations = connection.execute("PRAGMA foreign_key_check").fetchall()
-            if violations:
-                raise RuntimeError(f"session store migration foreign key check failed: {violations!r}")
         connection.commit()
     except Exception:
         connection.rollback()
         raise
-    finally:
-        if foreign_keys_disabled and foreign_keys:
-            connection.execute("PRAGMA foreign_keys = ON")
-
-
-def _add_work_item_metadata_columns(connection):
-    columns = {
-        row[1] for row in connection.execute("PRAGMA table_info(work_items)").fetchall()
-    }
-    if "title" not in columns:
-        connection.execute("ALTER TABLE work_items ADD COLUMN title TEXT")
-    if "plan_path" not in columns:
-        connection.execute("ALTER TABLE work_items ADD COLUMN plan_path TEXT")
-
-
-def _migrate_work_items_to_v4(connection):
-    columns = {row[1] for row in connection.execute("PRAGMA table_info(work_items)").fetchall()}
-    required = {"key", "repo", "feature", "item", "status", "branch", "pr", "updated_at"}
-    missing = required - columns
-    if missing:
-        raise RuntimeError(f"session store work_items table is missing columns {sorted(missing)!r}")
-    connection.execute(
-        """
-        CREATE TABLE work_items_v4 (
-            key TEXT PRIMARY KEY,
-            repo TEXT NOT NULL,
-            feature TEXT,
-            item TEXT,
-            status TEXT NOT NULL,
-            branch TEXT,
-            pr TEXT,
-            title TEXT,
-            plan_path TEXT,
-            updated_at REAL,
-            CHECK ((feature IS NULL AND item IS NULL) OR (feature IS NOT NULL AND item IS NOT NULL))
-        )
-        """
-    )
-    title = "title" if "title" in columns else "NULL"
-    plan_path = "plan_path" if "plan_path" in columns else "NULL"
-    connection.execute(
-        """
-        INSERT INTO work_items_v4 (
-            key, repo, feature, item, status, branch, pr, title, plan_path, updated_at
-        )
-        SELECT key, repo, feature, item, status, branch, pr, %s, %s, updated_at
-        FROM work_items
-        """ % (title, plan_path)
-    )
-    connection.execute("DROP TABLE work_items")
-    connection.execute("ALTER TABLE work_items_v4 RENAME TO work_items")
-
-
-def _deduplicate_owner_rows(connection):
-    work_items = connection.execute(
-        """
-        SELECT work_item FROM sessions
-        WHERE role = 'owner' AND work_item IS NOT NULL
-        GROUP BY work_item HAVING COUNT(*) > 1
-        """
-    ).fetchall()
-    for row in work_items:
-        keep = connection.execute(
-            """
-            SELECT handle FROM sessions WHERE work_item = ? AND role = 'owner'
-            ORDER BY COALESCE(last_activity_at, started_at, ended_at, 0) DESC, handle DESC
-            LIMIT 1
-            """,
-            (row["work_item"],),
-        ).fetchone()
-        connection.execute(
-            "UPDATE sessions SET role = NULL WHERE work_item = ? AND role = 'owner' AND handle != ?",
-            (row["work_item"], keep["handle"]),
-        )
 
 
 def current_machine():
@@ -541,6 +452,14 @@ def ensure_session(connection, host, session_id, cwd=None):
     )
     connection.commit()
     return handle
+
+
+def attach_session_client(connection, handle, pid, pid_started_at, cwd):
+    connection.execute(
+        "UPDATE sessions SET pid = ?, pid_started_at = ?, cwd = ? WHERE handle = ? AND ended_at IS NULL",
+        (pid, pid_started_at, str(cwd), handle),
+    )
+    connection.commit()
 
 
 def record_prompt(connection, handle):

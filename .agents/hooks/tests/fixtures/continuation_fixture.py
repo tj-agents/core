@@ -26,6 +26,11 @@ receipt = {"owner_id": os.environ["CONTINUATION_OWNER_ID"],
            "state": "blocked" if mode == "gate" else "waiting" if mode == "repair" else "complete",
            "reason": "human approval required" if mode == "gate" else "fixture verified boundary",
            "next_action": "Ask for product approval" if mode == "gate" else "Wait for repaired checks"}
+if mode == "post-merge":
+    observation = json.loads((root / "observation.json").read_text())
+    if observation["state"] != "MERGED":
+        sys.exit(9)
+    (root / "post-merge-completed").write_text(observation["headRefOid"])
 if mode == "badnonce":
     receipt["nonce"] = "wrong"
 if mode == "repair":

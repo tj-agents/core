@@ -15,27 +15,18 @@ the moment it is installed, with no change here and no release of `base`.
 Plugin and marketplace identity come from the installed path, never from the declaration, so a
 declaration cannot claim to be a plugin it is not.
 
-Two modes, one detection:
-
-- `--session-context` (SessionStart) states which tiers apply in this project. It prints nothing at
-  all when no stack tier is installed, because a statement about an empty set is pure noise.
-- No argument (PreToolUse) blocks invoking a skill that belongs to a tier whose stack is absent.
-  Claude sends the `Skill` tool and the qualified name; Codex has no such tool, and its contract is a
-  successful shell read of the tier's own `SKILL.md`, so a shell command naming a blocked plugin's
-  cache path *and* `SKILL.md` is the same event in the other host's shape. Matching only Claude's
-  shape would be a gate that looks wired while allowing every Codex read.
+`--session-context` (SessionStart) states which tiers apply in this project. It prints nothing at
+all when no stack tier is installed, because a statement about an empty set is pure noise.
 
 A tier's own authoring repository is exempt, even when its source files do not contain the
 stack's normal project markers.
-
-Contract: exit 0 allows, exit 2 blocks with stderr fed back to the agent. Anything unexpected exits 0.
-A gate that wedges a session is worse than a gate that misses one call.
 """
 
 from __future__ import annotations
 
 import argparse
 import functools
+from contextvars import ContextVar
 import fnmatch
 import json
 import os
@@ -54,7 +45,6 @@ ORPHAN_MARKER = ".orphaned_at"
 FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
 PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
 OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
-SHELL_TOOLS = frozenset({"Bash", "PowerShell", "Shell", "shell", "exec", "local_shell"})
 WALK_DEPTH = 4
 WALK_SKIP = frozenset({
     ".git", ".hg", ".svn", ".worktrees", "node_modules", "bin", "obj", "dist", "build",
@@ -469,7 +459,7 @@ def cache_roots():
             plugin_root = Path(value).resolve()
         except (OSError, ValueError):
             continue
-        if len(plugin_root.parents) >= 3:
+        if len(plugin_root.parents) >= 3 and plugin_root.parents[2].name == 'cache':
             add(plugin_root.parents[2])
 
     here = Path(__file__).resolve()
@@ -613,7 +603,21 @@ def project_root(payload):
     return Path.cwd()
 
 
+GIT_RESULTS = ContextVar("tier_git_results", default=None)
+
+
 def _git(root, arguments):
+    cache = GIT_RESULTS.get()
+    key = (str(root), tuple(arguments))
+    if cache is not None and key in cache:
+        return cache[key]
+    result = _run_git(root, arguments)
+    if cache is not None:
+        cache[key] = result
+    return result
+
+
+def _run_git(root, arguments):
     try:
         completed = subprocess.run(
             ["git", "-C", str(root), *arguments],
@@ -785,6 +789,14 @@ def declaration_diagnostics(declaration):
 
 
 def assess(root, found=None, facts=None, contexts=None):
+    token = GIT_RESULTS.set({})
+    try:
+        return _assess(root, found, facts, contexts)
+    finally:
+        GIT_RESULTS.reset(token)
+
+
+def _assess(root, found=None, facts=None, contexts=None):
     diagnostics = []
     selections = []
     found = list(declarations(project=root) if found is None else found)
@@ -1001,107 +1013,9 @@ def front_matter(text):
     return text[:end] if end != -1 else ""
 
 
-def requested_skill(payload):
-    tool = _text(payload.get("tool_name") or payload.get("toolName"))
-    if tool != "Skill":
-        return ""
-    tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
-    if not isinstance(tool_input, dict):
-        return ""
-    return _text(tool_input.get("skill") or tool_input.get("name"))
-
-
-def shell_command(payload):
-    tool = _text(payload.get("tool_name") or payload.get("toolName"))
-    if tool not in SHELL_TOOLS:
-        return ""
-    tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
-    if not isinstance(tool_input, dict):
-        return ""
-    command = tool_input.get("command")
-    if isinstance(command, list):
-        command = " ".join(_text(part) for part in command)
-    return _text(command)
-
-
-def refusal(declaration, subject, root, diagnostics=()):
-    if diagnostics:
-        return "Tier gate blocked " + subject + ".\n" + "\n".join(
-            "Configuration diagnostic for " + declaration.id + ": " + problem["path"] + ": " + problem["message"]
-            for problem in diagnostics)
-    markers = [
-        *(declaration.detect.get("files") or []),
-        *(declaration.detect.get("globs") or []),
-        *(declaration.detect.get("remote") or []),
-    ]
-    patterns = ", ".join(str(marker) for marker in markers) or "its declared markers"
-    owner = declaration.owner_repositories[0] if declaration.owner_repositories else declaration.id
-    return (
-        "Tier gate blocked " + subject + ".\n"
-        "It belongs to the `" + declaration.tier + "` tier, which applies only to projects with "
-        + declaration.stack + ". " + str(root) + " has no match for " + patterns + ", so that "
-        "standard describes code this project does not contain. Use the ubiquitous core standards "
-        "here instead.\n"
-        "If this project really is " + declaration.stack + ", the detection is wrong: fix "
-        "`tier.json` in " + owner + " rather than working around it."
-        + (" To force it for this session only, set " + OVERRIDE_VARIABLE + "=" + declaration.tier + "."
-           if declaration.schema_version < 3 else "")
-    )
-
-
-def selection_diagnostics(result, declaration):
-    return tuple(problem for selection in result.selections if selection["plugin_id"] == declaration.id
-                 for problem in selection["diagnostics"])
-
-
-def gate(payload, found=None):
-    root = project_root(payload)
-    result = assess(root, found)
-    _, _, blocked = result
-    harness = "claude" if requested_skill(payload) else active_host()
-
-    name = requested_skill(payload)
-    plugin, separator, skill = name.partition(":")
-    if separator and skill:
-        for declaration in blocked:
-            if declaration.plugin == plugin:
-                print(refusal(declaration, "`" + name + "`", root, selection_diagnostics(result, declaration)), file=sys.stderr)
-                return 2
-
-        replacement = replacement_skill(result, name,
-                                        lambda candidate: installed_replacement(root, candidate, harness))
-        if replacement != name:
-            print("Tier gate redirected `" + name + "` to installed `" + replacement
-                  + "`. Invoke the replacement skill.", file=sys.stderr)
-            return 2
-
-    command = shell_command(payload)
-    if command and "SKILL.md" in command:
-        haystack = command.replace("\\", "/")
-        for declaration in blocked:
-            if "/" + declaration.marketplace + "/" + declaration.plugin + "/" in haystack:
-                subject = "that read of a `" + declaration.tier + "` standard"
-                print(refusal(declaration, subject, root, selection_diagnostics(result, declaration)), file=sys.stderr)
-                return 2
-        for declaration, _ in result.applicable:
-            match = re.search(r"/" + re.escape(declaration.marketplace) + "/"
-                              + re.escape(declaration.plugin) + r"/[^/]+/skills/([a-z0-9-]+)/SKILL\.md",
-                              haystack)
-            if match:
-                original = declaration.plugin + ":" + match.group(1)
-                replacement = replacement_skill(result, original,
-                                                lambda candidate: installed_replacement(root, candidate, harness))
-                if replacement != original:
-                    print("Tier gate redirected `" + original + "` to installed `" + replacement
-                          + "`. Read the replacement skill.", file=sys.stderr)
-                    return 2
-    return 0
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--session-context", action="store_true")
-    parser.add_argument("--instruction-fragment", action="store_true")
     parser.add_argument("--project", default=None)
     arguments = parser.parse_args()
 
@@ -1109,36 +1023,20 @@ def main():
         print("tier gate: Python 3.9 or newer is required.", file=sys.stderr)
         return 0
 
-    emitting = arguments.session_context or arguments.instruction_fragment
-    payload = {}
-    if not emitting:
-        try:
-            raw = sys.stdin.read()
-        except (OSError, UnicodeError):
-            return 0
-        try:
-            payload = json.loads(raw) if raw.strip() else {}
-        except ValueError:
-            return 0
-        if not isinstance(payload, dict):
-            return 0
+    if not arguments.session_context:
+        return 0
 
+    payload = {}
     if arguments.project:
         payload["cwd"] = arguments.project
 
-    if emitting:
-        context = statement(project_root(payload))
-        if not context:
-            return 0
-        if arguments.instruction_fragment:
-            print("<!-- BEGIN tier-gate -->\n" + context + "\n<!-- END tier-gate -->")
-        else:
-            print(json.dumps({"hookSpecificOutput": {
-                "hookEventName": "SessionStart", "additionalContext": context
-            }}, ensure_ascii=True))
+    context = statement(project_root(payload))
+    if not context:
         return 0
-
-    return gate(payload)
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "SessionStart", "additionalContext": context
+    }}, ensure_ascii=True))
+    return 0
 
 
 if __name__ == "__main__":
@@ -1146,5 +1044,6 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except SystemExit:
         raise
-    except Exception:
-        raise SystemExit(0)
+    except Exception as error:
+        print(f"tier gate failed: {error}", file=sys.stderr)
+        raise SystemExit(1)

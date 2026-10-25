@@ -1,7 +1,6 @@
 """Run several hook scripts for one host event inside a single interpreter.
 
-Legacy arguments are script paths, absolute or beside this one, optionally followed by
-``@<tool matcher>``. Repeated ``--hook <script> [arguments...]`` groups pass arguments to each script.
+Repeated ``--hook <script> [arguments...]`` groups pass arguments to each script.
 The host's sibling-hook merge is reproduced here, so one event costs one
 interpreter launch instead of one per gate. Each gate still runs as its own ``__main__`` with its
 own stdin, stdout and stderr. A leading ``--deadline <seconds>`` stays under the host timeout: a gate
@@ -11,10 +10,10 @@ still running then is reported, and every finished gate's verdict is kept.
 from __future__ import annotations
 
 import io
+import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import runpy
 import sys
 import threading
@@ -23,7 +22,6 @@ import traceback
 
 HOOKS = Path(__file__).resolve().parent
 DECISIONS = ("deny", "defer", "ask", "allow")
-LEGACY_DECISIONS = {"approve": "allow", "block": "deny"}
 BLOCKING_EXIT = 2
 
 
@@ -93,6 +91,8 @@ def merge(event: str, results: list[tuple[str, int, str, str]]) -> tuple[dict, s
                 contexts.append(stdout.strip())
             else:
                 diagnostics.append(f"{name}: {stdout.strip()}")
+                if code == 0:
+                    code = 1
         if code == BLOCKING_EXIT:
             reason = stderr.strip() or f"{name} blocked this {event} event."
             if event == "PreToolUse":
@@ -100,11 +100,17 @@ def merge(event: str, results: list[tuple[str, int, str, str]]) -> tuple[dict, s
             else:
                 blocks.append(reason)
         elif code:
-            if event == "Stop":
-                blocks.append(
-                    f"hook-dispatch: {Path(name).name} failed with exit status {code}. "
-                    "Repair the gate and retry this Stop event."
-                )
+            failure = (
+                f"hook-dispatch: {Path(name).name} failed with exit status {code}. "
+                f"Repair the gate and retry this {event} event."
+            )
+            if event == "PreToolUse":
+                decisions.setdefault("deny", []).append(failure)
+            elif event == "Stop":
+                blocks.append(failure)
+            else:
+                stopped = True
+                stops.append(failure)
             if stderr.strip():
                 diagnostics.append(f"{name}: {stderr.strip()}")
             else:
@@ -138,12 +144,7 @@ def merge(event: str, results: list[tuple[str, int, str, str]]) -> tuple[dict, s
                 specific.setdefault(key, value)
 
         decision = data.get("decision")
-        if event == "PreToolUse" and decision in LEGACY_DECISIONS:
-            reason = data.get("reason")
-            decisions.setdefault(LEGACY_DECISIONS[decision], []).append(
-                reason if isinstance(reason, str) else ""
-            )
-        elif decision == "block":
+        if decision == "block":
             reason = data.get("reason")
             blocks.append(reason.strip() if isinstance(reason, str) and reason.strip()
                           else f"{name} blocked this {event} event.")
@@ -188,18 +189,6 @@ def merge(event: str, results: list[tuple[str, int, str, str]]) -> tuple[dict, s
     return merged, "\n".join(diagnostics)
 
 
-def selected(spec: str, tool: str) -> str | None:
-    name, separator, matcher = spec.rpartition("@")
-    if not separator or not name.endswith(".py"):
-        return spec
-    if not tool:
-        return None
-    try:
-        return name if re.fullmatch(matcher, tool) else None
-    except re.error:
-        return name
-
-
 def overrun_notice(event: str, merged: dict, deadline: float, unfinished: list[str]) -> dict:
     stalled, skipped = unfinished[0], unfinished[1:]
     notice = (
@@ -216,6 +205,15 @@ def overrun_notice(event: str, merged: dict, deadline: float, unfinished: list[s
         reason = merged.get("reason")
         merged["decision"] = "block"
         merged["reason"] = f"{reason}\n\n{notice}" if reason else notice
+    elif event == "PreToolUse":
+        specific = dict(merged.get("hookSpecificOutput") or {"hookEventName": event})
+        if specific.get("permissionDecision") != "deny":
+            specific["permissionDecision"] = "deny"
+            specific["permissionDecisionReason"] = notice + " Retry when every required hook can finish."
+        merged["hookSpecificOutput"] = specific
+    else:
+        merged["continue"] = False
+        merged["stopReason"] = notice + " Stop ordinary work until required hooks recover."
     if event in ("SessionStart", "PreToolUse", "PostToolUse", "PostToolUseFailure", "UserPromptSubmit"):
         specific = dict(merged.get("hookSpecificOutput") or {"hookEventName": event})
         context = specific.get("additionalContext")
@@ -233,9 +231,6 @@ def main(argv: list[str]) -> int:
         except ValueError:
             deadline = None
         arguments = arguments[2:]
-    deny_on_timeout = arguments[:1] == ["--deny-on-timeout"]
-    if deny_on_timeout:
-        arguments = arguments[1:]
     if not arguments:
         print("hook-dispatch: name the gate scripts to run.", file=sys.stderr)
         return 1
@@ -248,36 +243,58 @@ def main(argv: list[str]) -> int:
     if not isinstance(data, dict):
         data = {}
     event = data.get("hook_event_name") or data.get("hookEventName") or ""
-    if event == "SessionStart":
+
+    def acknowledge(succeeded: bool, detail: str) -> None:
+        if event != "SessionStart":
+            return
         directory = os.environ.get("TJ_AGENTS_STARTUP_ACK_DIRECTORY")
         token = os.environ.get("TJ_AGENTS_STARTUP_ACK_TOKEN")
-        if directory and token and len(token) >= 32 and all(value.isalnum() or value in "-_" for value in token):
+        required = os.environ.get("TJ_AGENTS_STARTUP_REQUIRED_HOOKS")
+        if directory and token and required is not None and len(token) >= 32 and all(value.isalnum() or value in "-_" for value in token):
             path = Path(directory) / token
             try:
+                identities = json.loads(required)
+                if not isinstance(identities, list) or not all(isinstance(value, str) for value in identities):
+                    return
+                if identities:
+                    harness = json.loads((Path(__file__).resolve().parents[1] / 'harness.json').read_text(encoding='utf-8'))
+                    marketplace, _, name = harness['plugin'].partition('/')
+                    identity = name + '@' + marketplace
+                    if identity not in identities:
+                        return
+                    if not succeeded:
+                        path.with_name(token + '.failed').write_text(
+                            f"Required startup hook {identity} failed: {detail}", encoding='utf-8')
+                        return
+                    receipt = path.with_name(token + '.' + hashlib.sha256(identity.encode()).hexdigest())
+                    receipt.write_text(token, encoding='utf-8')
+                    if not all(path.with_name(token + '.' + hashlib.sha256(value.encode()).hexdigest()).is_file()
+                               for value in identities):
+                        return
+                if not succeeded or path.with_name(token + '.failed').exists():
+                    return
                 if path.parent.is_dir() and path.parent.resolve() == Path(directory).resolve():
                     descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
                     with os.fdopen(descriptor, "w", encoding="utf-8") as output:
                         output.write(token)
             except FileExistsError:
                 pass
-            except OSError:
+            except (OSError, ValueError, KeyError, TypeError):
                 pass
-    tool = data.get("tool_name") if isinstance(data.get("tool_name"), str) else ""
-
+    if arguments[0] != "--hook":
+        stderr.write("hook-dispatch: use --hook <script> [arguments...] groups.\n")
+        return 1
     gates: list[tuple[str, list[str]]] = []
-    if arguments[0] == "--hook":
-        for argument in arguments:
-            if argument == "--hook":
-                gates.append(("", []))
-            elif not gates[-1][0]:
-                gates[-1] = (argument, [])
-            else:
-                gates[-1][1].append(argument)
-        if any(not name for name, _ in gates):
-            stderr.write("hook-dispatch: each --hook requires a script.\n")
-            return 1
-    else:
-        gates = [(name, []) for name in (selected(spec, tool) for spec in arguments) if name]
+    for argument in arguments:
+        if argument == "--hook":
+            gates.append(("", []))
+        elif not gates[-1][0]:
+            gates[-1] = (argument, [])
+        else:
+            gates[-1][1].append(argument)
+    if any(not name for name, _ in gates):
+        stderr.write("hook-dispatch: each --hook requires a script.\n")
+        return 1
     names = [name for name, _ in gates]
     results: list[tuple[str, int, str, str]] = []
     lock = threading.Lock()
@@ -297,16 +314,9 @@ def main(argv: list[str]) -> int:
     merged, diagnostics = merge(event, finished)
     if overrun:
         merged = overrun_notice(event, merged, deadline, names[len(finished):])
-        if deny_on_timeout and event == "PreToolUse":
-            specific = merged["hookSpecificOutput"]
-            if specific.get("permissionDecision") != "deny":
-                unfinished = [Path(name).name for name in names[len(finished):]]
-                specific["permissionDecision"] = "deny"
-                specific["permissionDecisionReason"] = (
-                    f"hook-dispatch: {unfinished[0]} did not finish before the deadline; "
-                    + "these gates did not run: " + (", ".join(unfinished[1:]) or "none")
-                    + ". Retry when every required hook can finish."
-                )
+    succeeded = not overrun and not any(code for _, code, _, _ in finished) \
+        and merged.get("continue") is not False and merged.get("decision") != "block"
+    acknowledge(succeeded, diagnostics or merged.get('stopReason') or str(merged))
     if diagnostics:
         stderr.write(diagnostics + "\n")
     if merged:

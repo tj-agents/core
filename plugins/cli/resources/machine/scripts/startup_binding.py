@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+"""Launch a native CLI and report handoff acknowledgement (Python 3.9+)."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import secrets
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+from typing import Callable, Mapping, Sequence
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import launch_check
+import launch_status
+import cli_client
+import required_plugins
+from terminal_command import command_for_target, without_binding_state
+
+PEER_SCRIPTS = Path(__file__).resolve().parent.parent / "utility/peer-cli/scripts"
+if not PEER_SCRIPTS.is_dir():
+    PEER_SCRIPTS = Path(__file__).resolve().parents[3] / ".agents/machine/utility/peer-cli/scripts"
+sys.path.insert(0, str(PEER_SCRIPTS))
+import register_session
+
+ACK_DIRECTORY_ENV = "TJ_AGENTS_STARTUP_ACK_DIRECTORY"
+ACK_TOKEN_ENV = "TJ_AGENTS_STARTUP_ACK_TOKEN"
+REQUIRED_HOOKS_ENV = "TJ_AGENTS_STARTUP_REQUIRED_HOOKS"
+STARTUP_TIMEOUT_SECONDS = 20
+
+
+class StartupBindingError(RuntimeError):
+    pass
+
+
+def _acknowledged(directory: Path, token: str) -> bool:
+    try:
+        return (directory / token).read_text(encoding="utf-8") == token
+    except OSError:
+        return False
+
+
+def startup_participants(host: str, roots) -> list[str]:
+    participants = []
+    for identity, root in (roots or {}).items():
+        manifest = json.loads((root / f'.{host}-plugin/plugin.json').read_text(encoding='utf-8-sig'))
+        sources = manifest.get('hooks', [])
+        if not isinstance(sources, list):
+            sources = [sources]
+        for source in sources:
+            document = json.loads((root / source).read_text(encoding='utf-8-sig')) if isinstance(source, str) else source
+            groups = document.get('hooks', document).get('SessionStart', [])
+            if any('hook_dispatch.py' in json.dumps(handler)
+                   for group in groups for handler in group.get('hooks', [])):
+                participants.append(identity)
+                break
+    return sorted(participants)
+
+
+def _terminate(process: subprocess.Popen) -> None:
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+
+
+def run_session(host: str, target: str, project: Path, arguments: Sequence[str], *,
+                extra_environment: Mapping[str, str] | None = None,
+                timeout: float = STARTUP_TIMEOUT_SECONDS,
+                on_running: Callable[..., None] | None = None,
+                on_unconfirmed: Callable[..., None] | None = None,
+                require_session_start: bool = False,
+                hook_project: Path | None = None,
+                on_phase: Callable[[str], None] | None = None) -> int:
+    phase = on_phase or (lambda _name: None)
+    running = on_running or (lambda child_pid=None: None)
+    environment = without_binding_state(os.environ)
+    if extra_environment:
+        environment.update(without_binding_state(extra_environment))
+    interpreter = launch_check.state_directory() / 'bin' / 'python'
+    if os.name != 'nt' and interpreter.is_file():
+        environment['PATH'] = str(interpreter.parent) + os.pathsep + environment.get('PATH', '')
+    with tempfile.TemporaryDirectory(prefix="tj-agents-launch-") as temporary:
+        directory = Path(temporary)
+        token = secrets.token_urlsafe(32)
+        if require_session_start:
+            environment[ACK_DIRECTORY_ENV] = str(directory)
+            environment[ACK_TOKEN_ENV] = token
+            roots = required_plugins.check(hook_project or project, host, target)
+            environment[REQUIRED_HOOKS_ENV] = json.dumps(startup_participants(host, roots))
+        phase("starting-native")
+        command = command_for_target(target, list(arguments))
+        arguments, environment, ticket = cli_client.prepare(host, command[1:], project, environment,
+                                                           executable=command[0])
+        process = None
+        def interrupt(signum, _frame):
+            if os.name != 'nt' and process.poll() is None:
+                try:
+                    os.killpg(process.pid, signum)
+                except ProcessLookupError:
+                    pass
+
+        previous_interrupt = None
+        try:
+            try:
+                process = subprocess.Popen([command[0], *arguments],
+                                           cwd=project, env=environment, start_new_session=os.name != "nt")
+            except OSError as error:
+                raise StartupBindingError(f"native {host} could not start: {error}") from error
+            previous_interrupt = signal.signal(signal.SIGINT, interrupt)
+            cli_client.attach(ticket, process.pid)
+            if require_session_start:
+                phase("waiting-session-start")
+                deadline = time.monotonic() + timeout
+                unconfirmed = False
+                while not _acknowledged(directory, token):
+                    failure = directory / (token + '.failed')
+                    if failure.is_file():
+                        raise StartupBindingError(failure.read_text(encoding='utf-8'))
+                    if process.poll() is not None:
+                        return process.returncode
+                    if not unconfirmed and time.monotonic() >= deadline:
+                        if on_unconfirmed is not None:
+                            on_unconfirmed(process.pid)
+                        print(f"launch: native {host} is still running, but SessionStart was not acknowledged; "
+                              "leaving the session open; do not relaunch", file=sys.stderr, flush=True)
+                        unconfirmed = True
+                    time.sleep(0.05)
+            running(process.pid)
+            return process.wait()
+        except BaseException:
+            if process is not None and process.poll() is None:
+                try:
+                    _terminate(process)
+                except (OSError, subprocess.SubprocessError) as error:
+                    print(f"launch: native child cleanup failed: {error}", file=sys.stderr)
+            raise
+        finally:
+            if previous_interrupt is not None:
+                signal.signal(signal.SIGINT, previous_interrupt)
+            cli_client.release(ticket)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--host", choices=("claude", "codex"), required=True)
+    parser.add_argument("--project", type=Path, required=True)
+    parser.add_argument("--target", required=True)
+    parser.add_argument("--status-file", type=Path)
+    parser.add_argument("--require-session-start", action="store_true")
+    parser.add_argument("arguments", nargs=argparse.REMAINDER)
+    parsed = parser.parse_args(argv)
+    arguments = parsed.arguments[1:] if parsed.arguments[:1] == ["--"] else parsed.arguments
+    status: dict[str, object] = {
+        "pid": os.getpid(), "terminal": register_session.terminal_identity(),
+        "title": os.environ.get(register_session.TITLE_ENV),
+    }
+    if parsed.host == "claude" and parsed.require_session_start and parsed.status_file is not None:
+        if not any(value == "--debug-file" or value.startswith("--debug-file=") for value in arguments):
+            debug_log = parsed.status_file.resolve().parent / "native-debug.log"
+            arguments = ["--debug-file", str(debug_log), *arguments]
+            status["debug_log"] = str(debug_log)
+
+    def report(state: str, **details: object) -> None:
+        status.update(details, state=state, at=time.time())
+        if parsed.status_file is not None:
+            try:
+                launch_status.replace(parsed.status_file, status)
+            except OSError:
+                pass
+
+    if parsed.status_file is not None:
+        try:
+            claimed = launch_status.create(parsed.status_file, {**status, "state": "preparing", "at": time.time()})
+        except OSError as error:
+            print(f"launch: {parsed.host} launch status could not be recorded: {error}", file=sys.stderr)
+            return 1
+        if not claimed:
+            print(f"launch: {parsed.host} launch was abandoned or already claimed before startup", file=sys.stderr)
+            return 1
+
+    def phase(name: str) -> None:
+        if parsed.status_file is not None:
+            report("preparing", phase=name)
+            print(f"launch: {parsed.host} startup: {name}", flush=True)
+
+    phase("checking-plugins")
+    try:
+        effective_project = launch_check.prepare_launch(parsed.project.resolve(), parsed.host, parsed.target, arguments)
+    except (required_plugins.RequiredPluginsError, RuntimeError, OSError) as error:
+        message = f"launch: {error}"
+        print(message, file=sys.stderr)
+        report("failed", error=message)
+        return 1
+    try:
+        result = launch_check.check(effective_project or parsed.project.resolve(), host=parsed.host)
+    except Exception as error:
+        print(f"plugins: update check failed: {error}", file=sys.stderr)
+        result = "failed"
+
+    if effective_project is not None:
+        try:
+            launch_check.require_update_check(result)
+        except RuntimeError as error:
+            message = f"launch: {error}"
+            print(message, file=sys.stderr)
+            report("failed", error=message)
+            return 1
+
+    if parsed.host == "codex" and effective_project is not None:
+        phase("verifying-required-hooks")
+        try:
+            launch_check.ensure_hooks(effective_project, parsed.target)
+        except Exception as error:
+            message = f"launch: required hook readiness failed: {error}"
+            print(message, file=sys.stderr)
+            report("failed", error=message)
+            return 1
+
+    try:
+        observe = parsed.require_session_start and effective_project is not None
+        options = {"require_session_start": True, "hook_project": effective_project} if observe else {}
+        if parsed.status_file is not None:
+            options["on_phase"] = phase
+        returncode = run_session(parsed.host, parsed.target, parsed.project, arguments, **options,
+                                 on_unconfirmed=lambda child_pid: report("unconfirmed", child_pid=child_pid),
+                                 on_running=(lambda child_pid=None: report("running", running_at=time.time(), child_pid=child_pid))
+                                 if effective_project is not None else (lambda child_pid=None: None))
+    except (RuntimeError, OSError, ValueError) as error:
+        message = f"launch: {parsed.host} launch failed: {error}"
+        print(message, file=sys.stderr)
+        report("failed", error=message)
+        return 1
+    report("exited", returncode=returncode)
+    return returncode
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -34,7 +34,8 @@ settings are current, not that native trust, installation or session loading suc
  "marketplaces": {
    "tj-agents": {"repository": "tj-agents/marketplace"},
    "agents": {"repository": "Concertable/agents"}},
- "plugins": ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents",
+ "plugins": ["agent@tj-agents", "agent-store@tj-agents", "base@tj-agents",
+             "engineering@tj-agents", "machine@tj-agents", "workflow@tj-agents",
              "dotnet@tj-agents", "concertable@agents"]}
 ```
 
@@ -45,9 +46,6 @@ two marketplace names cannot refer to the same repository. The schema is `catalo
 TJ Agents producer repositories are package sources, not selectable marketplaces. Follow the
 [shared catalog naming rule](https://github.com/tj-agents/marketplace#readme); ordinary validation rejects
 producer registrations, including Python and React, before either host's settings are written.
-Schema 2 and 3 locks migrate only through the adoption command. Migration replaces producer identities
-with their known shared-roster identities, collapses duplicates, preserves foreign publishers, writes
-the schema 1 selection, and removes the old lock and all revision pins.
 
 ## Adopt a stack
 
@@ -57,29 +55,26 @@ python -B '<skill-directory>\scripts\adopt_plugins.py' --root C:\path\to\reposit
 ```
 
 A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `python`, `github-actions`,
-`plugin-repository`) resolves to its plugins through `scripts/plugin_roster.json`, so nobody guesses which
-plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Required plugins are added and
-existing selections are kept. With no requested stack or plugin, a new selection uses the default base,
-engineering and machine packages. `preview` lists the changed files, `write` applies them together, and `check`
+`plugin-repository`) resolves through `scripts/plugin_stacks.json`; plugin names and required packages come
+from the offline `scripts/marketplace_catalog.lock.json` snapshot generated from
+[`tj-agents/marketplace/catalog.json`](https://github.com/tj-agents/marketplace/blob/main/catalog.json).
+Update that snapshot through Core's `scripts/update_marketplace_catalog.py` using a Marketplace checkout;
+never edit its plugin entries here. Repeat `--stack`, or add `--plugin <name>`. Required plugins are added and
+existing selections are kept. With no requested stack or plugin, a new selection uses Agent, Agent Store, Base,
+Engineering, Machine and Workflow. `preview` lists the changed files, `write` applies them together, and `check`
 exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
 
 Personal is only for personal projects explicitly adopting `personal@tj-agents`. Read the repository's
 README.md and AGENTS.md before selection; a GitHub owner, home directory or publisher account never
-establishes personal scope. `--plugin personal` selects it explicitly, and later adoption preserves that
-selection. Ownership alone never adds it. Infonetica, including `tj-agents/infonetica` work-tooling source
-and its worktrees, is work scope: never select or inject Personal there. Owner-based project/local file
-placement is independent of this policy boundary. Selecting a profile does not prove its instructions loaded.
+establishes personal scope. When the user explicitly confirms personal scope, include `--plugin personal`;
+otherwise omit it. Later adoption preserves that selection. Ownership alone never adds it. Infonetica,
+including `tj-agents/infonetica` work-tooling source and its worktrees, is work scope: never select or inject
+Personal there. Owner-based project/local file placement is independent of this policy boundary.
+Selecting a profile does not prove its instructions loaded.
 
 A bare `--plugin <name>` selects from `tj-agents`. Add a foreign plugin with
 `--plugin concertable@agents --marketplace agents=Concertable/agents`. Subsequent adoption preserves
 existing foreign marketplaces and selections. Every selected approved publisher follows `main`.
-
-Adoption also moves existing selections from retired individual `tj-agents` publisher marketplaces
-to the shared marketplace, using the shipped roster's known plugin names. It removes the retired
-declarations from both host settings in the same write; it keeps foreign publishers and never adds
-Personal implicitly. Unknown replacements fail explicitly. For example, an existing
-`python@python-agents` selection becomes `python@tj-agents`; the same rule applies to every known
-plugin rather than treating Python specially. Run preview, write, then check to migrate once.
 
 ## Generate settings from an existing selection
 

@@ -23,15 +23,6 @@ LockError = repo_config.lock_io.LockError
 
 
 class PluginSelectionTests(unittest.TestCase):
-    def test_explicit_migration_preserves_source_validation(self):
-        for repository in ("tj-agents/python.git", "tj-agents/python/other", "Other/python"):
-            with self.subTest(repository=repository):
-                document = {"schema_version": 1,
-                            "marketplaces": {"python-agents": {"repository": repository}},
-                            "plugins": ["python@python-agents"]}
-                with self.assertRaises(LockError):
-                    plugin_selection.migrate(document)
-
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -110,7 +101,8 @@ class PluginSelectionTests(unittest.TestCase):
                             self.run_mode(mode)
                         with self.assertRaisesRegex(LockError, "published through the tj-agents marketplace"):
                             adopt_plugins.run(self.root, [], [], mode, marketplaces=[f"{marketplace}={repository}"])
-                    self.assertTrue(adopt_plugins.run(self.root, [], [], "check"))
+                    with self.assertRaisesRegex(LockError, "published through the tj-agents marketplace"):
+                        adopt_plugins.run(self.root, [], [], "check")
                     with self.assertRaisesRegex(LockError, "published through the tj-agents marketplace"):
                         adopt_plugins.parse_marketplace(f"{marketplace}={repository}")
                     self.assertFalse((self.root / ".claude/settings.json").exists())

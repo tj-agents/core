@@ -26,7 +26,7 @@ def digest(value):
     return hashlib.sha256(value).hexdigest()
 
 
-def legacy_path(root, branch):
+def durable_path(root, branch):
     slug = branch.replace("/", "-").replace("\\", "-")
     path = Path(root) / "reviews" / f"{slug}.md"
     reject_redirects((path.parent, path))
@@ -70,9 +70,9 @@ def work_order_path(root, branch, git=None):
     locations = private_paths(root, branch, git)
     if locations and any(locations[key].exists() for key in ("body", "receipt")):
         return locations["body"]
-    legacy = legacy_path(root, branch)
-    if legacy.exists():
-        return legacy
+    durable = durable_path(root, branch)
+    if durable.exists():
+        return durable
     if locations is None:
         raise ReviewEvidenceError("private review requires a Git checkout")
     return locations["body"]
@@ -81,7 +81,7 @@ def work_order_path(root, branch, git=None):
 def prepare_path(root, branch, durable=False):
     path = work_order_path(root, branch)
     if durable:
-        target = legacy_path(root, branch)
+        target = durable_path(root, branch)
         if path != target and path.exists():
             if target.exists():
                 raise ReviewEvidenceError("both private and durable review bodies exist")
@@ -120,7 +120,7 @@ def resolve(root, branch, head, git=None):
             return {"body": raw.decode("utf-8"), "path": locations["body"], "private": True}
         except (OSError, ValueError, UnicodeError) as error:
             raise ReviewEvidenceError("private review proof is missing or unreadable") from error
-    path = legacy_path(root, branch)
+    path = durable_path(root, branch)
     relative = path.relative_to(Path(root)).as_posix()
     try:
         local_candidate = (path.exists() and reader("branch", "--show-current") == branch

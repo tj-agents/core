@@ -1,4 +1,4 @@
-"""Detached, identity-checked observer for peer-cli close and finish (Python 3.9+)."""
+"""Detached, identity-checked observer for peer-cli close (Python 3.9+)."""
 import argparse
 import os
 import time
@@ -13,8 +13,6 @@ def arguments():
         ("worktree", str, True), ("result", str, True),
         ("session-id", str, True), ("invocation-id", str, True),
         ("parent-pid", int, False), ("parent-start", float, False),
-        ("head", str, False), ("primary", str, False),
-        ("branch", str, False), ("default", str, False),
         ("spawn-timeout", float, False), ("armed-timeout", float, False),
         ("accept-timeout", float, False), ("reaper-timeout", float, False),
         ("state-directory", str, False), ("host-names", str, False),
@@ -78,74 +76,6 @@ def await_exit(args):
     return False
 
 
-def registered(worktree, primary):
-    code, output, _ = session_close.git(primary, "worktree", "list", "--porcelain")
-    return code != 0 or any(line.startswith("worktree ") and session_close.path_key(line[9:]) == session_close.path_key(worktree) for line in output.splitlines())
-
-
-def branch_checked_out(primary, branch):
-    try:
-        records = session_close.worktree_registrations(primary)
-    except session_close.Refusal:
-        return True
-    return any(record["branch"] == "refs/heads/" + branch for record in records)
-
-
-def final_preflight(args):
-    worktree = Path(args.worktree)
-    receipt = session_close.fresh_removable_receipt(worktree)
-    if any(receipt.get(key) != getattr(args, key) for key in ("head", "primary", "branch", "default")):
-        raise session_close.Refusal("cleanup receipt no longer matches the accepted cleanup target")
-    original_entry = {
-        "session_id": args.session_id,
-        "pid": args.host_pid,
-        "pid_started_at": args.host_start,
-    }
-    if not session_close.verified_exited(args.host_pid, args.host_start):
-        raise session_close.Refusal("original session host did not exit")
-    if session_close.other_live_claimant(worktree, original_entry):
-        raise session_close.Refusal("another verified live session claims this worktree")
-    code, dirty, _ = session_close.git(worktree, "status", "--porcelain")
-    if code or dirty:
-        raise session_close.Refusal("worktree is no longer clean")
-
-
-def remove_worktree_and_branch(args):
-    # This is intentionally the final action before each irreversible operation, not an earlier hint.
-    if Path(str(args.result) + ".cancelled").exists():
-        return "cancelled", {"error": "cleanup observer was cancelled"}
-    final_preflight(args)
-    worktree, primary = Path(args.worktree), Path(args.primary)
-    if Path(str(args.result) + ".cancelled").exists():
-        return "cancelled", {"error": "cleanup observer was cancelled"}
-    code, _out, error = session_close.git(primary, "worktree", "remove", "--", str(worktree))
-    if code and (worktree.exists() or registered(worktree, primary)):
-        return "failed", {"error": "git worktree remove failed: " + error}
-    code, branch_head, _ = session_close.git(primary, "rev-parse", "--verify", "--quiet", "refs/heads/" + args.branch)
-    preserved = code != 0 or branch_head != args.head
-    if not preserved and branch_checked_out(primary, args.branch):
-        preserved = True
-    if not preserved:
-        # The branch may have moved or become checked out after removal.
-        code, latest, _ = session_close.git(primary, "rev-parse", "--verify", "--quiet", "refs/heads/" + args.branch)
-        if code != 0 or latest != args.head:
-            preserved = True
-        else:
-            if Path(str(args.result) + ".cancelled").exists():
-                return "cancelled", {"error": "cleanup observer was cancelled"}
-            if branch_checked_out(primary, args.branch):
-                preserved = True
-            else:
-                code, _out, error = session_close.git(
-                    primary, "update-ref", "-d", "refs/heads/" + args.branch, args.head,
-                )
-                if code:
-                    return "failed", {"error": "git branch deletion failed: " + error}
-    if worktree.exists() or registered(worktree, primary):
-        return "failed", {"error": "worktree remains registered or present"}
-    return ("branch-preserved" if preserved else "succeeded"), {}
-
-
 def main():
     args = arguments()
     if args.state_directory:
@@ -156,14 +86,8 @@ def main():
     own = session_close.process_info(os.getpid())
     if own is None:
         return 0
-    cleanup_fields = {
-        key: getattr(args, key)
-        for key in ("head", "primary", "branch", "default")
-        if getattr(args, key) is not None
-    }
     expected = session_close.binding(
-        args.host_pid, args.host_start, args.worktree, args.session_id,
-        args.invocation_id, cleanup_fields,
+        args.host_pid, args.host_start, args.worktree, args.session_id, args.invocation_id,
     )
     if args.parent_pid is not None or args.parent_start is not None:
         expected.update({"parent_pid": args.parent_pid, "parent_start": args.parent_start})
@@ -177,29 +101,17 @@ def main():
     }
     if not session_close.write_json(target, observer, exclusive=True):
         return 0
-    cleanup = all(getattr(args, key) for key in ("head", "primary", "branch", "default"))
     accept_timeout = bounded_timeout(args.accept_timeout, "AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS")
     if not await_acceptance(target, observer, expected, accept_timeout):
         result(target, "cancelled" if Path(str(target) + ".cancelled").exists() else "not-accepted")
         return 0
-    try:
-        if not await_exit(args):
-            status = "cancelled" if Path(str(target) + ".cancelled").exists() else "timeout"
-            result(target, status, error="verified host (or Windows wrapper) did not exit")
-            return 0
-        session_close.delete_own_session(args.session_id)
-        if cleanup:
-            status, extra = remove_worktree_and_branch(args)
-            if status not in {"succeeded", "branch-preserved"}:
-                result(target, status, **extra)
-                return 0
-            session_close.remove_matching_obligations(args.worktree, args.session_id)
-            result(target, status, session_exited=True, **extra)
-        else:
-            session_close.remove_matching_obligations(args.worktree, args.session_id)
-            result(target, "session-closed", checkout_retained=True, session_exited=True)
-    except session_close.Refusal as error:
-        result(target, "failed", error=str(error))
+    if not await_exit(args):
+        status = "cancelled" if Path(str(target) + ".cancelled").exists() else "timeout"
+        result(target, status, error="verified host (or Windows wrapper) did not exit")
+        return 0
+    session_close.delete_own_session(args.session_id)
+    session_close.remove_matching_obligations(args.worktree, args.session_id)
+    result(target, "session-closed", checkout_retained=True, session_exited=True)
     return 0
 
 

@@ -817,26 +817,6 @@ class ReviewTests(RepositoryFixture):
 
         locations.assert_called_once()
 
-    def test_cleanup_never_scans_legacy_payload_trees(self):
-        payloads = []
-        for name, with_descriptor in (("stored", True), ("unpublished", False)):
-            candidate = ops.run_root(self.root, name) / "review" / ("a" * 64)
-            payload = candidate / "tree"
-            payload.mkdir(parents=True)
-            payloads.append(payload)
-            if with_descriptor:
-                ops.atomic_json(candidate / "descriptor.json", {"bundle": {}})
-        original_scandir = ops.os.scandir
-
-        def scan_namespace(path):
-            self.assertNotIn(Path(path), payloads)
-            return original_scandir(path)
-
-        with mock.patch.object(ops.os, "scandir", side_effect=scan_namespace), mock.patch.object(
-            getattr(Path, "_globber", ops.os), "scandir", side_effect=scan_namespace
-        ):
-            ops.cleanup_review_bundles(self.root)
-
     def test_descriptor_scan_preserves_nested_review_and_candidate_named_runs(self):
         runs = ops.state_root(self.root) / "runs"
         paths = []
@@ -899,122 +879,22 @@ class ReviewTests(RepositoryFixture):
         self.assertTrue(Path(recent["bundle"]["directory"]).is_dir())
         self.assertTrue(foreign.is_dir())
 
-    def test_complete_legacy_bundle_migrates_without_changing_frozen_identity(self):
+    def test_redirected_candidate_directory_is_refused(self):
         descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
         descriptor_path = Path(descriptor["artifact"])
-        stored = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        before = descriptor_path.read_bytes()
         locations = ops.review_bundle_locations(self.root, "run-1", descriptor_path.parent.name)
-        legacy = ops.legacy_review_bundle_locations(locations)
-        for name in ("patch", "paths", "tree", "tree_archive", "identity"):
-            shutil.move(str(Path(stored["bundle"][name])), str(legacy[name]))
-        Path(stored["bundle"]["directory"]).rmdir()
-        identity_sha = stored["bundle"]["identity_sha256"]
-        stored["bundle"].update({name: str(legacy[name]) for name in (
-            "directory", "patch", "paths", "tree", "tree_archive", "identity"
-        )})
-        ops.atomic_json(descriptor_path, stored)
-
-        with mock.patch.object(ops, "remove_legacy_review_payload"):
-            loaded = ops.load_descriptor(self.root, "run-1", descriptor_path)
-
-        self.assertEqual(descriptor["descriptor_id"], loaded["descriptor_id"])
-        self.assertEqual(identity_sha, loaded["bundle"]["identity_sha256"])
-        self.assertTrue(Path(loaded["bundle"]["tree"]).is_dir())
-        self.assertTrue(legacy["tree"].is_dir())
-        ops.load_descriptor(self.root, "run-1", descriptor_path)
-        self.assertFalse(legacy["tree"].exists())
-
-    def test_absent_legacy_bundle_restores_the_stored_frozen_identity(self):
-        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
-        descriptor_path = Path(descriptor["artifact"])
-        stored = json.loads(descriptor_path.read_text(encoding="utf-8"))
-        locations = ops.review_bundle_locations(self.root, "run-1", descriptor_path.parent.name)
-        legacy = ops.legacy_review_bundle_locations(locations)
-        identity = Path(stored["bundle"]["identity"]).read_bytes()
-        shutil.rmtree(stored["bundle"]["directory"])
-        stored["bundle"].update({name: str(legacy[name]) for name in (
-            "directory", "patch", "paths", "tree", "tree_archive", "identity"
-        )})
-        ops.atomic_json(descriptor_path, stored)
-
-        loaded = ops.load_descriptor(self.root, "run-1", descriptor_path)
-
-        self.assertEqual(descriptor["descriptor_id"], loaded["descriptor_id"])
-        self.assertEqual(identity, Path(loaded["bundle"]["identity"]).read_bytes())
-
-    def test_interrupted_legacy_descriptor_publication_reuses_the_complete_external_bundle(self):
-        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
-        descriptor_path = Path(descriptor["artifact"])
-        stored = json.loads(descriptor_path.read_text(encoding="utf-8"))
-        locations = ops.review_bundle_locations(self.root, "run-1", descriptor_path.parent.name)
-        legacy = ops.legacy_review_bundle_locations(locations)
-        for name in ("patch", "paths", "tree", "tree_archive", "identity"):
-            shutil.move(str(Path(stored["bundle"][name])), str(legacy[name]))
-        Path(stored["bundle"]["directory"]).rmdir()
-        identity = legacy["identity"].read_bytes()
-        stored["bundle"].update({name: str(legacy[name]) for name in (
-            "directory", "patch", "paths", "tree", "tree_archive", "identity"
-        )})
-        ops.atomic_json(descriptor_path, stored)
-        original_atomic_json = ops.atomic_json
-
-        def interrupt_descriptor_publication(path, value):
-            if Path(path) == descriptor_path and value["bundle"]["directory"] == str(locations["directory"]):
-                raise OSError("interrupted publication")
-            original_atomic_json(path, value)
-
-        with mock.patch.object(ops, "atomic_json", side_effect=interrupt_descriptor_publication):
-            with self.assertRaisesRegex(OSError, "interrupted publication"):
-                ops.load_descriptor(self.root, "run-1", descriptor_path)
-
-        loaded = ops.load_descriptor(self.root, "run-1", descriptor_path)
-
-        self.assertEqual(descriptor["descriptor_id"], loaded["descriptor_id"])
-        self.assertEqual(identity, Path(loaded["bundle"]["identity"]).read_bytes())
-        self.assertFalse(legacy["tree"].exists())
-
-    def test_tampered_legacy_bundle_is_not_rewritten(self):
-        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
-        descriptor_path = Path(descriptor["artifact"])
-        stored = json.loads(descriptor_path.read_text(encoding="utf-8"))
-        locations = ops.review_bundle_locations(self.root, "run-1", descriptor_path.parent.name)
-        legacy = ops.legacy_review_bundle_locations(locations)
-        for name in ("patch", "paths", "tree", "tree_archive", "identity"):
-            shutil.move(str(Path(stored["bundle"][name])), str(legacy[name]))
-        Path(stored["bundle"]["directory"]).rmdir()
-        stored["bundle"].update({name: str(legacy[name]) for name in (
-            "directory", "patch", "paths", "tree", "tree_archive", "identity"
-        )})
-        ops.atomic_json(descriptor_path, stored)
-        legacy["patch"].write_bytes(b"forged")
-
-        with self.assertRaisesRegex(ops.WorkflowOperationError, "legacy review patch hash"):
-            ops.load_descriptor(self.root, "run-1", descriptor_path)
-
-        self.assertEqual(str(legacy["directory"]), json.loads(descriptor_path.read_text(encoding="utf-8"))["bundle"]["directory"])
-        self.assertFalse(Path(descriptor["bundle"]["directory"]).exists())
-
-    def test_redirected_legacy_candidate_directory_is_not_migrated(self):
-        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
-        descriptor_path = Path(descriptor["artifact"])
-        stored = json.loads(descriptor_path.read_text(encoding="utf-8"))
-        locations = ops.review_bundle_locations(self.root, "run-1", descriptor_path.parent.name)
-        legacy = ops.legacy_review_bundle_locations(locations)
-        stored["bundle"].update({name: str(legacy[name]) for name in (
-            "directory", "patch", "paths", "tree", "tree_archive", "identity"
-        )})
-        ops.atomic_json(descriptor_path, stored)
         original_redirect = ops.is_redirect
 
         with mock.patch.object(
             ops,
             "is_redirect",
-            side_effect=lambda path: Path(path) == legacy["directory"] or original_redirect(path),
+            side_effect=lambda path: Path(path) == locations["private"] or original_redirect(path),
         ):
             with self.assertRaisesRegex(ops.WorkflowOperationError, "descriptor namespace"):
                 ops.load_descriptor(self.root, "run-1", descriptor_path)
 
-        self.assertEqual(str(legacy["directory"]), json.loads(descriptor_path.read_text(encoding="utf-8"))["bundle"]["directory"])
+        self.assertEqual(before, descriptor_path.read_bytes())
 
     def test_review_run_cannot_be_reused_on_another_branch(self):
         ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
@@ -1285,7 +1165,8 @@ class DeliveryOwnershipTests(RepositoryFixture):
             connection.executescript(
                 "CREATE TABLE work_items (key TEXT PRIMARY KEY, status TEXT, pr TEXT);"
                 "CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);"
-                "PRAGMA user_version = 2;"
+                "CREATE TABLE work_item_references (provider TEXT, scope TEXT, native_id TEXT, work_item TEXT);"
+                "PRAGMA user_version = 4;"
             )
             connection.execute(
                 "INSERT INTO work_items VALUES (?, 'active', NULL)",
@@ -1546,6 +1427,74 @@ class MonitorTests(RepositoryFixture):
         self.assertEqual("success", second["observation"]["conclusion"])
         self.assertGreaterEqual(second["timing"]["suspended_offline_seconds"], suspension["minimum_offline_seconds"])
 
+    def test_completed_run_emits_on_its_first_observation(self):
+        result = ops.monitor_remote(
+            self.root, "run-1", "run", "42", "HEAD", "ci", 1, 0.001, 2,
+            self.observer([{"state": "completed", "conclusion": "success"}]),
+        )
+        self.assertTrue(result["terminal"])
+        self.assertEqual(1, result["queries"])
+
+    def ready_pr(self, **changes):
+        value = {
+            "state": "open", "merge_state": "blocked", "auto_merge": False,
+            "review_decision": "review_required", "check_count": 2,
+            "pending_items": [], "failing_items": [], "merge_group_failures": [],
+        }
+        value.update(changes)
+        return value
+
+    def test_initial_green_pr_emits_once_before_human_review(self):
+        result = ops.monitor_remote(
+            self.root, "run-1", "pr", "42", "HEAD", None, None, 0.001, 0.2,
+            self.observer([self.ready_pr()]),
+        )
+        self.assertEqual("material-transition", result["transition"])
+        self.assertFalse(result["terminal"])
+        self.assertEqual(1, result["queries"])
+        state = json.loads(Path(result["state_artifact"]).read_text(encoding="utf-8"))
+        self.assertEqual(result["observation"], state["last_observation"])
+
+    def test_reconnect_does_not_repeat_initial_green_pr_notification(self):
+        ready = self.ready_pr()
+        first = ops.monitor_remote(
+            self.root, "run-1", "pr", "42", "HEAD", None, None, 0.001, 0.2,
+            self.observer([ready]),
+        )
+        second = ops.monitor_remote(
+            self.root, "run-1", "pr", "42", "HEAD", None, None, 0.001, 2,
+            self.observer([ready, ready, self.ready_pr(state="merged")]),
+        )
+        self.assertEqual("material-transition", first["transition"])
+        self.assertEqual(first["monitor_id"], second["monitor_id"])
+        self.assertTrue(second["reconnected"])
+        self.assertEqual("merged", second["observation"]["state"])
+        self.assertEqual(4, second["queries"])
+
+    def test_empty_or_pending_checks_do_not_emit_initial_readiness(self):
+        for changes in ({"check_count": 0}, {"pending_items": ["windows"]}):
+            with self.subTest(changes=changes):
+                target = "43" if changes.get("check_count") == 0 else "44"
+                result = ops.monitor_remote(
+                    self.root, "run-1", "pr", target, "HEAD", None, None, 0.001, 2,
+                    self.observer([self.ready_pr(**changes), self.ready_pr(state="merged")]),
+                )
+                self.assertEqual("merged", result["observation"]["state"])
+                self.assertEqual(2, result["queries"])
+
+    def test_pr_observer_retains_nonempty_check_evidence(self):
+        identity = ops.remote_identity(self.root, "pr", "42", "HEAD", None, None)
+        pr = {
+            "headRefOid": identity["head"], "state": "OPEN", "mergeStateStatus": "BLOCKED",
+            "reviewDecision": "REVIEW_REQUIRED", "autoMergeRequest": None,
+            "statusCheckRollup": [{"name": "ci", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+        }
+        queue = {"data": {"repository": {"pullRequest": {"mergeQueueEntry": None}}}}
+        responses = [subprocess.CompletedProcess([], 0, json.dumps(value), "") for value in (pr, queue, [])]
+        with mock.patch.object(ops, "run_process", side_effect=responses):
+            observed = ops.forge_observation(self.root, identity)
+        self.assertEqual(1, observed["check_count"])
+
     def head_or_base(self):
         return self.git("rev-parse", "HEAD")
 
@@ -1691,7 +1640,8 @@ class HostCoverageWorkflowTests(RepositoryFixture):
         path = self.root / "reviews" / "Feature-Workflow-ops.md"
         path.parent.mkdir(exist_ok=True)
         path.write_text(
-            "# Review\n\n```agent-host-coverage\n" + json.dumps(self.coverage_record(head)) + "\n```\n",
+            "# Review\n\n**Review status:** `complete`\n**Judgment:** `approved`\n\n"
+            "```agent-host-coverage\n" + json.dumps(self.coverage_record(head)) + "\n```\n",
             encoding="utf-8",
         )
         return path

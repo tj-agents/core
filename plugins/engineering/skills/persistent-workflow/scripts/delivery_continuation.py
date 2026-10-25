@@ -110,31 +110,6 @@ def receipt_for(owner, path, interval, host, windows=None):
     return scheduler.linux_receipt(owner, path, __file__, runtime, python, host, interval, os.environ)
 
 
-LEGACY_WINDOWS_SCRIPT = r'''$ErrorActionPreference='Stop';[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);$tasks=@(Get-ScheduledTask|Where-Object {$_.TaskPath -ceq '\' -and $_.TaskName.StartsWith('AgentStandards-Delivery-',[StringComparison]::OrdinalIgnoreCase)}|ForEach-Object {[pscustomobject]@{TaskName=$_.TaskName;TaskPath=$_.TaskPath;Actions=@($_.Actions|Select-Object WorkingDirectory)}});[pscustomobject]@{Tasks=$tasks}|ConvertTo-Json -Depth 5 -Compress'''
-
-
-def legacy_conflict(root, transport, windows=None):
-    windows = os.name == "nt" if windows is None else windows
-    if not windows:
-        return
-    result = transport.run([scheduler._powershell(), "-NoProfile", "-NonInteractive", "-Command",
-                            LEGACY_WINDOWS_SCRIPT], timeout=scheduler.WINDOWS_READ_QUERY_TIMEOUT)
-    if result.returncode:
-        detail = (result.stderr or result.stdout or "").strip()
-        raise scheduler.SchedulerError("legacy ScheduledTasks query failed" + ((": " + detail) if detail else ""))
-    try:
-        payload = json.loads(result.stdout)
-    except ValueError as error:
-        raise scheduler.SchedulerError("legacy ScheduledTasks query returned invalid JSON") from error
-    tasks = payload.get("Tasks") if isinstance(payload, dict) else None
-    if not isinstance(tasks, list):
-        raise scheduler.SchedulerError("legacy ScheduledTasks query returned invalid entries")
-    for task in tasks:
-        for action in task.get("Actions", []) if isinstance(task, dict) else []:
-            if scheduler.exact_path(action.get("WorkingDirectory")) == str(root):
-                raise scheduler.SchedulerError("legacy delivery task targets this worktree; inspect and retire it explicitly")
-
-
 def write_linux(receipt, owner_path, owner, root, transport):
     scheduler.assert_linux_write_paths(receipt)
     service, timer = scheduler.linux_units(receipt)
@@ -219,7 +194,6 @@ def register(owner, root, path, args, transport, windows=None):
         raise scheduler.SchedulerError("existing scheduled task has no matching receipt; refusing to overwrite it")
     if not windows:
         scheduler._validate_linux_recovery_evidence((stale_current, current, proposed), transport)
-    legacy_conflict(root, transport, windows=windows)
     if args.dry_run:
         return {"action": "register", "dry_run": True, "proposed": proposed, "previous": current}
     scheduler.atomic_json(pending_path, {"previous": stale_current or current, "proposed": proposed,

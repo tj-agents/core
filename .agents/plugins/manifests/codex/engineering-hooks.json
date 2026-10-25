@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py\" --session-start-context",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py\" --session-start-context",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session/scripts/session-context.py\"",
             "timeout": 10
           }
         ]
@@ -19,7 +19,7 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\"",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\"",
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\""
           }
         ],
@@ -31,7 +31,7 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/delivery_binding_gate.py\" --validate-body --pr-writes-only",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/delivery_binding_gate.py\" --validate-body --pr-writes-only",
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/delivery_binding_gate.py\" --validate-body --pr-writes-only"
           }
         ]
