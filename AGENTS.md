@@ -14,8 +14,8 @@ Shipped code must run on Windows and Linux; follow
 
 ```text
 Shell wrappers exist, but the launch check reports unconfigured:
-Follow README > Required setup on every machine before resuming ordinary work.
-Wrapper presence does not establish setup completion.
+Agent executes README > Required setup on every machine, repairs failed steps and verifies completion.
+Tommy receives the observed result; the agent retains deployment ownership across a credential wait.
 ```
 
 Machine setup and standards injection are reproducible Core deliverables. Implement their behavior in
