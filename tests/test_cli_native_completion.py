@@ -3,7 +3,7 @@
 import importlib.util
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import sys
 import tempfile
 import unittest
@@ -95,6 +95,51 @@ class NativeCompletionTests(unittest.TestCase):
         self.assertIsNotNone(self.wait())
         self.assertEqual(103.0, self.now)
 
+    @unittest.skipUnless(os.name == 'nt', 'Win32 extended paths require Windows')
+    def test_equivalent_extended_profile_and_rollout_paths_keep_the_exact_binding(self):
+        self.event('task_complete')
+        original = dict(self.entry)
+        for profile_extended, rollout_extended in ((False, True), (True, False), (True, True)):
+            with self.subTest(profile_extended=profile_extended, rollout_extended=rollout_extended):
+                self.entry = dict(original)
+                for key, extended in (('profile', profile_extended), ('native_rollout', rollout_extended)):
+                    if extended:
+                        self.entry[key] = '\\\\?\\' + self.entry[key]
+                frozen = dict(self.entry)
+                self.assertTrue(os.path.samefile(self.entry['native_rollout'], self.rollout))
+                self.arm()
+                self.assertIsNotNone(self.wait())
+                self.assertEqual(frozen, self.entry)
+
+    def test_valid_transcript_outside_the_profile_cannot_authorize_closure(self):
+        with tempfile.TemporaryDirectory() as outside:
+            foreign = Path(outside).resolve() / 'rollout.jsonl'
+            foreign.write_bytes(self.rollout.read_bytes())
+            variants = [str(foreign)]
+            if os.name == 'nt':
+                variants.append('\\\\?\\' + str(foreign))
+            for path in variants:
+                with self.subTest(path=path), self.assertRaisesRegex(RuntimeError, 'outside the verified profile'):
+                    cli_client.NativeCompletion({**self.entry, 'native_rollout': path})
+
+    def test_symlink_cannot_make_an_outside_rollout_look_contained(self):
+        with tempfile.TemporaryDirectory() as outside:
+            foreign = Path(outside).resolve() / 'rollout.jsonl'
+            foreign.write_bytes(self.rollout.read_bytes())
+            link = self.rollout.with_name('linked.jsonl')
+            try:
+                link.symlink_to(foreign)
+            except OSError as error:
+                if os.name == 'nt' and getattr(error, 'winerror', None) == 1314:
+                    self.skipTest('This Windows account cannot create symbolic links; Linux exercises this guard')
+                raise
+            variants = [str(link)]
+            if os.name == 'nt':
+                variants.append('\\\\?\\' + str(link))
+            for path in variants:
+                with self.subTest(path=path), self.assertRaisesRegex(RuntimeError, 'outside the verified profile'):
+                    cli_client.NativeCompletion({**self.entry, 'native_rollout': path})
+
     def test_managed_remote_tui_native_source_is_supported(self):
         self.rollout.write_bytes(self.rollout.read_bytes().replace(b'"cli"', b'"vscode"'))
         self.arm()
@@ -179,6 +224,34 @@ class NativeCompletionTests(unittest.TestCase):
     def test_missing_arm_binding_fails_closed(self):
         with self.assertRaisesRegex(RuntimeError, 'binding is missing'):
             self.wait()
+
+
+class WindowsPathComparisonTests(unittest.TestCase):
+    def test_native_drive_and_unc_prefixes_preserve_profile_containment(self):
+        for profile, rollout in (
+                ('C:/profile', '//?/C:/profile/sessions/rollout.jsonl'),
+                ('//?/C:/profile', 'C:/profile/sessions/rollout.jsonl'),
+                ('//server/share/profile', '//?/UNC/server/share/profile/sessions/rollout.jsonl'),
+                ('//?/UNC/server/share/profile', '//server/share/profile/sessions/rollout.jsonl')):
+            with self.subTest(profile=profile, rollout=rollout):
+                sessions = cli_client.comparable_path(PureWindowsPath(profile) / 'sessions')
+                self.assertIn(sessions, cli_client.comparable_path(PureWindowsPath(rollout)).parents)
+
+    def test_unrelated_drive_share_profile_and_device_namespace_remain_outside(self):
+        for profile, rollout in (
+                ('C:/profile', '//?/D:/profile/sessions/rollout.jsonl'),
+                ('C:/profile', '//?/C:/profile-other/sessions/rollout.jsonl'),
+                ('//server/share/profile', '//?/UNC/server/other/profile/sessions/rollout.jsonl'),
+                ('C:/profile', '//?/GLOBALROOT/Device/profile/sessions/rollout.jsonl'),
+                ('C:/profile', '//./C:/profile/sessions/rollout.jsonl')):
+            with self.subTest(profile=profile, rollout=rollout):
+                sessions = cli_client.comparable_path(PureWindowsPath(profile) / 'sessions')
+                self.assertNotIn(sessions, cli_client.comparable_path(PureWindowsPath(rollout)).parents)
+
+    @unittest.skipIf(os.name == 'nt', 'POSIX path spelling')
+    def test_posix_paths_are_not_reinterpreted_as_win32_namespaces(self):
+        path = Path('/tmp') / '\\\\?\\C:\\profile'
+        self.assertIs(path, cli_client.comparable_path(path))
 
 
 if __name__ == '__main__':
