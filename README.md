@@ -358,6 +358,13 @@ enrollment helper runs only with explicit `./setup.ps1 --onboard` or `./setup.sh
 or `./sync.sh --onboard` for enrollment. `--verify-only` checks without applying setup and rejects `--onboard`.
 
 Each `claude`, `codex`, handoff and open launch runs `launch_check.py` first: one non-blocking ntfy.sh
+poll followed by native installation reconciliation. An unconfigured machine or failed update automatically
+fetches canonical `tj-agents/core` main into `~/.agents-state/sources/core`, runs its supported setup entry
+point and `--check`, then retries readiness once. Recovery needs no existing Core checkout, never opens
+credential onboarding, and leaves failed setup or native admission closed. Claude installs missing catalog
+dependencies before either installing or updating dependents and reads back their native registrations.
+
+The normal event check uses one non-blocking ntfy.sh
 poll for events since the saved cursor; offline it starts anyway. Events name the publishing repositories.
 
 Repository-required standards are a separate, blocking check. Before starting the native host,
