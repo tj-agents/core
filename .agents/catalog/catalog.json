@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:38026672438ae2025db89681d5d0e47905679c418250283448aa168326cb309d",
+      "digest": "sha256:54420b4b15d9d8e1ca63ed34461dc127544cc740594f4f15a9715c8e0275aaeb",
       "harness": {
         "marketplaces": [
           {
@@ -135,7 +135,6 @@
       "dependencies": {
         "required": [
           "tj-agents/base",
-          "tj-agents/machine",
           "tj-agents/agent-store",
           "tj-agents/agent"
         ],
@@ -148,7 +147,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:586f8a89cc9dd4f62b34a79a7ca987fed9b2b52056062020014ebf0f41e69d17",
+      "digest": "sha256:6ca22170d64cf82e9620b650d72bb26123d433d8a7cf73ecf1d33f9960203cc2",
       "harness": {
         "marketplaces": [
           {
@@ -160,7 +159,6 @@
           "tj-agents/agent",
           "tj-agents/agent-store",
           "tj-agents/base",
-          "tj-agents/machine",
           "tj-agents/workflow"
         ],
         "hooks": [
@@ -326,7 +324,6 @@
         "required": [
           "tj-agents/base",
           "tj-agents/workflow",
-          "tj-agents/machine",
           "tj-agents/agent-store",
           "tj-agents/agent",
           "tj-agents/cli"
@@ -344,7 +341,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:ffd7f0215faa5512a4f1e7eb13dae41cc2e6624ff6b4d60b1a3269ccf96d252d",
+      "digest": "sha256:d81a02ffb6136772f71f73b7007891b7dcefb4e799d71d62f576471385447766",
       "harness": {
         "marketplaces": [
           {
@@ -358,7 +355,6 @@
           "tj-agents/base",
           "tj-agents/cli",
           "tj-agents/engineering",
-          "tj-agents/machine",
           "tj-agents/workflow"
         ],
         "hooks": [
@@ -607,113 +603,6 @@
             "id": "tj-agents/cli",
             "marketplace": "tj-agents",
             "repository": "tj-agents/cli"
-          }
-        ],
-        "optional": []
-      }
-    },
-    {
-      "owner_repository": "tj-agents/core",
-      "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "tj-agents",
-      "id": "tj-agents/machine",
-      "name": "machine",
-      "package_path": "plugins/machine",
-      "description": "Explicit harness, history and clipboard utilities.",
-      "platforms": [
-        "windows",
-        "linux",
-        "macos"
-      ],
-      "skills": [
-        "clip"
-      ],
-      "dependencies": {
-        "required": [
-          "tj-agents/base",
-          "tj-agents/agent-store"
-        ],
-        "optional": []
-      },
-      "external_prerequisites": {
-        "required": [
-          "python>=3.9"
-        ],
-        "optional": [
-          "exe:powershell",
-          "exe:codex",
-          "exe:claude",
-          "windows-terminal",
-          "python>=3.11"
-        ]
-      },
-      "digest": "sha256:c4c722a882d58d09c72ca01624320650f32c346b97d9c3d1f21d0291dbd7df6b",
-      "digest_excludes": [
-        "catalog/catalog.json"
-      ],
-      "harness": {
-        "marketplaces": [
-          {
-            "id": "tj-agents",
-            "repository": "tj-agents/marketplace"
-          }
-        ],
-        "plugins": [
-          "tj-agents/agent-store",
-          "tj-agents/base",
-          "tj-agents/machine"
-        ],
-        "hooks": [
-          {
-            "path": ".agents/agent-store/runtime/session_store.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": ".agents/agent/runtime/close_lifecycle.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": ".agents/agent/runtime/reap_orphans.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": ".agents/agent/utility/peer/scripts/register_session.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/hook_dispatch.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          }
-        ],
-        "permissions": {
-          "claude_allow": [],
-          "codex_prefix_rules": []
-        },
-        "setup": {
-          "script": ".agents/machine/scripts/setup_machine.py"
-        }
-      },
-      "external_dependencies": {
-        "required": [
-          {
-            "id": "tj-agents/agent-store",
-            "marketplace": "tj-agents",
-            "repository": "tj-agents/agent"
           }
         ],
         "optional": []

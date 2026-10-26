@@ -9,13 +9,6 @@
       "domain": "behavior"
     },
     {
-      "name": "machine",
-      "root": ".agents/machine",
-      "layout": "kind",
-      "plugin": "machine",
-      "domain": "machine"
-    },
-    {
       "name": "workflow",
       "root": ".agents/workflow",
       "layout": "kind",
@@ -46,10 +39,6 @@
     "engineering": {
       "codex": ".agents/plugins/manifests/codex/engineering-hooks.json",
       "claude": ".agents/plugins/manifests/claude/engineering-hooks.json"
-    },
-    "machine": {
-      "codex": ".agents/plugins/manifests/codex/machine-hooks.json",
-      "claude": ".agents/plugins/manifests/claude/machine-hooks.json"
     },
     "workflow": {
       "codex": ".agents/plugins/manifests/codex/workflow-hooks.json",
@@ -133,61 +122,6 @@
       "plugin": "engineering",
       "source": ".agents/workflow/resources/problem-records.md",
       "destination": ".agents/workflow/resources/problem-records.md"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/hooks/hook_dispatch.py",
-      "destination": "hooks/hook_dispatch.py"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/machine/scripts/setup_machine.py",
-      "destination": ".agents/machine/scripts/setup_machine.py"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/dependencies/agent/.agents/agent/runtime",
-      "destination": ".agents/agent/runtime"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/dependencies/agent/.agents/agent/resources",
-      "destination": ".agents/agent/resources"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts",
-      "destination": ".agents/agent/utility/plugins/scripts"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/dependencies/agent/.agents/agent/utility/peer/scripts",
-      "destination": ".agents/agent/utility/peer/scripts"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/hooks/codex_hook_snapshot.py",
-      "destination": "hooks/codex_hook_snapshot.py"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/dependencies/agent/.agents/agent/resources/lanes",
-      "destination": "resources/lanes"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/catalog",
-      "destination": "catalog"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/plugins/harness.schema.json",
-      "destination": "plugins/harness.schema.json"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/hooks/repo-owners.json",
-      "destination": "hooks/repo-owners.json"
     },
     {
       "plugin": "engineering",
@@ -275,11 +209,6 @@
       "destination": "tier.json"
     },
     {
-      "plugin": "machine",
-      "source": ".agents/tiers/machine.json",
-      "destination": "tier.json"
-    },
-    {
       "plugin": "base",
       "source": ".agents/hooks/project_facts.py",
       "destination": "hooks/project_facts.py"
@@ -308,11 +237,6 @@
       "plugin": "engineering",
       "source": ".agents/schemas/standards-context.schema.json",
       "destination": "schemas/standards-context.schema.json"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/dependencies/agent/.agents/agent-store/runtime",
-      "destination": ".agents/agent-store/runtime"
     },
     {
       "plugin": "engineering",
@@ -367,22 +291,16 @@
   ],
   "prerequisites": {
     "base": [],
-    "machine": ["base"],
     "workflow": [
-      "base",
-      "machine"
+      "base"
     ],
     "engineering": [
       "base",
-      "workflow",
-      "machine"
+      "workflow"
     ]
   },
   "external_prerequisites": {
     "base": [],
-    "machine": [
-      {"id": "tj-agents/agent-store", "marketplace": "tj-agents", "repository": "tj-agents/agent"}
-    ],
     "workflow": [
       {"id": "tj-agents/agent-store", "marketplace": "tj-agents", "repository": "tj-agents/agent"},
       {"id": "tj-agents/agent", "marketplace": "tj-agents", "repository": "tj-agents/agent"}

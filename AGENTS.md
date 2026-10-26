@@ -1,57 +1,32 @@
 # core
 
+Core authors and publishes only the `base`, `workflow` and `engineering` plugins. Behavior that acts on an
+agent session belongs in `tj-agents/agent`, deterministic CLI and OS mechanics in `tj-agents/cli`, plugin
+generation and checks in `tj-agents/template`, and stack standards in their stack repository. Never author,
+copy or refactor another repository's package here; the generator rejects a scope the marketplace publishes
+from elsewhere. Agent code reaches Core only as the staged, git-ignored `.agents/dependencies/` export.
+
 Read `README.md` before changing repository structure.
 Personal applies only to explicitly adopted personal projects. GitHub ownership and permission to commit
 agent configuration do not establish personal scope. Infonetica is work scope, including the
 `tj-agents/infonetica` plugin source repository and every worktree: never select or inject Personal there.
 Read the target repository's README.md and AGENTS.md before selecting its policy profiles.
-Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts, hooks, or launchers.
-Install machine state only through `./setup.ps1` or `./setup.sh`; rerunning converges.
-Before relying on machine setup or declaring its repair complete, follow
-[Required setup on every machine](README.md#required-setup-on-every-machine) and its completion evidence.
+Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts or hooks.
 Shipped code must run on Windows and Linux; follow
 [Supported platforms](CODE_CONVENTIONS.md#supported-platforms).
 
-```text
-Shell wrappers exist, but the launch check reports unconfigured:
-Agent executes README > Required setup on every machine, repairs failed steps and verifies completion.
-Tommy receives the observed result; the agent retains deployment ownership across a credential wait.
-```
-
-Machine setup and standards injection are reproducible Core deliverables. Implement their behavior in
-repository-owned code reached through the setup and sync entry points, with shared Python logic for
-Windows and Linux. A repair confined to one machine's profile, plugin cache or local settings is
-incomplete: carry it into source, then deploy it through those entry points. Verify effective native-host
-standards discovery and the affected behavior in a fresh session on each supported platform; report
-missing prerequisites or remaining verification explicitly. Keep credentials and native trust decisions
-under their existing controls. See [Machine setup and updates](README.md#machine-setup-and-updates).
-
-Marketplace owns plugin identities, source repositories and dependencies. Machine's offline selector
-snapshot is generated from Marketplace's authored catalog; Core owns stack choices and settings
-generation. Follow the [shared ownership decision](https://github.com/tj-agents/docs/blob/main/PLUGIN_CATALOG.md)
-when changing selection.
-
-```text
-One laptop is missing Engineering after setup:
-1. Repair the repository-owned selection, installation or injection path that caused the omission.
-2. Run setup and sync through their supported entry points on Windows and Linux.
-3. Verify Engineering discovery and the affected operation in fresh native host sessions.
-Result: copying a cached skill onto that laptop alone does not complete the repair.
-```
+Marketplace owns plugin identities, source repositories and dependencies. Follow the
+[shared ownership decision](https://github.com/tj-agents/docs/blob/main/PLUGIN_CATALOG.md) when changing
+selection.
 
 Global design and cross-repository plans belong in [`tj-agents/docs`](https://github.com/tj-agents/docs).
 Keep core implementation plans here and link to shared designs instead of copying them.
 
-`.agents/` is the only canonical home for Core host-neutral capability definitions, workflow contracts,
-shared hooks, schemas, tests and resources. Core's Base, Engineering, Workflow and Machine ownership lives
-below that directory; external Agent, Agent Store, Codex, Claude and CLI definitions arrive only through
-declared staged publisher exports and must not be recreated as authored Core source.
-
-`.codex/` contains Codex-only entry points, adapters, agent definitions and configuration. `.claude/`
-contains Claude-only equivalents. Authored host manifests and hook wiring live under
-`.agents/plugins/manifests/` and are mapped explicitly by `.agents/plugins/sources.json`. A host entry
-point references its canonical definition in `.agents/` and adds only genuine host differences; never
-copy a shared instruction body into either host tree as another authored source.
+`.agents/` holds only host-neutral shared source: Base, Engineering and Workflow definitions, workflow
+contracts, shared hooks, schemas, tests and resources. `.codex/` holds Codex-only entry points, adapters,
+agent definitions and configuration; `.claude/` holds the Claude-only equivalents. A host entry point
+references its canonical definition in `.agents/` and adds only genuine host differences; never copy a shared
+instruction body into either host tree.
 
 `plugins/*` is generated distribution output, never an authored source tree, and never part of a PR:
 CI's guard rejects generated paths and the post-merge job regenerates and commits them on main. Run
@@ -63,19 +38,6 @@ deciding to create, split, merge, rename or retire a skill, including while plan
 
 A utility skill must not depend on a manually assembled, machine-local file the plugin does not ship.
 See [`PACKAGING.md`](PACKAGING.md).
-
-For machine setup, event handling or repository adoption, read the
-[refresh and repository boundaries](README.md#refresh-and-repository-boundaries) before changing them.
-Preserve the separation with the [machine event fixtures](tests/test_machine_events.py); repository
-adoption and local exclusions follow `agent:plugins`.
-Consumer validation and native refresh share the staged Agent `plugin_autoupdate.py` runtime.
-Follow the [shared catalog's identity policy](https://github.com/tj-agents/marketplace#readme)
-when changing marketplace declarations or installed-registration cleanup.
-
-This repository owns common agent behavior, selected engineering process and machine utilities.
-`plan-artifacts` supplies maintained plans without requiring an engineering lifecycle. Stack standards,
-product profiles and product-specific enforcement remain with their scope owners. Shared runtime recovery
-and host acceptance remain part of P2; source generation alone does not establish adoption.
 
 <!-- BEGIN personal:current-solution sha256:2e091b5f18f67fb2302024e817c71d4a0f5234c1ca63ca1c9af5c4eef3b6a128 -->
 # Personal projects
