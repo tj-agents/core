@@ -1957,7 +1957,7 @@ class RepositoryProviderTests(unittest.TestCase):
         return state
 
     def write_session_store_with_writer(self, status):
-        path = ROOT / ".agents" / "agent-store" / "runtime" / "session_store.py"
+        path = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
         spec = importlib.util.spec_from_file_location("workflow_contract_session_store", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -2019,7 +2019,7 @@ class RepositoryProviderTests(unittest.TestCase):
         state = self.root / "v4-store-reader-state"
         state.mkdir()
         database = state / "sessions.db"
-        source = ROOT / ".agents" / "agent-store" / "runtime" / "session_store.py"
+        source = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
         spec = importlib.util.spec_from_file_location("workflow_contract_v4_session_store", source)
         session_store = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(session_store)
@@ -2252,7 +2252,7 @@ class RepositoryProviderTests(unittest.TestCase):
             "Done when: the runtime work item is verified.\n",
             encoding="utf-8",
         )
-        path = ROOT / ".agents" / "agent-store" / "runtime" / "session_store.py"
+        path = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
         spec = importlib.util.spec_from_file_location("linked_worktree_session_store", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
