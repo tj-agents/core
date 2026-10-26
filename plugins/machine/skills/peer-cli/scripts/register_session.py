@@ -418,7 +418,8 @@ def record(data, lookup=None, host_names=None, client=None):
     if client is not None:
         entry["client_identity"] = client["client_identity"]
         entry["launch_cwd"] = client.get("launch_cwd", cwd)
-        for key in ("client_message_id", "recording_path", "backend", "profile", "native_turn_id", "native_rollout"):
+        for key in ("client_message_id", "recording_path", "backend", "profile", "native_turn_id", "native_rollout",
+                    "native_cwd"):
             if key in client:
                 entry[key] = client[key]
     destination = state_directory() / f"{session}.json"
