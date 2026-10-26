@@ -113,6 +113,19 @@ class ClaudeWorktreeInstallations(unittest.TestCase):
         self.assertEqual([('local', self.sibling), ('project', self.primary)],
                          REFRESH.update_targets(IDENTITY, self.nested, rows))
 
+    def test_dangling_foreign_worktree_does_not_block_a_healthy_repository(self):
+        with tempfile.TemporaryDirectory(dir=self.root) as temporary:
+            dangling = Path(temporary)
+            (dangling / '.git').write_text('gitdir: ' + str(dangling / 'deleted-metadata'), encoding='utf-8')
+            rows = [self.entry(dangling), self.entry(self.primary, 'new'), self.entry(self.nested)]
+            self.assertEqual([('project', self.primary)], REFRESH.update_targets(IDENTITY, self.nested, rows))
+            with mock.patch.object(required_plugins, 'readable_payload', return_value=True):
+                self.assertEqual({IDENTITY: self.root / 'new'},
+                                 required_plugins.enabled_roots('claude', self.nested, rows))
+            self.assertEqual('new', RELAUNCH.effective_installation(rows, self.nested)['version'])
+            with self.assertRaises(required_plugins.RequiredPluginsError):
+                required_plugins.enabled_roots('claude', dangling, rows)
+
     def test_package_verification_ignores_only_shadowed_same_repository_rows(self):
         self.rows = [self.entry(self.primary, 'new'), self.entry(self.nested)]
         catalog = self.root / 'catalog'
