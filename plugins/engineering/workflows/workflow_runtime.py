@@ -529,7 +529,8 @@ def _read_only_git(root, *arguments):
 
 def _repository_identity(root):
     package = Path(__file__).resolve().parent.parent
-    runtime = package / "agent-store" / "runtime" if package.name == ".agents" else package / ".agents" / "agent-store" / "runtime"
+    runtime = (package / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime"
+               if package.name == ".agents" else package / ".agents" / "agent-store" / "runtime")
     path = runtime / "repository_identity.py"
     if not path.is_file():
         raise ContractViolation("work-item resolution requires the shipped repository identity helper")
@@ -543,7 +544,8 @@ def _repository_identity(root):
 
 def _read_only_store_module():
     package = Path(__file__).resolve().parent.parent
-    runtime = package / "agent-store" / "runtime" if package.name == ".agents" else package / ".agents" / "agent-store" / "runtime"
+    runtime = (package / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime"
+               if package.name == ".agents" else package / ".agents" / "agent-store" / "runtime")
     path = runtime / "reader.py"
     if not path.is_file():
         raise ContractViolation("work-item resolution requires the shipped read-only store")

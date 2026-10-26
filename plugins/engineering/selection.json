@@ -6,11 +6,25 @@
   "prerequisites": [
     "base",
     "workflow",
-    "agent-store",
-    "machine",
-    "agent"
+    "machine"
   ],
-  "external_prerequisites": [],
+  "external_prerequisites": [
+    {
+      "id": "tj-agents/agent-store",
+      "marketplace": "tj-agents",
+      "repository": "tj-agents/agent"
+    },
+    {
+      "id": "tj-agents/agent",
+      "marketplace": "tj-agents",
+      "repository": "tj-agents/agent"
+    },
+    {
+      "id": "tj-agents/cli",
+      "marketplace": "tj-agents",
+      "repository": "tj-agents/cli"
+    }
+  ],
   "skills": [
     "address-bug",
     "address-debt",

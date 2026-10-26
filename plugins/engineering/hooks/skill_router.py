@@ -81,7 +81,7 @@ from pathlib import Path
 
 from hook_runtime import claim_invocation, own_payload_root
 import tier_gate
-sys.path.append(str(Path(__file__).resolve().parents[1] / "machine" / "scripts"))
+sys.path.append(str(Path(__file__).resolve().parents[1] / "dependencies" / "agent" / ".agents" / "agent" / "runtime"))
 import required_plugins
 
 # Skill descriptions carry non-ASCII punctuation, and this text is what the agent acts on.

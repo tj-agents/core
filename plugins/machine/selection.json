@@ -4,29 +4,16 @@
     "machine"
   ],
   "prerequisites": [
-    "base",
-    "agent-store"
+    "base"
   ],
-  "external_prerequisites": [],
+  "external_prerequisites": [
+    {
+      "id": "tj-agents/agent-store",
+      "marketplace": "tj-agents",
+      "repository": "tj-agents/agent"
+    }
+  ],
   "skills": [
-    "auto-memory",
-    "clip",
-    "close",
-    "followup-codex",
-    "handoff-claude",
-    "handoff-codex",
-    "hook-control",
-    "lanes",
-    "last-conversation",
-    "open-claude",
-    "open-cli",
-    "open-codex",
-    "peer-cli",
-    "plugin-selection",
-    "recover-agents",
-    "search",
-    "search-claude",
-    "search-codex",
-    "sync-plugins"
+    "clip"
   ]
 }

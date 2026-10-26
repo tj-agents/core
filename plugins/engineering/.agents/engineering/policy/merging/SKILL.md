@@ -118,7 +118,7 @@ that capability is unavailable and an authorized `workflow:handoff` transfers cl
 the exact removal, rename or move and final filesystem verification recorded in `## Next Steps`.
 The predecessor ends repository-scoped activity and emits a recorded release marker; it never performs
 the operation after launch. The successor waits for that marker before releasing the predecessor through
-`machine:peer-cli`. Resolve the registry entry by the old checkout and any recorded session or terminal
+`agent:peer`. Resolve the registry entry by the old checkout and any recorded session or terminal
 identity. The native close operation must verify the recorded PID and start time; tab closure uses its
 exact native terminal identity. An unverifiable entry stays open with the user named as resolver.
 
