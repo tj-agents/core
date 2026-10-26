@@ -95,6 +95,31 @@ class NativeCompletionTests(unittest.TestCase):
         self.assertIsNotNone(self.wait())
         self.assertEqual(103.0, self.now)
 
+    def test_mutating_an_exported_pin_cannot_change_the_bound_file_identity(self):
+        guard = cli_client.NativeCompletion(self.entry)
+        pin = guard.pin()
+        pin['identity'][1] += 1
+        self.event('task_complete')
+        self.assertTrue(guard.poll())
+        with self.assertRaisesRegex(RuntimeError, 'replaced or truncated'):
+            cli_client.NativeCompletion(self.entry, pin)
+
+    def test_truncation_between_path_check_and_open_cannot_reuse_completion(self):
+        guard = cli_client.NativeCompletion(self.entry)
+        self.event('task_complete')
+        self.assertTrue(guard.poll())
+        original_open = Path.open
+
+        def truncate_before_open(path, *args, **kwargs):
+            if path == self.rollout and args and args[0] == 'rb':
+                with original_open(path, 'wb'):
+                    pass
+            return original_open(path, *args, **kwargs)
+
+        with mock.patch.object(Path, 'open', new=truncate_before_open):
+            with self.assertRaisesRegex(RuntimeError, 'replaced or truncated'):
+                guard.poll()
+
     @unittest.skipUnless(os.name == 'nt', 'Win32 extended paths require Windows')
     def test_equivalent_extended_profile_and_rollout_paths_keep_the_exact_binding(self):
         self.event('task_complete')
