@@ -100,6 +100,8 @@ class AggregateTests(unittest.TestCase):
             value = CI.plan(mode, "runtime", ["tests/test_example.py"] if mode == "focused" else [])
             for job in ClassificationTests.results():
                 for outcome in ("failure", "cancelled", "skipped", "neutral", None):
+                    if (job, outcome) == ("verify-windows", "skipped"):
+                        continue
                     with self.subTest(mode=mode, job=job, outcome=outcome):
                         broken = {**ClassificationTests.results(), job: {"result": outcome}}
                         with self.assertRaises(ValueError):
@@ -113,6 +115,17 @@ class AggregateTests(unittest.TestCase):
         results = ClassificationTests.results()
         results["guard"]["result"] = "skipped"
         CI.required_results(CI.plan("full", "main"), results, "push")
+        results["verify-windows"]["result"] = "skipped"
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("full", "main"), results, "push")
+
+    def test_pull_requests_leave_windows_to_main_unless_it_runs(self):
+        results = ClassificationTests.results()
+        results["verify-windows"]["result"] = "skipped"
+        CI.required_results(CI.plan("full", "pr"), results, "pull_request")
+        results["verify-windows"]["result"] = "failure"
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("full", "pr"), results, "pull_request")
 
     def test_non_pr_event_cannot_accept_a_narrowed_plan(self):
         results = ClassificationTests.results()
@@ -162,6 +175,18 @@ class GitSelectionTests(unittest.TestCase):
         self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "docs")
         self.payload["pull_request"]["labels"] = [{"name": "ci:full"}]
         self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "full")
+
+    def test_base_movement_after_branching_is_not_part_of_the_change(self):
+        self.git("checkout", "-q", "-b", "change")
+        (self.root / "README.md").write_text("changed\n", encoding="utf-8")
+        self.commit()
+        head = self.git("rev-parse", "HEAD").strip()
+        self.git("checkout", "-q", "main")
+        (self.root / "runtime.py").write_text("pass\n", encoding="utf-8")
+        self.commit()
+        self.payload["pull_request"]["base"]["sha"] = self.git("rev-parse", "HEAD").strip()
+        self.payload["pull_request"]["head"] = {"sha": head}
+        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "docs")
 
     def test_rename_keeps_the_old_executable_path_in_scope(self):
         self.git("mv", "README.md", "script.py")
@@ -263,6 +288,22 @@ class WorkflowWiringTests(unittest.TestCase):
                 self.assertIn("mode == 'full'", step)
             self.assertIn("sync-generated.ps1 -Check", job)
             self.assertIn("sync_harness_manifests.py --check", job)
+
+    def test_windows_runs_on_main_and_release_follows_only_a_verified_generated_main(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:|\Z)",
+                               workflow.split("jobs:\n", 1)[1], re.MULTILINE | re.DOTALL))
+        self.assertIn("github.event_name != 'pull_request'", jobs["verify-windows"])
+        self.assertIn("'ci:full'", jobs["verify-windows"])
+        self.assertNotIn("github.event_name", jobs["verify-linux"])
+        release = jobs["release"]
+        self.assertIn("needs: [ci-required, regenerate]", release)
+        for condition in ("github.ref == 'refs/heads/main'", "needs.ci-required.result == 'success'",
+                          "needs.regenerate.outputs.changed != 'true'"):
+            self.assertIn(condition, release)
+        self.assertIn("scripts/advance_release.py --sha", release)
+        self.assertIn("published: 'true'", release)
+        self.assertNotIn("machine-events", jobs["regenerate"])
 
     def test_changed_guidance_examples_run_on_pull_requests_and_default_pushes(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
