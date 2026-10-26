@@ -3,7 +3,7 @@
 import json
 import math
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import re
 import secrets
 import subprocess
@@ -311,6 +311,18 @@ def recorded_client(session_id, nearest, lookup, table):
     return info, {**record, **turn}
 
 
+def comparable_path(path):
+    """Compare equivalent Win32 drive/UNC spellings without changing paths used for I/O."""
+    if not isinstance(path, PureWindowsPath):
+        return path
+    value = path.as_posix()
+    if value[:8].casefold() == '//?/unc/':
+        value = '//' + value[8:]
+    elif re.match(r'//\?/[a-zA-Z]:/', value):
+        value = value[4:]
+    return PureWindowsPath(value)
+
+
 class NativeCompletion:
     """Follow one verified native turn without depending on hook-fed turn state."""
 
@@ -320,10 +332,11 @@ class NativeCompletion:
             raise RuntimeError('Native completion requires an exact frontend, profile and turn binding')
         self.entry = entry
         self.path = Path(entry['native_rollout'])
-        sessions = Path(entry['profile']).resolve() / 'sessions'
+        sessions = comparable_path(Path(entry['profile']).resolve() / 'sessions')
         resolved = self.path.resolve(strict=True)
-        if (not self.path.is_absolute() or resolved != self.path
-                or sessions not in resolved.parents
+        self.resolved_path = comparable_path(resolved)
+        if (not self.path.is_absolute() or self.resolved_path != comparable_path(self.path)
+                or sessions not in self.resolved_path.parents
                 or not entry.get('native_turn_id') or not entry.get('client_message_id')):
             raise RuntimeError('Native rollout is outside the verified profile or has no bound turn')
         stat = self.path.stat()
@@ -346,7 +359,7 @@ class NativeCompletion:
             raise RuntimeError('The frontend input changed after arming')
         stat = self.path.stat()
         if ([stat.st_dev, stat.st_ino] != self.identity or stat.st_size < max(self.offset, self.minimum_size)
-                or self.path.resolve(strict=True) != self.path):
+                or comparable_path(self.path.resolve(strict=True)) != self.resolved_path):
             raise RuntimeError('Native rollout was replaced or truncated after arming')
         partial = False
         with self.path.open('rb') as stream:
