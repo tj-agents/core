@@ -77,7 +77,6 @@ import shlex
 import subprocess
 import sys
 import tempfile
-import threading
 from pathlib import Path
 
 from hook_runtime import claim_invocation, own_payload_root
@@ -100,9 +99,6 @@ SHIPPED_ROUTES_DIR = Path(__file__).resolve().parent.parent / "routes"
 REGISTRY_FILE = "registry.json"
 TIER_SKILL_DIRS = []
 VERIFIED_PLUGIN_ROOTS = {}
-HOOK_TIMEOUT_SECONDS = 22
-HOOK_PHASE = "required plugin admission"
-HOOK_TIMER = None
 SUBAGENT_ID = re.compile(r"[A-Za-z0-9_-]+")
 GIT_BASH_DRIVE = re.compile(r"^/([A-Za-z])/(.*)$")
 REMOTE_URL = re.compile(r'\[remote "origin"\][^\[]*?\burl\s*=\s*([^\r\n]+)', re.DOTALL)
@@ -1396,7 +1392,6 @@ def verify_install(argv):
 
 
 def main():
-    global HOOK_PHASE, HOOK_TIMER
     if DIFF_FLAG in sys.argv[1:]:
         sys.exit(check_diff(sys.argv[1:]))
     if QUERY_FLAG in sys.argv[1:]:
@@ -1451,17 +1446,6 @@ def main():
     ]
     if not relative_targets:
         sys.exit(0)
-    def timed_out():
-        sys.stderr.write(
-            f"SKILL ROUTER - {HOOK_PHASE} exceeded {HOOK_TIMEOUT_SECONDS} seconds. "
-            "This tool call was NOT run. Invoke agent:refresh-plugins to complete automatic recovery, then retry.\n"
-        )
-        sys.stderr.flush()
-        os._exit(2)
-
-    HOOK_TIMER = threading.Timer(HOOK_TIMEOUT_SECONDS, timed_out)
-    HOOK_TIMER.daemon = True
-    HOOK_TIMER.start()
     try:
         verified = required_plugins.check(root, harness)
     except required_plugins.RequiredPluginsError as error:
@@ -1469,7 +1453,6 @@ def main():
         sys.exit(2)
     if verified is not None:
         VERIFIED_PLUGIN_ROOTS[harness] = tuple(verified.values())
-    HOOK_PHASE = "standards discovery"
     try:
         routes = load_routes(root)
     except RoutesUnusable as error:
@@ -1724,6 +1707,3 @@ if __name__ == "__main__":
     except NativePluginDiscoveryError as error:
         discovery_diagnostic(error)
         sys.exit(2)
-    finally:
-        if HOOK_TIMER is not None:
-            HOOK_TIMER.cancel()

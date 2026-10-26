@@ -124,40 +124,45 @@ class SkillRouterTests(unittest.TestCase):
         payload = {"cwd": str(self.repo), "session_id": "native-session", "agent_id": "child",
                    "tool_name": "Write", "tool_input": {"file_path": str(self.repo / "src/new.py"), "content": "value = 1"}}
         error = router.required_plugins.RequiredPluginsError("Invoke agent:refresh-plugins for claude in this project")
-        try:
-            with patch.object(router.required_plugins, "check", side_effect=error) as check, \
-                    patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
-                    patch.object(sys, "argv", [str(self.router), "--harness", "claude"]), \
-                    patch.object(sys, "stderr", io.StringIO()) as stderr:
-                with self.assertRaises(SystemExit) as stopped:
-                    router.main()
-            self.assertEqual(2, stopped.exception.code)
-            check.assert_called_once_with(self.repo, "claude")
-            self.assertIn("Invoke agent:refresh-plugins", stderr.getvalue())
-        finally:
-            if router.HOOK_TIMER is not None:
-                router.HOOK_TIMER.cancel()
+        with patch.object(router.required_plugins, "check", side_effect=error) as check, \
+                patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
+                patch.object(sys, "argv", [str(self.router), "--harness", "claude"]), \
+                patch.object(sys, "stderr", io.StringIO()) as stderr:
+            with self.assertRaises(SystemExit) as stopped:
+                router.main()
+        self.assertEqual(2, stopped.exception.code)
+        check.assert_called_once_with(self.repo, "claude")
+        self.assertIn("Invoke agent:refresh-plugins", stderr.getvalue())
 
-    def test_stalled_admission_returns_a_bounded_phase_diagnostic(self):
+    def test_stalled_admission_reports_recovery_through_both_host_wrappers(self):
         wrapper = self.base / "stalled router.py"
         wrapper.write_text(
             "import sys,time\n"
             f"sys.path.insert(0, {str(self.router.parent)!r})\n"
             "import skill_router as router\n"
-            "router.HOOK_TIMEOUT_SECONDS = 0.2\n"
             "router.required_plugins.check = lambda *args: time.sleep(30)\n"
             "router.main()\n", encoding="utf-8")
-        payload = {"cwd": str(self.repo), "session_id": "native-session", "tool_name": "Write",
+        payload = {"hook_event_name": "PreToolUse", "cwd": str(self.repo),
+                   "session_id": "native-session", "tool_name": "Write",
                    "tool_input": {"file_path": str(self.repo / "src/new.py"), "content": "value = 1"}}
-        started = time.monotonic()
-        result = subprocess.run([sys.executable, str(wrapper), "--harness", "claude"],
-                                input=json.dumps(payload), capture_output=True, text=True,
-                                encoding="utf-8", env=self.environment(), cwd=self.repo, timeout=5)
-        self.assertEqual(2, result.returncode, result.stderr)
-        self.assertLess(time.monotonic() - started, 4)
-        self.assertIn("required plugin admission exceeded", result.stderr)
-        self.assertIn("This tool call was NOT run", result.stderr)
-        self.assertNotIn("start a fresh session", result.stderr)
+        commands = {
+            "claude": [str(HOOKS / "hook_dispatch.py"), "--deadline", "0.5", "--hook", str(wrapper),
+                       "--harness", "claude"],
+            "codex": [str(HOOKS.parents[1] / ".codex/adapters/pre_tool_use.py"), "--timeout", "0.5",
+                      str(wrapper), "--harness", "codex"],
+        }
+        for host, command in commands.items():
+            with self.subTest(host=host):
+                started = time.monotonic()
+                result = subprocess.run([sys.executable, "-B", *command],
+                                        input=json.dumps(payload), capture_output=True, text=True,
+                                        encoding="utf-8", env=self.environment(), cwd=self.repo, timeout=5)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertLess(time.monotonic() - started, 4)
+                decision = json.loads(result.stdout)["hookSpecificOutput"]
+                self.assertEqual("deny", decision["permissionDecision"])
+                self.assertIn("This tool call was NOT run", decision["permissionDecisionReason"])
+                self.assertIn("agent:refresh-plugins", decision["permissionDecisionReason"])
 
     def test_skill_proof_keeps_company_and_stack_qualifiers_distinct(self):
         transcript = self.base / "transcript.jsonl"

@@ -105,6 +105,8 @@ class CodexPreToolAdapter(unittest.TestCase):
         self.assertEqual(process.returncode, 0, stderr)
         self.assertLess(time.monotonic() - started, 3)
         self.assertIn("child execution/output collection", self.decision(stdout))
+        self.assertIn("This tool call was NOT run", self.decision(stdout))
+        self.assertIn("agent:refresh-plugins", self.decision(stdout))
 
     def test_grandchild_holding_output_is_terminated(self):
         pid_file = self.root / "grandchild.pid"

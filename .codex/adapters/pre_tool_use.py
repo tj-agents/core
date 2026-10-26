@@ -184,6 +184,8 @@ def main():
         result = run_until(lambda: execute(payload), active_deadline)
     except TimeoutError:
         failure = f"The Codex pre-tool hook {args.script} timed out during {stage}."
+        if stage == "child execution/output collection":
+            failure += " This tool call was NOT run. Invoke agent:refresh-plugins to refresh the installed hooks, then retry."
     except Exception as error:
         failure = f"The Codex pre-tool hook {args.script} failed during {stage}: {error}"
     finally:
