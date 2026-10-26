@@ -1,8 +1,11 @@
 import hashlib
 import importlib.util
 import json
+import os
 import sqlite3
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -16,6 +19,17 @@ specification.loader.exec_module(NATIVE)
 
 
 class NativeHostAcceptanceTests(unittest.TestCase):
+    def test_observer_imports_the_nested_installed_startup_binding(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state = Path(temporary) / 'state'
+            binding = state / 'bin' / '.agents' / 'agent' / 'runtime' / 'startup_binding.py'
+            binding.parent.mkdir(parents=True)
+            binding.write_text('', encoding='utf-8')
+            result = subprocess.run([sys.executable, '-B', str(SCRIPT), '--help'], capture_output=True,
+                                    text=True, encoding='utf-8', env={**os.environ,
+                                                                       'AGENT_STATE_DIRECTORY': str(state)})
+        self.assertEqual(0, result.returncode, result.stderr)
+
     def test_an_early_failure_cannot_reuse_a_previous_failed_observer_receipt(self):
         with tempfile.TemporaryDirectory() as temporary:
             evidence = Path(temporary)

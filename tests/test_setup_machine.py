@@ -493,8 +493,8 @@ class RuntimeTests(Machine):
     def test_installed_runtime_preserves_the_agent_package_closure_without_source_checkout(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
         installed = self.home / ".agents-state/bin"
-        self.assertEqual((setup.runtime_source(self.context()) / 'source.json').read_bytes(),
-                         (installed / 'source.json').read_bytes())
+        self.assertEqual(setup.runtime_manifest(setup.runtime_source(self.context())),
+                         setup.runtime_manifest(installed))
         for relative in (Path('.agents/agent/runtime/startup_binding.py'),
                          Path('.agents/agent/resources/lanes/resolve.py'),
                          Path('.agents/agent/utility/peer/scripts/register_session.py'),
@@ -510,6 +510,9 @@ class RuntimeTests(Machine):
         source = setup.runtime_source(self.context())
         installed = self.home / '.agents-state/bin'
         for relative in setup.runtime_files(source):
+            if relative == Path('source.json'):
+                self.assertEqual(setup.runtime_manifest(source), setup.runtime_manifest(installed))
+                continue
             self.assertEqual((source / relative).read_bytes(), (installed / relative).read_bytes())
 
     def test_installed_shell_entry_point_resolves_its_complete_dependency_closure(self):
@@ -529,24 +532,30 @@ class RuntimeTests(Machine):
         bot_identity = installed / 'bot-identity' / 'identity.json'
         bot_identity.parent.mkdir()
         bot_identity.write_text('keep', encoding='utf-8')
-        retired = [installed / name for name in setup.MANAGED_LEGACY_RUNTIME]
-        for path in retired:
-            path.write_text('retired', encoding='utf-8')
         target = setup.launch_script(context)
         target.write_text('changed', encoding='utf-8')
         before = snapshot(self.root)
         changes = setup.check_runtime(context)
         self.assertIn('install Agent runtime: managed runtime file differs: '
                       '.agents/agent/runtime/startup_binding.py', changes)
-        self.assertEqual({f'remove retired runtime {path}' for path in retired},
-                         set(changes) - {'install Agent runtime: managed runtime file differs: '
-                                         '.agents/agent/runtime/startup_binding.py'})
+        self.assertEqual({'install Agent runtime: managed runtime file differs: '
+                          '.agents/agent/runtime/startup_binding.py'}, set(changes))
         self.assertEqual(before, snapshot(self.root))
         setup.apply_runtime(context)
         self.assertTrue(unrelated.is_file())
         self.assertTrue(bot_identity.is_file())
         self.assertEqual(setup.python_alias(), (installed / 'python').read_text(encoding='utf-8'))
-        self.assertTrue(all(not path.exists() for path in retired))
+
+    def test_unowned_or_linked_python_alias_is_refused_without_writing(self):
+        context = self.context(windows=False)
+        setup.apply_runtime(context)
+        alias = context.state_directory / 'bin' / 'python'
+        alias.write_text('custom', encoding='utf-8')
+        before = snapshot(self.root)
+        self.assertIn('refuse unowned', setup.python_alias_status(context, alias.parent))
+        with self.assertRaises(setup.SetupError):
+            setup.install_python_alias(context, alias.parent)
+        self.assertEqual(before, snapshot(self.root))
 
     def test_malformed_runtime_receipts_fail_closed_without_writing(self):
         running = self.root / 'running' / '.agents' / 'machine' / 'scripts'
