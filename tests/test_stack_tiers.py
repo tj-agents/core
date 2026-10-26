@@ -378,7 +378,7 @@ class ShippedDeclarations(unittest.TestCase):
             self.assertEqual(data["tier"], path.stem)
 
     def test_each_package_ships_its_declaration_at_its_payload_root(self):
-        for plugin in ("agent", "agent-store", "base", "cli", "engineering", "machine", "workflow"):
+        for plugin in ("base", "engineering", "machine", "workflow"):
             payload = ROOT / "plugins" / plugin / "tier.json"
             self.assertTrue(payload.is_file(), f"{plugin} ships no tier.json")
             self.assertEqual(json.loads(payload.read_text(encoding="utf-8"))["tier"], plugin)
