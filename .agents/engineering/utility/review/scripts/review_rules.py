@@ -64,9 +64,12 @@ def effective_claude_entries(entries, project):
     for entry in entries:
         scope, owner = entry.get("scope"), entry.get("projectPath")
         if scope in ("user", "managed"):
-            rank = (-1, 0)
-        elif scope in scopes and isinstance(owner, str) and owner and project.is_relative_to(Path(owner).resolve()):
-            rank = (len(Path(owner).resolve().parts), scopes[scope])
+            rank = (sys.maxsize, 0) if scope == "managed" else (-1, 0)
+        elif scope in scopes and isinstance(owner, str) and owner:
+            owner = Path(owner).resolve()
+            if not project.is_relative_to(owner):
+                continue
+            rank = (len(owner.parts), scopes[scope])
         else:
             continue
         if entry.get("id") not in effective or rank > effective[entry.get("id")][0]:

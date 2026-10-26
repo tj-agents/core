@@ -162,7 +162,8 @@ class MainCheckoutTests(Machine):
                 contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(2, setup.main([]))
             with mock.patch.object(setup, "reexec_if_not_main_checkout", return_value=0):
-                self.assertEqual(0, setup.main(["--check"]))
+                for reading in (["--check"], ["--help"], ["-h"]):
+                    self.assertEqual(0, setup.main(reading))
         update.assert_called_once()
 
     def test_a_failed_fetch_warns_and_keeps_the_current_revision(self):
