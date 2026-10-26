@@ -1,9 +1,11 @@
 """Bind managed Codex launches to their frontend process (Python 3.9+)."""
 
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 import json
 import math
 import os
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePath, PureWindowsPath
 import re
 import secrets
 import subprocess
@@ -322,6 +324,54 @@ def comparable_path(path):
     return PureWindowsPath(value)
 
 
+@dataclass(frozen=True)
+class NativeRollout:
+    """A profile-contained rollout with a frozen file identity and live verification."""
+
+    path: Path
+    profile: Path
+    identity: tuple[int, int] = field(init=False)
+    minimum_size: int = field(init=False)
+    _resolved_path: PurePath = field(init=False, repr=False)
+
+    def __post_init__(self):
+        sessions = comparable_path(self.profile.resolve() / 'sessions')
+        resolved = comparable_path(self.path.resolve(strict=True))
+        if (not self.path.is_absolute() or resolved != comparable_path(self.path)
+                or sessions not in resolved.parents):
+            raise RuntimeError('Native rollout is outside the verified profile')
+        stat = self.path.stat()
+        object.__setattr__(self, '_resolved_path', resolved)
+        object.__setattr__(self, 'identity', (stat.st_dev, stat.st_ino))
+        object.__setattr__(self, 'minimum_size', stat.st_size)
+
+    def pin(self):
+        return {'identity': list(self.identity), 'minimum_size': self.minimum_size}
+
+    def require_pin(self, expected):
+        if (expected['identity'] != list(self.identity)
+                or self.minimum_size < expected['minimum_size']):
+            raise RuntimeError('Native rollout was replaced or truncated after arming')
+
+    def verify(self, offset):
+        stat = self.path.stat()
+        if ((stat.st_dev, stat.st_ino) != self.identity
+                or stat.st_size < max(offset, self.minimum_size)
+                or comparable_path(self.path.resolve(strict=True)) != self._resolved_path):
+            raise RuntimeError('Native rollout was replaced or truncated after arming')
+
+    @contextmanager
+    def open(self, offset):
+        self.verify(offset)
+        with self.path.open('rb') as stream:
+            opened = os.fstat(stream.fileno())
+            if (opened.st_dev, opened.st_ino) != self.identity:
+                raise RuntimeError('Native rollout changed while opening it')
+            if opened.st_size < max(offset, self.minimum_size):
+                raise RuntimeError('Native rollout was replaced or truncated while opening it')
+            yield stream
+
+
 class NativeCompletion:
     """Follow one verified native turn without depending on hook-fed turn state."""
 
@@ -330,20 +380,9 @@ class NativeCompletion:
                 'native_rollout', 'profile', 'native_turn_id', 'client_message_id', 'session_id', 'recording_path')):
             raise RuntimeError('Native completion requires an exact frontend, profile and turn binding')
         self.entry = entry
-        self.path = Path(entry['native_rollout'])
-        sessions = comparable_path(Path(entry['profile']).resolve() / 'sessions')
-        resolved = self.path.resolve(strict=True)
-        self.resolved_path = comparable_path(resolved)
-        if (not self.path.is_absolute() or self.resolved_path != comparable_path(self.path)
-                or sessions not in self.resolved_path.parents
-                or not entry.get('native_turn_id') or not entry.get('client_message_id')):
-            raise RuntimeError('Native rollout is outside the verified profile or has no bound turn')
-        stat = self.path.stat()
-        self.identity = [stat.st_dev, stat.st_ino]
-        self.minimum_size = stat.st_size
-        if expected is not None and (expected['identity'] != self.identity
-                                     or stat.st_size < expected['minimum_size']):
-            raise RuntimeError('Native rollout was replaced or truncated after arming')
+        self.rollout = NativeRollout(Path(entry['native_rollout']), Path(entry['profile']))
+        if expected is not None:
+            self.rollout.require_pin(expected)
         self.offset = 0
         self.metadata = False
         self.started = False
@@ -351,20 +390,13 @@ class NativeCompletion:
         self.finished = False
 
     def pin(self):
-        return {'identity': self.identity, 'minimum_size': self.minimum_size}
+        return self.rollout.pin()
 
     def poll(self):
         if latest_input(self.entry['recording_path']) != self.entry['client_message_id']:
             raise RuntimeError('The frontend input changed after arming')
-        stat = self.path.stat()
-        if ([stat.st_dev, stat.st_ino] != self.identity or stat.st_size < max(self.offset, self.minimum_size)
-                or comparable_path(self.path.resolve(strict=True)) != self.resolved_path):
-            raise RuntimeError('Native rollout was replaced or truncated after arming')
         partial = False
-        with self.path.open('rb') as stream:
-            opened = os.fstat(stream.fileno())
-            if [opened.st_dev, opened.st_ino] != self.identity:
-                raise RuntimeError('Native rollout changed while opening it')
+        with self.rollout.open(self.offset) as stream:
             stream.seek(self.offset)
             while True:
                 line = stream.readline(8 * 1024 * 1024 + 1)
