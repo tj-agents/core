@@ -78,13 +78,29 @@ class FrontendBindingTests(unittest.TestCase):
 
     def test_native_session_id_prevents_latest_shared_backend_attachment_winning(self):
         self.entries[1][1]['started_at'] = 300.0
+        client = self.processes[21]
+        details = {'client_identity': 'managed-input', 'launch_cwd': str(ROOT), 'title': 'own tab',
+                   'client_message_id': 'own-input', 'native_turn_id': 'own-turn',
+                   'recording_path': str(self.state / 'events.jsonl'), 'backend': None,
+                   'profile': str(self.state / 'profile'), 'terminal': self.entry['terminal']}
+
+        def current(session_id, nearest):
+            self.assertEqual(self.processes[10], nearest)
+            if session_id != 'own':
+                raise RuntimeError('the explicit native session has no attributable frontend')
+            return client, details
+
         with mock.patch.dict(os.environ, {'CODEX_THREAD_ID': 'own'}), \
                 mock.patch.object(session_close.os, 'getppid', return_value=10), \
-                mock.patch.object(session_close, 'verified_live', return_value=True):
-            self.assertEqual('own', session_close.own_host_and_entry(ROOT)['session_id'])
+                mock.patch.object(session_close, 'current_codex_client', side_effect=current) as selected:
+            entry = session_close.own_host_and_entry(ROOT)
+            self.assertEqual('own', entry['session_id'])
+            self.assertEqual(client.pid, entry['pid'])
+            selected.assert_called_once_with('own', self.processes[10])
         with mock.patch.dict(os.environ, {'CODEX_THREAD_ID': 'missing'}), \
-                mock.patch.object(session_close.os, 'getppid', return_value=10):
-            with self.assertRaisesRegex(session_close.Refusal, 'cannot resolve'):
+                mock.patch.object(session_close.os, 'getppid', return_value=10), \
+                mock.patch.object(session_close, 'current_codex_client', side_effect=current):
+            with self.assertRaisesRegex(session_close.Refusal, 'explicit native session'):
                 session_close.own_host_and_entry(ROOT)
 
     def test_windows_runtime_id_guard_uses_the_frontends_observed_title(self):

@@ -203,7 +203,7 @@ class RequiredPluginsTests(unittest.TestCase):
     def test_explicit_directory_override_is_the_checked_project(self):
         with mock.patch.object(required, "check") as check:
             required.check_launch(self.project, "codex", "native-cli", ["--cd", "another", "exec", "work"])
-            check.assert_called_once_with(self.project / "another", "codex", "native-cli")
+            check.assert_called_once_with(self.project / "another", "codex", "native-cli", inventory_options=())
 
     def test_maintenance_after_global_options_can_repair_missing_plugins(self):
         for arguments in (["--cd", "another", "plugin", "add", "x@y"],
@@ -213,7 +213,7 @@ class RequiredPluginsTests(unittest.TestCase):
                 check.assert_not_called()
         with mock.patch.object(required, "check") as check:
             required.check_launch(self.project, "codex", "native-cli", ["exec", "--", "--cd=prompt"])
-            check.assert_called_once_with(self.project, "codex", "native-cli")
+            check.assert_called_once_with(self.project, "codex", "native-cli", inventory_options=())
 
     def test_native_flags_and_subcommand_directory_cannot_bypass_target_selection(self):
         for arguments in (["--no-daemon", "--cd", "another"],
@@ -222,17 +222,17 @@ class RequiredPluginsTests(unittest.TestCase):
                           ["--model", "plugin", "exec", "--cd", "another"]):
             with mock.patch.object(required, "check") as check:
                 required.check_launch(self.project, "codex", "native-cli", arguments)
-                check.assert_called_once_with(self.project / "another", "codex", "native-cli")
+                check.assert_called_once_with(self.project / "another", "codex", "native-cli", inventory_options=())
         with mock.patch.object(required, "check") as check:
             required.check_launch(self.project, "codex", "native-cli", ["--future-option", "--cd", "another"])
-            check.assert_called_once_with(self.project / "another", "codex", "native-cli")
+            check.assert_called_once_with(self.project / "another", "codex", "native-cli", inventory_options=())
 
     def test_claude_optional_values_cannot_be_mistaken_for_maintenance_commands(self):
         for arguments in (["--worktree", "plugin"], ["-w", "plugin"],
                           ["--debug", "plugin"], ["--resume", "plugin"], ["--print", "plugin"]):
             with mock.patch.object(required, "check") as check:
                 required.check_launch(self.project, "claude", "native-cli", arguments)
-                check.assert_called_once_with(self.project, "claude", "native-cli")
+                check.assert_called_once_with(self.project, "claude", "native-cli", inventory_options=())
 
     def test_help_and_version_remain_available_after_global_flags(self):
         for host, arguments in (("claude", ["--worktree", "--help"]),
@@ -249,7 +249,7 @@ class RequiredPluginsTests(unittest.TestCase):
                                 ("codex", ["auth"])):
             with mock.patch.object(required, "check") as check:
                 required.check_launch(self.project, host, "native-cli", arguments)
-                check.assert_called_once_with(self.project, host, "native-cli")
+                check.assert_called_once_with(self.project, host, "native-cli", inventory_options=())
 
     def test_launch_inventory_uses_the_effective_native_configuration(self):
         for host, arguments, options in (
