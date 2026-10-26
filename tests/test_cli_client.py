@@ -95,10 +95,12 @@ class ClientMetadataTests(unittest.TestCase):
                         mock.patch.object(close, 'process_info', return_value=backend), \
                         mock.patch.object(close.register_session, 'read_host_names', return_value={'codex'}), \
                         mock.patch.object(close, 'current_codex_client',
-                                          return_value=(frontend, {'client_identity': 'managed-input'})):
+                                          return_value=(frontend, {'client_identity': 'managed-input',
+                                                                   'native_cwd': str(root)})):
                     entry = close.own_host_and_entry(root)
                 self.assertEqual('own', entry['session_id'])
                 self.assertEqual(200, entry['pid'])
+                self.assertEqual(str(root), entry['native_cwd'])
                 after = store.get_session(connection, own)
                 self.assertEqual(200, after['pid'])
                 self.assertEqual(before['last_activity_at'], after['last_activity_at'])
