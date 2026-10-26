@@ -23,18 +23,6 @@ FAMILIES = {
             ".agents/hooks/tests/test_problem_records.py",
         },
     },
-    "plugin-adoption": {
-        "sources": {
-            ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/adopt_plugins.py",
-            ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/marketplace_catalog.lock.json",
-            ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/plugin_stacks.json",
-        },
-        "tests": {".agents/hooks/tests/test_adopt_plugins.py"},
-    },
-    "machine-verification": {
-        "sources": {".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/verify_machine.py"},
-        "tests": {".agents/hooks/tests/test_verify_machine.py"},
-    },
     "handoff-transfer": {
         "sources": {".agents/workflow/workflow/handoff/scripts/transfer.py"},
         "tests": {".agents/hooks/tests/test_handoff_transfer.py"},

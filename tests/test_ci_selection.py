@@ -31,12 +31,12 @@ class ClassificationTests(unittest.TestCase):
     def test_known_runtime_families_union_their_regressions_on_both_platforms(self):
         value = CI.classify([
             ".agents/hooks/problem_records.py",
-            ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/adopt_plugins.py",
+            ".agents/workflow/workflow/handoff/scripts/transfer.py",
             "README.md",
         ])
         self.assertEqual(value["mode"], "focused")
         self.assertTrue({".agents/hooks/tests/test_problem_records.py",
-                         ".agents/hooks/tests/test_adopt_plugins.py"}.issubset(value["tests"]))
+                         ".agents/hooks/tests/test_handoff_transfer.py"}.issubset(value["tests"]))
         CI.required_results(value, self.results(), "pull_request", ("ci:full",))
 
     def test_relocated_handoff_helper_keeps_focused_transfer_coverage(self):
