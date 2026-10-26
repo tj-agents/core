@@ -73,6 +73,7 @@ def current_codex_client(session_id, nearest):
     return info, {'client_identity': 'managed-input', 'launch_cwd': record['launch_cwd'],
                   'title': record.get('title'), 'client_message_id': record['client_message_id'],
                   'native_turn_id': record['native_turn_id'], 'native_rollout': record['native_rollout'],
+                  'native_cwd': record.get('native_cwd'),
                   'recording_path': record['recording_path'], 'backend': record['backend'], 'profile': record['profile'],
                   'terminal': register_session.terminal_identity(record.get('terminal_environment', {}))}
 
