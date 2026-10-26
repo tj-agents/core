@@ -81,7 +81,7 @@ def start_watcher(shared, entry, armed_at):
 def arm():
     shared = runtime()
     entry, activity = own_session(shared)
-    if activity.get('turn_state') != 'working':
+    if entry['host'] != 'codex' and activity.get('turn_state') != 'working':
         raise shared.Refusal('this session has no active turn to close after')
     return start_watcher(shared, entry, time.time())
 
