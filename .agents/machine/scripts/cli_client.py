@@ -235,7 +235,7 @@ def current_turn(server, session_id):
                     if not isinstance(identity, str) or not identity:
                         raise RuntimeError('The latest native input has no attributable frontend identity')
                     return {'client_message_id': identity, 'native_turn_id': turn['id'],
-                            'native_rollout': thread.get('path')}
+                            'native_rollout': thread.get('path'), 'native_cwd': thread.get('cwd')}
             cursor = page.get('nextCursor')
             if cursor is None:
                 break
