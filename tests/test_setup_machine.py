@@ -557,6 +557,17 @@ class RuntimeTests(Machine):
             setup.install_python_alias(context, alias.parent)
         self.assertEqual(before, snapshot(self.root))
 
+    def test_dangling_reparse_python_alias_is_refused_before_existence_check(self):
+        context = self.context(windows=False)
+        alias = context.state_directory / 'bin' / 'python'
+        delivery = mock.Mock()
+        delivery.is_reparse.side_effect = lambda path: path == alias
+        with mock.patch.object(setup, 'runtime_delivery', return_value=delivery), \
+             mock.patch.object(setup.os.path, 'lexists', side_effect=lambda path: Path(path) == alias):
+            with self.assertRaisesRegex(setup.SetupError, 'interpreter is a link'):
+                setup.python_alias_path(context, alias.parent)
+        delivery.is_reparse.assert_called_once_with(alias)
+
     def test_malformed_runtime_receipts_fail_closed_without_writing(self):
         running = self.root / 'running' / '.agents' / 'machine' / 'scripts'
         source = running.parents[2] / '.agents' / 'dependencies' / 'agent'

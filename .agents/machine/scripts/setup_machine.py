@@ -687,12 +687,12 @@ def python_alias() -> str:
 def python_alias_path(context: Context, directory: Path) -> Path:
     delivery = runtime_delivery(runtime_source(context))
     for path in (context.state_directory, directory):
-        if path.exists() and delivery.is_reparse(path):
+        if os.path.lexists(path) and delivery.is_reparse(path):
             raise SetupError(f"Claude hook interpreter parent is a link: {path}")
     alias = directory / 'python'
-    if alias.exists() or alias.is_symlink():
-        if delivery.is_reparse(alias):
-            raise SetupError(f"Claude hook interpreter is a link: {alias}")
+    if os.path.lexists(alias) and delivery.is_reparse(alias):
+        raise SetupError(f"Claude hook interpreter is a link: {alias}")
+    if alias.exists():
         if not alias.is_file():
             raise SetupError(f"Claude hook interpreter is not a file: {alias}")
     return alias
