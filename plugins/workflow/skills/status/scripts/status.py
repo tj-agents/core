@@ -82,7 +82,8 @@ def git(directory, *arguments):
 
 def work_item_reader():
     package = package_root()
-    runtime = package / ".agents/agent-store/runtime"
+    source_runtime = package / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime"
+    runtime = source_runtime if source_runtime.is_dir() else package / ".agents" / "agent-store" / "runtime"
     store = owned_module("reader", runtime / "reader.py")
     identity = owned_module("repository_identity", runtime / "repository_identity.py")
     reader_type = getattr(store, "ReadOnlyWorkItemStore", None)
