@@ -49,33 +49,6 @@ GENERATOR_SPEC.loader.exec_module(GENERATOR)
 
 
 class CodexHookSnapshotTests(unittest.TestCase):
-    def test_packaged_machine_session_start_acknowledges_and_registers_fixture(self):
-        with tempfile.TemporaryDirectory(prefix="machine hook fixture \u00fc ") as directory:
-            temporary = Path(directory)
-            payload = temporary / "cache" / "tj-agents" / "machine" / "local"
-            shutil.copytree(ROOT / "plugins" / "machine", payload)
-            manifest = json.loads((payload / "hooks" / "codex.json").read_text(encoding="utf-8"))
-            command = manifest["hooks"]["SessionStart"][0]["hooks"][0][HOST_COMMAND]
-            command = command.replace("${PLUGIN_ROOT}", str(payload))
-            token = "fixture-" + "a" * 40
-            environment = dict(os.environ, PLUGIN_DATA=str(temporary / "data"),
-                               AGENT_STATE_DIRECTORY=str(temporary / "state"),
-                               TJ_AGENTS_STARTUP_ACK_DIRECTORY=str(temporary),
-                               TJ_AGENTS_STARTUP_ACK_TOKEN=token,
-                               TJ_AGENTS_STARTUP_REQUIRED_HOOKS=json.dumps(['machine@tj-agents']))
-            result = subprocess.run(
-                command, shell=True, cwd=temporary, env=environment,
-                input=json.dumps({"hook_event_name": "SessionStart", "session_id": "fixture-session",
-                                  "cwd": str(temporary)}),
-                capture_output=True, text=True, encoding="utf-8", timeout=20,
-            )
-            self.assertEqual(0, result.returncode, result.stderr)
-            self.assertEqual(token, (temporary / token).read_text(encoding="utf-8"))
-            registration = json.loads((temporary / "state" / "cli-sessions" /
-                                       "fixture-session.json").read_text(encoding="utf-8"))
-            self.assertEqual("fixture-session", registration["session_id"])
-            self.assertEqual(str(temporary), registration["cwd"])
-
     def test_concurrent_delayed_reads_keep_digest_order_and_reject_tampering(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -136,8 +109,8 @@ class CodexHookSnapshotTests(unittest.TestCase):
             (root / 'empty directory').mkdir()
             self.assertEqual('sha256:4cae22b1da621db254dd6f8cae7c0e630f64de733ba21a92b739f5173f54cb5d',
                              SNAPSHOT.digest_tree(root, 'base'))
-            self.assertEqual('sha256:31d98d8abb3e0ea352cb87114db6c920bea86ade05e9ac72c6be9b1177789254',
-                             SNAPSHOT.digest_tree(root, 'machine'))
+            self.assertEqual('sha256:4cae22b1da621db254dd6f8cae7c0e630f64de733ba21a92b739f5173f54cb5d',
+                             SNAPSHOT.digest_tree(root, 'workflow'))
 
     def test_file_directory_and_excluded_symbolic_links_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -161,13 +134,13 @@ class CodexHookSnapshotTests(unittest.TestCase):
                         self.skipTest(f'Symbolic links unavailable: {error}')
                     try:
                         with self.assertRaises(SystemExit) as raised:
-                            SNAPSHOT.digest_tree(root, 'machine')
+                            SNAPSHOT.digest_tree(root, 'workflow')
                         self.assertEqual(2, raised.exception.code)
                     finally:
                         link.unlink()
 
     def test_each_generated_command_binds_to_its_package_bytes(self):
-        for plugin in ("base", "engineering", "machine"):
+        for plugin in ("base", "engineering", "workflow"):
             with self.subTest(plugin=plugin):
                 root = ROOT / "plugins" / plugin
                 expected = SNAPSHOT.digest_tree(root, plugin)
@@ -223,7 +196,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
     def test_each_host_parsing_of_each_command_preserves_the_plaintext_bootstrap(self):
         loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
         digest = hashlib.sha256(GENERATOR.canonical_output_bytes(loader)).hexdigest()
-        for plugin in ("base", "engineering", "machine"):
+        for plugin in ("base", "engineering", "workflow"):
             manifest = json.loads(
                 (ROOT / "plugins" / plugin / "hooks" / "codex.json").read_text(encoding="utf-8")
             )
