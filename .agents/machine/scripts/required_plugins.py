@@ -167,7 +167,10 @@ def claude_installations(project: Path, entries: list) -> list:
             if not isinstance(owner, str) or not owner:
                 continue
             owner = Path(owner).resolve()
-            owner_common = git_common_directory(owner)
+            try:
+                owner_common = git_common_directory(owner)
+            except RequiredPluginsError:
+                continue
             if common and owner_common:
                 if common != owner_common:
                     continue
