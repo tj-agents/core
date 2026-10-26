@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:72172c64a7404043cd14fd74dcb902c0f1b7222b8a28571aefd77bf2393f98eb",
+      "digest": "sha256:38026672438ae2025db89681d5d0e47905679c418250283448aa168326cb309d",
       "harness": {
         "marketplaces": [
           {
@@ -104,145 +104,10 @@
           "claude_allow": [],
           "codex_prefix_rules": []
         }
-      }
-    },
-    {
-      "owner_repository": "tj-agents/core",
-      "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "tj-agents",
-      "id": "tj-agents/agent-store",
-      "name": "agent-store",
-      "package_path": "plugins/agent-store",
-      "description": "Recorded agent executions, sessions, ownership and references.",
-      "platforms": [
-        "windows",
-        "linux",
-        "macos"
-      ],
-      "skills": [
-        "inspect"
-      ],
-      "dependencies": {
+      },
+      "external_dependencies": {
         "required": [],
         "optional": []
-      },
-      "external_prerequisites": {
-        "required": [
-          "python>=3.9"
-        ],
-        "optional": []
-      },
-      "digest": "sha256:46ad8c197424d2f1369262ef8a744e97058b319de3e791a3fac89453854f9548",
-      "harness": {
-        "marketplaces": [
-          {
-            "id": "tj-agents",
-            "repository": "tj-agents/marketplace"
-          }
-        ],
-        "plugins": [
-          "tj-agents/agent-store"
-        ],
-        "hooks": [],
-        "permissions": {
-          "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py:*)"
-          ],
-          "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py",
-                  "${PLUGIN_ROOT}/skills/inspect/scripts/inspect.py",
-                  "${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py"
-                ]
-              ],
-              "justification": "Read recorded agent execution and session metadata without creating or modifying its database or observing native processes.",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/inspect/scripts/inspect.py"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/agent-store/utility/inspect/scripts/inspect.py",
-                  "--repository",
-                  "github.com/owner/repo"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/writer.py"
-                ]
-              ]
-            }
-          ]
-        }
-      }
-    },
-    {
-      "owner_repository": "tj-agents/core",
-      "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "tj-agents",
-      "id": "tj-agents/agent",
-      "name": "agent",
-      "package_path": "plugins/agent",
-      "description": "Shared agent execution and background completion across native hosts.",
-      "platforms": [
-        "windows",
-        "linux",
-        "macos"
-      ],
-      "skills": [
-        "background-listener"
-      ],
-      "dependencies": {
-        "required": [
-          "tj-agents/base"
-        ],
-        "optional": []
-      },
-      "external_prerequisites": {
-        "required": [],
-        "optional": []
-      },
-      "digest": "sha256:dc005d70d7cf88164ce67d11716ef088f1e4d042d461a3600adae7fa14488e84",
-      "harness": {
-        "marketplaces": [
-          {
-            "id": "tj-agents",
-            "repository": "tj-agents/marketplace"
-          }
-        ],
-        "plugins": [
-          "tj-agents/agent",
-          "tj-agents/base"
-        ],
-        "hooks": [],
-        "permissions": {
-          "claude_allow": [],
-          "codex_prefix_rules": []
-        }
       }
     },
     {
@@ -270,8 +135,8 @@
       "dependencies": {
         "required": [
           "tj-agents/base",
-          "tj-agents/agent-store",
           "tj-agents/machine",
+          "tj-agents/agent-store",
           "tj-agents/agent"
         ],
         "optional": []
@@ -283,7 +148,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:63289c6ee313efe79cf107b1415bb32ba7c0a7b07ad00d6981745a923cb74642",
+      "digest": "sha256:586f8a89cc9dd4f62b34a79a7ca987fed9b2b52056062020014ebf0f41e69d17",
       "harness": {
         "marketplaces": [
           {
@@ -375,158 +240,21 @@
             }
           ]
         }
-      }
-    },
-    {
-      "owner_repository": "tj-agents/core",
-      "source": "https://github.com/tj-agents/core.git",
-      "marketplace": "tj-agents",
-      "id": "tj-agents/cli",
-      "name": "cli",
-      "package_path": "plugins/cli",
-      "description": "Close CLI tabs or finish their workflows before closing.",
-      "platforms": [
-        "windows",
-        "linux",
-        "macos"
-      ],
-      "skills": [
-        "close",
-        "closeout"
-      ],
-      "dependencies": {
-        "required": [
-          "tj-agents/base",
-          "tj-agents/agent-store",
-          "tj-agents/machine"
-        ],
-        "optional": []
       },
-      "external_prerequisites": {
+      "external_dependencies": {
         "required": [
-          "python>=3.9"
-        ],
-        "optional": [
-          "exe:powershell",
-          "exe:codex",
-          "exe:claude",
-          "windows-terminal",
-          "python>=3.11"
-        ]
-      },
-      "digest": "sha256:1e0fb3e3452e1392a5911dec417e1434081d242c52a932fed0c800fa112d3930",
-      "harness": {
-        "marketplaces": [
           {
-            "id": "tj-agents",
-            "repository": "tj-agents/marketplace"
+            "id": "tj-agents/agent-store",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/agent"
+          },
+          {
+            "id": "tj-agents/agent",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/agent"
           }
         ],
-        "plugins": [
-          "tj-agents/agent-store",
-          "tj-agents/base",
-          "tj-agents/cli",
-          "tj-agents/machine"
-        ],
-        "hooks": [],
-        "permissions": {
-          "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py arm:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py arm:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py arm:*)"
-          ],
-          "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
-                  "${PLUGIN_ROOT}/skills/close/scripts/close_session.py",
-                  "${PLUGIN_ROOT}/codex-skills/close/scripts/close_session.py"
-                ],
-                "arm"
-              ],
-              "justification": "Arm a watcher that closes only this verified CLI after its final reply",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
-                  "arm"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/cli/utility/close/scripts/close_session.py",
-                  "hook"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/other.py",
-                  "arm"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
-                  "${PLUGIN_ROOT}/skills/closeout/scripts/closeout.py",
-                  "${PLUGIN_ROOT}/codex-skills/closeout/scripts/closeout.py"
-                ],
-                "arm"
-              ],
-              "justification": "Arm a watcher that closes only this verified CLI after its final reply",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
-                  "arm"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/closeout.py",
-                  "hook"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/other.py",
-                  "arm"
-                ]
-              ]
-            }
-          ]
-        }
+        "optional": []
       }
     },
     {
@@ -598,9 +326,10 @@
         "required": [
           "tj-agents/base",
           "tj-agents/workflow",
-          "tj-agents/agent-store",
           "tj-agents/machine",
-          "tj-agents/agent"
+          "tj-agents/agent-store",
+          "tj-agents/agent",
+          "tj-agents/cli"
         ],
         "optional": []
       },
@@ -615,7 +344,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:008da2255447addbbde05b5f824b3a98e0f94d24ac96daf3703a9e310604e4fd",
+      "digest": "sha256:ffd7f0215faa5512a4f1e7eb13dae41cc2e6624ff6b4d60b1a3269ccf96d252d",
       "harness": {
         "marketplaces": [
           {
@@ -627,6 +356,7 @@
           "tj-agents/agent",
           "tj-agents/agent-store",
           "tj-agents/base",
+          "tj-agents/cli",
           "tj-agents/engineering",
           "tj-agents/machine",
           "tj-agents/workflow"
@@ -862,7 +592,23 @@
         }
       },
       "external_dependencies": {
-        "required": [],
+        "required": [
+          {
+            "id": "tj-agents/agent-store",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/agent"
+          },
+          {
+            "id": "tj-agents/agent",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/agent"
+          },
+          {
+            "id": "tj-agents/cli",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/cli"
+          }
+        ],
         "optional": []
       }
     },
@@ -880,25 +626,7 @@
         "macos"
       ],
       "skills": [
-        "auto-memory",
-        "clip",
-        "close",
-        "followup-codex",
-        "handoff-claude",
-        "handoff-codex",
-        "hook-control",
-        "lanes",
-        "last-conversation",
-        "open-claude",
-        "open-cli",
-        "open-codex",
-        "peer-cli",
-        "plugin-selection",
-        "recover-agents",
-        "search",
-        "search-claude",
-        "search-codex",
-        "sync-plugins"
+        "clip"
       ],
       "dependencies": {
         "required": [
@@ -919,7 +647,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:a0a8678c94264d817338987ab02708a7f63fb959cbed1909f1dfc6cea500f3ee",
+      "digest": "sha256:0ff0a20cc8bdef2b403b3a28e0b270cc3a0a7e9f38f86217c20f0a4f4838f57b",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -944,14 +672,21 @@
             ]
           },
           {
-            "path": ".agents/cli/workflow/closeout/scripts/close_landed.py",
+            "path": ".agents/agent/runtime/close_lifecycle.py",
             "hosts": [
               "claude",
               "codex"
             ]
           },
           {
-            "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
+            "path": ".agents/agent/runtime/reap_orphans.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/agent/utility/peer/scripts/register_session.py",
             "hosts": [
               "claude",
               "codex"
@@ -963,606 +698,25 @@
               "claude",
               "codex"
             ]
-          },
-          {
-            "path": "resources/machine/scripts/reap_orphans.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
           }
         ],
         "permissions": {
-          "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/adopt_plugins.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/adopt_plugins.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/adopt_plugins.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/adopt_plugins.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py arm:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/close/scripts/close_session.py arm:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py:*)"
-          ],
-          "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py",
-                  "${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py",
-                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
-                ]
-              ],
-              "justification": "After its delivered report, close only the exact CLI process PID and start time whose unchanged idle guard still passes; select its native tab by unique exact title when UI Automation has no automation ID, while retaining its checkout",
-              "match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/other.py"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py",
-                  "${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py",
-                  "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/hook_control.py"
-                ],
-                [
-                  "status",
-                  "off",
-                  "on"
-                ]
-              ],
-              "justification": "machine:hook-control: inspect, suspend or restore the requested Codex configuration layer while preserving hook trust and plugin state",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/hook_control.py",
-                  "off"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/other.py",
-                  "off"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py"
-                ],
-                [
-                  "search",
-                  "open"
-                ],
-                "--host",
-                "codex"
-              ],
-              "justification": "Permits exact-session recovery tooling; callers follow the shared task-recovery contract when preparing private instructions and any per-call approval justification.",
-              "match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
-                  "search",
-                  "--host",
-                  "codex"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
-                  "open",
-                  "--host",
-                  "codex"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
-                  "search",
-                  "--host",
-                  "codex"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
-                  "search",
-                  "--host",
-                  "claude"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
-                  "recover",
-                  "--host",
-                  "codex"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py"
-                ],
-                [
-                  "status",
-                  "find",
-                  "interrupted",
-                  "resume"
-                ]
-              ],
-              "justification": "machine:recover-agents 'Continue a work item': status, find and interrupted without --resume are read-only; resume and interrupted --resume perform the guarded reopen through agent_recovery.open_session, limited to rows that are not live, foreign or stale on this machine.",
-              "match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                  "status"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                  "find"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                  "interrupted"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                  "resume"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
-                  "status"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                  "end"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py"
-                ],
-                "item"
-              ],
-              "justification": "Local work-item status and context updates through the shipped CLI; the owning workflow supplies task authority",
-              "match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                  "item",
-                  "feature/item",
-                  "--status",
-                  "proposed",
-                  "--title",
-                  "Plan the feature"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
-                  "item"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                  "end"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py"
-                ],
-                "claim"
-              ],
-              "justification": "Native-verified work-item ownership claims through the shipped CLI; the owning workflow supplies task authority and the store guards competing owners",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                  "claim",
-                  "feature/item",
-                  "--host",
-                  "codex",
-                  "--role",
-                  "owner",
-                  "--status",
-                  "active",
-                  "--title",
-                  "Implement the feature"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/other.py",
-                  "claim"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                  "end"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py",
-                  "${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py"
-                ],
-                [
-                  "register",
-                  "bind"
-                ]
-              ],
-              "justification": "machine:recover-agents records a validated external reference or binds it to an existing execution through the shipped CLI.",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
-                  "register",
-                  "--provider",
-                  "github",
-                  "--scope",
-                  "github.com/owner/repository",
-                  "--native-id",
-                  "42"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/recover-agents/scripts/work_item_sessions.py",
-                  "bind",
-                  "--execution-key",
-                  "execution:123e4567-e89b-12d3-a456-426614174000",
-                  "--provider",
-                  "github",
-                  "--scope",
-                  "github.com/owner/repository",
-                  "--native-id",
-                  "42"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/recover-agents/scripts/other.py",
-                  "register"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/skills/recover-agents/scripts/work_item_sessions.py",
-                  "end"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py",
-                  "${PLUGIN_ROOT}/skills/plugin-selection/scripts/adopt_plugins.py",
-                  "${PLUGIN_ROOT}/codex-skills/plugin-selection/scripts/adopt_plugins.py"
-                ],
-                "--root"
-              ],
-              "justification": "machine:plugin-selection selects approved marketplaces on main, migrates old locks and generates repository host settings",
-              "match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py",
-                  "--root",
-                  "/workspace/project"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/other.py",
-                  "--root",
-                  "/workspace/project"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py",
-                  "${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py",
-                  "${PLUGIN_ROOT}/codex-skills/plugin-selection/scripts/repo_config.py"
-                ],
-                "--root"
-              ],
-              "justification": "machine:plugin-selection generates a repository's committed Claude and Codex plugin settings from its plugin selection",
-              "match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py",
-                  "--root",
-                  "/workspace/project"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/other.py",
-                  "--root",
-                  "/workspace/project"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-                  "${PLUGIN_ROOT}/skills/close/scripts/close_session.py",
-                  "${PLUGIN_ROOT}/codex-skills/close/scripts/close_session.py"
-                ],
-                "arm"
-              ],
-              "justification": "Arm a watcher that closes only this verified CLI after its final reply",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-                  "arm"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-                  "hook"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/other.py",
-                  "arm"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py",
-                  "${PLUGIN_ROOT}/skills/sync-plugins/scripts/sync_plugins.py",
-                  "${PLUGIN_ROOT}/codex-skills/sync-plugins/scripts/sync_plugins.py",
-                  "${PLUGIN_ROOT}/.agents/machine/utility/sync-plugins/scripts/sync_plugins.py"
-                ]
-              ],
-              "justification": "Refresh selected tj-agents plugins through native host commands, with optional remote verification.",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/reload_plugins.py",
-                  "--project",
-                  "C:/repo"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/machine/scripts/reload_plugins.py",
-                  "--verify-only"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
-                  "--project",
-                  "C:/repo"
-                ]
-              ]
-            }
-          ]
+          "claude_allow": [],
+          "codex_prefix_rules": []
+        },
+        "setup": {
+          "script": ".agents/machine/scripts/setup_machine.py"
         }
+      },
+      "external_dependencies": {
+        "required": [
+          {
+            "id": "tj-agents/agent-store",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/agent"
+          }
+        ],
+        "optional": []
       }
     }
   ]

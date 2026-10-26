@@ -2,7 +2,7 @@
   "schema_version": 1,
   "plugin": "tj-agents/workflow",
   "source_roots": [
-    ".agents/agent-store/runtime",
+    ".agents/dependencies/agent/.agents/agent-store/runtime",
     ".agents/hooks/hook_dispatch.py",
     ".agents/hooks/problem_records.py",
     ".agents/tiers/workflow.json",

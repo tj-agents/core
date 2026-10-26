@@ -45,7 +45,7 @@ def project_root(project: Path) -> Path:
     return project
 
 
-def check_launch(project: Path, host: str, executable: str | None, arguments) -> Path | None:
+def launch_context(project: Path, host: str, arguments) -> tuple[Path | None, tuple[str, ...]]:
     original_project = project
     value_options = {
         "-C", "--cd", "-c", "--config", "-m", "--model", "-p", "--profile",
@@ -70,9 +70,9 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
         if argument == "--":
             break
         if argument in ("--help", "-h", "--version", "-V" if host == "codex" else "-v"):
-            return None
+            return None, ()
         if not command_seen and argument in MAINTENANCE_COMMANDS[host]:
-            return None
+            return None, ()
         option, separator, value = argument.partition("=")
         if host == "codex" and len(argument) > 2 and argument[:2] in value_options:
             option, separator, value = argument[:2], "=", argument[2:].removeprefix("=")
@@ -89,11 +89,18 @@ def check_launch(project: Path, host: str, executable: str | None, arguments) ->
         elif argument not in flag_options:
             command_seen = True
         index += 1
-    if inventory_options:
-        check(project, host, executable, inventory_options=tuple(inventory_options))
-    else:
-        check(project, host, executable)
-    return project.resolve()
+    return project.resolve(), tuple(inventory_options)
+
+
+def check_launch_roots(project: Path, host: str, executable: str | None, arguments) -> tuple[Path | None, dict[str, Path] | None]:
+    effective_project, inventory_options = launch_context(project, host, arguments)
+    if effective_project is None:
+        return None, None
+    return effective_project, check(effective_project, host, executable, inventory_options=inventory_options)
+
+
+def check_launch(project: Path, host: str, executable: str | None, arguments) -> Path | None:
+    return check_launch_roots(project, host, executable, arguments)[0]
 
 
 def readable_payload(path: Path, host: str, name: str) -> bool:
@@ -142,7 +149,7 @@ def selected(project: Path) -> tuple[str, ...]:
 
 @functools.lru_cache(maxsize=None)
 def git_common_directory(project: Path) -> str | None:
-    if not project.is_dir() or not any((directory / '.git').exists() for directory in (project, *project.parents)):
+    if not project.is_dir() or not any((directory / ".git").exists() for directory in (project, *project.parents)):
         return None
     try:
         result = subprocess.run(['git', '-C', str(project), 'rev-parse', '--git-common-dir'],
@@ -224,38 +231,6 @@ def enabled_roots(host: str, project: Path, entries: list) -> dict[str, Path]:
     return roots
 
 
-def inventory(binary: str, host: str, launch_directory: Path, inventory_options: tuple[str, ...],
-              marketplace: str | None = None) -> list:
-    command = [binary, *inventory_options, "plugin", "list"]
-    if marketplace is not None:
-        command.extend(("--marketplace", marketplace))
-    command.append("--json")
-    if os.name == "nt" and Path(binary).suffix.casefold() == ".ps1":
-        command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-File", *command]
-    try:
-        result = subprocess.run(
-            command, cwd=launch_directory, capture_output=True,
-            text=True, encoding="utf-8", errors="replace", timeout=INVENTORY_TIMEOUT_SECONDS,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
-        scope = f" for marketplace {marketplace}" if marketplace is not None else ""
-        raise RequiredPluginsError(f"Required {host} plugin inventory{scope} could not run: {error}") from error
-    if result.returncode:
-        scope = f" for marketplace {marketplace}" if marketplace is not None else ""
-        raise RequiredPluginsError(
-            f"Required {host} plugin inventory{scope} failed: {(result.stderr or result.stdout).strip()[:1024]}"
-        )
-    try:
-        data = json.loads(result.stdout)
-    except ValueError as error:
-        raise RequiredPluginsError(f"Required {host} plugin inventory returned invalid JSON") from error
-    entries = data.get("installed") if host == "codex" and isinstance(data, dict) else data
-    if not isinstance(entries, list):
-        raise RequiredPluginsError(f"Required {host} plugin inventory returned an invalid roster")
-    return entries
-
-
 def check(project: Path, host: str, executable: str | None = None,
           inventory_options: tuple[str, ...] = ()) -> dict[str, Path] | None:
     launch_directory = project.resolve()
@@ -289,6 +264,48 @@ def check(project: Path, host: str, executable: str | None = None,
             "Cached files from another host do not establish activation.", project, missing,
         )
     return {identity: roots[identity] for identity in required}
+
+
+def inventory_roots(project: Path, host: str, executable: str | None = None,
+                    inventory_options: tuple[str, ...] = ()) -> dict[str, Path]:
+    """Return the host's enabled, verified inventory without project selection filtering."""
+    launch_directory = project.resolve()
+    binary = executable or shutil.which(host)
+    if not binary:
+        raise RequiredPluginsError(f"Required standards cannot be verified: {host} executable is unavailable")
+    return enabled_roots(host, launch_directory, inventory(binary, host, launch_directory, inventory_options))
+
+
+def inventory(binary: str, host: str, launch_directory: Path, inventory_options: tuple[str, ...],
+              marketplace: str | None = None) -> list:
+    command = [binary, *inventory_options, "plugin", "list"]
+    if marketplace is not None:
+        command.extend(("--marketplace", marketplace))
+    command.append("--json")
+    try:
+        if os.name == "nt" and Path(binary).suffix.casefold() == ".ps1":
+            command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-File", *command]
+        result = subprocess.run(
+            command, cwd=launch_directory, capture_output=True,
+            text=True, encoding="utf-8", errors="replace", timeout=INVENTORY_TIMEOUT_SECONDS,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        scope = f" for marketplace {marketplace}" if marketplace is not None else ""
+        raise RequiredPluginsError(f"Required {host} plugin inventory{scope} could not run: {error}") from error
+    if result.returncode:
+        scope = f" for marketplace {marketplace}" if marketplace is not None else ""
+        raise RequiredPluginsError(
+            f"Required {host} plugin inventory{scope} failed: {(result.stderr or result.stdout).strip()[:1024]}"
+        )
+    try:
+        data = json.loads(result.stdout)
+    except ValueError as error:
+        raise RequiredPluginsError(f"Required {host} plugin inventory returned invalid JSON") from error
+    entries = data.get("installed") if host == "codex" and isinstance(data, dict) else data
+    if not isinstance(entries, list):
+        raise RequiredPluginsError(f"Required {host} plugin inventory returned an invalid roster")
+    return entries
 
 
 CHECK_TIMEOUT_SECONDS = 90
@@ -425,7 +442,7 @@ def collect(project: Path, hosts: tuple[str, ...], executables: dict[str, str | 
     for host in hosts:
         try:
             discovered[host] = {target.identity: target for target in targets(project, host, executables.get(host), repair=repair)}
-        except (RequiredPluginsError, RuntimeError, OSError) as error:
+        except (RequiredPluginsError, PluginSetupError, RuntimeError, OSError) as error:
             errors.append(f"{host}: {error}")
     if not errors and discovered:
         reference_host = next(iter(discovered))

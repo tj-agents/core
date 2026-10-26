@@ -31,7 +31,14 @@ class PolicyViolation(ValueError):
 
 
 def _configuration_reader():
-    path = Path(__file__).resolve().with_name("repository_configuration.py")
+    script = Path(__file__).resolve()
+    candidates = (
+        script.parents[1] / "resources" / "agent" / "runtime" / "repository_configuration.py",
+        script.parents[1] / "dependencies" / "agent" / ".agents" / "agent" / "runtime" / "repository_configuration.py",
+    )
+    path = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if path is None:
+        raise PolicyViolation("the packaged Agent repository configuration runtime is unavailable")
     spec = importlib.util.spec_from_file_location("tj_agents_repository_configuration", path)
     if spec is None or spec.loader is None:
         raise PolicyViolation("repository settings reader is unavailable")
