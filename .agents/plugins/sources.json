@@ -57,10 +57,7 @@
     }
   },
   "generated_roots": [
-    "plugins/base",
-    "plugins/machine",
-    "plugins/workflow",
-    "plugins/engineering",
+    "plugins",
     "plugins/publication.json",
     ".agents/plugins/marketplace.json",
     ".claude-plugin/marketplace.json",

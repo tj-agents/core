@@ -1118,13 +1118,35 @@ $results | ConvertTo-Json -Compress
                         repository,
                         ignore=shutil.ignore_patterns(".git", "__pycache__"),
                     )
+                    shutil.rmtree(repository / "plugins")
+                    digests = subprocess.run(
+                        [sys.executable, "-B", str(repository / "scripts" / "update_catalog_digests.py")],
+                        cwd=repository,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, digests.returncode, digests.stderr)
+                    generated = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(repository / ".agents" / "sync-generated.ps1"),
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, generated.returncode, generated.stderr)
+                    valid = repository / "plugins/engineering/harness.json"
+                    expected_valid = valid.read_bytes()
                     source_markers = (
+                        repository / ".agents" / "user-owned.txt",
                         repository / ".claude" / "user-owned.txt",
                         repository / ".codex" / "user-owned.txt",
                     )
                     for marker in source_markers:
                         marker.write_text("preserve\n", encoding="utf-8")
-                    orphan = repository / "plugins/engineering/codex-agents/unrelated.toml"
+                    orphan = repository / "plugins/retired/generated.txt"
+                    orphan.parent.mkdir()
                     orphan.write_text("generated orphan\n", encoding="utf-8")
                     checked = subprocess.run(
                         [
@@ -1149,6 +1171,8 @@ $results | ConvertTo-Json -Compress
                     )
                     self.assertEqual(0, completed.returncode, completed.stderr)
                     self.assertFalse(orphan.exists())
+                    self.assertFalse(orphan.parent.exists())
+                    self.assertEqual(expected_valid, valid.read_bytes())
                     for marker in source_markers:
                         self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))
 
