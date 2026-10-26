@@ -58,6 +58,9 @@ class Machine(unittest.TestCase):
             self.assertEqual('hook-interpreter-ready', result.stdout.strip())
 
     def setUp(self):
+        environment = mock.patch.dict(os.environ, {"GIT_CONFIG_COUNT": "0"})
+        environment.start()
+        self.addCleanup(environment.stop)
         temp = tempfile.TemporaryDirectory(prefix="setup machine ü ")
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
