@@ -120,6 +120,65 @@ class MainCheckoutTests(Machine):
     def test_outside_a_checkout_there_is_no_main_checkout(self):
         self.assertIsNone(setup.main_checkout(self.root, run=lambda *args, **kwargs: completed(128)))
 
+    def clones(self):
+        origin = self.root / "origin.git"
+        self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=self.root)
+        main, other = self.root / "core", self.root / "other"
+        self.git("clone", "-q", str(origin), str(main), cwd=self.root)
+        self.git("commit", "-q", "--allow-empty", "-m", "start", cwd=main)
+        self.git("push", "-q", "-u", "origin", "HEAD:main", cwd=main)
+        self.git("clone", "-q", str(origin), str(other), cwd=self.root)
+        self.git("commit", "-q", "--allow-empty", "-m", "published", cwd=other)
+        self.git("push", "-q", "origin", "HEAD:main", cwd=other)
+        return main, other
+
+    def head(self, checkout):
+        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=checkout, capture_output=True, text=True).stdout
+
+    def test_a_stale_main_checkout_is_fast_forwarded_once(self):
+        main, other = self.clones()
+        self.assertTrue(setup.fast_forward(main))
+        self.assertEqual(self.head(other), self.head(main))
+        self.assertFalse(setup.fast_forward(main))
+
+    def test_an_updated_checkout_reruns_its_own_setup_once(self):
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append((command, kwargs.get("env", {}).get(setup.CHECKOUT_UPDATED)))
+            return completed(3)
+
+        with mock.patch.object(setup, "main_checkout", return_value=self.root), \
+                mock.patch.object(setup, "fast_forward", return_value=True), \
+                mock.patch.object(setup.subprocess, "run", side_effect=run), \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(3, setup.main(["--step", "shell profiles"]))
+        self.assertEqual([([sys.executable, str(setup.canonical_script(self.root)), "--step", "shell profiles"], "1")],
+                         calls)
+
+    def test_a_checkout_that_cannot_update_fails_setup_and_check_never_updates(self):
+        with mock.patch.object(setup, "main_checkout", return_value=self.root), \
+                mock.patch.object(setup, "fast_forward", side_effect=setup.SetupError("diverged")) as update, \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(2, setup.main([]))
+            with mock.patch.object(setup, "reexec_if_not_main_checkout", return_value=0):
+                for reading in (["--check"], ["--help"], ["-h"]):
+                    self.assertEqual(0, setup.main(reading))
+        update.assert_called_once()
+
+    def test_a_failed_fetch_warns_and_keeps_the_current_revision(self):
+        main, _ = self.clones()
+        with contextlib.redirect_stderr(io.StringIO()) as error:
+            self.assertFalse(setup.fast_forward(main, run=lambda command, **kwargs: completed(
+                1 if "fetch" in command else 0, stderr="authentication failed")))
+        self.assertIn("authentication failed", error.getvalue())
+
+    def test_a_diverged_main_checkout_fails_instead_of_running_stale(self):
+        main, _ = self.clones()
+        self.git("commit", "-q", "--allow-empty", "-m", "local", cwd=main)
+        with self.assertRaisesRegex(setup.SetupError, "cannot fast-forward"):
+            setup.fast_forward(main)
+
 
 class ReexecTests(Machine):
     def canonical(self):
