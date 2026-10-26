@@ -1,5 +1,6 @@
 import argparse
 import base64
+import errno
 import hashlib
 import importlib.util
 import io
@@ -282,7 +283,9 @@ def retry_windows_sharing_violation(action, timeout=2):
         try:
             return action()
         except PermissionError as error:
-            if (os.name != "nt" or getattr(error, "winerror", None) not in WINDOWS_REPLACE_CONFLICTS
+            winerror = getattr(error, "winerror", None)
+            conflict = winerror in WINDOWS_REPLACE_CONFLICTS or winerror is None and error.errno == errno.EACCES
+            if (os.name != "nt" or not conflict
                     or time.monotonic() >= deadline):
                 raise
             time.sleep(0.01)

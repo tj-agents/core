@@ -321,6 +321,37 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(json.loads(stdout)["launches"], 1)
 
     @unittest.skipUnless(os.name == "nt", "Windows sharing violations are Windows-only")
+    def test_owner_read_recovers_from_a_crt_sharing_violation(self):
+        kernel = runtime.ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateFileW.restype = runtime.ctypes.c_void_p
+        kernel.CreateFileW.argtypes = [runtime.ctypes.c_wchar_p, runtime.ctypes.c_uint32,
+                                      runtime.ctypes.c_uint32, runtime.ctypes.c_void_p,
+                                      runtime.ctypes.c_uint32, runtime.ctypes.c_uint32,
+                                      runtime.ctypes.c_void_p]
+        kernel.CloseHandle.argtypes = [runtime.ctypes.c_void_p]
+        handle = kernel.CreateFileW(str(self.owner), 0x80000000, 0, None, 3, 0x80, None)
+        self.assertNotEqual(handle, runtime.ctypes.c_void_p(-1).value)
+        handles = [handle]
+        original_read = Path.read_text
+        observed = []
+
+        def read_text(path, *args, **kwargs):
+            try:
+                return original_read(path, *args, **kwargs)
+            except PermissionError as error:
+                observed.append((error.errno, getattr(error, "winerror", None)))
+                kernel.CloseHandle(handles.pop())
+                raise
+
+        try:
+            with mock.patch.object(Path, "read_text", new=read_text):
+                self.assertEqual(runtime.read(self.owner)["worktree"], str(self.root))
+            self.assertEqual([(13, None)], observed)
+        finally:
+            for handle in handles:
+                kernel.CloseHandle(handle)
+
+    @unittest.skipUnless(os.name == "nt", "Windows sharing violations are Windows-only")
     def test_owner_state_read_and_save_tolerate_an_open_reader(self):
         original = self.state()
         replacement = dict(original, reason="concurrent-save")
