@@ -8,3 +8,6 @@ shell/hidden-bash*.exe
 .agents/continuation/
 .agents/dependencies/
 .agents/persistent-workflow-binding.json
+.venv/
+.mypy_cache/
+.ruff_cache/
