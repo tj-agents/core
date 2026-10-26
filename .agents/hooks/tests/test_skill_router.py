@@ -1,10 +1,12 @@
 import importlib.util
+import io
 import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import uuid
 from pathlib import Path
@@ -116,6 +118,46 @@ class SkillRouterTests(unittest.TestCase):
                                     encoding="utf-8", env=self.environment(), cwd=self.repo)
             self.assertEqual(2, result.returncode, result.stderr)
             self.assertIn("missing-stack@publisher", result.stderr)
+
+    def test_missing_admission_routes_the_agent_to_refresh(self):
+        router = self.load_router()
+        payload = {"cwd": str(self.repo), "session_id": "native-session", "agent_id": "child",
+                   "tool_name": "Write", "tool_input": {"file_path": str(self.repo / "src/new.py"), "content": "value = 1"}}
+        error = router.required_plugins.RequiredPluginsError("Invoke agent:refresh-plugins for claude in this project")
+        try:
+            with patch.object(router.required_plugins, "check", side_effect=error) as check, \
+                    patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
+                    patch.object(sys, "argv", [str(self.router), "--harness", "claude"]), \
+                    patch.object(sys, "stderr", io.StringIO()) as stderr:
+                with self.assertRaises(SystemExit) as stopped:
+                    router.main()
+            self.assertEqual(2, stopped.exception.code)
+            check.assert_called_once_with(self.repo, "claude")
+            self.assertIn("Invoke agent:refresh-plugins", stderr.getvalue())
+        finally:
+            if router.HOOK_TIMER is not None:
+                router.HOOK_TIMER.cancel()
+
+    def test_stalled_admission_returns_a_bounded_phase_diagnostic(self):
+        wrapper = self.base / "stalled router.py"
+        wrapper.write_text(
+            "import sys,time\n"
+            f"sys.path.insert(0, {str(self.router.parent)!r})\n"
+            "import skill_router as router\n"
+            "router.HOOK_TIMEOUT_SECONDS = 0.2\n"
+            "router.required_plugins.check = lambda *args: time.sleep(30)\n"
+            "router.main()\n", encoding="utf-8")
+        payload = {"cwd": str(self.repo), "session_id": "native-session", "tool_name": "Write",
+                   "tool_input": {"file_path": str(self.repo / "src/new.py"), "content": "value = 1"}}
+        started = time.monotonic()
+        result = subprocess.run([sys.executable, str(wrapper), "--harness", "claude"],
+                                input=json.dumps(payload), capture_output=True, text=True,
+                                encoding="utf-8", env=self.environment(), cwd=self.repo, timeout=5)
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertLess(time.monotonic() - started, 4)
+        self.assertIn("required plugin admission exceeded", result.stderr)
+        self.assertIn("This tool call was NOT run", result.stderr)
+        self.assertNotIn("start a fresh session", result.stderr)
 
     def test_skill_proof_keeps_company_and_stack_qualifiers_distinct(self):
         transcript = self.base / "transcript.jsonl"
