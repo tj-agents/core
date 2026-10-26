@@ -67,7 +67,7 @@ jobs:
     needs: select
     if: >-
       needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
-      && fromJSON(needs.select.outputs.plan).windows
+      && contains(github.event.pull_request.labels.*.name, 'ci:full')
     runs-on: windows-latest
     env:
       CI_SELECTION: ${{ needs.select.outputs.plan }}
@@ -181,7 +181,9 @@ jobs:
 
   verify-linux:
     needs: select
-    if: needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
+    if: >-
+      needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
+      && contains(github.event.pull_request.labels.*.name, 'ci:full')
     runs-on: ubuntu-latest
     env:
       CI_SELECTION: ${{ needs.select.outputs.plan }}
@@ -262,6 +264,7 @@ jobs:
         env:
           CI_SELECTION: ${{ needs.select.outputs.plan }}
           CI_NEEDS: ${{ toJSON(needs) }}
+          CI_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: python3 -B scripts/ci_selection.py required
 
   regenerate:
@@ -318,37 +321,8 @@ jobs:
             "Generated output already current."
           }
 
-  release:
-    needs: ci-required
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-required.result == 'success'
-    runs-on: ubuntu-latest
-    environment: regenerate
-    permissions:
-      contents: write
-    concurrency:
-      group: release-main
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          ssh-key: ${{ secrets.REGENERATE_DEPLOY_KEY }}
-
-      - name: release only a commit whose generated packages are current
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          ./.agents/sync-generated.ps1 -Check
-          python3 -B scripts/update_catalog_digests.py --check
-
-      - name: advance release to the verified commit
-        id: advance
-        run: python3 -B scripts/advance_release.py --sha "${{ github.sha }}"
-
-      - name: Publish the release hint
-        if: steps.advance.outputs.outcome == 'advanced' && vars.MACHINE_EVENTS_TOPIC != ''
+      - name: Publish the generated package hint
+        if: steps.publish-packages.outputs.changed == 'true' && vars.MACHINE_EVENTS_TOPIC != ''
         uses: tj-agents/github-actions/.github/actions/machine-events@d45d8a70dc1309ca02d304c8e3c58e493c263f89
         with:
           topic: ${{ secrets.MACHINE_EVENTS_TOPIC }}
