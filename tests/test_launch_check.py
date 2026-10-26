@@ -134,7 +134,8 @@ class LaunchCheckTests(unittest.TestCase):
         reconciliation.start()
         self.addCleanup(reconciliation.stop)
         patcher = mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state),
-                                               "CLAUDE_CONFIG_DIR": str(self.state / "claude")})
+                                                 "CLAUDE_CONFIG_DIR": str(self.state / "claude"),
+                                                 "TJ_AGENTS_SETUP_RECOVERY": "1"})
         patcher.start()
         self.addCleanup(patcher.stop)
         (self.state / "machine-events.json").write_text(json.dumps({"topic": TOPIC}), encoding="utf-8")
