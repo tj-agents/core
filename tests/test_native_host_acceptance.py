@@ -13,6 +13,7 @@ from unittest import mock
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "native_host_acceptance.py"
+OBSERVER = Path(__file__).resolve().parents[1] / "scripts" / "native_startup_observer.py"
 specification = importlib.util.spec_from_file_location("native_host_acceptance", SCRIPT)
 NATIVE = importlib.util.module_from_spec(specification)
 specification.loader.exec_module(NATIVE)
@@ -25,7 +26,7 @@ class NativeHostAcceptanceTests(unittest.TestCase):
             binding = state / 'bin' / '.agents' / 'agent' / 'runtime' / 'startup_binding.py'
             binding.parent.mkdir(parents=True)
             binding.write_text('', encoding='utf-8')
-            result = subprocess.run([sys.executable, '-B', str(SCRIPT), '--help'], capture_output=True,
+            result = subprocess.run([sys.executable, '-B', str(OBSERVER), '--help'], capture_output=True,
                                     text=True, encoding='utf-8', env={**os.environ,
                                                                        'AGENT_STATE_DIRECTORY': str(state)})
         self.assertEqual(0, result.returncode, result.stderr)
