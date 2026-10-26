@@ -26,7 +26,7 @@ def setUpModule():
     ISOLATION.append(home)
     environment = {key: value for key, value in os.environ.items() if key not in SESSION_VARIABLES}
     environment.update(GIT_CONFIG_COUNT='0', CLAUDE_CONFIG_DIR=str(Path(home.name) / "claude"), CODEX_HOME=str(Path(home.name) / "codex"),
-                       AGENT_STATE_DIRECTORY=str(Path(home.name) / "state"))
+                       AGENT_STATE_DIRECTORY=str(Path(home.name) / "state"), TJ_AGENTS_SETUP_RECOVERY="1")
     patcher = mock.patch.dict(os.environ, environment, clear=True)
     patcher.start()
     ISOLATION.append(patcher)
@@ -55,6 +55,10 @@ class FakeClaude:
         self.commands.append((command, Path(cwd)))
         if command[1:3] == ["plugin", "list"]:
             return json.dumps([{**entry, "errors": self.errors.get(entry["id"], [])} for entry in self.installations])
+        if command[1:3] == ["plugin", "install"] and self.persist:
+            identity, scope = command[3], command[5]
+            self.installations.append({"id": identity, "scope": scope, "projectPath": str(cwd),
+                                       "enabled": True, "version": self.version})
         if command[1:3] == ["plugin", "update"]:
             identity, scope = command[3], command[5]
             for entry in self.installations:
