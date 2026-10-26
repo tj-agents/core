@@ -120,6 +120,33 @@ class MainCheckoutTests(Machine):
     def test_outside_a_checkout_there_is_no_main_checkout(self):
         self.assertIsNone(setup.main_checkout(self.root, run=lambda *args, **kwargs: completed(128)))
 
+    def clones(self):
+        origin = self.root / "origin.git"
+        self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=self.root)
+        main, other = self.root / "core", self.root / "other"
+        self.git("clone", "-q", str(origin), str(main), cwd=self.root)
+        self.git("commit", "-q", "--allow-empty", "-m", "start", cwd=main)
+        self.git("push", "-q", "-u", "origin", "HEAD:main", cwd=main)
+        self.git("clone", "-q", str(origin), str(other), cwd=self.root)
+        self.git("commit", "-q", "--allow-empty", "-m", "published", cwd=other)
+        self.git("push", "-q", "origin", "HEAD:main", cwd=other)
+        return main, other
+
+    def head(self, checkout):
+        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=checkout, capture_output=True, text=True).stdout
+
+    def test_a_stale_main_checkout_is_fast_forwarded_once(self):
+        main, other = self.clones()
+        self.assertTrue(setup.fast_forward(main))
+        self.assertEqual(self.head(other), self.head(main))
+        self.assertFalse(setup.fast_forward(main))
+
+    def test_a_diverged_main_checkout_fails_instead_of_running_stale(self):
+        main, _ = self.clones()
+        self.git("commit", "-q", "--allow-empty", "-m", "local", cwd=main)
+        with self.assertRaisesRegex(setup.SetupError, "cannot fast-forward"):
+            setup.fast_forward(main)
+
 
 class ReexecTests(Machine):
     def canonical(self):

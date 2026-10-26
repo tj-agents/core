@@ -172,10 +172,44 @@ def persistence_problems(expected: list[tuple[str, str, Path, str]], installatio
     return problems
 
 
+def catalog_dependencies() -> dict[str, list[str]]:
+    result = {}
+    for name, (_, location) in tj_agents_marketplaces().items():
+        for entry in read_json(location / ".claude-plugin/marketplace.json").get("plugins", []):
+            if isinstance(entry, dict) and isinstance(entry.get("name"), str):
+                result[f"{entry['name']}@{name}"] = [f"{plugin}@{name}" for plugin in entry.get("dependencies") or []
+                                                     if isinstance(plugin, str)]
+    return result
+
+
+def missing_dependencies(identity: str, scope: str, owner: Path, dependencies: dict[str, list[str]],
+                         installations: list) -> list[str]:
+    order, seen = [], set()
+
+    def visit(plugin: str) -> None:
+        for dependency in dependencies.get(plugin, []):
+            if dependency not in seen:
+                seen.add(dependency)
+                visit(dependency)
+                order.append(dependency)
+    visit(identity)
+    return [dependency for dependency in order if not any(
+        entry.get("id") == dependency and (entry.get("scope") == "user" or scope != "user" and applies(entry, owner))
+        for entry in installations)]
+
+
+def install_dependencies(executable: str, updates: list[tuple[str, str, Path]]) -> None:
+    dependencies = catalog_dependencies()
+    for identity, scope, owner in updates:
+        for dependency in missing_dependencies(identity, scope, owner, dependencies, installed_entries()):
+            run([executable, "plugin", "install", dependency, "--scope", scope], owner)
+
+
 def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]],
                  updates: list[tuple[str, str, Path]], starting=None) -> list[str]:
     for identity, scope in installs:
         run([executable, "plugin", "install", identity, "--scope", scope], project)
+    install_dependencies(executable, updates)
     expected, updated = [], list(dict.fromkeys(identity for identity, _ in installs))
     for identity, scope, owner in updates:
         if starting is not None:
