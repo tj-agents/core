@@ -37,13 +37,13 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(value["mode"], "focused")
         self.assertTrue({".agents/hooks/tests/test_problem_records.py",
                          ".agents/hooks/tests/test_adopt_plugins.py"}.issubset(value["tests"]))
-        CI.required_results(value, self.results(), "pull_request")
+        CI.required_results(value, self.results(), "pull_request", ("ci:full",))
 
     def test_relocated_handoff_helper_keeps_focused_transfer_coverage(self):
         value = CI.classify([".agents/workflow/workflow/handoff/scripts/transfer.py"])
         self.assertEqual("focused", value["mode"])
         self.assertEqual([".agents/hooks/tests/test_handoff_transfer.py"], value["tests"])
-        CI.required_results(value, self.results(), "pull_request")
+        CI.required_results(value, self.results(), "pull_request", ("ci:full",))
 
     @staticmethod
     def results():
@@ -103,16 +103,21 @@ class AggregateTests(unittest.TestCase):
                     with self.subTest(mode=mode, job=job, outcome=outcome):
                         broken = {**ClassificationTests.results(), job: {"result": outcome}}
                         with self.assertRaises(ValueError):
-                            CI.required_results(value, broken, "pull_request")
+                            CI.required_results(value, broken, "pull_request", ("ci:full",))
                 broken = ClassificationTests.results()
                 broken.pop(job)
                 with self.assertRaises(ValueError):
-                    CI.required_results(value, broken, "pull_request")
+                    CI.required_results(value, broken, "pull_request", ("ci:full",))
 
-    def test_main_requires_both_platforms_with_no_pr_guard(self):
+    def test_suites_run_only_on_request(self):
         results = ClassificationTests.results()
         results["guard"]["result"] = "skipped"
+        results["verify-windows"]["result"] = results["verify-linux"]["result"] = "skipped"
         CI.required_results(CI.plan("full", "main"), results, "push")
+        results["guard"]["result"] = "success"
+        CI.required_results(CI.plan("full", "unlabelled"), results, "pull_request")
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("full", "requested"), results, "pull_request", ("ci:full",))
 
     def test_non_pr_event_cannot_accept_a_narrowed_plan(self):
         results = ClassificationTests.results()
@@ -148,6 +153,22 @@ class GitSelectionTests(unittest.TestCase):
         self.base = self.git("rev-parse", "HEAD").strip()
         self.payload = {"pull_request": {"base": {"sha": self.base}, "labels": []}}
 
+    def select(self):
+        self.payload["pull_request"]["head"] = {"sha": self.git("rev-parse", "HEAD").strip()}
+        return CI.select(self.root, "pull_request", self.payload)
+
+    def test_base_movement_after_branching_is_not_part_of_the_change(self):
+        self.git("checkout", "-q", "-b", "change")
+        (self.root / "README.md").write_text("changed\n", encoding="utf-8")
+        self.commit()
+        head = self.git("rev-parse", "HEAD").strip()
+        self.git("checkout", "-q", "main")
+        (self.root / "runtime.py").write_text("pass\n", encoding="utf-8")
+        self.commit()
+        self.payload["pull_request"]["base"]["sha"] = self.git("rev-parse", "HEAD").strip()
+        self.payload["pull_request"]["head"] = {"sha": head}
+        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "docs")
+
     def git(self, *arguments):
         return subprocess.run(["git", *arguments], cwd=self.root, check=True,
                               capture_output=True, text=True, timeout=30).stdout
@@ -159,14 +180,14 @@ class GitSelectionTests(unittest.TestCase):
     def test_doc_range_and_explicit_risk_label(self):
         (self.root / "README.md").write_text("changed\n", encoding="utf-8")
         self.commit()
-        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "docs")
+        self.assertEqual(self.select()["mode"], "docs")
         self.payload["pull_request"]["labels"] = [{"name": "ci:full"}]
-        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "full")
+        self.assertEqual(self.select()["mode"], "full")
 
     def test_rename_keeps_the_old_executable_path_in_scope(self):
         self.git("mv", "README.md", "script.py")
         self.commit()
-        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "full")
+        self.assertEqual(self.select()["mode"], "full")
 
     def test_deleted_unknown_runtime_is_not_invisible(self):
         (self.root / "runtime.py").write_text("pass\n", encoding="utf-8")
@@ -174,12 +195,12 @@ class GitSelectionTests(unittest.TestCase):
         self.payload["pull_request"]["base"]["sha"] = self.git("rev-parse", "HEAD").strip()
         (self.root / "runtime.py").unlink()
         self.commit()
-        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "full")
+        self.assertEqual(self.select()["mode"], "full")
 
     def test_binary_change_cannot_look_like_prose(self):
         (self.root / "README.md").write_bytes(b"\0binary\0")
         self.commit()
-        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "full")
+        self.assertEqual(self.select()["mode"], "full")
 
     def test_unresolvable_range_and_missing_event_data_fall_back_to_full(self):
         for payload in ({}, {"pull_request": {"base": {"sha": "--help"}}},
@@ -243,6 +264,7 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertEqual(set(required[1].split(", ")),
                          {"select", "guard", "guidance-examples", "verify-windows", "verify-linux"})
         self.assertIn("CI_NEEDS: ${{ toJSON(needs) }}", jobs["ci-required"])
+        self.assertIn("CI_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}", jobs["ci-required"])
         self.assertIn("scripts/ci_selection.py required", jobs["ci-required"])
         self.assertNotRegex(workflow.split("jobs:\n", 1)[0], r"paths(?:-ignore)?:")
         self.assertNotIn("cancel-in-progress: true", workflow)
@@ -250,6 +272,7 @@ class WorkflowWiringTests(unittest.TestCase):
             job = jobs[f"verify-{platform}"]
             self.assertIn("    needs: select\n", job)
             self.assertIn("mode != 'docs'", job)
+            self.assertIn("contains(github.event.pull_request.labels.*.name, 'ci:full')", job)
             for group in ("source", "runtime"):
                 step = re.search(r"      - name: selected[^\n]*\n(.*?)(?=\n      -|\Z)",
                                  job[job.index(f"      - name: selected {'source' if group == 'source' else 'shared'}"):],

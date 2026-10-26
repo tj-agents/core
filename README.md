@@ -268,16 +268,17 @@ python -B scripts/update_catalog_digests.py
 pwsh .agents/sync-generated.ps1
 ```
 
-PR CI uses `scripts/ci_selection.py` (Python 3.9+) to classify the complete base-to-merge change.
-Inert prose runs the documentation reachability check. Changes to mapped problem-record, plugin-adoption,
-lock-bump, machine-verification and handoff-transfer code run their regression modules on Windows and
-Linux, with generation and packaging checks. Changed test modules include their import consumers.
-Unknown paths, shared infrastructure, executable guidance, binary changes, unresolved ranges and broad
-changes retain the full matrix. Main always runs the full matrix. Add the `ci:full` PR label to request
-full coverage; adding or removing a label reevaluates selection.
+The Windows and Linux test suites run only on a PR labelled `ci:full`; every other PR and main run
+selection, the generated-path guard and guidance examples. With the label, `scripts/ci_selection.py`
+(Python 3.9+) classifies the PR's own change from its merge base. Inert prose runs the documentation
+reachability check. Changes to mapped problem-record, plugin-adoption, lock-bump, machine-verification and
+handoff-transfer code run their regression modules on Windows and Linux, with generation and packaging
+checks. Changed test modules include their import consumers. Unknown paths, shared infrastructure,
+executable guidance, binary changes, unresolved ranges and broad changes run the full matrix. Adding or
+removing the label reevaluates selection.
 
 `ci-required` runs after selection, the generated-path guard and both platform jobs. It fails if
-classification or any selected job fails, disappears, is cancelled or skips. Configure branch protection
+classification or any selected job fails, disappears or is cancelled, or skips on a `ci:full` PR. Configure branch protection
 to require this check when enabling server-side enforcement. Existing all-checks merge validation also
 consumes its result. Selection never cancels a prior run or transfers a previous head's test success.
 
@@ -379,8 +380,11 @@ both hosts update in parallel, and the cursor advances once both succeed. A fail
 launch; a cursor older than ntfy's retention compares every publisher instead. Every launch except `codex` then compares
 this project's Claude installs with the recorded heads from local files only, and updates an install only
 when its plugin directory differs at the head; each install is tried at most once per head, so a failure waits
-for the next head. A project install is skipped when a nested worktree's install below it is listed first,
-because Claude's CLI then updates the nested one. Codex re-adds a plugin only when its directory changed. Without GitHub content, both compare commits.
+for the next head. Claude uses the first installation for the same Git repository at each scope, including
+linked worktrees. Refresh, installed-byte verification, admission and restart detection use that same
+registration; an update that fails to persist there remains a failure. Separate clones are separate
+repositories even when their remotes match. Codex re-adds a plugin only when its directory changed.
+Without GitHub content, both compare commits.
 `agent:refresh` runs the same check in a running session.
 
 Main-branch callers publish events through the shared

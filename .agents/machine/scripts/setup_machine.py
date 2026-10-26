@@ -39,6 +39,7 @@ import host_permissions
 import required_plugins
 
 COMMAND_TIMEOUT_SECONDS = 60
+CHECKOUT_UPDATED = "TJ_AGENTS_SETUP_CHECKOUT_UPDATED"
 INSTALLER_TIMEOUT_SECONDS = 600
 HOSTS = ("claude", "codex")
 PROFILE_START = "# >>> tj-agents >>>"
@@ -933,13 +934,40 @@ def canonical_script(checkout: Path) -> Path:
 
 
 def reexec_if_not_main_checkout(checkout: Path | None, running: Path, argv: list[str],
-                                run: Callable = subprocess.run) -> int | None:
+                                run: Callable = subprocess.run, env: dict | None = None) -> int | None:
     if checkout is None:
         return None
     canonical = canonical_script(checkout)
     if not canonical.is_file() or same_path(canonical, running):
         return None
-    return run([sys.executable, str(canonical), *argv], check=False).returncode
+    return run([sys.executable, str(canonical), *argv], check=False, env=env).returncode
+
+
+def fast_forward(checkout: Path, run: Callable = subprocess.run) -> bool:
+    environment = {"GIT_SSH_COMMAND": "ssh -o BatchMode=yes", **os.environ,
+                   "GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never"}
+
+    def git(*arguments: str) -> subprocess.CompletedProcess:
+        return run(["git", "-C", str(checkout), *arguments], capture_output=True, text=True, encoding="utf-8",
+                   errors="replace", timeout=COMMAND_TIMEOUT_SECONDS, check=False, env=environment)
+
+    try:
+        if git("rev-parse", "--verify", "--quiet", "@{u}").returncode:
+            return False
+        fetched = git("fetch", "--quiet")
+        if fetched.returncode:
+            raise subprocess.SubprocessError((fetched.stderr or fetched.stdout).strip() or "git fetch failed")
+        if not git("merge-base", "--is-ancestor", "@{u}", "HEAD").returncode:
+            return False
+        merged = git("merge", "--ff-only", "--quiet", "@{u}")
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"warning: could not update the main checkout {checkout} ({error}); "
+              "setup runs on its current revision", file=sys.stderr)
+        return False
+    if merged.returncode:
+        raise SetupError(f"the main checkout {checkout} is behind its upstream and cannot fast-forward: "
+                         f"{(merged.stderr or merged.stdout).strip()}. Reconcile it, then rerun setup")
+    return True
 
 
 def machine_context(checkout: Path | None = None) -> Context:
@@ -962,10 +990,21 @@ def main(argv: list[str] | None = None) -> int:
     arguments = list(argv if argv is not None else sys.argv[1:])
     running = Path(__file__).resolve()
     checkout = main_checkout(running.parent)
-    delegated = reexec_if_not_main_checkout(checkout, running, arguments)
+    reads_only = any(argument in ("--check", "-h", "--help") for argument in arguments)
+    if checkout is not None and not reads_only and not os.environ.get(CHECKOUT_UPDATED):
+        try:
+            updated = fast_forward(checkout)
+        except SetupError as error:
+            print(f"failed checkout update: {error}", file=sys.stderr)
+            return 2
+        if updated:
+            print(f"updated the main checkout {checkout}; rerunning setup on the new revision", file=sys.stderr)
+            return subprocess.run([sys.executable, str(canonical_script(checkout)), *arguments],
+                                  env={**os.environ, CHECKOUT_UPDATED: "1"}, check=False).returncode
+    delegated = reexec_if_not_main_checkout(checkout, running, arguments, env={**os.environ, CHECKOUT_UPDATED: "1"})
     if delegated is not None:
         return delegated
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--check", action="store_true", help="report drift, write nothing, exit 1 on drift")
     modes.add_argument("--onboard", action="store_true", help="allow explicitly requested plugin enrollment")

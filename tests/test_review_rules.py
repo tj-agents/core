@@ -118,6 +118,31 @@ class ReviewRulesTests(unittest.TestCase):
         self.assertEqual(["stack:style"], [rule["name"] for rule in result["rules"]])
         self.assertTrue(Path(result["rules"][0]["path"]).is_relative_to(cache.resolve()))
 
+    def test_claude_inventory_uses_only_the_installation_that_applies_to_the_reviewed_repository(self):
+        self.selection("stack@selected")
+        profile = self.root / "profile"
+        cache = profile / "plugins/cache"
+        installs = {}
+        for version in ("user", "elsewhere", "here"):
+            payload = cache / "selected/stack" / version
+            (payload / "skills/style").mkdir(parents=True)
+            (payload / "skills/style/SKILL.md").write_text(
+                f"---\nname: style\nkind: convention\n---\n{version}\n", encoding="utf-8")
+            (payload / "tier.json").write_text(json.dumps({"schema_version": 1, "tier": "stack", "applies": "always"}),
+                                               encoding="utf-8")
+            installs[version] = str(payload)
+        with mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(profile)}), mock.patch.object(
+                self.gate, "native_plugins", return_value=[
+                    {"id": "stack@selected", "scope": "user", "installPath": installs["user"]},
+                    {"id": "stack@selected", "scope": "project", "projectPath": str(self.root / "other"),
+                     "installPath": installs["elsewhere"]},
+                    {"id": "stack@selected", "scope": "project", "projectPath": str(self.project),
+                     "installPath": installs["here"]},
+                ]):
+            result = RULES.resolve(self.project, self.gate, host="claude")
+        self.assertEqual([Path(installs["here"]).resolve()],
+                         [Path(rule["path"]).parents[2] for rule in result["rules"]])
+
     def test_native_inventory_executes_in_the_reviewed_repository(self):
         script = self.project / "plugin"
         script.write_text(
