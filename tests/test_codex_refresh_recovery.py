@@ -77,7 +77,7 @@ class RecoveryTests(unittest.TestCase):
 
     def arm(self, entry=None, close_status="armed"):
         entry = entry or {"host": "codex", "session_id": SESSION, "pid": 4242,
-                          "pid_started_at": 1000.5, "launch_cwd": str(self.root),
+                          "pid_started_at": 1000.5, "launch_cwd": str(self.root), "native_cwd": str(self.root),
                           "profile": str(self.root / "profile"), "title": "Existing task"}
         events = []
         shared = mock.Mock()
@@ -122,7 +122,8 @@ class RecoveryTests(unittest.TestCase):
     def test_failed_recovery_admission_prevents_both_watchers_and_closure(self):
         shared, close = mock.Mock(), mock.Mock()
         shared.own_host_and_entry.return_value = {
-            "host": "codex", "session_id": SESSION, "pid": 4242, "launch_cwd": str(self.root)}
+            "host": "codex", "session_id": SESSION, "pid": 4242, "launch_cwd": str(self.root),
+            "native_cwd": str(self.root)}
         with mock.patch.object(RELAUNCH, "codex_preflight", side_effect=RuntimeError("admission failed")), \
                 self.assertRaisesRegex(RuntimeError, "admission failed"):
             RELAUNCH.relaunch(self.root, {}, shared=shared, close=close, arguments=lambda _: [], host="codex")
@@ -146,6 +147,30 @@ class RecoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "checkout"):
             self.arm(entry)
         self.assertFalse(RELAUNCH.record_path(SESSION).exists())
+
+    def test_native_directory_change_can_restart_in_the_current_checkout(self):
+        entry = {"host": "codex", "session_id": SESSION, "pid": 4242, "pid_started_at": 1000.5,
+                 "launch_cwd": str(self.root / "original"), "native_cwd": str(self.root)}
+        result, events = self.arm(entry)
+        self.assertEqual("armed", result["relaunch"])
+        self.assertEqual(["watcher", "close"], [event[0] for event in events])
+        self.assertEqual(str(self.root.resolve()), RELAUNCH.read_json(RELAUNCH.record_path(SESSION))["cwd"])
+
+    def test_launch_directory_cannot_override_a_different_native_checkout(self):
+        entry = {"host": "codex", "session_id": SESSION, "pid": 4242, "pid_started_at": 1000.5,
+                 "launch_cwd": str(self.root), "native_cwd": str(self.root / "other")}
+        with self.assertRaisesRegex(RuntimeError, "checkout"):
+            self.arm(entry)
+        self.assertFalse(RELAUNCH.record_path(SESSION).exists())
+
+    def test_missing_or_relative_native_checkout_cannot_arm_recovery(self):
+        for native_cwd in (None, "", "relative", 123):
+            with self.subTest(native_cwd=native_cwd):
+                entry = {"host": "codex", "session_id": SESSION, "pid": 4242, "pid_started_at": 1000.5,
+                         "launch_cwd": str(self.root), "native_cwd": native_cwd}
+                with self.assertRaisesRegex(RuntimeError, "checkout"):
+                    self.arm(entry)
+                self.assertFalse(RELAUNCH.record_path(SESSION).exists())
 
     def test_a_close_without_armed_confirmation_cancels_relaunch(self):
         with self.assertRaisesRegex(RuntimeError, "not armed"):
