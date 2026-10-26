@@ -95,6 +95,31 @@ class NativeCompletionTests(unittest.TestCase):
         self.assertIsNotNone(self.wait())
         self.assertEqual(103.0, self.now)
 
+    def test_mutating_an_exported_pin_cannot_change_the_bound_file_identity(self):
+        guard = cli_client.NativeCompletion(self.entry)
+        pin = guard.pin()
+        pin['identity'][1] += 1
+        self.event('task_complete')
+        self.assertTrue(guard.poll())
+        with self.assertRaisesRegex(RuntimeError, 'replaced or truncated'):
+            cli_client.NativeCompletion(self.entry, pin)
+
+    def test_truncation_between_path_check_and_open_cannot_reuse_completion(self):
+        guard = cli_client.NativeCompletion(self.entry)
+        self.event('task_complete')
+        self.assertTrue(guard.poll())
+        original_open = Path.open
+
+        def truncate_before_open(path, *args, **kwargs):
+            if path == self.rollout and args and args[0] == 'rb':
+                with original_open(path, 'wb'):
+                    pass
+            return original_open(path, *args, **kwargs)
+
+        with mock.patch.object(Path, 'open', new=truncate_before_open):
+            with self.assertRaisesRegex(RuntimeError, 'replaced or truncated'):
+                guard.poll()
+
     @unittest.skipUnless(os.name == 'nt', 'Win32 extended paths require Windows')
     def test_equivalent_extended_profile_and_rollout_paths_keep_the_exact_binding(self):
         self.event('task_complete')
@@ -234,8 +259,8 @@ class WindowsPathComparisonTests(unittest.TestCase):
                 ('//server/share/profile', '//?/UNC/server/share/profile/sessions/rollout.jsonl'),
                 ('//?/UNC/server/share/profile', '//server/share/profile/sessions/rollout.jsonl')):
             with self.subTest(profile=profile, rollout=rollout):
-                sessions = cli_client.comparable_path(PureWindowsPath(profile) / 'sessions')
-                self.assertIn(sessions, cli_client.comparable_path(PureWindowsPath(rollout)).parents)
+                sessions = cli_client._comparable_path(PureWindowsPath(profile) / 'sessions')
+                self.assertIn(sessions, cli_client._comparable_path(PureWindowsPath(rollout)).parents)
 
     def test_unrelated_drive_share_profile_and_device_namespace_remain_outside(self):
         for profile, rollout in (
@@ -245,13 +270,13 @@ class WindowsPathComparisonTests(unittest.TestCase):
                 ('C:/profile', '//?/GLOBALROOT/Device/profile/sessions/rollout.jsonl'),
                 ('C:/profile', '//./C:/profile/sessions/rollout.jsonl')):
             with self.subTest(profile=profile, rollout=rollout):
-                sessions = cli_client.comparable_path(PureWindowsPath(profile) / 'sessions')
-                self.assertNotIn(sessions, cli_client.comparable_path(PureWindowsPath(rollout)).parents)
+                sessions = cli_client._comparable_path(PureWindowsPath(profile) / 'sessions')
+                self.assertNotIn(sessions, cli_client._comparable_path(PureWindowsPath(rollout)).parents)
 
     @unittest.skipIf(os.name == 'nt', 'POSIX path spelling')
     def test_posix_paths_are_not_reinterpreted_as_win32_namespaces(self):
         path = Path('/tmp') / '\\\\?\\C:\\profile'
-        self.assertIs(path, cli_client.comparable_path(path))
+        self.assertIs(path, cli_client._comparable_path(path))
 
 
 if __name__ == '__main__':
