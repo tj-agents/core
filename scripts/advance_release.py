@@ -18,13 +18,20 @@ def git(root, *arguments):
 def advance(root, sha, remote="origin"):
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise ValueError(f"invalid release commit: {sha}")
-    fetched = git(root, "fetch", "--quiet", remote, f"refs/heads/{BRANCH}")
-    if not fetched.returncode:
-        current = git(root, "rev-parse", "FETCH_HEAD").stdout.strip()
+    listed = git(root, "ls-remote", "--exit-code", remote, f"refs/heads/{BRANCH}")
+    if listed.returncode not in (0, 2):
+        raise RuntimeError(f"cannot read {BRANCH}: {(listed.stderr or listed.stdout).strip()}")
+    if not listed.returncode:
+        current = listed.stdout.split()[0]
         if current == sha:
             return "current"
-        if git(root, "merge-base", "--is-ancestor", current, sha).returncode:
+        fetched = git(root, "fetch", "--quiet", remote, f"refs/heads/{BRANCH}")
+        if fetched.returncode:
+            raise RuntimeError(f"cannot fetch {BRANCH}: {(fetched.stderr or fetched.stdout).strip()}")
+        if not git(root, "merge-base", "--is-ancestor", sha, current).returncode:
             return "superseded"
+        if git(root, "merge-base", "--is-ancestor", current, sha).returncode:
+            raise RuntimeError(f"{BRANCH} at {current} has diverged from {sha}; reconcile it by hand")
     pushed = git(root, "push", remote, f"{sha}:refs/heads/{BRANCH}")
     if pushed.returncode:
         raise RuntimeError(f"release push failed: {(pushed.stderr or pushed.stdout).strip()}")

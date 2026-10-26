@@ -42,8 +42,17 @@ FAMILIES = {
 }
 
 
-def plan(mode, reason, tests=()):
-    return {"mode": mode, "reason": reason, "tests": sorted(set(tests))}
+WINDOWS_ONLY_ROOTS = {"shell", "cli-session-recovery"}
+WINDOWS_ONLY_SUFFIXES = {".ps1", ".psm1", ".psd1"}
+
+
+def plan(mode, reason, tests=(), windows=False):
+    return {"mode": mode, "reason": reason, "tests": sorted(set(tests)), "windows": windows}
+
+
+def windows_only(path):
+    value = PurePosixPath(path)
+    return value.parts[0] in WINDOWS_ONLY_ROOTS or value.suffix.lower() in WINDOWS_ONLY_SUFFIXES
 
 
 def inert_document(path):
@@ -87,11 +96,12 @@ def test_closure(root, selected):
 def classify(paths, *, event="pull_request", labels=(), lines=0, binary=False, root=ROOT):
     paths = set(paths)
     if event != "pull_request":
-        return plan("full", "non-PR event")
+        return plan("full", "non-PR event", windows=True)
     if FULL_LABEL in labels:
-        return plan("full", "explicit full-coverage label")
+        return plan("full", "explicit full-coverage label", windows=True)
+    windows = any(windows_only(path) for path in paths)
     if not paths or binary or len(paths) > MAX_FILES or lines > MAX_LINES:
-        return plan("full", "empty, binary or broad change")
+        return plan("full", "empty, binary or broad change", windows=windows)
     selected = set()
     for path in sorted(paths):
         if inert_document(path):
@@ -102,19 +112,19 @@ def classify(paths, *, event="pull_request", labels=(), lines=0, binary=False, r
                 selected.update(family["tests"])
         elif test_file(path) and path != "tests/test_ci_selection.py":
             if not (root / path).is_file():
-                return plan("full", "deleted test")
+                return plan("full", "deleted test", windows=windows)
             selected.add(path)
         else:
-            return plan("full", f"unmapped surface: {path}")
+            return plan("full", f"unmapped surface: {path}", windows=windows)
     if selected:
         try:
             selected = test_closure(root, selected)
         except (OSError, UnicodeError, SyntaxError):
-            return plan("full", "regression dependencies cannot be read")
+            return plan("full", "regression dependencies cannot be read", windows=windows)
         if not all((root / path).is_file() for path in selected):
-            return plan("full", "selected regression is unavailable")
+            return plan("full", "selected regression is unavailable", windows=windows)
     if selected:
-        return plan("focused", "mapped behavioral regressions", selected)
+        return plan("focused", "mapped behavioral regressions", selected, windows)
     return plan("docs", "inert documentation")
 
 
@@ -126,14 +136,13 @@ def git_output(root, *arguments):
 
 def select(root, event, payload):
     if event != "pull_request":
-        return plan("full", "non-PR event")
+        return plan("full", "non-PR event", windows=True)
     try:
         base = payload["pull_request"]["base"]["sha"]
-        head = payload["pull_request"].get("head", {}).get("sha", "HEAD")
-        if not isinstance(base, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", base):
-            raise ValueError("invalid base SHA")
-        if head != "HEAD" and (not isinstance(head, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", head)):
-            raise ValueError("invalid head SHA")
+        head = payload["pull_request"]["head"]["sha"]
+        for value in (base, head):
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", value):
+                raise ValueError("invalid base or head SHA")
         change = f"{base}...{head}"
         raw_paths = git_output(root, "diff", "--name-only", "--no-renames", "-z", change)
         paths = raw_paths.decode("utf-8").rstrip("\0").split("\0") if raw_paths else []
@@ -151,12 +160,14 @@ def select(root, event, payload):
         labels = [label["name"] for label in payload["pull_request"].get("labels", [])]
         return classify(paths, event=event, labels=labels, lines=lines, binary=binary, root=root)
     except (KeyError, TypeError, ValueError, OSError, subprocess.SubprocessError):
-        return plan("full", "change range or event cannot be resolved")
+        return plan("full", "change range or event cannot be resolved", windows=True)
 
 
 def validate_plan(value):
-    if not isinstance(value, dict) or set(value) != {"mode", "reason", "tests"}:
+    if not isinstance(value, dict) or set(value) != {"mode", "reason", "tests", "windows"}:
         raise ValueError("invalid CI selection")
+    if not isinstance(value["windows"], bool):
+        raise ValueError("invalid CI selection platform")
     if (value["mode"] not in {"full", "focused", "docs"}
             or not isinstance(value["reason"], str) or not value["reason"]):
         raise ValueError("invalid CI selection mode/reason")
@@ -172,21 +183,18 @@ def required_results(value, needs, event):
     validate_plan(value)
     if not isinstance(needs, dict):
         raise ValueError("invalid CI job results")
-    if event != "pull_request" and value["mode"] != "full":
-        raise ValueError("non-PR validation requires full coverage")
+    if event != "pull_request" and (value["mode"] != "full" or not value["windows"]):
+        raise ValueError("non-PR validation requires full coverage on every platform")
     expected = {
         "select": "success",
         "guard": "success" if event == "pull_request" else "skipped",
         "guidance-examples": "success",
     }
-    expected.update({name: "skipped" if value["mode"] == "docs" else "success"
-                     for name in ("verify-windows", "verify-linux")})
-    if event == "pull_request" and value["mode"] != "docs":
-        expected["verify-windows"] = ("success", "skipped")
+    expected["verify-linux"] = "skipped" if value["mode"] == "docs" else "success"
+    expected["verify-windows"] = "success" if value["mode"] != "docs" and value["windows"] else "skipped"
     for name, result in expected.items():
-        allowed = result if isinstance(result, tuple) else (result,)
-        if not isinstance(needs.get(name), dict) or needs[name].get("result") not in allowed:
-            raise ValueError(f"{name} must finish as {' or '.join(allowed)}")
+        if not isinstance(needs.get(name), dict) or needs[name].get("result") != result:
+            raise ValueError(f"{name} must finish as {result}")
 
 
 def run_tests(root, value, group):

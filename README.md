@@ -277,14 +277,15 @@ merge base. Inert prose runs the documentation reachability check. Changes to ma
 plugin-adoption, lock-bump, machine-verification and handoff-transfer code run their regression modules,
 with generation and packaging checks. Changed test modules include their import consumers. Unknown paths,
 shared infrastructure, executable guidance, binary changes, unresolved ranges and broad changes run the
-full suite. Pull requests verify on Linux; main always runs the full Windows and Linux matrix. Add the
-`ci:full` PR label to request full coverage including Windows; adding or removing a label reevaluates
+full suite. Pull requests verify on Linux, and also on Windows when they change PowerShell, `shell/` or
+`cli-session-recovery/`, or an unresolvable range; main always runs the full Windows and Linux matrix. Add
+the `ci:full` PR label to request full coverage on both platforms; adding or removing a label reevaluates
 selection.
 
 Machines install Core's plugins from the `release` branch, never from main. After a main commit's full
-matrix passes and its generated packages are already current, the `release` job fast-forwards `release`
-to it with `scripts/advance_release.py` and publishes the machine update hint. A red main therefore never
-reaches an installed machine.
+matrix passes, the `release` job checks that the commit's generated packages are current, fast-forwards
+`release` to it with `scripts/advance_release.py` and publishes the machine update hint. A red main
+therefore never reaches an installed machine, and a `release` that diverged from main fails the job.
 
 `ci-required` runs after selection, the generated-path guard and both platform jobs. It fails if
 classification or any selected job fails, disappears or is cancelled, or skips where it must run. Configure branch protection
