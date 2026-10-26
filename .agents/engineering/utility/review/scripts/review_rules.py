@@ -58,6 +58,22 @@ def conventions(declaration):
     return result
 
 
+def effective_claude_entries(entries, project):
+    scopes = {"local": 2, "project": 1}
+    effective = {}
+    for entry in entries:
+        scope, owner = entry.get("scope"), entry.get("projectPath")
+        if scope in ("user", "managed"):
+            rank = (-1, 0)
+        elif scope in scopes and isinstance(owner, str) and owner and project.is_relative_to(Path(owner).resolve()):
+            rank = (len(Path(owner).resolve().parts), scopes[scope])
+        else:
+            continue
+        if entry.get("id") not in effective or rank > effective[entry.get("id")][0]:
+            effective[entry.get("id")] = (rank, entry)
+    return [entry for _, entry in effective.values()]
+
+
 def host_declarations(gate, host, identities, project):
     if host not in ("codex", "claude"):
         raise ValueError("Specify the reviewing host with --host codex or --host claude")
@@ -67,6 +83,8 @@ def host_declarations(gate, host, identities, project):
     entries = gate.native_plugins(host, str(project))
     if not entries:
         raise ValueError("The reviewing host's enabled plugin inventory is unavailable or empty")
+    if host == "claude":
+        entries = effective_claude_entries(entries, project)
     found = []
     for entry in entries:
         if host == "codex":
