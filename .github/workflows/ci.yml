@@ -98,6 +98,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
+          python -B scripts/runtime_sources.py
           python -B scripts/update_catalog_digests.py
           ./.agents/sync-generated.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -196,6 +197,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
+          python -B scripts/runtime_sources.py
           python -B scripts/update_catalog_digests.py
           ./.agents/sync-generated.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -282,6 +284,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
+          python -B scripts/runtime_sources.py
           python -B scripts/update_catalog_digests.py
           ./.agents/sync-generated.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
