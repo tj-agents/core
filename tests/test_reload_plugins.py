@@ -25,7 +25,7 @@ def setUpModule():
     home = tempfile.TemporaryDirectory(prefix="sync plugins home ")
     ISOLATION.append(home)
     environment = {key: value for key, value in os.environ.items() if key not in SESSION_VARIABLES}
-    environment.update(CLAUDE_CONFIG_DIR=str(Path(home.name) / "claude"), CODEX_HOME=str(Path(home.name) / "codex"),
+    environment.update(GIT_CONFIG_COUNT='0', CLAUDE_CONFIG_DIR=str(Path(home.name) / "claude"), CODEX_HOME=str(Path(home.name) / "codex"),
                        AGENT_STATE_DIRECTORY=str(Path(home.name) / "state"))
     patcher = mock.patch.dict(os.environ, environment, clear=True)
     patcher.start()
@@ -740,28 +740,26 @@ class HeadReconcileTests(unittest.TestCase):
         with mock.patch.object(REFRESH, "run", side_effect=fake):
             self.assertEqual(["dotnet@tj-agents"], REFRESH.reconcile_claude(project))
 
-    def test_a_project_install_shadowed_by_a_nested_worktree_install_is_skipped(self):
+    def test_a_non_git_subdirectory_does_not_shadow_its_parent_install(self):
         project = self.home.project("core", "settings.json", "base@tj-agents")
         nested = project / ".worktrees" / "Feature"
         self.home.installed(("base@tj-agents", "project", nested, OLD_HEAD), ("base@tj-agents", "project", project, OLD_HEAD))
         self.record({"tj-agents/core@main": CORE_HEAD}, {f"tj-agents/core@{OLD_HEAD}:plugins/base": "1" * 40,
                                                        f"tj-agents/core@{CORE_HEAD}:plugins/base": "2" * 40})
-        with mock.patch.object(REFRESH, "run", side_effect=AssertionError("updated a shadowed install")):
-            self.assertEqual([], REFRESH.reconcile_claude(project))
-            self.assertEqual([], REFRESH.reconcile_claude(project, event=True, repositories=None))
-        fake = FakeClaude(self.home.installed(("base@tj-agents", "project", project, OLD_HEAD),
-                                              ("base@tj-agents", "project", nested, OLD_HEAD)))
+        fake = FakeClaude(REFRESH.installed_entries())
         with mock.patch.object(REFRESH, "run", side_effect=fake):
-            self.assertEqual(["base@tj-agents"], REFRESH.reconcile_claude(project))
-
-    def test_a_full_refresh_also_skips_a_shadowed_project_install(self):
+            self.assertEqual(['base@tj-agents'], REFRESH.reconcile_claude(project))
+        self.assertEqual('v1', fake.installations[0]['version'])
+        self.assertEqual('v2', fake.installations[1]['version'])
+    def test_a_full_refresh_does_not_update_an_unrelated_subdirectory_install(self):
         project = self.home.project("core", "settings.json", "base@tj-agents")
         nested = project / ".worktrees" / "Feature"
         fake = FakeClaude(self.home.installed(("base@tj-agents", "project", nested, OLD_HEAD),
                                               ("base@tj-agents", "project", project, OLD_HEAD)))
         with mock.patch.object(REFRESH, "run", side_effect=fake):
             REFRESH.refresh("claude", "claude", project, {}, ["base@tj-agents"])
-        self.assertNotIn("update", [command[2] for command, _ in fake.commands])
+        self.assertEqual('v1', fake.installations[0]['version'])
+        self.assertEqual('v2', fake.installations[1]['version'])
 
     def test_content_query_names_only_validated_revisions_and_paths(self):
         wanted = {"tj-agents/core@main": {"plugins/base", 'plugins/x") { oid } evil: object(expression: "y'}}
