@@ -30,7 +30,7 @@ from workflow_runtime import (
 )
 import workflow_runtime
 READER_SPEC = importlib.util.spec_from_file_location(
-    "agent_store_reader", ROOT / ".agents" / "agent-store" / "runtime" / "reader.py"
+    "agent_store_reader", ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "reader.py"
 )
 READER = importlib.util.module_from_spec(READER_SPEC)
 READER_SPEC.loader.exec_module(READER)
@@ -392,7 +392,7 @@ class WorkflowGenerationTests(unittest.TestCase):
 
     def test_extended_host_adapter_preserves_one_public_identity(self):
         config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
-        self.assertEqual(["agent:background-listener", "engineering:persistent-workflow", "engineering:review", "machine:sync-plugins"],
+        self.assertEqual(["engineering:persistent-workflow", "engineering:review"],
                          config["extended_host_adapters"])
         for identity in config["extended_host_adapters"]:
             plugin, skill = identity.split(":")
@@ -954,6 +954,18 @@ class WorkflowGenerationTests(unittest.TestCase):
         else:
             link.symlink_to(target, target_is_directory=True)
 
+    def link_file(self, link, target):
+        if os.name == "nt":
+            created = subprocess.run(
+                ["cmd.exe", "/D", "/C", "mklink", str(link), str(target)],
+                capture_output=True,
+                text=True,
+            )
+            if created.returncode:
+                self.skipTest(created.stderr or created.stdout)
+        else:
+            link.symlink_to(target)
+
     def test_codex_installer_rejects_a_reparse_point_in_a_profile_ancestor(self):
         hosts = powershell_hosts()
         self.assertNotEqual([], hosts)
@@ -1118,13 +1130,35 @@ $results | ConvertTo-Json -Compress
                         repository,
                         ignore=shutil.ignore_patterns(".git", "__pycache__"),
                     )
+                    shutil.rmtree(repository / "plugins")
+                    digests = subprocess.run(
+                        [sys.executable, "-B", str(repository / "scripts" / "update_catalog_digests.py")],
+                        cwd=repository,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, digests.returncode, digests.stderr)
+                    generated = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(repository / ".agents" / "sync-generated.ps1"),
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, generated.returncode, generated.stderr)
+                    valid = repository / "plugins/engineering/harness.json"
+                    expected_valid = valid.read_bytes()
                     source_markers = (
+                        repository / ".agents" / "user-owned.txt",
                         repository / ".claude" / "user-owned.txt",
                         repository / ".codex" / "user-owned.txt",
                     )
                     for marker in source_markers:
                         marker.write_text("preserve\n", encoding="utf-8")
-                    orphan = repository / "plugins/engineering/codex-agents/unrelated.toml"
+                    orphan = repository / "plugins/retired/generated.txt"
+                    orphan.parent.mkdir()
                     orphan.write_text("generated orphan\n", encoding="utf-8")
                     checked = subprocess.run(
                         [
@@ -1149,8 +1183,151 @@ $results | ConvertTo-Json -Compress
                     )
                     self.assertEqual(0, completed.returncode, completed.stderr)
                     self.assertFalse(orphan.exists())
+                    self.assertFalse(orphan.parent.exists())
+                    self.assertEqual(expected_valid, valid.read_bytes())
                     for marker in source_markers:
                         self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))
+
+    def test_generator_refuses_linked_orphan_directory_cleanup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repository = Path(temp) / "repository"
+            shutil.copytree(
+                ROOT,
+                repository,
+                ignore=shutil.ignore_patterns(".git", "__pycache__"),
+            )
+            shutil.rmtree(repository / "plugins")
+            digests = subprocess.run(
+                [sys.executable, "-B", str(repository / "scripts" / "update_catalog_digests.py")],
+                cwd=repository,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, digests.returncode, digests.stderr)
+            generator = [
+                sys.executable,
+                "-B",
+                str(repository / "scripts" / "sync_plugin_packages.py"),
+                "--root",
+                str(repository),
+            ]
+            generated = subprocess.run(generator, capture_output=True, text=True)
+            self.assertEqual(0, generated.returncode, generated.stderr)
+            outside = Path(temp) / "outside"
+            outside_child = outside / "empty-child"
+            outside_child.mkdir(parents=True)
+            linked = repository / "plugins" / "retired"
+            self.link_directory(linked, outside)
+            completed = subprocess.run(generator, capture_output=True, text=True)
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("Path escapes repository", completed.stderr)
+            self.assertTrue(linked.exists())
+            self.assertTrue(outside.exists())
+            self.assertTrue(outside_child.exists())
+
+    def test_generator_refuses_in_generated_root_junction_before_pruning_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repository = Path(temp) / "repository"
+            shutil.copytree(
+                ROOT,
+                repository,
+                ignore=shutil.ignore_patterns(".git", "__pycache__"),
+            )
+            shutil.rmtree(repository / "plugins")
+            digests = subprocess.run(
+                [sys.executable, "-B", str(repository / "scripts" / "update_catalog_digests.py")],
+                cwd=repository,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, digests.returncode, digests.stderr)
+            generator = [
+                sys.executable,
+                "-B",
+                str(repository / "scripts" / "sync_plugin_packages.py"),
+                "--root",
+                str(repository),
+            ]
+            generated = subprocess.run(generator, capture_output=True, text=True)
+            self.assertEqual(0, generated.returncode, generated.stderr)
+            valid = repository / "plugins" / "base" / "harness.json"
+            expected_valid = valid.read_bytes()
+            marker = repository / ".agents" / "user-owned.txt"
+            marker.write_text("preserve\n", encoding="utf-8")
+            linked = repository / "plugins" / "retired"
+            self.link_directory(linked, valid.parent)
+            completed = subprocess.run(generator, capture_output=True, text=True)
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("Unsafe generated entry: plugins/retired", completed.stderr)
+            self.assertTrue(linked.exists())
+            self.assertEqual(expected_valid, valid.read_bytes())
+            self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))
+
+    def test_generator_refuses_in_generated_root_file_link_before_pruning_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repository = Path(temp) / "repository"
+            shutil.copytree(
+                ROOT,
+                repository,
+                ignore=shutil.ignore_patterns(".git", "__pycache__"),
+            )
+            shutil.rmtree(repository / "plugins")
+            digests = subprocess.run(
+                [sys.executable, "-B", str(repository / "scripts" / "update_catalog_digests.py")],
+                cwd=repository,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, digests.returncode, digests.stderr)
+            generator = [
+                sys.executable,
+                "-B",
+                str(repository / "scripts" / "sync_plugin_packages.py"),
+                "--root",
+                str(repository),
+            ]
+            generated = subprocess.run(generator, capture_output=True, text=True)
+            self.assertEqual(0, generated.returncode, generated.stderr)
+            valid = repository / "plugins" / "base" / "harness.json"
+            expected_valid = valid.read_bytes()
+            marker = repository / ".agents" / "user-owned.txt"
+            marker.write_text("preserve\n", encoding="utf-8")
+            linked = repository / "plugins" / "orphan.txt"
+            self.link_file(linked, valid)
+            completed = subprocess.run(generator, capture_output=True, text=True)
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("Unsafe generated entry: plugins/orphan.txt", completed.stderr)
+            self.assertTrue(linked.exists())
+            self.assertEqual(expected_valid, valid.read_bytes())
+            self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))
+
+    def test_generator_refuses_generated_root_alias(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repository = Path(temp) / "repository"
+            shutil.copytree(
+                ROOT,
+                repository,
+                ignore=shutil.ignore_patterns(".git", "__pycache__"),
+            )
+            shutil.rmtree(repository / "plugins")
+            marker = repository / ".agents" / "user-owned.txt"
+            marker.write_text("preserve\n", encoding="utf-8")
+            self.link_directory(repository / "plugins", repository / ".agents")
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(repository / "scripts" / "sync_plugin_packages.py"),
+                    "--root",
+                    str(repository),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("Unsafe generated root: plugins", completed.stderr)
+            self.assertTrue((repository / "plugins").exists())
+            self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))
 
 
 
@@ -1780,7 +1957,7 @@ class RepositoryProviderTests(unittest.TestCase):
         return state
 
     def write_session_store_with_writer(self, status):
-        path = ROOT / ".agents" / "agent-store" / "runtime" / "session_store.py"
+        path = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
         spec = importlib.util.spec_from_file_location("workflow_contract_session_store", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -1842,7 +2019,7 @@ class RepositoryProviderTests(unittest.TestCase):
         state = self.root / "v4-store-reader-state"
         state.mkdir()
         database = state / "sessions.db"
-        source = ROOT / ".agents" / "agent-store" / "runtime" / "session_store.py"
+        source = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
         spec = importlib.util.spec_from_file_location("workflow_contract_v4_session_store", source)
         session_store = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(session_store)
@@ -2075,7 +2252,7 @@ class RepositoryProviderTests(unittest.TestCase):
             "Done when: the runtime work item is verified.\n",
             encoding="utf-8",
         )
-        path = ROOT / ".agents" / "agent-store" / "runtime" / "session_store.py"
+        path = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
         spec = importlib.util.spec_from_file_location("linked_worktree_session_store", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

@@ -17,46 +17,10 @@
       "category": "Productivity"
     },
     {
-      "name": "agent-store",
-      "source": {
-        "source": "local",
-        "path": "./plugins/agent-store"
-      },
-      "policy": {
-        "installation": "INSTALLED_BY_DEFAULT",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Productivity"
-    },
-    {
-      "name": "agent",
-      "source": {
-        "source": "local",
-        "path": "./plugins/agent"
-      },
-      "policy": {
-        "installation": "INSTALLED_BY_DEFAULT",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Productivity"
-    },
-    {
       "name": "machine",
       "source": {
         "source": "local",
         "path": "./plugins/machine"
-      },
-      "policy": {
-        "installation": "INSTALLED_BY_DEFAULT",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Productivity"
-    },
-    {
-      "name": "cli",
-      "source": {
-        "source": "local",
-        "path": "./plugins/cli"
       },
       "policy": {
         "installation": "INSTALLED_BY_DEFAULT",

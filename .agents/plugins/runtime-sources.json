@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "agent": {
+      "repository": "tj-agents/agent",
+      "exports": [
+        ".agents/agent/runtime",
+        ".agents/agent/resources",
+        ".agents/agent/utility/plugins/scripts",
+        ".agents/agent/utility/peer/scripts",
+        ".agents/agent/utility/close/scripts",
+        ".agents/agent-store/runtime"
+      ]
+    },
+    "cli": {
+      "repository": "tj-agents/cli",
+      "exports": [
+        ".agents/cli/utility/close/scripts",
+        ".agents/cli/utility/closeout/scripts"
+      ]
+    }
+  }
+}

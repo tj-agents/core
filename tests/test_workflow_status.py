@@ -466,7 +466,7 @@ class WorkItemStatusTests(WorkflowStatusHarness):
             (package / 'hooks').mkdir()
             shutil.copy2(ROOT / '.agents/hooks/problem_records.py', package / 'hooks/problem_records.py')
             shutil.copytree(
-                ROOT / '.agents/agent-store/runtime',
+                ROOT / '.agents/dependencies/agent/.agents/agent-store/runtime',
                 package / '.agents/agent-store/runtime',
             )
             copies.append(script)
