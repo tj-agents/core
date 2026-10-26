@@ -65,7 +65,9 @@ jobs:
 
   verify-windows:
     needs: select
-    if: needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
+    if: >-
+      needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
+      && contains(github.event.pull_request.labels.*.name, 'ci:full')
     runs-on: windows-latest
     env:
       CI_SELECTION: ${{ needs.select.outputs.plan }}
@@ -179,7 +181,9 @@ jobs:
 
   verify-linux:
     needs: select
-    if: needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
+    if: >-
+      needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
+      && contains(github.event.pull_request.labels.*.name, 'ci:full')
     runs-on: ubuntu-latest
     env:
       CI_SELECTION: ${{ needs.select.outputs.plan }}
@@ -260,6 +264,7 @@ jobs:
         env:
           CI_SELECTION: ${{ needs.select.outputs.plan }}
           CI_NEEDS: ${{ toJSON(needs) }}
+          CI_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: python3 -B scripts/ci_selection.py required
 
   regenerate:
