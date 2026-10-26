@@ -532,6 +532,21 @@ class HeadReconcileTests(unittest.TestCase):
             self.assertEqual(['base@tj-agents'], REFRESH.reconcile_claude(project))
         self.assertIn(['claude', 'plugin', 'install', 'base@tj-agents', '--scope', 'project'], calls)
 
+    def test_an_update_first_installs_dependencies_the_catalog_newly_declares(self):
+        project = self.home.project('core', 'settings.json', 'personal@tj-agents')
+        write(self.home.root / "market/.claude-plugin/marketplace.json", {"plugins": [
+            {"name": "personal", "dependencies": ["base", "agent"]},
+            {"name": "agent", "dependencies": ["base", "cli"]}, {"name": "cli"}, {"name": "base"}]})
+        fake = FakeClaude(self.home.installed(("personal@tj-agents", "project", project, CORE_HEAD),
+                                              ("base@tj-agents", "user", None, CORE_HEAD)))
+        with mock.patch.object(REFRESH, 'run', side_effect=fake):
+            REFRESH.apply_claude('claude', project, [], [('personal@tj-agents', 'project', project)])
+        self.assertEqual([command[2:6] for command, _ in fake.commands][:3], [
+            ['install', 'cli@tj-agents', '--scope', 'project'],
+            ['install', 'agent@tj-agents', '--scope', 'project'],
+            ['update', 'personal@tj-agents', '--scope', 'project']])
+        self.assertEqual({project}, {cwd for command, cwd in fake.commands if command[2] == 'install'})
+
     def test_missing_installation_that_does_not_persist_fails_refresh(self):
         project = self.home.project('new-project', 'settings.json', 'base@tj-agents')
         self.home.installed()
