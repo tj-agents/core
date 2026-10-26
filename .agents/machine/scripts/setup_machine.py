@@ -29,6 +29,7 @@ import host_permissions
 import required_plugins
 
 COMMAND_TIMEOUT_SECONDS = 60
+CHECKOUT_UPDATED = "TJ_AGENTS_SETUP_CHECKOUT_UPDATED"
 INSTALLER_TIMEOUT_SECONDS = 600
 HOSTS = ("claude", "codex")
 PROFILE_START = "# >>> tj-agents >>>"
@@ -820,17 +821,24 @@ def reexec_if_not_main_checkout(checkout: Path | None, running: Path, argv: list
 
 
 def fast_forward(checkout: Path, run: Callable = subprocess.run) -> bool:
+    environment = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never"}
+
     def git(*arguments: str) -> subprocess.CompletedProcess:
         return run(["git", "-C", str(checkout), *arguments], capture_output=True, text=True, encoding="utf-8",
-                   errors="replace", timeout=COMMAND_TIMEOUT_SECONDS, check=False)
+                   errors="replace", timeout=COMMAND_TIMEOUT_SECONDS, check=False, env=environment)
 
     try:
-        if git("rev-parse", "--verify", "--quiet", "@{u}").returncode or git("fetch", "--quiet").returncode:
+        if git("rev-parse", "--verify", "--quiet", "@{u}").returncode:
             return False
+        fetched = git("fetch", "--quiet")
+        if fetched.returncode:
+            raise subprocess.SubprocessError((fetched.stderr or fetched.stdout).strip() or "git fetch failed")
         if not git("merge-base", "--is-ancestor", "@{u}", "HEAD").returncode:
             return False
         merged = git("merge", "--ff-only", "--quiet", "@{u}")
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"warning: could not update the main checkout {checkout} ({error}); "
+              "setup runs on its current revision", file=sys.stderr)
         return False
     if merged.returncode:
         raise SetupError(f"the main checkout {checkout} is behind its upstream and cannot fast-forward: "
@@ -858,6 +866,16 @@ def main(argv: list[str] | None = None) -> int:
     arguments = list(argv if argv is not None else sys.argv[1:])
     running = Path(__file__).resolve()
     checkout = main_checkout(running.parent)
+    if checkout is not None and "--check" not in arguments and not os.environ.get(CHECKOUT_UPDATED):
+        try:
+            updated = fast_forward(checkout)
+        except SetupError as error:
+            print(f"failed checkout update: {error}", file=sys.stderr)
+            return 2
+        if updated:
+            print(f"updated the main checkout {checkout}; rerunning setup on the new revision", file=sys.stderr)
+            return subprocess.run([sys.executable, str(canonical_script(checkout)), *arguments],
+                                  env={**os.environ, CHECKOUT_UPDATED: "1"}, check=False).returncode
     delegated = reexec_if_not_main_checkout(checkout, running, arguments)
     if delegated is not None:
         return delegated
@@ -868,15 +886,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--step", action="append", choices=[step.name for step in STEPS],
                         help="run named steps with their dependencies and required preconditions; repeat to select several")
     parsed = parser.parse_args(arguments)
-    if not parsed.check and checkout is not None:
-        try:
-            current = not fast_forward(checkout)
-        except SetupError as error:
-            print(f"failed checkout update: {error}", file=sys.stderr)
-            return 1
-        if not current:
-            print(f"updated the main checkout {checkout}; rerunning setup on the new revision", file=sys.stderr)
-            return subprocess.run([sys.executable, str(canonical_script(checkout)), *arguments], check=False).returncode
     selected = set(parsed.step or ())
     if "shell profiles" in selected:
         selected.add("launch-check runtime")

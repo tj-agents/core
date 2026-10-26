@@ -172,13 +172,24 @@ def persistence_problems(expected: list[tuple[str, str, Path, str]], installatio
     return problems
 
 
+def dependency_identity(dependency: object, marketplace: str) -> str | None:
+    if isinstance(dependency, dict):
+        name, marketplace = dependency.get("name"), dependency.get("marketplace") or marketplace
+    else:
+        name = dependency
+    if not isinstance(name, str) or not name or not isinstance(marketplace, str):
+        return None
+    return name if "@" in name else f"{name}@{marketplace}"
+
+
 def catalog_dependencies() -> dict[str, list[str]]:
     result = {}
     for name, (_, location) in tj_agents_marketplaces().items():
         for entry in read_json(location / ".claude-plugin/marketplace.json").get("plugins", []):
             if isinstance(entry, dict) and isinstance(entry.get("name"), str):
-                result[f"{entry['name']}@{name}"] = [f"{plugin}@{name}" for plugin in entry.get("dependencies") or []
-                                                     if isinstance(plugin, str)]
+                result[f"{entry['name']}@{name}"] = [dependency_identity(dependency, name)
+                                                     for dependency in entry.get("dependencies") or []
+                                                     if dependency_identity(dependency, name)]
     return result
 
 
@@ -194,22 +205,31 @@ def missing_dependencies(identity: str, scope: str, owner: Path, dependencies: d
                 order.append(dependency)
     visit(identity)
     return [dependency for dependency in order if not any(
-        entry.get("id") == dependency and (entry.get("scope") == "user" or scope != "user" and applies(entry, owner))
+        entry.get("id") == dependency and (entry.get("scope") in {"user", "managed"}
+                                           or scope != "user" and applies(entry, owner))
         for entry in installations)]
 
 
-def install_dependencies(executable: str, updates: list[tuple[str, str, Path]]) -> None:
-    dependencies = catalog_dependencies()
-    for identity, scope, owner in updates:
-        for dependency in missing_dependencies(identity, scope, owner, dependencies, installed_entries()):
-            run([executable, "plugin", "install", dependency, "--scope", scope], owner)
+def dependency_installs(dependents: list[tuple[str, str, Path]]) -> list[tuple[str, str, Path]]:
+    dependencies, installations, installs = catalog_dependencies(), installed_entries(), []
+    for identity, scope, owner in dependents:
+        for dependency in missing_dependencies(identity, scope, owner, dependencies, installations):
+            install = (dependency, scope, owner)
+            if install not in installs:
+                installs.append(install)
+    return installs
+
+
+def install_dependencies(executable: str, dependents: list[tuple[str, str, Path]]) -> None:
+    for dependency, scope, owner in dependency_installs(dependents):
+        run([executable, "plugin", "install", dependency, "--scope", scope], owner)
 
 
 def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]],
-                 updates: list[tuple[str, str, Path]], starting=None) -> list[str]:
+                 updates: list[tuple[str, str, Path]], starting=None, dependents=None) -> list[str]:
     for identity, scope in installs:
         run([executable, "plugin", "install", identity, "--scope", scope], project)
-    install_dependencies(executable, updates)
+    install_dependencies(executable, updates if dependents is None else dependents)
     expected, updated = [], list(dict.fromkeys(identity for identity, _ in installs))
     for identity, scope, owner in updates:
         if starting is not None:
@@ -346,7 +366,7 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
     installations = installed_entries()
     contents = plugin_autoupdate.read_contents()
     publishers = catalog_publishers(tj_agents_marketplaces())
-    installs, updates, attempts = [], [], {}
+    installs, updates, present, attempts = [], [], [], {}
     for identity in plugins:
         plugin, name = identity.rsplit("@", 1)
         key, path = publishers.get(name, {}).get(plugin, (None, None))
@@ -358,6 +378,7 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
             entry = entry_for(installations, identity, scope, owner)
             if entry is None:
                 continue
+            present.append((identity, scope, owner))
             same = (plugin_autoupdate.same_content(contents, key.rsplit("@", 1)[0], path, entry.get("gitCommitSha"), head)
                     if head is not None else True)
             attempted = contents["attempts"].get(attempt_key(identity, scope, owner)) == head
@@ -365,7 +386,7 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
                 updates.append((identity, scope, owner))
                 if head is not None:
                     attempts[attempt_key(identity, scope, owner)] = head
-    if not installs and not updates:
+    if not installs and not updates and not dependency_installs(present):
         return []
     touched = {work[0].rsplit("@", 1)[1] for work in installs + updates}
     executable = agent_cli.resolve_claude_executable()
@@ -376,7 +397,7 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
             with contextlib.suppress(OSError):
                 plugin_autoupdate.record_contents(attempts={key: attempts[key]})
 
-    return apply_claude(executable, project, installs, updates, starting)
+    return apply_claude(executable, project, installs, updates, starting, present)
 
 
 def refresh_repositories(project: Path, repositories: set[str] | None, updated: set[str] | None = None,
