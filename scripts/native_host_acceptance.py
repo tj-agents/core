@@ -6,13 +6,10 @@ import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import importlib.util
 import json
-import math
 import os
 from pathlib import Path
 import queue
 import shutil
-import sqlite3
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -22,8 +19,9 @@ from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = ("base", "machine", "workflow", "engineering")
+PACKAGES = ("base", "workflow", "engineering")
 IDENTITIES = tuple(f"{package}@tj-agents" for package in PACKAGES)
+STARTUP_HOOKS = ("base@tj-agents",)
 
 
 class AcceptanceError(RuntimeError):
@@ -295,13 +293,13 @@ def require_startup_hooks(value, trusted=False, trusted_hashes=None):
         if hook.get("source") == "plugin" and hook.get("enabled") is True
     ]
     values = {hook.get("pluginId") for hook in hooks}
-    missing = {"base@tj-agents", "machine@tj-agents"} - values
+    missing = set(STARTUP_HOOKS) - values
     if missing:
         raise AcceptanceError(f"Codex hooks/list is missing required startup hooks for {', '.join(sorted(missing))}")
     if trusted:
         untrusted = [
             hook.get("key", "unknown") for hook in hooks
-            if hook.get("pluginId") in {"base@tj-agents", "machine@tj-agents"}
+            if hook.get("pluginId") in STARTUP_HOOKS
             and (
                 hook.get("trustStatus") != "trusted"
                 or hook.get("currentHash") != (trusted_hashes or {}).get(hook.get("key"), {}).get("trusted_hash")
@@ -344,7 +342,7 @@ def verify_installed_roots(value, trust, marketplace):
             if trust.package_files(installed) != trust.package_files(expected[identity]):
                 raise AcceptanceError(f"installed {identity} plugin differs from the candidate package")
             roots[identity] = SimpleNamespace(identity=identity, root=installed)
-    for identity in ("base@tj-agents", "machine@tj-agents"):
+    for identity in STARTUP_HOOKS:
         if identity not in roots:
             raise AcceptanceError(f"Codex hooks/list has no installed package root for {identity}")
     return list(roots.values())
@@ -472,57 +470,6 @@ def require_claude_discovery(response):
             raise AcceptanceError(f"Claude initialize response did not discover {name}")
 
 
-def is_descendant(process, root_pid, lookup):
-    seen = set()
-    current = process
-    while current is not None and current.pid not in seen:
-        if current.pid == root_pid:
-            return True
-        seen.add(current.pid)
-        current = lookup(getattr(current, "ppid", None))
-    return False
-
-
-def require_receipt(state, store, register, host, session_id, project, root_pid):
-    path = state / "cli-sessions" / f"{session_id}.json"
-    try:
-        receipt = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise AcceptanceError(f"missing or malformed {host} receipt") from error
-    required = ("host", "session_id", "cwd", "pid", "pid_started_at")
-    if any(key not in receipt for key in required):
-        raise AcceptanceError(f"{host} receipt is missing identity fields")
-    if receipt["host"] != host or receipt["session_id"] != session_id:
-        raise AcceptanceError(f"{host} receipt identity does not match startup")
-    if Path(receipt["cwd"]).resolve() != project.resolve():
-        raise AcceptanceError(f"{host} receipt cwd does not match fixture project")
-    if not isinstance(receipt["pid"], int) or receipt["pid"] <= 0:
-        raise AcceptanceError(f"{host} receipt pid is invalid")
-    if not isinstance(receipt["pid_started_at"], (int, float)) or not math.isfinite(receipt["pid_started_at"]):
-        raise AcceptanceError(f"{host} receipt start time is invalid")
-    lookup = register.build_process_lookup()
-    process = lookup(receipt["pid"])
-    if process is None or process.pid != receipt["pid"] or Path(process.name).stem.casefold() != host:
-        raise AcceptanceError(f"{host} receipt does not identify a live native process")
-    if abs(process.started_at - receipt["pid_started_at"]) > 2:
-        raise AcceptanceError(f"{host} receipt start time does not match its native process")
-    if not is_descendant(process, root_pid, lookup):
-        raise AcceptanceError(f"{host} receipt process is not descended from the accepted native host")
-    try:
-        connection = store.connect(state / "sessions.db")
-        try:
-            row = store.get_session(connection, f"{host}:{session_id}")
-        finally:
-            connection.close()
-    except sqlite3.Error as error:
-        raise AcceptanceError(f"{host} Agent Store is unavailable") from error
-    if not isinstance(row, dict):
-        raise AcceptanceError(f"{host} session is missing from Agent Store")
-    for key in required:
-        if row.get(key) != receipt[key]:
-            raise AcceptanceError(f"{host} Agent Store row does not match its receipt")
-
-
 def install_codex_plugins(executable, marketplace, project, environment, timeout):
     run_native(
         [*native_command(executable), "plugin", "marketplace", "add", str(marketplace), "--json"],
@@ -557,26 +504,9 @@ def install_claude_plugins(executable, marketplace, project, environment, timeou
     require_plugins(inventory)
 
 
-def receipt_ids(state, host):
-    directory = state / "cli-sessions"
-    if not directory.is_dir():
-        return set()
-    values = set()
-    for path in directory.glob("*.json"):
-        try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if value.get("host") == host and isinstance(value.get("session_id"), str):
-            values.add(value["session_id"])
-    return values
-
-
 def accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout):
     artifacts.mkdir(parents=True, exist_ok=True)
     debug = artifacts / "claude-debug.jsonl"
-    state = Path(environment["AGENT_STATE_DIRECTORY"])
-    before = receipt_ids(state, "claude")
     claude_environment = dict(environment)
     claude_environment["CLAUDE_CODE_ENTRYPOINT"] = "sdk-py"
     claude_environment.pop("CLAUDECODE", None)
@@ -596,8 +526,6 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
         errors = []
         start_line_reader(process.stdout, messages, parse_json=True, completion=completed)
         start_line_reader(process.stderr, errors)
-        store = load_module("native_acceptance_claude_store", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py")
-        register = load_module("native_acceptance_claude_register", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "utility" / "peer" / "scripts" / "register_session.py")
         deadline = time.monotonic() + timeout
         request_id = "native-acceptance-1"
         process.stdin.write(json.dumps({
@@ -631,30 +559,6 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
             if detail:
                 message = f"{message}: {detail}"
             raise AcceptanceError(message)
-        session_id = None
-        receipt_error = None
-        while time.monotonic() < deadline:
-            candidates = receipt_ids(state, "claude") - before
-            if len(candidates) == 1:
-                candidate = candidates.pop()
-                try:
-                    require_receipt(state, store, register, "claude", candidate, project, process.pid)
-                except AcceptanceError as error:
-                    receipt_error = error
-                else:
-                    session_id = candidate
-                    break
-            elif len(candidates) > 1:
-                raise AcceptanceError("Claude startup created multiple session receipts")
-            if process.poll() is not None:
-                break
-            time.sleep(0.05)
-        if session_id is None:
-            detail = diagnostic(errors) or str(receipt_error or "")
-            message = "Claude startup did not create a live session receipt"
-            if detail:
-                message = f"{message}: {detail}"
-            raise AcceptanceError(message)
         process.stdin.close()
         try:
             process.wait(timeout=max(0.01, deadline - time.monotonic()))
@@ -674,7 +578,6 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
             raise AcceptanceError("Claude debug artifact has no SessionStart marker")
         require_base_evidence(trace, marketplace / "plugins" / "base", "Claude debug artifact")
         require_observer(observer, 'confirmed')
-        return session_id
     finally:
         if process.poll() is None:
             terminate_owned(process)
@@ -688,8 +591,6 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
 def accept_codex(root, marketplace, executable, project, environment, artifacts, timeout):
     install_codex_plugins(executable, marketplace, project, environment, timeout)
     trust = load_module("native_acceptance_trust", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime" / "codex_hook_trust.py")
-    store = load_module("native_acceptance_store", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py")
-    register = load_module("native_acceptance_register", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "utility" / "peer" / "scripts" / "register_session.py")
     with AppServer(executable, project, environment, timeout) as server:
         hooks = server.request("hooks/list", {"cwds": [str(project)]})
         require_startup_hooks(hooks)
@@ -717,19 +618,14 @@ def accept_codex(root, marketplace, executable, project, environment, artifacts,
         finally:
             snapshot_transcript(transcript, artifacts)
             snapshot_diagnostic(artifacts, "codex-app-server.stderr.log", diagnostic(server.stderr))
-        require_receipt(
-            Path(environment["AGENT_STATE_DIRECTORY"]), store, register, "codex", session_id,
-            project, server.process.pid,
-        )
         skills = server.request("skills/list", {"cwds": [str(project)], "forceReload": True})
         require_discovery(skills, "Codex skills/list")
         require_observer(observer, 'confirmed')
-    return session_id
 
 
 def accept_claude(root, marketplace, executable, project, environment, artifacts, timeout):
     install_claude_plugins(executable, marketplace, project, environment, timeout)
-    return accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout)
+    accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout)
 
 
 @contextmanager
@@ -811,13 +707,6 @@ def isolated_environment(temporary_root, codex, claude, endpoint):
         AGENT_STATE_DIRECTORY=str(state),
         PATH=os.pathsep.join([*directories, inherited]) if inherited else os.pathsep.join(directories),
     )
-    sys.path.insert(0, str(ROOT / '.agents/machine/scripts'))
-    setup = load_module('native_acceptance_setup', ROOT / '.agents/machine/scripts/setup_machine.py')
-    context = setup.Context(home=home, checkout=None, environ=environment, windows=os.name == 'nt')
-    setup.apply_runtime(context)
-    if setup.check_runtime(context):
-        raise AcceptanceError('isolated setup runtime did not converge')
-    environment['PATH'] = os.pathsep.join([*directories, str(state / 'bin'), inherited])
     return environment
 
 
@@ -831,8 +720,8 @@ def accept(root, marketplace, codex, claude, artifacts, timeout):
         temporary_root = Path(temporary)
         environment = isolated_environment(temporary_root, codex, claude, endpoint)
         project = write_fixture(temporary_root / "fixture", environment)
-        codex_session = accept_codex(root, marketplace, codex, project, environment, artifacts, timeout)
-        claude_session = accept_claude(root, marketplace, claude, project, environment, artifacts, timeout)
+        accept_codex(root, marketplace, codex, project, environment, artifacts, timeout)
+        accept_claude(root, marketplace, claude, project, environment, artifacts, timeout)
         failed_marketplace = failure_marketplace(root, temporary_root / 'failure-marketplace')
         failures = {}
         for host, executable, operation in (('codex', codex, accept_codex), ('claude', claude, accept_claude)):
@@ -842,8 +731,7 @@ def accept(root, marketplace, codex, claude, artifacts, timeout):
             evidence = artifacts / ('failure-' + host)
             failures[host] = require_failure_probe(host, evidence, lambda: operation(
                 root, failed_marketplace, executable, probe_project, probe_environment, evidence, timeout))
-    return {"claude_session": claude_session, "codex_session": codex_session,
-            "plugins": list(IDENTITIES), 'required_hook_failure_probes': failures}
+    return {"plugins": list(IDENTITIES), 'required_hook_failure_probes': failures}
 
 
 def failure_marketplace(root, directory):

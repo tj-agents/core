@@ -32,5 +32,5 @@ Report the rows as printed, newest first. Keep out-of-scope and text-only matche
 caller selected `all`. Blank state means the plan has no explicit checkbox or completion state. A selected
 repository's plans show `supporting`: they are design and recovery context, never its live queue. Report
 `skipped` repositories whose selection could not be read; an invalid selection in the current repository
-stops the script. Recorded execution state does not establish native process liveness; request Machine
+stops the script. Recorded execution state does not establish native process liveness; request Agent
 observation separately when that is needed.

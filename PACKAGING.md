@@ -23,11 +23,11 @@ one authored owner and are covered by each package fingerprint. Runtime referenc
 another plugin or depend on the author checkout.
 
 ```json
-{"plugin":"machine","source":".agents/dependencies/agent/.agents/agent-store/runtime","destination":".agents/agent-store/runtime"}
+{"plugin":"workflow","source":".agents/dependencies/agent/.agents/agent-store/runtime","destination":".agents/agent-store/runtime"}
 ```
 
-Machine loads this embedded store implementation from its own package. Agent Store owns the source,
-schema and transaction contract; Machine owns its native observations and lifecycle adapters.
+Workflow loads this embedded store implementation from its own package. Agent Store owns the source,
+schema and transaction contract.
 
 Resolve shipped files relative to the installed skill or package. Scripts use `$PSScriptRoot`, their own
 file location, or an explicit package-root input. Instructions use `<skill-directory>`. They do not resolve
@@ -38,9 +38,7 @@ A genuine external prerequisite, such as a host CLI or operating-system feature,
 missing prerequisite must fail clearly. It is not replaced with an invented policy or silently ignored.
 
 Package verification uses `sha256-tree-v1`: hash each sorted forward-slash package-relative path, NUL, byte
-length, NUL and file bytes. Reject symlinks. Digest exclusions must be declared per catalog entry and kept
-narrow. The machine package excludes only `catalog/catalog.json`, because that file contains the machine
-package's digest; schemas, scripts and the rest of the embedded catalog remain covered. The generated
+length, NUL and file bytes. Reject symlinks. The generated
 publication fingerprint identifies the authored rolling-main inputs while catalog digests are refreshed.
 
 ## Why

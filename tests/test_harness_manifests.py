@@ -51,7 +51,7 @@ foreach ($document in $documents) {{
 class HarnessManifestTests(unittest.TestCase):
     def test_core_manifests_are_current_and_catalog_is_core_only(self):
         manifests = HARNESS.synchronize(ROOT, check=True)
-        self.assertEqual({"base", "engineering", "machine", "workflow"}, set(manifests))
+        self.assertEqual({"base", "engineering", "workflow"}, set(manifests))
         catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
         self.assertEqual({"tj-agents/core"}, {package["owner_repository"] for package in catalog["packages"]})
         for package in catalog["packages"]:
@@ -61,17 +61,17 @@ class HarnessManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             shutil.copytree(ROOT / ".agents", root / ".agents")
-            path = root / ".agents/plugins/harness/machine.json"
+            path = root / ".agents/plugins/harness/workflow.json"
             original = json.loads(path.read_text(encoding="utf-8"))
             HARNESS.synchronize(root, check=True)
             for roots in (
                 [".agents/catalog/catalog.schema.json"],
-                [".agents/machine", ".agents/catalog/catalog.schema.json"],
-                [".agents/machine", ".agents/machine"],
-                [".agents/lanes", ".agents/machine", ".agents/workflows"],
-                [".agents/catalog/missing.json", ".agents/machine"],
-                [".agents/catalog/../catalog/catalog.schema.json", ".agents/machine"],
-                ["../outside", ".agents/machine"],
+                [".agents/workflow", ".agents/catalog/catalog.schema.json"],
+                [".agents/workflow", ".agents/workflow"],
+                [".agents/lanes", ".agents/workflow", ".agents/workflows"],
+                [".agents/catalog/missing.json", ".agents/workflow"],
+                [".agents/catalog/../catalog/catalog.schema.json", ".agents/workflow"],
+                ["../outside", ".agents/workflow"],
             ):
                 with self.subTest(roots=roots):
                     manifest = {**original, "source_roots": roots}
@@ -108,20 +108,6 @@ class HarnessManifestTests(unittest.TestCase):
                 [{"path": "hooks/start.py", "hosts": ["claude"]}],
                 HARNESS.expected_hooks(root, config, "base"),
             )
-
-    def test_wildcard_script_paths_in_claude_permissions_are_rejected(self):
-        catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
-        config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
-        original = json.loads((ROOT / ".agents/plugins/harness/machine.json").read_text(encoding="utf-8"))["requires"]
-        for command in (
-            r"PowerShell(& *\handoff-codex\scripts\launch-codex.ps1 *)",
-            r"PowerShell(& *\.claude\plugins\cache\tj-agents\machine\*\handoff-codex\scripts\launch-codex.ps1 *)",
-        ):
-            with self.subTest(command=command):
-                requires = json.loads(json.dumps(original))
-                requires["permissions"]["claude_allow"] = [command]
-                with self.assertRaisesRegex(ValueError, "wildcard script path"):
-                    HARNESS.validate_requires(ROOT, config, catalog, "machine", requires)
 
     def test_foreign_marketplace_owner_is_rejected(self):
         catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
