@@ -378,9 +378,10 @@ feature and non-model configuration overrides that cannot be verified. Persist t
 repository configuration instead. Model and reasoning overrides remain available; help, version and
 native maintenance commands remain available to repair an installation.
 
-For example, selecting `example@tj-agents` while it is absent from Codex's inventory prevents a
-Codex launch and file writes even if its `tier.json` and routes are entirely missing. Repair the
-selection through `agent:refresh-plugins`; copying a Claude cache directory does not satisfy admission.
+For example, an enabled `example@tj-agents` missing from Codex's inventory prevents file writes even
+if its `tier.json` and routes are entirely missing. Launch or `agent:refresh-plugins` repairs the missing
+installation. A declaration that disagrees with native enabled settings requires `agent:plugins` to
+reconcile repository selection; refresh does not enable undeclared or disabled plugins.
 Launch and `agent:refresh-plugins` share required-plugin installation and native readback. A failed running-session
 hook directs the agent to invoke that skill and adopt the result in the same conversation before retrying.
 Tommy does not need to restart the client or run a repair command.
