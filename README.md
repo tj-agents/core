@@ -384,8 +384,11 @@ both hosts update in parallel, and the cursor advances once both succeed. A fail
 launch; a cursor older than ntfy's retention compares every publisher instead. Every launch except `codex` then compares
 this project's Claude installs with the recorded heads from local files only, and updates an install only
 when its plugin directory differs at the head; each install is tried at most once per head, so a failure waits
-for the next head. A project install is skipped when a nested worktree's install below it is listed first,
-because Claude's CLI then updates the nested one. Codex re-adds a plugin only when its directory changed. Without GitHub content, both compare commits.
+for the next head. Claude uses the first installation for the same Git repository at each scope, including
+linked worktrees. Refresh, installed-byte verification, admission and restart detection use that same
+registration; an update that fails to persist there remains a failure. Separate clones are separate
+repositories even when their remotes match. Codex re-adds a plugin only when its directory changed.
+Without GitHub content, both compare commits.
 `machine:sync-plugins` runs the same check in a running session.
 
 Main-branch callers publish events through the shared
