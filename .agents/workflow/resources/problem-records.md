@@ -1,7 +1,6 @@
 # Work and problem records
 
-Core owns reusable agent execution. Machine attaches verified native/session references through the
-canonical Agent Store. The selected profile owns remote work-item content, native types, tracker operations
+Agent attaches verified native/session references through the canonical Agent Store. The selected profile owns remote work-item content, native types, tracker operations
 and record policy. Core never installs or selects a profile on a repository's behalf.
 
 ## Repository selection
@@ -42,7 +41,7 @@ or concrete task. The profile maps that intent to its actual tracker types; Core
 remote schema. Recording never starts implementation. An explicit addressing request reuses the item's
 existing repair, feature or plan owner and the applicable engineering lifecycle.
 
-A read returns persisted details without creating an agent execution. When work begins, use Machine's
+A read returns persisted details without creating an agent execution. When work begins, use Agent's
 shared session registry to associate the profile-verified qualified external reference with the existing
 execution and its agent sessions. Keep ownership, execution status and resume IDs in the original SQLite
 store; keep backlog content and acceptance evidence in the profile's remote tracker.

@@ -1,7 +1,6 @@
 {
   "fresh_selection": [
     "base@tj-agents",
-    "machine@tj-agents",
     "workflow@tj-agents",
     "engineering@tj-agents"
   ],
