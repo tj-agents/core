@@ -271,6 +271,8 @@ class HookDispatchTests(unittest.TestCase):
         self.assertIn("context from Bash", specific["additionalContext"])
         self.assertIn("hang.py did not finish within 2s", specific["additionalContext"])
         self.assertIn("these gates did not run: ask.py", output["systemMessage"])
+        self.assertIn("agent:refresh-plugins", specific["additionalContext"])
+        self.assertIn("This tool call was NOT run", output["systemMessage"])
 
     def test_silent_gates_produce_no_output(self):
         output, stderr = self.dispatch(["--hook", "rebind.py"])
