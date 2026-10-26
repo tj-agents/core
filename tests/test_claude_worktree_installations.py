@@ -126,6 +126,10 @@ class ClaudeWorktreeInstallations(unittest.TestCase):
             with self.assertRaises(required_plugins.RequiredPluginsError):
                 required_plugins.enabled_roots('claude', dangling, rows)
 
+    def test_empty_inventory_does_not_hide_missing_plugins_behind_a_git_error(self):
+        with mock.patch.object(required_plugins, 'git_common_directory', side_effect=AssertionError('unneeded Git query')):
+            self.assertEqual({}, required_plugins.enabled_roots('claude', self.nested, []))
+
     def test_package_verification_ignores_only_shadowed_same_repository_rows(self):
         self.rows = [self.entry(self.primary, 'new'), self.entry(self.nested)]
         catalog = self.root / 'catalog'
