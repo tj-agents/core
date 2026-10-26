@@ -77,6 +77,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
 from hook_runtime import claim_invocation, own_payload_root
@@ -99,6 +100,9 @@ SHIPPED_ROUTES_DIR = Path(__file__).resolve().parent.parent / "routes"
 REGISTRY_FILE = "registry.json"
 TIER_SKILL_DIRS = []
 VERIFIED_PLUGIN_ROOTS = {}
+HOOK_TIMEOUT_SECONDS = 22
+HOOK_PHASE = "required plugin admission"
+HOOK_TIMER = None
 SUBAGENT_ID = re.compile(r"[A-Za-z0-9_-]+")
 GIT_BASH_DRIVE = re.compile(r"^/([A-Za-z])/(.*)$")
 REMOTE_URL = re.compile(r'\[remote "origin"\][^\[]*?\burl\s*=\s*([^\r\n]+)', re.DOTALL)
@@ -1392,6 +1396,7 @@ def verify_install(argv):
 
 
 def main():
+    global HOOK_PHASE, HOOK_TIMER
     if DIFF_FLAG in sys.argv[1:]:
         sys.exit(check_diff(sys.argv[1:]))
     if QUERY_FLAG in sys.argv[1:]:
@@ -1446,6 +1451,17 @@ def main():
     ]
     if not relative_targets:
         sys.exit(0)
+    def timed_out():
+        sys.stderr.write(
+            f"SKILL ROUTER - {HOOK_PHASE} exceeded {HOOK_TIMEOUT_SECONDS} seconds. "
+            "This tool call was NOT run. Invoke agent:refresh-plugins to complete automatic recovery, then retry.\n"
+        )
+        sys.stderr.flush()
+        os._exit(2)
+
+    HOOK_TIMER = threading.Timer(HOOK_TIMEOUT_SECONDS, timed_out)
+    HOOK_TIMER.daemon = True
+    HOOK_TIMER.start()
     try:
         verified = required_plugins.check(root, harness)
     except required_plugins.RequiredPluginsError as error:
@@ -1453,6 +1469,7 @@ def main():
         sys.exit(2)
     if verified is not None:
         VERIFIED_PLUGIN_ROOTS[harness] = tuple(verified.values())
+    HOOK_PHASE = "standards discovery"
     try:
         routes = load_routes(root)
     except RoutesUnusable as error:
@@ -1478,8 +1495,8 @@ def main():
         sys.stderr.write(
             "SKILL ROUTER - blocked, this repository requires unavailable standards:\n\n"
             + "\n".join(f"  {name}" for name in missing_install)
-            + f"\n\nInstall or enable the owning plugin(s) for {harness}, then start a new "
-            "session. This tool call was NOT run.\n"
+            + f"\n\nInvoke agent:refresh-plugins for {harness} to repair and adopt the required plugins, then retry. "
+            "This tool call was NOT run.\n"
         )
         sys.exit(2)
     if not targets:
@@ -1652,8 +1669,8 @@ def main():
                     "      REJECTED THIS SESSION - its file is present, but invoking it returned an "
                     "error (e.g. `Unknown skill`), so this session's own registry does not resolve it "
                     "- typically a plugin enabled or updated after the session started, which does not "
-                    "hot-reload. Restart the session (exit and relaunch); if it still fails afterward, "
-                    "this is a genuine bug, report it. Do not read the standard's file directly and "
+                    "hot-reload. Invoke agent:refresh-plugins to adopt the plugin in this same conversation, "
+                    "then retry. Do not read the standard's file directly and "
                     "code from precedent as a substitute for actually invoking it."
                     if harness != "codex" else
                     "      REJECTED THIS SESSION - the read of its file did not succeed. Re-run it and "
@@ -1670,7 +1687,7 @@ def main():
     if missing:
         lines += [
             "",
-            f"Install or enable the missing skill(s) for {harness}, then start a new session. The file "
+            f"Invoke agent:refresh-plugins for {harness} to repair and adopt the missing skill(s). The file "
             "was NOT written. This route remains blocked on every attempt until every owning skill "
             "is available.",
         ]
@@ -1707,3 +1724,6 @@ if __name__ == "__main__":
     except NativePluginDiscoveryError as error:
         discovery_diagnostic(error)
         sys.exit(2)
+    finally:
+        if HOOK_TIMER is not None:
+            HOOK_TIMER.cancel()
