@@ -553,9 +553,8 @@ class HeadReconcileTests(unittest.TestCase):
             {"name": "personal", "dependencies": ["agent", "service@other"]}, {"name": "agent"}]})
         fake = FakeClaude(self.home.installed(("personal@tj-agents", "project", project, CORE_HEAD)))
         with mock.patch.object(REFRESH, 'run', side_effect=fake):
-            REFRESH.reconcile_claude(project)
-        self.assertEqual([['install', 'agent@tj-agents', '--scope', 'project'],
-                          ['install', 'service@other', '--scope', 'project']],
+            self.assertEqual(['agent@tj-agents'], REFRESH.reconcile_claude(project))
+        self.assertEqual([['install', 'agent@tj-agents', '--scope', 'project']],
                          [command[2:6] for command, _ in fake.commands if command[2] == 'install'])
 
     def test_a_dependency_from_another_marketplace_keeps_its_own_identity(self):

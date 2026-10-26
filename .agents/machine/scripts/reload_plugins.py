@@ -187,9 +187,8 @@ def catalog_dependencies() -> dict[str, list[str]]:
     for name, (_, location) in tj_agents_marketplaces().items():
         for entry in read_json(location / ".claude-plugin/marketplace.json").get("plugins", []):
             if isinstance(entry, dict) and isinstance(entry.get("name"), str):
-                result[f"{entry['name']}@{name}"] = [dependency_identity(dependency, name)
-                                                     for dependency in entry.get("dependencies") or []
-                                                     if dependency_identity(dependency, name)]
+                result[f"{entry['name']}@{name}"] = [identity for dependency in entry.get("dependencies") or []
+                                                     if (identity := dependency_identity(dependency, name))]
     return result
 
 
@@ -212,25 +211,24 @@ def missing_dependencies(identity: str, scope: str, owner: Path, dependencies: d
 
 def dependency_installs(dependents: list[tuple[str, str, Path]]) -> list[tuple[str, str, Path]]:
     dependencies, installations, installs = catalog_dependencies(), installed_entries(), []
+    registered = read_json(configuration_root("claude") / "plugins/known_marketplaces.json").keys()
     for identity, scope, owner in dependents:
         for dependency in missing_dependencies(identity, scope, owner, dependencies, installations):
             install = (dependency, scope, owner)
-            if install not in installs:
+            if dependency.rsplit("@", 1)[1] in registered and install not in installs:
                 installs.append(install)
     return installs
 
 
-def install_dependencies(executable: str, dependents: list[tuple[str, str, Path]]) -> None:
-    for dependency, scope, owner in dependency_installs(dependents):
-        run([executable, "plugin", "install", dependency, "--scope", scope], owner)
-
-
 def apply_claude(executable: str, project: Path, installs: list[tuple[str, str]],
-                 updates: list[tuple[str, str, Path]], starting=None, dependents=None) -> list[str]:
+                 updates: list[tuple[str, str, Path]], starting=None, dependencies=None) -> list[str]:
     for identity, scope in installs:
         run([executable, "plugin", "install", identity, "--scope", scope], project)
-    install_dependencies(executable, updates if dependents is None else dependents)
-    expected, updated = [], list(dict.fromkeys(identity for identity, _ in installs))
+    dependencies = dependency_installs(updates) if dependencies is None else dependencies
+    for dependency, scope, owner in dependencies:
+        run([executable, "plugin", "install", dependency, "--scope", scope], owner)
+    expected, updated = [], list(dict.fromkeys([identity for identity, _ in installs]
+                                               + [dependency for dependency, _, _ in dependencies]))
     for identity, scope, owner in updates:
         if starting is not None:
             starting(identity, scope, owner)
@@ -386,9 +384,10 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
                 updates.append((identity, scope, owner))
                 if head is not None:
                     attempts[attempt_key(identity, scope, owner)] = head
-    if not installs and not updates and not dependency_installs(present):
+    dependencies = dependency_installs(present)
+    if not installs and not updates and not dependencies:
         return []
-    touched = {work[0].rsplit("@", 1)[1] for work in installs + updates}
+    touched = {work[0].rsplit("@", 1)[1] for work in installs + updates + dependencies}
     executable = agent_cli.resolve_claude_executable()
     refresh_marketplaces("claude", executable, project,
                          {name: repo for name, repo in marketplaces.items() if name in touched - fresh})
@@ -397,7 +396,7 @@ def reconcile_claude(project: Path, event: bool = False, repositories: set[str] 
             with contextlib.suppress(OSError):
                 plugin_autoupdate.record_contents(attempts={key: attempts[key]})
 
-    return apply_claude(executable, project, installs, updates, starting, present)
+    return apply_claude(executable, project, installs, updates, starting, dependencies)
 
 
 def refresh_repositories(project: Path, repositories: set[str] | None, updated: set[str] | None = None,
