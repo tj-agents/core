@@ -334,6 +334,10 @@ class SessionLog:
     minimum_size: int = field(init=False)
     _resolved_path: PurePath = field(init=False, repr=False)
 
+    @classmethod
+    def create(cls, path, profile):
+        return cls(Path(path), Path(profile))
+
     def __post_init__(self):
         sessions = _comparable_path(self.profile.resolve() / 'sessions')
         resolved = _comparable_path(self.path.resolve(strict=True))
@@ -380,7 +384,7 @@ class NativeCompletion:
                 'native_rollout', 'profile', 'native_turn_id', 'client_message_id', 'session_id', 'recording_path')):
             raise RuntimeError('Native completion requires an exact frontend, profile and turn binding')
         self.entry = entry
-        self.log = SessionLog(Path(entry['native_rollout']), Path(entry['profile']))
+        self.log = SessionLog.create(entry['native_rollout'], entry['profile'])
         if expected is not None:
             self.log.require_pin(expected)
         self.offset = 0
