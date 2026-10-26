@@ -129,11 +129,15 @@ def select(root, event, payload):
         return plan("full", "non-PR event")
     try:
         base = payload["pull_request"]["base"]["sha"]
+        head = payload["pull_request"].get("head", {}).get("sha", "HEAD")
         if not isinstance(base, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", base):
             raise ValueError("invalid base SHA")
-        raw_paths = git_output(root, "diff", "--name-only", "--no-renames", "-z", base, "HEAD")
+        if head != "HEAD" and (not isinstance(head, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", head)):
+            raise ValueError("invalid head SHA")
+        change = f"{base}...{head}"
+        raw_paths = git_output(root, "diff", "--name-only", "--no-renames", "-z", change)
         paths = raw_paths.decode("utf-8").rstrip("\0").split("\0") if raw_paths else []
-        stats = git_output(root, "diff", "--numstat", "--no-renames", "-z", base, "HEAD")
+        stats = git_output(root, "diff", "--numstat", "--no-renames", "-z", change)
         lines = 0
         binary = False
         for entry in stats.split(b"\0"):
@@ -177,9 +181,12 @@ def required_results(value, needs, event):
     }
     expected.update({name: "skipped" if value["mode"] == "docs" else "success"
                      for name in ("verify-windows", "verify-linux")})
+    if event == "pull_request" and value["mode"] != "docs":
+        expected["verify-windows"] = ("success", "skipped")
     for name, result in expected.items():
-        if not isinstance(needs.get(name), dict) or needs[name].get("result") != result:
-            raise ValueError(f"{name} must finish as {result}")
+        allowed = result if isinstance(result, tuple) else (result,)
+        if not isinstance(needs.get(name), dict) or needs[name].get("result") not in allowed:
+            raise ValueError(f"{name} must finish as {' or '.join(allowed)}")
 
 
 def run_tests(root, value, group):

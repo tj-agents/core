@@ -65,7 +65,9 @@ jobs:
 
   verify-windows:
     needs: select
-    if: needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
+    if: >-
+      needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
+      && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: windows-latest
     env:
       CI_SELECTION: ${{ needs.select.outputs.plan }}
@@ -271,6 +273,8 @@ jobs:
     concurrency:
       group: regenerate-main
       cancel-in-progress: false
+    outputs:
+      changed: ${{ steps.publish-packages.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -316,8 +320,32 @@ jobs:
             "Generated output already current."
           }
 
-      - name: Publish the generated package hint
-        if: steps.publish-packages.outputs.changed == 'true' && vars.MACHINE_EVENTS_TOPIC != ''
+  release:
+    needs: [ci-required, regenerate]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && needs.ci-required.result == 'success' && needs.regenerate.result == 'success'
+      && needs.regenerate.outputs.changed != 'true'
+    runs-on: ubuntu-latest
+    environment: regenerate
+    permissions:
+      contents: write
+    concurrency:
+      group: release-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          ssh-key: ${{ secrets.REGENERATE_DEPLOY_KEY }}
+
+      - name: advance release to the verified commit
+        id: advance
+        run: python3 -B scripts/advance_release.py --sha "${{ github.sha }}"
+
+      - name: Publish the release hint
+        if: steps.advance.outputs.outcome == 'advanced' && vars.MACHINE_EVENTS_TOPIC != ''
         uses: tj-agents/github-actions/.github/actions/machine-events@d45d8a70dc1309ca02d304c8e3c58e493c263f89
         with:
           topic: ${{ secrets.MACHINE_EVENTS_TOPIC }}

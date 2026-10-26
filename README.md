@@ -272,16 +272,22 @@ python -B scripts/update_catalog_digests.py
 pwsh .agents/sync-generated.ps1
 ```
 
-PR CI uses `scripts/ci_selection.py` (Python 3.9+) to classify the complete base-to-merge change.
-Inert prose runs the documentation reachability check. Changes to mapped problem-record, plugin-adoption,
-lock-bump, machine-verification and handoff-transfer code run their regression modules on Windows and
-Linux, with generation and packaging checks. Changed test modules include their import consumers.
-Unknown paths, shared infrastructure, executable guidance, binary changes, unresolved ranges and broad
-changes retain the full matrix. Main always runs the full matrix. Add the `ci:full` PR label to request
-full coverage; adding or removing a label reevaluates selection.
+PR CI uses `scripts/ci_selection.py` (Python 3.9+) to classify the pull request's own change from its
+merge base. Inert prose runs the documentation reachability check. Changes to mapped problem-record,
+plugin-adoption, lock-bump, machine-verification and handoff-transfer code run their regression modules,
+with generation and packaging checks. Changed test modules include their import consumers. Unknown paths,
+shared infrastructure, executable guidance, binary changes, unresolved ranges and broad changes run the
+full suite. Pull requests verify on Linux; main always runs the full Windows and Linux matrix. Add the
+`ci:full` PR label to request full coverage including Windows; adding or removing a label reevaluates
+selection.
+
+Machines install Core's plugins from the `release` branch, never from main. After a main commit's full
+matrix passes and its generated packages are already current, the `release` job fast-forwards `release`
+to it with `scripts/advance_release.py` and publishes the machine update hint. A red main therefore never
+reaches an installed machine.
 
 `ci-required` runs after selection, the generated-path guard and both platform jobs. It fails if
-classification or any selected job fails, disappears, is cancelled or skips. Configure branch protection
+classification or any selected job fails, disappears or is cancelled, or skips where it must run. Configure branch protection
 to require this check when enabling server-side enforcement. Existing all-checks merge validation also
 consumes its result. Selection never cancels a prior run or transfers a previous head's test success.
 
