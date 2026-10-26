@@ -80,7 +80,7 @@ scheduler does not establish goal completion or a whole-goal blocker.
 
 ## Listen for the next result
 
-Use `agent:background-listener` for this conversation's deferred result and completion notification.
+Use `agent:listen` for this conversation's deferred result and completion notification.
 It owns generic background execution, the host callback and existing desktop alerts. The scheduled
 continuation below owns durable work separately. Keep the exact delivery identity from this workflow.
 
@@ -90,7 +90,7 @@ reconnects. That signal grants no review or merge approval. On a wake, route the
 `persistent-delivery` and report the next gate through `engineering:open-pr`.
 
 ```text
-Pending CI: give its exact-head monitor command to agent:background-listener.
+Pending CI: give its exact-head monitor command to agent:listen.
 Completion: route the returned bound result, report the PR's next gate and continue the same goal.
 ```
 

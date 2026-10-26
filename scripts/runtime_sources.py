@@ -132,7 +132,8 @@ def stage(root: Path, overrides: dict[str, Path], check: bool = False) -> list[d
                 revision = git("-C", str(checkout), "rev-parse", "HEAD")
             contents = export_contents(checkout, source["exports"])
             receipt = {"repository": source["repository"], "revision": revision,
-                       "exports": source["exports"], "sha256": digest(contents)}
+                       "exports": source["exports"], "sha256": digest(contents),
+                       "files": {name: hashlib.sha256(body).hexdigest() for name, body in contents.items()}}
             destination.mkdir(parents=True, exist_ok=True)
             previous = files(destination)
             expected = {**contents, "source.json": (json.dumps(receipt, indent=2) + "\n").encode("utf-8")}

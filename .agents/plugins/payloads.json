@@ -3,9 +3,6 @@
     "base": [
       "behavior"
     ],
-    "agent-store": [
-      "process"
-    ],
     "machine": [
       "machine"
     ],
@@ -13,12 +10,6 @@
       "process"
     ],
     "engineering": [
-      "process"
-    ],
-    "cli": [
-      "cli"
-    ],
-    "agent": [
       "process"
     ]
   }

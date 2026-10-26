@@ -15,7 +15,7 @@ SPEC.loader.exec_module(updater)
 class CatalogUpdateTests(unittest.TestCase):
     def test_harness_change_converges_without_a_manual_catalog_edit(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             for name in (".agents", ".codex", ".claude"):
                 shutil.copytree(ROOT / name, root / name,
                                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "continuation"))

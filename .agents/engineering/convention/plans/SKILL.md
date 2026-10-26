@@ -354,7 +354,7 @@ action that removes it, and the evidence that makes resumption valid.
 
 Conversely, when a turn deliberately transfers an **actionable, non-terminal** plan owned by the current
 worktree to another context, it must end with the exact continuation pointer whose shape is
-the `handoff` skill's. Actionable `## Next Steps`, local implementation completion, or a phase boundary
+the `workflow:handoff` skill's. Actionable `## Next Steps`, local implementation completion, or a phase boundary
 alone does not require that transfer; the context-transfer decision is owned by
 [End of a phase — leave it compaction/clear-safe](#end-of-a-phase--leave-it-compactionclear-safe).
 

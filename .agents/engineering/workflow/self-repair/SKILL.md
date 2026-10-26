@@ -47,7 +47,7 @@ instruction needs no source edit.
 
 ## Preserve ownership and recording decisions
 
-Before changing a shared lifecycle, use `machine:recover-agents` to check for a verified live owner of the
+Before changing a shared lifecycle, use `agent:recover` to check for a verified live owner of the
 same repair. Reconcile that owner and contribute the evidence without creating a duplicate writer.
 Keep the original task's owner and writer lease.
 

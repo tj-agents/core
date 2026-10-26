@@ -13,6 +13,7 @@ import argparse
 import codecs
 from dataclasses import dataclass, field
 import importlib.util
+import json
 import os
 from pathlib import Path
 import secrets
@@ -21,6 +22,15 @@ import shutil
 import subprocess
 import sys
 from typing import Callable
+
+ROOT = Path(__file__).resolve().parents[3]
+for candidate in (
+    ROOT / ".agents" / "agent" / "runtime",
+    ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime",
+):
+    if candidate.is_dir():
+        sys.path.insert(0, str(candidate))
+        break
 
 import launch_check
 import plugin_autoupdate
@@ -242,7 +252,8 @@ def posix_block(python: str, script: Path) -> str:
     def quoted(value: object) -> str:
         return "'" + str(value).replace("'", "'\\''") + "'"
 
-    return "\n".join([PROFILE_START, f'export PATH={quoted(script.parent)}:"$PATH"', *(
+    runtime_bin = script.parents[3] if len(script.parents) > 3 else script.parent
+    return "\n".join([PROFILE_START, f'export PATH={quoted(runtime_bin)}:"$PATH"', *(
         f'{name}() {{ [ -x {quoted(python)} ] || {{ printf "%s\\n" "Standards verifier Python is unavailable" >&2; return 1; }}; '
         f'{launch_check.HOST_VARIABLE}={name} {quoted(python)} -I -B {quoted(script)} --host {name} --project "$PWD" --target "$(command -v {name})" --require-session-start -- "$@"; }}'
         for name in HOSTS), PROFILE_END])
@@ -307,7 +318,7 @@ def profile_loader(context: Context) -> Path | None:
 
 
 def launch_script(context: Context) -> Path:
-    return context.state_directory / "bin" / "startup_binding.py"
+    return context.state_directory / "bin" / ".agents" / "agent" / "runtime" / "startup_binding.py"
 
 
 def profile_updates(context: Context) -> tuple[list[tuple[Path, str, str, bool]], list[str]]:
@@ -481,10 +492,15 @@ def apply_codex_agents(context: Context) -> list[str]:
 
 
 def permission_sync(context: Context):
-    directory = context.script_directory.parent / "utility" / "plugin-selection" / "scripts"
+    root = context.script_directory.parents[2]
+    directories = (
+        root / ".agents" / "agent" / "utility" / "plugins" / "scripts",
+        root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "utility" / "plugins" / "scripts",
+    )
+    directory = next((candidate for candidate in directories if (candidate / "harness_permissions_sync.py").is_file()), None)
+    if directory is None:
+        raise SetupError("the packaged Agent harness_permissions_sync.py is unavailable")
     path = directory / "harness_permissions_sync.py"
-    if not path.is_file():
-        raise SetupError("harness_permissions_sync.py is not available beside setup_machine.py")
     if str(directory) not in sys.path:
         sys.path.insert(0, str(directory))
     spec = importlib.util.spec_from_file_location("tj_agents_harness_permissions_sync", path)
@@ -614,45 +630,152 @@ def apply_autoupdate(context: Context) -> list[str]:
     return [f"Claude marketplace now auto-updates: {name}" for name in enable_claude_autoupdate(context.claude_home)]
 
 
-def install_runtime(directory: Path, source: Path = Path(__file__).resolve().parent) -> Path:
-    directory.mkdir(parents=True, exist_ok=True)
-    for name in plugin_autoupdate.RUNTIME:
-        target = directory / name
-        temporary = target.with_suffix(".next")
-        shutil.copyfile(plugin_autoupdate.runtime_file(source, name), temporary)
-        os.replace(temporary, target)
-    return directory / "launch_check.py"
-
-
 def runtime_source(context: Context) -> Path:
-    return context.script_directory
+    return context.script_directory.parents[2] / ".agents" / "dependencies" / "agent"
+
+
+def runtime_delivery(source: Path):
+    path = source / ".agents" / "agent" / "runtime" / "runtime_delivery.py"
+    spec = importlib.util.spec_from_file_location("tj_agents_runtime_delivery", path)
+    if spec is None or spec.loader is None:
+        raise SetupError(f"the staged Agent runtime delivery helper is unavailable: {path}")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except (OSError, ImportError) as error:
+        raise SetupError(f"the staged Agent runtime delivery helper is unavailable: {path}") from error
+    return module
+
+
+def runtime_manifest(source: Path) -> dict:
+    receipt = source / "source.json"
+    try:
+        value = json.loads(receipt.read_text(encoding="utf-8"))
+        return runtime_delivery(source).validate_receipt(value, source)
+    except (OSError, ValueError, RuntimeError) as error:
+        raise SetupError(f"missing or invalid staged Agent receipt: {receipt}") from error
+
+
+def runtime_files(source: Path) -> list[Path]:
+    manifest = runtime_manifest(source)
+    return [Path("source.json"), *(Path(name) for name in manifest["files"])]
+
+
+def install_runtime(directory: Path, source: Path) -> Path:
+    receipt = runtime_manifest(source)
+    errors = runtime_delivery(source).apply(directory, source, receipt)
+    if errors:
+        raise SetupError("; ".join(errors))
+    return directory / ".agents" / "agent" / "runtime" / "startup_binding.py"
 
 
 def check_runtime(context: Context) -> list[str]:
-    directory = launch_script(context).parent
+    directory = context.state_directory / "bin"
     source = runtime_source(context)
-    changes = [f"install {directory / name}" for name in plugin_autoupdate.RUNTIME
-            if not (directory / name).is_file()
-            or (directory / name).read_bytes() != plugin_autoupdate.runtime_file(source, name).read_bytes()]
+    receipt = runtime_manifest(source)
+    changes = [f"install Agent runtime: {error}" for error in runtime_delivery(source).check(directory, source, receipt)]
     if not context.windows:
-        alias = directory / 'python'
-        if not alias.is_file() or alias.read_text(encoding='utf-8') != python_alias() \
-                or (os.name != 'nt' and not os.access(alias, os.X_OK)):
-            changes.append(f'install Claude hook interpreter {alias}')
+        alias = python_alias_status(context, directory)
+        if alias:
+            changes.append(alias)
     return changes
 
 
-def python_alias() -> str:
-    return '#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' "$@"\n'
+PYTHON_ALIAS_MARKER = '# tj-agents-managed-python-alias '
+
+
+def python_alias(interpreter: str | None = None) -> str:
+    interpreter = sys.executable if interpreter is None else interpreter
+    marker = json.dumps({'interpreter': interpreter}, separators=(',', ':'), sort_keys=True)
+    return '#!/bin/sh\n' + PYTHON_ALIAS_MARKER + marker + '\nexec ' + shlex.quote(interpreter) + ' "$@"\n'
+
+
+def managed_python_alias(value: str) -> str | None:
+    prefix = '#!/bin/sh\n' + PYTHON_ALIAS_MARKER
+    if not value.startswith(prefix):
+        return None
+    marker, separator, _ = value[len(prefix):].partition('\n')
+    if not separator:
+        return None
+    try:
+        metadata = json.loads(marker)
+    except json.JSONDecodeError:
+        return None
+    interpreter = metadata.get('interpreter') if isinstance(metadata, dict) and set(metadata) == {'interpreter'} else None
+    if not isinstance(interpreter, str) or not interpreter or python_alias(interpreter) != value:
+        return None
+    return interpreter
+
+
+def python_alias_path(context: Context, directory: Path) -> Path:
+    delivery = runtime_delivery(runtime_source(context))
+    for path in (context.state_directory, directory):
+        if os.path.lexists(path) and delivery.is_reparse(path):
+            raise SetupError(f"Claude hook interpreter parent is a link: {path}")
+    alias = directory / 'python'
+    if os.path.lexists(alias) and delivery.is_reparse(alias):
+        raise SetupError(f"Claude hook interpreter is a link: {alias}")
+    if alias.exists():
+        if not alias.is_file():
+            raise SetupError(f"Claude hook interpreter is not a file: {alias}")
+    return alias
+
+
+def python_alias_status(context: Context, directory: Path) -> str | None:
+    alias = python_alias_path(context, directory)
+    if not alias.exists():
+        return f'install Claude hook interpreter {alias}'
+    value = alias.read_text(encoding='utf-8')
+    if managed_python_alias(value) is None:
+        return f'refuse unowned Claude hook interpreter {alias}'
+    if value != python_alias():
+        return f'install Claude hook interpreter {alias}'
+    if os.name != 'nt' and not os.access(alias, os.X_OK):
+        return f'install Claude hook interpreter {alias}'
+    return None
+
+
+def install_python_alias(context: Context, directory: Path) -> None:
+    alias = python_alias_path(context, directory)
+    status = python_alias_status(context, directory)
+    if status is None:
+        return
+    if status.startswith('refuse '):
+        raise SetupError(status)
+    if not alias.exists():
+        try:
+            with alias.open('x', encoding='utf-8', newline='\n') as stream:
+                stream.write(python_alias())
+        except FileExistsError:
+            return install_python_alias(context, directory)
+    value = alias.read_text(encoding='utf-8')
+    if managed_python_alias(value) is None:
+        raise SetupError(f'refuse unowned Claude hook interpreter {alias}')
+    if value != python_alias():
+        temporary = alias.with_name(f'.{alias.name}.{secrets.token_hex(12)}.tmp')
+        created = False
+        try:
+            with temporary.open('x', encoding='utf-8', newline='\n') as stream:
+                created = True
+                stream.write(python_alias())
+            alias = python_alias_path(context, directory)
+            if alias.read_text(encoding='utf-8') != value:
+                raise SetupError(f'refuse changed Claude hook interpreter {alias}')
+            os.replace(temporary, alias)
+        finally:
+            if created and temporary.exists():
+                temporary.unlink()
+    if alias.read_text(encoding='utf-8') != python_alias():
+        raise SetupError(f'refuse changed Claude hook interpreter {alias}')
+    alias.chmod(0o755)
 
 
 def apply_runtime(context: Context) -> list[str]:
-    install_runtime(launch_script(context).parent, runtime_source(context))
+    directory = context.state_directory / "bin"
+    install_runtime(directory, runtime_source(context))
     if not context.windows:
-        alias = launch_script(context).parent / 'python'
-        alias.write_text(python_alias(), encoding='utf-8', newline='\n')
-        alias.chmod(0o755)
-    return [f"installed the launch-check runtime in {launch_script(context).parent}"]
+        install_python_alias(context, directory)
+    return [f"installed the Agent runtime in {directory}"]
 
 
 def stale_repositories(context: Context) -> list[str]:

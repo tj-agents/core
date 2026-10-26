@@ -9,8 +9,10 @@ import tempfile
 import unittest
 from unittest import mock
 
-SCRIPTS = Path(__file__).resolve().parents[1] / ".agents/machine/scripts"
+SCRIPTS = Path(__file__).resolve().parents[1] / ".agents/dependencies/agent/.agents/agent/runtime"
+SETUP_SCRIPTS = Path(__file__).resolve().parents[1] / ".agents/machine/scripts"
 sys.path.insert(0, str(SCRIPTS))
+sys.path.insert(0, str(SETUP_SCRIPTS))
 import machine_events as events
 import setup_machine as setup
 
@@ -215,13 +217,19 @@ class SetupTests(unittest.TestCase):
         self.assertEqual("a" * 48, cli.call_args.kwargs["input"])
         self.assertNotIn("a" * 48, cli.call_args.args[0])
 
-    def test_installation_copies_the_complete_standalone_runtime(self):
+    def test_installation_copies_the_complete_receipted_agent_runtime(self):
         with tempfile.TemporaryDirectory(prefix="runtime ü ") as directory:
-            script = setup.install_runtime(Path(directory))
-            self.assertEqual("launch_check.py", script.name)
-            for name in events.plugins.RUNTIME:
-                self.assertEqual(events.plugins.runtime_file(SCRIPTS, name).read_bytes(),
-                                 (Path(directory) / name).read_bytes())
+            context = setup.Context(Path(directory), None, {}, False)
+            source = setup.runtime_source(context)
+            script = setup.install_runtime(Path(directory), source)
+            self.assertEqual(Path(directory) / '.agents/agent/runtime/startup_binding.py', script)
+            delivery = setup.runtime_delivery(source)
+            installed_receipt = json.loads((Path(directory) / "source.json").read_text(encoding="utf-8"))
+            self.assertEqual(setup.runtime_manifest(source), delivery.validate_receipt(installed_receipt, source))
+            for relative in setup.runtime_files(source):
+                if relative == Path("source.json"):
+                    continue
+                self.assertEqual((source / relative).read_bytes(), (Path(directory) / relative).read_bytes())
             result = subprocess.run([sys.executable, "-I", "-B", str(script), "--help"], capture_output=True,
                                     text=True, timeout=30)
             self.assertEqual(0, result.returncode, result.stderr)

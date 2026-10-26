@@ -197,7 +197,10 @@ def lane_command(state, prompt, executable=None):
     if host not in {"codex", "claude"}:
         raise Gate("unsupported-host")
     base = Path(__file__).resolve().parent.parent
-    tables = [base / "lanes" / f"{host}.json", base / ".agents/lanes" / f"{host}.json"]
+    tables = [
+        base / "dependencies" / "agent" / ".agents" / "agent" / "resources" / "lanes" / f"{host}.json",
+        base / ".agents" / "lanes" / f"{host}.json",
+    ]
     lane_path = next((p for p in tables if p.is_file()), None)
     if lane_path is None:
         raise Gate("packaged-lane-table-unavailable")

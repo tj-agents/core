@@ -16,28 +16,6 @@
       ]
     },
     {
-      "name": "agent-store",
-      "source": "./plugins/agent-store",
-      "description": "Recorded agent executions, sessions, ownership and references.",
-      "category": "Productivity",
-      "keywords": [
-        "agents",
-        "executions",
-        "registry"
-      ]
-    },
-    {
-      "name": "agent",
-      "source": "./plugins/agent",
-      "description": "Shared agent execution and background completion across native hosts.",
-      "category": "Productivity",
-      "keywords": [
-        "agents",
-        "execution",
-        "background"
-      ]
-    },
-    {
       "name": "machine",
       "source": "./plugins/machine",
       "description": "Explicit harness, history and clipboard utilities.",
@@ -46,17 +24,6 @@
         "machine",
         "sessions",
         "handoff"
-      ]
-    },
-    {
-      "name": "cli",
-      "source": "./plugins/cli",
-      "description": "Close CLI tabs or finish their workflows before closing.",
-      "category": "Productivity",
-      "keywords": [
-        "cli",
-        "sessions",
-        "closeout"
       ]
     },
     {

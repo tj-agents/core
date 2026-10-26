@@ -97,7 +97,9 @@ def prerequisites(owner, host):
     if not python.is_file() or not runtime.is_file() or not Path(host).is_file():
         raise scheduler.SchedulerError("registered continuation prerequisite is missing")
     package = runtime.parent.parent
-    if not (package / "lanes" / (owner["harness"] + ".json")).is_file() and not (package / ".agents/lanes" / (owner["harness"] + ".json")).is_file():
+    lanes = (package / "dependencies" / "agent" / ".agents" / "agent" / "resources" / "lanes"
+             if package.name == ".agents" else package / ".agents" / "lanes")
+    if not (lanes / (owner["harness"] + ".json")).is_file():
         raise scheduler.SchedulerError("package is missing selected host lane resource")
     return runtime, python
 

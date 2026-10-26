@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
-LANES = ROOT / ".agents" / "lanes"
+LANES = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "resources" / "lanes"
 HOSTS = ROOT / ".agents" / "workflows" / "hosts"
 
 HOST_IDS = ("claude", "codex")
@@ -351,20 +351,6 @@ class PluginDeliveryTests(unittest.TestCase):
         self.assertEqual("supported", claude["plugin_loading"])
         self.assertEqual("agents", claude["plugin_directory"])
         self.assertFalse((ROOT / ".claude" / "agents").exists())
-
-    def test_the_shipped_skill_names_locations_that_exist_in_each_layout(self):
-        source = ROOT / ".agents/machine/policy/lanes/SKILL.md"
-        canonical = ROOT / "plugins/machine/.agents/machine/policy/lanes/SKILL.md"
-        body = canonical.read_text(encoding="utf-8-sig")
-        self.assertIn("../../../lanes/", body)
-        self.assertIn("../../../../resources/lanes/", body)
-        self.assertTrue((source.parent / "../../../lanes").resolve().is_dir())
-        self.assertTrue((canonical.parent / "../../../../resources/lanes").resolve().is_dir())
-        for tree in ("skills", "codex-skills"):
-            adapter = ROOT / "plugins/machine" / tree / "lanes/SKILL.md"
-            self.assertTrue((adapter.parent / "../../resources/lanes").resolve().is_dir())
-
-
 
 class StagePinTests(unittest.TestCase):
     """The workflow contract pins its own stage models under its version. It may not drift from the ladder
