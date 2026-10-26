@@ -41,6 +41,14 @@ class AdvanceReleaseTests(unittest.TestCase):
         self.assertEqual("superseded", RELEASE.advance(self.clone, first))
         self.assertEqual(second, self.released())
 
+    def test_a_diverged_release_fails_instead_of_skipping(self):
+        base = self.commit()
+        self.assertEqual("advanced", RELEASE.advance(self.clone, self.commit()))
+        self.git(self.clone, "reset", "-q", "--hard", base)
+        diverged = self.commit()
+        with self.assertRaisesRegex(RuntimeError, "diverged"):
+            RELEASE.advance(self.clone, diverged)
+
     def test_an_invalid_commit_is_rejected_before_any_push(self):
         with self.assertRaises(ValueError):
             RELEASE.advance(self.clone, "main")

@@ -67,7 +67,7 @@ jobs:
     needs: select
     if: >-
       needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
-      && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full'))
+      && fromJSON(needs.select.outputs.plan).windows
     runs-on: windows-latest
     env:
       CI_SELECTION: ${{ needs.select.outputs.plan }}
@@ -273,8 +273,6 @@ jobs:
     concurrency:
       group: regenerate-main
       cancel-in-progress: false
-    outputs:
-      changed: ${{ steps.publish-packages.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -321,11 +319,8 @@ jobs:
           }
 
   release:
-    needs: [ci-required, regenerate]
-    if: >-
-      github.event_name == 'push' && github.ref == 'refs/heads/main'
-      && needs.ci-required.result == 'success' && needs.regenerate.result == 'success'
-      && needs.regenerate.outputs.changed != 'true'
+    needs: ci-required
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-required.result == 'success'
     runs-on: ubuntu-latest
     environment: regenerate
     permissions:
@@ -339,6 +334,14 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           ssh-key: ${{ secrets.REGENERATE_DEPLOY_KEY }}
+
+      - name: release only a commit whose generated packages are current
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          ./.agents/sync-generated.ps1 -Check
+          python3 -B scripts/update_catalog_digests.py --check
 
       - name: advance release to the verified commit
         id: advance

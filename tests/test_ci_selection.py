@@ -37,18 +37,27 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(value["mode"], "focused")
         self.assertTrue({".agents/hooks/tests/test_problem_records.py",
                          ".agents/hooks/tests/test_adopt_plugins.py"}.issubset(value["tests"]))
-        CI.required_results(value, self.results(), "pull_request")
+        CI.required_results(value, self.results("skipped"), "pull_request")
 
     def test_relocated_handoff_helper_keeps_focused_transfer_coverage(self):
         value = CI.classify([".agents/workflow/workflow/handoff/scripts/transfer.py"])
         self.assertEqual("focused", value["mode"])
         self.assertEqual([".agents/hooks/tests/test_handoff_transfer.py"], value["tests"])
-        CI.required_results(value, self.results(), "pull_request")
+        CI.required_results(value, self.results("skipped"), "pull_request")
+
+    def test_windows_only_changes_and_the_full_label_require_windows_on_the_pull_request(self):
+        for paths, labels in ((["shell/profile.ps1"], ()), (["cli-session-recovery/vault.py"], ()),
+                              ([".agents/machine/scripts/setup.psm1"], ()), (["scripts/new_tool.py"], ("ci:full",))):
+            with self.subTest(paths=paths, labels=labels):
+                self.assertTrue(CI.classify(paths, labels=labels)["windows"])
+        self.assertFalse(CI.classify(["scripts/new_tool.py"])["windows"])
 
     @staticmethod
-    def results():
-        return {name: {"result": "success"} for name in
-                ("select", "guard", "guidance-examples", "verify-windows", "verify-linux")}
+    def results(windows="success"):
+        results = {name: {"result": "success"} for name in
+                   ("select", "guard", "guidance-examples", "verify-windows", "verify-linux")}
+        results["verify-windows"]["result"] = windows
+        return results
 
     def test_unknown_shared_infrastructure_and_mixed_changes_use_full_coverage(self):
         for path in (".agents/hooks/hook_runtime.py", ".agents/hooks/hook_dispatch.py",
@@ -97,11 +106,9 @@ class AggregateTests(unittest.TestCase):
 
     def test_selected_jobs_must_succeed_not_skip_cancel_or_disappear(self):
         for mode in ("full", "focused"):
-            value = CI.plan(mode, "runtime", ["tests/test_example.py"] if mode == "focused" else [])
+            value = CI.plan(mode, "runtime", ["tests/test_example.py"] if mode == "focused" else [], True)
             for job in ClassificationTests.results():
                 for outcome in ("failure", "cancelled", "skipped", "neutral", None):
-                    if (job, outcome) == ("verify-windows", "skipped"):
-                        continue
                     with self.subTest(mode=mode, job=job, outcome=outcome):
                         broken = {**ClassificationTests.results(), job: {"result": outcome}}
                         with self.assertRaises(ValueError):
@@ -114,8 +121,10 @@ class AggregateTests(unittest.TestCase):
     def test_main_requires_both_platforms_with_no_pr_guard(self):
         results = ClassificationTests.results()
         results["guard"]["result"] = "skipped"
-        CI.required_results(CI.plan("full", "main"), results, "push")
+        CI.required_results(CI.plan("full", "main", windows=True), results, "push")
         results["verify-windows"]["result"] = "skipped"
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("full", "main", windows=True), results, "push")
         with self.assertRaises(ValueError):
             CI.required_results(CI.plan("full", "main"), results, "push")
 
@@ -126,6 +135,9 @@ class AggregateTests(unittest.TestCase):
         results["verify-windows"]["result"] = "failure"
         with self.assertRaises(ValueError):
             CI.required_results(CI.plan("full", "pr"), results, "pull_request")
+        results["verify-windows"]["result"] = "skipped"
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("full", "pr", windows=True), results, "pull_request")
 
     def test_non_pr_event_cannot_accept_a_narrowed_plan(self):
         results = ClassificationTests.results()
@@ -161,6 +173,10 @@ class GitSelectionTests(unittest.TestCase):
         self.base = self.git("rev-parse", "HEAD").strip()
         self.payload = {"pull_request": {"base": {"sha": self.base}, "labels": []}}
 
+    def select(self):
+        self.payload["pull_request"]["head"] = {"sha": self.git("rev-parse", "HEAD").strip()}
+        return CI.select(self.root, "pull_request", self.payload)
+
     def git(self, *arguments):
         return subprocess.run(["git", *arguments], cwd=self.root, check=True,
                               capture_output=True, text=True, timeout=30).stdout
@@ -172,9 +188,9 @@ class GitSelectionTests(unittest.TestCase):
     def test_doc_range_and_explicit_risk_label(self):
         (self.root / "README.md").write_text("changed\n", encoding="utf-8")
         self.commit()
-        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "docs")
+        self.assertEqual(self.select()["mode"], "docs")
         self.payload["pull_request"]["labels"] = [{"name": "ci:full"}]
-        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "full")
+        self.assertEqual(self.select()["mode"], "full")
 
     def test_base_movement_after_branching_is_not_part_of_the_change(self):
         self.git("checkout", "-q", "-b", "change")
@@ -191,7 +207,7 @@ class GitSelectionTests(unittest.TestCase):
     def test_rename_keeps_the_old_executable_path_in_scope(self):
         self.git("mv", "README.md", "script.py")
         self.commit()
-        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "full")
+        self.assertEqual(self.select()["mode"], "full")
 
     def test_deleted_unknown_runtime_is_not_invisible(self):
         (self.root / "runtime.py").write_text("pass\n", encoding="utf-8")
@@ -199,12 +215,12 @@ class GitSelectionTests(unittest.TestCase):
         self.payload["pull_request"]["base"]["sha"] = self.git("rev-parse", "HEAD").strip()
         (self.root / "runtime.py").unlink()
         self.commit()
-        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "full")
+        self.assertEqual(self.select()["mode"], "full")
 
     def test_binary_change_cannot_look_like_prose(self):
         (self.root / "README.md").write_bytes(b"\0binary\0")
         self.commit()
-        self.assertEqual(CI.select(self.root, "pull_request", self.payload)["mode"], "full")
+        self.assertEqual(self.select()["mode"], "full")
 
     def test_unresolvable_range_and_missing_event_data_fall_back_to_full(self):
         for payload in ({}, {"pull_request": {"base": {"sha": "--help"}}},
@@ -293,14 +309,14 @@ class WorkflowWiringTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:|\Z)",
                                workflow.split("jobs:\n", 1)[1], re.MULTILINE | re.DOTALL))
-        self.assertIn("github.event_name != 'pull_request'", jobs["verify-windows"])
-        self.assertIn("'ci:full'", jobs["verify-windows"])
-        self.assertNotIn("github.event_name", jobs["verify-linux"])
+        self.assertIn("fromJSON(needs.select.outputs.plan).windows", jobs["verify-windows"])
+        self.assertNotIn("windows", jobs["verify-linux"].split("steps:", 1)[0])
         release = jobs["release"]
-        self.assertIn("needs: [ci-required, regenerate]", release)
+        self.assertIn("needs: ci-required", release)
         for condition in ("github.ref == 'refs/heads/main'", "needs.ci-required.result == 'success'",
-                          "needs.regenerate.outputs.changed != 'true'"):
+                          "sync-generated.ps1 -Check", "update_catalog_digests.py --check"):
             self.assertIn(condition, release)
+        self.assertLess(release.index("sync-generated.ps1 -Check"), release.index("advance_release.py"))
         self.assertIn("scripts/advance_release.py --sha", release)
         self.assertIn("published: 'true'", release)
         self.assertNotIn("machine-events", jobs["regenerate"])
