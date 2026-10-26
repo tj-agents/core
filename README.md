@@ -82,7 +82,7 @@ immediate explicit refresh from the Core checkout, run:
 ./sync.sh --verify
 ```
 
-`agent:refresh` owns adoption in a running session, including resuming the same conversation when
+`agent:refresh-plugins` owns adoption in a running session, including resuming the same conversation when
 native reload is unavailable. The agent runs explicit sync whenever an immediate refresh is needed.
 Fresh managed launches establish individual CLI close bindings; setup cannot add native frontend evidence
 to an already running unmanaged CLI.
@@ -380,7 +380,10 @@ native maintenance commands remain available to repair an installation.
 
 For example, selecting `example@tj-agents` while it is absent from Codex's inventory prevents a
 Codex launch and file writes even if its `tier.json` and routes are entirely missing. Repair the
-selection/install and start a fresh session; copying a Claude cache directory does not satisfy it.
+selection through `agent:refresh-plugins`; copying a Claude cache directory does not satisfy admission.
+Launch and `agent:refresh-plugins` share required-plugin installation and native readback. A failed running-session
+hook directs the agent to invoke that skill and adopt the result in the same conversation before retrying.
+Tommy does not need to restart the client or run a repair command.
 
 A GitHub query per repository reads its head and each plugin directory's tree into `~/.agents-state/plugin-heads.json`,
 both hosts update in parallel, and the cursor advances once both succeed. A failed host retries on the next
@@ -392,7 +395,7 @@ linked worktrees. Refresh, installed-byte verification, admission and restart de
 registration; an update that fails to persist there remains a failure. Separate clones are separate
 repositories even when their remotes match. Codex re-adds a plugin only when its directory changed.
 Without GitHub content, both compare commits.
-`agent:refresh` runs the same check in a running session.
+`agent:refresh-plugins` runs the same check in a running session.
 
 Main-branch callers publish events through the shared
 `tj-agents/github-actions/.github/actions/machine-events` publisher. Setup reuses or creates the
@@ -418,7 +421,7 @@ The generic service scaffold does not generate it. GitHub Free's repository rule
 apply to private repositories.
 
 Published package bytes reach `main` after the post-merge `regenerate` job. Running sessions keep what they
-loaded; follow `agent:refresh` for adoption and the required recovery verification.
+loaded; follow `agent:refresh-plugins` for adoption and the required recovery verification.
 
 ### Refresh and repository boundaries
 
@@ -457,10 +460,10 @@ A hook repair reaches a machine after it merges, the `regenerate` job publishes 
 automatic update installs it. Codex launch and refresh verify published package contents, apply trust only
 to verified current hook hashes, and read back required-hook readiness. Failed readiness blocks ordinary
 work; native plugin maintenance remains available for recovery. A running session keeps the hook bytes it
-loaded. Use `agent:refresh` to recover, and verify the affected hooks actually execute successfully.
+loaded. Use `agent:refresh-plugins` to recover, and verify the affected hooks actually execute successfully.
 If native reload is unavailable, resume the same conversation by its exact session ID and directory.
-Keep ownership and leave the conversation open for that user action; do not launch a successor merely
-to change directory or reload hooks. `base:cd` owns the native directory-change fallback.
+`agent:refresh-plugins` owns automatic client recovery and verifies required hooks before work resumes.
+`base:cd` owns the native directory-change fallback.
 
 Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.
 
