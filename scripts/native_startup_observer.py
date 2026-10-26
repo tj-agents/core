@@ -7,7 +7,7 @@ import signal
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(os.environ['AGENT_STATE_DIRECTORY']) / 'bin'))
+sys.path.insert(0, str(Path(os.environ['AGENT_STATE_DIRECTORY']) / 'bin' / '.agents' / 'agent' / 'runtime'))
 import startup_binding
 
 
