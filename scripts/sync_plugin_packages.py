@@ -24,6 +24,8 @@ def load(path: Path):
 
 
 EMPTY_EXTERNAL_DEPENDENCIES = {"required": [], "optional": []}
+MARKETPLACE_SNAPSHOT = ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/marketplace_catalog.lock.json"
+PUBLISHER = "core"
 
 
 def external_dependencies(owner: str, entries) -> list[dict[str, str]]:
@@ -279,7 +281,7 @@ def publication_fingerprint(root: Path, output: dict[str, bytes]) -> str:
     members = [
         (path, data)
         for path, data in output.items()
-        if path not in {"CAPABILITIES.md", "plugins/machine/catalog/catalog.json", "plugins/publication.json"}
+        if path not in {"CAPABILITIES.md", "plugins/publication.json"}
     ]
     members.append((".agents/catalog/catalog.json", canonical_output_bytes(json.dumps(catalog, indent=2) + "\n")))
     digest = hashlib.sha256()
@@ -320,10 +322,7 @@ def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set
         hook_path = f"plugins/{plugin}/hooks/codex.json"
         if hook_path not in output:
             continue
-        excluded = ["hooks/codex.json"]
-        if plugin == "machine":
-            excluded.append("catalog/catalog.json")
-        expected = output_tree_digest(output, f"plugins/{plugin}", excluded)
+        expected = output_tree_digest(output, f"plugins/{plugin}", ["hooks/codex.json"])
         payload = json.loads(output[hook_path])
         for groups in payload["hooks"].values():
             for group in groups:
@@ -377,8 +376,18 @@ def metadata(body: str, source: Path) -> dict[str, str]:
     return values
 
 
+def foreign_packages(root: Path, plugins: set[str]) -> list[str]:
+    publishers = {entry["name"]: entry["repository"] for entry in load(root / MARKETPLACE_SNAPSHOT)["catalog"]["plugins"]}
+    return sorted(plugin for plugin in plugins if publishers.get(plugin) != PUBLISHER)
+
+
 def validate_configuration(root: Path, config: dict) -> set[str]:
     plugins = {scope["plugin"] for scope in config["scopes"]}
+    foreign = foreign_packages(root, plugins)
+    if foreign:
+        raise ValueError(
+            f"Core may author only packages the marketplace publishes from tj-agents/{PUBLISHER}: {', '.join(foreign)}"
+        )
     if set(config["prerequisites"]) != plugins:
         raise ValueError("Prerequisite owners do not match declared plugins")
     for plugin, prerequisites in config["prerequisites"].items():
@@ -985,16 +994,13 @@ def build(root: Path, validate_catalog_digests: bool = True, catalog=None):
             raise ValueError(f"Catalog package path drift: {plugin_id}")
         if entry.get("harness") != harnesses[plugin]["requires"]:
             raise ValueError(f"Catalog harness drift: {plugin_id}")
-        allowed_excludes = ["catalog/catalog.json"] if plugin == "machine" else []
-        if entry.get("digest_excludes", []) != allowed_excludes:
-            raise ValueError(f"Catalog digest exclusion drift: {plugin_id}")
         if entry["marketplace"] != marketplace or entry["owner_repository"] != "tj-agents/core":
             raise ValueError(f"Catalog owner drift: {plugin_id}")
         if validate_catalog_digests:
             actual_digest = output_tree_digest(
                 output,
                 entry["package_path"],
-                entry.get("digest_excludes", []),
+                [],
             )
             if entry["digest"] != actual_digest:
                 raise ValueError(

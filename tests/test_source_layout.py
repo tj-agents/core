@@ -55,14 +55,21 @@ class SourceLayoutTests(unittest.TestCase):
         edit(value)
         path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
+    def test_a_package_the_marketplace_publishes_elsewhere_cannot_be_authored(self):
+        config = json.loads((self.root / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
+        config["scopes"].append({"name": "agent", "root": ".agents/agent", "layout": "kind", "plugin": "agent",
+                                 "domain": "agent"})
+        with self.assertRaisesRegex(ValueError, "Core may author only packages .*: agent"):
+            SYNC.validate_configuration(self.root, config)
+
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(63, len(skills))
-        self.assertEqual("machine", skills["machine:clip"]["plugin"])
+        self.assertEqual(62, len(skills))
+        self.assertEqual("workflow", skills["workflow:session"]["plugin"])
         self.assertNotIn("agent:background-listener", skills)
         for tree in ("skills", "codex-skills"):
-            self.assertIn(f"plugins/machine/{tree}/clip/SKILL.md", output)
-            self.assertNotIn(f"plugins/machine/{tree}/background-listener/SKILL.md", output)
+            self.assertIn(f"plugins/workflow/{tree}/session/SKILL.md", output)
+            self.assertNotIn(f"plugins/workflow/{tree}/background-listener/SKILL.md", output)
         self.assertEqual("session", skills["workflow:session"]["name"])
         self.assertEqual("session", skills["engineering:session"]["name"])
         for host in ("codex", "claude"):
@@ -84,7 +91,7 @@ class SourceLayoutTests(unittest.TestCase):
             self.assertIn(f"plugins/{plugin}/skills/session/SKILL.md", output)
         self.assertFalse((self.root / "base").exists())
         self.assertFalse((self.root / "engineering").exists())
-        self.assertFalse((self.root / "machine").exists())
+        self.assertFalse((self.root / "workflow").exists())
         self.assertIn(
             "plugins/workflow/.agents/workflow/contract/plan-artifacts/SKILL.md",
             output,
@@ -122,7 +129,7 @@ class SourceLayoutTests(unittest.TestCase):
         catalog = json.loads((self.root / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
         engineering = next(package for package in catalog["packages"] if package["id"] == "tj-agents/engineering")
         self.assertEqual(
-            ["tj-agents/base", "tj-agents/workflow", "tj-agents/machine",
+            ["tj-agents/base", "tj-agents/workflow",
              "tj-agents/agent-store", "tj-agents/agent", "tj-agents/cli"],
             engineering["dependencies"]["required"],
         )
@@ -132,7 +139,7 @@ class SourceLayoutTests(unittest.TestCase):
         )
         harness = json.loads(output["plugins/engineering/harness.json"].decode("utf-8"))
         self.assertEqual([{"id": "tj-agents", "repository": "tj-agents/marketplace"}], harness["requires"]["marketplaces"])
-        self.assertEqual(["tj-agents/agent", "tj-agents/agent-store", "tj-agents/base", "tj-agents/cli", "tj-agents/engineering", "tj-agents/machine", "tj-agents/workflow"], harness["requires"]["plugins"])
+        self.assertEqual(["tj-agents/agent", "tj-agents/agent-store", "tj-agents/base", "tj-agents/cli", "tj-agents/engineering", "tj-agents/workflow"], harness["requires"]["plugins"])
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertEqual(engineering["external_dependencies"]["required"], selection["external_prerequisites"])
 
@@ -146,9 +153,9 @@ class SourceLayoutTests(unittest.TestCase):
             "id": external, "marketplace": "personal-agents", "repository": "tj-agents/personal"})
 
         borrowed = json.loads(json.dumps(catalog))
-        next(package for package in borrowed["packages"] if package["id"] == "tj-agents/machine")[
+        next(package for package in borrowed["packages"] if package["id"] == "tj-agents/base")[
             "dependencies"]["required"].append(external)
-        with self.assertRaisesRegex(ValueError, "tj-agents/machine names unknown dependency"):
+        with self.assertRaisesRegex(ValueError, "tj-agents/base names unknown dependency"):
             SYNC.catalog_index(borrowed)
 
         for mutation in (
@@ -169,9 +176,9 @@ class SourceLayoutTests(unittest.TestCase):
             SYNC.catalog_index(duplicate)
 
         conflicting = json.loads(json.dumps(catalog))
-        machine = next(package for package in conflicting["packages"] if package["id"] == "tj-agents/machine")
-        machine["dependencies"]["optional"].append(external)
-        machine["external_dependencies"] = {"required": machine["external_dependencies"]["required"], "optional": [
+        base = next(package for package in conflicting["packages"] if package["id"] == "tj-agents/base")
+        base["dependencies"]["optional"].append(external)
+        base["external_dependencies"] = {"required": base.get("external_dependencies", {}).get("required", []), "optional": [
             {"id": external, "marketplace": "personal-agents", "repository": "someone/else"}]}
         with self.assertRaisesRegex(ValueError, "inconsistent ownership: personal-agents"):
             SYNC.catalog_index(conflicting)
@@ -181,14 +188,6 @@ class SourceLayoutTests(unittest.TestCase):
             SYNC.catalog_marketplaces(SYNC.catalog_index(catalog))["personal-agents"],
         )
         self.assertEqual(set(packages), set(SYNC.catalog_index(catalog)))
-
-    def test_agent_task_recovery_resource_is_embedded_for_machine_consumers(self):
-        _, output, skills, _ = SYNC.build(self.root)
-        resource = "plugins/machine/.agents/agent/resources/task-recovery.md"
-        staged = self.root / ".agents/dependencies/agent/.agents/agent/resources/task-recovery.md"
-        self.assertEqual(SYNC.canonical_output_bytes(staged.read_bytes()), output[resource])
-        for name in ("agent:open", "agent:message", "agent:recover"):
-            self.assertNotIn(name, skills)
 
     def test_authored_host_manifests_have_one_canonical_owner(self):
         for host in ("codex", "claude"):
@@ -207,25 +206,17 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/base/skills/solution-assessment/scripts/session-context.py",
             "plugins/base/skills/task-routing/scripts/session-context.py",
             "plugins/workflow/codex-skills/plan-artifacts/templates/PLAN.md",
-            "plugins/machine/.agents/agent/runtime/launch_check.py",
-            "plugins/machine/.agents/agent/utility/plugins/scripts/repo_config.py",
-            "plugins/machine/.agents/agent/resources/lanes/resolve.py",
-            "plugins/machine/catalog/catalog.json",
-            "plugins/machine/catalog/plugins.schema.json",
             "plugins/workflow/skills/status/scripts/status.py",
             "plugins/workflow/codex-skills/status/scripts/status.py",
             "CAPABILITIES.md",
         ):
             self.assertIn(relative, output)
-        self.assertEqual(output["plugins/machine/.agents/agent/runtime/launch_check.py"],
-                         SYNC.canonical_output_bytes(
-                             (self.root / ".agents/dependencies/agent/.agents/agent/runtime/launch_check.py").read_bytes()))
 
     def test_agent_store_runtime_is_embedded_in_each_core_consumer(self):
         _, output, _, _ = SYNC.build(self.root)
         runtime = ".agents/agent-store/runtime"
         staged = self.root / ".agents/dependencies/agent/.agents/agent-store/runtime"
-        for plugin in ("machine", "workflow", "engineering"):
+        for plugin in ("workflow", "engineering"):
             for name in ("session_store.py", "repository_identity.py", "reader.py"):
                 self.assertEqual(
                     SYNC.canonical_output_bytes((staged / name).read_bytes()),
@@ -233,8 +224,8 @@ class SourceLayoutTests(unittest.TestCase):
                 )
         isolated = self.root / "isolated package \u00e9"
         for relative, body in output.items():
-            if relative.startswith("plugins/machine/"):
-                destination = isolated / relative.removeprefix("plugins/machine/")
+            if relative.startswith("plugins/workflow/"):
+                destination = isolated / relative.removeprefix("plugins/workflow/")
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_bytes(body)
         spec = importlib.util.spec_from_file_location(
@@ -291,7 +282,7 @@ class SourceLayoutTests(unittest.TestCase):
             for entry in compatibility["fresh_selection"]
         ]
 
-        self.assertEqual(["base", "machine", "workflow", "engineering"], fresh_plugins)
+        self.assertEqual(["base", "workflow", "engineering"], fresh_plugins)
         self.assertEqual(fresh_plugins, default_plugins)
         self.assertEqual(
             fresh_plugins,
@@ -316,7 +307,7 @@ class SourceLayoutTests(unittest.TestCase):
             catalog_skills.update(catalog["skills"])
 
         workflow_selection = json.loads(output["plugins/workflow/selection.json"].decode("utf-8"))
-        self.assertEqual(["base", "machine"], workflow_selection["prerequisites"])
+        self.assertEqual(["base"], workflow_selection["prerequisites"])
         self.assertNotIn("engineering", workflow_selection["prerequisites"])
         engineering_selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertIn("workflow", engineering_selection["prerequisites"])
@@ -460,9 +451,9 @@ class SourceLayoutTests(unittest.TestCase):
             kinded.read_text(encoding="utf-8").replace("kind: workflow", "kind: utility"),
             encoding="utf-8",
         )
-        path = self.root / ".agents/machine/utility/clip/SKILL.md"
-        shutil.copytree(path.parent, self.root / ".agents/machine/utility/clip-copy")
-        with self.assertRaisesRegex(ValueError, "Duplicate public skill name: machine:clip"):
+        path = self.root / ".agents/engineering/utility/recents/SKILL.md"
+        shutil.copytree(path.parent, self.root / ".agents/engineering/utility/recents-copy")
+        with self.assertRaisesRegex(ValueError, "Duplicate public skill name: engineering:recents"):
             SYNC.build(self.root)
 
     def test_public_names_equal_without_hyphens_fail_generation(self):
@@ -481,8 +472,8 @@ class SourceLayoutTests(unittest.TestCase):
         self.config(
             lambda value: value["resources"].append(
                 {
-                    "plugin": "machine",
-                    "source": ".agents/machine/scripts",
+                    "plugin": "engineering",
+                    "source": ".agents/hooks",
                     "destination": "../base/escaped",
                 }
             )
@@ -498,15 +489,6 @@ class SourceLayoutTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "overlaps authored source"):
             SYNC.build(self.root)
-
-    def test_catalog_digest_exclusion_cannot_be_widened(self):
-        path = self.root / ".agents/catalog/catalog.json"
-        catalog = json.loads(path.read_text(encoding="utf-8"))
-        machine = next(package for package in catalog["packages"] if package["id"] == "tj-agents/machine")
-        machine["digest_excludes"].append("codex-skills/clip/SKILL.md")
-        path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "digest exclusion drift"):
-            SYNC.build(self.root, validate_catalog_digests=False)
 
     def test_prerequisite_cycles_and_missing_owners_fail(self):
         self.config(lambda value: value["prerequisites"]["base"].append("engineering"))

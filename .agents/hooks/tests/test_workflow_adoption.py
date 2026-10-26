@@ -22,7 +22,7 @@ class WorkflowAdoptionTests(unittest.TestCase):
         cls.capabilities = set(cls.contract.capabilities["delegable_capabilities"])
         cls.skills = {
             path.parent.name: path.read_text(encoding="utf-8")
-            for scope in ("base", "engineering", "machine")
+            for scope in ("base", "engineering", "workflow")
             for path in sorted((ROOT / ".agents" / scope).rglob("SKILL.md"))
         }
         cls.hosts = {

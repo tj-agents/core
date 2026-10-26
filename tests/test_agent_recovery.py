@@ -566,15 +566,6 @@ Observed blocker: no send was attempted."""
                 self.assertEqual(code, RECOVERY.main(["open", "--host", "codex", "--id", "exact_id"]))
             self.assertIn(str(error), output.getvalue())
 
-    def test_packaged_resource_loads_peer_process_helper(self):
-        path = ROOT / "plugins/machine/resources/machine/scripts/agent_recovery.py"
-        if not path.is_file():
-            self.skipTest("generated package has not been refreshed")
-        spec = importlib.util.spec_from_file_location("packaged_agent_recovery", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        self.assertTrue(callable(module._load("register_session").build_process_lookup))
-
     def test_loader_caches_native_exception_identity(self):
         self.assertIs(RECOVERY._load("agent_cli").LaunchTimeout, RECOVERY._load("agent_cli").LaunchTimeout)
 

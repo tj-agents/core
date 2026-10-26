@@ -2,12 +2,11 @@
 
 import argparse
 import json
-import os
 import signal
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(os.environ['AGENT_STATE_DIRECTORY']) / 'bin' / '.agents' / 'agent' / 'runtime'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '.agents' / 'dependencies' / 'agent' / '.agents' / 'agent' / 'runtime'))
 import startup_binding
 
 

@@ -64,7 +64,7 @@ def update(root: Path, check: bool) -> None:
             raise ValueError("Core catalog may contain only core packages")
         required = harnesses[package["name"]]["requires"]
         actual = SYNC.output_tree_digest(
-            output, package["package_path"], package.get("digest_excludes", [])
+            output, package["package_path"], []
         )
         if package.get("harness") != required or package["digest"] != actual:
             if package["id"] not in changed:
