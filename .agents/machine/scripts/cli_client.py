@@ -312,7 +312,7 @@ def recorded_client(session_id, nearest, lookup, table):
     return info, {**record, **turn}
 
 
-def comparable_path(path):
+def _comparable_path(path):
     """Compare equivalent Win32 drive/UNC spellings without changing paths used for I/O."""
     if not isinstance(path, PureWindowsPath):
         return path
@@ -325,8 +325,8 @@ def comparable_path(path):
 
 
 @dataclass(frozen=True)
-class NativeRollout:
-    """A profile-contained rollout with a frozen file identity and live verification."""
+class SessionLog:
+    """A session log bound to a profile and captured file identity."""
 
     path: Path
     profile: Path
@@ -335,9 +335,9 @@ class NativeRollout:
     _resolved_path: PurePath = field(init=False, repr=False)
 
     def __post_init__(self):
-        sessions = comparable_path(self.profile.resolve() / 'sessions')
-        resolved = comparable_path(self.path.resolve(strict=True))
-        if (not self.path.is_absolute() or resolved != comparable_path(self.path)
+        sessions = _comparable_path(self.profile.resolve() / 'sessions')
+        resolved = _comparable_path(self.path.resolve(strict=True))
+        if (not self.path.is_absolute() or resolved != _comparable_path(self.path)
                 or sessions not in resolved.parents):
             raise RuntimeError('Native rollout is outside the verified profile')
         stat = self.path.stat()
@@ -357,7 +357,7 @@ class NativeRollout:
         stat = self.path.stat()
         if ((stat.st_dev, stat.st_ino) != self.identity
                 or stat.st_size < max(offset, self.minimum_size)
-                or comparable_path(self.path.resolve(strict=True)) != self._resolved_path):
+                or _comparable_path(self.path.resolve(strict=True)) != self._resolved_path):
             raise RuntimeError('Native rollout was replaced or truncated after arming')
 
     @contextmanager
@@ -380,9 +380,9 @@ class NativeCompletion:
                 'native_rollout', 'profile', 'native_turn_id', 'client_message_id', 'session_id', 'recording_path')):
             raise RuntimeError('Native completion requires an exact frontend, profile and turn binding')
         self.entry = entry
-        self.rollout = NativeRollout(Path(entry['native_rollout']), Path(entry['profile']))
+        self.log = SessionLog(Path(entry['native_rollout']), Path(entry['profile']))
         if expected is not None:
-            self.rollout.require_pin(expected)
+            self.log.require_pin(expected)
         self.offset = 0
         self.metadata = False
         self.started = False
@@ -390,13 +390,13 @@ class NativeCompletion:
         self.finished = False
 
     def pin(self):
-        return self.rollout.pin()
+        return self.log.pin()
 
     def poll(self):
         if latest_input(self.entry['recording_path']) != self.entry['client_message_id']:
             raise RuntimeError('The frontend input changed after arming')
         partial = False
-        with self.rollout.open(self.offset) as stream:
+        with self.log.open(self.offset) as stream:
             stream.seek(self.offset)
             while True:
                 line = stream.readline(8 * 1024 * 1024 + 1)
