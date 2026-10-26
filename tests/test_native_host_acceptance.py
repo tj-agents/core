@@ -19,15 +19,11 @@ specification.loader.exec_module(NATIVE)
 
 
 class NativeHostAcceptanceTests(unittest.TestCase):
-    def test_observer_imports_the_nested_installed_startup_binding(self):
+    def test_observer_runs_the_staged_agent_startup_binding_without_installed_state(self):
         with tempfile.TemporaryDirectory() as temporary:
-            state = Path(temporary) / 'state'
-            binding = state / 'bin' / '.agents' / 'agent' / 'runtime' / 'startup_binding.py'
-            binding.parent.mkdir(parents=True)
-            binding.write_text('', encoding='utf-8')
             result = subprocess.run([sys.executable, '-B', str(OBSERVER), '--help'], capture_output=True,
                                     text=True, encoding='utf-8', env={**os.environ,
-                                                                       'AGENT_STATE_DIRECTORY': str(state)})
+                                                                       'AGENT_STATE_DIRECTORY': temporary})
         self.assertEqual(0, result.returncode, result.stderr)
 
     def test_an_early_failure_cannot_reuse_a_previous_failed_observer_receipt(self):
