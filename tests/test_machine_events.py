@@ -223,7 +223,12 @@ class SetupTests(unittest.TestCase):
             source = setup.runtime_source(context)
             script = setup.install_runtime(Path(directory), source)
             self.assertEqual(Path(directory) / '.agents/agent/runtime/startup_binding.py', script)
+            delivery = setup.runtime_delivery(source)
+            installed_receipt = json.loads((Path(directory) / "source.json").read_text(encoding="utf-8"))
+            self.assertEqual(setup.runtime_manifest(source), delivery.validate_receipt(installed_receipt, source))
             for relative in setup.runtime_files(source):
+                if relative == Path("source.json"):
+                    continue
                 self.assertEqual((source / relative).read_bytes(), (Path(directory) / relative).read_bytes())
             result = subprocess.run([sys.executable, "-I", "-B", str(script), "--help"], capture_output=True,
                                     text=True, timeout=30)
