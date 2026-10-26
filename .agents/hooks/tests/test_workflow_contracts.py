@@ -1176,6 +1176,43 @@ $results | ConvertTo-Json -Compress
                     for marker in source_markers:
                         self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))
 
+    def test_generator_refuses_linked_orphan_directory_cleanup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repository = Path(temp) / "repository"
+            shutil.copytree(
+                ROOT,
+                repository,
+                ignore=shutil.ignore_patterns(".git", "__pycache__"),
+            )
+            shutil.rmtree(repository / "plugins")
+            digests = subprocess.run(
+                [sys.executable, "-B", str(repository / "scripts" / "update_catalog_digests.py")],
+                cwd=repository,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, digests.returncode, digests.stderr)
+            generator = [
+                sys.executable,
+                "-B",
+                str(repository / "scripts" / "sync_plugin_packages.py"),
+                "--root",
+                str(repository),
+            ]
+            generated = subprocess.run(generator, capture_output=True, text=True)
+            self.assertEqual(0, generated.returncode, generated.stderr)
+            outside = Path(temp) / "outside"
+            outside_child = outside / "empty-child"
+            outside_child.mkdir(parents=True)
+            linked = repository / "plugins" / "retired"
+            self.link_directory(linked, outside)
+            completed = subprocess.run(generator, capture_output=True, text=True)
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("Path escapes repository", completed.stderr)
+            self.assertTrue(linked.exists())
+            self.assertTrue(outside.exists())
+            self.assertTrue(outside_child.exists())
+
 
 
 class HostAdapterTests(unittest.TestCase):
