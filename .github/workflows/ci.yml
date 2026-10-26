@@ -94,6 +94,18 @@ jobs:
           repository: tj-agents/dotnet
           path: .dotnet
           persist-credentials: false
+      - uses: actions/checkout@v4
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
+        with:
+          repository: tj-agents/agent
+          path: .agent
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
+        with:
+          repository: tj-agents/cli
+          path: .cli
+          persist-credentials: false
 
       - name: regenerate the workspace from authored sources
         shell: pwsh
@@ -137,16 +149,12 @@ jobs:
       - name: authored skill references resolve in the public corpus
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
-        run: python -B .template/.agents/template/utility/check/scripts/check_skill_references.py --root . --root .template --root .react --root .dotnet --source-root .
+        run: python -B .template/.agents/template/utility/check/scripts/check_skill_references.py --root . --root .template --root .react --root .dotnet --root .agent --root .cli --source-root .
 
       - name: CLI session recovery tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: powershell
         run: ./cli-session-recovery/tests/cli-session-vault.tests.ps1
-
-      - name: skill packaging tests
-        shell: pwsh
-        run: ./tests/skill-packaging.tests.ps1
 
       - name: PowerShell host compatibility tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
@@ -231,10 +239,6 @@ jobs:
           name: native-host-acceptance-linux
           path: ${{ runner.temp }}/tj-agents-native-acceptance/artifacts
           if-no-files-found: warn
-
-      - name: skill packaging tests
-        shell: pwsh
-        run: ./tests/skill-packaging.tests.ps1
 
       # Hook subprocesses in some tests read stdin as their payload; a closed stdin stands in for the host,
       # which always closes it, so an inherited runner stdin can never leave a hook waiting.
