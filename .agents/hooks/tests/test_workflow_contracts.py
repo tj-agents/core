@@ -954,6 +954,18 @@ class WorkflowGenerationTests(unittest.TestCase):
         else:
             link.symlink_to(target, target_is_directory=True)
 
+    def link_file(self, link, target):
+        if os.name == "nt":
+            created = subprocess.run(
+                ["cmd.exe", "/D", "/C", "mklink", str(link), str(target)],
+                capture_output=True,
+                text=True,
+            )
+            if created.returncode:
+                self.skipTest(created.stderr or created.stdout)
+        else:
+            link.symlink_to(target)
+
     def test_codex_installer_rejects_a_reparse_point_in_a_profile_ancestor(self):
         hosts = powershell_hosts()
         self.assertNotEqual([], hosts)
@@ -1246,7 +1258,45 @@ $results | ConvertTo-Json -Compress
             self.link_directory(linked, valid.parent)
             completed = subprocess.run(generator, capture_output=True, text=True)
             self.assertNotEqual(0, completed.returncode)
-            self.assertIn("Unsafe generated directory: plugins/retired", completed.stderr)
+            self.assertIn("Unsafe generated entry: plugins/retired", completed.stderr)
+            self.assertTrue(linked.exists())
+            self.assertEqual(expected_valid, valid.read_bytes())
+            self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))
+
+    def test_generator_refuses_in_generated_root_file_link_before_pruning_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repository = Path(temp) / "repository"
+            shutil.copytree(
+                ROOT,
+                repository,
+                ignore=shutil.ignore_patterns(".git", "__pycache__"),
+            )
+            shutil.rmtree(repository / "plugins")
+            digests = subprocess.run(
+                [sys.executable, "-B", str(repository / "scripts" / "update_catalog_digests.py")],
+                cwd=repository,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, digests.returncode, digests.stderr)
+            generator = [
+                sys.executable,
+                "-B",
+                str(repository / "scripts" / "sync_plugin_packages.py"),
+                "--root",
+                str(repository),
+            ]
+            generated = subprocess.run(generator, capture_output=True, text=True)
+            self.assertEqual(0, generated.returncode, generated.stderr)
+            valid = repository / "plugins" / "base" / "harness.json"
+            expected_valid = valid.read_bytes()
+            marker = repository / ".agents" / "user-owned.txt"
+            marker.write_text("preserve\n", encoding="utf-8")
+            linked = repository / "plugins" / "orphan.txt"
+            self.link_file(linked, valid)
+            completed = subprocess.run(generator, capture_output=True, text=True)
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("Unsafe generated entry: plugins/orphan.txt", completed.stderr)
             self.assertTrue(linked.exists())
             self.assertEqual(expected_valid, valid.read_bytes())
             self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))

@@ -1015,18 +1015,17 @@ def generate(root: Path, check: bool = False):
     for generated_root in generated_roots:
         if not generated_root.is_dir():
             continue
-        directories = sorted(
-            (path for path in generated_root.rglob("*") if path.is_dir()),
-            key=lambda path: len(path.parts), reverse=True,
-        )
-        for directory in directories:
-            relative = directory.relative_to(root).as_posix()
+        directories = []
+        for entry in generated_root.rglob("*"):
+            relative = entry.relative_to(root).as_posix()
             target = inside(root, relative)
-            if target != directory:
-                raise ValueError(f"Unsafe generated directory: {relative}")
+            if target != entry:
+                raise ValueError(f"Unsafe generated entry: {relative}")
             if not any(target == declared or target.is_relative_to(declared) for declared in generated_roots):
-                raise ValueError(f"Unsafe generated directory: {relative}")
-        generated_directories[generated_root] = directories
+                raise ValueError(f"Unsafe generated entry: {relative}")
+            if entry.is_dir():
+                directories.append(entry)
+        generated_directories[generated_root] = sorted(directories, key=lambda path: len(path.parts), reverse=True)
 
     existing: dict[str, Path] = {}
     for generated_root in generated_roots:
