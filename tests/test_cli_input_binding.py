@@ -92,6 +92,34 @@ class InputBindingTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Cannot attribute'):
                 self.resolve()
 
+    def test_shared_frontend_ancestor_is_distinct_from_its_verified_daemon(self):
+        self.bind()
+        self.nearest = self.infos[123]
+
+        def daemon_identity(environment=None, expected_pid=None):
+            if expected_pid is not None and expected_pid != self.backend['pid']:
+                raise RuntimeError('Native Codex daemon identity does not match this session')
+            return self.backend
+
+        with mock.patch.object(client, 'daemon_identity', side_effect=daemon_identity):
+            info, record = self.resolve()
+        self.assertEqual(123, info.pid)
+        self.assertEqual(self.backend, record['backend'])
+        self.assertTrue(codex_hook_trust.AppServer.call_args.kwargs['existing'])
+
+    def test_frontend_ancestor_cannot_resolve_a_matching_peer(self):
+        self.bind(identity='other-input')
+        self.bind(pid=456)
+        self.nearest = self.infos[123]
+        with self.assertRaisesRegex(RuntimeError, 'Cannot attribute'):
+            self.resolve()
+
+    def test_shared_frontend_ancestor_selects_only_its_own_record(self):
+        self.bind()
+        self.bind(pid=456)
+        self.nearest = self.infos[123]
+        self.assertEqual(123, self.resolve()[0].pid)
+
     def test_first_submitted_input_before_delayed_session_hook_is_attributable(self):
         ticket, _, _ = self.bind()
         with mock.patch.object(client.time, 'time', return_value=ticket['created_at'] + 20):
