@@ -129,11 +129,14 @@ def select(root, event, payload):
         return plan("full", "non-PR event")
     try:
         base = payload["pull_request"]["base"]["sha"]
-        if not isinstance(base, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", base):
-            raise ValueError("invalid base SHA")
-        raw_paths = git_output(root, "diff", "--name-only", "--no-renames", "-z", base, "HEAD")
+        head = payload["pull_request"]["head"]["sha"]
+        for value in (base, head):
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", value):
+                raise ValueError("invalid base or head SHA")
+        change = f"{base}...{head}"
+        raw_paths = git_output(root, "diff", "--name-only", "--no-renames", "-z", change)
         paths = raw_paths.decode("utf-8").rstrip("\0").split("\0") if raw_paths else []
-        stats = git_output(root, "diff", "--numstat", "--no-renames", "-z", base, "HEAD")
+        stats = git_output(root, "diff", "--numstat", "--no-renames", "-z", change)
         lines = 0
         binary = False
         for entry in stats.split(b"\0"):
@@ -164,7 +167,7 @@ def validate_plan(value):
     return value
 
 
-def required_results(value, needs, event):
+def required_results(value, needs, event, labels=()):
     validate_plan(value)
     if not isinstance(needs, dict):
         raise ValueError("invalid CI job results")
@@ -175,8 +178,8 @@ def required_results(value, needs, event):
         "guard": "success" if event == "pull_request" else "skipped",
         "guidance-examples": "success",
     }
-    expected.update({name: "skipped" if value["mode"] == "docs" else "success"
-                     for name in ("verify-windows", "verify-linux")})
+    suites = event == "pull_request" and FULL_LABEL in labels and value["mode"] != "docs"
+    expected.update({name: "success" if suites else "skipped" for name in ("verify-windows", "verify-linux")})
     for name, result in expected.items():
         if not isinstance(needs.get(name), dict) or needs[name].get("result") != result:
             raise ValueError(f"{name} must finish as {result}")
@@ -233,7 +236,8 @@ def main(argv=None):
         value = json.loads(os.environ["CI_SELECTION"])
         if args.operation == "required":
             required_results(
-                value, json.loads(os.environ["CI_NEEDS"]), os.environ.get("GITHUB_EVENT_NAME", "")
+                value, json.loads(os.environ["CI_NEEDS"]), os.environ.get("GITHUB_EVENT_NAME", ""),
+                json.loads(os.environ.get("CI_LABELS") or "null") or (),
             )
             print("Every selected CI job succeeded")
             return 0
