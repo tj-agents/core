@@ -141,6 +141,37 @@ class MainCheckoutTests(Machine):
         self.assertEqual(self.head(other), self.head(main))
         self.assertFalse(setup.fast_forward(main))
 
+    def test_an_updated_checkout_reruns_its_own_setup_once(self):
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append((command, kwargs.get("env", {}).get(setup.CHECKOUT_UPDATED)))
+            return completed(3)
+
+        with mock.patch.object(setup, "main_checkout", return_value=self.root), \
+                mock.patch.object(setup, "fast_forward", return_value=True), \
+                mock.patch.object(setup.subprocess, "run", side_effect=run), \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(3, setup.main(["--step", "shell profiles"]))
+        self.assertEqual([([sys.executable, str(setup.canonical_script(self.root)), "--step", "shell profiles"], "1")],
+                         calls)
+
+    def test_a_checkout_that_cannot_update_fails_setup_and_check_never_updates(self):
+        with mock.patch.object(setup, "main_checkout", return_value=self.root), \
+                mock.patch.object(setup, "fast_forward", side_effect=setup.SetupError("diverged")) as update, \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(2, setup.main([]))
+            with mock.patch.object(setup, "reexec_if_not_main_checkout", return_value=0):
+                self.assertEqual(0, setup.main(["--check"]))
+        update.assert_called_once()
+
+    def test_a_failed_fetch_warns_and_keeps_the_current_revision(self):
+        main, _ = self.clones()
+        with contextlib.redirect_stderr(io.StringIO()) as error:
+            self.assertFalse(setup.fast_forward(main, run=lambda command, **kwargs: completed(
+                1 if "fetch" in command else 0, stderr="authentication failed")))
+        self.assertIn("authentication failed", error.getvalue())
+
     def test_a_diverged_main_checkout_fails_instead_of_running_stale(self):
         main, _ = self.clones()
         self.git("commit", "-q", "--allow-empty", "-m", "local", cwd=main)

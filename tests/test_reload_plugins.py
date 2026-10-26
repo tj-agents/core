@@ -547,6 +547,23 @@ class HeadReconcileTests(unittest.TestCase):
             ['update', 'personal@tj-agents', '--scope', 'project']])
         self.assertEqual({project}, {cwd for command, cwd in fake.commands if command[2] == 'install'})
 
+    def test_a_current_plugin_still_gets_a_dependency_its_catalog_declares(self):
+        project = self.home.project('core', 'settings.json', 'personal@tj-agents')
+        write(self.home.root / "market/.claude-plugin/marketplace.json", {"plugins": [
+            {"name": "personal", "dependencies": ["agent", "service@other"]}, {"name": "agent"}]})
+        fake = FakeClaude(self.home.installed(("personal@tj-agents", "project", project, CORE_HEAD)))
+        with mock.patch.object(REFRESH, 'run', side_effect=fake):
+            REFRESH.reconcile_claude(project)
+        self.assertEqual([['install', 'agent@tj-agents', '--scope', 'project'],
+                          ['install', 'service@other', '--scope', 'project']],
+                         [command[2:6] for command, _ in fake.commands if command[2] == 'install'])
+
+    def test_a_dependency_from_another_marketplace_keeps_its_own_identity(self):
+        self.assertEqual("service@other", REFRESH.dependency_identity({"name": "service", "marketplace": "other"},
+                                                                      "tj-agents"))
+        self.assertEqual("agent@tj-agents", REFRESH.dependency_identity("agent", "tj-agents"))
+        self.assertIsNone(REFRESH.dependency_identity({"marketplace": "other"}, "tj-agents"))
+
     def test_missing_installation_that_does_not_persist_fails_refresh(self):
         project = self.home.project('new-project', 'settings.json', 'base@tj-agents')
         self.home.installed()
