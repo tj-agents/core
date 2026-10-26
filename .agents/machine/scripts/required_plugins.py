@@ -156,6 +156,8 @@ def git_common_directory(project: Path) -> str | None:
 
 
 def claude_installations(project: Path, entries: list) -> list:
+    if not entries:
+        return []
     project = project.resolve()
     common = git_common_directory(project)
     selected, seen = [], set()
