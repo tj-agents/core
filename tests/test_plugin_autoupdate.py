@@ -664,7 +664,8 @@ class LockAndSelfUpdateTests(unittest.TestCase):
             packaged = Path(temp) / 'package' / UPDATE.SCRIPT_NAME
             packaged.parent.mkdir()
             for name in UPDATE.RUNTIME:
-                packaged.with_name(name).write_text('new ' + name, encoding='utf-8')
+                (packaged.parent / name).parent.mkdir(exist_ok=True)
+                (packaged.parent / name).write_text('new ' + name, encoding='utf-8')
             packaged.write_text('new', encoding='utf-8')
             stable.with_name('machine_events.py').write_text('old listener', encoding='utf-8')
 
@@ -674,7 +675,7 @@ class LockAndSelfUpdateTests(unittest.TestCase):
 
             self.assertEqual('new', stable.read_text(encoding='utf-8'))
             for name in UPDATE.RUNTIME[1:]:
-                self.assertEqual('new ' + name, stable.with_name(name).read_text(encoding='utf-8'))
+                self.assertEqual('new ' + name, (stable.parent / name).read_text(encoding='utf-8'))
 
     def test_base_installed_copier_upgrades_to_a_runnable_runtime(self):
         fixture = ROOT / 'tests/fixtures/plugin_autoupdate_208cc302.py'

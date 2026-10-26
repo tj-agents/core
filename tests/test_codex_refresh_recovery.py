@@ -179,7 +179,7 @@ class RecoveryTests(unittest.TestCase):
 
     def run_sync(self, failure=None, extra=(), setup_errors=()):
         output = io.StringIO()
-        failure = failure or REFRESH.codex_hook_trust.RestartRequired("standalone client is absent from daemon")
+        failure = failure or REFRESH.hook_trust.RestartRequired("standalone client is absent from daemon")
         with mock.patch.object(REFRESH.launch_check, "check", return_value="current"), \
                 mock.patch.object(REFRESH.launch_check, "ensure_hooks", side_effect=failure), \
                 mock.patch.object(REFRESH.required_plugins, "converge_setup", return_value=list(setup_errors)), \
@@ -231,7 +231,7 @@ class RecoveryTests(unittest.TestCase):
                 mock.patch.object(REFRESH, "refresh", return_value=[]), \
                 mock.patch.object(REFRESH, "verify", return_value={"host": "codex", "problems": []}), \
                 mock.patch.object(REFRESH.required_plugins, "converge_setup", return_value=[]), \
-                mock.patch.object(REFRESH.launch_check, "ensure_hooks", side_effect=REFRESH.codex_hook_trust.RestartRequired("restart")), \
+                mock.patch.object(REFRESH.launch_check, "ensure_hooks", side_effect=REFRESH.hook_trust.RestartRequired("restart")), \
                 mock.patch.object(REFRESH, "relaunch_codex", return_value={"relaunch": "armed"}) as restart, \
                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(0, REFRESH.main(["--host", "codex", "--verify", "--project", str(self.root)]))

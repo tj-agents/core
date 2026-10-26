@@ -79,15 +79,15 @@ class LaunchCheckTests(unittest.TestCase):
 
     def test_unselected_project_does_not_require_an_uninstalled_codex(self):
         import agent_cli
-        import codex_hook_trust
+        from codex import hook_trust
 
         with mock.patch.object(agent_cli, "resolve_codex_executable", side_effect=AssertionError("Codex is absent")), \
-                mock.patch.object(codex_hook_trust, "apply_trust") as trust:
+                mock.patch.object(hook_trust, "apply_trust") as trust:
             load("launch_check").ensure_hooks(self.state)
         trust.assert_not_called()
 
     def test_readiness_uses_only_selected_plugins_and_all_their_definitions(self):
-        import codex_hook_trust
+        from codex import hook_trust
         import required_plugins
 
         selected = self.state / ".agents/plugins.json"
@@ -97,18 +97,18 @@ class LaunchCheckTests(unittest.TestCase):
         other = self.state / "plugins/cache/publisher/other/local"
         definitions = [("sessionStart", None, "command", "python start.py")]
         with mock.patch.object(required_plugins, "check", return_value={"base@tj-agents": base}), \
-                mock.patch.object(codex_hook_trust, "required_definitions", return_value=definitions) as expected, \
-                mock.patch.object(codex_hook_trust, "apply_trust") as trust, \
-                mock.patch.object(codex_hook_trust, "reload_running") as reload:
+                mock.patch.object(hook_trust, "required_definitions", return_value=definitions) as expected, \
+                mock.patch.object(hook_trust, "apply_trust") as trust, \
+                mock.patch.object(hook_trust, "reload_running") as reload:
             # Call the implementation, bypassing only this test class's readiness stub.
             load("launch_check").ensure_hooks(self.state, "native-cli")
         expected.assert_called_once_with(base, "base@tj-agents")
         trust.assert_called_once_with("native-cli", self.state.resolve(), required={"base@tj-agents": definitions})
         reload.assert_not_called()
         with mock.patch.object(required_plugins, "check", return_value={"base@tj-agents": base}), \
-                mock.patch.object(codex_hook_trust, "required_definitions", return_value=definitions), \
-                mock.patch.object(codex_hook_trust, "apply_trust"), \
-                mock.patch.object(codex_hook_trust, "reload_running") as reload:
+                mock.patch.object(hook_trust, "required_definitions", return_value=definitions), \
+                mock.patch.object(hook_trust, "apply_trust"), \
+                mock.patch.object(hook_trust, "reload_running") as reload:
             load("launch_check").ensure_hooks(self.state, "native-cli", running_session=True)
         reload.assert_called_once_with("native-cli", self.state.resolve(), required={"base@tj-agents": definitions})
 

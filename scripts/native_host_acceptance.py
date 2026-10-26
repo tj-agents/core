@@ -687,7 +687,7 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
 
 def accept_codex(root, marketplace, executable, project, environment, artifacts, timeout):
     install_codex_plugins(executable, marketplace, project, environment, timeout)
-    trust = load_module("native_acceptance_trust", root / ".agents" / "machine" / "scripts" / "codex_hook_trust.py")
+    trust = load_module("native_acceptance_trust", root / ".agents" / "machine" / "scripts" / "codex" / "hook_trust.py")
     store = load_module("native_acceptance_store", root / ".agents" / "agent-store" / "runtime" / "session_store.py")
     register = load_module("native_acceptance_register", root / ".agents" / "machine" / "utility" / "peer-cli" / "scripts" / "register_session.py")
     with AppServer(executable, project, environment, timeout) as server:

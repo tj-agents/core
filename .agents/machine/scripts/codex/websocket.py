@@ -6,7 +6,7 @@ import struct
 import threading
 
 
-class WebSocketStdio:
+class StdioConnection:
     def __init__(self, reader, writer):
         self.reader = reader
         self.writer = writer

@@ -14,6 +14,7 @@ if sys.version_info < (3, 11):
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / ".agents/machine/scripts"
+RUNTIME_PROBE = ROOT / "tests/fixtures/runtime_probe.py"
 sys.path.insert(0, str(SCRIPTS))
 import setup_machine as setup  # noqa: E402
 import tomllib  # noqa: E402
@@ -540,19 +541,7 @@ class RuntimeTests(Machine):
     def test_installed_runtime_can_load_live_proxy_transport_without_source_checkout(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
         installed = self.home / ".agents-state/bin"
-        probe = self.root / "runtime_probe.py"
-        probe.write_text(
-            "import sys\nfrom unittest.mock import patch\n"
-            "sys.path.insert(0, sys.argv[1])\nimport codex_hook_trust\nimport codex_websocket\n"
-            "assert codex_websocket.__file__.startswith(sys.argv[1])\n"
-            "with patch.object(codex_hook_trust.subprocess, 'Popen', side_effect=RuntimeError('transport-loaded')):\n"
-            "    try:\n        codex_hook_trust.AppServer('unused',sys.argv[1],existing=True)\n"
-            "    except RuntimeError as error:\n"
-            "        if str(error) != 'transport-loaded':\n            raise\n"
-            "        print('transport-loaded')\n",
-            encoding="utf-8",
-        )
-        result = subprocess.run([sys.executable, "-I", "-B", str(probe), str(installed)],
+        result = subprocess.run([sys.executable, "-I", "-B", str(RUNTIME_PROBE), str(installed)],
                                 cwd=self.root, capture_output=True, timeout=15)
         self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
         self.assertEqual(b"transport-loaded", result.stdout.strip())
@@ -575,6 +564,7 @@ class RuntimeTests(Machine):
         running = self.root / "running" / "scripts"
         running.mkdir(parents=True)
         for name in setup.plugin_autoupdate.RUNTIME:
+            (running / name).parent.mkdir(exist_ok=True)
             (running / name).write_text("running script copy\n", encoding="utf-8")
         context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
                                 run=self.unexpected_run, which=lambda name: None, documents=self.documents,

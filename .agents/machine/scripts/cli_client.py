@@ -255,10 +255,10 @@ def recorded_client(session_id, nearest, lookup, table):
     private = frontend and '--no-daemon' in arguments
     backend = None if private else daemon_identity(expected_pid=None if frontend else nearest.pid)
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import codex_hook_trust
+    from codex import hook_trust
 
     executable = arguments[0]
-    with codex_hook_trust.AppServer(executable, Path.cwd(), existing=not private, timeout=15) as server:
+    with hook_trust.AppServer(executable, Path.cwd(), existing=not private, timeout=15) as server:
         turn = current_turn(server, session_id)
         identity = turn['client_message_id']
     state = Path(os.environ.get('AGENT_STATE_DIRECTORY') or Path.home() / '.agents-state')

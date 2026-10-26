@@ -56,7 +56,7 @@ def run(arguments, cwd, timeout=TIMEOUT):
 class AppServer:
     def __init__(self, executable, cwd, launch_args=(), environment=None, timeout=TIMEOUT, existing=False):
         if existing:
-            from codex_websocket import WebSocketStdio
+            from codex import websocket
 
         self.timeout = timeout
         self.process = subprocess.Popen(
@@ -72,7 +72,7 @@ class AppServer:
         self.connection_error = None
         self.websocket = None
         if existing:
-            self.websocket = WebSocketStdio(self.process.stdout, self.process.stdin)
+            self.websocket = websocket.StdioConnection(self.process.stdout, self.process.stdin)
         threading.Thread(target=self.read, daemon=True).start()
 
     def read(self):
