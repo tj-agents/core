@@ -113,7 +113,7 @@ def apply(envelopes: list[dict], cursor: dict, path: Path, project: Path, update
         return "busy"
     try:
         identifiers = [envelope["id"] for envelope in envelopes]
-        last = identifiers[-1]
+        last = identifiers[-1] if identifiers else cursor.get("since", "all")
         hosts = cursor.get("hosts") if isinstance(cursor.get("hosts"), dict) else {}
         work: dict[str, set[str] | None] = {}
         for host in HOSTS:
@@ -204,7 +204,7 @@ def check(project: Path, fetch=https_get, update=update_host, now: float | None 
     except (OSError, ValueError) as error:
         print(f"plugins: update check skipped ({type(error).__name__})", file=sys.stderr)
         return "offline"
-    result = apply(envelopes, cursor, path, project, update, now, expired) if envelopes else "current"
+    result = apply(envelopes, cursor, path, project, update, now, expired) if envelopes or expired else "current"
     return settle(project, reconcile) if result == "current" and host != "codex" else result
 
 
@@ -233,6 +233,18 @@ def require_update_check(result: str) -> None:
         )
 
 
+def prepare_launch(project, host, executable, arguments):
+    import required_plugins
+
+    try:
+        return required_plugins.check_launch(project, host, executable, arguments)
+    except required_plugins.MissingRequiredPluginsError as error:
+        import reload_plugins
+
+        reload_plugins.repair_missing(host, error.project, error.missing, executable)
+        return required_plugins.check_launch(project, host, executable, arguments)
+
+
 def ensure_hooks(project: Path, executable: str | None = None, *, running_session=False) -> None:
     import agent_cli
     import codex_hook_trust
@@ -250,7 +262,10 @@ def ensure_hooks(project: Path, executable: str | None = None, *, running_sessio
             expected[identity] = definitions
     codex_hook_trust.apply_trust(binary, project.resolve(), required=expected)
     if running_session:
-        codex_hook_trust.reload_running(binary, project.resolve(), required=expected)
+        try:
+            codex_hook_trust.reload_running(binary, project.resolve(), required=expected)
+        except (OSError, RuntimeError) as error:
+            raise codex_hook_trust.RestartRequired(str(error)) from error
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -268,9 +283,9 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             native_arguments = arguments.arguments[1:] if arguments.arguments[:1] == ["--"] else arguments.arguments
-            effective_project = required_plugins.check_launch(arguments.project.resolve(), arguments.host,
-                                                              arguments.target, native_arguments)
-        except required_plugins.RequiredPluginsError as error:
+            effective_project = prepare_launch(arguments.project.resolve(), arguments.host,
+                                               arguments.target, native_arguments)
+        except (required_plugins.RequiredPluginsError, RuntimeError, OSError) as error:
             print(f"plugins: {error}", file=sys.stderr)
             return 1
     try:
