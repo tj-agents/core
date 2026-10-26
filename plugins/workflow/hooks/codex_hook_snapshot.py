@@ -15,8 +15,6 @@ def fail(message):
 
 def digest_tree(root, plugin):
     excluded = {"hooks/codex.json"}
-    if plugin == "machine":
-        excluded.add("catalog/catalog.json")
     files = []
     directories = [(root, "")]
     while directories:
