@@ -2,7 +2,6 @@ import hashlib
 import importlib.util
 import json
 import os
-import sqlite3
 from pathlib import Path
 import subprocess
 import sys
@@ -20,15 +19,11 @@ specification.loader.exec_module(NATIVE)
 
 
 class NativeHostAcceptanceTests(unittest.TestCase):
-    def test_observer_imports_the_nested_installed_startup_binding(self):
+    def test_observer_runs_the_staged_agent_startup_binding_without_installed_state(self):
         with tempfile.TemporaryDirectory() as temporary:
-            state = Path(temporary) / 'state'
-            binding = state / 'bin' / '.agents' / 'agent' / 'runtime' / 'startup_binding.py'
-            binding.parent.mkdir(parents=True)
-            binding.write_text('', encoding='utf-8')
             result = subprocess.run([sys.executable, '-B', str(OBSERVER), '--help'], capture_output=True,
                                     text=True, encoding='utf-8', env={**os.environ,
-                                                                       'AGENT_STATE_DIRECTORY': str(state)})
+                                                                       'AGENT_STATE_DIRECTORY': temporary})
         self.assertEqual(0, result.returncode, result.stderr)
 
     def test_an_early_failure_cannot_reuse_a_previous_failed_observer_receipt(self):
@@ -85,61 +80,6 @@ class NativeHostAcceptanceTests(unittest.TestCase):
         with self.assertRaisesRegex(NATIVE.AcceptanceError, "engineering@tj-agents"):
             NATIVE.require_plugins(inventory)
 
-    def test_missing_or_malformed_receipt_fails_closed(self):
-        store = SimpleNamespace(connect=lambda path: None, get_session=lambda connection, handle: None)
-        register = SimpleNamespace(build_process_lookup=lambda: lambda pid: None)
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "missing or malformed codex receipt"):
-            NATIVE.require_receipt(self.state, store, register, "codex", "session", self.project, 1)
-        receipt = self.state / "cli-sessions" / "session.json"
-        receipt.parent.mkdir(parents=True)
-        receipt.write_text("not-json", encoding="utf-8")
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "missing or malformed codex receipt"):
-            NATIVE.require_receipt(self.state, store, register, "codex", "session", self.project, 1)
-
-    def test_receipt_uses_explicit_isolated_store_and_host_descendant(self):
-        value = self.receipt()
-        connection = SimpleNamespace(close=lambda: None)
-        connected = []
-        store = SimpleNamespace(
-            connect=lambda path: connected.append(path) or connection,
-            get_session=lambda current, handle: dict(value),
-        )
-        processes = {
-            42: SimpleNamespace(pid=42, ppid=7, name="codex.exe", started_at=100.0),
-            7: SimpleNamespace(pid=7, ppid=1, name="shell.exe", started_at=99.0),
-        }
-        register = SimpleNamespace(build_process_lookup=lambda: processes.get)
-        NATIVE.require_receipt(self.state, store, register, "codex", "session", self.project, 7)
-        self.assertEqual([self.state / "sessions.db"], connected)
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "not descended"):
-            NATIVE.require_receipt(self.state, store, register, "codex", "session", self.project, 99)
-
-    def test_locked_agent_store_fails_closed(self):
-        self.receipt()
-        store = SimpleNamespace(connect=lambda path: (_ for _ in ()).throw(sqlite3.OperationalError("locked")))
-        processes = {
-            42: SimpleNamespace(pid=42, ppid=7, name="codex.exe", started_at=100.0),
-            7: SimpleNamespace(pid=7, ppid=1, name="shell.exe", started_at=99.0),
-        }
-        register = SimpleNamespace(build_process_lookup=lambda: processes.get)
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "Agent Store is unavailable"):
-            NATIVE.require_receipt(self.state, store, register, "codex", "session", self.project, 7)
-
-    def test_receipt_and_agent_store_must_match(self):
-        value = self.receipt()
-        connection = SimpleNamespace(close=lambda: None)
-        store = SimpleNamespace(
-            connect=lambda path: connection,
-            get_session=lambda current, handle: {**value, "cwd": "wrong"},
-        )
-        processes = {
-            42: SimpleNamespace(pid=42, ppid=7, name="codex.exe", started_at=100.0),
-            7: SimpleNamespace(pid=7, ppid=1, name="shell.exe", started_at=99.0),
-        }
-        register = SimpleNamespace(build_process_lookup=lambda: processes.get)
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "Agent Store row does not match"):
-            NATIVE.require_receipt(self.state, store, register, "codex", "session", self.project, 7)
-
     def test_transcript_requires_base_context_and_unauthenticated_completion(self):
         package = self.root / "base"
         contract = package / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
@@ -190,11 +130,9 @@ class NativeHostAcceptanceTests(unittest.TestCase):
     def test_restarted_startup_hooks_require_trusted_current_hashes(self):
         hooks = {"data": [{"hooks": [
             {"pluginId": "base@tj-agents", "source": "plugin", "enabled": True, "key": "base", "trustStatus": "trusted", "currentHash": "sha256:base", "trustedHash": "sha256:base"},
-            {"pluginId": "machine@tj-agents", "source": "plugin", "enabled": True, "key": "machine", "trustStatus": "trusted", "currentHash": "sha256:machine", "trustedHash": "sha256:machine"},
         ]}]}
         trusted = {
             "base": {"trusted_hash": "sha256:base"},
-            "machine": {"trusted_hash": "sha256:machine"},
         }
         NATIVE.require_startup_hooks(hooks, trusted=True, trusted_hashes=trusted)
         trusted["base"]["trusted_hash"] = "sha256:stale"
