@@ -14,7 +14,8 @@ import delivery_policy
 
 
 SPEC = importlib.util.spec_from_file_location(
-    "repository_configuration", ROOT / ".agents" / "workflows" / "repository_configuration.py"
+    "repository_configuration",
+    ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime" / "repository_configuration.py",
 )
 CONFIGURATION = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CONFIGURATION)

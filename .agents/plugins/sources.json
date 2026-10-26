@@ -9,32 +9,11 @@
       "domain": "behavior"
     },
     {
-      "name": "agent-store",
-      "root": ".agents/agent-store",
-      "layout": "kind",
-      "plugin": "agent-store",
-      "domain": "process"
-    },
-    {
-      "name": "agent",
-      "root": ".agents/agent",
-      "layout": "kind",
-      "plugin": "agent",
-      "domain": "process"
-    },
-    {
       "name": "machine",
       "root": ".agents/machine",
       "layout": "kind",
       "plugin": "machine",
       "domain": "machine"
-    },
-    {
-      "name": "cli",
-      "root": ".agents/cli",
-      "layout": "kind",
-      "plugin": "cli",
-      "domain": "cli"
     },
     {
       "name": "workflow",
@@ -78,13 +57,7 @@
     }
   },
   "generated_roots": [
-    "plugins/base",
-    "plugins/agent-store",
-    "plugins/agent",
-    "plugins/machine",
-    "plugins/cli",
-    "plugins/workflow",
-    "plugins/engineering",
+    "plugins",
     "plugins/publication.json",
     ".agents/plugins/marketplace.json",
     ".claude-plugin/marketplace.json",
@@ -93,7 +66,7 @@
   "resources": [
     {
       "plugin": "base",
-      "source": ".agents/machine/scripts/required_plugins.py",
+      "source": ".agents/dependencies/agent/.agents/agent/runtime/required_plugins.py",
       "destination": "hooks/required_plugins.py"
     },
     {
@@ -103,7 +76,7 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/machine/scripts/required_plugins.py",
+      "source": ".agents/dependencies/agent/.agents/agent/runtime/required_plugins.py",
       "destination": "hooks/required_plugins.py"
     },
     {
@@ -153,7 +126,7 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/lanes",
+      "source": ".agents/dependencies/agent/.agents/agent/resources/lanes",
       "destination": ".agents/lanes"
     },
     {
@@ -168,18 +141,28 @@
     },
     {
       "plugin": "machine",
-      "source": ".agents/machine/scripts",
-      "destination": "resources/machine/scripts"
+      "source": ".agents/machine/scripts/setup_machine.py",
+      "destination": ".agents/machine/scripts/setup_machine.py"
     },
     {
       "plugin": "machine",
-      "source": ".agents/machine/resources/task-recovery.md",
-      "destination": ".agents/machine/resources/task-recovery.md"
+      "source": ".agents/dependencies/agent/.agents/agent/runtime",
+      "destination": ".agents/agent/runtime"
     },
     {
       "plugin": "machine",
-      "source": ".agents/machine/resources/work-item-sessions.md",
-      "destination": ".agents/machine/resources/work-item-sessions.md"
+      "source": ".agents/dependencies/agent/.agents/agent/resources",
+      "destination": ".agents/agent/resources"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts",
+      "destination": ".agents/agent/utility/plugins/scripts"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/dependencies/agent/.agents/agent/utility/peer/scripts",
+      "destination": ".agents/agent/utility/peer/scripts"
     },
     {
       "plugin": "machine",
@@ -188,7 +171,7 @@
     },
     {
       "plugin": "machine",
-      "source": ".agents/lanes",
+      "source": ".agents/dependencies/agent/.agents/agent/resources/lanes",
       "destination": "resources/lanes"
     },
     {
@@ -210,21 +193,6 @@
       "plugin": "engineering",
       "source": ".agents/workflows",
       "destination": "workflows"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/workflows/delivery_policy.py",
-      "destination": "resources/machine/scripts/delivery_policy.py"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/workflows/repository_configuration.py",
-      "destination": "resources/machine/scripts/repository_configuration.py"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/machine/utility/peer-cli/scripts/register_session.py",
-      "destination": "resources/machine/scripts/register_session.py"
     },
     {
       "plugin": "engineering",
@@ -342,28 +310,28 @@
       "destination": "schemas/standards-context.schema.json"
     },
     {
-      "plugin": "agent-store",
-      "source": ".agents/agent-store/runtime",
-      "destination": ".agents/agent-store/runtime"
-    },
-    {
       "plugin": "machine",
-      "source": ".agents/agent-store/runtime",
+      "source": ".agents/dependencies/agent/.agents/agent-store/runtime",
       "destination": ".agents/agent-store/runtime"
     },
     {
       "plugin": "engineering",
-      "source": ".agents/agent-store/runtime",
+      "source": ".agents/dependencies/agent/.agents/agent-store/runtime",
       "destination": ".agents/agent-store/runtime"
     },
     {
-      "plugin": "agent-store",
-      "source": ".agents/tiers/agent-store.json",
-      "destination": "tier.json"
+      "plugin": "workflow",
+      "source": ".agents/dependencies/agent/.agents/agent/runtime/repository_configuration.py",
+      "destination": "resources/agent/runtime/repository_configuration.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/dependencies/agent/.agents/agent/runtime/repository_configuration.py",
+      "destination": "resources/agent/runtime/repository_configuration.py"
     },
     {
       "plugin": "workflow",
-      "source": ".agents/agent-store/runtime",
+      "source": ".agents/dependencies/agent/.agents/agent-store/runtime",
       "destination": ".agents/agent-store/runtime"
     },
     {
@@ -395,81 +363,39 @@
       "plugin": "workflow",
       "source": ".agents/hooks/codex_hook_snapshot.py",
       "destination": "hooks/codex_hook_snapshot.py"
-    },
-    {
-      "plugin": "cli",
-      "source": ".agents/machine/utility/peer-cli/scripts",
-      "destination": ".agents/machine/utility/peer-cli/scripts"
-    },
-    {
-      "plugin": "cli",
-      "source": ".agents/machine/scripts",
-      "destination": "resources/machine/scripts"
-    },
-    {
-      "plugin": "cli",
-      "source": ".agents/agent-store/runtime",
-      "destination": ".agents/agent-store/runtime"
-    },
-    {
-      "plugin": "cli",
-      "source": ".agents/tiers/cli.json",
-      "destination": "tier.json"
-    },
-    {
-      "plugin": "machine",
-      "source": ".agents/cli",
-      "destination": ".agents/cli"
-    },
-    {
-      "plugin": "agent",
-      "source": ".agents/tiers/agent.json",
-      "destination": "tier.json"
     }
   ],
   "prerequisites": {
     "base": [],
-    "agent-store": [],
-    "machine": [
-      "base",
-      "agent-store"
-    ],
+    "machine": ["base"],
     "workflow": [
       "base",
-      "agent-store",
-      "machine",
-      "agent"
+      "machine"
     ],
     "engineering": [
       "base",
       "workflow",
-      "agent-store",
-      "machine",
-      "agent"
-    ],
-    "cli": [
-      "base",
-      "agent-store",
       "machine"
-    ],
-    "agent": [
-      "base"
     ]
   },
   "external_prerequisites": {
     "base": [],
-    "agent-store": [],
-    "machine": [],
-    "workflow": [],
-    "engineering": [],
-    "cli": [],
-    "agent": []
+    "machine": [
+      {"id": "tj-agents/agent-store", "marketplace": "tj-agents", "repository": "tj-agents/agent"}
+    ],
+    "workflow": [
+      {"id": "tj-agents/agent-store", "marketplace": "tj-agents", "repository": "tj-agents/agent"},
+      {"id": "tj-agents/agent", "marketplace": "tj-agents", "repository": "tj-agents/agent"}
+    ],
+    "engineering": [
+      {"id": "tj-agents/agent-store", "marketplace": "tj-agents", "repository": "tj-agents/agent"},
+      {"id": "tj-agents/agent", "marketplace": "tj-agents", "repository": "tj-agents/agent"},
+      {"id": "tj-agents/cli", "marketplace": "tj-agents", "repository": "tj-agents/cli"}
+    ]
   },
   "extended_host_adapters": [
-    "agent:background-listener",
     "engineering:persistent-workflow",
-    "engineering:review",
-    "machine:sync-plugins"
+    "engineering:review"
   ],
   "host_only_terms": {
     "claude": [

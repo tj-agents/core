@@ -484,7 +484,7 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(self.wake()["reason"], "unsupported-host")
         state["harness"] = "codex"
         args = runtime.lane_command(state, "test", ["fixture"])
-        lane = json.loads((ROOT / ".agents/lanes/codex.json").read_text())["lanes"]["L4"]
+        lane = json.loads((ROOT / ".agents/dependencies/agent/.agents/agent/resources/lanes/codex.json").read_text())["lanes"]["L4"]
         self.assertIn(lane["model"], args)
         self.assertIn(f'model_reasoning_effort="{lane["reasoning_effort"]}"', args)
         self.assertFalse(any("bypass" in arg for arg in args))

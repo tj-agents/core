@@ -4,10 +4,10 @@ This repository has one shared source and two host-specific adapter trees.
 
 ## Canonical shared source
 
-`.agents/` owns every host-neutral capability definition and its shared runtime material. The logical
-Base, Agent Store, Machine, CLI, Workflow and Engineering packages are classifications inside `.agents/`; they are not authored
-top-level repository trees. Shared workflow contracts, hooks, schemas, tests and resources also remain
-under `.agents/`.
+`.agents/` owns every Core host-neutral capability definition and its shared runtime material. Core owns
+Base, Machine, Workflow and Engineering classifications inside `.agents/`; they are not authored top-level
+repository trees. Agent, Agent Store, Codex, Claude and CLI source stays with its publisher. Core consumes
+declared publisher exports from `.agents/dependencies/` while building its own packages.
 
 The package catalog and project-selection schemas live under `.agents/catalog/`. `CAPABILITIES.md` is generated
 from that canonical catalog and is never edited as a second source.

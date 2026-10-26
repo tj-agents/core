@@ -1,2 +1,4 @@
 #!/usr/bin/env bash
-exec python3 -B "$(dirname "$0")/.agents/machine/scripts/reload_plugins.py" --project "$PWD" "$@"
+root="$(dirname "$0")"
+python3 -B "$root/scripts/runtime_sources.py" || exit $?
+exec python3 -B "$root/.agents/dependencies/agent/.agents/agent/runtime/reload_plugins.py" --project "$PWD" "$@"

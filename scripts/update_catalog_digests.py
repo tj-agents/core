@@ -22,8 +22,37 @@ HARNESS_SPEC.loader.exec_module(HARNESS)
 def update(root: Path, check: bool) -> None:
     catalog_path = root / ".agents/catalog/catalog.json"
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-    harnesses = HARNESS.synchronize(root, check=True)
+    sources = json.loads((root / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
+    marketplace = SYNC.core_marketplace(root, sources)
+    skills = SYNC.discover(root, sources)
     changed: list[str] = []
+    configured = set(sources["prerequisites"])
+    removed = [package["id"] for package in catalog["packages"] if package["name"] not in configured]
+    if removed:
+        catalog["packages"] = [package for package in catalog["packages"] if package["name"] in configured]
+        changed.extend(removed)
+    for package in catalog["packages"]:
+        name = package["name"]
+        expected_skills = sorted(skill["name"] for skill in skills.values() if skill["plugin"] == name)
+        if package["skills"] != expected_skills:
+            package["skills"] = expected_skills
+            changed.append(package["id"])
+        external = sources["external_prerequisites"][name]
+        required = [
+            *(f"{marketplace}/{dependency}" for dependency in sources["prerequisites"][name]),
+            *(dependency["id"] for dependency in external),
+        ]
+        if package["dependencies"]["required"] != required:
+            package["dependencies"]["required"] = required
+            changed.append(package["id"])
+        expected_external = {"required": external, "optional": []}
+        if package.get("external_dependencies") != expected_external:
+            package["external_dependencies"] = expected_external
+            if package["id"] not in changed:
+                changed.append(package["id"])
+    if changed and not check:
+        catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+    harnesses = HARNESS.synchronize(root, check=True)
     for package in catalog["packages"]:
         required = harnesses[package["name"]]["requires"]
         if package.get("harness") != required:

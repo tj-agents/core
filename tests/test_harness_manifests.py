@@ -16,12 +16,15 @@ SPEC = importlib.util.spec_from_file_location("harness_sync", ROOT / "scripts/sy
 HARNESS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(HARNESS)
 
-PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/plugin-selection/scripts"
+PERMISSIONS_SCRIPTS = ROOT / ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts"
+RUNTIME_SCRIPTS = ROOT / ".agents/dependencies/agent/.agents/agent/runtime"
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
+sys.path.insert(0, str(RUNTIME_SCRIPTS))
 import harness_permissions  # noqa: E402
+import plugin_autoupdate  # noqa: E402
 
-INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "close.py"), ("workflow", "status.py"))
-HOST_ENTRY_SKILLS = {"engineering": "merge", "machine": "peer-cli", "workflow": "status"}
+INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("workflow", "status.py"))
+HOST_ENTRY_SKILLS = {"engineering": "merge", "workflow": "status"}
 
 
 def validate_harness_schema(documents):
@@ -48,7 +51,7 @@ foreach ($document in $documents) {{
 class HarnessManifestTests(unittest.TestCase):
     def test_core_manifests_are_current_and_catalog_is_core_only(self):
         manifests = HARNESS.synchronize(ROOT, check=True)
-        self.assertEqual({"agent", "agent-store", "base", "cli", "engineering", "machine", "workflow"}, set(manifests))
+        self.assertEqual({"base", "engineering", "machine", "workflow"}, set(manifests))
         catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
         self.assertEqual({"tj-agents/core"}, {package["owner_repository"] for package in catalog["packages"]})
         for package in catalog["packages"]:
@@ -132,16 +135,14 @@ class HarnessManifestTests(unittest.TestCase):
             HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
 
     def test_core_marketplace_identity_matches_plugin_selection(self):
-        import plugin_selection
-
         config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
-        self.assertEqual(plugin_selection.MARKETPLACE_NAME, HARNESS.PACKAGES.core_marketplace(ROOT, config))
-        self.assertEqual(plugin_selection.MARKETPLACE_REPOSITORY, HARNESS.DISTRIBUTION_REPOSITORY)
+        self.assertEqual(plugin_autoupdate.MARKETPLACE_NAME, HARNESS.PACKAGES.core_marketplace(ROOT, config))
+        self.assertEqual(plugin_autoupdate.MARKETPLACE_REPOSITORY, HARNESS.DISTRIBUTION_REPOSITORY)
         for path in (ROOT / ".agents/plugins/harness").glob("*.json"):
             with self.subTest(path=path.name):
                 manifest = json.loads(path.read_text(encoding="utf-8"))
-                self.assertEqual(f"{plugin_selection.MARKETPLACE_NAME}/{path.stem}", manifest["plugin"])
-                self.assertEqual([{"id": plugin_selection.MARKETPLACE_NAME, "repository": plugin_selection.MARKETPLACE_REPOSITORY}],
+                self.assertEqual(f"{plugin_autoupdate.MARKETPLACE_NAME}/{path.stem}", manifest["plugin"])
+                self.assertEqual([{"id": plugin_autoupdate.MARKETPLACE_NAME, "repository": plugin_autoupdate.MARKETPLACE_REPOSITORY}],
                                  manifest["requires"]["marketplaces"])
 
 
@@ -284,92 +285,6 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
                     f"codex-skills/{skill}/scripts/{script}", rules_text,
                     f"{plugin}: missing the host-entry codex-skills/ Codex path",
                 )
-
-    def test_close_permissions_are_exact_argument_free_commands(self):
-        claude_allow, codex_rules = self.rendered("machine")
-        entries = [entry for entry in claude_allow if "close.py" in entry]
-        self.assertEqual(16, len(entries))
-        for entry in entries:
-            self.assertTrue(entry.replace("\\", "/").endswith("/close.py)"), entry)
-            self.assertNotIn("*", entry)
-            self.assertRegex(entry, r"(?:python|python3) -B ")
-        rules = [rule for rule in codex_rules if "close.py" in json.dumps(rule)]
-        self.assertEqual(1, len(rules))
-        self.assertEqual(3, len(rules[0]["pattern"]))
-        root = self.PLUGIN_ROOT.replace("\\", "/")
-        paths = {path.replace("\\", "/") for path in rules[0]["pattern"][-1]}
-        self.assertEqual({
-            f"{root}/.agents/machine/utility/peer-cli/scripts/close.py",
-            f"{root}/skills/peer-cli/scripts/close.py",
-            f"{root}/codex-skills/peer-cli/scripts/close.py",
-        }, paths)
-
-    def test_recovery_permissions_declare_script_boundary_and_codex_prefix_inventory(self):
-        manifest = json.loads((ROOT / ".agents/plugins/harness/machine.json").read_text(encoding="utf-8"))
-        harness_permissions.validate_requires(manifest["requires"], "machine")
-        templates = [
-            entry for entry in manifest["requires"]["permissions"]["claude_allow"]
-            if "agent_recovery.py" in entry
-        ]
-        self.assertEqual(8, len(templates))
-        self.assertEqual({"Bash", "PowerShell"}, {entry.partition("(")[0] for entry in templates})
-        self.assertEqual({"python", "python3"}, {
-            entry.partition("(")[2].split(" ", 1)[0] for entry in templates
-        })
-        claude_allow, codex_rules = self.rendered("machine")
-        entries = [entry for entry in claude_allow if "agent_recovery.py" in entry]
-        self.assertEqual(16, len(entries))
-        self.assertTrue(all(entry.endswith("agent_recovery.py:*)") for entry in entries))
-        self.assertTrue(all(" -B " in entry for entry in entries))
-        root = self.PLUGIN_ROOT.replace("\\", "/")
-        paths = {
-            entry.partition(" -B ")[2].removesuffix(":*)").replace("\\", "/")
-            for entry in entries
-        }
-        self.assertEqual({
-            f"{root}/.agents/machine/scripts/agent_recovery.py",
-            f"{root}/resources/machine/scripts/agent_recovery.py",
-        }, paths)
-        rules = [rule for rule in codex_rules if "agent_recovery.py" in json.dumps(rule)]
-        self.assertEqual(1, len(rules))
-        rule = rules[0]
-        self.assertEqual(2, len(rule["match"]))
-        self.assertEqual({"python", "python3"}, {tokens[0] for tokens in rule["match"]})
-        self.assertEqual(3, len(rule["not_match"]))
-        self.assertTrue(any(tokens[2].endswith("other.py") for tokens in rule["not_match"]))
-        self.assertTrue(any(tokens[-1] == "claude" for tokens in rule["not_match"]))
-        self.assertTrue(any(tokens[3] == "recover" for tokens in rule["not_match"]))
-
-    def test_work_item_registration_permissions_allow_item_and_claim_only(self):
-        claude_allow, codex_rules = self.rendered("machine")
-        self.assertTrue(any("work_item_sessions.py" in entry for entry in claude_allow))
-        rules = [
-            rule
-            for rule in codex_rules
-            if isinstance(rule["pattern"][-1], str)
-            and rule["pattern"][-1] in {"item", "claim"}
-        ]
-        self.assertEqual(2, len(rules))
-        self.assertEqual({"item", "claim"}, {rule["pattern"][-1] for rule in rules})
-        root = self.PLUGIN_ROOT.replace("\\", "/")
-        expected_paths = {
-            f"{root}/.agents/machine/scripts/work_item_sessions.py",
-            f"{root}/resources/machine/scripts/work_item_sessions.py",
-            f"{root}/.agents/machine/utility/recover-agents/scripts/work_item_sessions.py",
-            f"{root}/skills/recover-agents/scripts/work_item_sessions.py",
-            f"{root}/codex-skills/recover-agents/scripts/work_item_sessions.py",
-        }
-        for rule in rules:
-            command = rule["pattern"][-1]
-            with self.subTest(command=command):
-                paths = {
-                    path.replace("\\", "/")
-                    for path in rule["pattern"][2]
-                }
-                self.assertEqual(expected_paths, paths)
-                self.assertEqual(command, rule["match"][0][3])
-                self.assertTrue(any(tokens[2].endswith("other.py") for tokens in rule["not_match"]))
-                self.assertTrue(any(tokens[3] == "end" for tokens in rule["not_match"]))
 
     def test_rendered_codex_rules_load_under_execpolicy_when_available(self):
         codex = shutil.which("codex")

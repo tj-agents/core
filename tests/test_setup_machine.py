@@ -49,7 +49,7 @@ class Machine(unittest.TestCase):
     def test_posix_setup_supplies_the_interpreter_named_by_claude_hooks(self):
         context = self.context(windows=False)
         self.converge(step('launch-check runtime'), context)
-        alias = setup.launch_script(context).parent / 'python'
+        alias = context.state_directory / 'bin' / 'python'
         self.assertEqual(setup.python_alias(), alias.read_text(encoding='utf-8'))
         self.assertIn(str(alias.parent), setup.posix_block(sys.executable, setup.launch_script(context)))
         if os.name != 'nt':
@@ -230,7 +230,7 @@ class ProfileTests(Machine):
         return [self.documents / name / "Microsoft.PowerShell_profile.ps1" for name in setup.PROFILE_NAMES]
 
     def script(self):
-        return self.home / ".agents-state" / "bin" / "startup_binding.py"
+        return self.home / ".agents-state" / "bin" / ".agents" / "agent" / "runtime" / "startup_binding.py"
 
     def block(self, newline="\r\n", loader=None):
         loader = loader or self.checkout / "shell" / "profile.ps1"
@@ -241,6 +241,17 @@ class ProfileTests(Machine):
         for path in self.profiles():
             self.assertEqual(BOM + (self.block() + "\r\n").encode("utf-8"), path.read_bytes())
             self.assertEqual([], list(path.parent.glob("*.bak")))
+
+    def test_host_launchers_bind_the_current_project_and_native_target_without_a_legacy_flag(self):
+        powershell = self.block()
+        posix = setup.posix_block(sys.executable, self.script())
+        for block in (powershell, posix):
+            self.assertIn("startup_binding.py", block)
+            self.assertIn("--target", block)
+            self.assertIn("--require-session-start", block)
+            self.assertNotIn("--launch", block)
+        self.assertIn("--project (Get-Location).Path", powershell)
+        self.assertIn('--project "$PWD"', posix)
 
     def test_an_existing_block_for_another_checkout_is_rewired(self):
         path = self.profiles()[1]
@@ -517,18 +528,19 @@ class PermissionStepTests(Machine):
 
         self.assertEqual(["Bash(mine)", "Bash(shipped)"], json.loads(settings.read_text(encoding="utf-8"))["permissions"]["allow"])
 
-    def test_the_permission_sync_module_is_loaded_beside_the_running_script(self):
-        running = self.root / "running" / "machine" / "scripts"
-        running_scripts = running.parent / "utility" / "plugin-selection" / "scripts"
+    def test_the_permission_sync_module_is_loaded_from_the_staged_agent_receipt(self):
+        running = self.root / "running" / ".agents" / "machine" / "scripts"
+        running_scripts = running.parents[2] / ".agents" / "dependencies" / "agent" / \
+            ".agents" / "agent" / "utility" / "plugins" / "scripts"
         running_scripts.mkdir(parents=True)
-        (running_scripts / "harness_permissions_sync.py").write_text("SOURCE = 'running'\n", encoding="utf-8")
+        (running_scripts / "harness_permissions_sync.py").write_text("SOURCE = 'staged-agent'\n", encoding="utf-8")
         context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
                                 run=self.unexpected_run, which=lambda name: None, documents=self.documents,
                                 script_directory=running)
 
         module = setup.permission_sync(context)
 
-        self.assertEqual("running", module.SOURCE)
+        self.assertEqual("staged-agent", module.SOURCE)
 
     def test_a_missing_permission_sync_module_is_reported(self):
         context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
@@ -540,31 +552,30 @@ class PermissionStepTests(Machine):
 
 
 class RuntimeTests(Machine):
-    def test_installed_runtime_can_load_live_proxy_transport_without_source_checkout(self):
+    def test_installed_runtime_preserves_the_agent_package_closure_without_source_checkout(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
         installed = self.home / ".agents-state/bin"
-        probe = self.root / "runtime_probe.py"
-        probe.write_text(
-            "import sys\nfrom unittest.mock import patch\n"
-            "sys.path.insert(0, sys.argv[1])\nimport codex_hook_trust\nimport codex_websocket\n"
-            "assert codex_websocket.__file__.startswith(sys.argv[1])\n"
-            "with patch.object(codex_hook_trust.subprocess, 'Popen', side_effect=RuntimeError('transport-loaded')):\n"
-            "    try:\n        codex_hook_trust.AppServer('unused',sys.argv[1],existing=True)\n"
-            "    except RuntimeError as error:\n"
-            "        if str(error) != 'transport-loaded':\n            raise\n"
-            "        print('transport-loaded')\n",
-            encoding="utf-8",
-        )
-        result = subprocess.run([sys.executable, "-I", "-B", str(probe), str(installed)],
-                                cwd=self.root, capture_output=True, timeout=15)
-        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
-        self.assertEqual(b"transport-loaded", result.stdout.strip())
+        self.assertEqual(setup.runtime_manifest(setup.runtime_source(self.context())),
+                         setup.runtime_manifest(installed))
+        for relative in (Path('.agents/agent/runtime/startup_binding.py'),
+                         Path('.agents/agent/resources/lanes/resolve.py'),
+                         Path('.agents/agent/utility/peer/scripts/register_session.py'),
+                         Path('.agents/agent-store/runtime/session_store.py')):
+            self.assertTrue((installed / relative).is_file(), relative)
+        result = subprocess.run([sys.executable, "-I", "-B", str(setup.launch_script(self.context())), "--help"],
+                                cwd=self.root, capture_output=True, text=True, timeout=15)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn('--require-session-start', result.stdout)
 
-    def test_the_launch_check_runtime_is_installed_once(self):
+    def test_the_agent_runtime_receipt_and_exports_are_installed_once(self):
         self.converge(step("launch-check runtime"), self.context(windows=False))
-        for name in setup.plugin_autoupdate.RUNTIME:
-            self.assertEqual(setup.plugin_autoupdate.runtime_file(SCRIPTS, name).read_bytes(),
-                             (self.home / ".agents-state" / "bin" / name).read_bytes())
+        source = setup.runtime_source(self.context())
+        installed = self.home / '.agents-state/bin'
+        for relative in setup.runtime_files(source):
+            if relative == Path('source.json'):
+                self.assertEqual(setup.runtime_manifest(source), setup.runtime_manifest(installed))
+                continue
+            self.assertEqual((source / relative).read_bytes(), (installed / relative).read_bytes())
 
     def test_installed_shell_entry_point_resolves_its_complete_dependency_closure(self):
         context = self.context(windows=os.name == 'nt')
@@ -574,20 +585,122 @@ class RuntimeTests(Machine):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn('--require-session-start', result.stdout)
 
-    def test_the_runtime_is_installed_from_the_running_scripts_directory(self):
-        running = self.root / "running" / "scripts"
-        running.mkdir(parents=True)
-        for name in setup.plugin_autoupdate.RUNTIME:
-            (running / name).write_text("running script copy\n", encoding="utf-8")
+    def test_runtime_check_detects_export_drift_without_writing_and_preserves_unrelated_files(self):
+        context = self.context(windows=False)
+        setup.apply_runtime(context)
+        installed = context.state_directory / 'bin'
+        unrelated = installed / 'keep-me.txt'
+        unrelated.write_text('keep', encoding='utf-8')
+        bot_identity = installed / 'bot-identity' / 'identity.json'
+        bot_identity.parent.mkdir()
+        bot_identity.write_text('keep', encoding='utf-8')
+        target = setup.launch_script(context)
+        target.write_text('changed', encoding='utf-8')
+        before = snapshot(self.root)
+        changes = setup.check_runtime(context)
+        self.assertIn('install Agent runtime: managed runtime file differs: '
+                      '.agents/agent/runtime/startup_binding.py', changes)
+        self.assertEqual({'install Agent runtime: managed runtime file differs: '
+                          '.agents/agent/runtime/startup_binding.py'}, set(changes))
+        self.assertEqual(before, snapshot(self.root))
+        setup.apply_runtime(context)
+        self.assertTrue(unrelated.is_file())
+        self.assertTrue(bot_identity.is_file())
+        self.assertEqual(setup.python_alias(), (installed / 'python').read_text(encoding='utf-8'))
+
+    def test_unowned_or_linked_python_alias_is_refused_without_writing(self):
+        context = self.context(windows=False)
+        setup.apply_runtime(context)
+        alias = context.state_directory / 'bin' / 'python'
+        alias.write_text('custom', encoding='utf-8')
+        before = snapshot(self.root)
+        self.assertIn('refuse unowned', setup.python_alias_status(context, alias.parent))
+        with self.assertRaises(setup.SetupError):
+            setup.install_python_alias(context, alias.parent)
+        self.assertEqual(before, snapshot(self.root))
+
+    def test_managed_python_alias_updates_when_the_interpreter_changes(self):
+        context = self.context(windows=False)
+        alias = context.state_directory / 'bin' / 'python'
+        with mock.patch.object(setup.sys, 'executable', '/managed/python-a'):
+            setup.apply_runtime(context)
+            self.assertEqual(setup.python_alias('/managed/python-a'), alias.read_text(encoding='utf-8'))
+        with mock.patch.object(setup.sys, 'executable', '/managed/python-b'):
+            self.assertIn('install Claude hook interpreter', setup.python_alias_status(context, alias.parent))
+            setup.apply_runtime(context)
+            self.assertEqual(setup.python_alias('/managed/python-b'), alias.read_text(encoding='utf-8'))
+
+    def test_managed_python_alias_upgrade_preserves_an_unowned_temporary_collision(self):
+        context = self.context(windows=False)
+        alias = context.state_directory / 'bin' / 'python'
+        with mock.patch.object(setup.sys, 'executable', '/managed/python-a'):
+            setup.apply_runtime(context)
+        collision = alias.with_name('.python.collision.tmp')
+        collision.write_text('custom', encoding='utf-8')
+        before = snapshot(self.root)
+        with mock.patch.object(setup.sys, 'executable', '/managed/python-b'), \
+             mock.patch.object(setup.secrets, 'token_hex', return_value='collision'):
+            with self.assertRaises(FileExistsError):
+                setup.install_python_alias(context, alias.parent)
+        self.assertEqual(setup.python_alias('/managed/python-a'), alias.read_text(encoding='utf-8'))
+        self.assertEqual('custom', collision.read_text(encoding='utf-8'))
+        self.assertEqual(before, snapshot(self.root))
+
+    def test_modified_managed_python_alias_is_refused_without_writing(self):
+        context = self.context(windows=False)
+        setup.apply_runtime(context)
+        alias = context.state_directory / 'bin' / 'python'
+        alias.write_text(setup.python_alias() + '# modified\n', encoding='utf-8')
+        before = snapshot(self.root)
+        self.assertIn('refuse unowned', setup.python_alias_status(context, alias.parent))
+        with self.assertRaises(setup.SetupError):
+            setup.install_python_alias(context, alias.parent)
+        self.assertEqual(before, snapshot(self.root))
+
+    def test_python_alias_symlink_refuses_without_touching_outside_file(self):
+        context = self.context(windows=False)
+        setup.apply_runtime(context)
+        alias = context.state_directory / 'bin' / 'python'
+        outside = self.root / 'outside-python'
+        outside.write_text('custom', encoding='utf-8')
+        alias.unlink()
+        try:
+            alias.symlink_to(outside)
+        except OSError as error:
+            self.skipTest(f'symlink creation is unavailable: {error}')
+        before = snapshot(self.root)
+        with self.assertRaises(setup.SetupError):
+            setup.install_python_alias(context, alias.parent)
+        self.assertEqual('custom', outside.read_text(encoding='utf-8'))
+        self.assertEqual(before, snapshot(self.root))
+
+    def test_dangling_reparse_python_alias_is_refused_before_existence_check(self):
+        context = self.context(windows=False)
+        alias = context.state_directory / 'bin' / 'python'
+        delivery = mock.Mock()
+        delivery.is_reparse.side_effect = lambda path: path == alias
+        with mock.patch.object(setup, 'runtime_delivery', return_value=delivery), \
+             mock.patch.object(setup.os.path, 'lexists', side_effect=lambda path: Path(path) == alias):
+            with self.assertRaisesRegex(setup.SetupError, 'interpreter is a link'):
+                setup.python_alias_path(context, alias.parent)
+        delivery.is_reparse.assert_called_once_with(alias)
+
+    def test_malformed_runtime_receipts_fail_closed_without_writing(self):
+        running = self.root / 'running' / '.agents' / 'machine' / 'scripts'
+        source = running.parents[2] / '.agents' / 'dependencies' / 'agent'
+        source.mkdir(parents=True)
         context = setup.Context(home=self.home, checkout=self.checkout, environ={}, windows=False,
                                 run=self.unexpected_run, which=lambda name: None, documents=self.documents,
                                 script_directory=running)
-
-        setup.apply_runtime(context)
-
-        for name in setup.plugin_autoupdate.RUNTIME:
-            self.assertEqual((running / name).read_bytes(),
-                             (self.home / ".agents-state" / "bin" / name).read_bytes())
+        for value in (None, [], 'receipt', {'exports': {'not': 'a list'}},
+                      {'repository': 'tj-agents/agent', 'revision': 'x',
+                       'exports': [{'not': 'a string'}], 'sha256': '0' * 64}):
+            with self.subTest(value=value):
+                (source / 'source.json').write_text(json.dumps(value), encoding='utf-8')
+                before = snapshot(self.root)
+                with self.assertRaises(setup.SetupError):
+                    setup.check_runtime(context)
+                self.assertEqual(before, snapshot(self.root))
 
 
 class CatchUpTests(Machine):

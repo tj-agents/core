@@ -12,7 +12,7 @@ import sys
 
 
 FRONTMATTER = re.compile(r"\A---\n(?P<header>.*?)\n---\n(?P<body>.*)\Z", re.DOTALL)
-DEFAULT_HANDOFF_SKILLS = frozenset({"cd", "handoff", "handoff-codex"})
+DEFAULT_HANDOFF_SKILLS = frozenset({"cd", "handoff"})
 
 
 def read(path: Path) -> str:
@@ -410,7 +410,13 @@ def validate_configuration(root: Path, config: dict) -> set[str]:
     authored = [inside(root, scope["root"]) for scope in config["scopes"]]
     authored.extend(inside(root, value) for value in config["host_adapter_roots"].values())
     authored.extend(inside(root, value) for value in config["host_manifest_roots"].values())
-    generated = [inside(root, value) for value in config["generated_roots"]]
+    generated = []
+    for value in config["generated_roots"]:
+        lexical_root = root / Path(*PurePosixPath(value).parts)
+        generated_root = inside(root, value)
+        if generated_root != lexical_root:
+            raise ValueError(f"Unsafe generated root: {value}")
+        generated.append(generated_root)
     for generated_path in generated:
         for authored_path in authored:
             if (generated_path == authored_path or generated_path.is_relative_to(authored_path)
@@ -621,7 +627,7 @@ def validate_adapters(root: Path, config: dict, skills: dict[str, dict]) -> dict
     if unknown_extended:
         raise ValueError(f"Unknown extended host adapters: {sorted(unknown_extended)}")
     lane_tables = {
-        host: load(root / f".agents/lanes/{host}.json") for host in ("codex", "claude")
+        host: load(root / f".agents/dependencies/agent/.agents/agent/resources/lanes/{host}.json") for host in ("codex", "claude")
     }
     for host, adapter_root_value in config["host_adapter_roots"].items():
         adapter_root = inside(root, adapter_root_value)
@@ -742,10 +748,10 @@ def emit_workflow_agents(root: Path, config: dict, emit):
                 agent_payload(role, body, host),
             )
 
-    lane_body = read(root / ".agents/lanes/agent-body.md").strip()
-    handoff_body = read(root / ".agents/lanes/handoff-agent-body.md").strip()
+    lane_body = read(root / ".agents/dependencies/agent/.agents/agent/resources/lanes/agent-body.md").strip()
+    handoff_body = read(root / ".agents/dependencies/agent/.agents/agent/resources/lanes/handoff-agent-body.md").strip()
     for host in ("claude", "codex"):
-        table = load(root / f".agents/lanes/{host}.json")
+        table = load(root / f".agents/dependencies/agent/.agents/agent/resources/lanes/{host}.json")
         for lane, rung in table["lanes"].items():
             body = lane_body
             if rung.get("handoff"):
@@ -1004,6 +1010,23 @@ def generate(root: Path, check: bool = False):
     root = root.resolve()
     config, output, skills, _ = build(root)
     generated_roots = [inside(root, value) for value in config["generated_roots"]]
+
+    generated_directories: dict[Path, list[Path]] = {}
+    for generated_root in generated_roots:
+        if not generated_root.is_dir():
+            continue
+        directories = []
+        for entry in generated_root.rglob("*"):
+            relative = entry.relative_to(root).as_posix()
+            target = inside(root, relative)
+            if target != entry:
+                raise ValueError(f"Unsafe generated entry: {relative}")
+            if not any(target == declared or target.is_relative_to(declared) for declared in generated_roots):
+                raise ValueError(f"Unsafe generated entry: {relative}")
+            if entry.is_dir():
+                directories.append(entry)
+        generated_directories[generated_root] = sorted(directories, key=lambda path: len(path.parts), reverse=True)
+
     existing: dict[str, Path] = {}
     for generated_root in generated_roots:
         if generated_root.is_file():
@@ -1044,12 +1067,7 @@ def generate(root: Path, check: bool = False):
                 raise ValueError(f"Unsafe prune target: {relative}")
             target.unlink()
         for generated_root in generated_roots:
-            if not generated_root.is_dir():
-                continue
-            for directory in sorted(
-                (path for path in generated_root.rglob("*") if path.is_dir()),
-                key=lambda path: len(path.parts), reverse=True,
-            ):
+            for directory in generated_directories.get(generated_root, []):
                 try:
                     directory.rmdir()
                 except OSError:

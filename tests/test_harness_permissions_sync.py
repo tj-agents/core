@@ -11,7 +11,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / ".agents/machine/utility/plugin-selection/scripts/harness_permissions_sync.py"
+SCRIPT = ROOT / ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/harness_permissions_sync.py"
 sys.path.insert(0, str(SCRIPT.parent))
 SPEC = importlib.util.spec_from_file_location("harness_permissions_sync", SCRIPT)
 SYNC = importlib.util.module_from_spec(SPEC)
