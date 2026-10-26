@@ -1,6 +1,6 @@
 {
   "name": "tj-agents",
-  "description": "Common behavior, optional engineering process and machine utilities.",
+  "description": "Common agent behavior and the engineering and workflow process.",
   "owner": {
     "name": "Tommy Seery"
   },
@@ -13,17 +13,6 @@
       "keywords": [
         "behavior",
         "plans"
-      ]
-    },
-    {
-      "name": "machine",
-      "source": "./plugins/machine",
-      "description": "Explicit harness, history and clipboard utilities.",
-      "category": "Productivity",
-      "keywords": [
-        "machine",
-        "sessions",
-        "handoff"
       ]
     },
     {

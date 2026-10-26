@@ -4,8 +4,7 @@
     "process"
   ],
   "prerequisites": [
-    "base",
-    "machine"
+    "base"
   ],
   "external_prerequisites": [
     {

@@ -25,7 +25,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
         self.assertCountEqual(names, ["git_auth_scope_gate.py", "delivery_binding_gate.py"])
 
     def test_every_plugin_uses_host_expanded_plugin_root_and_pretool_adapter(self):
-        for name in ("base", "engineering", "machine"):
+        for name in ("base", "engineering", "workflow"):
             with self.subTest(plugin=name):
                 manifest = json.loads((ROOT / "plugins" / name / "hooks" / "codex.json").read_text(encoding="utf-8"))
                 for event, groups in manifest["hooks"].items():

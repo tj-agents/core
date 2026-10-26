@@ -12,7 +12,7 @@ class ProcessStandardsTests(unittest.TestCase):
     def corpus(self):
         paths = [
             path
-            for scope in ("base", "engineering", "machine", "workflow")
+            for scope in ("base", "engineering", "workflow")
             for path in (self.root / ".agents" / scope).rglob("SKILL.md")
         ]
         return "\n".join(path.read_text(encoding="utf-8") for path in paths)
