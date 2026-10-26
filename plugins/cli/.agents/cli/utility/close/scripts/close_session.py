@@ -37,6 +37,12 @@ def claude_transcript(session_id):
 
 def own_session(shared, session_id=None):
     entry = verified_entry(shared, session_id)
+    if entry['host'] == 'codex':
+        return entry, {}
+    return entry, session_activity(shared, entry)
+
+
+def session_activity(shared, entry):
     store = shared.register_session._load_session_store()
     if store is None:
         raise shared.Refusal('session turn store is unavailable')
@@ -49,7 +55,7 @@ def own_session(shared, session_id=None):
         raise shared.Refusal('this session has no active turn to close after')
     if activity.get('pid') != entry['pid'] or activity.get('pid_started_at') != entry['pid_started_at']:
         raise shared.Refusal('the CLI client attachment is not recorded in Agent Store; sync Machine and Agent Store')
-    return entry, activity
+    return activity
 
 
 def armed_path(shared, session_id):
@@ -66,7 +72,12 @@ def start_watcher(shared, entry, armed_at, cleanup=None):
         arguments += ['--transcript', str(transcript), '--transcript-offset', str(transcript.stat().st_size)]
     if cleanup:
         arguments += ['--repo', str(cleanup[0]), '--sweep', str(cleanup[1])]
-    shared.write_json(armed_path(shared, entry['session_id']), {'armed_at': armed_at})
+    receipt = {'armed_at': armed_at}
+    if entry['host'] == 'codex':
+        guard = shared.client_runtime().NativeCompletion(entry)
+        guard.poll()
+        receipt.update(entry=entry, rollout=guard.pin())
+    shared.write_json(armed_path(shared, entry['session_id']), receipt)
     here = Path(__file__).resolve()
     scripts = peer_scripts()
     shared.start_detached(here.with_name('close_watcher.py'), arguments,
@@ -78,7 +89,7 @@ def start_watcher(shared, entry, armed_at, cleanup=None):
 def arm():
     shared = runtime()
     entry, activity = own_session(shared)
-    if activity.get('turn_state') != 'working':
+    if entry['host'] != 'codex' and activity.get('turn_state') != 'working':
         raise shared.Refusal('this session has no active turn to close after')
     return start_watcher(shared, entry, time.time())
 
