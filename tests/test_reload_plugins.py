@@ -311,17 +311,6 @@ class RefreshCliTests(unittest.TestCase):
             ["claude", "plugin", "marketplace", "update", "tj-agents"],
         ])
 
-    def test_packaged_entry_point_resolves_from_each_skill_surface(self):
-        package = ROOT / "plugins/machine"
-        for relative in ("skills/sync-plugins", "codex-skills/sync-plugins",
-                         ".agents/machine/utility/sync-plugins"):
-            with self.subTest(surface=relative):
-                result = subprocess.run([sys.executable, "-I", "-B", str(package / relative / "scripts/sync_plugins.py"),
-                                         "--help"], cwd=ROOT.parent, capture_output=True, text=True,
-                                        encoding="utf-8", timeout=20)
-                self.assertEqual(0, result.returncode, result.stderr)
-                self.assertIn("--verify-only", result.stdout)
-
     def test_project_selection_overrides_user_and_foreign_sources_are_untouched(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -55,7 +55,7 @@ class ClassificationTests(unittest.TestCase):
                      ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/plugin_selection.py",
                      ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/repo_config.py",
                      ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/lock_io.py",
-                     ".agents/plugins/sources.json", "tests/test_agent_cli.py"):
+                     ".agents/plugins/sources.json", "tests/native_plugin_inventory.py"):
             with self.subTest(path=path):
                 self.assertEqual(CI.classify(["README.md", path])["mode"], "full")
 
