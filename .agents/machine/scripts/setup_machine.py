@@ -680,8 +680,30 @@ def check_runtime(context: Context) -> list[str]:
     return changes
 
 
-def python_alias() -> str:
-    return '#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' "$@"\n'
+PYTHON_ALIAS_MARKER = '# tj-agents-managed-python-alias '
+
+
+def python_alias(interpreter: str | None = None) -> str:
+    interpreter = sys.executable if interpreter is None else interpreter
+    marker = json.dumps({'interpreter': interpreter}, separators=(',', ':'), sort_keys=True)
+    return '#!/bin/sh\n' + PYTHON_ALIAS_MARKER + marker + '\nexec ' + shlex.quote(interpreter) + ' "$@"\n'
+
+
+def managed_python_alias(value: str) -> str | None:
+    prefix = '#!/bin/sh\n' + PYTHON_ALIAS_MARKER
+    if not value.startswith(prefix):
+        return None
+    marker, separator, _ = value[len(prefix):].partition('\n')
+    if not separator:
+        return None
+    try:
+        metadata = json.loads(marker)
+    except json.JSONDecodeError:
+        return None
+    interpreter = metadata.get('interpreter') if isinstance(metadata, dict) and set(metadata) == {'interpreter'} else None
+    if not isinstance(interpreter, str) or not interpreter or python_alias(interpreter) != value:
+        return None
+    return interpreter
 
 
 def python_alias_path(context: Context, directory: Path) -> Path:
@@ -702,8 +724,11 @@ def python_alias_status(context: Context, directory: Path) -> str | None:
     alias = python_alias_path(context, directory)
     if not alias.exists():
         return f'install Claude hook interpreter {alias}'
-    if alias.read_text(encoding='utf-8') != python_alias():
+    value = alias.read_text(encoding='utf-8')
+    if managed_python_alias(value) is None:
         return f'refuse unowned Claude hook interpreter {alias}'
+    if value != python_alias():
+        return f'install Claude hook interpreter {alias}'
     if os.name != 'nt' and not os.access(alias, os.X_OK):
         return f'install Claude hook interpreter {alias}'
     return None
@@ -722,8 +747,23 @@ def install_python_alias(context: Context, directory: Path) -> None:
                 stream.write(python_alias())
         except FileExistsError:
             return install_python_alias(context, directory)
-    if alias.read_text(encoding='utf-8') != python_alias():
+    value = alias.read_text(encoding='utf-8')
+    if managed_python_alias(value) is None:
         raise SetupError(f'refuse unowned Claude hook interpreter {alias}')
+    if value != python_alias():
+        temporary = alias.with_name(f'.{alias.name}.{secrets.token_hex(12)}.tmp')
+        try:
+            with temporary.open('x', encoding='utf-8', newline='\n') as stream:
+                stream.write(python_alias())
+            alias = python_alias_path(context, directory)
+            if alias.read_text(encoding='utf-8') != value:
+                raise SetupError(f'refuse changed Claude hook interpreter {alias}')
+            os.replace(temporary, alias)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+    if alias.read_text(encoding='utf-8') != python_alias():
+        raise SetupError(f'refuse changed Claude hook interpreter {alias}')
     alias.chmod(0o755)
 
 

@@ -557,6 +557,45 @@ class RuntimeTests(Machine):
             setup.install_python_alias(context, alias.parent)
         self.assertEqual(before, snapshot(self.root))
 
+    def test_managed_python_alias_updates_when_the_interpreter_changes(self):
+        context = self.context(windows=False)
+        alias = context.state_directory / 'bin' / 'python'
+        with mock.patch.object(setup.sys, 'executable', '/managed/python-a'):
+            setup.apply_runtime(context)
+            self.assertEqual(setup.python_alias('/managed/python-a'), alias.read_text(encoding='utf-8'))
+        with mock.patch.object(setup.sys, 'executable', '/managed/python-b'):
+            self.assertIn('install Claude hook interpreter', setup.python_alias_status(context, alias.parent))
+            setup.apply_runtime(context)
+            self.assertEqual(setup.python_alias('/managed/python-b'), alias.read_text(encoding='utf-8'))
+
+    def test_modified_managed_python_alias_is_refused_without_writing(self):
+        context = self.context(windows=False)
+        setup.apply_runtime(context)
+        alias = context.state_directory / 'bin' / 'python'
+        alias.write_text(setup.python_alias() + '# modified\n', encoding='utf-8')
+        before = snapshot(self.root)
+        self.assertIn('refuse unowned', setup.python_alias_status(context, alias.parent))
+        with self.assertRaises(setup.SetupError):
+            setup.install_python_alias(context, alias.parent)
+        self.assertEqual(before, snapshot(self.root))
+
+    def test_python_alias_symlink_refuses_without_touching_outside_file(self):
+        context = self.context(windows=False)
+        setup.apply_runtime(context)
+        alias = context.state_directory / 'bin' / 'python'
+        outside = self.root / 'outside-python'
+        outside.write_text('custom', encoding='utf-8')
+        alias.unlink()
+        try:
+            alias.symlink_to(outside)
+        except OSError as error:
+            self.skipTest(f'symlink creation is unavailable: {error}')
+        before = snapshot(self.root)
+        with self.assertRaises(setup.SetupError):
+            setup.install_python_alias(context, alias.parent)
+        self.assertEqual('custom', outside.read_text(encoding='utf-8'))
+        self.assertEqual(before, snapshot(self.root))
+
     def test_dangling_reparse_python_alias_is_refused_before_existence_check(self):
         context = self.context(windows=False)
         alias = context.state_directory / 'bin' / 'python'
