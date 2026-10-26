@@ -41,7 +41,7 @@ Full plan-graph validation reports six existing errors in unrelated legacy MACHI
 
 PR491's initial Windows CI failed only two test comparisons of short versus resolved temporary paths; normalize the fixture root with `Path.resolve`, retaining the same assertions. Linux passed. Send the stable reviewed repair head to the same PR once ready; do not retry the failed old head.
 
-The skill-ownership cutover owner acknowledged verified delivery of the repair evidence. It explicitly retains PR491 as runtime owner and will propagate the delivered runtime plus automatic `agent:refresh` guidance in its existing reviewed Agent change. Do not add another refresh skill or edit its checkout. The caller's original npm CLI failed messaging to a standalone peer; using the verified target shared-daemon executable delivered the coordination to the desktop owner. No terminal or peer restart was used.
+The skill-ownership cutover owner acknowledged verified delivery of the repair evidence. It explicitly retains PR491 as runtime owner and will propagate the delivered runtime plus automatic `agent:refresh-plugins` guidance in its existing reviewed Agent change. Do not add another refresh skill or edit its checkout. The caller's original npm CLI failed messaging to a standalone peer; using the verified target shared-daemon executable delivered the coordination to the desktop owner. No terminal or peer restart was used.
 
 ```agent-host-coverage
 {
