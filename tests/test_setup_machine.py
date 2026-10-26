@@ -568,6 +568,22 @@ class RuntimeTests(Machine):
             setup.apply_runtime(context)
             self.assertEqual(setup.python_alias('/managed/python-b'), alias.read_text(encoding='utf-8'))
 
+    def test_managed_python_alias_upgrade_preserves_an_unowned_temporary_collision(self):
+        context = self.context(windows=False)
+        alias = context.state_directory / 'bin' / 'python'
+        with mock.patch.object(setup.sys, 'executable', '/managed/python-a'):
+            setup.apply_runtime(context)
+        collision = alias.with_name('.python.collision.tmp')
+        collision.write_text('custom', encoding='utf-8')
+        before = snapshot(self.root)
+        with mock.patch.object(setup.sys, 'executable', '/managed/python-b'), \
+             mock.patch.object(setup.secrets, 'token_hex', return_value='collision'):
+            with self.assertRaises(FileExistsError):
+                setup.install_python_alias(context, alias.parent)
+        self.assertEqual(setup.python_alias('/managed/python-a'), alias.read_text(encoding='utf-8'))
+        self.assertEqual('custom', collision.read_text(encoding='utf-8'))
+        self.assertEqual(before, snapshot(self.root))
+
     def test_modified_managed_python_alias_is_refused_without_writing(self):
         context = self.context(windows=False)
         setup.apply_runtime(context)

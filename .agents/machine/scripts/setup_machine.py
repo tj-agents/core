@@ -752,15 +752,17 @@ def install_python_alias(context: Context, directory: Path) -> None:
         raise SetupError(f'refuse unowned Claude hook interpreter {alias}')
     if value != python_alias():
         temporary = alias.with_name(f'.{alias.name}.{secrets.token_hex(12)}.tmp')
+        created = False
         try:
             with temporary.open('x', encoding='utf-8', newline='\n') as stream:
+                created = True
                 stream.write(python_alias())
             alias = python_alias_path(context, directory)
             if alias.read_text(encoding='utf-8') != value:
                 raise SetupError(f'refuse changed Claude hook interpreter {alias}')
             os.replace(temporary, alias)
         finally:
-            if temporary.exists():
+            if created and temporary.exists():
                 temporary.unlink()
     if alias.read_text(encoding='utf-8') != python_alias():
         raise SetupError(f'refuse changed Claude hook interpreter {alias}')
