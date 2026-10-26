@@ -26,9 +26,7 @@ def runtime():
 
 
 def verified_entry(shared, session_id=None):
-    entry = shared.own_host_and_entry(session_id=session_id)
-    shared.close_target(entry)
-    return entry
+    return shared.own_host_and_entry(session_id=session_id)
 
 
 def claude_transcript(session_id):
@@ -49,6 +47,8 @@ def own_session(shared, session_id=None):
         connection.close()
     if not isinstance(activity, dict) or activity.get('ended_at') is not None:
         raise shared.Refusal('this session has no active turn to close after')
+    if activity.get('pid') != entry['pid'] or activity.get('pid_started_at') != entry['pid_started_at']:
+        raise shared.Refusal('the CLI client attachment is not recorded in Agent Store; sync Machine and Agent Store')
     return entry, activity
 
 
@@ -57,12 +57,10 @@ def armed_path(shared, session_id):
 
 
 def start_watcher(shared, entry, armed_at, cleanup=None):
-    target = shared.close_target(entry)
     arguments = ['--host', entry['host'], '--session-id', entry['session_id'], '--pid', str(entry['pid']),
                  '--pid-started-at', repr(entry['pid_started_at']), '--armed-at', repr(armed_at),
                  '--state-directory', str(shared.state_directory()),
-                 '--host-names', os.environ.get('AGENT_CLI_HOST_NAMES', ''),
-                 '--target', json.dumps(target)]
+                 '--host-names', os.environ.get('AGENT_CLI_HOST_NAMES', '')]
     transcript = claude_transcript(entry['session_id']) if entry['host'] == 'claude' else None
     if transcript:
         arguments += ['--transcript', str(transcript), '--transcript-offset', str(transcript.stat().st_size)]
@@ -72,7 +70,7 @@ def start_watcher(shared, entry, armed_at, cleanup=None):
     here = Path(__file__).resolve()
     scripts = peer_scripts()
     shared.start_detached(here.with_name('close_watcher.py'), arguments,
-                          [scripts / 'close.py', scripts / 'close_tab.py', scripts / 'windows_terminal_uia.ps1'])
+                          [scripts / 'close.py', shared.client_runtime_path()])
     return {'operation': 'session-close', 'status': 'armed', 'session_id': entry['session_id'],
             'transcript_checked': transcript is not None}
 

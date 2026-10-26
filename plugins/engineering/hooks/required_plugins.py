@@ -29,6 +29,13 @@ class RequiredPluginsError(RuntimeError):
     pass
 
 
+class MissingRequiredPluginsError(RequiredPluginsError):
+    def __init__(self, message, project, missing):
+        super().__init__(message)
+        self.project = project
+        self.missing = tuple(missing)
+
+
 def project_root(project: Path) -> Path:
     project = project.resolve()
     for directory in (project, *project.parents):
@@ -167,6 +174,38 @@ def enabled_roots(host: str, project: Path, entries: list) -> dict[str, Path]:
     return roots
 
 
+def inventory(binary: str, host: str, launch_directory: Path, inventory_options: tuple[str, ...],
+              marketplace: str | None = None) -> list:
+    command = [binary, *inventory_options, "plugin", "list"]
+    if marketplace is not None:
+        command.extend(("--marketplace", marketplace))
+    command.append("--json")
+    if os.name == "nt" and Path(binary).suffix.casefold() == ".ps1":
+        command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-File", *command]
+    try:
+        result = subprocess.run(
+            command, cwd=launch_directory, capture_output=True,
+            text=True, encoding="utf-8", errors="replace", timeout=INVENTORY_TIMEOUT_SECONDS,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        scope = f" for marketplace {marketplace}" if marketplace is not None else ""
+        raise RequiredPluginsError(f"Required {host} plugin inventory{scope} could not run: {error}") from error
+    if result.returncode:
+        scope = f" for marketplace {marketplace}" if marketplace is not None else ""
+        raise RequiredPluginsError(
+            f"Required {host} plugin inventory{scope} failed: {(result.stderr or result.stdout).strip()[:1024]}"
+        )
+    try:
+        data = json.loads(result.stdout)
+    except ValueError as error:
+        raise RequiredPluginsError(f"Required {host} plugin inventory returned invalid JSON") from error
+    entries = data.get("installed") if host == "codex" and isinstance(data, dict) else data
+    if not isinstance(entries, list):
+        raise RequiredPluginsError(f"Required {host} plugin inventory returned an invalid roster")
+    return entries
+
+
 def check(project: Path, host: str, executable: str | None = None,
           inventory_options: tuple[str, ...] = ()) -> dict[str, Path] | None:
     launch_directory = project.resolve()
@@ -187,35 +226,17 @@ def check(project: Path, host: str, executable: str | None = None,
     binary = executable or shutil.which(host)
     if not binary:
         raise RequiredPluginsError(f"Required standards cannot be verified: {host} executable is unavailable")
-    try:
-        command = [binary, *inventory_options, "plugin", "list", "--json"]
-        if os.name == "nt" and Path(binary).suffix.casefold() == ".ps1":
-            command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-File", *command]
-        result = subprocess.run(
-            command, cwd=launch_directory, capture_output=True,
-            text=True, encoding="utf-8", errors="replace", timeout=INVENTORY_TIMEOUT_SECONDS,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
-        raise RequiredPluginsError(f"Required {host} plugin inventory could not run: {error}") from error
-    if result.returncode:
-        raise RequiredPluginsError(
-            f"Required {host} plugin inventory failed: {(result.stderr or result.stdout).strip()[:1024]}"
-        )
-    try:
-        data = json.loads(result.stdout)
-    except ValueError as error:
-        raise RequiredPluginsError(f"Required {host} plugin inventory returned invalid JSON") from error
-    entries = data.get("installed") if host == "codex" and isinstance(data, dict) else data
-    if not isinstance(entries, list):
-        raise RequiredPluginsError(f"Required {host} plugin inventory returned an invalid roster")
+    marketplaces = sorted({identity.rsplit("@", 1)[1] for identity in required}) if host == "codex" else (None,)
+    entries = []
+    for marketplace in marketplaces:
+        entries.extend(inventory(binary, host, launch_directory, inventory_options, marketplace))
     roots = enabled_roots(host, launch_directory, entries)
     missing = sorted(set(required) - roots.keys())
     if missing:
-        raise RequiredPluginsError(
+        raise MissingRequiredPluginsError(
             f"Required standards unavailable for {host} in {project}: {', '.join(missing)}. "
             "Repair repository selection/native installation, then start a fresh session. "
-            "Cached files from another host do not establish activation."
+            "Cached files from another host do not establish activation.", project, missing,
         )
     return {identity: roots[identity] for identity in required}
 
@@ -322,8 +343,16 @@ def declaration(root: Path, identity: str, document: dict | None = None) -> Targ
     return Target(identity, script, setup["script"], runtime_bytes(script.parent))
 
 
-def targets(project: Path, host: str, executable: str | None) -> list[Target]:
-    roots = check(project, host, executable)
+def targets(project: Path, host: str, executable: str | None, *, repair=False) -> list[Target]:
+    try:
+        roots = check(project, host, executable)
+    except MissingRequiredPluginsError as error:
+        if not repair:
+            raise
+        import reload_plugins
+
+        reload_plugins.repair_missing(host, error.project, error.missing, executable)
+        roots = check(project, host, executable)
     if roots is None:
         return []
     identities = selected(project_root(project))
@@ -341,12 +370,12 @@ def targets(project: Path, host: str, executable: str | None) -> list[Target]:
     return found
 
 
-def collect(project: Path, hosts: tuple[str, ...], executables: dict[str, str | None]) -> tuple[list[Target], list[str]]:
+def collect(project: Path, hosts: tuple[str, ...], executables: dict[str, str | None], *, repair=False) -> tuple[list[Target], list[str]]:
     discovered, errors = {}, []
     for host in hosts:
         try:
-            discovered[host] = {target.identity: target for target in targets(project, host, executables.get(host))}
-        except (RequiredPluginsError, PluginSetupError) as error:
+            discovered[host] = {target.identity: target for target in targets(project, host, executables.get(host), repair=repair)}
+        except (RequiredPluginsError, RuntimeError, OSError) as error:
             errors.append(f"{host}: {error}")
     if not errors and discovered:
         reference_host = next(iter(discovered))
@@ -383,7 +412,7 @@ def check_setup(project: Path, hosts: tuple[str, ...], executables: dict[str, st
 
 
 def converge_setup(project: Path, hosts: tuple[str, ...], executables: dict[str, str | None], onboard: bool = False) -> list[str]:
-    targets_found, errors = collect(project, hosts, executables)
+    targets_found, errors = collect(project, hosts, executables, repair=True)
     for target in targets_found:
         try:
             checked = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS)

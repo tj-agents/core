@@ -13,15 +13,8 @@
               "--deadline",
               "8",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py"
-            ]
-          },
-          {
-            "type": "command",
-            "timeout": 10,
-            "command": "python",
-            "args": [
-              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py",
+              "--hook",
               "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/reap_orphans.py",
               "--notice"
             ]
@@ -71,7 +64,7 @@
               "--host",
               "claude",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_landed.py"
+              "${CLAUDE_PLUGIN_ROOT}/.agents/cli/workflow/closeout/scripts/close_landed.py"
             ]
           }
         ]

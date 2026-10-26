@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:c4ecc67c6db321160a2883eaff5672279ccaf3bcfb00eda30cd3228dcdf2fc9c",
+      "digest": "sha256:c38ce235935c93caa9b4385ad975d35ec3ed1fa4f3c55960c2ce26ab1e3b85c6",
       "harness": {
         "marketplaces": [
           {
@@ -132,7 +132,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:de2a8c71ae167910b659e3ab63e9717f50de42596b6bae11ae016a34b29be512",
+      "digest": "sha256:46ad8c197424d2f1369262ef8a744e97058b319de3e791a3fac89453854f9548",
       "harness": {
         "marketplaces": [
           {
@@ -283,7 +283,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:bfb3cf679c508aa94f26f1fdf582116849c2d4f03fc7961bc688ee90cead9b74",
+      "digest": "sha256:63289c6ee313efe79cf107b1415bb32ba7c0a7b07ad00d6981745a923cb74642",
       "harness": {
         "marketplaces": [
           {
@@ -414,7 +414,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:04a0ec099a90263737422c1b081830b748ee2e27feed4c45bdb77f3f97b40962",
+      "digest": "sha256:aad50993b1b7d4be53eefd2e049bba0350e37aaba8db24b7a6e9f65f36e1fb6e",
       "harness": {
         "marketplaces": [
           {
@@ -615,7 +615,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:5b2527efdcf6d027adc86f4f74c758df92e7788db4599e3ea852dbcd83361f75",
+      "digest": "sha256:631267af3e176cb33802f00bf00e3749b822e1f3cc45f217101ec5035eceb010",
       "harness": {
         "marketplaces": [
           {
@@ -919,7 +919,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:dbea5a20f41ce9da7453bc9b0334c548357148604549db1ade819e5f5885fa47",
+      "digest": "sha256:4668bccb7af03c5a145a6effc850b46658d6dbf66045d4d727fe9fa67c7e9688",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
@@ -944,7 +944,7 @@
             ]
           },
           {
-            "path": ".agents/machine/utility/close/scripts/close_landed.py",
+            "path": ".agents/cli/workflow/closeout/scripts/close_landed.py",
             "hosts": [
               "claude",
               "codex"

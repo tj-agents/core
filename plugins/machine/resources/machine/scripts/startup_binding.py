@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import secrets
@@ -18,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import launch_check
 import launch_status
+import cli_client
 import required_plugins
 from terminal_command import command_for_target, without_binding_state
 
@@ -29,6 +31,7 @@ import register_session
 
 ACK_DIRECTORY_ENV = "TJ_AGENTS_STARTUP_ACK_DIRECTORY"
 ACK_TOKEN_ENV = "TJ_AGENTS_STARTUP_ACK_TOKEN"
+REQUIRED_HOOKS_ENV = "TJ_AGENTS_STARTUP_REQUIRED_HOOKS"
 STARTUP_TIMEOUT_SECONDS = 20
 
 
@@ -43,22 +46,29 @@ def _acknowledged(directory: Path, token: str) -> bool:
         return False
 
 
+def startup_participants(host: str, roots) -> list[str]:
+    participants = []
+    for identity, root in (roots or {}).items():
+        manifest = json.loads((root / f'.{host}-plugin/plugin.json').read_text(encoding='utf-8-sig'))
+        sources = manifest.get('hooks', [])
+        if not isinstance(sources, list):
+            sources = [sources]
+        for source in sources:
+            document = json.loads((root / source).read_text(encoding='utf-8-sig')) if isinstance(source, str) else source
+            groups = document.get('hooks', document).get('SessionStart', [])
+            if any('hook_dispatch.py' in json.dumps(handler)
+                   for group in groups for handler in group.get('hooks', [])):
+                participants.append(identity)
+                break
+    return sorted(participants)
+
+
 def _terminate(process: subprocess.Popen) -> None:
-    if os.name == "nt":
-        try:
-            subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
-                           capture_output=True, timeout=10, check=False)
-        except (OSError, subprocess.TimeoutExpired):
-            process.kill()
-    else:
-        os.killpg(process.pid, signal.SIGTERM)
+    process.terminate()
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
-        if os.name == "nt":
-            process.kill()
-        else:
-            os.killpg(process.pid, signal.SIGKILL)
+        process.kill()
         process.wait(timeout=5)
 
 
@@ -68,30 +78,53 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 on_running: Callable[..., None] | None = None,
                 on_unconfirmed: Callable[..., None] | None = None,
                 require_session_start: bool = False,
+                hook_project: Path | None = None,
                 on_phase: Callable[[str], None] | None = None) -> int:
     phase = on_phase or (lambda _name: None)
     running = on_running or (lambda child_pid=None: None)
     environment = without_binding_state(os.environ)
     if extra_environment:
         environment.update(without_binding_state(extra_environment))
+    interpreter = launch_check.state_directory() / 'bin' / 'python'
+    if os.name != 'nt' and interpreter.is_file():
+        environment['PATH'] = str(interpreter.parent) + os.pathsep + environment.get('PATH', '')
     with tempfile.TemporaryDirectory(prefix="tj-agents-launch-") as temporary:
         directory = Path(temporary)
         token = secrets.token_urlsafe(32)
         if require_session_start:
             environment[ACK_DIRECTORY_ENV] = str(directory)
             environment[ACK_TOKEN_ENV] = token
+            roots = required_plugins.check(hook_project or project, host, target)
+            environment[REQUIRED_HOOKS_ENV] = json.dumps(startup_participants(host, roots))
         phase("starting-native")
+        command = command_for_target(target, list(arguments))
+        arguments, environment, ticket = cli_client.prepare(host, command[1:], project, environment,
+                                                           executable=command[0])
+        process = None
+        def interrupt(signum, _frame):
+            if os.name != 'nt' and process.poll() is None:
+                try:
+                    os.killpg(process.pid, signum)
+                except ProcessLookupError:
+                    pass
+
+        previous_interrupt = None
         try:
-            process = subprocess.Popen(command_for_target(target, list(arguments)),
-                                       cwd=project, env=environment, start_new_session=os.name != "nt")
-        except OSError as error:
-            raise StartupBindingError(f"native {host} could not start: {error}") from error
-        try:
+            try:
+                process = subprocess.Popen([command[0], *arguments],
+                                           cwd=project, env=environment, start_new_session=os.name != "nt")
+            except OSError as error:
+                raise StartupBindingError(f"native {host} could not start: {error}") from error
+            previous_interrupt = signal.signal(signal.SIGINT, interrupt)
+            cli_client.attach(ticket, process.pid)
             if require_session_start:
                 phase("waiting-session-start")
                 deadline = time.monotonic() + timeout
                 unconfirmed = False
                 while not _acknowledged(directory, token):
+                    failure = directory / (token + '.failed')
+                    if failure.is_file():
+                        raise StartupBindingError(failure.read_text(encoding='utf-8'))
                     if process.poll() is not None:
                         return process.returncode
                     if not unconfirmed and time.monotonic() >= deadline:
@@ -104,12 +137,16 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
             running(process.pid)
             return process.wait()
         except BaseException:
-            if process.poll() is None:
+            if process is not None and process.poll() is None:
                 try:
                     _terminate(process)
                 except (OSError, subprocess.SubprocessError) as error:
                     print(f"launch: native child cleanup failed: {error}", file=sys.stderr)
             raise
+        finally:
+            if previous_interrupt is not None:
+                signal.signal(signal.SIGINT, previous_interrupt)
+            cli_client.release(ticket)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -157,8 +194,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     phase("checking-plugins")
     try:
-        effective_project = required_plugins.check_launch(parsed.project.resolve(), parsed.host, parsed.target, arguments)
-    except required_plugins.RequiredPluginsError as error:
+        effective_project = launch_check.prepare_launch(parsed.project.resolve(), parsed.host, parsed.target, arguments)
+    except (required_plugins.RequiredPluginsError, RuntimeError, OSError) as error:
         message = f"launch: {error}"
         print(message, file=sys.stderr)
         report("failed", error=message)
@@ -189,13 +226,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
 
     try:
-        options = {"require_session_start": True} if parsed.require_session_start else {}
+        observe = parsed.require_session_start and effective_project is not None
+        options = {"require_session_start": True, "hook_project": effective_project} if observe else {}
         if parsed.status_file is not None:
             options["on_phase"] = phase
         returncode = run_session(parsed.host, parsed.target, parsed.project, arguments, **options,
                                  on_unconfirmed=lambda child_pid: report("unconfirmed", child_pid=child_pid),
-                                 on_running=lambda child_pid=None: report("running", running_at=time.time(), child_pid=child_pid))
-    except StartupBindingError as error:
+                                 on_running=(lambda child_pid=None: report("running", running_at=time.time(), child_pid=child_pid))
+                                 if effective_project is not None else (lambda child_pid=None: None))
+    except (RuntimeError, OSError, ValueError) as error:
         message = f"launch: {parsed.host} launch failed: {error}"
         print(message, file=sys.stderr)
         report("failed", error=message)

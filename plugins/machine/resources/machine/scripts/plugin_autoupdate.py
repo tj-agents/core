@@ -26,7 +26,8 @@ GIT_TIMEOUT_SECONDS = 30
 SWEEP_TIMEOUT_SECONDS = 1800
 SCRIPT_NAME = "plugin_autoupdate.py"
 RUNTIME = ("plugin_autoupdate.py", "machine_events.py", "launch_check.py", "reload_plugins.py", "agent_cli.py",
-           "codex_hook_trust.py", "codex_websocket.py", "required_plugins.py")
+           "codex_hook_trust.py", "codex_websocket.py", "required_plugins.py", "startup_binding.py",
+           "launch_status.py", "terminal_command.py", "register_session.py", "cli_client.py")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 CLI_TIMEOUT_SECONDS = 60
 STILL_ACTIVE = 259
@@ -37,6 +38,13 @@ SHA = re.compile(r"[0-9a-f]{40}")
 NAME = re.compile(r"[A-Za-z0-9_.-]+")
 REVISION_PATH = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*")
 CONTENTS_WAIT_SECONDS = 10
+
+
+def runtime_file(directory: Path, name: str) -> Path:
+    path = directory / name
+    if name == 'register_session.py' and not path.is_file():
+        return directory.parent / 'utility/peer-cli/scripts/register_session.py'
+    return path
 SNAPSHOT_FIRST = "(Path(s) if s else d/'hook-snapshots')/k/"
 MARKETPLACE_NAME = "tj-agents"
 MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
