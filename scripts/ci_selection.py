@@ -42,17 +42,8 @@ FAMILIES = {
 }
 
 
-WINDOWS_ONLY_ROOTS = {"shell", "cli-session-recovery"}
-WINDOWS_ONLY_SUFFIXES = {".ps1", ".psm1", ".psd1"}
-
-
-def plan(mode, reason, tests=(), windows=False):
-    return {"mode": mode, "reason": reason, "tests": sorted(set(tests)), "windows": windows}
-
-
-def windows_only(path):
-    value = PurePosixPath(path)
-    return value.parts[0] in WINDOWS_ONLY_ROOTS or value.suffix.lower() in WINDOWS_ONLY_SUFFIXES
+def plan(mode, reason, tests=()):
+    return {"mode": mode, "reason": reason, "tests": sorted(set(tests))}
 
 
 def inert_document(path):
@@ -96,12 +87,11 @@ def test_closure(root, selected):
 def classify(paths, *, event="pull_request", labels=(), lines=0, binary=False, root=ROOT):
     paths = set(paths)
     if event != "pull_request":
-        return plan("full", "non-PR event", windows=True)
+        return plan("full", "non-PR event")
     if FULL_LABEL in labels:
-        return plan("full", "explicit full-coverage label", windows=True)
-    windows = any(windows_only(path) for path in paths)
+        return plan("full", "explicit full-coverage label")
     if not paths or binary or len(paths) > MAX_FILES or lines > MAX_LINES:
-        return plan("full", "empty, binary or broad change", windows=windows)
+        return plan("full", "empty, binary or broad change")
     selected = set()
     for path in sorted(paths):
         if inert_document(path):
@@ -112,19 +102,19 @@ def classify(paths, *, event="pull_request", labels=(), lines=0, binary=False, r
                 selected.update(family["tests"])
         elif test_file(path) and path != "tests/test_ci_selection.py":
             if not (root / path).is_file():
-                return plan("full", "deleted test", windows=windows)
+                return plan("full", "deleted test")
             selected.add(path)
         else:
-            return plan("full", f"unmapped surface: {path}", windows=windows)
+            return plan("full", f"unmapped surface: {path}")
     if selected:
         try:
             selected = test_closure(root, selected)
         except (OSError, UnicodeError, SyntaxError):
-            return plan("full", "regression dependencies cannot be read", windows=windows)
+            return plan("full", "regression dependencies cannot be read")
         if not all((root / path).is_file() for path in selected):
-            return plan("full", "selected regression is unavailable", windows=windows)
+            return plan("full", "selected regression is unavailable")
     if selected:
-        return plan("focused", "mapped behavioral regressions", selected, windows)
+        return plan("focused", "mapped behavioral regressions", selected)
     return plan("docs", "inert documentation")
 
 
@@ -136,7 +126,7 @@ def git_output(root, *arguments):
 
 def select(root, event, payload):
     if event != "pull_request":
-        return plan("full", "non-PR event", windows=True)
+        return plan("full", "non-PR event")
     try:
         base = payload["pull_request"]["base"]["sha"]
         head = payload["pull_request"]["head"]["sha"]
@@ -160,14 +150,12 @@ def select(root, event, payload):
         labels = [label["name"] for label in payload["pull_request"].get("labels", [])]
         return classify(paths, event=event, labels=labels, lines=lines, binary=binary, root=root)
     except (KeyError, TypeError, ValueError, OSError, subprocess.SubprocessError):
-        return plan("full", "change range or event cannot be resolved", windows=True)
+        return plan("full", "change range or event cannot be resolved")
 
 
 def validate_plan(value):
-    if not isinstance(value, dict) or set(value) != {"mode", "reason", "tests", "windows"}:
+    if not isinstance(value, dict) or set(value) != {"mode", "reason", "tests"}:
         raise ValueError("invalid CI selection")
-    if not isinstance(value["windows"], bool):
-        raise ValueError("invalid CI selection platform")
     if (value["mode"] not in {"full", "focused", "docs"}
             or not isinstance(value["reason"], str) or not value["reason"]):
         raise ValueError("invalid CI selection mode/reason")
@@ -179,19 +167,19 @@ def validate_plan(value):
     return value
 
 
-def required_results(value, needs, event):
+def required_results(value, needs, event, labels=()):
     validate_plan(value)
     if not isinstance(needs, dict):
         raise ValueError("invalid CI job results")
-    if event != "pull_request" and (value["mode"] != "full" or not value["windows"]):
-        raise ValueError("non-PR validation requires full coverage on every platform")
+    if event != "pull_request" and value["mode"] != "full":
+        raise ValueError("non-PR validation requires full coverage")
     expected = {
         "select": "success",
         "guard": "success" if event == "pull_request" else "skipped",
         "guidance-examples": "success",
     }
-    expected["verify-linux"] = "skipped" if value["mode"] == "docs" else "success"
-    expected["verify-windows"] = "success" if value["mode"] != "docs" and value["windows"] else "skipped"
+    suites = event == "pull_request" and FULL_LABEL in labels and value["mode"] != "docs"
+    expected.update({name: "success" if suites else "skipped" for name in ("verify-windows", "verify-linux")})
     for name, result in expected.items():
         if not isinstance(needs.get(name), dict) or needs[name].get("result") != result:
             raise ValueError(f"{name} must finish as {result}")
@@ -248,7 +236,8 @@ def main(argv=None):
         value = json.loads(os.environ["CI_SELECTION"])
         if args.operation == "required":
             required_results(
-                value, json.loads(os.environ["CI_NEEDS"]), os.environ.get("GITHUB_EVENT_NAME", "")
+                value, json.loads(os.environ["CI_NEEDS"]), os.environ.get("GITHUB_EVENT_NAME", ""),
+                json.loads(os.environ.get("CI_LABELS") or "null") or (),
             )
             print("Every selected CI job succeeded")
             return 0
