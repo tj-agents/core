@@ -251,8 +251,9 @@ def recorded_client(session_id, nearest, lookup, table):
     if sys.version_info < (3, 11):
         raise RuntimeError('Codex frontend attribution requires Python 3.11 or newer')
     arguments = process_arguments(nearest.pid)
-    private = bool(arguments and is_session(arguments[1:]) and '--no-daemon' in arguments)
-    backend = None if private else daemon_identity(expected_pid=nearest.pid)
+    frontend = bool(arguments and is_session(arguments[1:]))
+    private = frontend and '--no-daemon' in arguments
+    backend = None if private else daemon_identity(expected_pid=None if frontend else nearest.pid)
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import codex_hook_trust
 
@@ -272,7 +273,7 @@ def recorded_client(session_id, nearest, lookup, table):
             info = lookup(record['pid'])
             if info is None or Path(info.name).stem.casefold() != 'codex':
                 continue
-            if private and info.pid != nearest.pid:
+            if frontend and info.pid != nearest.pid:
                 continue
             times = [record.get(key) for key in ('created_at', 'recorded_at')]
             if (not all(type(value) in (int, float) and math.isfinite(value) and value > 0 for value in times)
