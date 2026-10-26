@@ -370,7 +370,7 @@ class SessionStatement(TemporaryProject):
 class ShippedDeclarations(unittest.TestCase):
     def test_every_core_package_declares_itself_ubiquitous(self):
         names = sorted(path.stem for path in DECLARED.glob("*.json"))
-        self.assertEqual(names, ["base", "engineering", "machine", "workflow"])
+        self.assertEqual(names, ["base", "engineering", "workflow"])
         for path in DECLARED.glob("*.json"):
             data = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(data["schema_version"], 1)
@@ -378,7 +378,7 @@ class ShippedDeclarations(unittest.TestCase):
             self.assertEqual(data["tier"], path.stem)
 
     def test_each_package_ships_its_declaration_at_its_payload_root(self):
-        for plugin in ("base", "engineering", "machine", "workflow"):
+        for plugin in ("base", "engineering", "workflow"):
             payload = ROOT / "plugins" / plugin / "tier.json"
             self.assertTrue(payload.is_file(), f"{plugin} ships no tier.json")
             self.assertEqual(json.loads(payload.read_text(encoding="utf-8"))["tier"], plugin)

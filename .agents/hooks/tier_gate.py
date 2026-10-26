@@ -1,6 +1,6 @@
 r"""Answer "does this stack tier apply to the project I am in?" for both hosts.
 
-The corpus is layered: the base, engineering and machine packages are stack-agnostic process and
+The corpus is layered: the base, workflow and engineering packages are stack-agnostic process and
 behavior, so they apply in every project. `dotnet`, `react` and `cpp` are stack tiers, and a tier
 whose stack is absent is not merely unhelpful - it is wrong, because its standards describe code the
 project does not contain. Nothing in either host expresses that. A plugin manifest has
