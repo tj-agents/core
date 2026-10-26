@@ -410,7 +410,13 @@ def validate_configuration(root: Path, config: dict) -> set[str]:
     authored = [inside(root, scope["root"]) for scope in config["scopes"]]
     authored.extend(inside(root, value) for value in config["host_adapter_roots"].values())
     authored.extend(inside(root, value) for value in config["host_manifest_roots"].values())
-    generated = [inside(root, value) for value in config["generated_roots"]]
+    generated = []
+    for value in config["generated_roots"]:
+        lexical_root = root / Path(*PurePosixPath(value).parts)
+        generated_root = inside(root, value)
+        if generated_root != lexical_root:
+            raise ValueError(f"Unsafe generated root: {value}")
+        generated.append(generated_root)
     for generated_path in generated:
         for authored_path in authored:
             if (generated_path == authored_path or generated_path.is_relative_to(authored_path)
@@ -1004,6 +1010,24 @@ def generate(root: Path, check: bool = False):
     root = root.resolve()
     config, output, skills, _ = build(root)
     generated_roots = [inside(root, value) for value in config["generated_roots"]]
+
+    generated_directories: dict[Path, list[Path]] = {}
+    for generated_root in generated_roots:
+        if not generated_root.is_dir():
+            continue
+        directories = sorted(
+            (path for path in generated_root.rglob("*") if path.is_dir()),
+            key=lambda path: len(path.parts), reverse=True,
+        )
+        for directory in directories:
+            relative = directory.relative_to(root).as_posix()
+            target = inside(root, relative)
+            if target != directory:
+                raise ValueError(f"Unsafe generated directory: {relative}")
+            if not any(target == declared or target.is_relative_to(declared) for declared in generated_roots):
+                raise ValueError(f"Unsafe generated directory: {relative}")
+        generated_directories[generated_root] = directories
+
     existing: dict[str, Path] = {}
     for generated_root in generated_roots:
         if generated_root.is_file():
@@ -1044,20 +1068,7 @@ def generate(root: Path, check: bool = False):
                 raise ValueError(f"Unsafe prune target: {relative}")
             target.unlink()
         for generated_root in generated_roots:
-            if not generated_root.is_dir():
-                continue
-            directories = sorted(
-                (path for path in generated_root.rglob("*") if path.is_dir()),
-                key=lambda path: len(path.parts), reverse=True,
-            )
-            for directory in directories:
-                relative = directory.relative_to(root).as_posix()
-                target = inside(root, relative)
-                if target != directory:
-                    raise ValueError(f"Unsafe generated directory: {relative}")
-                if not any(target == declared or target.is_relative_to(declared) for declared in generated_roots):
-                    raise ValueError(f"Unsafe generated directory: {relative}")
-            for directory in directories:
+            for directory in generated_directories.get(generated_root, []):
                 try:
                     directory.rmdir()
                 except OSError:
