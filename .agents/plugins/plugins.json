@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:d232e41336f8cb10b2ad7f26087b34d06fc0b780b165fbabef1097d8e1bec1ee",
+      "digest": "sha256:b70170ed3dfb5fb7f1a0266afbc82f260c07b4e4d994a366e8da823e7f2b461b",
       "harness": {
         "marketplaces": [
           {
@@ -76,6 +76,7 @@
         "macos"
       ],
       "skills": [
+        "continue",
         "handoff",
         "plan",
         "plan-artifacts",
@@ -99,7 +100,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:d61b9f91def6e580e406d7357e1aa8cba666f03e467d5092bb5329ef80045bcc",
+      "digest": "sha256:f3f2f2527112a1c2654859343e9f3e852f5cf3e7da7715d482937e0fcf5ffb1d",
       "harness": {
         "marketplaces": [
           {
@@ -214,7 +215,6 @@
         "bugfix",
         "commit",
         "commit-all",
-        "commit-push",
         "committing",
         "docs",
         "docs-review",
@@ -231,13 +231,11 @@
         "open-pr",
         "open-worktree",
         "persistent-delivery",
-        "persistent-workflow",
         "plans",
         "pr-preflight",
         "pr-screenshots",
         "prune-worktrees",
         "pull",
-        "pull-main",
         "push",
         "recents",
         "remote-validation",
@@ -249,12 +247,9 @@
         "stack",
         "staged-review",
         "staged-review-all",
-        "sync",
-        "sync-all",
         "sync-checkout",
         "unmerged",
-        "update-roadmap",
-        "worktree"
+        "update-roadmap"
       ],
       "dependencies": {
         "required": [
@@ -277,7 +272,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:c57d5fec1ae76f41343d38d45d9e43faf674fa8af9f24fb6d0822e59c617fd78",
+      "digest": "sha256:009a5bb5f900fa7798f4c9065361a74eb044b6d50f21279001bb68c82c176f82",
       "harness": {
         "marketplaces": [
           {

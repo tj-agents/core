@@ -13,8 +13,8 @@ from unittest import mock
 from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[3]
-RUNTIME = ROOT / ".agents/workflows/continuation_runtime.py"
-WORKFLOWS = RUNTIME.parent
+RUNTIME = ROOT / ".codex/runtime/continuation/continuation_runtime.py"
+WORKFLOWS = ROOT / ".agents/workflows"
 FIXTURE = Path(__file__).parent / "fixtures/continuation_fixture.py"
 RUNTIME_FIXTURE = Path(__file__).parent / "fixtures/continuation_runtime_fixture.py"
 sys.path.insert(0, str(RUNTIME.parent))
@@ -398,6 +398,23 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(read_attempts, 3)
         self.assertEqual(runtime.read(self.owner)["reason"], "concurrent-save")
 
+    def test_claude_initialization_and_existing_owner_fail_closed(self):
+        before = self.owner.read_bytes()
+        result = self.cli("init", "--root", str(self.root), "--goal", "goal.md",
+                          "--completion", "Fixture", "--authority", "Isolated test",
+                          "--harness", "claude", "--actions", "test", code=2)
+        self.assertEqual(result["reason"], "unsupported-host")
+        self.assertEqual(before, self.owner.read_bytes())
+        state = self.state()
+        state["harness"] = "claude"
+        runtime.atomic_json(self.owner, state)
+        before = self.owner.read_bytes()
+        for command in ("status", "wake", "claim"):
+            result = self.cli(command, "--owner", str(self.owner), code=2)
+            self.assertEqual(result["reason"], "unsupported-host")
+            self.assertEqual(before, self.owner.read_bytes())
+        self.assertFalse((self.root / "host-started").exists())
+
     def test_fresh_and_stale_foreground(self):
         claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
         token = claimed["foreground"]["token"]
@@ -414,47 +431,46 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(self.wake()["state"], "complete")
 
     def test_heartbeat_refreshes_recovery_metadata_without_releasing_foreground(self):
-        for harness in ("claude", "codex"):
-            with self.subTest(harness=harness):
-                self.owner.unlink()
-                self.cli("init", "--root", str(self.root), "--goal", "goal.md",
-                         "--completion", "CI repaired and boundary recorded", "--authority", "Isolated test",
-                         "--harness", harness, "--actions", "edit", "test")
-                claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
-                token = claimed["foreground"]["token"]
-                preserved = {key: claimed[key] for key in (
-                    "state", "goal", "repo", "worktree", "branch", "head", "authority",
-                    "max_launches", "max_failures", "deadline", "timeout_seconds", "lease_seconds",
-                )}
-                lease = {key: claimed["foreground"][key] for key in ("token", "pid", "identity")}
+        harness = "codex"
+        self.owner.unlink()
+        self.cli("init", "--root", str(self.root), "--goal", "goal.md",
+                 "--completion", "CI repaired and boundary recorded", "--authority", "Isolated test",
+                 "--harness", harness, "--actions", "edit", "test")
+        claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
+        token = claimed["foreground"]["token"]
+        preserved = {key: claimed[key] for key in (
+            "state", "goal", "repo", "worktree", "branch", "head", "authority",
+            "max_launches", "max_failures", "deadline", "timeout_seconds", "lease_seconds",
+        )}
+        lease = {key: claimed["foreground"][key] for key in ("token", "pid", "identity")}
 
-                refreshed = self.cli("heartbeat", "--owner", str(self.owner), "--token", token,
-                                     "--reason", "Refresh recovery instructions", "--next-action", "Run focused checks")
-                self.assertEqual(refreshed["reason"], "Refresh recovery instructions")
-                self.assertEqual(refreshed["next_action"], "Run focused checks")
-                self.assertEqual({key: refreshed[key] for key in preserved}, preserved)
-                self.assertEqual({key: refreshed["foreground"][key] for key in lease}, lease)
+        refreshed = self.cli("heartbeat", "--owner", str(self.owner), "--token", token,
+                             "--reason", "Refresh recovery instructions", "--next-action", "Run focused checks")
+        self.assertEqual(refreshed["reason"], "Refresh recovery instructions")
+        self.assertEqual(refreshed["next_action"], "Run focused checks")
+        self.assertEqual({key: refreshed[key] for key in preserved}, preserved)
+        self.assertEqual({key: refreshed["foreground"][key] for key in lease}, lease)
 
-                for arguments in ((), ("--reason", "", "--next-action", "")):
-                    unchanged = self.cli("heartbeat", "--owner", str(self.owner), "--token", token, *arguments)
-                    self.assertEqual(unchanged["reason"], "Refresh recovery instructions")
-                    self.assertEqual(unchanged["next_action"], "Run focused checks")
-                    self.assertEqual({key: unchanged[key] for key in preserved}, preserved)
-                    self.assertEqual({key: unchanged["foreground"][key] for key in lease}, lease)
+        for arguments in ((), ("--reason", "", "--next-action", "")):
+            unchanged = self.cli("heartbeat", "--owner", str(self.owner), "--token", token, *arguments)
+            self.assertEqual(unchanged["reason"], "Refresh recovery instructions")
+            self.assertEqual(unchanged["next_action"], "Run focused checks")
+            self.assertEqual({key: unchanged[key] for key in preserved}, preserved)
+            self.assertEqual({key: unchanged["foreground"][key] for key in lease}, lease)
 
-                before_invalid_token = self.state()
-                invalid_token = self.cli("heartbeat", "--owner", str(self.owner), "--token", "invalid",
-                                         "--reason", "must not persist", "--next-action", "must not persist", code=2)
-                self.assertEqual(invalid_token["reason"], "foreground-token-invalid")
-                self.assertEqual(self.state(), before_invalid_token)
+        before_invalid_token = self.state()
+        invalid_token = self.cli("heartbeat", "--owner", str(self.owner), "--token", "invalid",
+                                 "--reason", "must not persist", "--next-action", "must not persist", code=2)
+        self.assertEqual(invalid_token["reason"], "foreground-token-invalid")
+        self.assertEqual(self.state(), before_invalid_token)
 
-                dead = self.state()
-                dead["foreground"]["identity"] = "dead-identity"
-                runtime.atomic_json(self.owner, dead)
-                invalid_identity = self.cli("heartbeat", "--owner", str(self.owner), "--token", token,
-                                            "--reason", "must not persist", "--next-action", "must not persist", code=2)
-                self.assertEqual(invalid_identity["reason"], "foreground-token-invalid")
-                self.assertEqual(self.state(), dead)
+        dead = self.state()
+        dead["foreground"]["identity"] = "dead-identity"
+        runtime.atomic_json(self.owner, dead)
+        invalid_identity = self.cli("heartbeat", "--owner", str(self.owner), "--token", token,
+                                    "--reason", "must not persist", "--next-action", "must not persist", code=2)
+        self.assertEqual(invalid_identity["reason"], "foreground-token-invalid")
+        self.assertEqual(self.state(), dead)
 
     def test_orphan_writer_gate_after_supervisor_exit(self):
         self.fixture("complete", sleep=3)
@@ -512,7 +528,7 @@ class ContinuationTests(unittest.TestCase):
         state = self.state()
         state["harness"] = "other"
         runtime.atomic_json(self.owner, state)
-        self.assertEqual(self.wake()["reason"], "unsupported-host")
+        self.assertEqual(self.cli(*self.wake_args(), code=2)["reason"], "unsupported-host")
         state["harness"] = "codex"
         args = runtime.lane_command(state, "test", ["fixture"])
         lane = json.loads((ROOT / ".agents/dependencies/agent/.agents/agent/resources/lanes/codex.json").read_text())["lanes"]["L4"]

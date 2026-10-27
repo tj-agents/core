@@ -173,29 +173,33 @@ class ProcessStandardsTests(unittest.TestCase):
         shared = authored_skill("persistent-delivery").read_text(
             encoding="utf-8"
         )
-        workflow = authored_skill("persistent-workflow").read_text(encoding="utf-8")
+        workflow = authored_skill("workflow:continue").read_text(encoding="utf-8")
         claude = (
-            self.root / ".claude/skills/engineering/persistent-workflow/SKILL.md"
+            self.root / ".claude/skills/workflow/continue/SKILL.md"
         ).read_text(encoding="utf-8")
         codex = (
-            self.root / ".codex/skills/engineering/persistent-workflow/SKILL.md"
+            self.root / ".codex/skills/workflow/continue/SKILL.md"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("persistent-workflow skill", remote)
+        delivery = (self.root / ".codex/skills/engineering/persistent-delivery/SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("`workflow:continue`", remote)
         self.assertIn("persistent-delivery", remote)
         self.assertIn("one persistent owner for a PR/head pair", shared)
-        self.assertIn("init --root ROOT --goal GOALPATH", workflow)
-        self.assertIn("CONTINUATION_RESULT_PATH", workflow)
-        self.assertIn("900-second child timeout", workflow)
+        self.assertIn("init --root ROOT --goal GOALPATH", delivery)
+        self.assertIn("CONTINUATION_RESULT_PATH", delivery)
+        self.assertIn("900-second child timeout", delivery)
         self.assertIn("Missing merge authorization gates merge only", shared)
-        self.assertIn("Claude `/goal`, `/loop`, monitors, channels", claude)
-        self.assertIn("fresh `claude -p` context", claude)
+        self.assertIn("`/goal`", claude)
+        self.assertIn("`/loop`", claude)
+        self.assertNotIn("continuation_runtime.py", claude)
+        self.assertNotIn("delivery_continuation.py", claude)
         self.assertIn(
-            "Scheduled Task attached to the owning Codex conversation",
+            "Scheduled interface",
             codex,
         )
-        self.assertIn("fresh headless `codex exec` context", codex)
-        self.assertIn("delivery_continuation.py", codex)
+        self.assertIn("fresh headless `codex exec` context", " ".join(delivery.split()))
+        self.assertIn("delivery_continuation.py", delivery)
         self.assertNotIn("Claude uses", remote)
         self.assertNotIn("Codex Desktop uses", remote)
         for skill in ("e2e-debug", "e2e-api-debug", "e2e-ui-debug", "integration-debug"):

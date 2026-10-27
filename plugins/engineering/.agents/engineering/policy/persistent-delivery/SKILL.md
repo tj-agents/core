@@ -1,6 +1,6 @@
 ---
 name: persistent-delivery
-description: Shared safety and identity contract for a PR that must survive an agent turn and continue through exact-head validation, repair, review, and authorized delivery. The host-specific persistent-workflow skill supplies the actual wake mechanism.
+description: Shared safety and identity contract for a PR that must survive an agent turn and continue through exact-head validation, repair, review, and authorized delivery. Use when an authorized software delivery must continue across delayed checks; workflow:continue selects the supported native wake mechanism.
 
 kind: policy
 domain: process
@@ -8,13 +8,72 @@ domain: process
 
 # Persistent delivery contract
 
-Use this contract only through the current harness's `persistent-workflow` skill. It defines the delivery
-owner; it does not create a watcher, scheduler, background process, or model turn.
+Owns software delivery identity, completion evidence and authorized decisions across wakes. Load
+`workflow:continue` to establish supported host continuation. The Codex entry supplies its required durable
+CLI transport; the shared policy does not start a scheduler or model turn.
 
 A continuation goal may exist before a PR or delivery binding. Keep its repository, worktree, canonical
 goal, completion condition and authorized actions in the existing goal record; add the exact PR/head/run
 binding when a remote delivery stage exists. Missing merge authorization gates merge only. It does not
 block authorized local work, exact-head repair, or review that can proceed before that gate.
+
+## Completion record
+
+Before reporting completion, maintain the canonical goal's fenced `completion` JSON with observed
+acceptance evidence, every delivered PR identity, and every unresolved PR task with its owner and next
+action. The shared completion check refreshes every recorded PR and rejects completion unless the bound delivery is
+recorded, merged at its full head, has no unchecked tasks, and the outcome evidence is present. A rejection
+keeps the current owner and leaves the returned actions open.
+
+Before retiring recovery artifacts, reconcile and update any linked selected item through
+[the shared recording contract](../../../workflow/resources/problem-records.md). Resolve it only after its own
+acceptance is verified; the PR completion check alone does not close it. Preserve unresolved item
+ownership and next action.
+
+Run the same read-only check before a foreground terminal report:
+
+Run the Python helpers with `python` on Windows or `python3` on Linux/macOS:
+
+```bash
+python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree>
+```
+
+Resolve `<completion-check>` to `.agents/workflows/completion.py` in source or
+`workflows/completion.py` in an installed engineering package.
+
+The record has this exact shape. Every string is nonempty, every head is a forty-character SHA, acceptance
+and delivery records are unique, and empty evidence keeps its acceptance item open with an owner and next
+action.
+
+```completion
+{
+  "outcome": "The requested user-visible outcome.",
+  "acceptance": [
+    {
+      "id": "criterion-id",
+      "criterion": "The observable acceptance criterion.",
+      "evidence": [
+        {"source": "artifact or observation", "result": "concrete observed result"}
+      ],
+      "owner": "current execution owner",
+      "next_action": "Resolve this criterion when evidence is absent."
+    }
+  ],
+  "deliveries": [
+    {"repository": "owner/repository", "pr": 123, "head": "0123456789abcdef0123456789abcdef01234567"}
+  ],
+  "open_tasks": [
+    {
+      "repository": "owner/repository",
+      "pr": 123,
+      "head": "0123456789abcdef0123456789abcdef01234567",
+      "text": "Unchecked visible PR task.",
+      "owner": "current execution owner",
+      "next_action": "Complete the task and refresh the PR."
+    }
+  ]
+}
+```
 
 ## Bind one delivery owner
 
