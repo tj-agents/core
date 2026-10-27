@@ -1,6 +1,7 @@
 # Core native wrappers
 
-Owns the approved Core D6, D7 and D11 cutover from the [shared native-duplicates plan](https://github.com/tj-agents/docs/blob/main/plans/native-duplicates/NATIVE_DUPLICATES_PLAN.md).
+Owns the approved Core native-wrapper cleanup: native host continuation, shared PR delivery evidence
+and host-specific transport only where the native interface is insufficient.
 
 ```text
 Claude delivery wait -> native goal and scheduling -> shared delivery evidence.
