@@ -38,9 +38,9 @@ procedure that goes stale in the repo that renames one.
   flow), or a wedged queue. Never because the queue is slow. **Skipping a suite is not the same as skipping
   the queue:** to run less, apply the tier label below and enqueue normally so the hard floor still builds
   against current base.
-- **A required approval is Tommy's, and `--auto` waits for it.** Before arming auto-merge, initialize,
-  claim, register and observe the existing Codex transport through `engineering:persistent-delivery` for the exact
-  PR/head and its authorized post-merge steps. Use the guarded command below and report the approval link
+- **A required approval is Tommy's, and `--auto` waits for it.** Before arming auto-merge, establish
+  and observe the supported host continuation through `workflow:continue`, retaining the exact PR/head
+  binding and authorized post-merge steps under `engineering:persistent-delivery`. Use the guarded command below and report the approval link
   once. GitHub's required review remains a waiting dependency; retain the binding and scheduler so a
   merge observation resumes cleanup and publication without another prompt. Never approve or bypass it.
   A missing task authorization or an explicit hold remains a human gate.
