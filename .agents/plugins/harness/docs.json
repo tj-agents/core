@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "plugin": "tj-agents/docs",
+  "source_roots": [
+    ".agents/docs",
+    ".agents/tiers/docs.json"
+  ],
+  "requires": {
+    "marketplaces": [
+      {
+        "id": "tj-agents",
+        "repository": "tj-agents/marketplace"
+      }
+    ],
+    "plugins": [
+      "tj-agents/docs"
+    ],
+    "hooks": [],
+    "permissions": {
+      "claude_allow": [],
+      "codex_prefix_rules": []
+    }
+  }
+}
