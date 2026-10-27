@@ -382,17 +382,31 @@ class WorkflowGenerationTests(unittest.TestCase):
         self.assertNotIn("version", codex)
         self.assertNotIn("version", claude)
         self.assertEqual("./codex-skills/", codex["skills"])
-        self.assertTrue((plugin / "codex-skills" / "persistent-delivery" / "SKILL.md").is_file())
-        self.assertTrue((plugin / "skills" / "persistent-delivery" / "SKILL.md").is_file())
+        self.assertTrue((plugin / "skills/merge/references/delivery.md").is_file())
         self.assertTrue((plugin / "codex-agents" / "review-lens.toml").is_file())
         self.assertTrue((plugin / "agents" / "review-lens.md").is_file())
         self.assertTrue((plugin / "workflows" / "delivery_runtime.py").is_file())
         self.assertNotIn("workflows", codex)
         self.assertNotIn("workflows", claude)
 
+    def test_continuation_retired_names_are_absent_from_public_discovery(self):
+        retired = {"persistent-delivery", "persistent-workflow"}
+        for plugin in (ROOT / "plugins").iterdir():
+            if not plugin.is_dir():
+                continue
+            for tree in ("skills", "codex-skills"):
+                for path in (plugin / tree).glob("*/SKILL.md"):
+                    with self.subTest(path=path):
+                        self.assertNotIn(path.parent.name, retired)
+        for host, tree in (("claude", "skills"), ("codex", "codex-skills")):
+            entry = ROOT / "plugins/workflow" / tree / "continue/SKILL.md"
+            with self.subTest(host=host):
+                self.assertTrue(entry.is_file())
+        self.assertTrue((ROOT / "plugins/engineering/.codex/runtime/continuation/delivery_continuation.py").is_file())
+
     def test_extended_host_adapter_preserves_one_public_identity(self):
         config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
-        self.assertEqual(["workflow:continue", "engineering:persistent-delivery", "engineering:review"],
+        self.assertEqual(["workflow:continue", "engineering:review"],
                          config["extended_host_adapters"])
         for identity in config["extended_host_adapters"]:
             plugin, skill = identity.split(":")

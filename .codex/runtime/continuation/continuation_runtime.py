@@ -410,7 +410,7 @@ def launch(path, state, binding, evidence, executable):
               "before deletion, with the same PR and current repo/worktree/branch/head. "
               "A released snapshot cannot override an existing binding or authorize a waiting release. "
               "Successful process exit is not completion. "
-              "For a PR, load persistent-delivery and honor its review/evidence/authority decisions. "
+              "For a PR, read the software delivery reference beside engineering:merge and honor its review/evidence/authority decisions. "
               "The supervisor already owns the writer and scheduler; do not recursively initialize, "
               "claim, register or wake this owner. Preserve user host safeguards. "
               "Do not claim same-chat continuation. Stop at an actual authority or human decision gate. "
