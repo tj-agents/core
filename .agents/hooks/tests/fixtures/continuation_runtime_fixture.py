@@ -18,5 +18,5 @@ def forge_state(delivery, root):
 
 
 completion.forge_state = forge_state
-sys.argv = [str(ROOT / ".agents/workflows/continuation_runtime.py"), *sys.argv[1:]]
+sys.argv = [str(ROOT / ".codex/runtime/continuation/continuation_runtime.py"), *sys.argv[1:]]
 runpy.run_path(sys.argv[0], run_name="__main__")
