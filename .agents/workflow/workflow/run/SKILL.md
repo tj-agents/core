@@ -35,9 +35,10 @@ continues.
 For a deferred command or condition, invoke `agent:listen` before parking or moving to
 independent work. It owns deterministic background waiting and the native result notification.
 
-Use only a supported host continuation. Do not claim unattended execution before owner, foreground lease, and
-wake are initialized and observed. `engineering:persistent-workflow` is only a software remote-delivery
-adapter. Foreground execution remains valid without unattended capability. After exhausting independent
+Use only a supported host continuation. Do not claim unattended execution before the selected native or
+host-specific continuation is established and its wake observed. `workflow:continue` selects and establishes
+the next supported wake for this goal. Foreground execution remains valid without unattended capability.
+After exhausting independent
 authorized work, persist the exact blocker, resolver, unblock action, and observable resume condition.
 
 Report terminal work as its actual outcome, validation evidence, and remaining durable state. A local commit,

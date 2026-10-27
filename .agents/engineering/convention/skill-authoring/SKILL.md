@@ -68,18 +68,27 @@ or a name that differs only by hyphens. No generator catches every near miss. Ch
 an unrelated exact match or a near miss. Write the qualified `plugin:name` in every reference to a shared
 bare name, because a bare name may select the other plugin's skill.
 
-## Mirror a host's native command
+## Justify a wrapper before naming it
 
-When a host already provides a capability natively, name the skill exactly after that command and make it
-one skill on both hosts with extended host adapters (`extended_host_adapters` in
-`.agents/plugins/sources.json`). Each host's entry point uses its native mechanism; the shared definition
-supplies an implementation only for a host that lacks one. Never give the same capability different names
-or different update paths per host.
+Use a host's native capability directly when it satisfies the requested outcome. A skill earns its
+discovery and maintenance cost through a concrete additional workflow, policy or missing host capability.
+A shared spelling, copied command help or a pointer to native controls alone does not justify one.
+Remove redundant wrappers and their adapters rather than keeping aliases for them.
 
 ```text
-Both hosts ship a native code reviewer.
-Skill `review`: each host's entry point invokes its own native reviewer.
+Request: inspect native memory settings.
+Decision: use the host's native controls directly; no house memory skill is needed.
+
+Request: review an exact committed candidate before authorized delivery.
+Decision: keep review for frozen scope, independent review and delivery evidence; invoke the native reviewer.
 ```
+
+For a justified wrapper, use the native command's name when it describes the owned subject, and keep one
+canonical definition with extended host adapters (`extended_host_adapters` in
+`.agents/plugins/sources.json`). Each host entry uses its native mechanism. Ship custom implementation
+only where the required behavior is missing, in that host's runtime; a requirement missing on both hosts
+may have one shared implementation. Naming consistency applies to retained capabilities, not to every
+built-in feature.
 
 ## Write the description as the selection trigger
 

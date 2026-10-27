@@ -19,8 +19,14 @@ Marketplace owns plugin identities, source repositories and dependencies. Follow
 [shared ownership decision](https://github.com/tj-agents/docs/blob/main/PLUGINS.md) when changing
 selection.
 
-Global design and cross-repository plans belong in [`tj-agents/docs`](https://github.com/tj-agents/docs).
-Keep core implementation plans here and link to shared designs instead of copying them.
+Current architecture and cross-repository reference documentation belong in
+[`tj-agents/docs`](https://github.com/tj-agents/docs); follow its `AGENTS.md` for scope.
+Keep Core's proposals, implementation plans and audit evidence with the owning source work or its PR.
+
+```text
+Implemented cross-repository ownership -> update the existing Docs reference.
+Core capability audit and CI results -> retain with Core's source work or PR.
+```
 
 `.agents/` holds only host-neutral shared source: Base, Engineering, Workflow and Docs definitions, workflow
 contracts, shared hooks, schemas, tests and resources. `.codex/` holds Codex-only entry points, adapters,
