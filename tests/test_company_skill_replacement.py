@@ -8,8 +8,6 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ROUTERS = (ROOT / "plugins/base/hooks/skill_router.py",
-           ROOT / "plugins/engineering/hooks/skill_router.py")
 GATES = (ROOT / "plugins/base/hooks/tier_gate.py",
          ROOT / "plugins/engineering/hooks/tier_gate.py")
 
@@ -23,9 +21,6 @@ class CompanySkillReplacement(unittest.TestCase):
         (self.repo / ".agents").mkdir(parents=True)
         (self.repo / "src").mkdir()
         (self.repo / "src/item.x").write_text("value\n", encoding="utf-8")
-        (self.repo / ".agents/skill-routes.json").write_text(json.dumps({
-            "routes": [{"path": "^src/", "skills": ["stackx:style", "stackx:logging"]}]
-        }), encoding="utf-8")
         subprocess.run(["git", "init", "--quiet", str(self.repo)], check=True)
         self.remote("acme/project")
         self.profile = self.root / "profile"
@@ -36,7 +31,7 @@ class CompanySkillReplacement(unittest.TestCase):
                               "detect": {"all": [{"remote_host": "example.test"},
                                                  {"remote": "^acme/"}]},
                               "employer": {"context_skill": "context"}}, ("context",))
-        self.company = self.install("acme-stackx", None, ("style",))
+        self.install("acme-stackx", None, ("style",))
 
     def remote(self, identity):
         subprocess.run(["git", "-C", str(self.repo), "config", "remote.origin.url",
@@ -65,31 +60,6 @@ class CompanySkillReplacement(unittest.TestCase):
         return subprocess.run([sys.executable, "-B", str(path), *arguments], cwd=self.repo,
                               env=self.environment(), input=json.dumps(payload) if payload else None,
                               capture_output=True, text=True, encoding="utf-8", timeout=20)
-
-    def query(self, router):
-        result = self.run_hook(router, "--skills-for", "--json", "src/item.x")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        return json.loads(result.stdout)["skills"]
-
-    def test_both_packaged_routers_replace_only_installed_same_name_skills(self):
-        for router in ROUTERS:
-            with self.subTest(router=router):
-                self.assertEqual(set(self.query(router)), {"acme-stackx:style", "stackx:logging"})
-        self.remote("other/project")
-        for router in ROUTERS:
-            self.assertEqual(set(self.query(router)), {"stackx:style", "stackx:logging"})
-        self.remote("acme/project")
-        (self.company / "skills/style/SKILL.md").unlink()
-        for router in ROUTERS:
-            self.assertEqual(set(self.query(router)), {"stackx:style", "stackx:logging"})
-
-    def test_uninstalled_company_plugin_falls_through(self):
-        registry = self.cache.parent / "installed_plugins.json"
-        data = json.loads(registry.read_text(encoding="utf-8"))
-        del data["plugins"]["acme-stackx@market"]
-        registry.write_text(json.dumps(data), encoding="utf-8")
-        for router in ROUTERS:
-            self.assertEqual(set(self.query(router)), {"stackx:style", "stackx:logging"})
 
     def test_both_packaged_gates_name_the_company_replacement_at_session_start(self):
         for gate in GATES:

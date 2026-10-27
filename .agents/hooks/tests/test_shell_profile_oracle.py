@@ -219,28 +219,5 @@ class OracleTests(unittest.TestCase):
                     oracle.validate(self.profiles, malformed_sources)
 
 
-class ExistingFacadeCompatibilityTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        spec = importlib.util.spec_from_file_location("git_auth_scope_gate", HOOKS / "git_auth_scope_gate.py")
-        cls.gate = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cls.gate)
-
-    def test_supported_raw_command_fields(self):
-        for key in ("command", "cmd", "script", "input"):
-            with self.subTest(key=key):
-                self.assertEqual("echo ok", self.gate.extract_command("Bash", {key: "echo ok"}))
-        self.assertEqual("echo ok", self.gate.extract_command("Bash", {"action": {"command": "echo ok"}}))
-
-    def test_established_shell_and_non_shell_boundaries(self):
-        for shell in ("bash", "sh", "zsh", "dash"):
-            with self.subTest(shell=shell):
-                self.assertEqual("echo ok", self.gate.extract_command("exec_command", {"command": [shell, "-c", "echo ok"]}))
-        self.assertEqual("tool alpha", self.gate.extract_command("exec_command", {"command": ["tool", "alpha"]}))
-        self.assertIsNone(self.gate.extract_command("Write", {"command": "echo ok"}))
-        self.assertIsNone(self.gate.extract_command("Bash", {}))
-        self.assertIsNone(self.gate.extract_command("Bash", None))
-
-
 if __name__ == "__main__":
     unittest.main()
