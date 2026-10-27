@@ -39,8 +39,8 @@ incomplete.
   to run `powershell.exe`, `pwsh` or `wt.exe` without saying which platform the instruction is for.
 
   ```text
-  python3 -B scripts/update_catalog_digests.py   # Linux and macOS
-  python -B scripts/update_catalog_digests.py    # Windows
+  python3 -B scripts/update_plugin_digests.py   # Linux and macOS
+  python -B scripts/update_plugin_digests.py    # Windows
   ```
 
 - Open terminal tabs through `agent_cli.launch_tab` (Windows Terminal, tmux, kitty, Konsole), never by
@@ -52,8 +52,7 @@ incomplete.
   behaviour differs by platform pin the platform explicitly.
 
 Repository tooling (`.agents/sync-generated.ps1`, `.codex/install-workflow-agents.ps1`) may use PowerShell 7
-(`pwsh`), but it must run under `pwsh` on Linux as well as on Windows. `cli-session-recovery/` is
-Windows-only by design.
+(`pwsh`), but it must run under `pwsh` on Linux as well as on Windows.
 
 ## Python and portability
 

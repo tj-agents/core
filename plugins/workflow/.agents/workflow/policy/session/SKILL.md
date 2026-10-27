@@ -22,7 +22,7 @@ evidence or a stated user decision, and say what changed.
 
 Required hooks gate ordinary work and delivery. Failure, timeout, skipping, a missing verdict or trust
 review permits only bounded diagnosis and authorized repair. For stale plugin contents, run
-`agent:refresh` once. Resume only after affected hooks succeed; refresh or trust alone proves no
+`agent:refresh-plugins` once. Resume only after affected hooks succeed; refresh or trust alone proves no
 execution. Otherwise remain blocked and report the hook, cause, resolver and exact recovery command.
 Never bypass trust, disable hooks, suppress failures or change executor to evade the gate.
 
