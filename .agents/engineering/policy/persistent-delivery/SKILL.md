@@ -20,10 +20,27 @@ block authorized local work, exact-head repair, or review that can proceed befor
 ## Completion record
 
 Before reporting completion, maintain the canonical goal's fenced `completion` JSON with observed
-acceptance evidence, every delivered PR identity, and every unresolved PR task with its owner and next
-action. The shared completion check refreshes every recorded PR and rejects completion unless the bound delivery is
+acceptance evidence, every owned delivery PR identity, and every unresolved task required for the authorized
+outcome with its owner and next action. The shared completion check refreshes every delivery PR and rejects completion unless the bound delivery is
 recorded, merged at its full head, has no unchecked tasks, and the outcome evidence is present. A rejection
 keeps the current owner and leaves the returned actions open.
+
+Derive that boundary from the user's authorized outcome and verified delivery ownership. Preserve
+independent work in optional `follow_up`, with its exact PR/head, responsible owner, next action and
+`scope_evidence` identifying why it belongs to that separate delivery. The check returns this information
+without waiting for it or refreshing its PR. It rejects overlap with an owned delivery or open task.
+An external owner does not waive acceptance: when the requested outcome requires that work, keep the
+unmet criterion in `acceptance` and its action in `open_tasks`. Do not add independent future work to the
+current goal's acceptance merely to retain it. A successful completion check proceeds to the session's
+`agent:close` decision; independent follow-up alone is no reason to keep the frontend open.
+
+```text
+User requests reviewed parser PRs; both are merged and verified.
+Another owner retains a separate dashboard PR: record it in follow_up with that ownership evidence.
+Result: the parser delivery may complete and enter agent:close.
+User instead requests the working dashboard: its missing acceptance still blocks completion,
+even when another owner is implementing it.
+```
 
 Before retiring recovery artifacts, reconcile and update any linked selected item through
 [the shared recording contract](../../../workflow/resources/problem-records.md). Resolve it only after its own
@@ -41,7 +58,7 @@ python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree>
 Resolve `<completion-check>` to `.agents/workflows/completion.py` in source or
 `workflows/completion.py` in an installed engineering package.
 
-The record has this exact shape. Every string is nonempty, every head is a forty-character SHA, acceptance
+The record has this shape; `follow_up` may be omitted when empty. Every string is nonempty, every head is a forty-character SHA, acceptance
 and delivery records are unique, and empty evidence keeps its acceptance item open with an owner and next
 action.
 
@@ -70,6 +87,17 @@ action.
       "text": "Unchecked visible PR task.",
       "owner": "current execution owner",
       "next_action": "Complete the task and refresh the PR."
+    }
+  ],
+  "follow_up": [
+    {
+      "repository": "owner/dashboard",
+      "pr": 456,
+      "head": "abcdef0123456789abcdef0123456789abcdef0123",
+      "text": "Add the independently requested dashboard.",
+      "owner": "dashboard delivery owner",
+      "next_action": "Complete dashboard review under its existing goal.",
+      "scope_evidence": "The user requested parser delivery here; the dashboard goal assigns PR456 to its existing owner."
     }
   ]
 }
