@@ -33,7 +33,7 @@ class SkillRouterTests(unittest.TestCase):
         hooks.mkdir(parents=True)
         for name in ("skill_router.py", "tier_gate.py", "hook_runtime.py"):
             shutil.copy2(HOOKS / name, hooks / name)
-        shutil.copy2(HOOKS.parent / "dependencies/agent/.agents/agent/runtime/required_plugins.py", hooks / "required_plugins.py")
+        shutil.copytree(HOOKS.parent / "dependencies/agent/.agents/agent/runtime", self.plugin / "dependencies/agent/.agents/agent/runtime")
         self.router = hooks / "skill_router.py"
         skill = self.plugin / "skills" / "feature"
         skill.mkdir(parents=True)

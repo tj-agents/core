@@ -67,11 +67,13 @@ def declarations(root: Path) -> dict[str, dict]:
     for name, source in sources.items():
         if not name.isascii() or not name.replace("-", "").isalnum() or name.lower() != name:
             raise ValueError(f"Invalid runtime source name: {name!r}")
-        if not isinstance(source, dict) or set(source) != {"repository", "exports"}:
+        if not isinstance(source, dict) or set(source) != {"repository", "package", "exports"}:
             raise ValueError(f"Invalid runtime source: {name}")
         repository = source["repository"]
         if not isinstance(repository, str) or not re.fullmatch(r"tj-agents/[a-z][a-z0-9-]*", repository):
             raise ValueError(f"Unapproved runtime publisher: {repository!r}")
+        if not isinstance(source["package"], str) or not relative(source["package"]).startswith("plugins/"):
+            raise ValueError(f"Runtime package must belong to plugins: {source['package']!r}")
         exports = source["exports"]
         if not isinstance(exports, list) or not exports or len(set(exports)) != len(exports):
             raise ValueError(f"Runtime exports must be nonempty and unique: {name}")
@@ -116,6 +118,7 @@ def stage(root: Path, overrides: dict[str, Path], check: bool = False) -> list[d
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             contents = export_contents(destination, source["exports"])
             if (receipt.get("repository") != source["repository"]
+                    or receipt.get("package") != source["package"]
                     or receipt.get("exports") != source["exports"]
                     or receipt.get("sha256") != digest(contents)):
                 raise ValueError(f"Stale or modified staged runtime: {name}; run scripts/runtime_sources.py")
@@ -124,14 +127,14 @@ def stage(root: Path, overrides: dict[str, Path], check: bool = False) -> list[d
         with tempfile.TemporaryDirectory(prefix="tj-runtime-") as temporary:
             if name in overrides:
                 checkout = overrides[name].resolve()
-                revision = "local:" + digest(export_contents(checkout, source["exports"]))
+                revision = "local:" + digest(export_contents(safe_path(checkout, source["package"]), source["exports"]))
             else:
                 checkout = Path(temporary) / "source"
                 git("clone", "--quiet", "--depth", "1", "--branch", "main",
                     f"https://github.com/{source['repository']}.git", str(checkout))
                 revision = git("-C", str(checkout), "rev-parse", "HEAD")
-            contents = export_contents(checkout, source["exports"])
-            receipt = {"repository": source["repository"], "revision": revision,
+            contents = export_contents(safe_path(checkout, source["package"]), source["exports"])
+            receipt = {"repository": source["repository"], "package": source["package"], "revision": revision,
                        "exports": source["exports"], "sha256": digest(contents),
                        "files": {name: hashlib.sha256(body).hexdigest() for name, body in contents.items()}}
             destination.mkdir(parents=True, exist_ok=True)

@@ -56,7 +56,7 @@ def expected_hooks(root: Path, config: dict, plugin: str) -> list[dict]:
     ]
 
 
-def validate_requires(root: Path, config: dict, catalog: dict, plugin: str, requires: dict) -> None:
+def validate_requires(root: Path, config: dict, roster: dict, plugin: str, requires: dict) -> None:
     if set(requires) not in (REQUIRED_KEYS, REQUIRED_KEYS | {"setup"}):
         raise ValueError(f"{plugin}: harness requires fields must be {sorted(REQUIRED_KEYS)}")
     if "setup" in requires:
@@ -70,28 +70,28 @@ def validate_requires(root: Path, config: dict, catalog: dict, plugin: str, requ
             raise ValueError(f"{plugin}: setup script is unavailable")
     required_marketplaces = requires["marketplaces"]
     marketplace_name = PACKAGES.core_marketplace(root, config)
-    entries = PACKAGES.catalog_index(catalog)
-    catalog_marketplaces = PACKAGES.catalog_marketplaces(entries)
+    entries = PACKAGES.roster_index(roster)
+    roster_marketplaces = PACKAGES.roster_marketplaces(entries)
     for marketplace in required_marketplaces:
         if set(marketplace) != {"id", "repository"}:
             raise ValueError(f"{plugin}: invalid marketplace declaration")
-        package = catalog_marketplaces.get(marketplace["id"])
+        package = roster_marketplaces.get(marketplace["id"])
         if package is None:
-            raise ValueError(f"{plugin}: marketplace declaration disagrees with catalog: {marketplace}")
+            raise ValueError(f"{plugin}: marketplace declaration disagrees with plugin roster: {marketplace}")
         expected = DISTRIBUTION_REPOSITORY if marketplace["id"] == marketplace_name else package["owner_repository"]
         if marketplace["repository"] != expected:
-            raise ValueError(f"{plugin}: marketplace declaration disagrees with catalog: {marketplace}")
+            raise ValueError(f"{plugin}: marketplace declaration disagrees with plugin roster: {marketplace}")
         if package["source"].removesuffix(".git") != f"https://github.com/{package['owner_repository']}":
-            raise ValueError(f"{plugin}: marketplace source disagrees with catalog owner: {marketplace}")
+            raise ValueError(f"{plugin}: marketplace source disagrees with plugin roster owner: {marketplace}")
     plugin_id = f"{marketplace_name}/{plugin}"
     if plugin_id not in entries:
-        raise ValueError(f"{plugin}: missing catalog entry {plugin_id}")
+        raise ValueError(f"{plugin}: missing plugin roster entry {plugin_id}")
     expected_plugins = sorted([plugin_id, *entries[plugin_id]["dependencies"]["required"]])
     if requires["plugins"] != expected_plugins:
         raise ValueError(f"{plugin}: required plugins must be {expected_plugins}")
     expected_marketplaces = sorted({value.split("/", 1)[0] for value in expected_plugins})
     actual_marketplaces = sorted(item["id"] for item in required_marketplaces)
-    if actual_marketplaces != expected_marketplaces or any(value not in catalog_marketplaces for value in actual_marketplaces):
+    if actual_marketplaces != expected_marketplaces or any(value not in roster_marketplaces for value in actual_marketplaces):
         raise ValueError(f"{plugin}: marketplace declarations disagree with required plugins")
     if requires["hooks"] != expected_hooks(root, config, plugin):
         raise ValueError(f"{plugin}: declared hooks disagree with both host manifests")
@@ -118,7 +118,7 @@ def validate_requires(root: Path, config: dict, catalog: dict, plugin: str, requ
 
 def synchronize(root: Path, check: bool) -> dict[str, dict]:
     config = load(root / ".agents/plugins/sources.json")
-    catalog = load(root / ".agents/catalog/catalog.json")
+    roster = load(root / ".agents/plugins/plugins.json")
     directory = root / ".agents/plugins/harness"
     expected = {scope["plugin"] for scope in config["scopes"]}
     found = {path.stem for path in directory.glob("*.json")}
@@ -144,7 +144,7 @@ def synchronize(root: Path, check: bool) -> dict[str, dict]:
             source = inside(root, relative)
             if source.relative_to(root.resolve()).as_posix() != relative or not source.exists() or not any(source == resource or resource.is_dir() and source.is_relative_to(resource) for resource in resources):
                 raise ValueError(f"{path}: source root is not a canonical shipped {plugin} resource: {relative}")
-        validate_requires(root, config, catalog, plugin, manifest["requires"])
+        validate_requires(root, config, roster, plugin, manifest["requires"])
         result[plugin] = manifest
     return result
 

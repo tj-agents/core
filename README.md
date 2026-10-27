@@ -14,7 +14,7 @@ mechanics such as closing terminals or the clipboard (`tj-agents/cli`), plugin g
 staged, git-ignored `.agents/dependencies/` export.
 
 Marketplace owns the canonical plugin roster and dependency graph in
-[`catalog.json`](https://github.com/tj-agents/marketplace/blob/main/catalog.json). Do not edit plugin names
+[`plugins.json`](https://github.com/tj-agents/marketplace/blob/main/plugins.json). Do not edit plugin names
 or dependencies in Core.
 
 Agent's launch admission verifies selected native plugin installations. A missing enabled installation is
@@ -116,18 +116,18 @@ gate. Source verification does not establish installed-host trust or acceptance.
 - [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md) defines the source, adapter and distribution boundary.
 - [`SKILL_KINDS.md`](SKILL_KINDS.md) defines the shared skill taxonomy.
 - [`PACKAGING.md`](PACKAGING.md) is the rule that a utility skill's runtime dependencies ship with it.
-- `.agents/catalog/catalog.json` records Core's package definitions and digests. The generated
+- `.agents/plugins/plugins.json` records Core's package definitions and digests. The generated
   [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index.
 - `plugins/*` is generated distribution output assembled from canonical shared definitions and the
   selected host adapter. Nothing under it is an authored source.
 
 A PR carries authored sources only. CI's guard job rejects generated paths, PR CI regenerates its own
 workspace before testing, and the post-merge `regenerate` job commits the refreshed `plugins/*`,
-catalog digests, marketplace bridges and `CAPABILITIES.md` to main. To refresh a local tree for tests,
+plugin digests, marketplace bridges and `CAPABILITIES.md` to main. To refresh a local tree for tests,
 run the same two commands and leave their output uncommitted:
 
 ```powershell
-python -B scripts/update_catalog_digests.py
+python -B scripts/update_plugin_digests.py
 pwsh .agents/sync-generated.ps1
 ```
 
@@ -147,5 +147,5 @@ consumes its result. Selection never cancels a prior run or transfers a previous
 Repositories select plugins with `agent:plugins`, and machines are installed by Agent's `install`; see
 [`tj-agents/agent`](https://github.com/tj-agents/agent).
 
-Catalog packages have no release or manifest version. `sha256-tree-v1` hashes the sorted package paths,
+Plugin roster entries have no release or manifest version. `sha256-tree-v1` hashes the sorted package paths,
 lengths and bytes of each package.

@@ -82,6 +82,7 @@ from pathlib import Path
 from hook_runtime import claim_invocation, own_payload_root
 import tier_gate
 sys.path.append(str(Path(__file__).resolve().parents[1] / "dependencies" / "agent" / ".agents" / "agent" / "runtime"))
+from host import Host
 import required_plugins
 
 # Skill descriptions carry non-ASCII punctuation, and this text is what the agent acts on.
@@ -1447,7 +1448,7 @@ def main():
     if not relative_targets:
         sys.exit(0)
     try:
-        verified = required_plugins.check(root, harness)
+        verified = required_plugins.check(root, Host(harness))
     except required_plugins.RequiredPluginsError as error:
         sys.stderr.write(f"SKILL ROUTER - {error}\nThis tool call was NOT run.\n")
         sys.exit(2)
