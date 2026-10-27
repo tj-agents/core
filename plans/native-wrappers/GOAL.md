@@ -97,3 +97,11 @@ change atomically. Splitting the rename would leave a missing skill or competing
 behavior is unchanged; focused adapter, completion, packaging and process checks plus fresh frozen review
 and exact-head Windows/Linux CI qualify the new candidate. The only delivery-hook change updates two
 diagnostic skill references; routing, permission and gate logic remain outside this correction.
+
+Rename slice assessment: the first immutable rename candidate changes 24 paths, with 309 additions and
+314 deletions; the cumulative PR changes 48 paths, with 678 additions and 750 deletions. Most rename
+content moves existing guidance or the adapter; the supervisor and scheduler algorithms do not change.
+Keep canonical ownership, both host entries, package assertions and caller references atomic in Core
+#517. A separate prerequisite or partial rename would expose missing or competing skill identities.
+Native incremental review found one shared merge prerequisite naming the Codex transport for both
+hosts; the repair selects host continuation through Workflow and retains PR authority in Engineering.
