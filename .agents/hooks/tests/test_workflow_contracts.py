@@ -1132,7 +1132,7 @@ $results | ConvertTo-Json -Compress
                     )
                     shutil.rmtree(repository / "plugins")
                     digests = subprocess.run(
-                        [sys.executable, "-B", str(repository / "scripts" / "update_catalog_digests.py")],
+                        [sys.executable, "-B", str(repository / "scripts" / "update_plugin_digests.py")],
                         cwd=repository,
                         capture_output=True,
                         text=True,
@@ -1198,7 +1198,7 @@ $results | ConvertTo-Json -Compress
             )
             shutil.rmtree(repository / "plugins")
             digests = subprocess.run(
-                [sys.executable, "-B", str(repository / "scripts" / "update_catalog_digests.py")],
+                [sys.executable, "-B", str(repository / "scripts" / "update_plugin_digests.py")],
                 cwd=repository,
                 capture_output=True,
                 text=True,
@@ -1235,7 +1235,7 @@ $results | ConvertTo-Json -Compress
             )
             shutil.rmtree(repository / "plugins")
             digests = subprocess.run(
-                [sys.executable, "-B", str(repository / "scripts" / "update_catalog_digests.py")],
+                [sys.executable, "-B", str(repository / "scripts" / "update_plugin_digests.py")],
                 cwd=repository,
                 capture_output=True,
                 text=True,
@@ -1273,7 +1273,7 @@ $results | ConvertTo-Json -Compress
             )
             shutil.rmtree(repository / "plugins")
             digests = subprocess.run(
-                [sys.executable, "-B", str(repository / "scripts" / "update_catalog_digests.py")],
+                [sys.executable, "-B", str(repository / "scripts" / "update_plugin_digests.py")],
                 cwd=repository,
                 capture_output=True,
                 text=True,
