@@ -944,7 +944,6 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize, docs_
             "context": {
                 "immutable_artifacts": [f"git-base:{base}", f"git-head:{head}"],
                 "repository_paths": paths,
-                "rule_identities": rules,
             },
             "synchronization": sync,
             "created_at": utc_now(),
