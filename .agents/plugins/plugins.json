@@ -80,19 +80,6 @@
             ]
           },
           {
-            "path": "hooks/pre_tool_use_adapter.py",
-            "hosts": [
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/skill_router.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
             "path": "hooks/tier_gate.py",
             "hosts": [
               "claude",
@@ -309,7 +296,6 @@
         "self-repair",
         "session",
         "skill-authoring",
-        "skill-routes",
         "stack",
         "staged-review",
         "staged-review-all",
@@ -366,29 +352,9 @@
             ]
           },
           {
-            "path": "hooks/delivery_binding_gate.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/git_auth_scope_gate.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
             "path": "hooks/hook_dispatch.py",
             "hosts": [
               "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/pre_tool_use_adapter.py",
-            "hosts": [
               "codex"
             ]
           }
