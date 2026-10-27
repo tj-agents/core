@@ -15,14 +15,28 @@ from pathlib import Path
 import subprocess
 
 
-def resource(name):
+def package_root():
     here = Path(__file__).resolve()
-    for directory in (here.parent, *here.parents):
-        for relative in ("workflows", ".agents/workflows"):
-            candidate = directory / relative / name
-            if candidate.is_file():
-                return candidate
-    raise RuntimeError("continuation resource unavailable: " + name)
+    if here.parent.parts[-5:] == (".codex", "skills", "engineering", "persistent-workflow", "scripts"):
+        root = here.parents[5]
+        marker = root / ".agents" / "plugins" / "sources.json"
+    elif here.parent.parts[-3:] == ("codex-skills", "persistent-workflow", "scripts"):
+        root = here.parents[3]
+        marker = root / ".codex-plugin" / "plugin.json"
+    else:
+        raise RuntimeError("continuation adapter layout unavailable")
+    if not marker.is_file() or not (root / ".agents" / "engineering").is_dir():
+        raise RuntimeError("continuation package root unavailable")
+    return root
+
+
+def resource(name):
+    if name not in {"continuation_scheduler.py", "continuation_runtime.py"}:
+        raise RuntimeError("unknown continuation resource: " + name)
+    candidate = package_root() / ".codex" / "runtime" / "continuation" / name
+    if not candidate.is_file():
+        raise RuntimeError("continuation resource unavailable: " + name)
+    return candidate
 
 
 SCHEDULER_PATH = resource("continuation_scheduler.py")
@@ -60,7 +74,7 @@ def load_owner(path, requested_worktree=None):
     owner = read_json(path)
     owner_id = owner.get("owner_id")
     worktree = owner.get("worktree")
-    if not isinstance(owner_id, str) or not owner_id.strip() or owner.get("harness") not in {"codex", "claude"}:
+    if not isinstance(owner_id, str) or not owner_id.strip() or owner.get("harness") != "codex":
         raise scheduler.SchedulerError("invalid continuation runtime owner")
     if not isinstance(worktree, str) or not Path(worktree).is_absolute():
         raise scheduler.SchedulerError("owner worktree must be absolute")
@@ -96,9 +110,9 @@ def prerequisites(owner, host):
     python = Path(sys.executable).resolve()
     if not python.is_file() or not runtime.is_file() or not Path(host).is_file():
         raise scheduler.SchedulerError("registered continuation prerequisite is missing")
-    package = runtime.parent.parent
-    lanes = (package / "dependencies" / "agent" / ".agents" / "agent" / "resources" / "lanes"
-             if package.name == ".agents" else package / ".agents" / "lanes")
+    package = package_root()
+    lanes = (package / ".agents" / "lanes" if (package / ".codex-plugin" / "plugin.json").is_file()
+             else package / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "resources" / "lanes")
     if not (lanes / (owner["harness"] + ".json")).is_file():
         raise scheduler.SchedulerError("package is missing selected host lane resource")
     return runtime, python

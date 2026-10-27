@@ -5,10 +5,26 @@ kind: workflow
 domain: process
 ---
 
-Read the [shared continuation workflow](../../../../.agents/engineering/workflow/persistent-workflow/SKILL.md) and `engineering:persistent-delivery` first. They own goal identity, exact delivery binding, repair, review and authorization.
+Read the [shared continuation workflow](../../../../.agents/engineering/workflow/persistent-workflow/SKILL.md)
+and `engineering:persistent-delivery` first. They own the canonical goal, exact delivery binding,
+acceptance evidence, repair, review and authority.
 
-Claude `/goal`, `/loop`, monitors, channels and session restoration can continue or wake work only while their supported session is available. They do not continue after the application or terminal exits. For work that must continue across that boundary, use the supported adapter at `scripts/delivery_continuation.py`: Linux uses a reachable systemd user manager and Windows uses ScheduledTasks through inbox Windows PowerShell; it launches a fresh `claude -p` context in the initialized worktree.
+Use native `/goal` for turn-by-turn continuation toward the canonical completion condition. Use native
+`/loop` or the exposed scheduling tools for delayed checks within the supported session. For work that
+must survive its original application or terminal, use Claude's supported Desktop scheduled task or cloud
+routine with access to the required checkout and evidence. Resume or continue the native session when that
+is the intended lifecycle. Preserve the exact goal and delivery identity in every scheduled instruction.
 
-The adapter supports `register`, `remove`, `list`, and `wake`. Register only after initialization and foreground claim; yield the foreground lease before waiting. Use `python3` on Linux/macOS and `python` on Windows; registration needs `--host-executable` with an absolute native path unless the owner already pins it. Linux timers do not change lingering or extend execution beyond the existing login/user-manager scope. If a scheduler prerequisite is unavailable, report the capability gate and checkpoint, then continue independent authorized work in the current session.
+```text
+/goal Finish the authorized delivery recorded in the canonical goal; require its completion evidence.
+/loop 5m Check the bound PR once; route changed evidence through engineering:persistent-delivery.
+```
 
-Fresh repair and review work follows the roles and lane selection in the shared contracts. Reuse the declared L4 lane for ordinary continuation; do not hardcode a model or imply authenticated host acceptance from source packaging.
+Verify the selected native interface, permissions and actual wake before claiming unattended execution.
+A local-session loop does not establish execution after that session exits. If the required native surface
+cannot reach the owning checkout, preserve the concrete capability gate and continue independent authorized
+work in the foreground. Do not initialize an external supervisor or system scheduler for Claude.
+
+Existing external registrations require reconciliation of their exact owner before native adoption. This
+package neither migrates nor removes a running registration; unresolved owner state prevents claiming the
+migration complete. Shared completion and merge evidence still apply on every native wake.

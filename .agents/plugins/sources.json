@@ -287,6 +287,11 @@
       "plugin": "workflow",
       "source": ".codex/hooks/snapshot.py",
       "destination": "hooks/codex/snapshot.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".codex/runtime/continuation",
+      "destination": ".codex/runtime/continuation"
     }
   ],
   "prerequisites": {

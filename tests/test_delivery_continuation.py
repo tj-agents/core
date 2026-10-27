@@ -14,8 +14,8 @@ from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ADAPTER = ROOT / ".agents/engineering/workflow/persistent-workflow/scripts/delivery_continuation.py"
-SCHEDULER = ROOT / ".agents/workflows/continuation_scheduler.py"
+ADAPTER = ROOT / ".codex/skills/engineering/persistent-workflow/scripts/delivery_continuation.py"
+SCHEDULER = ROOT / ".codex/runtime/continuation/continuation_scheduler.py"
 
 
 def load(name, path):
@@ -146,13 +146,13 @@ class DeliveryContinuationTests(unittest.TestCase):
                             "GH_TOKEN": "must-not-copy", "CONTINUATION_NONCE": "must-not-child"}
 
     def receipt(self, interval=20):
-        return scheduler.linux_receipt(self.owner, self.owner_path, ADAPTER, ROOT / ".agents/workflows/continuation_runtime.py",
+        return scheduler.linux_receipt(self.owner, self.owner_path, ADAPTER, ROOT / ".codex/runtime/continuation/continuation_runtime.py",
                                        sys.executable, self.host, interval, self.environment)
 
     def windows_receipt(self):
         host = self.root / "native host.exe"
         host.write_text("native", encoding="utf-8")
-        return scheduler.windows_receipt(self.owner, self.owner_path, ADAPTER, ROOT / ".agents/workflows/continuation_runtime.py",
+        return scheduler.windows_receipt(self.owner, self.owner_path, ADAPTER, ROOT / ".codex/runtime/continuation/continuation_runtime.py",
                                          sys.executable, host, 20, self.environment)
 
     @unittest.skipIf(os.name == "nt" or not shutil.which("systemd-analyze"),
@@ -315,7 +315,7 @@ class DeliveryContinuationTests(unittest.TestCase):
     def test_mixed_known_update_restores_previous_before_register(self):
         previous = self.receipt(20)
         proposed = scheduler.linux_receipt(self.owner, self.owner_path, self.root / "new adapter.py",
-                                           ROOT / ".agents/workflows/continuation_runtime.py", sys.executable,
+                                           ROOT / ".codex/runtime/continuation/continuation_runtime.py", sys.executable,
                                            self.host, 10, self.environment)
         transport = LinuxTransport(previous)
         old_service, old_timer = scheduler.linux_units(previous)
@@ -554,7 +554,7 @@ class DeliveryContinuationTests(unittest.TestCase):
     def test_linux_recovery_rechecks_restored_ownership_after_reload_before_enabling(self):
         previous = self.receipt()
         proposed = scheduler.linux_receipt(self.owner, self.owner_path, self.root / "new adapter.py",
-                                           ROOT / ".agents/workflows/continuation_runtime.py", sys.executable,
+                                           ROOT / ".codex/runtime/continuation/continuation_runtime.py", sys.executable,
                                            self.host, 10, self.environment)
         transport = LinuxTransport(previous)
         old_service, _ = scheduler.linux_units(previous)
@@ -581,7 +581,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         real_config.mkdir()
         linked_config.symlink_to(real_config, target_is_directory=True)
         receipt = scheduler.linux_receipt(self.owner, self.owner_path, ADAPTER,
-                                          ROOT / ".agents/workflows/continuation_runtime.py", sys.executable,
+                                          ROOT / ".codex/runtime/continuation/continuation_runtime.py", sys.executable,
                                           self.host, 20, {"XDG_CONFIG_HOME": str(linked_config)})
         self.assertEqual(real_config.resolve() / "systemd/user", Path(receipt["unit_directory"]))
         self.assertEqual(Path(receipt["unit_directory"]) / receipt["timer_unit"], Path(receipt["timer_path"]))
@@ -615,7 +615,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         windows = WindowsTransport()
         windows_arguments = self.args("register", "--owner", str(self.owner_path), "--host-executable", str(windows_host))
         windows_receipt = scheduler.windows_receipt(self.owner, self.owner_path, ADAPTER,
-                                                    ROOT / ".agents/workflows/continuation_runtime.py", sys.executable,
+                                                    ROOT / ".codex/runtime/continuation/continuation_runtime.py", sys.executable,
                                                     windows_host, 20, self.environment)
         with patch.object(adapter, "receipt_for", return_value=windows_receipt):
             windows_result = adapter.register(self.owner, self.root, self.owner_path, windows_arguments, windows, windows=True)
@@ -822,18 +822,95 @@ class DeliveryContinuationTests(unittest.TestCase):
 
     def test_installed_package_resources_and_custom_profile_are_portable(self):
         package = (Path(self.temp.name) / "installed package £").resolve()
-        scripts, workflows = package / "skills/persistent-workflow/scripts", package / "workflows"
+        scripts = package / "codex-skills/persistent-workflow/scripts"
+        resources = package / ".codex/runtime/continuation"
         scripts.mkdir(parents=True)
-        workflows.mkdir()
+        resources.mkdir(parents=True)
+        (package / ".codex-plugin").mkdir()
+        (package / ".codex-plugin/plugin.json").write_text("{}")
+        (package / ".agents/engineering").mkdir(parents=True)
         shutil.copy2(ADAPTER, scripts / ADAPTER.name)
-        shutil.copy2(SCHEDULER, workflows / SCHEDULER.name)
-        shutil.copy2(ROOT / ".agents/workflows/continuation_runtime.py", workflows / "continuation_runtime.py")
+        shutil.copy2(SCHEDULER, resources / SCHEDULER.name)
+        shutil.copy2(ROOT / ".codex/runtime/continuation/continuation_runtime.py", resources / "continuation_runtime.py")
         installed = load("installed_delivery_continuation", scripts / ADAPTER.name)
-        self.assertEqual(workflows / "continuation_scheduler.py", installed.resource("continuation_scheduler.py"))
-        self.assertEqual(workflows / "continuation_runtime.py", installed.resource("continuation_runtime.py"))
+        self.assertEqual(resources / "continuation_scheduler.py", installed.resource("continuation_scheduler.py"))
+        self.assertEqual(resources / "continuation_runtime.py", installed.resource("continuation_runtime.py"))
         receipt = self.receipt()
         self.assertEqual("/safe profile £", receipt["profile_environment"]["CODEX_HOME"])
         self.assertNotIn("GH_TOKEN", receipt["profile_environment"])
+
+    def test_generated_continuation_transport_is_codex_only(self):
+        package = ROOT / "plugins/engineering"
+        self.assertTrue((package / "codex-skills/persistent-workflow/scripts/delivery_continuation.py").is_file())
+        self.assertTrue((package / ".codex/runtime/continuation/continuation_runtime.py").is_file())
+        self.assertTrue((package / ".codex/runtime/continuation/continuation_scheduler.py").is_file())
+        self.assertFalse((package / "skills/persistent-workflow/scripts").exists())
+        self.assertFalse((package / ".agents/engineering/workflow/persistent-workflow/scripts").exists())
+        self.assertFalse((package / "workflows/continuation_runtime.py").exists())
+        installed = load("generated_delivery_continuation",
+                         package / "codex-skills/persistent-workflow/scripts/delivery_continuation.py")
+        for module in (adapter, installed):
+            runtime, python = module.prerequisites(self.owner, str(self.host))
+            self.assertEqual(module.package_root() / ".codex/runtime/continuation/continuation_runtime.py", runtime)
+            self.assertEqual(Path(sys.executable).resolve(), python)
+
+    def test_runtime_does_not_use_outer_package_marker_or_shared_resources(self):
+        outer = self.root / "outer-runtime"
+        resources = outer / ".codex/runtime/continuation"
+        resources.mkdir(parents=True)
+        (outer / ".codex-plugin").mkdir()
+        (outer / ".codex-plugin/plugin.json").write_text("{}")
+        (outer / ".agents/engineering").mkdir(parents=True)
+        shutil.copytree(ROOT / ".agents/workflows", outer / "workflows")
+        nested = outer / "nested"
+        runtime = nested / ".codex/runtime/continuation/continuation_runtime.py"
+        runtime.parent.mkdir(parents=True)
+        (nested / ".agents/engineering").mkdir(parents=True)
+        shutil.copy2(ROOT / ".codex/runtime/continuation/continuation_runtime.py", runtime)
+        result = subprocess.run([sys.executable, "-B", str(runtime), "--help"],
+                                capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("package root unavailable", result.stderr)
+        (nested / ".codex-plugin").mkdir()
+        (nested / ".codex-plugin/plugin.json").write_text("{}")
+        result = subprocess.run([sys.executable, "-B", str(runtime), "--help"],
+                                capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("shared runtime unavailable", result.stderr)
+
+    def test_adapter_rejects_claude_layout(self):
+        scripts = self.root / "skills/persistent-workflow/scripts"
+        scripts.mkdir(parents=True)
+        shutil.copy2(ADAPTER, scripts / ADAPTER.name)
+        with self.assertRaisesRegex(RuntimeError, "adapter layout unavailable"):
+            load("claude_delivery_continuation", scripts / ADAPTER.name)
+
+    def test_adapter_does_not_use_outer_package_resources_or_marker(self):
+        outer = self.root / "outer"
+        for package in (outer, outer / "nested"):
+            scripts = package / "codex-skills/persistent-workflow/scripts"
+            scripts.mkdir(parents=True)
+            (package / ".agents/engineering").mkdir(parents=True)
+            (package / ".codex-plugin").mkdir()
+            (package / ".codex-plugin/plugin.json").write_text("{}")
+            shutil.copy2(ADAPTER, scripts / ADAPTER.name)
+        resources = outer / ".codex/runtime/continuation"
+        resources.mkdir(parents=True)
+        shutil.copy2(SCHEDULER, resources / SCHEDULER.name)
+        nested = outer / "nested"
+        script = nested / "codex-skills/persistent-workflow/scripts" / ADAPTER.name
+        with self.assertRaisesRegex(RuntimeError, "resource unavailable"):
+            load("nested_delivery_continuation", script)
+        (nested / ".codex-plugin/plugin.json").unlink()
+        with self.assertRaisesRegex(RuntimeError, "package root unavailable"):
+            load("unmarked_delivery_continuation", script)
+
+    def test_adapter_rejects_existing_claude_owner(self):
+        owner = json.loads(self.owner_path.read_text())
+        owner["harness"] = "claude"
+        self.owner_path.write_text(json.dumps(owner))
+        with self.assertRaisesRegex(adapter.scheduler.SchedulerError, "invalid continuation runtime owner"):
+            adapter.load_owner(self.owner_path)
 
     @unittest.skipUnless(os.name == "nt", "requires inbox Windows PowerShell")
     def test_inbox_powershell_json_transport_is_utf8_without_registration(self):
