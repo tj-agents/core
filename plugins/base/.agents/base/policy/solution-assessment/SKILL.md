@@ -29,6 +29,6 @@ assess a reusable technical component when selecting one.
 
 Handoff, resume, compaction, implementation steps, branch changes, or rereading this rule carry the
 completed assessment forward and never rerun it. Reopen it only at the user's explicit request.
-SessionStart supplies context only; it does not perform initialization. This assessment grants no
+This assessment grants no
 authority to install, execute third-party code, replace a component, or publish changes; those actions
 retain their existing gates.

@@ -11,6 +11,5 @@
     "plans"
   ],
   "displayName": "Workflow status",
-  "skills": "./skills/",
-  "hooks": "./hooks/claude.json"
+  "skills": "./skills/"
 }

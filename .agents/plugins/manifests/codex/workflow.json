@@ -19,6 +19,5 @@
     "category": "Productivity",
     "capabilities": [],
     "defaultPrompt": "Use the selected capability for this task."
-  },
-  "hooks": "./hooks/codex.json"
+  }
 }

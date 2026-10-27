@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:b70170ed3dfb5fb7f1a0266afbc82f260c07b4e4d994a366e8da823e7f2b461b",
+      "digest": "sha256:0aa72b74fdd2f673909fd91bfd924256958f8e75bc84b43a11e680baeef9c173",
       "harness": {
         "marketplaces": [
           {
@@ -44,41 +44,6 @@
           "tj-agents/base"
         ],
         "hooks": [
-          {
-            "path": ".agents/base/policy/agent-files/scripts/session-context.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": ".agents/base/policy/project-setup/scripts/session-context.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": ".agents/base/policy/solution-assessment/scripts/session-context.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": ".agents/base/policy/task-routing/scripts/session-context.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/hook_dispatch.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
           {
             "path": "hooks/tier_gate.py",
             "hosts": [
@@ -135,7 +100,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:f3f2f2527112a1c2654859343e9f3e852f5cf3e7da7715d482937e0fcf5ffb1d",
+      "digest": "sha256:f6126fdbc05056713f56648f5774e5d6423068fc0527af98b14a229516371e8d",
       "harness": {
         "marketplaces": [
           {
@@ -149,22 +114,7 @@
           "tj-agents/base",
           "tj-agents/workflow"
         ],
-        "hooks": [
-          {
-            "path": ".agents/workflow/policy/session/scripts/session-context.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/hook_dispatch.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          }
-        ],
+        "hooks": [],
         "permissions": {
           "claude_allow": [
             "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
@@ -322,7 +272,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:009a5bb5f900fa7798f4c9065361a74eb044b6d50f21279001bb68c82c176f82",
+      "digest": "sha256:8a63f22d06ec58cc37fde7cbebd780bd5b5801bbf44617203540cef39fa73c4e",
       "harness": {
         "marketplaces": [
           {
@@ -338,22 +288,7 @@
           "tj-agents/engineering",
           "tj-agents/workflow"
         ],
-        "hooks": [
-          {
-            "path": ".agents/engineering/policy/session/scripts/session-context.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/hook_dispatch.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          }
-        ],
+        "hooks": [],
         "permissions": {
           "claude_allow": [
             "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
