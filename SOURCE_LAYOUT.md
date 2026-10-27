@@ -12,6 +12,9 @@ declared publisher exports from `.agents/dependencies/` while building its own p
 The plugin roster and project-selection schemas live under `.agents/plugins/`. `CAPABILITIES.md` is generated
 from that canonical plugin roster and is never edited as a second source.
 
+A new package may be built before Marketplace publishes its entry when Core's package roster declares
+Core as its owner. An existing Marketplace assignment to another publisher always takes precedence.
+
 A shared rule or procedure is written once. Neither host adapter may reproduce its body as an independently
 maintained source.
 
