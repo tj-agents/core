@@ -216,16 +216,14 @@ class SourceLayoutTests(unittest.TestCase):
             manifest_root = self.root / f".agents/plugins/manifests/{host}"
             self.assertTrue((manifest_root / "engineering.json").is_file())
             self.assertTrue((manifest_root / "workflow.json").is_file())
-            self.assertTrue((manifest_root / "engineering-hooks.json").is_file())
+            self.assertTrue((manifest_root / "base-hooks.json").is_file())
+            self.assertFalse((manifest_root / "engineering-hooks.json").exists())
+            self.assertFalse((manifest_root / "workflow-hooks.json").exists())
             self.assertFalse((self.root / f".{host}/plugins").exists())
 
     def test_generated_payloads_are_self_contained(self):
         _, output, _, _ = SYNC.build(self.root)
         for relative in (
-            "plugins/base/skills/agent-files/scripts/session-context.py",
-            "plugins/base/skills/project-setup/scripts/session-context.py",
-            "plugins/base/skills/solution-assessment/scripts/session-context.py",
-            "plugins/base/skills/task-routing/scripts/session-context.py",
             "plugins/workflow/codex-skills/plan-artifacts/templates/PLAN.md",
             "plugins/workflow/skills/status/scripts/status.py",
             "plugins/workflow/codex-skills/status/scripts/status.py",

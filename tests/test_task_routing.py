@@ -1,7 +1,7 @@
-import hashlib
+"""Prove both hosts start one shared tier gate that leaves base policies to load from their descriptions."""
+
 import json
 import os
-import shlex
 from pathlib import Path
 import shutil
 import subprocess
@@ -15,25 +15,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def snapshot(root):
     return {
-        str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+        str(path.relative_to(root)): path.read_bytes()
         for path in root.rglob("*")
         if path.is_file()
     }
 
 
 class PolicyContextTests(unittest.TestCase):
-    policies = ("task-routing", "project-setup", "solution-assessment")
+    policies = ("agent-files", "project-setup", "solution-assessment", "task-routing")
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="policy context ")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.plugin = self.root / "installed cache with spaces" / "tj-agents" / "base" / "local"
+        self.profile = self.root / "profile with spaces"
+        self.plugin = self.profile / "plugins" / "cache" / "tj-agents" / "base" / "local"
         shutil.copytree(ROOT / "plugins/base", self.plugin)
         self.cwd = self.root / "unrelated directory with spaces"
         self.cwd.mkdir()
-        self.environment = dict(os.environ, PLUGIN_DATA=str(self.root / "data"), AGENT_STATE_DIRECTORY=str(self.root / "state"))
-        self.environment.pop("TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY", None)
+        self.environment = dict(os.environ, CLAUDE_CONFIG_DIR=str(self.profile), CODEX_HOME=str(self.profile))
 
     def manifest(self, host):
         manifest_path = self.plugin / f".{host}-plugin/plugin.json"
@@ -46,97 +46,49 @@ class PolicyContextTests(unittest.TestCase):
         self.assertEqual(1, len(startup[0]["hooks"]))
         return startup[0]["hooks"][0]
 
-    def invoke(self, policy, extra=()):
-        script = self.plugin / f".agents/base/policy/{policy}/scripts/session-context.py"
+    def run_gate(self, *arguments):
         return subprocess.run(
-            [sys.executable, "-B", str(script), *extra],
-            input="{}",
+            [sys.executable, "-B", str(self.plugin / "hooks/tier_gate.py"), *arguments],
+            capture_output=True,
             text=True,
             encoding="utf-8",
-            capture_output=True,
             cwd=self.cwd,
+            env=self.environment,
+            timeout=20,
         )
 
-    def dispatch_arguments(self, host, handler):
-        variable = "CLAUDE_PLUGIN_ROOT" if host == "claude" else "PLUGIN_ROOT"
-        if host == "claude":
-            self.assertEqual("python", handler["command"])
-            arguments = handler["args"]
-        else:
-            command = shlex.split(handler["command"])
-            self.assertEqual("python3", command[0])
-            arguments = command[1:]
-        return [argument.replace(f"${{{variable}}}", self.plugin.as_posix()) for argument in arguments]
-
-    def test_packaged_hooks_append_the_context_helper_for_both_hosts(self):
+    def test_both_host_manifests_dispatch_the_one_shared_gate_at_session_start(self):
         for host, variable in (("codex", "PLUGIN_ROOT"), ("claude", "CLAUDE_PLUGIN_ROOT")):
             with self.subTest(host=host):
                 handler = self.handler(host)
-                for policy in self.policies:
-                    helper = f".agents/base/policy/{policy}/scripts/session-context.py"
-                    target = f"${{{variable}}}/{helper}"
-                    if host == "claude":
-                        self.assertIn(f"${{{variable}}}/hooks/hook_dispatch.py", handler["args"])
-                        self.assertEqual(1, handler["args"].count(target))
-                    else:
-                        for variant in ("command", "commandWindows"):
-                            self.assertIn(f'"${{{variable}}}/hooks/hook_dispatch.py"', handler[variant])
-                            self.assertEqual(1, handler[variant].count(f'--hook "{target}"'))
-                    self.assertTrue((self.plugin / helper).is_file())
+                self.assertTrue((self.plugin / "hooks/tier_gate.py").is_file())
+                if host == "claude":
+                    self.assertEqual(
+                        ["-B", f"${{{variable}}}/hooks/tier_gate.py", "--session-context"],
+                        handler["args"],
+                    )
+                else:
+                    for variant in ("command", "commandWindows"):
+                        self.assertIn(f'"${{{variable}}}/hooks/tier_gate.py"', handler[variant])
+                        self.assertIn("--session-context", handler[variant])
 
-    def test_context_has_its_own_identity_and_is_read_only_in_an_installed_path(self):
+    def test_no_base_policy_is_preloaded_and_the_call_is_read_only(self):
+        before = snapshot(self.root)
+        result = self.run_gate("--session-context", "--project", str(self.cwd))
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stderr)
+        context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"] if result.stdout else ""
         for policy in self.policies:
             with self.subTest(policy=policy):
-                before = snapshot(self.root)
+                self.assertNotIn(f"base:{policy}", context)
+        self.assertEqual(before, snapshot(self.root))
+
+    def test_every_base_policy_is_selectable_from_its_description(self):
+        for policy in self.policies:
+            with self.subTest(policy=policy):
                 source = (self.plugin / f".agents/base/policy/{policy}/SKILL.md").read_text(encoding="utf-8")
-                result = self.invoke(policy)
-                self.assertEqual(0, result.returncode, result.stderr)
-                output = json.loads(result.stdout)["hookSpecificOutput"]
-                self.assertEqual("SessionStart", output["hookEventName"])
-                self.assertTrue(output["additionalContext"].startswith(f"base:{policy} (source SHA-256 "))
-                self.assertTrue(output["additionalContext"].endswith(source.split("\n---\n", 1)[1].strip()))
-                self.assertEqual("", result.stderr)
-                self.assertEqual(before, snapshot(self.root))
-
-    def test_missing_or_malformed_contract_fails_without_changing_the_package(self):
-        for policy in self.policies:
-            with self.subTest(policy=policy):
-                contract = self.plugin / f".agents/base/policy/{policy}/SKILL.md"
-                original = contract.read_bytes()
-                for content in (b"invalid contract", b"\xff"):
-                    contract.write_bytes(content)
-                    before = snapshot(self.root)
-                    result = self.invoke(policy)
-                    self.assertNotEqual(0, result.returncode)
-                    self.assertIn("cannot read contract", result.stderr)
-                    self.assertEqual("", result.stdout)
-                    self.assertEqual(before, snapshot(self.root))
-                contract.unlink()
-                result = self.invoke(policy)
-                self.assertNotEqual(0, result.returncode)
-                self.assertIn(str(contract.resolve()), result.stderr)
-                contract.write_bytes(original)
-
-    def test_packaged_session_start_dispatches_both_policy_bodies(self):
-        for host in ("claude", "codex"):
-            with self.subTest(host=host):
-                handler = self.handler(host)
-                arguments = self.dispatch_arguments(host, handler)
-                result = subprocess.run(
-                    [sys.executable, *arguments],
-                    input="{}",
-                    text=True,
-                    encoding="utf-8",
-                    capture_output=True,
-                    cwd=self.cwd,
-                    env=self.environment,
-                )
-                self.assertEqual(0, result.returncode, result.stderr)
-                context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
-                self.assertEqual(1, context.count("base:task-routing (source SHA-256 "))
-                for policy in self.policies:
-                    body = (self.plugin / f".agents/base/policy/{policy}/SKILL.md").read_text(encoding="utf-8").split("\n---\n", 1)[1].strip()
-                    self.assertIn(body, context)
+                header = source.split("\n---\n", 1)[0]
+                self.assertRegex(header, r"(?m)^description: .*\bUse (when|before)\b")
 
 
 if __name__ == "__main__":

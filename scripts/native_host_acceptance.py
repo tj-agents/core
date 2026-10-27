@@ -76,7 +76,7 @@ def require_failure_probe(host, evidence, operation):
     else:
         raise AcceptanceError(f'{host} accepted a deliberately failed required startup hook')
     receipt = require_observer(path, 'failed')
-    if 'workflow@tj-agents' not in receipt.get('error', '') \
+    if 'base@tj-agents' not in receipt.get('error', '') \
             or 'native-required-hook-failure-probe' not in receipt.get('error', ''):
         raise AcceptanceError(f'{host} failed for a different reason: {receipt}')
     return receipt
@@ -737,13 +737,13 @@ def accept(root, marketplace, codex, claude, artifacts, timeout):
 def failure_marketplace(root, directory):
     generator = load_module('native_failure_package_generator', root / 'scripts/sync_plugin_packages.py')
     _, output, _, _ = generator.build(root, validate_plugin_digests=False)
-    output['plugins/workflow/.agents/workflow/policy/session/scripts/session-context.py'] = (
+    output['plugins/base/hooks/tier_gate.py'] = (
         b"raise RuntimeError('native-required-hook-failure-probe')\n"
     )
-    output['plugins/workflow/hooks/codex.json'] = (
-        root / '.agents/plugins/manifests/codex/workflow-hooks.json'
+    output['plugins/base/hooks/codex.json'] = (
+        root / '.agents/plugins/manifests/codex/base-hooks.json'
     ).read_bytes()
-    generator.bind_codex_hook_snapshots(root, output, {'workflow'})
+    generator.bind_codex_hook_snapshots(root, output, {'base'})
     for relative, content in output.items():
         target = directory / relative
         target.parent.mkdir(parents=True, exist_ok=True)

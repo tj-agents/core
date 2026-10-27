@@ -16,7 +16,7 @@ Choose the qualified advertised owner for the request and preserve its existing 
 5. Use the appropriate selected operation directly for quick answers and one-step tasks. Selected Engineering owns software implementation, diagnosis, review and delivery; Workflow has no generic review operation.
 6. Resolve and load the qualified advertised skill. If Workflow is unavailable, report the concrete missing selection or capability, preserve the goal and continue independent authorized work. Do not fall back to retired lifecycle names, invent availability, install a package, or treat selection as activation.
 
-This is SessionStart context only. It establishes no scheduler, enforcement, authority, or continuation.
+This establishes no scheduler, enforcement, authority, or continuation.
 
 ```text
 Request: plan the migration
