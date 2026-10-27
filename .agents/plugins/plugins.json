@@ -111,6 +111,7 @@
         "macos"
       ],
       "skills": [
+        "continue",
         "handoff",
         "plan",
         "plan-artifacts",
@@ -264,7 +265,6 @@
         "bugfix",
         "commit",
         "commit-all",
-        "commit-push",
         "committing",
         "docs",
         "docs-review",
@@ -281,13 +281,11 @@
         "open-pr",
         "open-worktree",
         "persistent-delivery",
-        "persistent-workflow",
         "plans",
         "pr-preflight",
         "pr-screenshots",
         "prune-worktrees",
         "pull",
-        "pull-main",
         "push",
         "recents",
         "remote-validation",
@@ -299,12 +297,9 @@
         "stack",
         "staged-review",
         "staged-review-all",
-        "sync",
-        "sync-all",
         "sync-checkout",
         "unmerged",
-        "update-roadmap",
-        "worktree"
+        "update-roadmap"
       ],
       "dependencies": {
         "required": [
