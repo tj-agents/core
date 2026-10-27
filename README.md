@@ -17,6 +17,11 @@ Marketplace owns the canonical plugin roster and dependency graph in
 [`plugins.json`](https://github.com/tj-agents/marketplace/blob/main/plugins.json). Do not edit plugin names
 or dependencies in Core.
 
+Agent's launch admission verifies selected native plugin installations. A missing enabled installation is
+repaired by launch or `agent:refresh-plugins`. A declaration that disagrees with native enabled settings
+requires `agent:plugins` to reconcile repository selection; refresh does not enable undeclared or disabled
+plugins.
+
 `engineering:skill-authoring` owns skill selection triggers, names, and sizing; the
 [`template:check` validator](https://github.com/tj-agents/template) owns required skill content and layout
 validation. `engineering:docs` owns the generic guidance-writing convention.

@@ -198,6 +198,8 @@ def overrun_notice(event: str, merged: dict, deadline: float, unfinished: list[s
     if skipped:
         notice += "; these gates did not run: " + ", ".join(Path(name).name for name in skipped)
     notice += "."
+    if event == "PreToolUse":
+        notice += " This tool call was NOT run. Invoke agent:refresh-plugins to refresh the installed hooks, then retry."
     merged = dict(merged)
     message = merged.get("systemMessage")
     merged["systemMessage"] = f"{message}\n{notice}" if message else notice

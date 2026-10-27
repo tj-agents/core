@@ -1479,8 +1479,8 @@ def main():
         sys.stderr.write(
             "SKILL ROUTER - blocked, this repository requires unavailable standards:\n\n"
             + "\n".join(f"  {name}" for name in missing_install)
-            + f"\n\nInstall or enable the owning plugin(s) for {harness}, then start a new "
-            "session. This tool call was NOT run.\n"
+            + f"\n\nInvoke agent:refresh-plugins for {harness} to repair and adopt the required plugins, then retry. "
+            "This tool call was NOT run.\n"
         )
         sys.exit(2)
     if not targets:
@@ -1653,8 +1653,8 @@ def main():
                     "      REJECTED THIS SESSION - its file is present, but invoking it returned an "
                     "error (e.g. `Unknown skill`), so this session's own registry does not resolve it "
                     "- typically a plugin enabled or updated after the session started, which does not "
-                    "hot-reload. Restart the session (exit and relaunch); if it still fails afterward, "
-                    "this is a genuine bug, report it. Do not read the standard's file directly and "
+                    "hot-reload. Invoke agent:refresh-plugins to adopt the plugin in this same conversation, "
+                    "then retry. Do not read the standard's file directly and "
                     "code from precedent as a substitute for actually invoking it."
                     if harness != "codex" else
                     "      REJECTED THIS SESSION - the read of its file did not succeed. Re-run it and "
@@ -1671,7 +1671,7 @@ def main():
     if missing:
         lines += [
             "",
-            f"Install or enable the missing skill(s) for {harness}, then start a new session. The file "
+            f"Invoke agent:refresh-plugins for {harness} to repair and adopt the missing skill(s). The file "
             "was NOT written. This route remains blocked on every attempt until every owning skill "
             "is available.",
         ]
