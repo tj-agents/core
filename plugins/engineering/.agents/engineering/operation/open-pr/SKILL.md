@@ -28,11 +28,6 @@ Read the authoritative saved body and run Step 6's `pr-body-check` after the wri
 marking ready or reporting the PR. Preserve attribution and existing scope. A connector's successful
 write response alone is not body validation. Reuse the same validator for both hosts and both write paths.
 
-Selected Engineering hooks enforce this contract for recognized `gh pr create/new/edit` commands and
-direct GitHub MCP create/update calls. They do not inspect a connector hidden inside an orchestration
-tool that emits no corresponding hook event; the preflight and authoritative readback still apply there.
-The PR-write registration excludes merge commands and changes no merge authorization.
-
 Resolve the work and its owning review under `engineering:branching`. **During implementation, open a draft PR at the first stable
 candidate that needs remote validation**; later stable candidates within that slice push to the same
 PR. A new substantive slice gets its own PR under `engineering:branching`, stacked when dependent.

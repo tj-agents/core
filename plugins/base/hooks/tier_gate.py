@@ -214,42 +214,6 @@ def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
     return problems
 
 
-QUALIFIED_SKILL = re.compile(r"[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*")
-
-
-def route_problem(row):
-    if not isinstance(row, dict):
-        return "A route must be an object"
-    if not _text(row.get("path")):
-        return "A route requires a path pattern"
-    skills = row.get("skills")
-    if not isinstance(skills, list) or not skills or not all(
-            isinstance(skill, str) and QUALIFIED_SKILL.fullmatch(skill) for skill in skills):
-        return "A route requires a non-empty list of plugin-qualified skills"
-    for field in ("content_requires", "note"):
-        if field in row and not _text(row[field]):
-            return "A route " + field + " must be a non-empty string"
-    if "deny" in row and (not isinstance(row["deny"], list) or not all(
-            isinstance(rule, dict) and _text(rule.get("pattern")) for rule in row["deny"])):
-        return "A route deny must be a list of objects with a pattern"
-    patterns = [row["path"], row.get("content_requires")] + [rule["pattern"] for rule in row.get("deny") or []]
-    for pattern in patterns:
-        if pattern is None:
-            continue
-        try:
-            re.compile(pattern)
-        except re.error as error:
-            return "Invalid pattern " + repr(pattern) + ": " + str(error)
-    return ""
-
-
-def route_diagnostics(routes, path="tier.json.routes"):
-    if not isinstance(routes, list):
-        return [diagnostic("malformed-routes", path, "Routes require a list of rows")]
-    return [diagnostic("malformed-routes", path + "[" + str(index) + "]", problem)
-            for index, row in enumerate(routes) if (problem := route_problem(row))]
-
-
 def fact_references(node):
     if not isinstance(node, dict):
         return set()
@@ -676,18 +640,20 @@ def repository_identity(root):
 
 
 def _tracked_matches(root, patterns):
-    output = _git(root, [
-        "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", *patterns,
-    ])
+    output = _git(root, ["ls-files", "-z", "--cached", "--", *patterns])
     if output is None:
         return None
     return [entry for entry in output.split("\0") if entry]
 
 
-def _walked_matches(root, patterns):
-    matches = []
+def _walked_files(root):
+    cache = GIT_RESULTS.get()
+    key = (str(root), ("walk",))
+    if cache is not None and key in cache:
+        return cache[key]
+    files = []
     root = Path(root)
-    for current, directories, files in os.walk(root):
+    for current, directories, names in os.walk(root):
         relative = Path(current).relative_to(root)
         depth = 0 if str(relative) == "." else len(relative.parts)
         if depth >= WALK_DEPTH:
@@ -696,12 +662,37 @@ def _walked_matches(root, patterns):
             directories[:] = [
                 name for name in directories if name not in WALK_SKIP and not name.startswith(".")
             ]
-        for name in files:
-            if any(fnmatch.fnmatch(name, pattern) for pattern in patterns):
-                matches.append((relative / name).as_posix())
-                if len(matches) >= CONTENT_CANDIDATES:
-                    return matches
+        files.extend(((relative / name).as_posix(), os.path.normcase(name)) for name in names)
+    if cache is not None:
+        cache[key] = files
+    return files
+
+
+def _walked_matches(root, patterns):
+    expressions = [re.compile(fnmatch.translate(os.path.normcase(pattern))) for pattern in patterns]
+    matches = []
+    for path, name in _walked_files(root):
+        if any(expression.match(name) for expression in expressions):
+            matches.append(path)
+            if len(matches) >= CONTENT_CANDIDATES:
+                break
     return matches
+
+
+def _ignored(root, paths):
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), "check-ignore", "-z", "--stdin"],
+            input="\0".join(paths),
+            capture_output=True,
+            text=True,
+            timeout=GIT_TIMEOUT,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    if completed.returncode not in (0, 1):
+        return set()
+    return {entry for entry in completed.stdout.split("\0") if entry}
 
 
 def matching_paths(root, patterns):
@@ -709,9 +700,13 @@ def matching_paths(root, patterns):
     if not patterns:
         return []
     tracked = _tracked_matches(root, patterns)
-    if tracked is not None:
+    if tracked:
         return tracked
-    return _walked_matches(root, patterns)
+    walked = _walked_matches(root, patterns)
+    if tracked is None or not walked:
+        return walked
+    ignored = _ignored(root, walked)
+    return [path for path in walked if path not in ignored]
 
 
 def stack_present(root, detect):
@@ -877,10 +872,7 @@ def statement(root, found=None):
         names = ", ".join(declaration.tier for declaration in ubiquitous)
         lines.append("Ubiquitous, always applies: " + names + ".")
     for declaration, reason in applicable:
-        line = "Applies here: `" + declaration.plugin + ":*` - " + reason + "."
-        if declaration.data.get("routes"):
-            line += " Load its skills before writing its files; the write gate blocks them until you do."
-        lines.append(line)
+        lines.append("Applies here: `" + declaration.plugin + ":*` - " + reason + ".")
     for declaration, _ in result.employers:
         path = employer_context_path(declaration.payload_dir, declaration.employer["context_skill"])
         lines.append("Employer context: `" + declaration.plugin + ":" + declaration.employer["context_skill"]

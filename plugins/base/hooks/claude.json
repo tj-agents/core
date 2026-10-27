@@ -27,29 +27,6 @@
           }
         ]
       }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 30,
-            "onFailure": "block",
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
-              "--deadline",
-              "25",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py",
-              "--harness",
-              "claude"
-            ]
-          }
-        ],
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell"
-      }
     ]
   }
 }
