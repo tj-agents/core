@@ -29,8 +29,21 @@ whole page when the whole page is the destination. An earlier index link does no
 where the reader is told to act. Apply this to summaries, reading-order tables and follow-up prompts.
 
 Use the destination's subject as the label, such as "deployment options", rather than "here" or an
-unlinked section number. Verify the target page and anchor, and update incoming links when headings
-move. This applies to navigation instructions; ordinary prose need not link every repeated term.
+unlinked section number. Verify the target page and anchor against the rendered heading's permalink,
+especially for punctuation or duplicate headings, and update incoming links when headings move.
+This applies to navigation instructions; ordinary prose need not link every repeated term.
+
+Check representative same-page and cross-page section links in the reader's actual Markdown viewer.
+The destination heading must become visible; opening the correct file at the top is a failed section
+jump. A static anchor check alone does not establish viewer support. If the viewer ignores fragments,
+record that limitation and offer a verified supported reading route; keep standard links portable.
+
+```text
+Input: [Design options](#3-options)
+Action: click the link in the rendered page.
+Pass: the heading "3. Options" is visible at the destination.
+If only the page top opens: check the rendered anchor and the viewer's fragment support.
+```
 
 ## Put parallel items in a table
 
