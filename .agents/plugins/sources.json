@@ -55,8 +55,8 @@
   "resources": [
     {
       "plugin": "base",
-      "source": ".agents/dependencies/agent/.agents/agent/runtime/required_plugins.py",
-      "destination": "hooks/required_plugins.py"
+      "source": ".agents/dependencies/agent/.agents/agent/runtime",
+      "destination": "dependencies/agent/.agents/agent/runtime"
     },
     {
       "plugin": "engineering",
@@ -65,8 +65,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/dependencies/agent/.agents/agent/runtime/required_plugins.py",
-      "destination": "hooks/required_plugins.py"
+      "source": ".agents/dependencies/agent/.agents/agent/runtime",
+      "destination": "dependencies/agent/.agents/agent/runtime"
     },
     {
       "plugin": "base",
