@@ -21,6 +21,17 @@ an "In 30 seconds" list of three to five bullets. A reader who stops there has t
 One subject per numbered `##` section, a `---` rule between sections, and `### 2.1`-style subsections.
 Numbers let a reader say "see 4.2" and let an index link to stable anchors.
 
+## Link reading instructions to their destination
+
+When directing a reader to another page or section, put a descriptive link in that instruction.
+Link to the exact heading when naming a section, including sections on the same page; link to the
+whole page when the whole page is the destination. An earlier index link does not replace a link
+where the reader is told to act. Apply this to summaries, reading-order tables and follow-up prompts.
+
+Use the destination's subject as the label, such as "deployment options", rather than "here" or an
+unlinked section number. Verify the target page and anchor, and update incoming links when headings
+move. This applies to navigation instructions; ordinary prose need not link every repeated term.
+
 ## Put parallel items in a table
 
 Items with the same shape (options, problems, decisions, risks, steps, owners) go in a table whose
@@ -76,6 +87,7 @@ an owner each. End with the sources and the date they were read.
 - Orders are keyed by one id across services.
 - Consumers record event ids to handle repeated delivery safely.
 - Journal retention remains an open decision owned by Ana.
+- Follow [event delivery](#2-event-delivery), then compare the [design options](#3-options).
 
 ---
 
