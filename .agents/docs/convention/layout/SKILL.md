@@ -35,8 +35,26 @@ topic as the summary. Keep the glossary as the last section.
 ## Draw flows
 
 Draw any flow across three or more parts as a Mermaid diagram: `sequenceDiagram` for order over time,
-`flowchart` for structure. One idea per diagram. Colour only through `classDef` with `fill`, `stroke`
-and `color` set together so it reads in light and dark themes. Never draw ASCII art.
+`flowchart` for structure. One idea per diagram. Never draw ASCII art.
+
+For flowcharts, set custom node colours through `classDef`, pairing `fill`, `color` and `stroke`.
+Use the palette below for failure and repair nodes; let the viewer theme style ordinary nodes and
+connectors. Custom fills need explicit text colours because a dark viewer may otherwise put pale text
+on a pale background. Keep the meaning in the labels as well as the colours.
+
+```mermaid
+flowchart LR
+    request[Read stored reference] --> failed[Failure: reference missing]:::bad
+    failed --> repair[Fix: resolve the stored version]:::fix
+    classDef bad fill:#fee2e2,color:#7f1d1d,stroke:#b91c1c,stroke-width:2px
+    classDef fix fill:#dcfce7,color:#14532d,stroke:#15803d,stroke-width:2px
+```
+
+When changing a palette, render a representative diagram in both light and dark themes and inspect
+node text, multiline labels, arrows and edge labels at reading size. Aim for at least 4.5:1 text-to-fill
+contrast. Check the actual Markdown viewer when available; a standalone render does not prove that
+every viewer applies the same CSS. Mermaid's [class styling](https://mermaid.js.org/syntax/flowchart.html#styling-and-classes)
+is the syntax reference.
 
 ## Keep state distinct
 
