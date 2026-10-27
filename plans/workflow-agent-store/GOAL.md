@@ -122,8 +122,8 @@ explicit user request; readiness checks below qualify individual implementation 
   Current shared source embedding already includes hooks, lane data and repository identity helpers.
 - `engineering:plans`, `plan-authoring` and completion validation already own design readiness and
   goal acceptance. No distinct current reason for another public review skill has been established.
-- Existing `engineering:persistent-workflow` is specifically remote delivery continuation. Its name is
-  broader than its current behavior; generic execution must not depend on forge delivery.
+- Remote delivery continuation is specifically `workflow:continue`; generic execution must not depend on
+  forge delivery.
 
 Retaining SQLite and the native adapters preserves identities and existing atomicity without adding
 another scheduler, database or service. Public primary sources inspected: SQLite's

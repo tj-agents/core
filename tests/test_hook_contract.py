@@ -23,11 +23,18 @@ class HookContractTests(unittest.TestCase):
     def test_all_declared_hooks_have_valid_pointers_commands_and_scripts(self) -> None:
         self.validate(self.output)
 
-    def test_no_package_intercepts_tool_calls(self) -> None:
+    def test_only_base_ships_a_hooks_manifest_and_it_registers_only_session_start(self) -> None:
+        hook_manifests = {}
         for path, payload in self.output.items():
-            if path.startswith("plugins/") and path.endswith(".json") and path.split("/")[2:3] == ["hooks"]:
-                with self.subTest(path=path):
-                    self.assertNotIn("PreToolUse", json.loads(payload).get("hooks", {}))
+            if not (path.startswith("plugins/") and path.endswith(".json") and path.split("/")[2:3] == ["hooks"]):
+                continue
+            document = json.loads(payload)
+            if isinstance(document, dict) and isinstance(document.get("hooks"), dict):
+                hook_manifests[path] = document
+        self.assertEqual({"plugins/base/hooks/claude.json", "plugins/base/hooks/codex.json"}, set(hook_manifests))
+        for path, manifest in hook_manifests.items():
+            with self.subTest(path=path):
+                self.assertEqual({"SessionStart"}, set(manifest["hooks"]))
 
     def test_shipped_hook_without_manifest_pointer_is_rejected(self) -> None:
         output = copy.deepcopy(self.output)
@@ -44,19 +51,13 @@ class HookContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "shipped hooks disagree|target is missing"):
             self.validate(output)
 
-    def test_missing_hook_script_target_is_rejected(self) -> None:
-        output = copy.deepcopy(self.output)
-        del output["plugins/engineering/.agents/engineering/policy/session/scripts/session-context.py"]
-        with self.assertRaisesRegex(ValueError, "script target is missing"):
-            self.validate(output)
-
     def test_missing_second_windows_hook_script_target_is_rejected(self) -> None:
         output = copy.deepcopy(self.output)
-        path = "plugins/engineering/hooks/codex.json"
+        path = "plugins/base/hooks/codex.json"
         payload = json.loads(output[path])
         command = payload["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"]
         payload["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"] = command.replace(
-            ".agents/engineering/policy/session/scripts/session-context.py", "hooks/does-not-exist.py"
+            "hooks/tier_gate.py", "hooks/does-not-exist.py"
         )
         output[path] = json.dumps(payload).encode()
         with self.assertRaisesRegex(ValueError, "script target is missing"):
@@ -73,18 +74,18 @@ class HookContractTests(unittest.TestCase):
 
     def test_codex_windows_host_root_expansion_is_enforced(self) -> None:
         output = copy.deepcopy(self.output)
-        path = "plugins/engineering/hooks/codex.json"
+        path = "plugins/base/hooks/codex.json"
         payload = json.loads(output[path])
         payload["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"] = (
-            'python -B "%PLUGIN_ROOT%/hooks/hook_dispatch.py"'
+            'python -B "%PLUGIN_ROOT%/hooks/tier_gate.py"'
         )
         output[path] = json.dumps(payload).encode()
         with self.assertRaisesRegex(ValueError, "wrong plugin root"):
             self.validate(output)
 
     def test_claude_shell_form_and_packed_arguments_are_rejected(self) -> None:
-        path = "plugins/engineering/hooks/claude.json"
-        packed = '-B "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py"'
+        path = "plugins/base/hooks/claude.json"
+        packed = '-B "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py"'
         for hook in (
             {"type": "command", "command": f"python {packed}"},
             {"type": "command", "command": "python", "args": [packed]},
@@ -105,7 +106,7 @@ class HookContractTests(unittest.TestCase):
 
     def test_codex_windows_command_is_required(self) -> None:
         output = copy.deepcopy(self.output)
-        path = "plugins/engineering/hooks/codex.json"
+        path = "plugins/base/hooks/codex.json"
         payload = json.loads(output[path])
         payload["hooks"]["SessionStart"][0]["hooks"][0].pop("commandWindows")
         output[path] = json.dumps(payload).encode()
