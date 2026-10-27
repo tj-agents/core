@@ -131,7 +131,7 @@ class SkillRouterTests(unittest.TestCase):
             with self.assertRaises(SystemExit) as stopped:
                 router.main()
         self.assertEqual(2, stopped.exception.code)
-        check.assert_called_once_with(self.repo, "claude")
+        check.assert_called_once_with(self.repo, router.Host.CLAUDE)
         self.assertIn("Invoke agent:refresh-plugins", stderr.getvalue())
 
     def test_stalled_admission_reports_recovery_through_both_host_wrappers(self):
