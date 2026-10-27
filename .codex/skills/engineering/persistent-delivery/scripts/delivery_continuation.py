@@ -17,10 +17,10 @@ import subprocess
 
 def package_root():
     here = Path(__file__).resolve()
-    if here.parent.parts[-5:] == (".codex", "skills", "engineering", "persistent-workflow", "scripts"):
+    if here.parent.parts[-5:] == (".codex", "skills", "engineering", "persistent-delivery", "scripts"):
         root = here.parents[5]
         marker = root / ".agents" / "plugins" / "sources.json"
-    elif here.parent.parts[-3:] == ("codex-skills", "persistent-workflow", "scripts"):
+    elif here.parent.parts[-3:] == ("codex-skills", "persistent-delivery", "scripts"):
         root = here.parents[3]
         marker = root / ".codex-plugin" / "plugin.json"
     else:

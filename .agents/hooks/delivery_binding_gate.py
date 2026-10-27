@@ -442,7 +442,7 @@ def main():
             + failure
             + "). Run `python .agents/workflows/workflow_ops.py --workflow-run-id "
             "delivery-bind-pr-" + pr + " delivery-bind --pr " + pr + "` and read the error, or "
-            "enter the persistent-workflow skill and bind it by hand. Do not leave this PR with no "
+            "enter engineering:persistent-delivery and bind it by hand. Do not leave this PR with no "
             "continuation owning its wait."
         )
 
@@ -459,7 +459,7 @@ def main():
         + str(binding.get("worktree", ""))
         + ".\n"
         + authorization_line(resolution)
-        + "\nEnter the persistent-workflow skill now and give this binding a continuation that "
+        + "\nEnter engineering:persistent-delivery now and give this binding a continuation that "
         "owns the wait — do not end the turn with the PR unowned. The continuation drives exact-head "
         "CI, dispatches one fresh debugging context per failure, obtains independent current-head "
         "review, and stops at whichever terminal the binding records. Release it with "

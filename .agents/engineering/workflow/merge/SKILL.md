@@ -31,7 +31,7 @@ procedure that goes stale in the repo that renames one.
   without a queue or required branch checks it can merge immediately. Before every merge invocation,
   including `--auto`, require the exact PR head's own checks to be terminal and green under step 3.
   The flag is not a check-waiting gate. Observe the actual queued or merged outcome through
-  persistent-workflow or the foreground listener; waiting must not keep the model running.
+  `workflow:continue` or the foreground listener; waiting must not keep the model running.
 - **`--admin` is an escape hatch, not the default.** It force-merges immediately and **bypasses the queue,
   which means the required suites do not run at all.** Use it only when the user explicitly asks to skip the
   queue — a meta-only diff with zero runtime impact (`engineering:merge-docs` is that case as its own
@@ -39,7 +39,7 @@ procedure that goes stale in the repo that renames one.
   the queue:** to run less, apply the tier label below and enqueue normally so the hard floor still builds
   against current base.
 - **A required approval is Tommy's, and `--auto` waits for it.** Before arming auto-merge, initialize,
-  claim, register and observe the existing `engineering:persistent-workflow` continuation for the exact
+  claim, register and observe the existing Codex transport through `engineering:persistent-delivery` for the exact
   PR/head and its authorized post-merge steps. Use the guarded command below and report the approval link
   once. GitHub's required review remains a waiting dependency; retain the binding and scheduler so a
   merge observation resumes cleanup and publication without another prompt. Never approve or bypass it.
@@ -209,7 +209,7 @@ Run exactly one monitor through the host's notification or scheduled continuatio
 identity after interruption. The compact transition or terminal document is the whole progress report;
 unchanged observations remain silent and never create a model turn or user-facing update.
 
-- **A failed check dispatches; it does not retry.** When `persistent-workflow` owns the delivery, route the
+- **A failed check dispatches; it does not retry.** When `workflow:continue` owns the wake, route the
   exact failed check/run through `persistent-delivery`, classify its tier, and immediately dispatch one fresh
   debugging context with the complete binding and failure signature. Only in the explicit foreground fallback
   with no persistent host capability, emit a ready-to-paste dispatch prompt for a dedicated
