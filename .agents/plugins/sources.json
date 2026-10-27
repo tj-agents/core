@@ -246,6 +246,11 @@
       "plugin": "docs",
       "source": ".agents/tiers/docs.json",
       "destination": "tier.json"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".codex/runtime/continuation",
+      "destination": ".codex/runtime/continuation"
     }
   ],
   "prerequisites": {
@@ -273,7 +278,8 @@
     "docs": []
   },
   "extended_host_adapters": [
-    "engineering:persistent-workflow",
+    "workflow:continue",
+    "engineering:persistent-delivery",
     "engineering:review"
   ],
   "host_only_terms": {

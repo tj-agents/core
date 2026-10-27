@@ -312,25 +312,25 @@
       "adaptation": "Codex-only delivery configuration is authored under .codex and packaged with the engineering plugin."
     },
     {
-      "path": ".claude/skills/engineering/persistent-workflow/SKILL.md",
+      "path": ".claude/skills/workflow/continue/SKILL.md",
       "source_path": ".claude/workflow-skills/persistent-workflow/SKILL.md",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "479a7c0aa2fc47b8563701776e3c794674343f7f23a8fc26f326136ab01a3bd5",
       "adaptation": "Claude host behavior extends and references the canonical .agents workflow definition."
     },
     {
-      "path": ".codex/skills/engineering/persistent-workflow/SKILL.md",
+      "path": ".codex/skills/workflow/continue/SKILL.md",
       "source_path": ".codex/workflow-skills/persistent-workflow/SKILL.md",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "7e54dc045b59ab07e2a99b02849362ea1ab60166ebb30b8a70a5290ae42c1e8d",
       "adaptation": "Codex host behavior extends and references the canonical .agents workflow definition."
     },
     {
-      "path": ".agents/engineering/workflow/persistent-workflow/scripts/delivery_continuation.py",
+      "path": ".codex/skills/engineering/persistent-delivery/scripts/delivery_continuation.py",
       "source_path": "scripts/delivery_continuation.py",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "0cb3df64b4a9bc7753aab288dc7948f0841e202d635471899ff542ca04bdf1af",
-      "adaptation": "Cross-platform continuation adapter is canonical under .agents and packaged beside both host discovery entries."
+      "adaptation": "Codex durable CLI continuation adapter is authored in the Codex host tree and packaged only in its discovery entry."
     },
     {
       "path": ".agents/hooks/tests/test_goal_preflight.py",

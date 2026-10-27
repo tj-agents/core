@@ -382,8 +382,8 @@ class WorkflowGenerationTests(unittest.TestCase):
         self.assertNotIn("version", codex)
         self.assertNotIn("version", claude)
         self.assertEqual("./codex-skills/", codex["skills"])
-        self.assertTrue((plugin / "codex-skills" / "persistent-workflow" / "SKILL.md").is_file())
-        self.assertTrue((plugin / "skills" / "persistent-workflow" / "SKILL.md").is_file())
+        self.assertTrue((plugin / "codex-skills" / "persistent-delivery" / "SKILL.md").is_file())
+        self.assertTrue((plugin / "skills" / "persistent-delivery" / "SKILL.md").is_file())
         self.assertTrue((plugin / "codex-agents" / "review-lens.toml").is_file())
         self.assertTrue((plugin / "agents" / "review-lens.md").is_file())
         self.assertTrue((plugin / "workflows" / "delivery_runtime.py").is_file())
@@ -392,7 +392,7 @@ class WorkflowGenerationTests(unittest.TestCase):
 
     def test_extended_host_adapter_preserves_one_public_identity(self):
         config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
-        self.assertEqual(["engineering:persistent-workflow", "engineering:review"],
+        self.assertEqual(["workflow:continue", "engineering:persistent-delivery", "engineering:review"],
                          config["extended_host_adapters"])
         for identity in config["extended_host_adapters"]:
             plugin, skill = identity.split(":")
@@ -440,38 +440,40 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.assertEqual([], list(bundle.rglob("*.pyc")))
 
     def test_entry_points_suppress_bytecode_without_relying_on_the_parent_interpreter(self):
-        scripts = (
-            (WORKFLOWS / "workflow_ops.py", PLUGIN_WORKFLOWS / "workflow_ops.py"),
-            (WORKFLOWS / "continuation_runtime.py", PLUGIN_WORKFLOWS / "continuation_runtime.py"),
-        )
         env = {key: value for key, value in os.environ.items()
                if key not in {"PYTHONDONTWRITEBYTECODE", "PYTHONPYCACHEPREFIX"}}
-        for canonical, packaged in scripts:
-            for script in (canonical, packaged):
-                with self.subTest(script=script):
-                    with tempfile.TemporaryDirectory(dir=ROOT) as temp:
-                        root = Path(temp)
-                        bundle = root / "workflows"
-                        shutil.copytree(
-                            script.parent,
-                            bundle,
-                            ignore=shutil.ignore_patterns("__pycache__"),
-                        )
-                        before = {path.relative_to(bundle).as_posix(): path.read_bytes()
-                                  for path in bundle.rglob("*") if path.is_file()}
+        for packaged in (False, True):
+            with self.subTest(packaged=packaged):
+                with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+                    root = Path(temp) / "bundle"
+                    if packaged:
+                        shutil.copytree(ROOT / "plugins/engineering", root,
+                                        ignore=shutil.ignore_patterns("__pycache__"))
+                        workflows = root / "workflows"
+                    else:
+                        for relative in (".agents/workflows", ".agents/engineering",
+                                         ".codex/runtime/continuation",
+                                         ".agents/dependencies/agent/.agents/agent/resources/lanes"):
+                            shutil.copytree(ROOT / relative, root / relative,
+                                            ignore=shutil.ignore_patterns("__pycache__"))
+                        marker = root / ".agents/plugins/sources.json"
+                        marker.parent.mkdir(parents=True)
+                        shutil.copy2(ROOT / ".agents/plugins/sources.json", marker)
+                        workflows = root / ".agents/workflows"
+                    before = {path.relative_to(root).as_posix(): path.read_bytes()
+                              for path in root.rglob("*") if path.is_file()}
+                    for script in (workflows / "workflow_ops.py",
+                                   root / ".codex/runtime/continuation/continuation_runtime.py"):
                         completed = subprocess.run(
-                            [sys.executable, str(bundle / script.name), "--help"],
-                            cwd=str(bundle),
-                            capture_output=True,
-                            text=True,
-                            env=env,
+                            [sys.executable, str(script), "--help"],
+                            cwd=str(root), capture_output=True, text=True, env=env,
                         )
                         self.assertEqual(0, completed.returncode, completed.stderr)
-                        self.assertEqual([], list(bundle.rglob("*.pyc")))
-                        self.assertEqual([], list(bundle.rglob("__pycache__")))
-                        after = {path.relative_to(bundle).as_posix(): path.read_bytes()
-                                 for path in bundle.rglob("*") if path.is_file()}
-                        self.assertEqual(before, after)
+                    self.assertEqual([], list(root.rglob("*.pyc")))
+                    self.assertEqual([], list(root.rglob("__pycache__")))
+                    after = {path.relative_to(root).as_posix(): path.read_bytes()
+                             for path in root.rglob("*") if path.is_file()}
+                    self.assertEqual(before, after)
 
     def test_fixture_skill_inlines_the_gate_contract_without_becoming_discoverable(self):
         template = self.normalized(
