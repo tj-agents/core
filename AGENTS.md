@@ -1,6 +1,6 @@
 # core
 
-Core authors and publishes only the `base`, `workflow` and `engineering` plugins. Behavior that acts on an
+Core authors and publishes only the `base`, `workflow`, `engineering` and `docs` plugins. Behavior that acts on an
 agent session belongs in `tj-agents/agent`, deterministic CLI and OS mechanics in `tj-agents/cli`, plugin
 generation and checks in `tj-agents/template`, and stack standards in their stack repository. Never author,
 copy or refactor another repository's package here; the generator rejects a scope the marketplace publishes
@@ -22,7 +22,7 @@ selection.
 Global design and cross-repository plans belong in [`tj-agents/docs`](https://github.com/tj-agents/docs).
 Keep core implementation plans here and link to shared designs instead of copying them.
 
-`.agents/` holds only host-neutral shared source: Base, Engineering and Workflow definitions, workflow
+`.agents/` holds only host-neutral shared source: Base, Engineering, Workflow and Docs definitions, workflow
 contracts, shared hooks, schemas, tests and resources. `.codex/` holds Codex-only entry points, adapters,
 agent definitions and configuration; `.claude/` holds the Claude-only equivalents. A host entry point
 references its canonical definition in `.agents/` and adds only genuine host differences; never copy a shared

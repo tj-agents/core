@@ -1,0 +1,22 @@
+{
+  "name": "docs",
+  "description": "Layout conventions for pages people read.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tj-agents/core",
+  "keywords": [
+    "docs",
+    "layout"
+  ],
+  "skills": "./codex-skills/",
+  "interface": {
+    "displayName": "Documentation",
+    "shortDescription": "Layout conventions for pages people read.",
+    "longDescription": "Layout conventions for pages people read.",
+    "developerName": "Tommy Seery",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the selected capability for this task."
+  }
+}

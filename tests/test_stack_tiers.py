@@ -413,7 +413,7 @@ class SessionStatement(TemporaryProject):
 class ShippedDeclarations(unittest.TestCase):
     def test_every_core_package_declares_itself_ubiquitous(self):
         names = sorted(path.stem for path in DECLARED.glob("*.json"))
-        self.assertEqual(names, ["base", "engineering", "workflow"])
+        self.assertEqual(names, ["base", "docs", "engineering", "workflow"])
         for path in DECLARED.glob("*.json"):
             data = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(data["schema_version"], 1)

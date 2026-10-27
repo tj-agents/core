@@ -21,6 +21,13 @@
       "layout": "kind",
       "plugin": "engineering",
       "domain": "process"
+    },
+    {
+      "name": "docs",
+      "root": ".agents/docs",
+      "layout": "kind",
+      "plugin": "docs",
+      "domain": "docs"
     }
   ],
   "host_adapter_roots": {
@@ -259,6 +266,11 @@
       "destination": "tier.json"
     },
     {
+      "plugin": "docs",
+      "source": ".agents/tiers/docs.json",
+      "destination": "tier.json"
+    },
+    {
       "plugin": "workflow",
       "source": ".agents/hooks/hook_dispatch.py",
       "destination": "hooks/hook_dispatch.py"
@@ -277,7 +289,8 @@
     "engineering": [
       "base",
       "workflow"
-    ]
+    ],
+    "docs": []
   },
   "external_prerequisites": {
     "base": [],
@@ -289,7 +302,8 @@
       {"id": "tj-agents/agent-store", "marketplace": "tj-agents", "repository": "tj-agents/agent"},
       {"id": "tj-agents/agent", "marketplace": "tj-agents", "repository": "tj-agents/agent"},
       {"id": "tj-agents/cli", "marketplace": "tj-agents", "repository": "tj-agents/cli"}
-    ]
+    ],
+    "docs": []
   },
   "extended_host_adapters": [
     "engineering:persistent-workflow",

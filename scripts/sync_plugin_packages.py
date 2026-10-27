@@ -393,6 +393,9 @@ def metadata(body: str, source: Path) -> dict[str, str]:
 
 def foreign_packages(root: Path, plugins: set[str]) -> list[str]:
     publishers = {entry["name"]: entry["repository"] for entry in load(root / MARKETPLACE_SNAPSHOT)["marketplace"]["plugins"]}
+    for package in load(root / ".agents/plugins/plugins.json")["packages"]:
+        if package["owner_repository"] == f"tj-agents/{PUBLISHER}":
+            publishers.setdefault(package["name"], PUBLISHER)
     return sorted(plugin for plugin in plugins if publishers.get(plugin) != PUBLISHER)
 
 
@@ -401,7 +404,8 @@ def validate_configuration(root: Path, config: dict) -> set[str]:
     foreign = foreign_packages(root, plugins)
     if foreign:
         raise ValueError(
-            f"Core may author only packages the marketplace publishes from tj-agents/{PUBLISHER}: {', '.join(foreign)}"
+            f"Core may author only packages declared locally for tj-agents/{PUBLISHER} "
+            f"without a conflicting marketplace publisher: {', '.join(foreign)}"
         )
     if set(config["prerequisites"]) != plugins:
         raise ValueError("Prerequisite owners do not match declared plugins")
