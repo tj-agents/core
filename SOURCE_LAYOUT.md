@@ -5,7 +5,7 @@ This repository has one shared source and two host-specific adapter trees.
 ## Canonical shared source
 
 `.agents/` owns every Core host-neutral capability definition and its shared runtime material. Core owns
-Base, Workflow and Engineering classifications inside `.agents/`; they are not authored top-level
+Base, Workflow, Engineering and Docs classifications inside `.agents/`; they are not authored top-level
 repository trees. Agent, Agent Store, Codex, Claude and CLI source stays with its publisher. Core consumes
 declared publisher exports from `.agents/dependencies/` while building its own packages.
 

@@ -1,7 +1,7 @@
 # Tier declarations
 
-Every standards plugin ships a `tier.json` at its payload root. `base`, `workflow` and
-`engineering` apply to every project. A stack plugin declares `stack-present` and the markers that
+Every standards plugin ships a `tier.json` at its payload root. `base`, `workflow`,
+`engineering` and `docs` apply to every project. A stack plugin declares `stack-present` and the markers that
 identify its stack. The base package's `hooks/tier_gate.py` reads installed declarations at
 SessionStart and blocks use of a stack skill when its stack is absent.
 

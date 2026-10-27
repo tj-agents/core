@@ -607,6 +607,52 @@
         ],
         "optional": []
       }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/docs",
+      "name": "docs",
+      "package_path": "plugins/docs",
+      "description": "Layout conventions for pages people read.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "layout"
+      ],
+      "dependencies": {
+        "required": [],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [],
+        "optional": []
+      },
+      "digest": "sha256:89fca42f8ada1645b85a51dde697ee8f46d9d97808e5a33e1218ac780a010b67",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/docs"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [],
+          "codex_prefix_rules": []
+        }
+      },
+      "external_dependencies": {
+        "required": [],
+        "optional": []
+      }
     }
   ]
 }
