@@ -3,7 +3,6 @@
   "plugin": "tj-agents/base",
   "source_roots": [
     ".agents/base",
-    ".agents/hooks/hook_dispatch.py",
     ".agents/hooks/hook_runtime.py"
   ],
   "requires": {
@@ -17,41 +16,6 @@
       "tj-agents/base"
     ],
     "hooks": [
-      {
-        "path": ".agents/base/policy/agent-files/scripts/session-context.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": ".agents/base/policy/project-setup/scripts/session-context.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": ".agents/base/policy/solution-assessment/scripts/session-context.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": ".agents/base/policy/task-routing/scripts/session-context.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
-        "path": "hooks/hook_dispatch.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
       {
         "path": "hooks/tier_gate.py",
         "hosts": [
