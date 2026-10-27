@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from unittest import mock
 from pathlib import Path
+from types import SimpleNamespace
 
 
 OPERATIONS = Path(__file__).resolve().parents[2] / "workflows" / "workflow_ops.py"
@@ -24,6 +25,26 @@ def load_operations():
 
 
 ops = load_operations()
+
+
+class WindowsSharingRetryTests(unittest.TestCase):
+    def test_persistent_windows_denial_still_fails_at_the_existing_deadline(self):
+        denied = PermissionError(13, "access denied")
+        action = mock.Mock(side_effect=denied)
+        with mock.patch.object(ops, "os", SimpleNamespace(name="nt")), \
+                mock.patch.object(ops.time, "monotonic", side_effect=[0, 1, 2]), \
+                mock.patch.object(ops.time, "sleep"), self.assertRaises(PermissionError) as raised:
+            ops.retry_windows_sharing_violation(action)
+        self.assertIs(denied, raised.exception)
+        self.assertEqual(2, action.call_count)
+
+    def test_non_windows_denial_is_not_retried(self):
+        action = mock.Mock(side_effect=PermissionError(13, "access denied"))
+        with mock.patch.object(ops, "os", SimpleNamespace(name="posix")), \
+                mock.patch.object(ops.time, "sleep") as sleep, self.assertRaises(PermissionError):
+            ops.retry_windows_sharing_violation(action)
+        self.assertEqual(1, action.call_count)
+        sleep.assert_not_called()
 
 
 class RepositoryFixture(unittest.TestCase):

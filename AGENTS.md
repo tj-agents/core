@@ -16,7 +16,7 @@ Shipped code must run on Windows and Linux; follow
 [Supported platforms](CODE_CONVENTIONS.md#supported-platforms).
 
 Marketplace owns plugin identities, source repositories and dependencies. Follow the
-[shared ownership decision](https://github.com/tj-agents/docs/blob/main/PLUGIN_CATALOG.md) when changing
+[shared ownership decision](https://github.com/tj-agents/docs/blob/main/PLUGINS.md) when changing
 selection.
 
 Global design and cross-repository plans belong in [`tj-agents/docs`](https://github.com/tj-agents/docs).

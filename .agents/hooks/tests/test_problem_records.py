@@ -118,10 +118,10 @@ class ProblemRecordTests(unittest.TestCase):
                                      (found["operation"], found["skill"], found["provider"], found["primary"]))
             with self.assertRaisesRegex(RecordError, "personal:address-work-item is not installed"):
                 operation_skill(self.root, "address", "claude")
-        self.select({"schema_version": 1, "provider": "work-items:manage"})
+        self.select({"schema_version": 1, "provider": "fixture:manage"})
         with patch("installed_skills.resolved_skill", return_value=(self.skill, "")) as resolve:
-            self.assertEqual("work-items:manage", operation_skill(self.root, "create", "codex")["operation"])
-            resolve.assert_called_once_with("work-items:manage", "codex")
+            self.assertEqual("fixture:manage", operation_skill(self.root, "create", "codex")["operation"])
+            resolve.assert_called_once_with("fixture:manage", "codex")
 
     def test_operation_without_selection_or_installed_provider_blocks(self):
         with self.assertRaisesRegex(RecordError, "no selected"):

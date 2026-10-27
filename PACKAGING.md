@@ -39,7 +39,7 @@ missing prerequisite must fail clearly. It is not replaced with an invented poli
 
 Package verification uses `sha256-tree-v1`: hash each sorted forward-slash package-relative path, NUL, byte
 length, NUL and file bytes. Reject symlinks. The generated
-publication fingerprint identifies the authored rolling-main inputs while catalog digests are refreshed.
+publication fingerprint identifies the authored rolling-main inputs while plugin digests are refreshed.
 
 ## Why
 
