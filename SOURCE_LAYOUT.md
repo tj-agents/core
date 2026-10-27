@@ -9,8 +9,8 @@ Base, Workflow and Engineering classifications inside `.agents/`; they are not a
 repository trees. Agent, Agent Store, Codex, Claude and CLI source stays with its publisher. Core consumes
 declared publisher exports from `.agents/dependencies/` while building its own packages.
 
-The package catalog and project-selection schemas live under `.agents/catalog/`. `CAPABILITIES.md` is generated
-from that canonical catalog and is never edited as a second source.
+The plugin roster and project-selection schemas live under `.agents/plugins/`. `CAPABILITIES.md` is generated
+from that canonical plugin roster and is never edited as a second source.
 
 A shared rule or procedure is written once. Neither host adapter may reproduce its body as an independently
 maintained source.

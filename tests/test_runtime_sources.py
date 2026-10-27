@@ -16,11 +16,12 @@ class RuntimeSourcesTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name) / "consumer"
         self.source = Path(temporary.name) / "publisher"
+        self.package = self.source / "plugins/agent"
         (self.root / ".agents/plugins").mkdir(parents=True)
-        (self.source / ".agents/agent/runtime").mkdir(parents=True)
-        (self.source / ".agents/agent/runtime/helper.py").write_text("VALUE = 42\n", encoding="utf-8")
+        (self.package / ".agents/agent/runtime").mkdir(parents=True)
+        (self.package / ".agents/agent/runtime/helper.py").write_text("VALUE = 42\n", encoding="utf-8")
         self.declaration = {"schema_version": 1, "sources": {"agent": {
-            "repository": "tj-agents/agent", "exports": [".agents/agent/runtime"]}}}
+            "repository": "tj-agents/agent", "package": "plugins/agent", "exports": [".agents/agent/runtime"]}}}
         self.save()
 
     def save(self):
@@ -56,7 +57,7 @@ class RuntimeSourcesTests(unittest.TestCase):
 
     def test_restage_removes_obsolete_exported_files(self):
         self.stage()
-        original = self.source / ".agents/agent/runtime/helper.py"
+        original = self.package / ".agents/agent/runtime/helper.py"
         original.rename(original.with_name("replacement.py"))
         self.stage()
         target = self.root / ".agents/dependencies/agent/.agents/agent/runtime"
@@ -64,7 +65,7 @@ class RuntimeSourcesTests(unittest.TestCase):
         self.assertTrue((target / "replacement.py").exists())
 
     def test_restage_accepts_file_replaced_by_directory_and_back(self):
-        module = self.source / ".agents/agent/runtime/module"
+        module = self.package / ".agents/agent/runtime/module"
         module.write_text("old file", encoding="utf-8")
         self.stage()
         module.unlink()
@@ -100,7 +101,7 @@ class RuntimeSourcesTests(unittest.TestCase):
             self.stage()
 
     def test_rejects_source_links(self):
-        link = self.source / ".agents/agent/runtime/link.py"
+        link = self.package / ".agents/agent/runtime/link.py"
         try:
             link.symlink_to(link.with_name("helper.py"))
         except OSError:

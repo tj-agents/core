@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tj-agents/core/plugins/plugins.schema.json",
+  "title": "Agent plugin roster",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "digest_format",
+    "packages"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "digest_format": {
+      "const": "sha256-tree-v1"
+    },
+    "packages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/package"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*(?:/[a-z0-9][a-z0-9-]*)?$"
+    },
+    "stringList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_repository",
+        "source",
+        "marketplace",
+        "id",
+        "name",
+        "package_path",
+        "description",
+        "platforms",
+        "skills",
+        "dependencies",
+        "external_prerequisites",
+        "harness",
+        "digest"
+      ],
+      "properties": {
+        "owner_repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "source": {
+          "type": "string",
+          "format": "uri"
+        },
+        "marketplace": {
+          "$ref": "#/$defs/identifier"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "package_path": {
+          "type": "string",
+          "pattern": "^plugins/[a-z0-9][a-z0-9-]*$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platforms": {
+          "$ref": "#/$defs/stringList"
+        },
+        "skills": {
+          "$ref": "#/$defs/stringList"
+        },
+        "dependencies": {
+          "$ref": "#/$defs/dependencies"
+        },
+        "external_prerequisites": {
+          "$ref": "#/$defs/dependencies"
+        },
+        "external_dependencies": {
+          "$ref": "#/$defs/externalDependencies"
+        },
+        "harness": {
+          "$ref": "harness.schema.json#/$defs/requires"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "digest_excludes": {
+          "$ref": "#/$defs/stringList"
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "optional"
+      ],
+      "properties": {
+        "required": {
+          "$ref": "#/$defs/stringList"
+        },
+        "optional": {
+          "$ref": "#/$defs/stringList"
+        }
+      }
+    },
+    "externalDependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "marketplace", "repository"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "marketplace": { "$ref": "#/$defs/identifier" },
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        }
+      }
+    },
+    "externalDependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "optional"],
+      "properties": {
+        "required": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/externalDependency" },
+          "uniqueItems": true
+        },
+        "optional": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/externalDependency" },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

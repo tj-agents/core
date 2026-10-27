@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject pull requests that modify generated distribution output, including catalog digests."""
+"""Reject pull requests that modify generated distribution output, including plugin digests."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-CATALOG = ".agents/catalog/catalog.json"
+PLUGINS_FILE = ".agents/plugins/plugins.json"
 
 
 def git(*args: str, root: Path = ROOT) -> str:
@@ -27,24 +27,24 @@ def generated_roots(merge_base: str, root: Path = ROOT) -> list[str]:
     return list(config["generated_roots"])
 
 
-def catalog_digests(revision: str, root: Path = ROOT) -> dict[str, str]:
+def plugin_digests(revision: str, root: Path = ROOT) -> dict[str, str]:
     try:
-        catalog = json.loads(git("show", f"{revision}:{CATALOG}", root=root))
+        roster = json.loads(git("show", f"{revision}:{PLUGINS_FILE}", root=root))
     except subprocess.CalledProcessError:
         return {}
-    packages = catalog.get("packages")
+    packages = roster.get("packages")
     if packages is None:
-        packages = [package for release in catalog.get("releases", []) for package in release.get("plugins", [])]
+        packages = [package for release in roster.get("releases", []) for package in release.get("plugins", [])]
     return {package["id"]: package.get("digest") for package in packages}
 
 
-# The catalog itself is authored, but its digests are written by the same post-merge job as plugins/*.
+# The plugin roster itself is authored, but its digests are written by the same post-merge job as plugins/*.
 # A PR that commits them collides with that job's commit on main, and every other open PR touching the
 # same package then conflicts on the digest line.
 def changed_digests(merge_base: str, root: Path = ROOT) -> list[str]:
-    before, after = catalog_digests(merge_base, root), catalog_digests("HEAD", root)
+    before, after = plugin_digests(merge_base, root), plugin_digests("HEAD", root)
     return sorted(
-        f"{CATALOG} digest of {plugin_id}"
+        f"{PLUGINS_FILE} digest of {plugin_id}"
         for plugin_id in before.keys() & after.keys()
         if before[plugin_id] != after[plugin_id]
     )
