@@ -736,7 +736,7 @@ def accept(root, marketplace, codex, claude, artifacts, timeout):
 
 def failure_marketplace(root, directory):
     generator = load_module('native_failure_package_generator', root / 'scripts/sync_plugin_packages.py')
-    _, output, _, _ = generator.build(root, validate_catalog_digests=False)
+    _, output, _, _ = generator.build(root, validate_plugin_digests=False)
     output['plugins/workflow/.agents/workflow/policy/session/scripts/session-context.py'] = (
         b"raise RuntimeError('native-required-hook-failure-probe')\n"
     )
