@@ -1,6 +1,6 @@
 # Agent capabilities
 
-Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).
+Generated from [`plugins/plugins.json`](.agents/plugins/plugins.json).
 Select plugins in a project's `.agents/plugins.json`; do not copy definitions between repositories.
 
 ## tj-agents/base
