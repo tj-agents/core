@@ -29,6 +29,7 @@ Derive that boundary from the user's authorized outcome and verified delivery ow
 independent work in optional `follow_up`, with its exact PR/head, responsible owner, next action and
 `scope_evidence` identifying why it belongs to that separate delivery. The check returns this information
 without waiting for it or refreshing its PR. It rejects overlap with an owned delivery or open task.
+This validates the current declared record; scope evidence references do not independently prove authority.
 An external owner does not waive acceptance: when the requested outcome requires that work, keep the
 unmet criterion in `acceptance` and its action in `open_tasks`. Do not add independent future work to the
 current goal's acceptance merely to retain it. A successful completion check proceeds to the session's
