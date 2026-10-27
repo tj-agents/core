@@ -214,42 +214,6 @@ def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
     return problems
 
 
-QUALIFIED_SKILL = re.compile(r"[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*")
-
-
-def route_problem(row):
-    if not isinstance(row, dict):
-        return "A route must be an object"
-    if not _text(row.get("path")):
-        return "A route requires a path pattern"
-    skills = row.get("skills")
-    if not isinstance(skills, list) or not skills or not all(
-            isinstance(skill, str) and QUALIFIED_SKILL.fullmatch(skill) for skill in skills):
-        return "A route requires a non-empty list of plugin-qualified skills"
-    for field in ("content_requires", "note"):
-        if field in row and not _text(row[field]):
-            return "A route " + field + " must be a non-empty string"
-    if "deny" in row and (not isinstance(row["deny"], list) or not all(
-            isinstance(rule, dict) and _text(rule.get("pattern")) for rule in row["deny"])):
-        return "A route deny must be a list of objects with a pattern"
-    patterns = [row["path"], row.get("content_requires")] + [rule["pattern"] for rule in row.get("deny") or []]
-    for pattern in patterns:
-        if pattern is None:
-            continue
-        try:
-            re.compile(pattern)
-        except re.error as error:
-            return "Invalid pattern " + repr(pattern) + ": " + str(error)
-    return ""
-
-
-def route_diagnostics(routes, path="tier.json.routes"):
-    if not isinstance(routes, list):
-        return [diagnostic("malformed-routes", path, "Routes require a list of rows")]
-    return [diagnostic("malformed-routes", path + "[" + str(index) + "]", problem)
-            for index, row in enumerate(routes) if (problem := route_problem(row))]
-
-
 def fact_references(node):
     if not isinstance(node, dict):
         return set()
@@ -908,10 +872,7 @@ def statement(root, found=None):
         names = ", ".join(declaration.tier for declaration in ubiquitous)
         lines.append("Ubiquitous, always applies: " + names + ".")
     for declaration, reason in applicable:
-        line = "Applies here: `" + declaration.plugin + ":*` - " + reason + "."
-        if declaration.data.get("routes"):
-            line += " Load its skills before writing its files; the write gate blocks them until you do."
-        lines.append(line)
+        lines.append("Applies here: `" + declaration.plugin + ":*` - " + reason + ".")
     for declaration, _ in result.employers:
         path = employer_context_path(declaration.payload_dir, declaration.employer["context_skill"])
         lines.append("Employer context: `" + declaration.plugin + ":" + declaration.employer["context_skill"]

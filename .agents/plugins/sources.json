@@ -60,18 +60,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/delivery_binding_gate.py",
-      "destination": "hooks/delivery_binding_gate.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/dependencies/agent/.agents/agent/runtime/required_plugins.py",
       "destination": "hooks/required_plugins.py"
-    },
-    {
-      "plugin": "base",
-      "source": ".agents/hooks/skill_router.py",
-      "destination": "hooks/skill_router.py"
     },
     {
       "plugin": "base",
@@ -97,11 +87,6 @@
       "plugin": "base",
       "source": ".agents/tiers/README.md",
       "destination": "tiers/README.md"
-    },
-    {
-      "plugin": "base",
-      "source": ".codex/adapters/pre_tool_use.py",
-      "destination": "hooks/pre_tool_use_adapter.py"
     },
     {
       "plugin": "base",
@@ -150,8 +135,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/git_auth_scope_gate.py",
-      "destination": "hooks/git_auth_scope_gate.py"
+      "source": ".agents/hooks/installed_skills.py",
+      "destination": "hooks/installed_skills.py"
     },
     {
       "plugin": "engineering",
@@ -175,18 +160,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/skill_router.py",
-      "destination": "hooks/skill_router.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/hooks/codex_hook_snapshot.py",
       "destination": "hooks/codex_hook_snapshot.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".codex/adapters/pre_tool_use.py",
-      "destination": "hooks/pre_tool_use_adapter.py"
     },
     {
       "plugin": "engineering",
@@ -262,6 +237,11 @@
       "plugin": "workflow",
       "source": ".agents/hooks/problem_records.py",
       "destination": "hooks/problem_records.py"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/hooks/installed_skills.py",
+      "destination": "hooks/installed_skills.py"
     },
     {
       "plugin": "workflow",

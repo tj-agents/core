@@ -4,6 +4,7 @@
   "source_roots": [
     ".agents/dependencies/agent/.agents/agent-store/runtime",
     ".agents/hooks/hook_dispatch.py",
+    ".agents/hooks/installed_skills.py",
     ".agents/hooks/problem_records.py",
     ".agents/tiers/workflow.json",
     ".agents/workflow",

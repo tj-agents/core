@@ -430,9 +430,9 @@ class ReviewTests(RepositoryFixture):
         self.addCleanup(patcher.stop)
         self.head = self.commit("src/mapping.txt", "candidate\n", "candidate")
 
-    def test_failed_initial_routing_removes_the_unpublished_bundle_and_allows_retry(self):
-        with mock.patch.object(ops, "route_findings", side_effect=OSError("routing failed")):
-            with self.assertRaisesRegex(OSError, "routing failed"):
+    def test_failed_initial_preparation_removes_the_unpublished_bundle_and_allows_retry(self):
+        with mock.patch.object(ops, "security_classification", side_effect=OSError("classification failed")):
+            with self.assertRaisesRegex(OSError, "classification failed"):
                 ops.review_prepare(self.root, "retry", "origin/main", "HEAD", False)
 
         result = ops.review_prepare(self.root, "retry", "origin/main", "HEAD", False)
@@ -908,87 +908,6 @@ class ReviewTests(RepositoryFixture):
             ops.review_prepare(self.root, "run-2", "origin/main", "HEAD", False)["waves"],
         )
 
-    def test_review_prepare_resolves_rules_with_the_packaged_router(self):
-        route_table = self.root / ".agents" / "skill-routes.json"
-        route_table.write_text(
-            json.dumps({"routes": [{"path": "^src/", "skills": ["feature"]}]}),
-            encoding="utf-8",
-        )
-        candidate_router = self.root / ".agents" / "hooks" / "skill_router.py"
-        candidate_router.parent.mkdir(parents=True)
-        candidate_router.write_text(
-            'import json\nprint(json.dumps({"skills": {"shadowed": []}}))\n',
-            encoding="utf-8",
-        )
-        self.git("add", ".agents/skill-routes.json", ".agents/hooks/skill_router.py")
-        self.git("commit", "-q", "-m", "add routing")
-
-        result = ops.review_prepare(self.root, "routed-review", "origin/main", "HEAD", False)
-
-        self.assertEqual(["feature"], [rule["name"] for rule in result["rules"]])
-        self.assertEqual(".agents/skills/feature/SKILL.md", result["rules"][0]["path"])
-
-    def test_review_prepare_keeps_plugin_owned_routes_and_deny_hits(self):
-        (self.root / ".agents" / "skill-routes.json").write_text(json.dumps({"routes": [{
-            "path": "^src/", "skills": ["efcore:persistence"],
-            "deny": [{"pattern": "candidate", "reason": "no candidate text"}],
-        }]}), encoding="utf-8")
-        self.git("add", ".agents/skill-routes.json")
-        self.git("commit", "-q", "-m", "add plugin routing")
-
-        result = ops.review_prepare(self.root, "plugin-routed", "origin/main", "HEAD", False)
-
-        self.assertEqual([], result["rules"])
-        self.assertEqual(["efcore:persistence"], result["routed_skills"])
-        self.assertEqual([["src/mapping.txt", "no candidate text"]], result["route_violations"])
-
-    def test_review_prepare_uses_employer_from_original_repository(self):
-        self.git("remote", "set-url", "origin", "https://github.com/acme/project.git")
-        (self.root / ".agents/skill-routes.json").write_text(json.dumps({
-            "routes": [{"path": "^src/", "skills": ["stackx:style", "stackx:logging"]}]
-        }), encoding="utf-8")
-        self.commit("src/mapping.txt", "changed\n", "change routed file")
-        self.git("add", ".agents/skill-routes.json")
-        self.git("commit", "-q", "-m", "add routes")
-
-        profile = Path(self.temp.name) / "profile"
-        cache = profile / "plugins/cache"
-        employer = cache / "market/acme/1"
-        context = employer / "skills/context/SKILL.md"
-        context.parent.mkdir(parents=True)
-        context.write_text("---\nname: context\nkind: knowledge\n---\n", encoding="utf-8")
-        (employer / "tier.json").write_text(json.dumps({
-            "schema_version": 3, "tier": "acme", "applies": "stack-present",
-            "detect": {"all": [{"remote_host": "github.com"}, {"remote": "^acme/"}]},
-            "employer": {"context_skill": "context"},
-        }), encoding="utf-8")
-        replacement = cache / "market/acme-stackx/1/skills/style/SKILL.md"
-        replacement.parent.mkdir(parents=True)
-        replacement.write_text("---\nname: style\ndescription: Company style.\n---\n", encoding="utf-8")
-        registry = profile / "plugins/installed_plugins.json"
-        registry.write_text(json.dumps({"plugins": {
-            "acme@market": [{"installPath": str(employer)}],
-            "acme-stackx@market": [{"installPath": str(replacement.parents[2])}],
-        }}), encoding="utf-8")
-
-        with mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(profile),
-                                             "CODEX_HOME": str(profile),
-                                             "HOME": str(profile), "USERPROFILE": str(profile)}):
-            result = ops.review_prepare(self.root, "employer-review", "origin/main", "HEAD", False)
-        self.assertEqual(["acme-stackx:style", "stackx:logging"], result["routed_skills"])
-
-    def test_opted_in_review_fails_visibly_when_router_runtime_is_missing(self):
-        (self.root / ".agents" / "skill-routes.json").write_text(
-            json.dumps({"routes": [{"path": "^src/", "skills": ["feature"]}]}),
-            encoding="utf-8",
-        )
-        original = ops.__file__
-        ops.__file__ = str(self.root / "absent-package" / "workflows" / "workflow_ops.py")
-        try:
-            with self.assertRaisesRegex(ops.WorkflowOperationError, "has no skill_router.py"):
-                ops.routed_skills(self.root, ["src/mapping.txt"])
-        finally:
-            ops.__file__ = original
     def test_tampered_review_artifact_is_rejected(self):
         descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
         Path(descriptor["bundle"]["patch"]).write_bytes(b"forged")
