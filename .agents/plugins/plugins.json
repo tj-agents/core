@@ -111,6 +111,7 @@
         "macos"
       ],
       "skills": [
+        "continue",
         "handoff",
         "plan",
         "plan-artifacts",
@@ -280,7 +281,6 @@
         "open-pr",
         "open-worktree",
         "persistent-delivery",
-        "persistent-workflow",
         "plans",
         "pr-preflight",
         "pr-screenshots",
