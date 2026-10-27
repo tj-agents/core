@@ -2,7 +2,8 @@
   "fresh_selection": [
     "base@tj-agents",
     "workflow@tj-agents",
-    "engineering@tj-agents"
+    "engineering@tj-agents",
+    "docs@tj-agents"
   ],
   "fresh_required_skills": [
     "cd",

@@ -5,12 +5,15 @@ This repository has one shared source and two host-specific adapter trees.
 ## Canonical shared source
 
 `.agents/` owns every Core host-neutral capability definition and its shared runtime material. Core owns
-Base, Workflow and Engineering classifications inside `.agents/`; they are not authored top-level
+Base, Workflow, Engineering and Docs classifications inside `.agents/`; they are not authored top-level
 repository trees. Agent, Agent Store, Codex, Claude and CLI source stays with its publisher. Core consumes
 declared publisher exports from `.agents/dependencies/` while building its own packages.
 
 The plugin roster and project-selection schemas live under `.agents/plugins/`. `CAPABILITIES.md` is generated
 from that canonical plugin roster and is never edited as a second source.
+
+A new package may be built before Marketplace publishes its entry when Core's package roster declares
+Core as its owner. An existing Marketplace assignment to another publisher always takes precedence.
 
 A shared rule or procedure is written once. Neither host adapter may reproduce its body as an independently
 maintained source.
