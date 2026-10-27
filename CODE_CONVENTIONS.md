@@ -39,8 +39,8 @@ incomplete.
   to run `powershell.exe`, `pwsh` or `wt.exe` without saying which platform the instruction is for.
 
   ```text
-  python3 -B scripts/update_catalog_digests.py   # Linux and macOS
-  python -B scripts/update_catalog_digests.py    # Windows
+  python3 -B scripts/update_plugin_digests.py   # Linux and macOS
+  python -B scripts/update_plugin_digests.py    # Windows
   ```
 
 - Open terminal tabs through `agent_cli.launch_tab` (Windows Terminal, tmux, kitty, Konsole), never by

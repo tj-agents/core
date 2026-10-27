@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/tj-agents/core/catalog/plugins.schema.json",
+  "$id": "https://github.com/tj-agents/core/plugins/selection.schema.json",
   "title": "Repository plugin selection",
   "type": "object",
   "additionalProperties": false,
