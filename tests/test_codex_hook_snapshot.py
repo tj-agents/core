@@ -37,7 +37,7 @@ def windows_code_argument(command):
 
 
 SPEC = importlib.util.spec_from_file_location(
-    "codex_hook_snapshot", ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py"
+    "codex_hook_snapshot", ROOT / ".codex" / "hooks" / "snapshot.py"
 )
 SNAPSHOT = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SNAPSHOT)
@@ -55,7 +55,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             for name, content in [('a.txt', b'first\r\n'), ('b.bin', b'\xff\r\n'),
                                   ('c.txt', b'last\r')]:
                 (root / name).write_bytes(content)
-            expected = SNAPSHOT.digest_tree(root, 'base')
+            expected = SNAPSHOT.digest_tree(root)
             read_bytes = Path.read_bytes
             started = threading.Barrier(3)
             last_finished = threading.Event()
@@ -83,12 +83,12 @@ class CodexHookSnapshotTests(unittest.TestCase):
                         active -= 1
 
             with patch.object(Path, 'read_bytes', delayed_read):
-                self.assertEqual(expected, SNAPSHOT.digest_tree(root, 'base'))
+                self.assertEqual(expected, SNAPSHOT.digest_tree(root))
                 self.assertEqual(3, peak)
                 self.assertEqual('c.txt', completions[0])
                 (root / 'b.bin').write_bytes(b'tampered')
                 with self.assertRaises(SystemExit) as raised:
-                    SNAPSHOT.verified(root, expected, 'base')
+                    SNAPSHOT.verified(root, expected)
                 self.assertEqual(2, raised.exception.code)
 
     def test_nested_text_binary_and_exclusions_keep_known_integrity_digests(self):
@@ -108,9 +108,9 @@ class CodexHookSnapshotTests(unittest.TestCase):
                 path.write_bytes(content)
             (root / 'empty directory').mkdir()
             self.assertEqual('sha256:4cae22b1da621db254dd6f8cae7c0e630f64de733ba21a92b739f5173f54cb5d',
-                             SNAPSHOT.digest_tree(root, 'base'))
+                             SNAPSHOT.digest_tree(root))
             self.assertEqual('sha256:4cae22b1da621db254dd6f8cae7c0e630f64de733ba21a92b739f5173f54cb5d',
-                             SNAPSHOT.digest_tree(root, 'workflow'))
+                             SNAPSHOT.digest_tree(root))
 
     def test_file_directory_and_excluded_symbolic_links_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -134,7 +134,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
                         self.skipTest(f'Symbolic links unavailable: {error}')
                     try:
                         with self.assertRaises(SystemExit) as raised:
-                            SNAPSHOT.digest_tree(root, 'workflow')
+                            SNAPSHOT.digest_tree(root)
                         self.assertEqual(2, raised.exception.code)
                     finally:
                         link.unlink()
@@ -143,7 +143,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
         for plugin in ("base", "engineering", "workflow"):
             with self.subTest(plugin=plugin):
                 root = ROOT / "plugins" / plugin
-                expected = SNAPSHOT.digest_tree(root, plugin)
+                expected = SNAPSHOT.digest_tree(root)
                 manifest = json.loads((root / "hooks" / "codex.json").read_text(encoding="utf-8"))
                 for groups in manifest["hooks"].values():
                     for group in groups:
@@ -155,12 +155,12 @@ class CodexHookSnapshotTests(unittest.TestCase):
                                 )
 
     def test_snapshot_bootstrap_is_plaintext_and_binds_the_loader_hash(self):
-        loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
+        loader = (ROOT / ".codex" / "hooks" / "snapshot.py").read_text(encoding="utf-8")
         for text in (loader, 'print("café")\n', ""):
             with self.subTest(length=len(text)):
-                bootstrap = GENERATOR.codex_snapshot_bootstrap(text)
+                bootstrap = GENERATOR.codex_snapshot_bootstrap(ROOT, text)
                 digest = hashlib.sha256(GENERATOR.canonical_output_bytes(text)).hexdigest()
-                self.assertEqual(bootstrap, GENERATOR.codex_snapshot_bootstrap(text))
+                self.assertEqual(bootstrap, GENERATOR.codex_snapshot_bootstrap(ROOT, text))
                 self.assertIn(digest, bootstrap)
                 self.assertIn("runpy.run_path", bootstrap)
                 self.assertIn("tempfile.TemporaryDirectory", bootstrap)
@@ -179,8 +179,9 @@ class CodexHookSnapshotTests(unittest.TestCase):
         budget = GENERATOR.CODEX_WINDOWS_COMMAND_BUDGET
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            loader = root / ".agents" / "hooks" / "codex_hook_snapshot.py"
+            loader = root / ".codex" / "hooks" / "snapshot.py"
             loader.parent.mkdir(parents=True)
+            shutil.copyfile(ROOT / ".codex" / "hooks" / "bootstrap.py", loader.with_name("bootstrap.py"))
             lengths = []
             for size in (budget // 2, budget):
                 with self.subTest(size=size):
@@ -194,7 +195,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             self.assertEqual(lengths[0], lengths[1])
 
     def test_each_host_parsing_of_each_command_preserves_the_plaintext_bootstrap(self):
-        loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
+        loader = (ROOT / ".codex" / "hooks" / "snapshot.py").read_text(encoding="utf-8")
         digest = hashlib.sha256(GENERATOR.canonical_output_bytes(loader)).hexdigest()
         for plugin in ("base", "engineering", "workflow"):
             manifest = json.loads(
@@ -207,7 +208,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
                                                ("commandWindows", windows_code_argument)):
                             with self.subTest(plugin=plugin, field=field):
                                 code = extract(hook[field])
-                                self.assertTrue(code.startswith("import hashlib,os,runpy,sys,tempfile;"))
+                                self.assertTrue(code.startswith("import hashlib, os, runpy, sys, tempfile;"))
                                 self.assertIn(digest, code)
                                 self.assertIn("runpy.run_path", code)
                                 self.assertNotIn("base64", code)
@@ -241,12 +242,12 @@ class CodexHookSnapshotTests(unittest.TestCase):
                 capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(initial.returncode, 0, initial.stderr)
-            expected = SNAPSHOT.digest_tree(payload, "base")
+            expected = SNAPSHOT.digest_tree(payload)
             key = hashlib.sha256((str(payload) + "\0" + expected).encode("utf-8")).hexdigest()
-            snapshot_loader = data / "hook-snapshots" / key / "hooks" / "codex_hook_snapshot.py"
+            snapshot_loader = data / "hook-snapshots" / key / "hooks" / "codex" / "snapshot.py"
             malicious = f"from pathlib import Path; Path({str(marker)!r}).write_text('executed')\n"
 
-            (payload / "hooks" / "codex_hook_snapshot.py").write_text(malicious, encoding="utf-8")
+            (payload / "hooks" / "codex" / "snapshot.py").write_text(malicious, encoding="utf-8")
             snapshotted = subprocess.run(
                 command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=30,
@@ -277,13 +278,13 @@ class CodexHookSnapshotTests(unittest.TestCase):
             temporary = Path(directory)
             payload = temporary / "base" / "payload"
             hooks = payload / "hooks"
-            hooks.mkdir(parents=True)
-            loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
-            (hooks / "codex_hook_snapshot.py").write_text(loader, encoding="utf-8")
+            (hooks / "codex").mkdir(parents=True)
+            loader = (ROOT / ".codex" / "hooks" / "snapshot.py").read_text(encoding="utf-8")
+            (hooks / "codex" / "snapshot.py").write_text(loader, encoding="utf-8")
             probe = hooks / "probe.py"
             probe.write_text("print('verified snapshot')\n", encoding="utf-8")
-            expected = SNAPSHOT.digest_tree(payload, "base")
-            bootstrap = GENERATOR.codex_snapshot_bootstrap(loader)
+            expected = SNAPSHOT.digest_tree(payload)
+            bootstrap = GENERATOR.codex_snapshot_bootstrap(ROOT, loader)
             snapshots = temporary / "snapshots"
             environment = dict(os.environ, TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY=str(snapshots))
             command = [sys.executable, "-I", "-B", "-c", bootstrap, str(payload), expected, "base", str(probe)]
@@ -292,7 +293,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             self.assertEqual(first.returncode, 0, first.stderr)
             self.assertEqual("verified snapshot\n", first.stdout)
 
-            (hooks / "codex_hook_snapshot.py").write_text("raise RuntimeError('new loader')\n", encoding="utf-8")
+            (hooks / "codex" / "snapshot.py").write_text("raise RuntimeError('new loader')\n", encoding="utf-8")
             resumed = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=30)
             self.assertEqual(resumed.returncode, 0, resumed.stderr)
             self.assertEqual("verified snapshot\n", resumed.stdout)
@@ -302,13 +303,13 @@ class CodexHookSnapshotTests(unittest.TestCase):
             temporary = Path(directory)
             payload = temporary / "base" / "payload"
             hooks = payload / "hooks"
-            hooks.mkdir(parents=True)
-            loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
-            (hooks / "codex_hook_snapshot.py").write_text(loader, encoding="utf-8")
+            (hooks / "codex").mkdir(parents=True)
+            loader = (ROOT / ".codex" / "hooks" / "snapshot.py").read_text(encoding="utf-8")
+            (hooks / "codex" / "snapshot.py").write_text(loader, encoding="utf-8")
             probe = hooks / "probe.py"
             probe.write_text("print('verified snapshot')\n", encoding="utf-8")
-            expected = SNAPSHOT.digest_tree(payload, "base")
-            bootstrap = GENERATOR.codex_snapshot_bootstrap(loader)
+            expected = SNAPSHOT.digest_tree(payload)
+            bootstrap = GENERATOR.codex_snapshot_bootstrap(ROOT, loader)
             snapshots = temporary / "snapshots"
             environment = dict(os.environ, TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY=str(snapshots))
             command = [sys.executable, "-I", "-B", "-c", bootstrap, str(payload), expected, "base", str(probe)]
@@ -317,7 +318,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             self.assertEqual(first.returncode, 0, first.stderr)
             self.assertEqual("verified snapshot\n", first.stdout)
 
-            (hooks / "codex_hook_snapshot.py").write_text("raise RuntimeError('new loader')\n", encoding="utf-8")
+            (hooks / "codex" / "snapshot.py").write_text("raise RuntimeError('new loader')\n", encoding="utf-8")
             resumed = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=30)
             self.assertEqual(resumed.returncode, 0, resumed.stderr)
             self.assertEqual("verified snapshot\n", resumed.stdout)
@@ -338,10 +339,10 @@ class CodexHookSnapshotTests(unittest.TestCase):
                 capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(first.returncode, 0, first.stderr)
-            expected = SNAPSHOT.digest_tree(payload, "base")
+            expected = SNAPSHOT.digest_tree(payload)
             key = hashlib.sha256((str(payload) + "\0" + expected).encode("utf-8")).hexdigest()
             snapshot = data / "hook-snapshots" / key
-            self.assertTrue((snapshot / "hooks" / "codex_hook_snapshot.py").is_file())
+            self.assertTrue((snapshot / "hooks" / "codex" / "snapshot.py").is_file())
 
             shutil.rmtree(payload)
             recovered = subprocess.run(
@@ -379,7 +380,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
 
             for revision in ("first", "second"):
                 (payload / "revision.txt").write_text(revision, encoding="utf-8")
-                expected = SNAPSHOT.digest_tree(payload, "base")
+                expected = SNAPSHOT.digest_tree(payload)
                 command = template.replace(original, expected)
                 commands.append(command)
                 result = subprocess.run(
