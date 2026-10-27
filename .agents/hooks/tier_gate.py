@@ -676,18 +676,20 @@ def repository_identity(root):
 
 
 def _tracked_matches(root, patterns):
-    output = _git(root, [
-        "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", *patterns,
-    ])
+    output = _git(root, ["ls-files", "-z", "--cached", "--", *patterns])
     if output is None:
         return None
     return [entry for entry in output.split("\0") if entry]
 
 
-def _walked_matches(root, patterns):
-    matches = []
+def _walked_files(root):
+    cache = GIT_RESULTS.get()
+    key = (str(root), ("walk",))
+    if cache is not None and key in cache:
+        return cache[key]
+    files = []
     root = Path(root)
-    for current, directories, files in os.walk(root):
+    for current, directories, names in os.walk(root):
         relative = Path(current).relative_to(root)
         depth = 0 if str(relative) == "." else len(relative.parts)
         if depth >= WALK_DEPTH:
@@ -696,12 +698,37 @@ def _walked_matches(root, patterns):
             directories[:] = [
                 name for name in directories if name not in WALK_SKIP and not name.startswith(".")
             ]
-        for name in files:
-            if any(fnmatch.fnmatch(name, pattern) for pattern in patterns):
-                matches.append((relative / name).as_posix())
-                if len(matches) >= CONTENT_CANDIDATES:
-                    return matches
+        files.extend(((relative / name).as_posix(), os.path.normcase(name)) for name in names)
+    if cache is not None:
+        cache[key] = files
+    return files
+
+
+def _walked_matches(root, patterns):
+    expressions = [re.compile(fnmatch.translate(os.path.normcase(pattern))) for pattern in patterns]
+    matches = []
+    for path, name in _walked_files(root):
+        if any(expression.match(name) for expression in expressions):
+            matches.append(path)
+            if len(matches) >= CONTENT_CANDIDATES:
+                break
     return matches
+
+
+def _ignored(root, paths):
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), "check-ignore", "-z", "--stdin"],
+            input="\0".join(paths),
+            capture_output=True,
+            text=True,
+            timeout=GIT_TIMEOUT,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    if completed.returncode not in (0, 1):
+        return set()
+    return {entry for entry in completed.stdout.split("\0") if entry}
 
 
 def matching_paths(root, patterns):
@@ -709,9 +736,13 @@ def matching_paths(root, patterns):
     if not patterns:
         return []
     tracked = _tracked_matches(root, patterns)
-    if tracked is not None:
+    if tracked:
         return tracked
-    return _walked_matches(root, patterns)
+    walked = _walked_matches(root, patterns)
+    if tracked is None or not walked:
+        return walked
+    ignored = _ignored(root, walked)
+    return [path for path in walked if path not in ignored]
 
 
 def stack_present(root, detect):
