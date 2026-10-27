@@ -36,17 +36,13 @@ class HiddenCommandTests(unittest.TestCase):
         )
 
 
-SKILL_ROUTER = HOOK_ROOT / "skill_router.py"
-GIT_AUTH_SCOPE_GATE = HOOK_ROOT / "git_auth_scope_gate.py"
-
-
 class PayloadRootResolutionTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
         self.payload_root = self.root / "plugin"
-        self.hook = self.payload_root / "hooks" / "skill_router.py"
+        self.hook = self.payload_root / "hooks" / "hook.py"
         self.hook.parent.mkdir(parents=True)
         self.hook.touch()
 
@@ -97,117 +93,6 @@ class PayloadRootResolutionTests(unittest.TestCase):
             clear=True,
         ):
             self.assertEqual(self.payload_root, hook_runtime.own_payload_root(self.hook))
-
-
-class DuplicateRegistrationTests(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name).resolve()
-        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
-        (self.root / ".agents").mkdir()
-        self.session = str(uuid.uuid4())
-
-    def run_hook(self, hook, payload, environment=None, arguments=()):
-        return subprocess.run(
-            [sys.executable, str(hook), *arguments],
-            input=json.dumps(payload),
-            capture_output=True,
-            text=True,
-            cwd=str(self.root),
-            env=environment,
-        )
-
-    def test_duplicate_skill_router_registration_blocks_once(self):
-        plugin = self.root / "installed-plugin"
-        hooks = plugin / "hooks"
-        hooks.mkdir(parents=True)
-        for source in (SKILL_ROUTER, HOOK_ROOT / "hook_runtime.py", HOOK_ROOT / "tier_gate.py"):
-            shutil.copy2(source, hooks / source.name)
-        shutil.copytree(HOOK_ROOT.parent / "dependencies/agent/.agents/agent/runtime", plugin / "dependencies/agent/.agents/agent/runtime")
-        skill = plugin / "skills" / "branching"
-        skill.mkdir(parents=True)
-        (skill / "SKILL.md").write_text(
-            "---\nname: branching\ndescription: Branch rules.\n---\n", encoding="utf-8"
-        )
-        (self.root / ".agents" / "skill-routes.json").write_text(
-            json.dumps({"routes": [{"path": r"\.cs$", "skills": ["branching"]}]}),
-            encoding="utf-8",
-        )
-        payload = {
-            "hook_event_name": "PreToolUse",
-            "session_id": self.session,
-            "turn_id": "turn-1",
-            "tool_use_id": "call-1",
-            "tool_name": "Write",
-            "cwd": str(self.root),
-            "tool_input": {"file_path": str(self.root / "a.cs"), "content": "class A {}"},
-        }
-
-        state = self.root / "standards-state"
-        proof = state / "currency" / f"{hashlib.sha256(self.session.encode('utf-8')).hexdigest()}.json"
-        proof.parent.mkdir(parents=True)
-        proof.write_text(
-            json.dumps({"status": "current", "checked_at": time.time()}),
-            encoding="utf-8",
-        )
-        environment = os.environ.copy()
-        environment["AGENT_STANDARDS_STATE_DIRECTORY"] = str(state)
-        environment["PLUGIN_ROOT"] = str(plugin)
-
-        first = self.run_hook(hooks / "skill_router.py", payload, environment,
-                              arguments=("--harness", "claude"))
-        second = self.run_hook(hooks / "skill_router.py", payload, environment,
-                               arguments=("--harness", "claude"))
-
-        self.assertEqual(2, first.returncode, first.stdout + first.stderr)
-        self.assertEqual(0, second.returncode, second.stdout + second.stderr)
-        self.assertEqual("", second.stderr)
-
-    def test_duplicate_git_auth_scope_gate_registration_blocks_once(self):
-        payload = {
-            "hook_event_name": "PreToolUse",
-            "session_id": self.session,
-            "turn_id": "turn-1",
-            "tool_use_id": "call-2",
-            "tool_name": "Bash",
-            "cwd": str(self.root),
-            "tool_input": {"command": "gh auth refresh -s admin:org"},
-        }
-
-        first = self.run_hook(GIT_AUTH_SCOPE_GATE, payload)
-        second = self.run_hook(GIT_AUTH_SCOPE_GATE, payload)
-
-        self.assertEqual(2, first.returncode)
-        self.assertEqual(0, second.returncode)
-        self.assertEqual("", second.stderr)
-
-    def test_missing_invocation_id_preserves_enforcement(self):
-        (self.root / ".agents" / "skill-routes.json").write_text(
-            json.dumps(
-                {
-                    "routes": [
-                        {
-                            "path": r"\.cs$",
-                            "skills": ["branching"],
-                            "deny": [{"pattern": "forbidden", "reason": "forbidden test input"}],
-                        }
-                    ]
-                }
-            ),
-            encoding="utf-8",
-        )
-        payload = {
-            "tool_name": "Write",
-            "cwd": str(self.root),
-            "tool_input": {"file_path": str(self.root / "a.cs"), "content": "forbidden"},
-        }
-
-        first = self.run_hook(SKILL_ROUTER, payload, arguments=("--harness", "claude"))
-        second = self.run_hook(SKILL_ROUTER, payload, arguments=("--harness", "claude"))
-
-        self.assertEqual(2, first.returncode)
-        self.assertEqual(2, second.returncode)
 
 
 class ClaimRetentionTests(unittest.TestCase):

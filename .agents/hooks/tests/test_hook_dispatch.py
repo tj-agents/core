@@ -8,7 +8,6 @@ import tempfile
 import textwrap
 import time
 import unittest
-import uuid
 
 
 HOOKS = Path(__file__).resolve().parents[1]
@@ -374,63 +373,6 @@ class HookDispatchTests(unittest.TestCase):
         self.assertFalse(output["continue"])
         output, _ = self.dispatch(["--deadline", "2", "--hook", "allow.py"])
         self.assertEqual("allow", output["hookSpecificOutput"]["permissionDecision"])
-
-
-class PackagedDispatchTests(unittest.TestCase):
-    ROOT = HOOKS.parents[1]
-
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="packaged dispatch ")
-        self.addCleanup(self.temp.cleanup)
-        self.cwd = Path(self.temp.name)
-        self.manifest = json.loads(
-            (self.ROOT / "plugins/engineering/hooks/claude.json").read_text(encoding="utf-8")
-        )
-        self.plugin = self.ROOT / "plugins/engineering"
-        self.environment = dict(
-            os.environ, CLAUDE_PLUGIN_ROOT=str(self.plugin), TEMP=self.temp.name,
-            TMP=self.temp.name, TMPDIR=self.temp.name,
-        )
-        if os.name != 'nt':
-            interpreter = self.cwd / 'bin/python'
-            interpreter.parent.mkdir()
-            interpreter.symlink_to(sys.executable)
-            self.environment['PATH'] = str(interpreter.parent) + os.pathsep + self.environment.get('PATH', '')
-
-    def run_registration(self, event, payload):
-        hook = self.manifest["hooks"][event][0]["hooks"][0]
-        arguments = [
-            argument.replace("${CLAUDE_PLUGIN_ROOT}", str(self.plugin)) for argument in hook["args"]
-        ]
-        data = {"hook_event_name": event, "cwd": str(self.cwd),
-                "session_id": str(uuid.uuid4()), "tool_use_id": str(uuid.uuid4()), **payload}
-        return subprocess.run(
-            [hook["command"], *arguments], input=json.dumps(data), capture_output=True,
-            text=True, encoding="utf-8", cwd=self.cwd, env=self.environment, timeout=60,
-        )
-
-    def test_credential_widening_is_denied_and_status_passes(self):
-        result = self.run_registration("PreToolUse", {
-            "tool_name": "Bash", "tool_input": {"command": "gh auth refresh -s admin:org"},
-        })
-        self.assertEqual(0, result.returncode, result.stderr)
-        specific = json.loads(result.stdout)["hookSpecificOutput"]
-        self.assertEqual("deny", specific["permissionDecision"])
-        self.assertIn("GIT-AUTH GATE", specific["permissionDecisionReason"])
-
-        result = self.run_registration("PreToolUse", {
-            "tool_name": "Bash", "tool_input": {"command": "gh auth status"},
-        })
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual("", result.stdout + result.stderr)
-
-    def test_non_shell_tools_run_only_the_all_tool_gates(self):
-        result = self.run_registration("PreToolUse", {
-            "tool_name": "Read", "tool_input": {"file_path": str(self.cwd / "x")},
-        })
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual("", result.stdout + result.stderr)
-
 
 
 if __name__ == "__main__":

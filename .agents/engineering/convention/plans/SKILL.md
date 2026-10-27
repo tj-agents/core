@@ -132,10 +132,9 @@ different wiring, type shape, boundary, or control flow. Outcome and constraint 
 
 Before writing the examples, identify their intended implementation paths, including proposed files. Resolve
 the applicable standards for **those code paths**, not just the Markdown artifact: read the target repo's
-root and relevant ancestor `AGENTS.md` files, then its routed generic, stack, and organisation standards.
-Use `skill_router.py --skills-for <intended-paths>` from that target repo when its local or installed router
-is available. A missing route is not evidence that no standards apply; follow the repository's declared
-standard owners and record the gap. Never substitute familiar generic conventions for an applicable local
+root and relevant ancestor `AGENTS.md` files, then the generic, stack, and organisation standards whose
+skill descriptions cover those paths. A standard you did not find is not evidence that none applies; follow
+the repository's declared standard owners and record the gap. Never substitute familiar generic conventions for an applicable local
 rule. Record a compact mapping of implementation paths or areas to the standards actually read, using links
 or skill identities rather than copying their rules into the plan.
 

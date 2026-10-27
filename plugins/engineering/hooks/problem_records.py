@@ -93,7 +93,7 @@ def selected_provider(root):
 
 
 def installed_skill(name, harness):
-    from skill_router import NativePluginDiscoveryError, resolved_skill
+    from installed_skills import NativePluginDiscoveryError, resolved_skill
     try:
         found = resolved_skill(name, harness)
     except (OSError, ValueError, RuntimeError, NativePluginDiscoveryError) as error:
