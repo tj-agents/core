@@ -88,11 +88,6 @@ A generic work tier can depend on this fact:
 }
 ```
 
-`routes` is an optional list of write-gate rows on any tier version. When the tier applies and the
-project carries no `.agents/skill-routes.json` of its own, `skill_router.py` blocks a write to a
-matching path until each row's skills are proven loaded in that session, or in a subagent's own
-transcript. Rows use the `.agents/skill-routes.json` shape.
-
 `session_context` is an optional nonblank single line on a version 3 tier. SessionStart emits it
 only when that tier applies, including valid `always` tiers. It lists each genuinely matched
 employer's qualified context skill and exact installed `SKILL.md` path. Multiple matching employers

@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:d9adb740ea6c4d135ae9b338330246bb6abd809b5618331b3a3da394b2c66ce9",
+      "digest": "sha256:58c9ad6d03f6b7f808bfa00a42ccfc377181e3c17a41572a56bed960e31def4a",
       "harness": {
         "marketplaces": [
           {
@@ -74,19 +74,6 @@
           },
           {
             "path": "hooks/hook_dispatch.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/pre_tool_use_adapter.py",
-            "hosts": [
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/skill_router.py",
             "hosts": [
               "claude",
               "codex"
@@ -147,7 +134,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:777f5462c1f8c610f014689df4eb12a0f6ef1c193bc5878f53b1c556e7c32e43",
+      "digest": "sha256:d61b9f91def6e580e406d7357e1aa8cba666f03e467d5092bb5329ef80045bcc",
       "harness": {
         "marketplaces": [
           {
@@ -309,7 +296,6 @@
         "self-repair",
         "session",
         "skill-authoring",
-        "skill-routes",
         "stack",
         "staged-review",
         "staged-review-all",
@@ -341,7 +327,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:a5ad04c378c9c2f430cde468e41428b9cf2721cc7b285fd20fd924f1879a3e1a",
+      "digest": "sha256:ae8c968a6dfad826eaa17e898e1eb4e4f47adf8b86d815a11dba0c76c8c06007",
       "harness": {
         "marketplaces": [
           {
@@ -366,29 +352,9 @@
             ]
           },
           {
-            "path": "hooks/delivery_binding_gate.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/git_auth_scope_gate.py",
-            "hosts": [
-              "claude",
-              "codex"
-            ]
-          },
-          {
             "path": "hooks/hook_dispatch.py",
             "hosts": [
               "claude",
-              "codex"
-            ]
-          },
-          {
-            "path": "hooks/pre_tool_use_adapter.py",
-            "hosts": [
               "codex"
             ]
           }

@@ -264,6 +264,20 @@ class Detection(TemporaryProject):
         present, _ = gate.stack_present(project, DOTNET["detect"])
         self.assertFalse(present)
 
+    def test_an_untracked_marker_in_a_repository_proves_the_stack(self):
+        project = self.populated("", ["src/api/Service.csproj"])
+        subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+        present, evidence = gate.stack_present(project, DOTNET["detect"])
+        self.assertTrue(present)
+        self.assertEqual(evidence, "src/api/Service.csproj")
+
+    def test_an_ignored_marker_never_proves_the_stack(self):
+        project = self.populated("", ["generated/App.csproj", "README.md"])
+        (project / ".gitignore").write_text("generated/\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+        present, _ = gate.stack_present(project, DOTNET["detect"])
+        self.assertFalse(present)
+
     def test_content_matching_reads_the_file_not_its_name(self):
         project = self.populated(json.dumps({"dependencies": {"react": "18.3.1"}}), ["package.json"])
         present, evidence = gate.stack_present(project, REACT["detect"])
@@ -320,6 +334,35 @@ class Applicability(TemporaryProject):
         _, applicable, blocked = gate.assess(self.project, self.found)
         self.assertEqual([item.tier for item, _ in applicable], ["dotnet"])
         self.assertEqual(blocked, [])
+
+    def test_a_mostly_untracked_repository_is_walked_once_and_never_scanned_unbounded(self):
+        subprocess.run(["git", "init", "-q"], cwd=self.project, check=True)
+        cache = self.project / "plugins" / "cache" / "market" / "dotnet" / "version" / "templates"
+        cache.mkdir(parents=True)
+        (cache / "Template.csproj").write_text("", encoding="utf-8")
+        for index in range(50):
+            (self.project / "projects" / f"session-{index}").mkdir(parents=True)
+            (self.project / "projects" / f"session-{index}" / "transcript.jsonl").write_text("{}\n", encoding="utf-8")
+        found = [*self.found, *(declaration(f"stack{index}", "tj-agents", {**DOTNET, "tier": f"stack{index}",
+                                                                              "detect": {"globs": [f"*.ext{index}"]}})
+                                for index in range(8))]
+        commands, walks = [], []
+        real_git, real_walk = gate._run_git, gate.os.walk
+
+        def git(root, arguments):
+            commands.append(arguments)
+            return real_git(root, arguments)
+
+        def walk(top, *arguments, **options):
+            walks.append(top)
+            return real_walk(top, *arguments, **options)
+
+        with unittest.mock.patch.object(gate, "_run_git", side_effect=git), \
+                unittest.mock.patch.object(gate.os, "walk", side_effect=walk):
+            _, applicable, _ = gate.assess(self.project, found)
+        self.assertEqual(applicable, [])
+        self.assertFalse([command for command in commands if "--others" in command])
+        self.assertEqual(1, len(walks))
 
     def test_the_override_forces_one_session_without_configuring_the_project(self):
         with unittest.mock.patch.dict(os.environ, {gate.OVERRIDE_VARIABLE: "dotnet"}):

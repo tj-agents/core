@@ -164,8 +164,6 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
         descriptor = json.loads(completed.stdout)
         self.assertEqual("Infonetica/cris-authz", descriptor["repository"])
         self.assertEqual(["src/Authorization/Startup.cs"], descriptor["paths"])
-        self.assertEqual([], descriptor["rules"])
-        self.assertEqual([], descriptor["routed_skills"])
         self.assertEqual("src/Authorization/Startup.cs", descriptor["security"]["first_path"])
         self.assertEqual("src/Authorization/Startup.cs", descriptor["security"]["trunk_first_path"])
         self.assertTrue(Path(descriptor["bundle"]["tree"]).is_dir())
