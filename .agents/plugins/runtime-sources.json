@@ -3,6 +3,7 @@
   "sources": {
     "agent": {
       "repository": "tj-agents/agent",
+      "package": "plugins/agent",
       "exports": [
         ".agents/agent/runtime",
         ".agents/agent/resources",
@@ -14,6 +15,7 @@
     },
     "cli": {
       "repository": "tj-agents/cli",
+      "package": "plugins/cli",
       "exports": [
         ".agents/cli/utility/close/scripts",
         ".agents/cli/utility/closeout/scripts"
