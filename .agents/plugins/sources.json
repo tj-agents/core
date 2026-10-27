@@ -312,7 +312,6 @@
   },
   "extended_host_adapters": [
     "workflow:continue",
-    "engineering:persistent-delivery",
     "engineering:review"
   ],
   "host_only_terms": {

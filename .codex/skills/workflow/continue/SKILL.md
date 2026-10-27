@@ -15,9 +15,10 @@ wake after its process exits.
 
 ```text
 An authorized report needs a later source export -> native goal and an available Scheduled wake.
-Software delivery must survive a Codex CLI exit -> engineering:persistent-delivery supplies its durable transport.
+Software delivery must survive a Codex CLI exit -> the selected Engineering package supplies its durable transport.
 ```
 
 For a missing native surface, retain the concrete capability gate and continue authorized foreground
-work. Software delivery loads `engineering:persistent-delivery` for its existing evidence contract and
-required durable CLI transport. This generic workflow does not add PR or merge requirements to other goals.
+work. For software delivery, resolve the package containing the installed `engineering:merge` entry and
+read its `.codex/runtime/continuation/README.md`. It supplies the required Codex CLI transport under this
+same `workflow:continue` operation. Other goals retain their own acceptance criteria.

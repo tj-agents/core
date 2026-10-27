@@ -161,8 +161,8 @@ python <workflow-ops> --root <delivery-checkout> --workflow-run-id delivery-bind
 ```
 
 It resolves the repository's recorded standing merge authorization against this head and writes the binding
-artifact; `engineering:persistent-delivery` owns what that means. Enter the
-harness's `workflow:continue` skill to give that binding a continuation.
+artifact under the software delivery reference beside `engineering:merge`. Enter the harness's
+`workflow:continue` skill to give that binding a continuation.
 
 ### 7. Report and continue
 

@@ -102,12 +102,12 @@ class ContinuationTests(unittest.TestCase):
         binding.update(pr=42, pr_url="https://github.com/example/test/pull/42",
                        pending_evidence=[], review={"work_order": "review", "work_order_order": ["review"], "reviewed_sha": None},
                        merge_authorization={"mode": "absent", "instruction": None}, completion_condition="Boundary recorded")
-        (self.root / ".agents/persistent-workflow-binding.json").write_text(json.dumps(binding))
+        (self.root / ".agents/delivery-binding.json").write_text(json.dumps(binding))
         self.write_completion_goal([{"repository": state["repo"], "pr": 42, "head": state["head"]}])
         self.observation(status, conclusion)
 
     def observation(self, status, conclusion=None):
-        binding = json.loads((self.root / ".agents/persistent-workflow-binding.json").read_text())
+        binding = json.loads((self.root / ".agents/delivery-binding.json").read_text())
         value = {"number": 42, "headRefName": "feature", "headRefOid": binding["head"],
                  "url": "https://github.com/example/test/pull/42", "state": "OPEN",
                  "statusCheckRollup": [{"name": "CI", "status": status, "conclusion": conclusion}]}
@@ -619,7 +619,7 @@ class ContinuationTests(unittest.TestCase):
             self.assertEqual(initialized["goal"], str(goal))
             self.binding()
             goal.write_text((self.root / "goal.md").read_text())
-            binding_path = self.root / ".agents/persistent-workflow-binding.json"
+            binding_path = self.root / ".agents/delivery-binding.json"
             binding = json.loads(binding_path.read_text())
             binding["merge_authorization"] = {"mode": "merge", "instruction": "Merge this PR when reviewed and green"}
             binding_path.write_text(json.dumps(binding))
@@ -730,7 +730,7 @@ class ContinuationTests(unittest.TestCase):
         self.fixture("gate" if status == "blocked" else "complete",
                      release_binding=True, release_state=status)
         result = self.wake()
-        self.assertFalse((self.root / ".agents/persistent-workflow-binding.json").exists())
+        self.assertFalse((self.root / ".agents/delivery-binding.json").exists())
         self.assertEqual(result["launches"], 1)
         return result
 
@@ -771,7 +771,7 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(result["state"], "complete")
         self.assertNotEqual(result["head"], old_head)
         self.assertEqual(result["head"], self.git("rev-parse", "HEAD"))
-        self.assertFalse((self.root / ".agents/persistent-workflow-binding.json").exists())
+        self.assertFalse((self.root / ".agents/delivery-binding.json").exists())
 
     def test_repaired_terminal_release_preserves_human_gate(self):
         result = self.repaired_release("blocked", receipt={"reason": "Approve repaired release",
@@ -789,7 +789,7 @@ class ContinuationTests(unittest.TestCase):
         old = {key: state[key] for key in ("repo", "worktree", "branch", "head")}
         self.git("commit", "--allow-empty", "-m", "Repaired head")
         new = dict(old, head=self.git("rev-parse", "HEAD"))
-        binding_path = self.root / ".agents/persistent-workflow-binding.json"
+        binding_path = self.root / ".agents/delivery-binding.json"
         snapshot = dict(json.loads(binding_path.read_text()), head=new["head"])
         binding_path.unlink()
         receipt = {"nonce": state["launch_nonce"], "owner_id": state["owner_id"], "state": "complete",
