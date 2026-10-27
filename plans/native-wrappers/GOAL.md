@@ -109,3 +109,7 @@ hosts; the repair selects host continuation through Workflow and retains PR auth
 Integrated main 25309fbfa6161385d8b01637a511eb81b518a8d7. Preserve all upstream hook/routing removals,
 resolve the retired skill-routes definition into the actual 56-skill count, and retain the Workflow
 continuation ownership change. Requalify the combined source candidate on exact-head CI.
+
+Final packaging review retained ROSTER1: the authored package skill lists still advertised the retired
+Engineering identity. Move that roster membership to Workflow continue while preserving main-owned
+digest fields; local generation had already repaired the omission, so source lists need the same fix.
