@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ADAPTER = ROOT / ".codex/skills/engineering/persistent-workflow/scripts/delivery_continuation.py"
+ADAPTER = ROOT / ".codex/skills/engineering/persistent-delivery/scripts/delivery_continuation.py"
 SCHEDULER = ROOT / ".codex/runtime/continuation/continuation_scheduler.py"
 
 
@@ -822,7 +822,7 @@ class DeliveryContinuationTests(unittest.TestCase):
 
     def test_installed_package_resources_and_custom_profile_are_portable(self):
         package = (Path(self.temp.name) / "installed package £").resolve()
-        scripts = package / "codex-skills/persistent-workflow/scripts"
+        scripts = package / "codex-skills/persistent-delivery/scripts"
         resources = package / ".codex/runtime/continuation"
         scripts.mkdir(parents=True)
         resources.mkdir(parents=True)
@@ -841,14 +841,14 @@ class DeliveryContinuationTests(unittest.TestCase):
 
     def test_generated_continuation_transport_is_codex_only(self):
         package = ROOT / "plugins/engineering"
-        self.assertTrue((package / "codex-skills/persistent-workflow/scripts/delivery_continuation.py").is_file())
+        self.assertTrue((package / "codex-skills/persistent-delivery/scripts/delivery_continuation.py").is_file())
         self.assertTrue((package / ".codex/runtime/continuation/continuation_runtime.py").is_file())
         self.assertTrue((package / ".codex/runtime/continuation/continuation_scheduler.py").is_file())
-        self.assertFalse((package / "skills/persistent-workflow/scripts").exists())
-        self.assertFalse((package / ".agents/engineering/workflow/persistent-workflow/scripts").exists())
+        self.assertFalse((package / "skills/persistent-delivery/scripts").exists())
+        self.assertFalse((package / ".agents/engineering/policy/persistent-delivery/scripts").exists())
         self.assertFalse((package / "workflows/continuation_runtime.py").exists())
         installed = load("generated_delivery_continuation",
-                         package / "codex-skills/persistent-workflow/scripts/delivery_continuation.py")
+                         package / "codex-skills/persistent-delivery/scripts/delivery_continuation.py")
         for module in (adapter, installed):
             runtime, python = module.prerequisites(self.owner, str(self.host))
             self.assertEqual(module.package_root() / ".codex/runtime/continuation/continuation_runtime.py", runtime)
@@ -879,7 +879,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertIn("shared runtime unavailable", result.stderr)
 
     def test_adapter_rejects_claude_layout(self):
-        scripts = self.root / "skills/persistent-workflow/scripts"
+        scripts = self.root / "skills/persistent-delivery/scripts"
         scripts.mkdir(parents=True)
         shutil.copy2(ADAPTER, scripts / ADAPTER.name)
         with self.assertRaisesRegex(RuntimeError, "adapter layout unavailable"):
@@ -888,7 +888,7 @@ class DeliveryContinuationTests(unittest.TestCase):
     def test_adapter_does_not_use_outer_package_resources_or_marker(self):
         outer = self.root / "outer"
         for package in (outer, outer / "nested"):
-            scripts = package / "codex-skills/persistent-workflow/scripts"
+            scripts = package / "codex-skills/persistent-delivery/scripts"
             scripts.mkdir(parents=True)
             (package / ".agents/engineering").mkdir(parents=True)
             (package / ".codex-plugin").mkdir()
@@ -898,7 +898,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         resources.mkdir(parents=True)
         shutil.copy2(SCHEDULER, resources / SCHEDULER.name)
         nested = outer / "nested"
-        script = nested / "codex-skills/persistent-workflow/scripts" / ADAPTER.name
+        script = nested / "codex-skills/persistent-delivery/scripts" / ADAPTER.name
         with self.assertRaisesRegex(RuntimeError, "resource unavailable"):
             load("nested_delivery_continuation", script)
         (nested / ".codex-plugin/plugin.json").unlink()

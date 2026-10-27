@@ -67,22 +67,33 @@ correction requires incremental review and its own exact-head checks.
 ```agent-host-coverage
 {
   "schema_version": 1,
-  "shared_source": ".agents/engineering/workflow/persistent-workflow/SKILL.md",
+  "shared_source": ".agents/workflow/workflow/continue/SKILL.md",
   "hosts": [
     {
       "host": "claude",
       "behavior": "Native goal and scheduling preserve shared delivery identity and authority.",
-      "source": ".claude/skills/engineering/persistent-workflow/SKILL.md",
-      "mapping": "engineering/skills/persistent-workflow",
+      "source": ".claude/skills/workflow/continue/SKILL.md",
+      "mapping": "workflow/skills/continue",
       "verification": {"level": "source", "result": "passed", "evidence": "Focused guidance and package isolation checks; fresh host acceptance remains a delivery gate."}
     },
     {
       "host": "codex",
       "behavior": "Native goal and exposed scheduling use a Codex-only adapter for required durable CLI wakes.",
-      "source": ".codex/skills/engineering/persistent-workflow/SKILL.md",
-      "mapping": "engineering/codex-skills/persistent-workflow and .codex/runtime/continuation",
+      "source": ".codex/skills/workflow/continue/SKILL.md",
+      "mapping": "workflow/codex-skills/continue; engineering/codex-skills/persistent-delivery and .codex/runtime/continuation",
       "verification": {"level": "source", "result": "passed", "evidence": "Focused adapter, supervisor and source/package bytecode checks; fresh host acceptance remains a delivery gate."}
     }
   ]
 }
 ```
+
+October 27 naming correction: the user requested a Workflow namespace for continuation. The public
+identity is now `workflow:continue`; `workflow:run` retains the goal and `workflow:resume` reconstructs
+context. PR completion evidence moves into existing `engineering:persistent-delivery`; its Codex entry
+retains the durable CLI instructions and adapter. The supervisor, scheduler, binding filename and live
+registrations retain their identities. There is no old skill alias. This completes the same continuation
+cutover in Core #517: canonical definition, both host entries, caller guidance and package assertions
+change atomically. Splitting the rename would leave a missing skill or competing owners. Native runtime
+behavior is unchanged; focused adapter, completion, packaging and process checks plus fresh frozen review
+and exact-head Windows/Linux CI qualify the new candidate. The only delivery-hook change updates two
+diagnostic skill references; routing, permission and gate logic remain outside this correction.
