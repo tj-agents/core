@@ -1,4 +1,4 @@
-"""Package harness declarations stay consistent with the catalog and hook wiring."""
+"""Package harness declarations stay consistent with the plugin roster and hook wiring."""
 
 from copy import deepcopy
 import importlib.util
@@ -49,12 +49,12 @@ foreach ($document in $documents) {{
 
 
 class HarnessManifestTests(unittest.TestCase):
-    def test_core_manifests_are_current_and_catalog_is_core_only(self):
+    def test_core_manifests_are_current_and_roster_is_core_only(self):
         manifests = HARNESS.synchronize(ROOT, check=True)
         self.assertEqual({"base", "engineering", "workflow"}, set(manifests))
-        catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
-        self.assertEqual({"tj-agents/core"}, {package["owner_repository"] for package in catalog["packages"]})
-        for package in catalog["packages"]:
+        roster = HARNESS.load(ROOT / ".agents/plugins/plugins.json")
+        self.assertEqual({"tj-agents/core"}, {package["owner_repository"] for package in roster["packages"]})
+        for package in roster["packages"]:
             self.assertEqual(manifests[package["name"]]["requires"], package["harness"])
 
     def test_additional_roots_require_canonical_owned_shipped_resources(self):
@@ -65,12 +65,12 @@ class HarnessManifestTests(unittest.TestCase):
             original = json.loads(path.read_text(encoding="utf-8"))
             HARNESS.synchronize(root, check=True)
             for roots in (
-                [".agents/catalog/catalog.schema.json"],
-                [".agents/workflow", ".agents/catalog/catalog.schema.json"],
+                [".agents/plugins/plugins.schema.json"],
+                [".agents/workflow", ".agents/plugins/plugins.schema.json"],
                 [".agents/workflow", ".agents/workflow"],
                 [".agents/lanes", ".agents/workflow", ".agents/workflows"],
-                [".agents/catalog/missing.json", ".agents/workflow"],
-                [".agents/catalog/../catalog/catalog.schema.json", ".agents/workflow"],
+                [".agents/plugins/missing.json", ".agents/workflow"],
+                [".agents/plugins/../plugins/plugins.schema.json", ".agents/workflow"],
                 ["../outside", ".agents/workflow"],
             ):
                 with self.subTest(roots=roots):
@@ -110,15 +110,15 @@ class HarnessManifestTests(unittest.TestCase):
             )
 
     def test_foreign_marketplace_owner_is_rejected(self):
-        catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
+        roster = HARNESS.load(ROOT / ".agents/plugins/plugins.json")
         config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
         requires = json.loads((ROOT / ".agents/plugins/harness/base.json").read_text(encoding="utf-8"))["requires"]
         requires["marketplaces"][0]["repository"] = "another-org/core"
-        with self.assertRaisesRegex(ValueError, "disagrees with catalog"):
-            HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
+        with self.assertRaisesRegex(ValueError, "disagrees with plugin roster"):
+            HARNESS.validate_requires(ROOT, config, roster, "base", requires)
         requires["marketplaces"][0]["repository"] = "tj-agents/core"
-        with self.assertRaisesRegex(ValueError, "disagrees with catalog"):
-            HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
+        with self.assertRaisesRegex(ValueError, "disagrees with plugin roster"):
+            HARNESS.validate_requires(ROOT, config, roster, "base", requires)
 
     def test_core_marketplace_identity_matches_plugin_selection(self):
         config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
