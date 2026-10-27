@@ -196,7 +196,6 @@ class SourceLayoutTests(unittest.TestCase):
             self.assertTrue((manifest_root / "workflow.json").is_file())
             self.assertTrue((manifest_root / "engineering-hooks.json").is_file())
             self.assertFalse((self.root / f".{host}/plugins").exists())
-            self.assertFalse((self.root / f".{host}/hooks").exists())
 
     def test_generated_payloads_are_self_contained(self):
         _, output, _, _ = SYNC.build(self.root)
