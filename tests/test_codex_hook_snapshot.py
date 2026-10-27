@@ -323,7 +323,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             self.assertEqual(resumed.returncode, 0, resumed.stderr)
             self.assertEqual("verified snapshot\n", resumed.stdout)
 
-    def test_hook_survives_deleted_cache_path_and_rejects_modified_snapshot(self):
+    def test_hook_survives_deleted_cache_path_and_rejects_a_snapshot_with_a_wrong_marker(self):
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
             payload = temporary / "cache" / "tj-agents" / "base" / "2.1.16"
@@ -352,7 +352,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             self.assertEqual(recovered.returncode, 0, recovered.stderr)
             self.assertEqual(first.stdout, recovered.stdout)
 
-            (snapshot / "hooks" / "hook_runtime.py").write_text("changed", encoding="utf-8")
+            (snapshot / SNAPSHOT.MARKER).write_text("changed", encoding="utf-8")
             rejected = subprocess.run(
                 command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=30,
