@@ -93,12 +93,11 @@ authorize merge, deployment, destructive operations, or unrelated external chang
 
 ## Persistent continuation owns a future delivery decision
 
-When CI, queue, review, publication, or merge will resolve after this turn, enter the current harness's
-persistent-workflow skill and have it read persistent-delivery. It owns the exact repository, PR, worktree,
-head SHA, exact check and run IDs, review work order and watermark, authorization, duplicate suppression,
-tier-specific repair dispatch, review routing, and terminal cleanup. A terminal watcher is not a persistent
-workflow. Harness-specific wake, session, scheduling, and capability behavior belongs only to that host's
-persistent-workflow skill.
+When CI, queue, review, publication, or merge will resolve after this turn, load
+`engineering:persistent-delivery` for exact PR/head identity, completion evidence, authorization and the
+next delivery decision. Use `workflow:continue` to select and establish the supported host wake.
+Harness-specific native continuation belongs to that host's Workflow entry; Engineering's Codex delivery
+entry supplies its required durable CLI transport.
 
 Bind every remote wait through the shared reconnect-safe monitor before leaving the stage:
 
@@ -116,7 +115,7 @@ bounded timeout. Direct `gh run watch`, ad hoc sleeping forge loops, and model-t
 ### Notify before parking a listener
 
 Invoke `agent:listen` with the existing bound monitor. That skill owns the generic
-execution and native completion callback; `engineering:persistent-workflow` owns durable delivery.
+execution and native completion callback; `engineering:persistent-delivery` owns durable delivery.
 
 Read forge status for a PR, head, or run once, again only after a real wake or observed state change, and
 keep one shared monitor per identity.
