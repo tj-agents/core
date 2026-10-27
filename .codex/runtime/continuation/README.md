@@ -1,11 +1,6 @@
----
-name: persistent-delivery
-description: Preserve exact software delivery identity and evidence across wakes, with the Codex-only durable CLI transport when native scheduling cannot satisfy the authorized task.
-kind: policy
-domain: process
----
+# Codex software delivery transport
 
-Read the [shared delivery contract](../../../../.agents/engineering/policy/persistent-delivery/SKILL.md).
+Read the delivery reference beside the installed `engineering:merge` entry at `references/delivery.md`.
 Use `workflow:continue` for native goal and scheduling selection. The transport below is for authorized
 software work that must survive its original Codex CLI process. It launches a fresh headless `codex exec`
 context in the initialized checkout; other host owners are rejected. Reconcile any existing external
@@ -25,7 +20,7 @@ python -B "<engineering-package-root>/.codex/runtime/continuation/continuation_r
 
 The default owner record is `.agents/continuation/owner.json` below the worktree. `init` records one
 stable owner before any PR binding exists. Existing delivery identity and exact-head binding remain in
-`persistent-delivery`; add or refresh that binding when the task reaches a PR. A continuation goal may
+the software delivery reference beside `engineering:merge`; add or refresh that binding when the task reaches a PR. A continuation goal may
 therefore own local work and later remote repair/review without pretending a PR already exists.
 
 `GOALPATH` may name an existing worktree-relative file or an explicitly supplied absolute path to an
@@ -53,8 +48,8 @@ not call owner checkpoint itself. Continue to honor the canonical goal and autho
 The runtime lease coordinates its own writers; it does not gate arbitrary host writes or replace the
 harness's permission controls.
 
-The cross-platform Codex adapter is shipped beside this `persistent-delivery` entry at
-`<skill-directory>/scripts/delivery_continuation.py`. Initialize and claim the foreground
+The cross-platform Codex adapter is shipped at
+`<engineering-package-root>/.codex/runtime/continuation/delivery_continuation.py`. Initialize and claim the foreground
 owner before `register`; the adapter supports `register`, `remove`, `list`, and `wake`. The Python runtime
 supports `status` and `wake` against `--owner OWNER`. Remove only at a terminal result. Yield the foreground
 lease before waiting. Do not register another task for an
@@ -66,15 +61,15 @@ On Linux, registration requires a reachable `systemctl --user` manager and creat
 user oneshot service and timer. On Windows it requires inbox Windows PowerShell's ScheduledTasks capability.
 Neither path changes lingering or login policy: a Linux user timer runs only while the existing user manager
 runs. Use `python3` on Linux/macOS and `python` on Windows. Pin the native host executable explicitly when
-registering; for example, use `python3 -B "<skill-directory>/scripts/delivery_continuation.py" register --owner OWNER --host-executable /absolute/path/to/codex`
-on Linux/macOS, or `python -B "<skill-directory>\\scripts\\delivery_continuation.py" register --owner OWNER --host-executable C:\\absolute\\path\\to\\codex.exe`
+registering; for example, use `python3 -B "<engineering-package-root>/.codex/runtime/continuation/delivery_continuation.py" register --owner OWNER --host-executable /absolute/path/to/codex`
+on Linux/macOS, or `python -B "<engineering-package-root>\\.codex\\runtime\\continuation\\delivery_continuation.py" register --owner OWNER --host-executable C:\\absolute\\path\\to\\codex.exe`
 on Windows. Use `--dry-run` to inspect a proposed registration without changing scheduler or receipt files.
 
 Establish durable continuation through successful initialization, foreground claim, scheduler registration
 and an observed wake. Child execution resolves L4 model and effort from the packaged canonical lane table.
 The runtime owner remains bound to one worktree and branch; its receipt permits a head rebind within that
 identity. To move a longer goal to the next slice, follow the foreground owner transition in
-`persistent-delivery`, preserve the old receipts and maintain one active writer. Completing this runtime
+the software delivery reference beside `engineering:merge`, preserve the old receipts and maintain one active writer. Completing this runtime
 owner's slice does not mark the full goal complete. Automatic supervisor transfer across worktrees is
 outside this runtime.
 
@@ -83,7 +78,7 @@ and a 900-second child timeout. Tighter limits already recorded by the user take
 increase them silently or add bypass-permission flags.
 
 For remote delivery, preserve one exact PR/head/worktree/run identity and one continuation. Route every
-remote decision through `persistent-delivery`; reject observations from another identity. An exact-head
+remote decision through the software delivery reference beside `engineering:merge`; reject observations from another identity. An exact-head
 failure receives one appropriate repair context, a green head receives independent current-head review,
 and merge remains behind its existing authorization gate. Missing merge authorization blocks merge only;
 it does not stop authorized local work, failure repair, or review that can proceed before that gate.

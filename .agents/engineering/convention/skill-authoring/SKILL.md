@@ -8,8 +8,8 @@ domain: process
 
 # Skill authoring
 
-For creating, splitting, consolidating or renaming a skill, enter `template:new-skill` first.
-That selected gate resolves the authoring brief and delegates to the current host's native creator.
+For a new skill, enter `skill:create`; for an edit, split, consolidation or rename, enter `skill:update`.
+Those operations resolve the authoring brief and delegate to the current host's native skill creator.
 This convention supplies selection, sizing and naming rules to that gate and to reviews.
 
 A skill is loaded only when an agent selects it, and every installed skill's name and description is in
@@ -110,14 +110,15 @@ the selected profile under [the recording contract](../../../workflow/resources/
 
 ## Replace names cleanly
 
-When the user directs a clean rename or says not to preserve old names, remove the old entry,
-aliases and forwarding paths, and update in-scope authored callers and both host adapters in the same
-delivery. Do not infer a compatibility requirement from the old name having been published.
+A rename or consolidation replaces the whole public capability in the same cutover. Remove its former
+skill entries, aliases, forwarding paths and competing discovery names; do not retain an old name by
+reclassifying it as another selectable skill. Keep supporting contracts and host transport as resources
+of the retained capability or its existing discipline owner.
 
-Preserve an old interface only when the user or an applicable project contract explicitly requires
-compatibility. Record that requirement and its removal condition in the owning plan or debt entry.
-A required compatibility entry contains only links to its replacements; its description names the
-replacements and removal condition without repeating their selection triggers.
+Update authored callers, both host adapters, selections, routes, templates, generated payloads and known
+installed registrations. Search the maintained corpus and generated discovery by the former qualified
+identity, bare name and path. Any active match leaves the update incomplete. Historical evidence is not
+an active caller. Do not introduce backwards compatibility for a replaced skill identity.
 
 ## Tests
 

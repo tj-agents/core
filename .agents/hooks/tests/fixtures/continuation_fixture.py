@@ -34,7 +34,7 @@ if mode == "post-merge":
 if mode == "badnonce":
     receipt["nonce"] = "wrong"
 if mode == "repair":
-    binding_path = root / ".agents/persistent-workflow-binding.json"
+    binding_path = root / ".agents/delivery-binding.json"
     binding = json.loads(binding_path.read_text())
     old = {key: binding[key] for key in ("repo", "worktree", "branch", "head")}
     (root / "repair.txt").write_text("fixed")
@@ -60,7 +60,7 @@ if mode == "repair":
     observation["statusCheckRollup"] = [{"name": "CI", "status": "IN_PROGRESS"}]
     (root / "observation.json").write_text(json.dumps(observation))
 if scenario.get("release_binding"):
-    binding_path = root / ".agents/persistent-workflow-binding.json"
+    binding_path = root / ".agents/delivery-binding.json"
     receipt["released_binding"] = json.loads(binding_path.read_text())
     if scenario.get("retain_stale_binding"):
         binding = dict(receipt["released_binding"], head=receipt["rebind"]["old"]["head"])
