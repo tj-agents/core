@@ -16,6 +16,7 @@ owns routing, hook and workflow-ops changes; those files remain outside this cut
 - [x] Keep native-first continuation and delivery invariants shared; put executable custom continuation instructions in the Codex entry.
 - [x] Retire the five approved redundant selectors and their host/roster entries.
 - [x] Correct Codex security-review availability without changing review evidence or routing.
+- [x] Require a concrete workflow, policy or missing host capability before retaining a wrapper; native command naming alone does not justify a skill.
 - [x] Regenerate locally and run focused runtime, packaging and guidance checks.
 
 Acceptance requires relocated source and installed fixtures, no Claude custom continuation
@@ -55,6 +56,13 @@ Parent full-suite checkpoint: repository suite ran 431 tests (four failures, 61 
 Remaining parent gates: review the source diff, observe exact-head clean CI,
 complete native-host/Windows/Linux acceptance, and reconcile exact existing Claude external registrations
 before claiming an installed migration. Protected Core #512 remains outside this source diff.
+
+October 27 user correction: remove Agent's redundant memory wrapper and repair this repository's
+`engineering:skill-authoring` rule that encouraged mirroring every native command. The retained review
+and continuation skills own frozen delivery evidence and durable CLI requirements, respectively.
+Their value audit does not justify a separate wrapper for native memory controls. The earlier source
+candidate passed full Windows/Linux CI at `bf287c19d3dcfb00abd6ed9bc314421d344ad38c`; this guidance
+correction requires incremental review and its own exact-head checks.
 
 ```agent-host-coverage
 {
