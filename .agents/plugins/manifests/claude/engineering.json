@@ -11,6 +11,5 @@
     "git"
   ],
   "displayName": "Engineering process",
-  "skills": "./skills/",
-  "hooks": "./hooks/claude.json"
+  "skills": "./skills/"
 }
