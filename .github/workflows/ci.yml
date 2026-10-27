@@ -300,8 +300,8 @@ jobs:
           }
 
       - name: Publish the generated package hint
-        if: steps.publish-packages.outputs.changed == 'true' && vars.MACHINE_EVENTS_TOPIC != ''
-        uses: tj-agents/github-actions/.github/actions/machine-events@d45d8a70dc1309ca02d304c8e3c58e493c263f89
+        if: steps.publish-packages.outputs.changed == 'true' && vars.UPDATE_TOPIC != ''
+        uses: tj-agents/github-actions/.github/actions/publish-update@ef03e0aaa9bdaca8be97c0fa7a5a077d2b62a78a
         with:
-          topic: ${{ secrets.MACHINE_EVENTS_TOPIC }}
+          topic: ${{ secrets.UPDATE_TOPIC }}
           published: 'true'
