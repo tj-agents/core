@@ -42,14 +42,6 @@
     "base": {
       "codex": ".agents/plugins/manifests/codex/base-hooks.json",
       "claude": ".agents/plugins/manifests/claude/base-hooks.json"
-    },
-    "engineering": {
-      "codex": ".agents/plugins/manifests/codex/engineering-hooks.json",
-      "claude": ".agents/plugins/manifests/claude/engineering-hooks.json"
-    },
-    "workflow": {
-      "codex": ".agents/plugins/manifests/codex/workflow-hooks.json",
-      "claude": ".agents/plugins/manifests/claude/workflow-hooks.json"
     }
   },
   "generated_roots": [
@@ -101,11 +93,6 @@
       "destination": "hooks/hook_runtime.py"
     },
     {
-      "plugin": "base",
-      "source": ".agents/hooks/hook_dispatch.py",
-      "destination": "hooks/hook_dispatch.py"
-    },
-    {
       "plugin": "engineering",
       "source": ".agents/dependencies/agent/.agents/agent/resources/lanes",
       "destination": ".agents/lanes"
@@ -152,11 +139,6 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/hook_dispatch.py",
-      "destination": "hooks/hook_dispatch.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/hooks/merge_review_gate.py",
       "destination": "hooks/merge_review_gate.py"
     },
@@ -164,11 +146,6 @@
       "plugin": "engineering",
       "source": ".agents/hooks/plan_graph.py",
       "destination": "hooks/plan_graph.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".codex/hooks/snapshot.py",
-      "destination": "hooks/codex/snapshot.py"
     },
     {
       "plugin": "engineering",
@@ -269,16 +246,6 @@
       "plugin": "docs",
       "source": ".agents/tiers/docs.json",
       "destination": "tier.json"
-    },
-    {
-      "plugin": "workflow",
-      "source": ".agents/hooks/hook_dispatch.py",
-      "destination": "hooks/hook_dispatch.py"
-    },
-    {
-      "plugin": "workflow",
-      "source": ".codex/hooks/snapshot.py",
-      "destination": "hooks/codex/snapshot.py"
     }
   ],
   "prerequisites": {

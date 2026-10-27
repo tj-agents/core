@@ -140,7 +140,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
                         link.unlink()
 
     def test_each_generated_command_binds_to_its_package_bytes(self):
-        for plugin in ("base", "engineering", "workflow"):
+        for plugin in ("base",):
             with self.subTest(plugin=plugin):
                 root = ROOT / "plugins" / plugin
                 expected = SNAPSHOT.digest_tree(root)
@@ -197,7 +197,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
     def test_each_host_parsing_of_each_command_preserves_the_plaintext_bootstrap(self):
         loader = (ROOT / ".codex" / "hooks" / "snapshot.py").read_text(encoding="utf-8")
         digest = hashlib.sha256(GENERATOR.canonical_output_bytes(loader)).hexdigest()
-        for plugin in ("base", "engineering", "workflow"):
+        for plugin in ("base",):
             manifest = json.loads(
                 (ROOT / "plugins" / plugin / "hooks" / "codex.json").read_text(encoding="utf-8")
             )
@@ -350,12 +350,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
                 capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(recovered.returncode, 0, recovered.stderr)
-            first_context = json.loads(first.stdout)["hookSpecificOutput"]["additionalContext"]
-            recovered_context = json.loads(recovered.stdout)["hookSpecificOutput"]["additionalContext"]
-            self.assertIn("base:project-setup", first_context)
-            self.assertIn("base:project-setup", recovered_context)
-            self.assertIn("base:solution-assessment", first_context)
-            self.assertIn("base:solution-assessment", recovered_context)
+            self.assertEqual(first.stdout, recovered.stdout)
 
             (snapshot / "hooks" / "hook_runtime.py").write_text("changed", encoding="utf-8")
             rejected = subprocess.run(
