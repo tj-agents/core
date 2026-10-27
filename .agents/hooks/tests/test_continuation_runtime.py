@@ -60,7 +60,7 @@ class ContinuationTests(unittest.TestCase):
                         "--completion", "CI repaired and boundary recorded", "--authority", "Isolated test",
                         "--harness", "codex", "--actions", "edit", "test", *extra)
 
-    def write_completion_goal(self, deliveries=None, evidence=None):
+    def write_completion_goal(self, deliveries=None, evidence=None, follow_up=None):
         document = {
             "outcome": "The fixture records a verified completion boundary.",
             "acceptance": [{
@@ -73,6 +73,8 @@ class ContinuationTests(unittest.TestCase):
             "deliveries": deliveries or [],
             "open_tasks": [],
         }
+        if follow_up is not None:
+            document["follow_up"] = follow_up
         (self.root / "goal.md").write_text("```completion\n" + json.dumps(document) + "\n```\n")
 
     def cli(self, *args, code=0, env=None):
@@ -224,6 +226,22 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(token, after["foreground"]["token"])
         self.assertEqual(claimed["reason"], after["reason"])
         self.assertIn("completion-unverified: acceptance fixture lacks evidence", result["reason"])
+
+    def test_foreground_complete_checkpoint_releases_claim_with_independent_follow_up(self):
+        self.write_completion_goal(follow_up=[{
+            "repository": "example/publisher", "pr": 34, "head": "b" * 40,
+            "text": "Publish update hints.", "owner": "publisher delivery owner",
+            "next_action": "Complete the separate publisher delivery.",
+            "scope_evidence": "This session owns the verified refresh delivery; the publisher goal has its own owner.",
+        }])
+        claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
+        self.cli("checkpoint", "--owner", str(self.owner), "--token", claimed["foreground"]["token"],
+                 "--state", "complete", "--reason", "Owned delivery complete")
+        after = self.state()
+        self.assertEqual("complete", after["state"])
+        self.assertIsNone(after["foreground"])
+        self.assertTrue(after["completion_snapshot"]["report_ready"])
+        self.assertTrue(after["completion_snapshot"]["ready"])
 
     def test_parent_exit_delayed_failure_repair_success_complete(self):
         self.binding()
