@@ -317,7 +317,8 @@
     ]
   },
   "extended_host_adapters": [
-    "engineering:persistent-workflow",
+    "workflow:continue",
+    "engineering:persistent-delivery",
     "engineering:review"
   ],
   "host_only_terms": {
