@@ -7,13 +7,13 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("catalog_update", ROOT / "scripts/update_catalog_digests.py")
+SPEC = importlib.util.spec_from_file_location("plugin_update", ROOT / "scripts/update_plugin_digests.py")
 updater = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(updater)
 
 
-class CatalogUpdateTests(unittest.TestCase):
-    def test_harness_change_converges_without_a_manual_catalog_edit(self):
+class PluginUpdateTests(unittest.TestCase):
+    def test_harness_change_converges_without_a_manual_plugin_roster_edit(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             for name in (".agents", ".codex", ".claude"):
@@ -23,16 +23,16 @@ class CatalogUpdateTests(unittest.TestCase):
             manifest = json.loads(path.read_text(encoding="utf-8"))
             manifest["requires"]["permissions"]["claude_allow"].append("Bash(python -B fixture.py)")
             path.write_text(json.dumps(manifest), encoding="utf-8")
-            catalog_path = root / ".agents/catalog/catalog.json"
-            before = catalog_path.read_bytes()
-            with self.assertRaisesRegex(ValueError, "Stale catalog packages"):
+            roster_path = root / ".agents/plugins/plugins.json"
+            before = roster_path.read_bytes()
+            with self.assertRaisesRegex(ValueError, "Stale plugin entries"):
                 updater.update(root, check=True)
-            self.assertEqual(before, catalog_path.read_bytes())
+            self.assertEqual(before, roster_path.read_bytes())
             updater.update(root, check=False)
             updater.update(root, check=True)
             updater.SYNC.build(root)
-            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-            engineering = next(item for item in catalog["packages"] if item["name"] == "engineering")
+            roster = json.loads(roster_path.read_text(encoding="utf-8"))
+            engineering = next(item for item in roster["packages"] if item["name"] == "engineering")
             self.assertEqual(manifest["requires"], engineering["harness"])
 
 
