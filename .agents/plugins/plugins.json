@@ -1,0 +1,578 @@
+{
+  "schema_version": 1,
+  "digest_format": "sha256-tree-v1",
+  "packages": [
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/base",
+      "name": "base",
+      "package_path": "plugins/base",
+      "description": "Maintained plans and common agent behavior.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "agent-files",
+        "cd",
+        "project-setup",
+        "solution-assessment",
+        "task-routing"
+      ],
+      "dependencies": {
+        "required": [],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "python>=3.9"
+        ],
+        "optional": []
+      },
+      "digest": "sha256:d9adb740ea6c4d135ae9b338330246bb6abd809b5618331b3a3da394b2c66ce9",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/base"
+        ],
+        "hooks": [
+          {
+            "path": ".agents/base/policy/agent-files/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/base/policy/project-setup/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/base/policy/solution-assessment/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/base/policy/task-routing/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/hook_dispatch.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/tier_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          }
+        ],
+        "permissions": {
+          "claude_allow": [],
+          "codex_prefix_rules": []
+        }
+      },
+      "external_dependencies": {
+        "required": [],
+        "optional": []
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/workflow",
+      "name": "workflow",
+      "package_path": "plugins/workflow",
+      "description": "Goal lifecycle and recorded work status.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "handoff",
+        "plan",
+        "plan-artifacts",
+        "resume",
+        "run",
+        "session",
+        "status"
+      ],
+      "dependencies": {
+        "required": [
+          "tj-agents/base",
+          "tj-agents/agent-store",
+          "tj-agents/agent"
+        ],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "exe:git",
+          "python>=3.9"
+        ],
+        "optional": []
+      },
+      "digest": "sha256:777f5462c1f8c610f014689df4eb12a0f6ef1c193bc5878f53b1c556e7c32e43",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/agent",
+          "tj-agents/agent-store",
+          "tj-agents/base",
+          "tj-agents/workflow"
+        ],
+        "hooks": [
+          {
+            "path": ".agents/workflow/policy/session/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/hook_dispatch.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          }
+        ],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
+                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
+                ]
+              ],
+              "justification": "Read selected work-item state and supporting plans without creating or changing agent-store records.",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py",
+                  "payments"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+                  "payments",
+                  "20",
+                  "all"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/writer.py"
+                ],
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
+                  "payments"
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "external_dependencies": {
+        "required": [
+          {
+            "id": "tj-agents/agent-store",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/agent"
+          },
+          {
+            "id": "tj-agents/agent",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/agent"
+          }
+        ],
+        "optional": []
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/engineering",
+      "name": "engineering",
+      "package_path": "plugins/engineering",
+      "description": "Selected engineering workflows, reviews and Git operations.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "address-bug",
+        "address-debt",
+        "address-mistake",
+        "address-review",
+        "branching",
+        "bugfix",
+        "commit",
+        "commit-all",
+        "commit-push",
+        "committing",
+        "docs",
+        "docs-review",
+        "failing-tests",
+        "failure-provenance",
+        "feature",
+        "git-auth",
+        "guide",
+        "guide-build",
+        "incremental-review",
+        "merge",
+        "merge-docs",
+        "merging",
+        "open-pr",
+        "open-worktree",
+        "persistent-delivery",
+        "persistent-workflow",
+        "plans",
+        "pr-preflight",
+        "pr-screenshots",
+        "prune-worktrees",
+        "pull",
+        "pull-main",
+        "push",
+        "recents",
+        "remote-validation",
+        "review",
+        "review-lifecycle",
+        "self-repair",
+        "session",
+        "skill-authoring",
+        "stack",
+        "staged-review",
+        "staged-review-all",
+        "sync",
+        "sync-all",
+        "sync-checkout",
+        "unmerged",
+        "update-roadmap",
+        "worktree"
+      ],
+      "dependencies": {
+        "required": [
+          "tj-agents/base",
+          "tj-agents/workflow",
+          "tj-agents/agent-store",
+          "tj-agents/agent",
+          "tj-agents/cli"
+        ],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "exe:git",
+          "python>=3.9"
+        ],
+        "optional": [
+          "exe:bash",
+          "exe:gh",
+          "exe:powershell"
+        ]
+      },
+      "digest": "sha256:a5ad04c378c9c2f430cde468e41428b9cf2721cc7b285fd20fd924f1879a3e1a",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/agent",
+          "tj-agents/agent-store",
+          "tj-agents/base",
+          "tj-agents/cli",
+          "tj-agents/engineering",
+          "tj-agents/workflow"
+        ],
+        "hooks": [
+          {
+            "path": ".agents/engineering/policy/session/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/hook_dispatch.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          }
+        ],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ],
+              "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
+                  "${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py",
+                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
+                ]
+              ],
+              "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; a delivered report and verified idle session remain separate prerequisites for retained-session closure",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py",
+                  "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
+                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/worktree_sweep.py"
+                ],
+                "--repo"
+              ],
+              "justification": "engineering:merge Step 5 removes proven-merged worktrees for one repository; it never forces, keeps worktrees in use, and archives leftovers first",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
+                  "--repo",
+                  "C:/repo"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/skills/merge/scripts/other.py",
+                  "--repo",
+                  "C:/repo"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
+                ],
+                "-B",
+                "${PLUGIN_ROOT}/workflows/pr_body.py",
+                "--body-file"
+              ],
+              "justification": "Reads a proposed PR description and rejects missing or empty What and Why sections before any forge write; no repository or remote state changes",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/workflows/pr_body.py",
+                  "--body-file",
+                  "body.md"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/workflows/pr_body.py"
+                ]
+              ]
+            }
+          ],
+          "auto_merge": {
+            "claude_allow": [
+              "Bash(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")",
+              "PowerShell(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")"
+            ],
+            "codex_prefix_rules": [
+              {
+                "pattern": [
+                  [
+                    "python",
+                    "python.exe",
+                    "python3",
+                    "py"
+                  ],
+                  "-B",
+                  "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                  "--root",
+                  "${PROJECT_ROOT}"
+                ],
+                "justification": "Rechecks required authorization, checkout identity, readiness, review, and security evidence before arming auto-merge for this declared checkout.",
+                "match": [
+                  [
+                    "python",
+                    "-B",
+                    "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                    "--root",
+                    "${PROJECT_ROOT}"
+                  ]
+                ],
+                "not_match": [
+                  [
+                    "python",
+                    "-B",
+                    "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                    "--root"
+                  ]
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "external_dependencies": {
+        "required": [
+          {
+            "id": "tj-agents/agent-store",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/agent"
+          },
+          {
+            "id": "tj-agents/agent",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/agent"
+          },
+          {
+            "id": "tj-agents/cli",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/cli"
+          }
+        ],
+        "optional": []
+      }
+    }
+  ]
+}

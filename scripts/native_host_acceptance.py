@@ -590,7 +590,7 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
 
 def accept_codex(root, marketplace, executable, project, environment, artifacts, timeout):
     install_codex_plugins(executable, marketplace, project, environment, timeout)
-    trust = load_module("native_acceptance_trust", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime" / "codex_hook_trust.py")
+    trust = load_module("native_acceptance_trust", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime" / "codex" / "hook_trust.py")
     with AppServer(executable, project, environment, timeout) as server:
         hooks = server.request("hooks/list", {"cwds": [str(project)]})
         require_startup_hooks(hooks)
@@ -736,7 +736,7 @@ def accept(root, marketplace, codex, claude, artifacts, timeout):
 
 def failure_marketplace(root, directory):
     generator = load_module('native_failure_package_generator', root / 'scripts/sync_plugin_packages.py')
-    _, output, _, _ = generator.build(root, validate_catalog_digests=False)
+    _, output, _, _ = generator.build(root, validate_plugin_digests=False)
     output['plugins/workflow/.agents/workflow/policy/session/scripts/session-context.py'] = (
         b"raise RuntimeError('native-required-hook-failure-probe')\n"
     )
