@@ -59,12 +59,34 @@ class SourceLayoutTests(unittest.TestCase):
         config = json.loads((self.root / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
         config["scopes"].append({"name": "agent", "root": ".agents/agent", "layout": "kind", "plugin": "agent",
                                  "domain": "agent"})
+        roster_path = self.root / ".agents/plugins/plugins.json"
+        roster = json.loads(roster_path.read_text(encoding="utf-8"))
+        roster["packages"].append({"name": "agent", "owner_repository": "tj-agents/core"})
+        roster_path.write_text(json.dumps(roster), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "Core may author only packages .*: agent"):
+            SYNC.validate_configuration(self.root, config)
+
+    def test_an_unpublished_package_requires_a_local_core_owner(self) -> None:
+        snapshot_path = self.root / SYNC.MARKETPLACE_SNAPSHOT
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        snapshot["marketplace"]["plugins"] = [
+            entry for entry in snapshot["marketplace"]["plugins"] if entry["name"] != "docs"
+        ]
+        snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+        config = json.loads((self.root / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
+        self.assertIn("docs", SYNC.validate_configuration(self.root, config))
+        roster_path = self.root / ".agents/plugins/plugins.json"
+        roster = json.loads(roster_path.read_text(encoding="utf-8"))
+        for package in roster["packages"]:
+            if package["name"] == "docs":
+                package["owner_repository"] = "tj-agents/other"
+        roster_path.write_text(json.dumps(roster), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "Core may author only packages .*: docs"):
             SYNC.validate_configuration(self.root, config)
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(56, len(skills))
+        self.assertEqual(57, len(skills))
         self.assertEqual("workflow", skills["workflow:session"]["plugin"])
         self.assertNotIn("agent:background-listener", skills)
         for tree in ("skills", "codex-skills"):
@@ -281,7 +303,7 @@ class SourceLayoutTests(unittest.TestCase):
             for entry in compatibility["fresh_selection"]
         ]
 
-        self.assertEqual(["base", "workflow", "engineering"], fresh_plugins)
+        self.assertEqual(["base", "workflow", "engineering", "docs"], fresh_plugins)
         self.assertEqual(fresh_plugins, default_plugins)
         self.assertEqual(
             fresh_plugins,

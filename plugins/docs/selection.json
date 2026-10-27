@@ -1,0 +1,11 @@
+{
+  "plugin": "docs",
+  "payloads": [
+    "docs"
+  ],
+  "prerequisites": [],
+  "external_prerequisites": [],
+  "skills": [
+    "layout"
+  ]
+}

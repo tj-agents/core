@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:58c9ad6d03f6b7f808bfa00a42ccfc377181e3c17a41572a56bed960e31def4a",
+      "digest": "sha256:d232e41336f8cb10b2ad7f26087b34d06fc0b780b165fbabef1097d8e1bec1ee",
       "harness": {
         "marketplaces": [
           {
@@ -322,7 +322,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:ae8c968a6dfad826eaa17e898e1eb4e4f47adf8b86d815a11dba0c76c8c06007",
+      "digest": "sha256:c57d5fec1ae76f41343d38d45d9e43faf674fa8af9f24fb6d0822e59c617fd78",
       "harness": {
         "marketplaces": [
           {
@@ -566,6 +566,52 @@
             "repository": "tj-agents/cli"
           }
         ],
+        "optional": []
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "tj-agents",
+      "id": "tj-agents/docs",
+      "name": "docs",
+      "package_path": "plugins/docs",
+      "description": "Layout conventions for pages people read.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "layout"
+      ],
+      "dependencies": {
+        "required": [],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [],
+        "optional": []
+      },
+      "digest": "sha256:89fca42f8ada1645b85a51dde697ee8f46d9d97808e5a33e1218ac780a010b67",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "tj-agents",
+            "repository": "tj-agents/marketplace"
+          }
+        ],
+        "plugins": [
+          "tj-agents/docs"
+        ],
+        "hooks": [],
+        "permissions": {
+          "claude_allow": [],
+          "codex_prefix_rules": []
+        }
+      },
+      "external_dependencies": {
+        "required": [],
         "optional": []
       }
     }
