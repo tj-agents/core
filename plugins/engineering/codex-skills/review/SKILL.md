@@ -15,4 +15,13 @@ This entry point adds only Codex's reviewers; the shared procedure is authored o
 
 - **Native layer (Stage 3):** `codex review --base <frozen-base>`, run from a checkout at the frozen head.
   It cannot take a path scope, so the parent drops findings outside a bounded scope.
-- **Security layer (Stage 6):** Codex has no native security reviewer; use the `security` lens.
+- **Security layer (Stage 6):** use the installed first-party Codex Security change-review plugin when
+  its setup, permissions and reviewed candidate match the frozen scope. Discover its actual installed
+  entry point. The cloud PR security service has separate eligibility and repository setup; invoke it
+  only with authority for that external action. Record which runner and exact range actually ran.
+  Otherwise use the bounded `security` lens over the required frozen range.
+
+```text
+Frozen API change + configured first-party plugin with matching scope -> native security review.
+Plugin unavailable or scope mismatched -> security lens over that same frozen candidate.
+```
