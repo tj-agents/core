@@ -32,7 +32,7 @@ case, unchanged blocking conditions and generated-package CLI behavior. Process 
 session hooks (5), generation freshness, digest check and changed guidance examples pass. Continuation
 runtime verification passed all 43 tests, including foreground claim release with independent follow-up.
 The repaired checker also reread the actual merged Agent PR27/28 goal and returned both readiness values
-true while retaining publisher ownership. Independent frozen review and exact-head Windows/Linux CI are next.
+true while retaining publisher ownership. PR: https://github.com/tj-agents/core/pull/521. Full Windows/Linux CI is running. Initial native-general fallback review passed; independent workflow review found repository casing could bypass overlap. Normalize identity once and cover casing/different-head overlap; verify and review that delta before readiness. A historical-ownership ledger proposal was dropped after confirming the baseline also permits omission of prior deliveries; current declared scope remains explicit.
 
 Additional observation retained without widening this repair: the documented source agent_recovery.py
 inventory entry raised ModuleNotFoundError for its host adapter. No source or install was changed for
@@ -42,3 +42,34 @@ also has no existing PR owning this runtime boundary.
 Standards applied: Core AGENTS.md and CODE_CONVENTIONS.md, engineering:bugfix, engineering:docs,
 engineering:branching, python:modules and python:imports. Reuse the existing completion validator and
 continuation integration; do not duplicate Agent's completion or CLI process binding.
+
+```agent-host-coverage
+{
+  "schema_version": 1,
+  "shared_source": ".agents/workflows/completion.py",
+  "hosts": [
+    {
+      "host": "claude",
+      "behavior": "finishes verified owned delivery while retaining independent follow-up",
+      "source": ".agents/workflows/completion.py",
+      "mapping": "plugins/engineering/workflows/completion.py shared entry point",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Completion package CLI and 43 continuation tests passed locally on Windows; Linux exact-head CI pending; no installed native frontend exit claimed."
+      }
+    },
+    {
+      "host": "codex",
+      "behavior": "finishes verified owned delivery while retaining independent follow-up",
+      "source": ".agents/workflows/completion.py",
+      "mapping": "plugins/engineering/workflows/completion.py shared entry point",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Completion package CLI and 43 continuation tests passed locally on Windows; Linux exact-head CI pending; no installed native frontend exit claimed."
+      }
+    }
+  ]
+}
+```
