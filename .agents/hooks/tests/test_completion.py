@@ -105,6 +105,24 @@ class CompletionTests(unittest.TestCase):
                 with self.assertRaisesRegex(CompletionError, "follow_up task requires"):
                     completion_check(path, root=path.parent)
 
+    def test_repository_casing_cannot_disguise_follow_up_overlap(self):
+        task = {**self.publisher_follow_up()[0], "repository": "EXAMPLE/AGENT"}
+        owned = {"repository": "example/agent", "pr": task["pr"], "head": HEAD}
+        for deliveries, open_tasks in (([owned], []), ([], [{**owned, "text": "Finish delivery.",
+                                                             "owner": "this session", "next_action": "Finish."}])):
+            with self.subTest(deliveries=deliveries):
+                path = self.write_goal(goal(deliveries=deliveries, open_tasks=open_tasks, follow_up=[task]))
+                with self.assertRaisesRegex(CompletionError, "cannot include an owned delivery or open task"):
+                    completion_check(path, root=path.parent)
+
+    def test_bound_repository_casing_matches_canonical_delivery_identity(self):
+        path = self.write_goal(goal())
+        result = completion_check(
+            path, {"repository": "EXAMPLE/TEST", "pr": 42, "head": HEAD}, path.parent,
+            lambda *_: {"number": 42, "headRefOid": HEAD, "state": "MERGED", "body": ""},
+        )
+        self.assertTrue(result["ready"])
+
     def test_generated_package_retains_follow_up_and_allows_completed_exit(self):
         follow_up = self.publisher_follow_up()
         path = self.write_goal(goal(deliveries=[], follow_up=follow_up))

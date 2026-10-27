@@ -129,7 +129,7 @@ def identity(value, name):
         raise CompletionError(f"{name} has an invalid repository or PR")
     if not isinstance(value["head"], str) or SHA.fullmatch(value["head"]) is None:
         raise CompletionError(f"{name} requires a forty-character head SHA")
-    return {"repository": value["repository"].strip(), "pr": value["pr"], "head": value["head"]}
+    return {"repository": value["repository"].strip().casefold(), "pr": value["pr"], "head": value["head"]}
 
 
 def bound_identity(binding):
