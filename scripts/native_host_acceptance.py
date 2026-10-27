@@ -590,7 +590,7 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
 
 def accept_codex(root, marketplace, executable, project, environment, artifacts, timeout):
     install_codex_plugins(executable, marketplace, project, environment, timeout)
-    trust = load_module("native_acceptance_trust", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime" / "codex_hook_trust.py")
+    trust = load_module("native_acceptance_trust", root / ".agent" / "plugins" / "agent" / ".agents" / "agent" / "runtime" / "codex" / "hook_trust.py")
     with AppServer(executable, project, environment, timeout) as server:
         hooks = server.request("hooks/list", {"cwds": [str(project)]})
         require_startup_hooks(hooks)
