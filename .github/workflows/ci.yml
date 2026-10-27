@@ -301,7 +301,7 @@ jobs:
 
       - name: Publish the generated package hint
         if: steps.publish-packages.outputs.changed == 'true' && vars.UPDATE_TOPIC != ''
-        uses: tj-agents/github-actions/.github/actions/publish-update@5a6f33967ce83a07c7eb1b7f7b4fc1d71e771b02
+        uses: tj-agents/github-actions/.github/actions/publish-update@c68a5021111c945145023608f614a6b2d9008526
         with:
           topic: ${{ secrets.UPDATE_TOPIC }}
           published: 'true'
