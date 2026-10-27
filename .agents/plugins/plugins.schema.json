@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/tj-agents/core/catalog/catalog.schema.json",
-  "title": "Agent capability catalog",
+  "$id": "https://github.com/tj-agents/core/plugins/plugins.schema.json",
+  "title": "Agent plugin roster",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -97,7 +97,7 @@
           "$ref": "#/$defs/externalDependencies"
         },
         "harness": {
-          "$ref": "../plugins/harness.schema.json#/$defs/requires"
+          "$ref": "harness.schema.json#/$defs/requires"
         },
         "digest": {
           "type": "string",

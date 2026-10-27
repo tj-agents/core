@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Update or verify current package digests in the capability catalog."""
+"""Update or verify current package digests in the plugin roster."""
 
 from __future__ import annotations
 
@@ -20,18 +20,18 @@ HARNESS_SPEC.loader.exec_module(HARNESS)
 
 
 def update(root: Path, check: bool) -> None:
-    catalog_path = root / ".agents/catalog/catalog.json"
-    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    roster_path = root / ".agents/plugins/plugins.json"
+    roster = json.loads(roster_path.read_text(encoding="utf-8"))
     sources = json.loads((root / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
     marketplace = SYNC.core_marketplace(root, sources)
     skills = SYNC.discover(root, sources)
     changed: list[str] = []
     configured = set(sources["prerequisites"])
-    removed = [package["id"] for package in catalog["packages"] if package["name"] not in configured]
+    removed = [package["id"] for package in roster["packages"] if package["name"] not in configured]
     if removed:
-        catalog["packages"] = [package for package in catalog["packages"] if package["name"] in configured]
+        roster["packages"] = [package for package in roster["packages"] if package["name"] in configured]
         changed.extend(removed)
-    for package in catalog["packages"]:
+    for package in roster["packages"]:
         name = package["name"]
         expected_skills = sorted(skill["name"] for skill in skills.values() if skill["plugin"] == name)
         if package["skills"] != expected_skills:
@@ -51,17 +51,17 @@ def update(root: Path, check: bool) -> None:
             if package["id"] not in changed:
                 changed.append(package["id"])
     if changed and not check:
-        catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+        roster_path.write_text(json.dumps(roster, indent=2) + "\n", encoding="utf-8")
     harnesses = HARNESS.synchronize(root, check=True)
-    for package in catalog["packages"]:
+    for package in roster["packages"]:
         required = harnesses[package["name"]]["requires"]
         if package.get("harness") != required:
             changed.append(package["id"])
             package["harness"] = required
-    _, output, _, _ = SYNC.build(root, validate_catalog_digests=False, catalog=catalog)
-    for package in catalog["packages"]:
+    _, output, _, _ = SYNC.build(root, validate_plugin_digests=False, roster=roster)
+    for package in roster["packages"]:
         if package["owner_repository"] != "tj-agents/core":
-            raise ValueError("Core catalog may contain only core packages")
+            raise ValueError("Core plugin roster may contain only core packages")
         required = harnesses[package["name"]]["requires"]
         actual = SYNC.output_tree_digest(
             output, package["package_path"], []
@@ -72,10 +72,10 @@ def update(root: Path, check: bool) -> None:
             package["harness"] = required
             package["digest"] = actual
     if check and changed:
-        raise ValueError("Stale catalog packages: " + ", ".join(changed))
+        raise ValueError("Stale plugin entries: " + ", ".join(changed))
     if not check:
-        catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
-    print(f"{'Checked' if check else 'Updated'} catalog digests; {len(changed)} changed.")
+        roster_path.write_text(json.dumps(roster, indent=2) + "\n", encoding="utf-8")
+    print(f"{'Checked' if check else 'Updated'} plugin digests; {len(changed)} changed.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -86,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         update(arguments.root.resolve(), arguments.check)
     except (OSError, ValueError, json.JSONDecodeError) as error:
-        print(f"Catalog digest update failed: {error}", file=sys.stderr)
+        print(f"Plugin digest update failed: {error}", file=sys.stderr)
         return 1
     return 0
 
