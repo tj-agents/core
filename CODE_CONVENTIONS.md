@@ -52,8 +52,7 @@ incomplete.
   behaviour differs by platform pin the platform explicitly.
 
 Repository tooling (`.agents/sync-generated.ps1`, `.codex/install-workflow-agents.ps1`) may use PowerShell 7
-(`pwsh`), but it must run under `pwsh` on Linux as well as on Windows. `cli-session-recovery/` is
-Windows-only by design.
+(`pwsh`), but it must run under `pwsh` on Linux as well as on Windows.
 
 ## Python and portability
 
