@@ -20,3 +20,9 @@ Goal lifecycle and recorded work status.
 Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
 
 Selected engineering workflows, reviews and Git operations.
+
+## tj-agents/docs
+
+Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
+
+Layout conventions for pages people read.

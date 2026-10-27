@@ -36,6 +36,16 @@
         "workflow",
         "git"
       ]
+    },
+    {
+      "name": "docs",
+      "source": "./plugins/docs",
+      "description": "Layout conventions for pages people read.",
+      "category": "Productivity",
+      "keywords": [
+        "docs",
+        "layout"
+      ]
     }
   ]
 }
