@@ -9,20 +9,8 @@
             "command": "python",
             "args": [
               "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
-              "--deadline",
-              "25",
-              "--hook",
               "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
-              "--session-context",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/project-setup/scripts/session-context.py",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/solution-assessment/scripts/session-context.py",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/task-routing/scripts/session-context.py"
+              "--session-context"
             ]
           }
         ]
