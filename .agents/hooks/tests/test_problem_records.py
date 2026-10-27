@@ -50,7 +50,7 @@ class ProblemRecordTests(unittest.TestCase):
     def test_both_hosts_resolve_the_declared_skill_and_run_its_reader_without_shell(self):
         self.select()
         for host in ("codex", "claude"):
-            with self.subTest(host=host), patch("skill_router.resolved_skill", return_value=(self.skill, "provider")) as resolve, patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 0, json.dumps(self.value), "")) as run:
+            with self.subTest(host=host), patch("installed_skills.resolved_skill", return_value=(self.skill, "provider")) as resolve, patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 0, json.dumps(self.value), "")) as run:
                 self.assertEqual(self.value, read_record(self.root, self.reference, host))
                 resolve.assert_called_once_with("optional:manage", host)
                 self.assertEqual([sys.executable, "-B", str(self.reader), "--root", str(self.root), "--record", self.reference], run.call_args.args[0])
@@ -59,10 +59,10 @@ class ProblemRecordTests(unittest.TestCase):
 
     def test_missing_provider_reader_and_host_fail_without_fallback(self):
         self.select()
-        with patch("skill_router.resolved_skill", return_value=None), self.assertRaises(RecordError):
+        with patch("installed_skills.resolved_skill", return_value=None), self.assertRaises(RecordError):
             read_record(self.root, self.reference, "codex")
         self.reader.unlink()
-        with patch("skill_router.resolved_skill", return_value=(self.skill, "provider")), self.assertRaises(RecordError):
+        with patch("installed_skills.resolved_skill", return_value=(self.skill, "provider")), self.assertRaises(RecordError):
             read_record(self.root, self.reference, "claude")
         with self.assertRaises(RecordError):
             read_record(self.root, self.reference, "unknown")
@@ -70,9 +70,9 @@ class ProblemRecordTests(unittest.TestCase):
             read_record(self.root, "relative/file.md", "codex")
 
     def test_native_discovery_failure_becomes_an_actionable_provider_error(self):
-        from skill_router import NativePluginDiscoveryError
+        from installed_skills import NativePluginDiscoveryError
         self.select()
-        with patch("skill_router.resolved_skill", side_effect=NativePluginDiscoveryError("codex", "unavailable")), self.assertRaisesRegex(RecordError, "could not be resolved"):
+        with patch("installed_skills.resolved_skill", side_effect=NativePluginDiscoveryError("codex", "unavailable")), self.assertRaisesRegex(RecordError, "could not be resolved"):
             read_record(self.root, self.reference, "codex")
 
     def test_invalid_closed_and_unrelated_provider_results_fail(self):
@@ -80,7 +80,7 @@ class ProblemRecordTests(unittest.TestCase):
         values = ["invalid", "[]", json.dumps({**self.value, "state": "closed"}),
                   json.dumps({**self.value, "record": "another"}), json.dumps({**self.value, "kind": []}),
                   json.dumps({**self.value, "body": " "}), json.dumps({**self.value, "extra": True})]
-        with patch("skill_router.resolved_skill", return_value=(self.skill, "provider")):
+        with patch("installed_skills.resolved_skill", return_value=(self.skill, "provider")):
             for value in values:
                 with self.subTest(value=value), patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 0, value, "")), self.assertRaises(RecordError):
                     read_record(self.root, self.reference, "codex")
@@ -110,7 +110,7 @@ class ProblemRecordTests(unittest.TestCase):
     def test_operation_uses_a_work_item_providers_dedicated_skill_and_never_falls_back(self):
         self.select({"schema_version": 1, "provider": "personal:work-item"})
         installed = {"personal:create-work-item": self.root / "create" / "SKILL.md", "personal:work-item": self.skill}
-        with patch("skill_router.resolved_skill", side_effect=lambda name, host: (installed[name], "") if name in installed else None):
+        with patch("installed_skills.resolved_skill", side_effect=lambda name, host: (installed[name], "") if name in installed else None):
             for operation, expected in (("create", "personal:create-work-item"), ("read", "personal:work-item")):
                 with self.subTest(operation=operation):
                     found = operation_skill(self.root, operation, "claude")
@@ -119,7 +119,7 @@ class ProblemRecordTests(unittest.TestCase):
             with self.assertRaisesRegex(RecordError, "personal:address-work-item is not installed"):
                 operation_skill(self.root, "address", "claude")
         self.select({"schema_version": 1, "provider": "work-items:manage"})
-        with patch("skill_router.resolved_skill", return_value=(self.skill, "")) as resolve:
+        with patch("installed_skills.resolved_skill", return_value=(self.skill, "")) as resolve:
             self.assertEqual("work-items:manage", operation_skill(self.root, "create", "codex")["operation"])
             resolve.assert_called_once_with("work-items:manage", "codex")
 
@@ -127,14 +127,14 @@ class ProblemRecordTests(unittest.TestCase):
         with self.assertRaisesRegex(RecordError, "no selected"):
             operation_skill(self.root, "create", "codex")
         self.select()
-        with patch("skill_router.resolved_skill", return_value=None), self.assertRaisesRegex(RecordError, "not installed"):
+        with patch("installed_skills.resolved_skill", return_value=None), self.assertRaisesRegex(RecordError, "not installed"):
             operation_skill(self.root, "create", "codex")
         with self.assertRaises(RecordError):
             operation_skill(self.root, "delete", "codex")
 
     def test_command_reports_a_missing_helper_as_a_block(self):
         self.select()
-        with patch("problem_records.installed_skill", side_effect=ImportError("skill_router")), patch("sys.stderr") as stderr:
+        with patch("problem_records.installed_skill", side_effect=ImportError("installed_skills")), patch("sys.stderr") as stderr:
             self.addCleanup(os.chdir, os.getcwd())
             self.assertEqual(2, main(["--root", str(self.root), "--operation", "read", "--harness", "codex"]))
         self.assertIn("write no other record", "".join(call.args[0] for call in stderr.write.call_args_list))
@@ -183,7 +183,7 @@ class PrimaryCheckoutTests(unittest.TestCase):
             skill.write_text("provider", encoding="utf-8")
             value = {"record": "https://example.invalid/issues/1", "kind": "bug", "state": "open", "body": "evidence"}
             reader.write_text("import json, sys\nassert sys.argv[sys.argv.index('--root') + 1] == " + repr(str(root)) + "\nprint(" + repr(json.dumps(value)) + ")\n", encoding="utf-8")
-            with patch("skill_router.resolved_skill", return_value=(skill, "provider")) as resolve:
+            with patch("installed_skills.resolved_skill", return_value=(skill, "provider")) as resolve:
                 self.assertEqual(value, read_record(feature, value["record"], "codex"))
                 resolve.assert_called_once_with("primary:work-item", "codex")
 

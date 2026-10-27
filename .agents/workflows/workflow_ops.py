@@ -466,47 +466,6 @@ def tree_content_digest(path):
     return digest(records)
 
 
-def routed_skills(root, paths):
-    return route_findings(root, paths)[0]
-
-
-def route_findings(root, paths, project=None):
-    """Every skill the route table owes for these paths, and its deny-pattern hits."""
-    route_table = root / ".agents" / "skill-routes.json"
-    if not route_table.is_file() or not paths:
-        return [], []
-    candidates = (
-        Path(__file__).resolve().parents[1] / "hooks" / "skill_router.py",
-        root / ".agents" / "hooks" / "skill_router.py",
-    )
-    router = next((candidate for candidate in candidates if candidate.is_file()), None)
-    if router is None:
-        raise WorkflowOperationError(
-            ".agents/skill-routes.json exists but the engineering package has no skill_router.py"
-        )
-    completed = subprocess.run(
-        [sys.executable, "-B", str(router), "--skills-for", "--json",
-         "--project", str(project or root)],
-        cwd=str(root),
-        input="\n".join(paths) + "\n",
-        capture_output=True,
-        text=True,
-    )
-    if completed.returncode:
-        detail = completed.stdout.strip() or completed.stderr.strip() or "skill routing failed"
-        raise WorkflowOperationError(redact(detail))
-    try:
-        value = json.loads(completed.stdout)
-    except json.JSONDecodeError as error:
-        raise WorkflowOperationError("skill router did not return its JSON contract") from error
-    if isinstance(value, list):
-        return sorted({str(item) for item in value}), []
-    if isinstance(value, dict) and isinstance(value.get("skills"), dict):
-        violations = [list(item) for item in value.get("violations") or [] if isinstance(item, (list, tuple))]
-        return sorted(str(item) for item in value["skills"]), violations
-    raise WorkflowOperationError("skill router returned an invalid JSON contract")
-
-
 def trunk_range(root, head):
     for trunk in ("origin/main", "main"):
         try:
@@ -704,7 +663,6 @@ def expected_identity(value, path_bytes):
         "path_digest": value["path_digest"],
         "tree_archive_sha256": value["tree_archive_sha256"],
         "tree_content_sha256": value["tree_content_sha256"],
-        "rules": value["rules"],
         "docs_review": value["docs_review"],
     }
 
@@ -770,20 +728,6 @@ def validate_review_bundle(root, value, locations):
     patch = run_process(["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False).stdout
     if hashlib.sha256(patch).hexdigest() != value["patch_sha256"]:
         raise WorkflowOperationError("review patch differs from the repository objects")
-    routed, violations = route_findings(required["tree"], paths, root)
-    if (value.get("routed_skills"), value.get("route_violations")) != (routed, violations):
-        raise WorkflowOperationError("review routing differs from the frozen tree routing evidence")
-    rules = []
-    for name in routed:
-        rule_path = required["tree"] / ".agents" / "skills" / name / "SKILL.md"
-        if rule_path.is_file():
-            rules.append({
-                "name": name,
-                "path": str(rule_path.relative_to(required["tree"])).replace("\\", "/"),
-                "sha256": sha256_file(rule_path),
-            })
-    if rules != value["rules"]:
-        raise WorkflowOperationError("review rules differ from the frozen tree routing evidence")
 
 
 def review_descriptor_paths(runs):
@@ -974,13 +918,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize, docs_
         tree_sha256 = tree_content_digest(locations["tree"])
         security = security_classification(root, locations["tree"], head, paths)
         docs_review = classify_docs_review(request, paths, security)
-        skills, route_violations = route_findings(locations["tree"], paths, root)
         agent_paths = coverage_requirement(paths)
-        rules = []
-        for name in skills:
-            path = locations["tree"] / ".agents" / "skills" / name / "SKILL.md"
-            if path.is_file():
-                rules.append({"name": name, "path": str(path.relative_to(locations["tree"])).replace("\\", "/"), "sha256": sha256_file(path)})
         descriptor = {
             "schema_version": SCHEMA_VERSION,
             "operation": "review-prepare",
@@ -999,9 +937,6 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize, docs_
             },
             "path_digest": path_digest,
             "patch_sha256": hashlib.sha256(patch).hexdigest(),
-            "rules": rules,
-            "routed_skills": skills,
-            "route_violations": route_violations,
             "lenses": ["docs-routine"] if docs_review["mode"] == "routine" else select_review_lenses(paths),
             "docs_review": docs_review,
             "security": security,
@@ -1030,7 +965,6 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize, docs_
             "path_digest": descriptor["path_digest"],
             "tree_archive_sha256": descriptor["tree_archive_sha256"],
             "tree_content_sha256": tree_sha256,
-            "rules": rules,
             "docs_review": docs_review,
         }
         descriptor["bundle"] = {
@@ -1060,7 +994,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize, docs_
 def load_descriptor(root, workflow_run_id, path):
     descriptor_path = Path(path).absolute()
     value = json.loads(descriptor_path.read_text(encoding="utf-8"))
-    required_fields = ("operation", "repository", "base", "head", "head_tree", "tree_archive_sha256", "tree_content_sha256", "paths", "path_digest", "patch_sha256", "rules", "routed_skills", "route_violations", "docs_review", "descriptor_id", "bundle")
+    required_fields = ("operation", "repository", "base", "head", "head_tree", "tree_archive_sha256", "tree_content_sha256", "paths", "path_digest", "patch_sha256", "docs_review", "descriptor_id", "bundle")
     if not isinstance(value, dict) or any(field not in value for field in required_fields):
         raise WorkflowOperationError("review descriptor is incomplete")
     if value.get("operation") != "review-prepare":
@@ -1123,22 +1057,6 @@ def load_descriptor(root, workflow_run_id, path):
     current_patch = run_process(["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False).stdout
     if hashlib.sha256(current_patch).hexdigest() != value["patch_sha256"]:
         raise WorkflowOperationError("review patch differs from the repository objects")
-    expected_rules = []
-    routed, violations = route_findings(required["tree"], paths, root)
-    if (value["routed_skills"], value["route_violations"]) != (routed, violations):
-        raise WorkflowOperationError("review routing differs from the frozen tree routing evidence")
-    for name in routed:
-        rule_path = required["tree"] / ".agents" / "skills" / name / "SKILL.md"
-        if rule_path.is_file():
-            expected_rules.append(
-                {
-                    "name": name,
-                    "path": str(rule_path.relative_to(required["tree"])).replace("\\", "/"),
-                    "sha256": sha256_file(rule_path),
-                }
-            )
-    if expected_rules != value.get("rules"):
-        raise WorkflowOperationError("review rules differ from the frozen tree routing evidence")
     value["bundle"]["last_validated_at"] = utc_now()
     atomic_json(descriptor_path, value)
     return value
@@ -1155,7 +1073,7 @@ def review_reconcile(root, workflow_run_id, descriptor_path, base_ref):
     base_moved = current_base != comparison_base
     if base_moved:
         changed = git(root, "diff", "--name-only", comparison_base, current_base).splitlines()
-        sensitive = set(descriptor["paths"]) | {rule["path"] for rule in descriptor["rules"]}
+        sensitive = set(descriptor["paths"])
         if sensitive.intersection(changed):
             reasons.append("base-changed-relevant-evidence")
     result = {
@@ -1560,16 +1478,10 @@ def monitor_remote_owned(root, workflow_run_id, target_kind, poll_seconds, timeo
     return result
 
 
-def skill_identities(root, workflow_run_id, lifecycle, technical, changed_paths=()):
+def skill_identities(root, workflow_run_id, lifecycle, technical):
     if not lifecycle:
         raise WorkflowOperationError("exactly one lifecycle skill is required")
-    expected = set(routed_skills(root, changed_paths)) if changed_paths else set()
-    supplied = {item.split("=", 1)[0] for item in technical}
-    if supplied and supplied != expected:
-        raise WorkflowOperationError(
-            f"technical skill identities differ from direct routes: expected {sorted(expected)}, received {sorted(supplied)}"
-        )
-    technical = list(technical) if technical else sorted(expected)
+    technical = list(technical)
     entries = [("lifecycle", lifecycle), *(("technical", item) for item in technical)]
     records = []
     for kind, entry in entries:
@@ -2289,7 +2201,6 @@ def parser():
     skills = commands.add_parser("skills")
     skills.add_argument("--lifecycle", required=True)
     skills.add_argument("--technical", action="append", default=[])
-    skills.add_argument("--changed-path", action="append", default=[])
 
     usage = commands.add_parser("telemetry")
     usage.add_argument("--transcript", required=True)
@@ -2365,7 +2276,7 @@ def main(argv=None):
     elif arguments.operation == "monitor":
         result = monitor_remote(root, arguments.workflow_run_id, arguments.kind, arguments.id, arguments.head, arguments.workflow, arguments.attempt, arguments.poll_seconds, arguments.timeout_seconds)
     elif arguments.operation == "skills":
-        result = skill_identities(root, arguments.workflow_run_id, arguments.lifecycle, arguments.technical, arguments.changed_path)
+        result = skill_identities(root, arguments.workflow_run_id, arguments.lifecycle, arguments.technical)
     elif arguments.operation == "telemetry":
         result = telemetry(root, arguments.workflow_run_id, arguments.transcript, arguments.host, arguments.offline_gap_seconds)
     elif arguments.operation == "delivery-preflight":
