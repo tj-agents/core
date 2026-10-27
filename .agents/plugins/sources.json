@@ -75,8 +75,8 @@
     },
     {
       "plugin": "base",
-      "source": ".agents/hooks/codex_hook_snapshot.py",
-      "destination": "hooks/codex_hook_snapshot.py"
+      "source": ".codex/hooks/snapshot.py",
+      "destination": "hooks/codex/snapshot.py"
     },
     {
       "plugin": "base",
@@ -180,8 +180,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/codex_hook_snapshot.py",
-      "destination": "hooks/codex_hook_snapshot.py"
+      "source": ".codex/hooks/snapshot.py",
+      "destination": "hooks/codex/snapshot.py"
     },
     {
       "plugin": "engineering",
@@ -285,8 +285,8 @@
     },
     {
       "plugin": "workflow",
-      "source": ".agents/hooks/codex_hook_snapshot.py",
-      "destination": "hooks/codex_hook_snapshot.py"
+      "source": ".codex/hooks/snapshot.py",
+      "destination": "hooks/codex/snapshot.py"
     }
   ],
   "prerequisites": {

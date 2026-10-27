@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import importlib.util
 import json
@@ -299,25 +300,39 @@ CODEX_WINDOWS_COMMAND_BUDGET = 8191
 WINDOWS_MAX_PATH = 260
 
 
-def codex_snapshot_bootstrap(loader: str) -> str:
-    digest = hashlib.sha256(canonical_output_bytes(loader)).hexdigest()
-    return (
-        "import hashlib,os,runpy,sys,tempfile;from pathlib import Path;"
-        "r=Path(sys.argv[1]);e=sys.argv[2];"
-        "s=os.environ.get('TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY','');d=Path(os.environ.get('PLUGIN_DATA','')).resolve();"
-        "k=hashlib.sha256((str(r)+chr(0)+e).encode()).hexdigest();"
-        "p=(Path(s) if s else d/'hook-snapshots')/k/'hooks'/'codex_hook_snapshot.py';"
-        "p=p if p.is_file() else r/'hooks'/'codex_hook_snapshot.py';"
-        "b=p.read_bytes() if p.is_file() else b'';n=chr(10).encode();"
-        "b=b.replace(chr(13).encode()+n,n).replace(chr(13).encode(),n);"
-        f"h=hashlib.sha256(b).hexdigest();h=='{digest}' or (sys.stderr.write('Codex hook snapshot loader integrity check failed'+chr(10)),sys.exit(2));"
-        "t=tempfile.TemporaryDirectory();q=Path(t.name)/'loader.py';q.write_bytes(b);runpy.run_path(str(q),run_name='__main__')"
-    )
+CODEX_HOOK_LOADER = ".codex/hooks/snapshot.py"
+CODEX_HOOK_BOOTSTRAP = ".codex/hooks/bootstrap.py"
+BOOTSTRAP_DIGEST = "LOADER_DIGEST"
+BOOTSTRAP_STATEMENTS = (ast.Import, ast.ImportFrom, ast.Assign, ast.Expr)
+COMMAND_UNSAFE = frozenset('"$`\\\n\r')
+
+
+class LoaderDigest(ast.NodeTransformer):
+    def __init__(self, digest: str) -> None:
+        self.digest = digest
+
+    def visit_Name(self, node: ast.Name) -> ast.expr:
+        if node.id == BOOTSTRAP_DIGEST:
+            return ast.Constant(self.digest)
+        return node
+
+
+def codex_snapshot_bootstrap(root: Path, loader: str) -> str:
+    tree = ast.parse(read(inside(root, CODEX_HOOK_BOOTSTRAP)))
+    for statement in tree.body:
+        if not isinstance(statement, BOOTSTRAP_STATEMENTS):
+            raise ValueError(f"{CODEX_HOOK_BOOTSTRAP}:{statement.lineno}: only simple statements fit one command line")
+    tree = LoaderDigest(hashlib.sha256(canonical_output_bytes(loader)).hexdigest()).visit(tree)
+    command = ";".join(ast.unparse(statement) for statement in tree.body)
+    unsafe = sorted({character for character in command if character in COMMAND_UNSAFE})
+    if unsafe:
+        raise ValueError(f"{CODEX_HOOK_BOOTSTRAP} compiles to unsafe {unsafe}")
+    return command
 
 
 def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set[str]) -> None:
-    loader = read(inside(root, ".agents/hooks/codex_hook_snapshot.py"))
-    bootstrap = codex_snapshot_bootstrap(loader)
+    loader = read(inside(root, CODEX_HOOK_LOADER))
+    bootstrap = codex_snapshot_bootstrap(root, loader)
     for plugin in sorted(plugins):
         hook_path = f"plugins/{plugin}/hooks/codex.json"
         if hook_path not in output:
