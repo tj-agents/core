@@ -184,17 +184,19 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("persistent-workflow skill", remote)
         self.assertIn("persistent-delivery", remote)
         self.assertIn("one persistent owner for a PR/head pair", shared)
-        self.assertIn("init --root ROOT --goal GOALPATH", workflow)
-        self.assertIn("CONTINUATION_RESULT_PATH", workflow)
-        self.assertIn("900-second child timeout", workflow)
+        self.assertIn("init --root ROOT --goal GOALPATH", codex)
+        self.assertIn("CONTINUATION_RESULT_PATH", codex)
+        self.assertIn("900-second child timeout", codex)
         self.assertIn("Missing merge authorization gates merge only", shared)
-        self.assertIn("Claude `/goal`, `/loop`, monitors, channels", claude)
-        self.assertIn("fresh `claude -p` context", claude)
+        self.assertIn("`/goal`", claude)
+        self.assertIn("`/loop`", claude)
+        self.assertNotIn("continuation_runtime.py", claude)
+        self.assertNotIn("delivery_continuation.py", claude)
         self.assertIn(
-            "Scheduled Task attached to the owning Codex conversation",
+            "Scheduled interface",
             codex,
         )
-        self.assertIn("fresh headless `codex exec` context", codex)
+        self.assertIn("fresh headless `codex exec` context", " ".join(codex.split()))
         self.assertIn("delivery_continuation.py", codex)
         self.assertNotIn("Claude uses", remote)
         self.assertNotIn("Codex Desktop uses", remote)

@@ -326,11 +326,11 @@
       "adaptation": "Codex host behavior extends and references the canonical .agents workflow definition."
     },
     {
-      "path": ".agents/engineering/workflow/persistent-workflow/scripts/delivery_continuation.py",
+      "path": ".codex/skills/engineering/persistent-workflow/scripts/delivery_continuation.py",
       "source_path": "scripts/delivery_continuation.py",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "0cb3df64b4a9bc7753aab288dc7948f0841e202d635471899ff542ca04bdf1af",
-      "adaptation": "Cross-platform continuation adapter is canonical under .agents and packaged beside both host discovery entries."
+      "adaptation": "Codex durable CLI continuation adapter is authored in the Codex host tree and packaged only in its discovery entry."
     },
     {
       "path": ".agents/hooks/tests/test_goal_preflight.py",

@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:d9adb740ea6c4d135ae9b338330246bb6abd809b5618331b3a3da394b2c66ce9",
+      "digest": "sha256:0f7eb3b2bb464707434c4feb15ab6d4e476e656096575eb46ce26afdaebc0750",
       "harness": {
         "marketplaces": [
           {
@@ -147,7 +147,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:777f5462c1f8c610f014689df4eb12a0f6ef1c193bc5878f53b1c556e7c32e43",
+      "digest": "sha256:aae83e0176cbc0a9671bb14ab70f69176e980792e53792ca3b7dda218f356c25",
       "harness": {
         "marketplaces": [
           {
@@ -277,7 +277,6 @@
         "bugfix",
         "commit",
         "commit-all",
-        "commit-push",
         "committing",
         "docs",
         "docs-review",
@@ -300,7 +299,6 @@
         "pr-screenshots",
         "prune-worktrees",
         "pull",
-        "pull-main",
         "push",
         "recents",
         "remote-validation",
@@ -313,12 +311,9 @@
         "stack",
         "staged-review",
         "staged-review-all",
-        "sync",
-        "sync-all",
         "sync-checkout",
         "unmerged",
-        "update-roadmap",
-        "worktree"
+        "update-roadmap"
       ],
       "dependencies": {
         "required": [
@@ -341,7 +336,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:a5ad04c378c9c2f430cde468e41428b9cf2721cc7b285fd20fd924f1879a3e1a",
+      "digest": "sha256:03c6b506becdf1b1aa869f3f57e5a2e9af7cbc9016fd435f9c3a3c9c136d7a55",
       "harness": {
         "marketplaces": [
           {
