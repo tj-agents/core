@@ -26,7 +26,8 @@ covered: not another repository, not a PR the goal did not create, and never pub
 ## Persistent continuation
 
 When a queue, check, publication, or generated sync will resolve after this turn, enter the current harness's
-persistent-workflow skill. It reads persistent-delivery, binds this exact PR/head/worktree and uses the native
+`engineering:persistent-delivery` contract and `workflow:continue`. The delivery contract binds this exact
+PR/head/worktree; the continuation selects the native
 continuation mechanism. That owner classifies a real failure by test tier, dispatches its corresponding debug
 skill in a fresh context, rebinds after a push, obtains the required review, and reaches merge under the
 goal-scoped authorization above. The shared monitor is the only foreground or persistent forge-wait mechanism.
