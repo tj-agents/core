@@ -95,8 +95,8 @@ registrations retain their identities. There is no old skill alias. This complet
 cutover in Core #517: canonical definition, both host entries, caller guidance and package assertions
 change atomically. Splitting the rename would leave a missing skill or competing owners. Native runtime
 behavior is unchanged; focused adapter, completion, packaging and process checks plus fresh frozen review
-and exact-head Windows/Linux CI qualify the new candidate. The only delivery-hook change updates two
-diagnostic skill references; routing, permission and gate logic remain outside this correction.
+and exact-head Windows/Linux CI qualify the new candidate. Core #512 landed during this correction. Its routing/auth and delivery-gate removals remain authoritative;
+the merge discards the two obsolete diagnostic-reference edits to the deleted delivery gate.
 
 Rename slice assessment: the first immutable rename candidate changes 24 paths, with 309 additions and
 314 deletions; the cumulative PR changes 48 paths, with 678 additions and 750 deletions. Most rename
@@ -105,3 +105,7 @@ Keep canonical ownership, both host entries, package assertions and caller refer
 #517. A separate prerequisite or partial rename would expose missing or competing skill identities.
 Native incremental review found one shared merge prerequisite naming the Codex transport for both
 hosts; the repair selects host continuation through Workflow and retains PR authority in Engineering.
+
+Integrated main 25309fbfa6161385d8b01637a511eb81b518a8d7. Preserve all upstream hook/routing removals,
+resolve the retired skill-routes definition into the actual 56-skill count, and retain the Workflow
+continuation ownership change. Requalify the combined source candidate on exact-head CI.
