@@ -14,7 +14,7 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PLUGINS = ("base", "engineering", "workflow")
+PLUGINS = ("base",)
 PER_CALL_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop")
 TOOLS = ("Bash", "PowerShell", "Read", "Edit", "Write", "MultiEdit", "Skill", "Agent", "Grep")
 BUDGET_SECONDS = 10

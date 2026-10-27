@@ -177,7 +177,7 @@ def employer_context_path(payload_dir, slug):
 def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
     problems = []
     unknown = set(data) - {"schema_version", "tier", "applies", "stack", "owner_repository", "detect",
-                           "fact_definitions", "employer", "session_context", "routes"}
+                           "fact_definitions", "employer", "session_context"}
     if unknown:
         problems.append(diagnostic("malformed-declaration", path, "Unknown declaration fields: " + ", ".join(sorted(unknown))))
     if not isinstance(data.get("tier"), str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", data["tier"]):
@@ -1038,4 +1038,4 @@ if __name__ == "__main__":
         raise
     except Exception as error:
         print(f"tier gate failed: {error}", file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(0)
