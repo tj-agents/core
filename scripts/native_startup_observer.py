@@ -7,12 +7,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '.agents' / 'dependencies' / 'agent' / '.agents' / 'agent' / 'runtime'))
+from host import Host
 import startup_binding
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--host', required=True, choices=('codex', 'claude'))
+    parser.add_argument('--host', required=True, type=Host, choices=list(Host))
     parser.add_argument('--target', required=True)
     parser.add_argument('--project', required=True, type=Path)
     parser.add_argument('--receipt', required=True, type=Path)
