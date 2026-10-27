@@ -14,7 +14,7 @@ SPEC.loader.exec_module(SYNC)
 class HookContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.config, cls.output, skills, _ = SYNC.build(ROOT, validate_catalog_digests=False)
+        cls.config, cls.output, skills, _ = SYNC.build(ROOT, validate_plugin_digests=False)
         cls.plugins = {skill["plugin"] for skill in skills.values()}
 
     def validate(self, output: dict[str, bytes]) -> None:
