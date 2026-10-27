@@ -13,7 +13,7 @@ def fail(message):
     raise SystemExit(2)
 
 
-def digest_tree(root, plugin):
+def digest_tree(root):
     excluded = {"hooks/codex.json"}
     files = []
     directories = [(root, "")]
@@ -51,23 +51,23 @@ def digest_tree(root, plugin):
     return "sha256:" + digest.hexdigest()
 
 
-def verified(root, expected, plugin):
-    if not root.is_dir() or root.is_symlink() or digest_tree(root, plugin) != expected:
+def verified(root, expected):
+    if not root.is_dir() or root.is_symlink() or digest_tree(root) != expected:
         fail("Codex hook package integrity check failed")
 
 
-def snapshot_root(root, expected, plugin, snapshot_dir):
+def snapshot_root(root, expected, snapshot_dir):
     root = Path(root)
     snapshot_dir = Path(snapshot_dir)
     key = hashlib.sha256((str(root) + "\0" + expected).encode("utf-8")).hexdigest()
     snapshot = snapshot_dir / key
     if not snapshot.is_dir():
-        verified(root, expected, plugin)
+        verified(root, expected)
         snapshot_dir.mkdir(parents=True, exist_ok=True)
         temporary = snapshot_dir / (key + "." + uuid.uuid4().hex)
         shutil.copytree(root, temporary, symlinks=True)
         try:
-            verified(temporary, expected, plugin)
+            verified(temporary, expected)
             try:
                 temporary.rename(snapshot)
             except OSError:
@@ -76,7 +76,7 @@ def snapshot_root(root, expected, plugin, snapshot_dir):
         finally:
             if temporary.is_dir():
                 shutil.rmtree(temporary)
-    verified(snapshot, expected, plugin)
+    verified(snapshot, expected)
     return snapshot
 
 
@@ -93,7 +93,7 @@ def main():
     if not data and not configured:
         fail("Codex hook data directory is unavailable")
     snapshot_dir = Path(configured).resolve() if configured else Path(data).resolve() / "hook-snapshots"
-    selected = snapshot_root(root, expected, plugin, snapshot_dir)
+    selected = snapshot_root(root, expected, snapshot_dir)
     target = selected / relative
     if not target.is_file():
         fail("Codex hook script is unavailable")
