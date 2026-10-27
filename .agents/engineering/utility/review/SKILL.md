@@ -92,7 +92,6 @@ new body read. Plans also owe their implementation-path standards when assessing
 ```text
 Repository selects stack:style and company-stack:style; company replacement applies.
 Changed API code -> review company-stack:style plus the injected API standard.
-No skill-routes.json -> the same injected standards still apply.
 An unrelated installed frontend standard -> excluded.
 ```
 

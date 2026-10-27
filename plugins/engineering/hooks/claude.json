@@ -19,31 +19,6 @@
           }
         ]
       }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash|PowerShell|(?:mcp__codex_apps__github_|mcp__github__|mcp__plugin_github_github__|github_)(create|update)_pull_request",
-        "hooks": [
-          {
-            "type": "command",
-            "onFailure": "block",
-            "timeout": 30,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
-              "--deadline",
-              "25",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py",
-              "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py",
-              "--validate-body",
-              "--pr-writes-only"
-            ]
-          }
-        ]
-      }
     ]
   }
 }
