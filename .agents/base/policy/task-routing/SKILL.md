@@ -9,8 +9,6 @@ domain: behavior
 
 Choose the qualified advertised owner for the request and preserve its existing goal and authority.
 
-Whenever you give Tommy a command to run or text to paste, use `cli:clip`; use `--plain-only` for commands. Clipboard mechanics belong to `cli:clip`.
-
 1. Route planning or design-only work to `workflow:plan`; it grants no implementation authority.
 2. Route authorized sustained or multiphase work to `workflow:run`, with or without a named plan. Keep the same goal through commits, phases and context changes.
 3. Route explicit reconstruction or resumption after interruption to `workflow:resume`; ordinary ongoing work stays with `workflow:run`.
@@ -26,7 +24,4 @@ Route: workflow:plan. Produce the authorized planning artifact; do not implement
 
 Request: implement the migration through completion
 Route: workflow:run. Retain the current goal and continue authorized work through its acceptance condition.
-
-Request: give Tommy a command to run
-Route: put the command on his clipboard with cli:clip --plain-only.
 ```
