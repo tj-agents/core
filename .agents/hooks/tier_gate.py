@@ -811,9 +811,10 @@ def _assess(root, found=None, facts=None, contexts=None):
         employer_predicates[declaration.id] = result
         if result.matched:
             employers.append((declaration, result))
-    employer_result = PredicateResult(root, bool(employers),
-                                     [declaration.id + ": " + item for declaration, result in employers
-                                      for item in result.evidence])
+    installed_employers = [declaration for declaration in found
+                           if declaration.employer is not None and not problems_by_id[declaration.id]]
+    employer_result = PredicateResult(root, bool(installed_employers),
+                                     [declaration.id + ": installed" for declaration in installed_employers])
     for declaration in found:
         problems = problems_by_id[declaration.id]
         if problems:
