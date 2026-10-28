@@ -72,13 +72,13 @@ class EmployerScope(unittest.TestCase):
         self.assertEqual(result.diagnostics, ())
         work = next(item for item in result.selections if item['plugin_id'] == 'work@test-market')
         self.assertEqual(work['prerequisites'], ('employer',))
-        self.assertEqual(work['evidence'], ('employer-a@test-market: origin host example.test', 'employer-a@test-market: origin employer-a/service'))
+        self.assertEqual(work['evidence'], ('employer-a@test-market: installed',))
         context = gate.statement(self.project, self.found())
         self.assertIn(str((employer / 'skills/communication-context/SKILL.md').resolve()), context)
         self.assertIn('employer-a:communication-context', context)
         self.assertEqual(context.count(WORK['session_context']), 1)
 
-    def test_work_scope_requires_both_exact_host_and_owner_for_every_origin_form(self):
+    def test_work_applies_wherever_an_employer_is_installed_and_the_employer_only_on_its_remote(self):
         self.install('employer-a', EMPLOYER)
         for url, applies in (
                 ('https://EXAMPLE.TEST/employer-a/service.git', True),
@@ -94,16 +94,17 @@ class EmployerScope(unittest.TestCase):
             with self.subTest(url=url):
                 self.origin(url)
                 result = gate.assess(self.project, self.found())
-                self.assertEqual(any(item.plugin == 'work' for item, _ in result.applicable), applies)
+                self.assertTrue(any(item.plugin == 'work' for item, _ in result.applicable))
                 self.assertEqual(bool(result.employers), applies)
-                self.assertEqual(WORK['session_context'] in gate.statement(self.project, self.found()), applies)
+                self.assertEqual('Employer context:' in gate.statement(self.project, self.found()), applies)
+                self.assertIn(WORK['session_context'], gate.statement(self.project, self.found()))
         subprocess.run(['git', '-C', str(self.project), 'config', '--unset', 'remote.origin.url'],
                        check=True, capture_output=True)
-        self.assertEqual(gate.assess(self.project, self.found()).applicable, [])
+        self.assertEqual([item.plugin for item, _ in gate.assess(self.project, self.found()).applicable], ['work'])
         with patch.object(gate, '_git', return_value=None):
-            self.assertEqual(gate.assess(self.project, self.found()).applicable, [])
+            self.assertEqual([item.plugin for item, _ in gate.assess(self.project, self.found()).applicable], ['work'])
 
-    def test_session_start_output_carries_context_only_for_the_matching_project(self):
+    def test_session_start_output_carries_employer_context_only_for_the_matching_project(self):
         self.install('employer-a', EMPLOYER)
         for identity, applies in (('employer-a/service', True), ('personal/project', False)):
             self.remote(identity)
@@ -114,14 +115,14 @@ class EmployerScope(unittest.TestCase):
                 self.assertEqual(gate.main(), 0)
             context = json.loads(output.getvalue())['hookSpecificOutput']
             self.assertEqual(context['hookEventName'], 'SessionStart')
-            self.assertEqual(WORK['session_context'] in context['additionalContext'], applies)
+            self.assertIn(WORK['session_context'], context['additionalContext'])
             self.assertEqual('Employer context:' in context['additionalContext'], applies)
 
-    def test_personal_remote_blocks_both_hosts_and_omits_conditional_context(self):
+    def test_personal_remote_keeps_work_but_omits_employer_context(self):
         employer = self.install('employer-a', EMPLOYER)
         self.remote('personal/project')
         context = gate.statement(self.project, self.found())
-        self.assertNotIn(WORK['session_context'], context)
+        self.assertIn(WORK['session_context'], context)
         self.assertNotIn('Employer context:', context)
         self.assertNotIn(str(employer / 'skills/communication-context/SKILL.md'), context)
 
@@ -208,12 +209,12 @@ class EmployerScope(unittest.TestCase):
         result = gate.assess(self.project, self.found(), facts=false_spoof)
         self.assertTrue(any(item.plugin == 'work' for item, _ in result.applicable))
 
-    def test_owner_identity_and_overrides_do_not_establish_employer(self):
+    def test_owner_identity_and_overrides_do_not_apply_the_employer(self):
         self.install('employer-a', EMPLOYER)
         self.remote('publisher/employer-a')
         with patch.dict(gate.os.environ, {gate.OVERRIDE_VARIABLE: 'employer-a,work'}):
             result = gate.assess(self.project, self.found())
-        self.assertEqual(result.applicable, [])
+        self.assertEqual([item.plugin for item, _ in result.applicable], ['work'])
         self.assertEqual(result.employers, ())
 
     def test_employer_cannot_depend_on_itself_directly_or_in_a_matching_alternative(self):
