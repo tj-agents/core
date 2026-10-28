@@ -8,7 +8,9 @@ domain: process
 
 # Skill authoring
 
-For a new skill, enter `skill:create`; for an edit, split, consolidation or rename, enter `skill:update`.
+Owns skill selection, naming, sizing and discovery triggers in a tj-agents plugin repository.
+
+For a new skill, enter `skill:new`; for an edit, split, consolidation or rename, enter `skill:update`.
 Those operations resolve the authoring brief and delegate to the current host's native skill creator.
 This convention supplies selection, sizing and naming rules to that gate and to reviews.
 
