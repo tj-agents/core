@@ -3,10 +3,16 @@ name = "tj-agents-core"
 version = "0.1.0"
 description = "Common agent behavior, engineering process and machine utilities for tj-agents"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["tj-base"]
 
 [tool.uv]
 package = false
+
+[tool.uv.workspace]
+members = ["packages/tj-base"]
+
+[tool.uv.sources]
+tj-base = { workspace = true }
 
 [dependency-groups]
 dev = [
