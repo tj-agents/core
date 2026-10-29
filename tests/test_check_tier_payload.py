@@ -42,7 +42,7 @@ class PayloadTree(unittest.TestCase):
         body = {"payloads": {name: [name] for name in names}}
         (payloads / "payloads.json").write_text(json.dumps(body), encoding="utf-8")
 
-    def payload(self, name, tier=TIER, skills=(("persistence", "contract"),)):
+    def payload(self, name, tier=TIER, skills=(("persistence", "standard"),)):
         payload = self.root / "plugins" / name
         payload.mkdir(parents=True, exist_ok=True)
         if tier is not None:
@@ -52,10 +52,14 @@ class PayloadTree(unittest.TestCase):
             skill = payload / "skills" / skill_name
             skill.mkdir(parents=True, exist_ok=True)
             (skill / "SKILL.md").write_text(
-                f"---\nname: {skill_name}\ndescription: rule\nkind: {kind}\n---\n\n# {skill_name}\n",
+                f"---\nname: {skill_name}\ndescription: rule\nmetadata:\n"
+                f"  tj-agents-kind: {kind}\n---\n\n# {skill_name}\n",
                 encoding="utf-8",
             )
-            listed.append(f"- `{skill_name}` — {kind} — `.agents/{kind}/{skill_name}/SKILL.md`")
+            listed.append(
+                f"- `{skill_name}` — {kind} — "
+                f"`.agents/{name}/skills/{skill_name}/SKILL.md`"
+            )
         (payload / "INDEX.md").write_text(
             "# capabilities\n\n" + "\n".join(listed) + "\n", encoding="utf-8"
         )
@@ -126,14 +130,47 @@ class PayloadTree(unittest.TestCase):
         problems = checker.check(self.root)
         self.assertTrue(any("kind" in problem for problem in problems), problems)
 
-    def test_kind_accepts_open_lowercase_words(self):
+    def test_canonical_header_uses_the_same_kind_vocabulary(self):
         self.declare(["dotnet"])
-        for kind in ("contract", "convention", "policy", "utility", "workflow", "knowledge", "custom"):
+        payload = self.payload("dotnet")
+        skill = payload / "skills/persistence/SKILL.md"
+        for kind in (
+            "policy", "standard", "operation", "workflow", "learning", "reference"
+        ):
+            with self.subTest(kind=kind):
+                skill.write_text(
+                    f"---\nname: persistence\nkind: {kind}\n---\n", encoding="utf-8"
+                )
+                self.assertEqual(checker.check(self.root), [])
+
+    def test_nested_or_duplicate_kind_values_fail(self):
+        self.declare(["dotnet"])
+        payload = self.payload("dotnet")
+        skill = payload / "skills/persistence/SKILL.md"
+        for marker in (
+            "kind:\n  standard: true",
+            "metadata:\n  tj-agents-kind:\n    standard: true",
+            "metadata:\n  notes:\n    tj-agents-kind: standard",
+            "kind: standard\nmetadata:\n  tj-agents-kind: standard",
+        ):
+            with self.subTest(marker=marker):
+                skill.write_text(
+                    "---\nname: persistence\n" + marker + "\n---\n", encoding="utf-8"
+                )
+                self.assertTrue(
+                    any("kind" in problem for problem in checker.check(self.root))
+                )
+
+    def test_kind_accepts_the_six_declared_categories(self):
+        self.declare(["dotnet"])
+        for kind in (
+            "policy", "standard", "operation", "workflow", "learning", "reference"
+        ):
             with self.subTest(kind=kind):
                 self.payload("dotnet", skills=(("persistence", kind),))
                 self.assertEqual(checker.check(self.root), [])
 
-    def test_kind_rejects_nonword_syntax(self):
+    def test_kind_rejects_retired_custom_and_malformed_values(self):
         self.declare(["dotnet"])
         for kind in ("convention2", "con-vention", "Convention", "", "two words", "café"):
             with self.subTest(kind=kind):

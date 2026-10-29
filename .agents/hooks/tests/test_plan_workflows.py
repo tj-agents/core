@@ -160,11 +160,11 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
 
     def test_public_lifecycle_skills_have_workflow_owners_and_thin_adapters(self):
         expected = {
-            "plan": ".agents/workflow/workflow/plan/SKILL.md",
-            "run": ".agents/workflow/workflow/run/SKILL.md",
-            "resume": ".agents/workflow/operation/resume/SKILL.md",
-            "handoff": ".agents/workflow/workflow/handoff/SKILL.md",
-            "plan-artifacts": ".agents/workflow/contract/plan-artifacts/SKILL.md",
+            "plan": ".agents/workflow/skills/plan/SKILL.md",
+            "run": ".agents/workflow/skills/run/SKILL.md",
+            "resume": ".agents/workflow/skills/resume/SKILL.md",
+            "handoff": ".agents/workflow/skills/handoff/SKILL.md",
+            "plan-artifacts": ".agents/workflow/skills/plan-artifacts/SKILL.md",
         }
         for name, relative in expected.items():
             with self.subTest(skill=name):
