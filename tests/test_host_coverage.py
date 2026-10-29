@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py"
+SCRIPT = ROOT / ".agents/workflow/skills/plan-artifacts/scripts/host_coverage.py"
 SPEC = importlib.util.spec_from_file_location("host_coverage", SCRIPT)
 coverage = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(coverage)
@@ -18,7 +18,7 @@ HEAD = "a" * 40
 def record(stage="plan"):
     value = {
         "schema_version": 1,
-        "shared_source": ".agents/workflow/contract/plan-artifacts/SKILL.md",
+        "shared_source": ".agents/workflow/skills/plan-artifacts/SKILL.md",
         "hosts": [
             {
                 "host": "claude",
