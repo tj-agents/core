@@ -2,7 +2,7 @@
   "schema_version": 1,
   "plugin": "tj-agents/base",
   "source_roots": [
-    ".agents/base",
+    ".agents/base/skills",
     ".agents/hooks/hook_runtime.py"
   ],
   "requires": {

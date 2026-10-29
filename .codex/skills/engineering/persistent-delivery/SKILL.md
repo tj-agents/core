@@ -1,11 +1,12 @@
 ---
 name: persistent-delivery
 description: Preserve exact software delivery identity and evidence across wakes, with the Codex-only durable CLI transport when native scheduling cannot satisfy the authorized task.
-kind: policy
-domain: process
+metadata:
+  tj-agents-kind: policy
+  tj-agents-domain: process
 ---
 
-Read the [shared delivery contract](../../../../.agents/engineering/policy/persistent-delivery/SKILL.md).
+Read the [shared delivery contract](../../../../.agents/engineering/skills/persistent-delivery/SKILL.md).
 Use `workflow:continue` for native goal and scheduling selection. The transport below is for authorized
 software work that must survive its original Codex CLI process. It launches a fresh headless `codex exec`
 context in the initialized checkout; other host owners are rejected. Reconcile any existing external

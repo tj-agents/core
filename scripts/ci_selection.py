@@ -24,7 +24,7 @@ FAMILIES = {
         },
     },
     "handoff-transfer": {
-        "sources": {".agents/workflow/workflow/handoff/scripts/transfer.py"},
+        "sources": {".agents/workflow/skills/handoff/scripts/transfer.py"},
         "tests": {".agents/hooks/tests/test_handoff_transfer.py"},
     },
 }
