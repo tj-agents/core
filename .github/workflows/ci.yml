@@ -112,7 +112,7 @@ jobs:
       - name: authored skill references resolve in the public corpus
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
-        run: python -B .template/.agents/template/skills/check/scripts/check_skill_references.py --root . --source-root . --marketplace tj-agents/marketplace
+        run: python -B .template/.agents/template/skills/check/scripts/check_skill_references.py --root . --root .template --source-root . --marketplace tj-agents/marketplace
 
       - name: PowerShell host compatibility tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
