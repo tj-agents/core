@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GUIDE_BUILD = ROOT / ".agents/engineering/utility/guide-build"
+GUIDE_BUILD = ROOT / ".agents/engineering/skills/guide-build"
 SCAFFOLD = GUIDE_BUILD / "scripts/scaffold.py"
 TEMPLATE = GUIDE_BUILD / "template"
 BUILDER_OWNED = ("build.py", "page.html", "open.sh", "README.md")

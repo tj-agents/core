@@ -2,7 +2,7 @@
   "schema_version": 1,
   "plugin": "tj-agents/docs",
   "source_roots": [
-    ".agents/docs",
+    ".agents/docs/skills",
     ".agents/tiers/docs.json"
   ],
   "requires": {

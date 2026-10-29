@@ -18,9 +18,10 @@ Marketplace owns the canonical plugin roster and dependency graph in
 [`plugins.json`](https://github.com/tj-agents/marketplace/blob/main/plugins.json). Do not edit plugin names
 or dependencies in Core.
 
-`engineering:skill-authoring` owns skill selection triggers, names, and sizing; the
-[`template:check` validator](https://github.com/tj-agents/template) owns required skill content and layout
-validation. `engineering:docs` owns the generic guidance-writing convention.
+`engineering:skill-authoring` owns skill selection triggers, names and sizing; `skill:check` owns skill
+content requirements. [`template:structure`](https://github.com/tj-agents/template) owns the shared plugin
+layout and `template:check` validates Template repository conformance. `engineering:docs` owns generic
+guidance writing.
 
 Global architecture and cross-repository designs live in [`tj-agents/docs`](https://github.com/tj-agents/docs)
 (private; organization access required). Core-specific implementation plans and operational documentation
@@ -28,10 +29,10 @@ stay here; shared plans link to their source owners.
 
 `workflow:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
 `base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
-[`base:project-setup`](.agents/base/policy/project-setup/SKILL.md) owns standards selection for new
+[`base:project-setup`](.agents/base/skills/project-setup/SKILL.md) owns standards selection for new
 repositories and new technology stacks, including the personal/work scope question.
-[`base:solution-assessment`](.agents/base/policy/solution-assessment/SKILL.md) owns the once-per-idea
-assessment of existing capabilities and solutions; [`workflow:run`](.agents/workflow/workflow/run/SKILL.md)
+[`base:solution-assessment`](.agents/base/skills/solution-assessment/SKILL.md) owns the once-per-idea
+assessment of existing capabilities and solutions; [`workflow:run`](.agents/workflow/skills/run/SKILL.md)
 owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known bugs, mistakes and debt follow the selected problem-record profile.
@@ -107,11 +108,12 @@ gate. Source verification does not establish installed-host trust or acceptance.
 ## Layout
 
 - `.agents/` is the canonical host-neutral source for Base, Workflow, Engineering and Docs.
+- Skills live at `.agents/<namespace>/skills/<subject>/SKILL.md`; kind stays in metadata.
 - `.codex/` contains only Codex entry points and host configuration; `.claude/` contains only Claude entry
   points and host configuration. Their skills reference canonical `.agents/` definitions.
 - [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md) defines the source, adapter and distribution boundary.
 - [`SKILL_KINDS.md`](SKILL_KINDS.md) defines the shared skill taxonomy.
-- [`PACKAGING.md`](PACKAGING.md) is the rule that a utility skill's runtime dependencies ship with it.
+- [`PACKAGING.md`](PACKAGING.md) is the rule that a skill's runtime dependencies ship with it.
 - `.agents/plugins/plugins.json` records Core's package definitions and digests. The generated
   [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index.
 - `plugins/*` is generated distribution output assembled from canonical shared definitions and the

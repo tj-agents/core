@@ -1,11 +1,12 @@
 ---
 name: cd
 description: Keep the active agent session attached to the exact repository or worktree that now owns the task. Use whenever work moves to a different directory, including after creating, cloning, moving, renaming, locating, or selecting a repository or worktree.
-kind: policy
-domain: behavior
+metadata:
+  tj-agents-kind: policy
+  tj-agents-domain: behavior
 ---
 
 # Keep the session in the working repository
 
-Read and follow the [canonical shared definition](../../../../.agents/base/policy/cd/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../../../.agents/base/skills/cd/SKILL.md) in full.
 This entry point supplies only Codex discovery metadata; the shared procedure is authored once under `.agents/`.

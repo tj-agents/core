@@ -9,6 +9,20 @@ Base, Workflow, Engineering and Docs classifications inside `.agents/`; they are
 repository trees. Agent, Agent Store, Codex, Claude and CLI source stays with its publisher. Core consumes
 declared publisher exports from `.agents/dependencies/` while building its own packages.
 
+Canonical skills use `.agents/<namespace>/skills/<subject>/SKILL.md`. Kind is frontmatter metadata,
+independent of that path and the public identity. A nested subject path joins with hyphens, so
+`skills/state/client/SKILL.md` publishes `<namespace>:state-client`; reject collisions with a flat
+`skills/state-client/SKILL.md`. Use a subject family when useful, without mechanically grouping names
+that share a word. Shared plugin-layout guidance belongs to `template:structure`; this document owns
+Core's authored/native/distribution boundaries.
+
+```text
+.agents/engineering/skills/commit/SKILL.md
+.codex/skills/engineering/commit/SKILL.md
+.claude/skills/engineering/commit/SKILL.md
+plugins/engineering/
+```
+
 The plugin roster and project-selection schemas live under `.agents/plugins/`. `CAPABILITIES.md` is generated
 from that canonical plugin roster and is never edited as a second source.
 
@@ -32,10 +46,23 @@ Each host skill entry point references one canonical definition under `.agents/`
 host-specific metadata or invocation mechanics required by that host. A host difference must be explicit;
 shared prose returns to `.agents/`.
 
-A plain host entry point repeats its canonical definition's name, description, kind and domain
-verbatim, adds only the model and effort keys its canonical lane resolves to, and has the fixed reference
-body. A skill named in `extended_host_adapters` in `.agents/plugins/sources.json` is the explicit
-exception on both hosts: its entry points keep the canonical name, kind and domain and link the canonical
+A plain host entry point repeats its canonical definition's name and description, projects kind and
+domain under `metadata.tj-agents-kind` and `metadata.tj-agents-domain`, and has the fixed reference body.
+Other house fields use the same `metadata.tj-agents-` prefix. Codex model and effort selections are house
+metadata; Claude retains its supported native `model` field and projects house effort into metadata.
+Only host-supported fields remain at the top level. The canonical lane remains the source of those
+selections, not a native host field.
+
+```yaml
+name: docs
+description: Keep repository guidance owned and reachable. Use when editing guidance.
+metadata:
+  tj-agents-kind: standard
+  tj-agents-domain: process
+```
+
+A skill named in `extended_host_adapters` in `.agents/plugins/sources.json` is the explicit
+exception on both hosts: its entry points keep the canonical name and projected kind/domain and link the canonical
 definition exactly once, and may word their description and the rest of their body for their host
 without restating shared prose. Generation does not compare that wording, so review an extended entry
 point whenever its canonical definition changes. `pwsh .agents/sync-generated.ps1 -Check` fails on any

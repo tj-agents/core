@@ -11,7 +11,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[3]
-SCRIPTS = ROOT / '.agents/engineering/workflow/merge/scripts'
+SCRIPTS = ROOT / '.agents/engineering/skills/merge/scripts'
 sys.path.insert(0, str(SCRIPTS))
 SPEC = importlib.util.spec_from_file_location('worktree_sweep', SCRIPTS / 'worktree_sweep.py')
 SWEEP = importlib.util.module_from_spec(SPEC)

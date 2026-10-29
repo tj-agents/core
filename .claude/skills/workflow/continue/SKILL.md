@@ -1,11 +1,12 @@
 ---
 name: continue
 description: Establish Claude continuation for an existing authorized goal whose next decision requires a later wake.
-kind: workflow
-domain: process
+metadata:
+  tj-agents-kind: workflow
+  tj-agents-domain: process
 ---
 
-Read the [shared continuation workflow](../../../../.agents/workflow/workflow/continue/SKILL.md).
+Read the [shared continuation workflow](../../../../.agents/workflow/skills/continue/SKILL.md).
 It owns goal identity, authority, existing-owner reconciliation and observed-wake requirements.
 
 Use native `/goal` for turn-by-turn continuation. Use native `/loop` or exposed scheduling tools for
