@@ -86,7 +86,7 @@ class PolicyContextTests(unittest.TestCase):
     def test_every_base_policy_is_selectable_from_its_description(self):
         for policy in self.policies:
             with self.subTest(policy=policy):
-                source = (self.plugin / f".agents/base/policy/{policy}/SKILL.md").read_text(encoding="utf-8")
+                source = (self.plugin / f".agents/base/skills/{policy}/SKILL.md").read_text(encoding="utf-8")
                 header = source.split("\n---\n", 1)[0]
                 self.assertRegex(header, r"(?m)^description: .*\bUse (when|before)\b")
 

@@ -42,7 +42,9 @@ from urllib.parse import urlsplit
 SCHEMA_VERSIONS = (1, 2, 3)
 DECLARATION_NAME = "tier.json"
 ORPHAN_MARKER = ".orphaned_at"
-FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
+SKILL_KINDS = frozenset({
+    "policy", "standard", "operation", "workflow", "learning", "reference"
+})
 PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
 OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
 WALK_DEPTH = 4
@@ -166,8 +168,8 @@ def employer_context_path(payload_dir, slug):
         skill.relative_to(payload)
         text = skill.read_text(encoding="utf-8-sig")
         block = front_matter(text)
-        name = re.search(r"^name:[ \t]*([^\r\n]+?)[ \t]*$", block, re.MULTILINE)
-        if name is None or name.group(1) != slug or FRONT_MATTER_KIND.search(block) is None:
+        fields = skill_fields(block)
+        if fields.get("name") != slug or fields.get("kind") not in SKILL_KINDS:
             return None
         return skill
     except (OSError, UnicodeError, ValueError, RuntimeError):
@@ -999,10 +1001,71 @@ def installed_replacement(root, name, harness=None):
 
 
 def front_matter(text):
-    if not text.startswith("---"):
+    lines = text.splitlines()
+    if not lines or lines[0] != "---":
         return ""
-    end = text.find("\n---", 3)
-    return text[:end] if end != -1 else ""
+    try:
+        end = lines.index("---", 1)
+    except ValueError:
+        return ""
+    return "\n".join(lines[1:end])
+
+
+def skill_fields(block):
+    fields = {}
+    parent = None
+    metadata_indent = None
+    previous_scalar = None
+    for line in block.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if previous_scalar is not None and indent > previous_scalar:
+            raise ValueError("Skill metadata fields must be scalar strings")
+        previous_scalar = None
+        match = re.fullmatch(r" *([a-zA-Z0-9_-]+)[ \t]*:[ \t]*(.*)", line)
+        if not match:
+            continue
+        key, value = match.groups()
+        if indent == 0:
+            parent = key
+            metadata_indent = None
+            if key == "metadata":
+                if value:
+                    raise ValueError("Skill metadata must be a block mapping")
+                continue
+            field = key if key in {"name", "kind", "domain"} else None
+        elif parent == "metadata":
+            if metadata_indent is None:
+                metadata_indent = indent
+            field = (
+                key.removeprefix("tj-agents-")
+                if indent == metadata_indent
+                and key in {"tj-agents-kind", "tj-agents-domain"}
+                else None
+            )
+        else:
+            field = None
+        if field is None:
+            continue
+        if value.startswith('"'):
+            try:
+                value = json.loads(value)
+            except ValueError as error:
+                raise ValueError(
+                    "Skill metadata fields must be scalar strings"
+                ) from error
+        elif value.startswith("'") and value.endswith("'"):
+            value = value[1:-1].replace("''", "'")
+        if not isinstance(value, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", value):
+            raise ValueError("Skill metadata fields must be scalar strings")
+        if field in fields:
+            raise ValueError("Duplicate skill metadata field: " + field)
+        if field == "kind" and value not in SKILL_KINDS:
+            raise ValueError("Unsupported skill kind: " + value)
+        fields[field] = value
+        previous_scalar = indent
+    return fields
 
 
 def main():

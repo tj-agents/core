@@ -44,7 +44,7 @@ class EmployerScope(unittest.TestCase):
         skill = payload / 'skills/communication-context'
         skill.mkdir(parents=True, exist_ok=True)
         if context:
-            (skill / 'SKILL.md').write_text('---\nname: communication-context\nkind: knowledge\n---\nEmployer contacts.\n', encoding='utf-8')
+            (skill / 'SKILL.md').write_text('---\nname: communication-context\nkind: reference\n---\nEmployer contacts.\n', encoding='utf-8')
         if data is not None:
             (payload / 'tier.json').write_text(data if isinstance(data, str) else json.dumps(data), encoding='utf-8')
         registry_path = self.cache.parent / 'installed_plugins.json'

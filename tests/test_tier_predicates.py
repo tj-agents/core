@@ -134,7 +134,10 @@ class Predicates(unittest.TestCase):
         payload = cache / "test-market" / plugin / "1"
         skill = payload / "skills" / "rule"
         skill.mkdir(parents=True)
-        (skill / "SKILL.md").write_text("---\nname: rule\nkind: convention\n---\n", encoding="utf-8")
+        (skill / "SKILL.md").write_text(
+            "---\nname: rule\nmetadata:\n  tj-agents-kind: standard\n---\n",
+            encoding="utf-8",
+        )
         if body is not None:
             (payload / "tier.json").write_text(body if isinstance(body, str) else json.dumps(body), encoding="utf-8")
         registry_path = cache.parent / "installed_plugins.json"
@@ -142,6 +145,36 @@ class Predicates(unittest.TestCase):
         registry["plugins"][plugin + "@test-market"] = [{"installPath": str(payload)}]
         registry_path.write_text(json.dumps(registry), encoding="utf-8")
         return cache, payload
+
+    def test_employer_context_marker_supports_flat_native_and_canonical_headers(self):
+        _, payload = self.install("company", None)
+        skill = payload / "skills/rule/SKILL.md"
+        for marker in (
+            "kind: reference", "metadata:\n  tj-agents-kind: reference",
+            'metadata:\n    tj-agents-kind: "reference"',
+        ):
+            with self.subTest(marker=marker):
+                skill.write_text(
+                    "---\nname: rule\n" + marker + "\n---\n", encoding="utf-8"
+                )
+                self.assertEqual(
+                    skill.resolve(), gate.employer_context_path(payload, "rule")
+                )
+
+    def test_employer_context_rejects_retired_missing_and_nested_kind_markers(self):
+        _, payload = self.install("company", None)
+        skill = payload / "skills/rule/SKILL.md"
+        for marker in (
+            "kind: knowledge", "metadata:\n  tj-agents-kind: custom",
+            "kind:\n  reference: true",
+            "metadata:\n  tj-agents-kind:\n    reference: true",
+            "metadata:\n  notes:\n    tj-agents-kind: reference",
+        ):
+            with self.subTest(marker=marker):
+                skill.write_text(
+                    "---\nname: rule\n" + marker + "\n---\n", encoding="utf-8"
+                )
+                self.assertIsNone(gate.employer_context_path(payload, "rule"))
 
     def test_invalid_installed_declarations_are_diagnosed(self):
         valid = {"schema_version": 3, "tier": "invalid", "applies": "stack-present", "detect": {"all": []}}
@@ -156,7 +189,7 @@ class Predicates(unittest.TestCase):
                     self.assertFalse(selection["matched"])
                     self.assertTrue(selection["diagnostics"])
 
-    def test_mixed_validity_keeps_every_valid_convention_and_ordinary_plugins(self):
+    def test_mixed_validity_keeps_every_valid_standard_and_ordinary_plugins(self):
         for version in (1, 2, 3):
             detect = {"globs": ["*.csproj"]} if version < 3 else {"glob": "*.csproj"}
             cache, _ = self.install("valid" + str(version), {"schema_version": version, "tier": "valid" + str(version),

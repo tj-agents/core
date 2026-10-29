@@ -12,7 +12,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/base"
-CONTRACT = PLUGIN / ".agents/base/policy/agent-files/SKILL.md"
+CONTRACT = PLUGIN / ".agents/base/skills/agent-files/SKILL.md"
 
 
 class AgentFileTests(unittest.TestCase):

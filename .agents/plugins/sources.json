@@ -3,29 +3,29 @@
   "scopes": [
     {
       "name": "base",
-      "root": ".agents/base",
-      "layout": "kind",
+      "root": ".agents/base/skills",
+      "layout": "subject",
       "plugin": "base",
       "domain": "behavior"
     },
     {
       "name": "workflow",
-      "root": ".agents/workflow",
-      "layout": "kind",
+      "root": ".agents/workflow/skills",
+      "layout": "subject",
       "plugin": "workflow",
       "domain": "process"
     },
     {
       "name": "engineering",
-      "root": ".agents/engineering",
-      "layout": "kind",
+      "root": ".agents/engineering/skills",
+      "layout": "subject",
       "plugin": "engineering",
       "domain": "process"
     },
     {
       "name": "docs",
-      "root": ".agents/docs",
-      "layout": "kind",
+      "root": ".agents/docs/skills",
+      "layout": "subject",
       "plugin": "docs",
       "domain": "docs"
     }
@@ -109,7 +109,7 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
+      "source": ".agents/workflow/skills/plan-artifacts/scripts/host_coverage.py",
       "destination": "workflows/host_coverage.py"
     },
     {
@@ -234,7 +234,7 @@
     },
     {
       "plugin": "workflow",
-      "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
+      "source": ".agents/workflow/skills/plan-artifacts/scripts/host_coverage.py",
       "destination": "resources/plan-artifacts/host_coverage.py"
     },
     {

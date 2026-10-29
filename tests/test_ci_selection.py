@@ -22,7 +22,7 @@ class ClassificationTests(unittest.TestCase):
         for path in ("README.md", "docs/usage.md", "plans/work/GOAL.md", "reviews/topic.md"):
             with self.subTest(path=path):
                 self.assertEqual(CI.classify([path])["mode"], "docs")
-        for path in ("AGENTS.md", "CLAUDE.md", ".agents/workflow/contract/plan-artifacts/SKILL.md",
+        for path in ("AGENTS.md", "CLAUDE.md", ".agents/workflow/skills/plan-artifacts/SKILL.md",
                      ".codex/agents/lane-l4.md", ".github/workflows/ci.yml", "scripts/ci_selection.py",
                      "tests/test_ci_selection.py", "scripts/new_tool.py", "CODE_CONVENTIONS.md"):
             with self.subTest(path=path):
@@ -31,7 +31,7 @@ class ClassificationTests(unittest.TestCase):
     def test_known_runtime_families_union_their_regressions_on_both_platforms(self):
         value = CI.classify([
             ".agents/hooks/problem_records.py",
-            ".agents/workflow/workflow/handoff/scripts/transfer.py",
+            ".agents/workflow/skills/handoff/scripts/transfer.py",
             "README.md",
         ])
         self.assertEqual(value["mode"], "focused")
@@ -40,7 +40,7 @@ class ClassificationTests(unittest.TestCase):
         CI.required_results(value, self.results(), "pull_request", ("ci:full",))
 
     def test_relocated_handoff_helper_keeps_focused_transfer_coverage(self):
-        value = CI.classify([".agents/workflow/workflow/handoff/scripts/transfer.py"])
+        value = CI.classify([".agents/workflow/skills/handoff/scripts/transfer.py"])
         self.assertEqual("focused", value["mode"])
         self.assertEqual([".agents/hooks/tests/test_handoff_transfer.py"], value["tests"])
         CI.required_results(value, self.results(), "pull_request", ("ci:full",))
@@ -301,7 +301,7 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertIn("github.event.before", job)
         self.assertIn("github.sha }}\"", job)
         self.assertIn("github.ref == 'refs/heads/main'", job)
-        self.assertEqual(2, job.count(".template/.agents/template/utility/check/scripts/check_examples.py --root . --base"))
+        self.assertEqual(2, job.count(".template/.agents/template/skills/check/scripts/check_examples.py --root . --base"))
         pull_request_run = next(line for line in job.splitlines()
                                 if "github.event.pull_request.base.sha" in line)
         push_run = next(line for line in job.splitlines() if "github.event.before" in line)

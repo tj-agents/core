@@ -4,7 +4,7 @@
   "source_roots": [
     ".agents/dependencies/agent/.agents/agent-store/runtime",
     ".agents/dependencies/agent/.agents/agent/runtime/repository_configuration.py",
-    ".agents/engineering",
+    ".agents/engineering/skills",
     ".agents/hooks/docs_reachability.py",
     ".agents/hooks/installed_skills.py",
     ".agents/hooks/problem_records.py",
@@ -33,14 +33,14 @@
       "claude_allow": [
         "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
-        "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/skills/merge/scripts/cleanup_proof.py)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/skills/merge/scripts/cleanup_proof.py)",
         "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-        "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/skills/merge/scripts/worktree_sweep.py --repo:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/skills/merge/scripts/worktree_sweep.py --repo:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/skills/merge/scripts/worktree_sweep.py --repo:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/skills/merge/scripts/worktree_sweep.py --repo:*)",
         "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
         "Bash(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
         "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
@@ -89,7 +89,7 @@
             ],
             "-B",
             [
-              "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
+              "${PLUGIN_ROOT}/.agents/engineering/skills/merge/scripts/cleanup_proof.py",
               "${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py",
               "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
             ]
@@ -99,7 +99,7 @@
             [
               "python",
               "-B",
-              "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+              "${PLUGIN_ROOT}/.agents/engineering/skills/merge/scripts/cleanup_proof.py"
             ],
             [
               "python",
@@ -110,7 +110,7 @@
           "not_match": [
             [
               "python",
-              "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+              "${PLUGIN_ROOT}/.agents/engineering/skills/merge/scripts/cleanup_proof.py"
             ]
           ]
         },
@@ -124,7 +124,7 @@
             ],
             "-B",
             [
-              "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py",
+              "${PLUGIN_ROOT}/.agents/engineering/skills/merge/scripts/worktree_sweep.py",
               "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
               "${PLUGIN_ROOT}/codex-skills/merge/scripts/worktree_sweep.py"
             ],

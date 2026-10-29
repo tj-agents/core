@@ -12,15 +12,14 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = ROOT / ".agents" / "engineering" / "workflow"
+SKILLS = ROOT / ".agents" / "engineering" / "skills"
 PACKAGE = ROOT / "plugins" / "engineering"
 REVIEW_FAMILY = ("review", "incremental-review", "staged-review", "staged-review-all", "docs-review", "address-review")
 DELEGATES_NATIVE_LAYER = ("incremental-review", "staged-review", "docs-review")
 
 
 def body(skill):
-    kind = "utility" if skill == "review" else "workflow"
-    return (WORKFLOW.parent / kind / skill / "SKILL.md").read_text(encoding="utf-8")
+    return (SKILLS / skill / "SKILL.md").read_text(encoding="utf-8")
 
 
 def section(text, heading):
@@ -78,14 +77,13 @@ class NativeLayerNamesTheHostReviewer(unittest.TestCase):
     def test_the_packaged_procedure_is_the_authored_one(self):
         for skill in ("review", *DELEGATES_NATIVE_LAYER):
             with self.subTest(skill=skill):
-                kind = "utility" if skill == "review" else "workflow"
-                packaged = PACKAGE / ".agents" / "engineering" / kind / skill / "SKILL.md"
+                packaged = PACKAGE / ".agents/engineering/skills" / skill / "SKILL.md"
                 self.assertEqual(body(skill), packaged.read_text(encoding="utf-8"))
 
 
 class ReviewRunsWithoutRepositoryHelpers(unittest.TestCase):
     def test_no_review_family_step_runs_a_helper_from_the_reviewed_repository(self):
-        lifecycle = ROOT / ".agents" / "engineering" / "convention" / "review-lifecycle" / "SKILL.md"
+        lifecycle = SKILLS / "review-lifecycle" / "SKILL.md"
         texts = {skill: body(skill) for skill in REVIEW_FAMILY}
         texts["review-lifecycle"] = lifecycle.read_text(encoding="utf-8")
         for skill, text in texts.items():

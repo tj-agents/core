@@ -22,16 +22,141 @@ class KindMetadataTests(unittest.TestCase):
     def body(self, kind):
         return f"---\nname: custom-skill\ndescription: fixture\nkind: {kind}\ndomain: process\n---\n"
 
-    def test_kind_accepts_open_lowercase_words(self):
-        for kind in ("contract", "convention", "policy", "utility", "workflow", "knowledge", "custom"):
+    def test_kind_accepts_only_current_responsibilities(self):
+        for kind in (
+            "policy", "standard", "operation", "workflow", "learning", "reference"
+        ):
             with self.subTest(kind=kind):
                 self.assertEqual(SYNC.metadata(self.body(kind), Path("fixture/SKILL.md"))["kind"], kind)
 
-    def test_kind_rejects_nonword_syntax(self):
-        for kind in ("convention2", "con-vention", "Convention", "", "two words", "café"):
+    def test_kind_rejects_retired_custom_and_invalid_values(self):
+        for kind in (
+            "contract", "convention", "utility", "knowledge", "custom",
+            "Convention", "", "two words", "café"
+        ):
             with self.subTest(kind=kind):
                 with self.assertRaises(ValueError):
                     SYNC.metadata(self.body(kind), Path("fixture/SKILL.md"))
+
+
+class SubjectDiscoveryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="subject source é ")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+        self.config = {
+            "scopes": [
+                {
+                    "name": "base",
+                    "plugin": "base",
+                    "root": ".agents/base/skills",
+                    "layout": "subject",
+                    "domain": "behavior",
+                }
+            ]
+        }
+        (self.root / ".agents/base/skills").mkdir(parents=True)
+
+    def skill(self, subject, name, kind="operation"):
+        path = self.root / ".agents/base/skills" / subject / "SKILL.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            f"---\nname: {name}\ndescription: fixture\nkind: {kind}\n"
+            "domain: behavior\n---\n# Fixture\n",
+            encoding="utf-8",
+        )
+        return path
+
+    def test_recursive_subjects_flatten_into_public_names(self):
+        path = self.skill("state/client", "state-client")
+        shared = SYNC.discover(self.root, self.config)["base:state-client"]
+        self.assertEqual(path, shared["path"])
+        self.assertEqual(
+            ".agents/base/skills/state/client/SKILL.md", shared["relative"]
+        )
+
+    def test_path_and_metadata_names_must_agree(self):
+        self.skill("state/client", "client")
+        with self.assertRaisesRegex(
+            ValueError, "does not match subject path state-client"
+        ):
+            SYNC.discover(self.root, self.config)
+
+    def test_flattened_subject_collision_fails(self):
+        self.skill("state/client", "state-client")
+        self.skill("state-client", "state-client")
+        with self.assertRaisesRegex(
+            ValueError, "Duplicate public skill name: base:state-client"
+        ):
+            SYNC.discover(self.root, self.config)
+
+    def test_invalid_subject_segments_fail(self):
+        self.skill("Bad/client", "bad-client")
+        with self.assertRaisesRegex(ValueError, "invalid subject path"):
+            SYNC.discover(self.root, self.config)
+
+    def test_retired_layouts_and_parallel_old_trees_fail(self):
+        self.skill("example", "example")
+        for layout in ("flat", "kind"):
+            with self.subTest(layout=layout):
+                self.config["scopes"][0]["layout"] = layout
+                with self.assertRaisesRegex(ValueError, "Unsupported source layout"):
+                    SYNC.discover(self.root, self.config)
+        self.config["scopes"][0]["layout"] = "subject"
+        old = self.root / ".agents/base/utility/old/SKILL.md"
+        old.parent.mkdir(parents=True)
+        old.write_text("old", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "outside subject layout"):
+            SYNC.discover(self.root, self.config)
+
+    def test_native_metadata_does_not_read_unrelated_nested_fields(self):
+        body = (
+            "---\nname: fixture\ndescription: fixture\nmetadata:\n"
+            "    tj-agents-kind: standard\n    tj-agents-domain: behavior\n"
+            "    example:\n      model: unrelated\n      kind: utility\n---\n"
+        )
+        values = SYNC.metadata(body, Path("fixture/SKILL.md"))
+        self.assertEqual("standard", values["kind"])
+        self.assertNotIn("model", values)
+        for required in ("name", "description"):
+            with self.subTest(required=required):
+                projected = body.replace(f"{required}: fixture\n", "").replace(
+                    "metadata:\n", f"metadata:\n    tj-agents-{required}: fixture\n"
+                )
+                with self.assertRaisesRegex(ValueError, f"missing {required}"):
+                    SYNC.metadata(projected, Path("fixture/SKILL.md"))
+        for declaration in ("kind: standard\n", "kind: operation\n"):
+            with (
+                self.subTest(declaration=declaration),
+                self.assertRaisesRegex(
+                    ValueError, "ambiguous frontmatter field kind"
+                ),
+            ):
+                SYNC.metadata(
+                    body.replace("metadata:\n", declaration + "metadata:\n"),
+                    Path("fixture/SKILL.md"),
+                )
+
+    def test_native_projection_preserves_host_fields_and_existing_metadata_indent(self):
+        body = (
+            "---\nname: fixture\ndescription : fixture\nkind: standard\n"
+            "domain: behavior\nmodel: sonnet\nallowed-tools: Read\n"
+            "context: fork\nmetadata:\n    example:\n"
+            "      model: unrelated\n---\nBody\n"
+        )
+        claude = SYNC.native_payload(body, Path("fixture/SKILL.md"), "claude")
+        codex = SYNC.native_payload(body, Path("fixture/SKILL.md"), "codex")
+        self.assertIn("\nmodel: sonnet\n", claude)
+        self.assertIn("\ncontext: fork\n", claude)
+        self.assertNotIn("\nmodel: sonnet\n", codex)
+        self.assertIn("\n    tj-agents-model: sonnet\n", codex)
+        for rendered in (claude, codex):
+            self.assertIn("\ndescription: fixture\n", rendered)
+            self.assertIn("\nallowed-tools: Read\n", rendered)
+            self.assertIn("\n    tj-agents-kind: standard\n", rendered)
+            values = SYNC.metadata(rendered, Path("fixture/SKILL.md"))
+            self.assertEqual("sonnet", values["model"])
+            self.assertEqual("standard", values["kind"])
 
 
 class SourceLayoutTests(unittest.TestCase):
@@ -115,19 +240,21 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertFalse((self.root / "engineering").exists())
         self.assertFalse((self.root / "workflow").exists())
         self.assertIn(
-            "plugins/workflow/.agents/workflow/contract/plan-artifacts/SKILL.md",
+            "plugins/workflow/.agents/workflow/skills/plan-artifacts/SKILL.md",
             output,
         )
-        self.assertIn("plugins/base/.agents/base/policy/agent-files/SKILL.md", output)
-        self.assertIn("plugins/base/.agents/base/policy/task-routing/SKILL.md", output)
-        self.assertIn("plugins/base/.agents/base/policy/project-setup/SKILL.md", output)
-        self.assertIn("plugins/base/.agents/base/policy/solution-assessment/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/skills/agent-files/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/skills/task-routing/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/skills/project-setup/SKILL.md", output)
+        self.assertIn(
+            "plugins/base/.agents/base/skills/solution-assessment/SKILL.md", output
+        )
 
     def test_problem_record_consumers_and_shared_contract_ship_for_both_hosts(self):
         _, output, skills, _ = SYNC.build(self.root)
         canonical = {
-            "address-bug": "workflow/address-bug",
-            "address-mistake": "workflow/address-mistake",
+            "address-bug": "skills/address-bug",
+            "address-mistake": "skills/address-mistake",
         }
         resource = "plugins/engineering/.agents/workflow/resources/problem-records.md"
         workflow_resource = "plugins/workflow/.agents/workflow/resources/problem-records.md"
@@ -272,14 +399,67 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertEqual("Fixture execution", payload["work_items"][0]["title"])
         self.assertEqual(before, database.read_bytes())
 
+    def test_nested_subjects_ship_their_own_siblings_once(self):
+        roster_path = self.root / ".agents/plugins/plugins.json"
+        roster = json.loads(roster_path.read_text(encoding="utf-8"))
+        engineering = next(
+            package
+            for package in roster["packages"]
+            if package["id"] == "tj-agents/engineering"
+        )
+        engineering["skills"] = sorted([*engineering["skills"], "recents-child"])
+        roster_path.write_text(json.dumps(roster, indent=2) + "\n", encoding="utf-8")
+        child = self.root / ".agents/engineering/skills/recents/child/SKILL.md"
+        child.parent.mkdir()
+        header = (
+            "---\nname: recents-child\ndescription: fixture\n"
+            "kind: reference\ndomain: process\n---\n"
+        )
+        child.write_text(header + "# Child\n", encoding="utf-8")
+        sibling = child.parent / "reference.txt"
+        sibling.write_text("child resource", encoding="utf-8")
+        shared = {
+            "body": child.read_text(encoding="utf-8"),
+            "metadata": {"name": "recents-child"},
+            "relative": child.relative_to(self.root).as_posix(),
+        }
+        for host in ("codex", "claude"):
+            adapter = self.root / f".{host}/skills/engineering/recents-child/SKILL.md"
+            adapter.parent.mkdir()
+            adapter.write_text(
+                header + SYNC.expected_adapter_body(shared, host), encoding="utf-8"
+            )
+
+        _, output, _, _ = SYNC.build(self.root, validate_plugin_digests=False)
+
+        self.assertEqual(
+            b"child resource",
+            output[
+                "plugins/engineering/.agents/engineering/skills/recents/child/reference.txt"
+            ],
+        )
+        for tree in ("skills", "codex-skills"):
+            self.assertEqual(
+                b"child resource",
+                output[f"plugins/engineering/{tree}/recents-child/reference.txt"],
+            )
+            self.assertNotIn(
+                f"plugins/engineering/{tree}/recents/child/SKILL.md", output
+            )
+            self.assertNotIn(
+                f"plugins/engineering/{tree}/recents/child/reference.txt", output
+            )
+
     def test_generated_text_bytes_are_stable_across_checkout_line_endings(self):
-        source = self.root / ".agents/workflow/contract/plan-artifacts/templates/PLAN.md"
+        source = self.root / ".agents/workflow/skills/plan-artifacts/templates/PLAN.md"
         lf = source.read_bytes().replace(b"\r\n", b"\n")
         source.write_bytes(lf.replace(b"\n", b"\r\n"))
 
         _, output, _, _ = SYNC.build(self.root)
 
-        generated = output["plugins/workflow/.agents/workflow/contract/plan-artifacts/templates/PLAN.md"]
+        generated = output[
+            "plugins/workflow/.agents/workflow/skills/plan-artifacts/templates/PLAN.md"
+        ]
         self.assertEqual(lf, generated)
         self.assertNotIn(b"\r\n", generated)
 
@@ -426,7 +606,7 @@ class SourceLayoutTests(unittest.TestCase):
             SYNC.build(self.root)
 
     def test_a_host_only_term_in_a_shared_definition_fails_generation(self):
-        shared = self.root / ".agents/engineering/utility/review/SKILL.md"
+        shared = self.root / ".agents/engineering/skills/review/SKILL.md"
         original = shared.read_text(encoding="utf-8")
         for host, term in (
             ("claude", "`code-review`"),
@@ -457,27 +637,32 @@ class SourceLayoutTests(unittest.TestCase):
         reference.unlink()
         SYNC.build(self.root)
 
-    def test_scope_metadata_and_public_names_are_enforced(self):
-        kinded = self.root / ".agents/engineering/utility/recents/SKILL.md"
-        kinded.write_text(
-            kinded.read_text(encoding="utf-8").replace("kind: utility", "kind: workflow"),
+    def test_changing_kind_preserves_subject_path_and_public_identity(self):
+        path = self.root / ".agents/engineering/skills/recents/SKILL.md"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "kind: operation", "kind: workflow"
+            ),
             encoding="utf-8",
         )
-        with self.assertRaisesRegex(ValueError, "kind .* does not match kind folder"):
-            SYNC.build(self.root)
+        config = SYNC.load(self.root / ".agents/plugins/sources.json")
+        discovered = SYNC.discover(self.root, config)
+        self.assertEqual(
+            "workflow", discovered["engineering:recents"]["metadata"]["kind"]
+        )
+        self.assertEqual(path, discovered["engineering:recents"]["path"])
 
-        kinded.write_text(
-            kinded.read_text(encoding="utf-8").replace("kind: workflow", "kind: utility"),
-            encoding="utf-8",
-        )
-        path = self.root / ".agents/engineering/utility/recents/SKILL.md"
-        shutil.copytree(path.parent, self.root / ".agents/engineering/utility/recents-copy")
-        with self.assertRaisesRegex(ValueError, "Duplicate public skill name: engineering:recents"):
+    def test_duplicate_public_names_fail_generation(self):
+        path = self.root / ".agents/engineering/skills/recents/SKILL.md"
+        shutil.copytree(path.parent, path.parent.with_name("recents-copy"))
+        with self.assertRaisesRegex(
+            ValueError, "Duplicate public skill name: engineering:recents"
+        ):
             SYNC.build(self.root)
 
     def test_public_names_equal_without_hyphens_fail_generation(self):
-        source = self.root / ".agents/engineering/workflow/address-debt"
-        near_miss = self.root / ".agents/engineering/workflow/addressdebt"
+        source = self.root / ".agents/engineering/skills/address-debt"
+        near_miss = self.root / ".agents/engineering/skills/addressdebt"
         shutil.copytree(source, near_miss)
         skill = near_miss / "SKILL.md"
         skill.write_text(

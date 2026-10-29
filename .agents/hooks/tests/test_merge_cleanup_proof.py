@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "engineering/workflow/merge/scripts/cleanup_proof.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "engineering/skills/merge/scripts/cleanup_proof.py"
 SPEC = importlib.util.spec_from_file_location("cleanup_proof", SCRIPT)
 CLEANUP_PROOF = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CLEANUP_PROOF)
