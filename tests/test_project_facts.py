@@ -110,7 +110,7 @@ class ProjectFacts(unittest.TestCase):
         self.assertTrue(result.matched)
         for invalid in ({'a': {'fact': 'b'}, 'b': {'fact': 'a'}}, {'a': {'all': []}}):
             self.assertTrue(gate.fact_definition_diagnostics(invalid))
-        data = {'schema_version': 3, 'tier': 'example', 'applies': 'stack-present', 'detect': {'fact': 'technology.example'}, 'fact_definitions': definitions}
+        data = {'tier': 'example', 'applies': 'stack-present', 'detect': {'fact': 'technology.example'}, 'fact_definitions': definitions}
         first = gate.Declaration('first', 'test', data)
         second = gate.Declaration('second', 'test', dict(data, fact_definitions={'technology.example': self.dependency('nuget', 'Other')}))
         self.assertEqual(gate.compose_fact_definitions([first])[1], [])
@@ -159,7 +159,7 @@ class ProjectFacts(unittest.TestCase):
         cache = self.root / 'cache'
         payload = cache / 'test' / 'example' / '1'
         payload.mkdir(parents=True)
-        data = {'schema_version': 3, 'tier': 'example', 'applies': 'stack-present', 'detect': {'fact': 'a'}, 'fact_definitions': {'a': {'all': None}}}
+        data = {'tier': 'example', 'applies': 'stack-present', 'detect': {'fact': 'a'}, 'fact_definitions': {'a': {'all': None}}}
         (payload / 'tier.json').write_text(json.dumps(data), encoding='utf-8')
         found = gate.declarations([cache])
         self.assertEqual(found[0].diagnostics[0]['code'], 'malformed-predicate')
@@ -168,11 +168,11 @@ class ProjectFacts(unittest.TestCase):
     def test_fact_composition_allows_foreign_references_and_detects_global_failures(self):
         self.write('A.csproj', '<Project><ItemGroup><PackageReference Include="Example"/></ItemGroup></Project>')
         def declaration(name, definitions, detect):
-            return gate.Declaration(name, 'test', {'schema_version': 3, 'tier': name, 'applies': 'stack-present',
+            return gate.Declaration(name, 'test', {'tier': name, 'applies': 'stack-present',
                                                   'detect': detect, 'fact_definitions': definitions})
         first = declaration('first', {'first.fact': {'fact': 'second.fact'}}, {'fact': 'first.fact'})
         second = declaration('second', {'second.fact': self.dependency('nuget', 'Example')}, {'fact': 'second.fact'})
-        self.assertEqual(gate.v3_declaration_diagnostics({'schema_version': 3, 'tier': 'first', 'applies': 'stack-present',
+        self.assertEqual(gate.declaration_data_diagnostics({'tier': 'first', 'applies': 'stack-present',
                                                         'detect': first.detect, 'fact_definitions': first.fact_definitions}), [])
         definitions, problems = gate.compose_fact_definitions([first, second])
         self.assertEqual(problems, [])

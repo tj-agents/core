@@ -23,8 +23,8 @@ checker = load("check_tier_payload")
 class Predicates(unittest.TestCase):
     def test_one_assessment_reuses_identical_git_queries_without_stale_later_results(self):
         found = [gate.Declaration(name, "tj-agents", {
-            "schema_version": 1, "tier": name, "stack": "Rust", "applies": "stack-present",
-            "detect": {"globs": ["*.rs"]},
+            "tier": name, "stack": "Rust", "applies": "stack-present",
+            "detect": {'glob': "*.rs"},
         }) for name in ("rust-one", "rust-two")]
         with patch.object(gate, "_run_git", return_value="") as git:
             self.assertEqual(2, len(gate.assess(self.root, found).blocked))
@@ -90,8 +90,8 @@ class Predicates(unittest.TestCase):
         self.assertTrue(result.matched)
         self.assertFalse(gate.evaluate_predicate(self.root, {"remote": "^infonetica/"}).matched)
 
-    def test_v3_selection_exposes_shared_results(self):
-        data = {"schema_version": 3, "tier": "example", "applies": "stack-present",
+    def test_selection_exposes_shared_results(self):
+        data = {"tier": "example", "applies": "stack-present",
                 "detect": {"all": [{"glob": "*.csproj"}, {"file": "project.csproj"}]}}
         declaration = gate.Declaration("example", "test", data)
         result = gate.assess(self.root, [declaration])
@@ -100,11 +100,11 @@ class Predicates(unittest.TestCase):
         self.assertEqual(result.selections[0]["evidence"], ("project.csproj",))
         self.assertEqual(result.diagnostics, ())
 
-    def test_v3_force_and_owner_identity_do_not_establish_governing_selection(self):
-        data = {"schema_version": 3, "tier": "example", "applies": "stack-present",
-                "owner_repository": "tj-agents/example", "detect": {"file": "missing"}}
+    def test_force_and_owner_identity_do_not_establish_governing_selection(self):
+        data = {"tier": "example", "applies": "stack-present",
+                "detect": {"file": "missing"}}
         declaration = gate.Declaration("example", "test", data)
-        with patch.dict(gate.os.environ, {gate.OVERRIDE_VARIABLE: "example"}), \
+        with patch.object(gate.os, "environ", {**gate.os.environ, "AGENTS_TIER_OVERRIDE": "example"}), \
                 patch.object(gate, "repository_identity", return_value="tj-agents/example"):
             result = gate.assess(self.root, [declaration])
         self.assertEqual(result.applicable, [])
@@ -112,13 +112,13 @@ class Predicates(unittest.TestCase):
 
     def test_session_reports_unknown_configuration(self):
         declaration = gate.Declaration("example", "test", {
-            "schema_version": 3, "tier": "example", "applies": "stack-present", "detect": {"fact": "unknown"}})
+            "tier": "example", "applies": "stack-present", "detect": {"fact": "unknown"}})
         output = gate.statement(self.root, [declaration])
         self.assertIn("Configuration diagnostic", output)
         self.assertIn("Provide scoped evidence for fact: unknown", output)
 
-    def test_discovery_reports_version_and_parse_failures(self):
-        for name, body in (("future", json.dumps({"schema_version": 99})), ("broken", "{")):
+    def test_discovery_reports_retired_fields_and_parse_failures(self):
+        for name, body in (("future", json.dumps({"schema_version": 99, "tier": "future", "applies": "always"})), ("broken", "{")):
             payload = self.root / name / name / "1"
             payload.mkdir(parents=True)
             (payload / "tier.json").write_text(body, encoding="utf-8")
@@ -126,7 +126,7 @@ class Predicates(unittest.TestCase):
         found = gate.declarations([self.root], diagnostics=diagnostics)
         self.assertEqual([item.id for item in found], ["broken@broken", "future@future"])
         self.assertTrue(all(item.diagnostics for item in found))
-        self.assertEqual([item["code"] for item in diagnostics], ["unreadable-declaration", "unsupported-version"])
+        self.assertEqual([item["code"] for item in diagnostics], ["unreadable-declaration", "malformed-declaration"])
 
 
     def install(self, plugin, body):
@@ -144,7 +144,7 @@ class Predicates(unittest.TestCase):
         return cache, payload
 
     def test_invalid_installed_declarations_are_diagnosed(self):
-        valid = {"schema_version": 3, "tier": "invalid", "applies": "stack-present", "detect": {"all": []}}
+        valid = {"tier": "invalid", "applies": "stack-present", "detect": {"all": []}}
         for body in (valid, dict(valid, detect={"not": {"file": "project.csproj"}}),
                      dict(valid, owner_repository=17), dict(valid, schema_version=99), "{", []):
             with self.subTest(body=body):
@@ -157,12 +157,12 @@ class Predicates(unittest.TestCase):
                     self.assertTrue(selection["diagnostics"])
 
     def test_mixed_validity_keeps_every_valid_convention_and_ordinary_plugins(self):
-        for version in (1, 2, 3):
-            detect = {"globs": ["*.csproj"]} if version < 3 else {"glob": "*.csproj"}
-            cache, _ = self.install("valid" + str(version), {"schema_version": version, "tier": "valid" + str(version),
-                                                            "applies": "stack-present", "detect": detect})
-        self.install("invalid", {"schema_version": 3, "tier": "invalid", "applies": "stack-present", "detect": {"all": []}})
-        self.install("unknown", {"schema_version": 3, "tier": "unknown", "applies": "stack-present", "detect": {"fact": "missing"}})
+        predicates = ({"glob": "*.csproj"}, {"file": "project.csproj"}, {"all": [{"glob": "*.csproj"}]})
+        for index, detect in enumerate(predicates, start=1):
+            cache, _ = self.install("valid" + str(index), {"tier": "valid" + str(index),
+                                                          "applies": "stack-present", "detect": detect})
+        self.install("invalid", {"tier": "invalid", "applies": "stack-present", "detect": {"all": []}})
+        self.install("unknown", {"tier": "unknown", "applies": "stack-present", "detect": {"fact": "missing"}})
         self.install("ordinary", None)
         with patch.object(gate, "cache_roots", return_value=[cache]):
             result = gate.assess(self.root)
@@ -177,8 +177,8 @@ class Predicates(unittest.TestCase):
             gate.declarations([cache], diagnostics=diagnostics)
             self.assertFalse(any("ordinary" in item["path"] for item in diagnostics))
 
-    def test_payload_checker_accepts_v3_and_rejects_invalid_composition(self):
-        data = {"schema_version": 3, "tier": "example", "applies": "stack-present",
+    def test_payload_checker_accepts_predicates_and_rejects_invalid_composition(self):
+        data = {"tier": "example", "applies": "stack-present",
                 "detect": {"all": [{"fact": "language.dotnet"}, {"context": {"key": "house", "equals": "tommy"}}]}}
         path = self.root / "tier.json"
         path.write_text(json.dumps(data), encoding="utf-8")

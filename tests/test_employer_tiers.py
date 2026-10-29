@@ -22,10 +22,10 @@ def load(name):
 
 gate = load('tier_gate')
 checker = load('check_tier_payload')
-WORK = {'schema_version': 3, 'tier': 'work', 'applies': 'stack-present',
+WORK = {'tier': 'work', 'applies': 'stack-present',
         'detect': {'fact': 'employer'}, 'session_context': 'Load work:ask-person before drafting and clip the draft.'}
-EMPLOYER = {'schema_version': 3, 'tier': 'employer-a', 'applies': 'stack-present',
-            'owner_repository': 'publisher/employer-a', 'detect': {'all': [{'remote_host': 'example.test'}, {'remote': '^employer-a/'}]},
+EMPLOYER = {'tier': 'employer-a', 'applies': 'stack-present',
+            'detect': {'all': [{'remote_host': 'example.test'}, {'remote': '^employer-a/'}]},
             'employer': {'context_skill': 'communication-context'}}
 
 
@@ -184,7 +184,7 @@ class EmployerScope(unittest.TestCase):
         with patch.object(Path, 'resolve', lambda path: target if path == skill else resolve(path)):
             self.assertIsNone(gate.employer_context_path(employer, 'communication-context'))
             self.assertTrue(any(item['code'] == 'missing-employer-context'
-                                for item in gate.v3_declaration_diagnostics(EMPLOYER, payload_dir=employer)))
+                                for item in gate.declaration_data_diagnostics(EMPLOYER, payload_dir=employer)))
 
     def test_unresolvable_context_path_does_not_turn_into_a_hook_exception(self):
         employer = self.install('employer-a', EMPLOYER)
@@ -211,7 +211,7 @@ class EmployerScope(unittest.TestCase):
     def test_owner_identity_and_overrides_do_not_establish_employer(self):
         self.install('employer-a', EMPLOYER)
         self.remote('publisher/employer-a')
-        with patch.dict(gate.os.environ, {gate.OVERRIDE_VARIABLE: 'employer-a,work'}):
+        with patch.object(gate.os, "environ", {**gate.os.environ, "AGENTS_TIER_OVERRIDE": 'employer-a,work'}):
             result = gate.assess(self.project, self.found())
         self.assertEqual(result.applicable, [])
         self.assertEqual(result.employers, ())
@@ -241,20 +241,20 @@ class EmployerScope(unittest.TestCase):
             self.assertIn(str((payload / 'skills/communication-context/SKILL.md').resolve()), context)
         self.assertEqual(context.count(WORK['session_context']), 1)
 
-    def test_legacy_metadata_cannot_supply_employer_evidence(self):
+    def test_retired_version_fields_cannot_supply_employer_evidence(self):
         self.remote('employer-a/service')
-        for version in (1, 2):
-            employer = self.install('employer-a', dict(EMPLOYER, schema_version=version, detect={'files': ['marker']}))
+        for version in (1, 2, 3):
+            employer = self.install('employer-a', dict(EMPLOYER, schema_version=version, detect={'file': 'marker'}))
             (self.project / 'marker').touch()
             result = gate.assess(self.project, self.found())
             self.assertEqual(result.employers, ())
             self.assertFalse(any(item.plugin == 'work' for item, _ in result.applicable))
             problems = []
             checker.check_tier_declaration(employer, problems)
-            self.assertTrue(any('employer requires schema_version 3' in item for item in problems))
+            self.assertTrue(any('Unknown declaration fields: schema_version' in item for item in problems))
 
     def test_only_valid_applicable_tiers_emit_one_line_session_context(self):
-        declaration = gate.Declaration('base', 'test-market', {'schema_version': 3, 'tier': 'base',
+        declaration = gate.Declaration('base', 'test-market', {'tier': 'base',
                                       'applies': 'always', 'session_context': 'Always load this context.'})
         self.assertIn('Always load this context.', gate.statement(self.project, [declaration]))
         for text in ('', '  ', 'first\nsecond', 'first\rsecond', 'first\u2028second'):
@@ -262,8 +262,6 @@ class EmployerScope(unittest.TestCase):
             result = gate.assess(self.project, [invalid])
             self.assertEqual(result.ubiquitous, [])
             self.assertTrue(result.diagnostics)
-        legacy = gate.Declaration('base', 'test-market', dict(declaration.data, schema_version=2))
-        self.assertEqual(gate.statement(self.project, [legacy]), '')
 
     def test_employer_context_shipping_is_required_for_in_memory_declarations_too(self):
         (self.project / 'marker').touch()
@@ -280,13 +278,13 @@ class EmployerScope(unittest.TestCase):
         for value in ('../outside', 'work:context', 'Context', 'context\n', ''):
             self.assertIsNone(re.search(slug, value))
             data = dict(EMPLOYER, employer={'context_skill': value})
-            self.assertTrue(gate.v3_declaration_diagnostics(data))
+            self.assertTrue(gate.declaration_data_diagnostics(data))
         self.assertIsNotNone(re.search(context, 'Load this context.'))
         for value in ('', '  ', 'first\nsecond', 'first\r', 'first\u2028second', 'first\n'):
             self.assertIsNone(re.search(context, value))
-            self.assertTrue(gate.v3_declaration_diagnostics(dict(WORK, session_context=value)))
-        self.assertFalse(schema['allOf'][0]['else']['properties']['employer'])
-        self.assertFalse(schema['allOf'][0]['else']['properties']['session_context'])
+            self.assertTrue(gate.declaration_data_diagnostics(dict(WORK, session_context=value)))
+        self.assertNotIn('schema_version', schema['properties'])
+        self.assertEqual(schema['properties']['detect'], {'$ref': '#/$defs/predicate'})
         employer = schema['allOf'][-1]
         self.assertEqual(employer['if'], {'required': ['employer']})
         self.assertEqual(employer['then']['properties']['applies'], {'const': 'stack-present'})

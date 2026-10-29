@@ -1,4 +1,3 @@
-import hashlib
 import importlib.util
 import json
 import os
@@ -12,30 +11,44 @@ from unittest import mock
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "native_host_acceptance.py"
-OBSERVER = Path(__file__).resolve().parents[1] / "scripts" / "native_startup_observer.py"
 specification = importlib.util.spec_from_file_location("native_host_acceptance", SCRIPT)
 NATIVE = importlib.util.module_from_spec(specification)
 specification.loader.exec_module(NATIVE)
 
 
 class NativeHostAcceptanceTests(unittest.TestCase):
-    def test_observer_runs_the_staged_agent_startup_binding_without_installed_state(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            result = subprocess.run([sys.executable, '-B', str(OBSERVER), '--help'], capture_output=True,
-                                    text=True, encoding='utf-8', env={**os.environ,
-                                                                       'AGENT_STATE_DIRECTORY': temporary})
-        self.assertEqual(0, result.returncode, result.stderr)
+    def test_codex_requires_a_matching_native_hook_completion(self):
+        source = Path("base/hooks/codex.json").resolve()
+        run = {"id": "current", "eventName": "sessionStart", "source": "plugin",
+               "sourcePath": str(source), "status": "completed", "entries": []}
+        messages = [{"method": "hook/started", "params": {"run": run}},
+                    {"method": "hook/completed", "params": {"run": run}}]
+        self.assertEqual(run, NATIVE.require_codex_hook(messages, source))
+        for invalid in ([], messages[1:], messages + messages[1:]):
+            with self.assertRaises(NATIVE.AcceptanceError):
+                NATIVE.require_codex_hook(invalid, source)
+        with self.assertRaises(NATIVE.AcceptanceError):
+            NATIVE.require_codex_hook(messages, source.parent / "different.json")
+        with self.assertRaises(NATIVE.AcceptanceError):
+            NATIVE.require_codex_hook(messages, source, "probe")
+        run.update(status="failed", entries=[{"kind": "error", "text": "hook exited with code 1"}])
+        self.assertEqual(run, NATIVE.require_codex_hook(messages, source, "probe"))
 
-    def test_an_early_failure_cannot_reuse_a_previous_failed_observer_receipt(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            evidence = Path(temporary)
-            receipt = evidence / 'codex-startup-observer.json'
-            receipt.write_text(json.dumps({'state': 'failed', 'error':
-                'workflow@tj-agents native-required-hook-failure-probe'}), encoding='utf-8')
-            operation = mock.Mock(side_effect=NATIVE.AcceptanceError('installation failed before launch'))
-            with self.assertRaisesRegex(NATIVE.AcceptanceError, 'no valid receipt'):
-                NATIVE.require_failure_probe('codex', evidence, operation)
-            self.assertFalse(receipt.exists())
+    def test_claude_requires_a_current_native_hook_response(self):
+        run = {"type": "system", "subtype": "hook_response", "hook_event": "SessionStart",
+               "hook_id": "current", "exit_code": 0, "stderr": ""}
+        started = {"type": "system", "subtype": "hook_started", "hook_event": "SessionStart", "hook_id": "current"}
+        messages = [started, run]
+        self.assertEqual(run, NATIVE.require_claude_hook(messages))
+        for invalid in ([], [run], messages + [run]):
+            with self.assertRaises(NATIVE.AcceptanceError):
+                NATIVE.require_claude_hook(invalid)
+        with self.assertRaises(NATIVE.AcceptanceError):
+            NATIVE.require_claude_hook(messages, "probe")
+        run.update(exit_code=1, stderr="probe")
+        self.assertEqual(run, NATIVE.require_claude_hook(messages, "probe"))
+        with self.assertRaises(NATIVE.AcceptanceError):
+            NATIVE.require_claude_hook(messages, "another failure")
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -43,18 +56,6 @@ class NativeHostAcceptanceTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.project = self.root / "project"
         self.project.mkdir()
-        self.state = self.root / "state"
-
-    def receipt(self):
-        path = self.state / "cli-sessions" / "session.json"
-        path.parent.mkdir(parents=True)
-        value = {
-            "host": "codex", "session_id": "session", "cwd": str(self.project),
-            "pid": 42, "pid_started_at": 100.0,
-        }
-        path.write_text(json.dumps(value), encoding="utf-8")
-        return value
-
     def test_fixture_selects_required_packages_without_personal(self):
         NATIVE.write_fixture(self.project)
         value = json.loads((self.project / ".agents" / "plugins.json").read_text(encoding="utf-8"))
@@ -82,13 +83,12 @@ class NativeHostAcceptanceTests(unittest.TestCase):
 
     def test_transcript_requires_base_context_and_unauthenticated_completion(self):
         package = self.root / "base"
-        contract = package / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
+        contract = package / "tier.json"
         contract.parent.mkdir(parents=True)
-        contract.write_text("task routing", encoding="utf-8")
+        contract.write_text(json.dumps({"tier": "base", "applies": "always", "session_context": "Use the clipboard."}), encoding="utf-8")
         transcript = self.root / "session.jsonl"
-        digest = hashlib.sha256(b"task routing").hexdigest()
         transcript.write_text(
-            json.dumps({"type": "response_item", "payload": {"content": f"base:task-routing {digest}"}}) + "\n"
+            json.dumps({"type": "response_item", "payload": {"content": "Tier gate - which standards apply in this project\nUbiquitous, always applies: base, engineering, workflow.\nUse the clipboard."}}) + "\n"
             + json.dumps({"type": "event_msg", "payload": {"type": "task_complete", "error": {"message": "401 Unauthorized"}}}) + "\n",
             encoding="utf-8",
         )
@@ -97,14 +97,19 @@ class NativeHostAcceptanceTests(unittest.TestCase):
         with self.assertRaisesRegex(NATIVE.AcceptanceError, "Base context"):
             NATIVE.require_failed_turn(transcript, package, 0.1)
 
+    def test_base_without_session_context_accepts_an_empty_hook_result(self):
+        package = self.root / "base"
+        package.mkdir()
+        (package / "tier.json").write_text(json.dumps({"tier": "base", "applies": "always"}), encoding="utf-8")
+        NATIVE.require_base_evidence("", package, "native hook")
+
     def test_transcript_waits_for_initial_appearance(self):
         package = self.root / "base"
-        contract = package / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
+        contract = package / "tier.json"
         contract.parent.mkdir(parents=True)
-        contract.write_text("task routing", encoding="utf-8")
-        digest = hashlib.sha256(b"task routing").hexdigest()
+        contract.write_text(json.dumps({"tier": "base", "applies": "always", "session_context": "Use the clipboard."}), encoding="utf-8")
         entries = [
-            {"type": "response_item", "payload": {"content": f"base:task-routing {digest}"}},
+            {"type": "response_item", "payload": {"content": "Tier gate - which standards apply in this project\nUbiquitous, always applies: base, engineering, workflow.\nUse the clipboard."}},
             {"type": "event_msg", "payload": {"type": "task_complete", "error": {"message": "401 Unauthorized"}}},
         ]
         with mock.patch.object(NATIVE, "transcript_entries", side_effect=[None, entries]):

@@ -18,8 +18,7 @@ declaration cannot claim to be a plugin it is not.
 `--session-context` (SessionStart) states which tiers apply in this project. It prints nothing at
 all when no stack tier is installed, because a statement about an empty set is pure noise.
 
-A tier's own authoring repository is exempt, even when its source files do not contain the
-stack's normal project markers.
+Authoring repositories declare their applicability with an explicit remote predicate.
 """
 
 from __future__ import annotations
@@ -39,12 +38,10 @@ import sys
 from urllib.parse import urlsplit
 
 
-SCHEMA_VERSIONS = (1, 2, 3)
 DECLARATION_NAME = "tier.json"
 ORPHAN_MARKER = ".orphaned_at"
 FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
 PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
-OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
 WALK_DEPTH = 4
 WALK_SKIP = frozenset({
     ".git", ".hg", ".svn", ".worktrees", "node_modules", "bin", "obj", "dist", "build",
@@ -60,21 +57,17 @@ class Declaration:
     def __init__(self, plugin, marketplace, data, payload_dir=None, orphaned=False, diagnostics=()):
         self.plugin = plugin
         self.data = data
-        self.schema_version = data.get("schema_version")
         self.marketplace = marketplace
         self.tier = _text(data.get("tier")) or plugin
         self.applies = data.get("applies")
         self.stack = _text(data.get("stack")) or self.tier
-        owner = data.get("owner_repository")
-        owner = [owner] if isinstance(owner, str) else owner if isinstance(owner, list) else []
-        self.owner_repositories = [_text(name).lower() for name in owner if _text(name)]
         self.detect = data.get("detect") if isinstance(data.get("detect"), dict) else {}
         self.payload_dir = payload_dir
         self.orphaned = orphaned
         self.diagnostics = tuple(diagnostics)
         self.fact_definitions = data.get("fact_definitions", {})
-        self.employer = data.get("employer") if self.schema_version == 3 else None
-        self.session_context = _text(data.get("session_context")) if self.schema_version == 3 else ""
+        self.employer = data.get("employer")
+        self.session_context = _text(data.get("session_context"))
 
     @property
     def id(self):
@@ -174,9 +167,9 @@ def employer_context_path(payload_dir, slug):
         return None
 
 
-def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
+def declaration_data_diagnostics(data, path="tier.json", payload_dir=None):
     problems = []
-    unknown = set(data) - {"schema_version", "tier", "applies", "stack", "owner_repository", "detect",
+    unknown = set(data) - {"tier", "applies", "stack", "detect",
                            "fact_definitions", "employer", "session_context"}
     if unknown:
         problems.append(diagnostic("malformed-declaration", path, "Unknown declaration fields: " + ", ".join(sorted(unknown))))
@@ -186,12 +179,6 @@ def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
         problems.append(diagnostic("malformed-declaration", path, "Applies requires always or stack-present"))
     if "stack" in data and (not isinstance(data["stack"], str) or not data["stack"]):
         problems.append(diagnostic("malformed-declaration", path, "Stack requires a non-empty string"))
-    if "owner_repository" in data:
-        owner = data["owner_repository"]
-        owners = [owner] if isinstance(owner, str) else owner
-        if not isinstance(owners, list) or any(not isinstance(item, str) or not re.fullmatch(r"[^/ ]+/[^/ ]+", item)
-                                              for item in owners) or len(set(owners)) != len(owners):
-            problems.append(diagnostic("malformed-declaration", path, "Owner requires unique owner/name strings"))
     if data.get("applies") == "stack-present" or "detect" in data:
         problems.extend(predicate_diagnostics(data.get("detect"), path + ".detect"))
     if "fact_definitions" in data:
@@ -385,9 +372,30 @@ def _evaluate_predicate(root, node, facts=None, contexts=None, path="detect", em
         host = repository_host(root)
         matched = host is not None and host == value.rstrip(".").lower()
         return PredicateResult(root, matched, ["origin host " + host] if matched else [])
-    legacy = {"file": "files", "glob": "globs", "remote": "remote", "content": "content"}
-    matched, evidence = stack_present(root, {legacy[operator]: [value]})
-    return PredicateResult(root, matched, [evidence] if evidence else [])
+    root = Path(root)
+    if operator == "file":
+        try:
+            matched = (root / value).exists()
+        except OSError:
+            matched = False
+        return PredicateResult(root, matched, [value] if matched else [])
+    if operator == "glob":
+        matches = matching_paths(root, [value])
+        return PredicateResult(root, bool(matches), matches[:1])
+    if operator == "remote":
+        identity = repository_identity(root)
+        matched = bool(identity and re.search(value, identity, re.IGNORECASE))
+        return PredicateResult(root, matched, ["origin " + identity] if matched else [])
+    expression = re.compile(value["pattern"])
+    for candidate in matching_paths(root, [value["glob"]])[:CONTENT_CANDIDATES]:
+        try:
+            text = (root / candidate).read_text(encoding="utf-8-sig", errors="ignore")
+        except (OSError, UnicodeError):
+            continue
+        if expression.search(text[:CONTENT_BYTES]):
+            return PredicateResult(root, True, [candidate])
+    return PredicateResult(root)
+
 
 
 class SelectionResult:
@@ -524,12 +532,7 @@ def declarations(roots=None, project=None, diagnostics=None):
                 data = {}
                 problems.append(diagnostic("malformed-declaration", str(path), "Declare tier.json as an object"))
             if not problems:
-                if data.get("schema_version") not in SCHEMA_VERSIONS:
-                    problems.append(diagnostic("unsupported-version", str(path), "Supported tier schema versions: 1, 2, 3"))
-                elif data.get("schema_version") == 3:
-                    problems.extend(v3_declaration_diagnostics(data, str(path), version_directory))
-                elif not _text(data.get("tier")) or data.get("applies") not in ("always", "stack-present"):
-                    problems.append(diagnostic("malformed-declaration", str(path), "Declare tier and applies"))
+                problems.extend(declaration_data_diagnostics(data, str(path), version_directory))
             orphaned = (version_directory / ORPHAN_MARKER).exists()
             declaration = Declaration(plugin, marketplace, data, version_directory, orphaned, problems)
             preference = _preference(declaration, rank)
@@ -709,72 +712,11 @@ def matching_paths(root, patterns):
     return [path for path in walked if path not in ignored]
 
 
-def stack_present(root, detect):
-    root = Path(root)
-    if not root.is_dir():
-        return False, None
-
-    for name in detect.get("files") or []:
-        if not isinstance(name, str):
-            continue
-        try:
-            if (root / name).exists():
-                return True, name
-        except OSError:
-            continue
-
-    matches = matching_paths(root, detect.get("globs") or [])
-    if matches:
-        return True, matches[0]
-
-    remote_patterns = [_text(pattern) for pattern in detect.get("remote") or [] if _text(pattern)]
-    if remote_patterns:
-        identity = repository_identity(root)
-        if identity:
-            for pattern in remote_patterns:
-                try:
-                    expression = re.compile(pattern, re.IGNORECASE)
-                except re.error:
-                    continue
-                if expression.search(identity):
-                    return True, "origin " + identity
-
-    for rule in detect.get("content") or []:
-        if not isinstance(rule, dict):
-            continue
-        glob = _text(rule.get("glob"))
-        pattern = _text(rule.get("pattern"))
-        if not glob or not pattern:
-            continue
-        try:
-            expression = re.compile(pattern)
-        except re.error:
-            continue
-        for candidate in matching_paths(root, [glob])[:CONTENT_CANDIDATES]:
-            try:
-                text = (root / candidate).read_text(encoding="utf-8-sig", errors="ignore")
-            except (OSError, UnicodeError):
-                continue
-            if expression.search(text[:CONTENT_BYTES]):
-                return True, candidate
-
-    return False, None
-
-
-def overridden():
-    raw = os.environ.get(OVERRIDE_VARIABLE) or ""
-    return {part.strip().lower() for part in raw.split(",") if part.strip()}
-
-
 def declaration_diagnostics(declaration):
     if declaration.diagnostics:
         return declaration.diagnostics
-    if declaration.schema_version not in SCHEMA_VERSIONS:
-        return (diagnostic("unsupported-version", declaration.id, "Supported tier schema versions: 1, 2, 3"),)
-    if declaration.schema_version != 3:
-        return ()
     path = str(Path(declaration.payload_dir) / DECLARATION_NAME) if declaration.payload_dir else declaration.id
-    problems = v3_declaration_diagnostics(declaration.data, path, declaration.payload_dir)
+    problems = declaration_data_diagnostics(declaration.data, path, declaration.payload_dir)
     if declaration.employer is not None:
         if declaration.payload_dir is None:
             problems.append(diagnostic("missing-employer-context", path, "Employer context requires an installed payload"))
@@ -798,8 +740,6 @@ def _assess(root, found=None, facts=None, contexts=None):
     if not found:
         return SelectionResult(root, diagnostics=diagnostics)
 
-    forced = overridden()
-    identity = None
     ubiquitous, applicable, blocked = [], [], []
     problems_by_id = {declaration.id: declaration_diagnostics(declaration) for declaration in found}
     employers = []
@@ -826,33 +766,16 @@ def _assess(root, found=None, facts=None, contexts=None):
         if not declaration.gated:
             ubiquitous.append(declaration)
             continue
-        if declaration.schema_version == 3:
-            result = employer_predicates.get(declaration.id)
-            if result is None:
-                result = _evaluate_predicate(root, declaration.detect, facts, contexts, employer_result=employer_result)
-            selections.append({"plugin_id": declaration.id, "scope": result.scope,
-                               "predicate": declaration.detect, "matched": result.matched,
-                               "prerequisites": result.prerequisites, "evidence": result.evidence,
-                               "diagnostics": result.diagnostics})
-            diagnostics.extend(result.diagnostics)
-            if result.matched:
-                applicable.append((declaration, declaration.stack + " detected"))
-            else:
-                blocked.append(declaration)
-            continue
-        if declaration.tier.lower() in forced:
-            applicable.append((declaration, "forced by " + OVERRIDE_VARIABLE))
-            continue
-        if declaration.owner_repositories:
-            if identity is None:
-                identity = repository_identity(root) or ""
-            if identity and identity in declaration.owner_repositories:
-                applicable.append((declaration, "this is the tier's own repository"))
-                continue
-        present, evidence = stack_present(root, declaration.detect)
-        if present:
-            found_at = " (" + evidence + ")" if evidence else ""
-            applicable.append((declaration, declaration.stack + " detected" + found_at))
+        result = employer_predicates.get(declaration.id)
+        if result is None:
+            result = _evaluate_predicate(root, declaration.detect, facts, contexts, employer_result=employer_result)
+        selections.append({"plugin_id": declaration.id, "scope": result.scope,
+                           "predicate": declaration.detect, "matched": result.matched,
+                           "prerequisites": result.prerequisites, "evidence": result.evidence,
+                           "diagnostics": result.diagnostics})
+        diagnostics.extend(result.diagnostics)
+        if result.matched:
+            applicable.append((declaration, declaration.stack + " detected"))
         else:
             blocked.append(declaration)
     return SelectionResult(root, ubiquitous, applicable, blocked, diagnostics, selections, employers)
