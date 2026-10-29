@@ -349,8 +349,11 @@ def verify_installed_roots(value, trust, marketplace):
 
 def require_base_evidence(evidence, package_root, label):
     declaration = json.loads((package_root / "tier.json").read_text(encoding="utf-8"))
-    context = declaration.get("session_context")
-    if not isinstance(context, str) or not context or context not in evidence:
+    expected = ["Tier gate - which standards apply in this project",
+                "Ubiquitous, always applies: " + ", ".join(sorted(PACKAGES)) + "."]
+    if declaration.get("session_context"):
+        expected.append(declaration["session_context"])
+    if any(text not in evidence for text in expected):
         raise AcceptanceError(f"{label} did not include Base session context")
 
 
