@@ -34,15 +34,19 @@ agent definitions and configuration; `.claude/` holds the Claude-only equivalent
 references its canonical definition in `.agents/` and adds only genuine host differences; never copy a shared
 instruction body into either host tree.
 
+Canonical skills live at `.agents/<namespace>/skills/<subject>/SKILL.md`; kind is metadata and does not
+determine the source path or public name. Native entry points put project fields under `metadata`
+with `tj-agents-` keys; see [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md).
+
 `plugins/*` is generated distribution output, never an authored source tree, and never part of a PR:
 CI's guard rejects generated paths and the post-merge job regenerates and commits them on main. Run
 `pwsh .agents/sync-generated.ps1` locally only to refresh the tree for tests, and leave its output
 uncommitted. See [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md).
 
-Read [`engineering:skill-authoring`](.agents/engineering/convention/skill-authoring/SKILL.md) before
+Read [`engineering:skill-authoring`](.agents/engineering/skills/skill-authoring/SKILL.md) before
 deciding to create, split, merge, rename or retire a skill, including while planning one.
 
-A utility skill must not depend on a manually assembled, machine-local file the plugin does not ship.
+A skill must not depend on a manually assembled, machine-local file the plugin does not ship.
 See [`PACKAGING.md`](PACKAGING.md).
 
 <!-- BEGIN personal:rules sha256:eee7a719bb90e67aaa81ac101a45836dd099bc745fee61216c99ec7d6075f12d -->

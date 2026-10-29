@@ -845,7 +845,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertTrue((package / ".codex/runtime/continuation/continuation_runtime.py").is_file())
         self.assertTrue((package / ".codex/runtime/continuation/continuation_scheduler.py").is_file())
         self.assertFalse((package / "skills/persistent-delivery/scripts").exists())
-        self.assertFalse((package / ".agents/engineering/policy/persistent-delivery/scripts").exists())
+        self.assertFalse((package / ".agents/engineering/skills/persistent-delivery/scripts").exists())
         self.assertFalse((package / "workflows/continuation_runtime.py").exists())
         installed = load("generated_delivery_continuation",
                          package / "codex-skills/persistent-delivery/scripts/delivery_continuation.py")

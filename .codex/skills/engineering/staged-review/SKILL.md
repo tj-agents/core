@@ -1,12 +1,12 @@
 ---
 name: staged-review
 description: Select and drive the canonical isolated review workflow for a very large immutable branch diff in resumable, dependency-ordered area stages recorded in the branch's one canonical work order. Use for hundreds or thousands of changed files, a multi-service diff, or to resume one staged review area.
-
-kind: workflow
-domain: process
+metadata:
+  tj-agents-kind: workflow
+  tj-agents-domain: process
 ---
 
 # Staged review selector
 
-Read and follow the [canonical shared definition](../../../../.agents/engineering/workflow/staged-review/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../../../.agents/engineering/skills/staged-review/SKILL.md) in full.
 This entry point supplies only Codex discovery metadata; the shared procedure is authored once under `.agents/`.

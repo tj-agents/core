@@ -1,14 +1,14 @@
 ---
 name: review
 description: Review a branch, PR, commit range or selected paths with the host's native reviewer and the relevant standards injected into that repository. Use for a full code review or a targeted review; use incremental-review for a later sweep, staged-review for explicit resumable partitioning, and docs-review for documentation.
-
-kind: utility
-domain: process
+metadata:
+  tj-agents-kind: operation
+  tj-agents-domain: process
 ---
 
 # Canonical isolated code review
 
-Read and follow the [canonical shared definition](../../../../.agents/engineering/utility/review/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../../../.agents/engineering/skills/review/SKILL.md) in full.
 This entry point adds only Codex's reviewers; the shared procedure is authored once under `.agents/`.
 
 ## Codex reviewers

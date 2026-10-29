@@ -14,6 +14,19 @@ import sys
 
 FRONTMATTER = re.compile(r"\A---\n(?P<header>.*?)\n---\n(?P<body>.*)\Z", re.DOTALL)
 DEFAULT_HANDOFF_SKILLS = frozenset({"cd", "handoff"})
+SKILL_KINDS = frozenset(
+    {"policy", "standard", "operation", "workflow", "learning", "reference"}
+)
+NATIVE_FIELDS = {"name", "description", "license", "allowed-tools"}
+CLAUDE_FIELDS = {
+    "argument-hint",
+    "disable-model-invocation",
+    "user-invocable",
+    "model",
+    "context",
+    "agent",
+    "hooks",
+}
 
 
 def read(path: Path) -> str:
@@ -371,24 +384,90 @@ def inside(root: Path, relative: str | PurePosixPath) -> Path:
     return candidate
 
 
-def metadata(body: str, source: Path) -> dict[str, str]:
+def frontmatter_blocks(body: str, source: Path) -> dict[str, list[str]]:
     match = FRONTMATTER.match(body)
     if match is None:
         raise ValueError(f"Missing frontmatter: {source}")
-    values: dict[str, str] = {}
+    blocks: dict[str, list[str]] = {}
+    current = None
     for line in match.group("header").splitlines():
-        if ":" not in line:
+        if line and not line[0].isspace() and not line.startswith("#") and ":" in line:
+            key, value = line.split(":", 1)
+            current = key.strip()
+            if current in blocks:
+                raise ValueError(f"{source}: duplicate frontmatter field {current}")
+            blocks[current] = [f"{current}:{value}"]
+        elif current is not None:
+            blocks[current].append(line)
+    return blocks
+
+
+def metadata(body: str, source: Path) -> dict[str, str]:
+    blocks = frontmatter_blocks(body, source)
+    values = {
+        key: block[0].split(":", 1)[1].strip()
+        for key, block in blocks.items()
+        if key != "metadata"
+    }
+    extension = blocks.get("metadata", ["metadata:"])
+    if extension[0].strip() != "metadata:":
+        raise ValueError(f"{source}: metadata must be a block mapping")
+    indentation = next(
+        (
+            len(line) - len(line.lstrip())
+            for line in extension[1:]
+            if line.strip() and not line.lstrip().startswith("#")
+        ),
+        None,
+    )
+    for line in extension[1:]:
+        if not line.strip() or line.lstrip().startswith("#"):
             continue
-        key, value = line.split(":", 1)
-        values[key.strip()] = value.strip()
+        if len(line) - len(line.lstrip()) != indentation or ":" not in line:
+            continue
+        key, value = line.strip().split(":", 1)
+        if key.startswith("tj-agents-"):
+            key = key.removeprefix("tj-agents-")
+            if key in values:
+                raise ValueError(f"{source}: ambiguous frontmatter field {key}")
+            values[key] = value.strip()
     for required in ("name", "description", "kind", "domain"):
-        if not values.get(required):
+        if not values.get(required) or (
+            required in {"name", "description"} and required not in blocks
+        ):
             raise ValueError(f"{source}: missing {required}")
     if not re.fullmatch(r"[a-z][a-z0-9-]*", values["name"]):
         raise ValueError(f"{source}: invalid public skill name {values['name']}")
-    if not re.fullmatch(r"[a-z]+", values["kind"]):
-        raise ValueError(f"{source}: kind must be one lowercase ASCII word")
+    if values["kind"] not in SKILL_KINDS:
+        raise ValueError(f"{source}: unsupported skill kind {values['kind']}")
     return values
+
+
+def native_payload(body: str, source: Path, host: str) -> str:
+    blocks = frontmatter_blocks(body, source)
+    native = NATIVE_FIELDS | (CLAUDE_FIELDS if host == "claude" else set())
+    lines = [line for key, block in blocks.items() if key in native for line in block]
+    extension = blocks.get("metadata", ["metadata:"])
+    if extension[0].strip() != "metadata:":
+        raise ValueError(f"{source}: metadata must be a block mapping")
+    indentation = next(
+        (
+            line[: len(line) - len(line.lstrip())]
+            for line in extension[1:]
+            if line.strip() and not line.lstrip().startswith("#")
+        ),
+        "  ",
+    )
+    lines.extend(extension)
+    for key, block in blocks.items():
+        if key in native or key == "metadata":
+            continue
+        first, *rest = block
+        lines.append(f"{indentation}tj-agents-{first}")
+        lines.extend(f"{indentation}{line}" for line in rest)
+    match = FRONTMATTER.match(body)
+    assert match is not None
+    return "---\n" + "\n".join(lines) + "\n---\n" + match.group("body")
 
 
 def foreign_packages(root: Path, plugins: set[str]) -> list[str]:
@@ -574,13 +653,29 @@ def discover(root: Path, config: dict) -> dict[str, dict]:
         source_root = inside(root, scope["root"])
         if not source_root.is_dir():
             raise ValueError(f"Missing canonical scope root: {scope['root']}")
-        if scope["layout"] == "flat":
-            candidates = sorted(source_root.glob("*/SKILL.md"))
-        elif scope["layout"] == "kind":
-            candidates = sorted(source_root.glob("*/*/SKILL.md"))
-        else:
-            raise ValueError(f"Unknown source layout: {scope['layout']}")
+        if (
+            scope["layout"] != "subject"
+            or scope["root"] != f".agents/{scope['plugin']}/skills"
+        ):
+            raise ValueError(
+                f"Unsupported source layout: {scope['layout']} at {scope['root']}"
+            )
+        for outside in source_root.parent.rglob("SKILL.md"):
+            if not outside.is_relative_to(source_root):
+                raise ValueError(
+                    f"Canonical skill is outside subject layout: {outside}"
+                )
+        candidates = sorted(source_root.rglob("SKILL.md"))
         for path in candidates:
+            if path.resolve() != path or not path.resolve().is_relative_to(
+                source_root.resolve()
+            ):
+                raise ValueError(f"Canonical skill escapes scope: {path}")
+            segments = path.parent.relative_to(source_root).parts
+            if not segments or any(
+                not re.fullmatch(r"[a-z][a-z0-9-]*", segment) for segment in segments
+            ):
+                raise ValueError(f"{path}: invalid subject path")
             body = read(path)
             values = metadata(body, path)
             name = values["name"]
@@ -591,10 +686,11 @@ def discover(root: Path, config: dict) -> dict[str, dict]:
                 raise ValueError(
                     f"{path}: domain {values['domain']} does not match {scope['domain']}"
                 )
-            if scope["layout"] == "kind" and values["kind"] != path.parent.parent.name:
+            subject_name = "-".join(segments)
+            if name != subject_name:
                 raise ValueError(
-                    f"{path}: kind {values['kind']} does not match kind folder "
-                    f"{path.parent.parent.name}"
+                    f"{path}: public skill name {name} "
+                    f"does not match subject path {subject_name}"
                 )
             found[identity] = {
                 "name": name,
@@ -611,7 +707,9 @@ def discover(root: Path, config: dict) -> dict[str, dict]:
         plugin, name = identity.split(":", 1)
         other = unhyphenated.setdefault(f"{plugin}:{name.replace('-', '')}", identity)
         if other != identity:
-            raise ValueError(f"Public skill names differ only by hyphens: {other}, {identity}")
+            raise ValueError(
+                f"Public skill names differ only by hyphens: {other}, {identity}"
+            )
     return found
 
 
@@ -862,7 +960,17 @@ def build(root: Path, validate_plugin_digests: bool = True, roster=None):
     for name, shared in skills.items():
         capability = shared["path"].parent
         shared_resources: list[tuple[str, bytes]] = []
+        nested = {
+            item["path"].parent
+            for item in skills.values()
+            if (
+                item["path"].parent != capability
+                and item["path"].parent.is_relative_to(capability)
+            )
+        }
         for path in sorted(capability.rglob("*")):
+            if any(path.is_relative_to(directory) for directory in nested):
+                continue
             if not path.is_file() or path.suffix == ".pyc" or "__pycache__" in path.parts:
                 continue
             if path.is_symlink() or not path.resolve().is_relative_to(capability.resolve()):
@@ -883,7 +991,7 @@ def build(root: Path, validate_plugin_digests: bool = True, roster=None):
                 relative = path.relative_to(adapter_dir).as_posix()
                 data = path.read_bytes()
                 if relative == "SKILL.md":
-                    data = read(path).replace(
+                    data = native_payload(read(path), path, host).replace(
                         "../../../../.agents/", "../../.agents/"
                     ).encode("utf-8")
                 emit(f"plugins/{shared['plugin']}/{tree}/{shared['name']}/{relative}", data)
