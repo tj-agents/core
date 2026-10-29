@@ -1,16 +1,8 @@
----
-name: persistent-delivery
-description: Shared safety and identity contract for a PR that must survive an agent turn and continue through exact-head validation, repair, review, and authorized delivery. Use when an authorized software delivery must continue across delayed checks; workflow:continue selects the supported native wake mechanism.
-
-kind: policy
-domain: process
----
-
-# Persistent delivery contract
+# Software delivery evidence
 
 Owns software delivery identity, completion evidence and authorized decisions across wakes. Load
-`workflow:continue` to establish supported host continuation. The Codex entry supplies its required durable
-CLI transport; the shared policy does not start a scheduler or model turn.
+`workflow:continue` to establish supported host continuation. Engineering packages the Codex CLI transport
+under `.codex/runtime/continuation/`; this reference supplies its PR safety and completion rules.
 
 A continuation goal may exist before a PR or delivery binding. Keep its repository, worktree, canonical
 goal, completion condition and authorized actions in the existing goal record; add the exact PR/head/run
@@ -20,13 +12,31 @@ block authorized local work, exact-head repair, or review that can proceed befor
 ## Completion record
 
 Before reporting completion, maintain the canonical goal's fenced `completion` JSON with observed
-acceptance evidence, every delivered PR identity, and every unresolved PR task with its owner and next
-action. The shared completion check refreshes every recorded PR and rejects completion unless the bound delivery is
+acceptance evidence, every owned delivery PR identity, and every unresolved task required for the authorized
+outcome with its owner and next action. The shared completion check refreshes every delivery PR and rejects completion unless the bound delivery is
 recorded, merged at its full head, has no unchecked tasks, and the outcome evidence is present. A rejection
 keeps the current owner and leaves the returned actions open.
 
+Derive that boundary from the user's authorized outcome and verified delivery ownership. Preserve
+independent work in optional `follow_up`, with its exact PR/head, responsible owner, next action and
+`scope_evidence` identifying why it belongs to that separate delivery. The check returns this information
+without waiting for it or refreshing its PR. It rejects overlap with an owned delivery or open task.
+This validates the current declared record; scope evidence references do not independently prove authority.
+An external owner does not waive acceptance: when the requested outcome requires that work, keep the
+unmet criterion in `acceptance` and its action in `open_tasks`. Do not add independent future work to the
+current goal's acceptance merely to retain it. A successful completion check proceeds to the session's
+`agent:close` decision; independent follow-up alone is no reason to keep the frontend open.
+
+```text
+User requests reviewed parser PRs; both are merged and verified.
+Another owner retains a separate dashboard PR: record it in follow_up with that ownership evidence.
+Result: the parser delivery may complete and enter agent:close.
+User instead requests the working dashboard: its missing acceptance still blocks completion,
+even when another owner is implementing it.
+```
+
 Before retiring recovery artifacts, reconcile and update any linked selected item through
-[the shared recording contract](../../../workflow/resources/problem-records.md). Resolve it only after its own
+`workflow:run`'s shared recording contract. Resolve it only after its own
 acceptance is verified; the PR completion check alone does not close it. Preserve unresolved item
 ownership and next action.
 
@@ -41,7 +51,7 @@ python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree>
 Resolve `<completion-check>` to `.agents/workflows/completion.py` in source or
 `workflows/completion.py` in an installed engineering package.
 
-The record has this exact shape. Every string is nonempty, every head is a forty-character SHA, acceptance
+The record has this shape; `follow_up` may be omitted when empty. Every string is nonempty, every head is a forty-character SHA, acceptance
 and delivery records are unique, and empty evidence keeps its acceptance item open with an owner and next
 action.
 
@@ -70,6 +80,17 @@ action.
       "text": "Unchecked visible PR task.",
       "owner": "current execution owner",
       "next_action": "Complete the task and refresh the PR."
+    }
+  ],
+  "follow_up": [
+    {
+      "repository": "owner/dashboard",
+      "pr": 456,
+      "head": "abcdef0123456789abcdef0123456789abcdef0123",
+      "text": "Add the independently requested dashboard.",
+      "owner": "dashboard delivery owner",
+      "next_action": "Complete dashboard review under its existing goal.",
+      "scope_evidence": "The user requested parser delivery here; the dashboard goal assigns PR456 to its existing owner."
     }
   ]
 }
@@ -161,7 +182,7 @@ PR, worktree or branch. If ordinary merge is approved and GitHub auto-merge is u
 terminal checks and current-head review, then perform the authorized ordinary merge. End the binding with
 `delivery-release --reason <terminal>`.
 
-That command writes the binding to `.agents/persistent-workflow-binding.json` at the owning worktree root — repo
+That command writes the binding to `.agents/delivery-binding.json` at the owning worktree root — repo
 owner/name, PR number and URL, branch, absolute worktree, full head SHA, the exact check and run IDs, and
 the completion condition. It is per-worktree runtime state, gitignored, and is the discoverable form of the
 binding a hook can read. Update it on every rebind to a new head, and delete it on any terminal (merge,

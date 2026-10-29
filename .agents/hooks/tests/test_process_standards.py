@@ -170,9 +170,7 @@ class ProcessStandardsTests(unittest.TestCase):
         remote = authored_skill("remote-validation").read_text(
             encoding="utf-8"
         )
-        shared = authored_skill("persistent-delivery").read_text(
-            encoding="utf-8"
-        )
+        shared = (self.root / ".agents/engineering/workflow/merge/references/delivery.md").read_text(encoding="utf-8")
         workflow = authored_skill("workflow:continue").read_text(encoding="utf-8")
         claude = (
             self.root / ".claude/skills/workflow/continue/SKILL.md"
@@ -181,10 +179,10 @@ class ProcessStandardsTests(unittest.TestCase):
             self.root / ".codex/skills/workflow/continue/SKILL.md"
         ).read_text(encoding="utf-8")
 
-        delivery = (self.root / ".codex/skills/engineering/persistent-delivery/SKILL.md").read_text(encoding="utf-8")
+        delivery = (self.root / ".codex/runtime/continuation/README.md").read_text(encoding="utf-8")
 
         self.assertIn("`workflow:continue`", remote)
-        self.assertIn("persistent-delivery", remote)
+        self.assertIn("`workflow:continue`", remote)
         self.assertIn("one persistent owner for a PR/head pair", shared)
         self.assertIn("init --root ROOT --goal GOALPATH", delivery)
         self.assertIn("CONTINUATION_RESULT_PATH", delivery)
@@ -237,20 +235,20 @@ class ProcessStandardsTests(unittest.TestCase):
         bodies = {
             name: " ".join(authored_skill(name).read_text(encoding="utf-8").split())
             for name in (
-                "persistent-delivery",
                 "merge",
                 "plans",
                 "feature",
                 "bugfix",
             )
         }
+        bodies["delivery"] = " ".join((self.root / ".agents/engineering/workflow/merge/references/delivery.md").read_text(encoding="utf-8").split())
         self.assertIn(
             "an authorization naming no mode records `auto`",
-            bodies["persistent-delivery"],
+            bodies["delivery"],
         )
         for referrer, pointer in (
             (
-                "persistent-delivery",
+                "delivery",
                 "the owning goal record (`engineering:merging` owns that goal-wide scope)",
             ),
             (

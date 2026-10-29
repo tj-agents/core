@@ -129,7 +129,7 @@ def identity(value, name):
         raise CompletionError(f"{name} has an invalid repository or PR")
     if not isinstance(value["head"], str) or SHA.fullmatch(value["head"]) is None:
         raise CompletionError(f"{name} requires a forty-character head SHA")
-    return {"repository": value["repository"].strip(), "pr": value["pr"], "head": value["head"]}
+    return {"repository": value["repository"].strip().casefold(), "pr": value["pr"], "head": value["head"]}
 
 
 def bound_identity(binding):
@@ -145,8 +145,29 @@ def bound_identity(binding):
     return identity(value, "runtime delivery binding")
 
 
+def validate_tasks(items, name, extra_fields=()):
+    if not isinstance(items, list):
+        raise CompletionError(f"completion {name} must be a list")
+    fields = {"text", "owner", "next_action", *extra_fields}
+    tasks = []
+    task_keys = set()
+    for item in items:
+        if not isinstance(item, dict) or set(item) != {"repository", "pr", "head", *fields}:
+            raise CompletionError(f"completion {name} task has an invalid shape")
+        entry = identity({key: item[key] for key in ("repository", "pr", "head")}, f"completion {name} task")
+        if any(not nonempty(item[key]) for key in fields):
+            raise CompletionError(f"completion {name} task requires {', '.join(sorted(fields))}")
+        key = (*entry.values(), item["text"])
+        if key in task_keys:
+            raise CompletionError(f"completion {name} tasks must be unique")
+        task_keys.add(key)
+        tasks.append({**entry, **{key: item[key] for key in fields}})
+    return tasks
+
+
 def validate_document(document):
-    if not isinstance(document, dict) or set(document) != {"outcome", "acceptance", "deliveries", "open_tasks"}:
+    required = {"outcome", "acceptance", "deliveries", "open_tasks"}
+    if not isinstance(document, dict) or not required <= set(document) or set(document) - required - {"follow_up"}:
         raise CompletionError("completion JSON requires outcome, acceptance, deliveries, and open_tasks")
     if not nonempty(document["outcome"]):
         raise CompletionError("completion outcome is required")
@@ -185,22 +206,12 @@ def validate_document(document):
             raise CompletionError("completion deliveries must be unique")
         identities.add(key)
         deliveries.append(entry)
-    if not isinstance(document["open_tasks"], list):
-        raise CompletionError("completion open_tasks must be a list")
-    tasks = []
-    task_keys = set()
-    for item in document["open_tasks"]:
-        if not isinstance(item, dict) or set(item) != {"repository", "pr", "head", "text", "owner", "next_action"}:
-            raise CompletionError("completion open task has an invalid shape")
-        entry = identity({key: item[key] for key in ("repository", "pr", "head")}, "completion open task")
-        if any(not nonempty(item[key]) for key in ("text", "owner", "next_action")):
-            raise CompletionError("completion open task requires text, owner, and next_action")
-        key = (*entry.values(), item["text"])
-        if key in task_keys:
-            raise CompletionError("completion open tasks must be unique")
-        task_keys.add(key)
-        tasks.append({**entry, "text": item["text"], "owner": item["owner"], "next_action": item["next_action"]})
-    return acceptance, deliveries, pending, tasks
+    tasks = validate_tasks(document["open_tasks"], "open_tasks")
+    follow_up = validate_tasks(document.get("follow_up", []), "follow_up", ("scope_evidence",))
+    owned = {(item["repository"], item["pr"]) for item in deliveries + tasks}
+    if any((item["repository"], item["pr"]) in owned for item in follow_up):
+        raise CompletionError("completion follow_up cannot include an owned delivery or open task")
+    return acceptance, deliveries, pending, tasks, follow_up
 
 
 def forge_state(delivery, root):
@@ -223,7 +234,7 @@ def forge_state(delivery, root):
 
 def completion_check(goal, bound_delivery=None, root=None, viewer=None):
     body, document = completion_document(goal)
-    acceptance, deliveries, pending, open_tasks = validate_document(document)
+    acceptance, deliveries, pending, open_tasks, follow_up = validate_document(document)
     required = bound_identity(bound_delivery)
     identities = {tuple(item.values()) for item in deliveries}
     blockers = []
@@ -271,6 +282,7 @@ def completion_check(goal, bound_delivery=None, root=None, viewer=None):
         "ready": report_ready and not pending_cleanup,
         "blockers": blockers,
         "open_tasks": unresolved,
+        "follow_up": follow_up,
         "deliveries": fetched,
         "cleanup_status": cleanup_status,
         "pending_cleanup": pending_cleanup,

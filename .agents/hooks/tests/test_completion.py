@@ -14,7 +14,7 @@ from completion import CompletionError, completion_check, visible_tasks
 HEAD = "a" * 40
 
 
-def goal(acceptance=None, deliveries=None, open_tasks=None, extra=""):
+def goal(acceptance=None, deliveries=None, open_tasks=None, extra="", follow_up=None):
     document = {
         "outcome": "The requested user-visible outcome is observed.",
         "acceptance": acceptance if acceptance is not None else [
@@ -27,6 +27,8 @@ def goal(acceptance=None, deliveries=None, open_tasks=None, extra=""):
         ],
         "open_tasks": open_tasks if open_tasks is not None else [],
     }
+    if follow_up is not None:
+        document["follow_up"] = follow_up
     return f"# Goal\n\n{extra}\n```completion\n{json.dumps(document)}\n```\n"
 
 
@@ -37,6 +39,102 @@ class CompletionTests(unittest.TestCase):
         path = Path(directory.name) / "GOAL.md"
         path.write_text(content, encoding="utf-8")
         return path
+
+    def publisher_follow_up(self):
+        return [
+            {"repository": "example/agent", "pr": 20, "head": "b" * 40,
+             "text": "Adopt publisher actions.", "owner": "publisher delivery owner",
+             "next_action": "Finish the separately owned publisher review.",
+             "scope_evidence": "User authorized this session to deliver refresh PRs 27 and 28; PR20 has an existing publisher owner."},
+            {"repository": "example/actions", "pr": 34, "head": "c" * 40,
+             "text": "Publish update hints.", "owner": "publisher delivery owner",
+             "next_action": "Land shared publisher actions.",
+             "scope_evidence": "Publisher owner's existing goal retains the independent PR34 delivery."},
+        ]
+
+    def test_completed_refresh_stack_keeps_publisher_follow_up_without_blocking_close(self):
+        deliveries = [{"repository": "example/agent", "pr": number, "head": HEAD} for number in (27, 28)]
+        follow_up = self.publisher_follow_up()
+        path = self.write_goal(goal(deliveries=deliveries, follow_up=follow_up))
+        requested = []
+
+        def forge(delivery, _):
+            requested.append(delivery)
+            return {"number": delivery["pr"], "headRefOid": HEAD, "state": "MERGED", "body": ""}
+
+        result = completion_check(path, deliveries[-1], path.parent, forge)
+        self.assertTrue(result["report_ready"])
+        self.assertTrue(result["ready"])
+        self.assertEqual([], result["blockers"])
+        self.assertEqual([], result["open_tasks"])
+        self.assertEqual(follow_up, result["follow_up"])
+        self.assertEqual(deliveries, requested)
+
+    def test_external_owner_does_not_waive_required_acceptance(self):
+        path = self.write_goal(goal(acceptance=[
+            {"id": "live", "criterion": "Live notifications are observed.", "evidence": [],
+             "owner": "publisher delivery owner", "next_action": "Verify live consumption."},
+        ], deliveries=[], follow_up=self.publisher_follow_up()))
+        result = completion_check(path, root=path.parent)
+        self.assertFalse(result["report_ready"])
+        self.assertFalse(result["ready"])
+        self.assertIn("acceptance live lacks evidence", result["blockers"])
+
+    def test_open_task_blocks_even_when_its_owner_is_external(self):
+        task = {key: value for key, value in self.publisher_follow_up()[0].items() if key != "scope_evidence"}
+        path = self.write_goal(goal(deliveries=[], open_tasks=[task]))
+        result = completion_check(path, root=path.parent)
+        self.assertFalse(result["ready"])
+        self.assertEqual([task], result["open_tasks"])
+
+    def test_follow_up_cannot_reclassify_an_owned_pr_even_at_another_head(self):
+        task = self.publisher_follow_up()[0]
+        owned = {"repository": task["repository"], "pr": task["pr"], "head": HEAD}
+        for deliveries, open_tasks in (([owned], []), ([], [{**owned, "text": "Finish delivery.",
+                                                             "owner": "this session", "next_action": "Finish."}])):
+            with self.subTest(deliveries=deliveries):
+                path = self.write_goal(goal(deliveries=deliveries, open_tasks=open_tasks, follow_up=[task]))
+                with self.assertRaisesRegex(CompletionError, "cannot include an owned delivery or open task"):
+                    completion_check(path, root=path.parent)
+
+    def test_follow_up_requires_scope_and_owner_evidence(self):
+        for field in ("scope_evidence", "owner", "next_action"):
+            with self.subTest(field=field):
+                task = {**self.publisher_follow_up()[0], field: " "}
+                path = self.write_goal(goal(deliveries=[], follow_up=[task]))
+                with self.assertRaisesRegex(CompletionError, "follow_up task requires"):
+                    completion_check(path, root=path.parent)
+
+    def test_repository_casing_cannot_disguise_follow_up_overlap(self):
+        task = {**self.publisher_follow_up()[0], "repository": "EXAMPLE/AGENT"}
+        owned = {"repository": "example/agent", "pr": task["pr"], "head": HEAD}
+        for deliveries, open_tasks in (([owned], []), ([], [{**owned, "text": "Finish delivery.",
+                                                             "owner": "this session", "next_action": "Finish."}])):
+            with self.subTest(deliveries=deliveries):
+                path = self.write_goal(goal(deliveries=deliveries, open_tasks=open_tasks, follow_up=[task]))
+                with self.assertRaisesRegex(CompletionError, "cannot include an owned delivery or open task"):
+                    completion_check(path, root=path.parent)
+
+    def test_bound_repository_casing_matches_canonical_delivery_identity(self):
+        path = self.write_goal(goal())
+        result = completion_check(
+            path, {"repository": "EXAMPLE/TEST", "pr": 42, "head": HEAD}, path.parent,
+            lambda *_: {"number": 42, "headRefOid": HEAD, "state": "MERGED", "body": ""},
+        )
+        self.assertTrue(result["ready"])
+
+    def test_generated_package_retains_follow_up_and_allows_completed_exit(self):
+        follow_up = self.publisher_follow_up()
+        path = self.write_goal(goal(deliveries=[], follow_up=follow_up))
+        package = Path(__file__).resolve().parents[3] / "plugins/engineering/workflows/completion.py"
+        completed = subprocess.run(
+            [sys.executable, "-B", str(package), "--goal", str(path), "--root", str(path.parent)],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
+        result = json.loads(completed.stdout)
+        self.assertTrue(result["ready"])
+        self.assertEqual(follow_up, result["follow_up"])
 
     def test_complete_requires_fresh_merged_bound_delivery(self):
         path = self.write_goal(goal())

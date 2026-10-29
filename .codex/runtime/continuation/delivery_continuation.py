@@ -17,15 +17,11 @@ import subprocess
 
 def package_root():
     here = Path(__file__).resolve()
-    if here.parent.parts[-5:] == (".codex", "skills", "engineering", "persistent-delivery", "scripts"):
-        root = here.parents[5]
-        marker = root / ".agents" / "plugins" / "sources.json"
-    elif here.parent.parts[-3:] == ("codex-skills", "persistent-delivery", "scripts"):
-        root = here.parents[3]
-        marker = root / ".codex-plugin" / "plugin.json"
-    else:
+    if here.parent.parts[-3:] != (".codex", "runtime", "continuation"):
         raise RuntimeError("continuation adapter layout unavailable")
-    if not marker.is_file() or not (root / ".agents" / "engineering").is_dir():
+    root = here.parents[3]
+    markers = (root / ".agents" / "plugins" / "sources.json", root / ".codex-plugin" / "plugin.json")
+    if not any(marker.is_file() for marker in markers) or not (root / ".agents" / "engineering").is_dir():
         raise RuntimeError("continuation package root unavailable")
     return root
 

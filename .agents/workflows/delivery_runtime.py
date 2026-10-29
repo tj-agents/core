@@ -51,7 +51,7 @@ STOP_CLASSES = (
     ),
 )
 
-BINDING_FILE = ".agents/persistent-workflow-binding.json"
+BINDING_FILE = ".agents/delivery-binding.json"
 ARTIFACT_ALIASES = (
     ("repo", "repository"),
     ("pr", "pr_number"),

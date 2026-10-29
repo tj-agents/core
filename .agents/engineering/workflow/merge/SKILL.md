@@ -8,6 +8,8 @@ domain: process
 
 # Landing a PR through the merge queue
 
+Read [software delivery evidence](references/delivery.md) when binding, waiting on or completing a PR.
+
 The executable counterpart of `engineering:merging`: one pass that takes the current branch's PR
 from green to landed and leaves the workstation on a clean, current base ready for the next task. `merging`
 owns *why* — the currency rule, the four terminal states and the trap that hides one behind another, the
@@ -40,7 +42,7 @@ procedure that goes stale in the repo that renames one.
   against current base.
 - **A required approval is Tommy's, and `--auto` waits for it.** Before arming auto-merge, establish
   and observe the supported host continuation through `workflow:continue`, retaining the exact PR/head
-  binding and authorized post-merge steps under `engineering:persistent-delivery`. Use the guarded command below and report the approval link
+  binding and authorized post-merge steps under `workflow:continue`. Use the guarded command below and report the approval link
   once. GitHub's required review remains a waiting dependency; retain the binding and scheduler so a
   merge observation resumes cleanup and publication without another prompt. Never approve or bypass it.
   A missing task authorization or an explicit hold remains a human gate.
@@ -98,7 +100,7 @@ A child targeting an unmerged parent's branch is not eligible: continue the lowe
 record that dependency instead of merging the child into the parent. After the parent lands, verify
 retargeting/restacking, rerun affected checks and refresh the child's delivery binding. Verified native
 stack merging may handle the chain atomically; follow its documented semantics and confirm every layer's
-required review and checks. A green persistent-delivery action alone does not override this base gate.
+required review and checks. A green delivery action alone does not override this base gate.
 
 ### 2. Prove the branch is pushed and preserve the final-review synchronization
 
@@ -175,7 +177,7 @@ present:
   the skip took, because those suites never run on a PR at all; only the label, or a correctly-blocked
   trailer, changes what the *queue* runs.
 
-Use the guarded command from `engineering:persistent-delivery`, with `python` on Windows or `python3`
+Use the guarded command from [software delivery evidence](references/delivery.md), with `python` on Windows or `python3`
 on Linux/macOS. It admits a conflict-free, green PR awaiting required review while retaining the exact-head,
 independent-review, repository preference and authorization checks. GitHub still enforces its ruleset.
 
@@ -210,7 +212,7 @@ identity after interruption. The compact transition or terminal document is the 
 unchanged observations remain silent and never create a model turn or user-facing update.
 
 - **A failed check dispatches; it does not retry.** When `workflow:continue` owns the wake, route the
-  exact failed check/run through `persistent-delivery`, classify its tier, and immediately dispatch one fresh
+  exact failed check/run through the software delivery reference beside `engineering:merge`, classify its tier, and immediately dispatch one fresh
   debugging context with the complete binding and failure signature. Only in the explicit foreground fallback
   with no persistent host capability, emit a ready-to-paste dispatch prompt for a dedicated
   debug session — worktree path, branch, PR, failing scenarios, failure signature — as soon as the failure is
