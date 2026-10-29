@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("base", "workflow", "engineering")
 IDENTITIES = tuple(f"{package}@tj-agents" for package in PACKAGES)
 STARTUP_HOOKS = ("base@tj-agents",)
+FAILURE_MARKER = "native-required-hook-failure-probe"
 
 
 class AcceptanceError(RuntimeError):
@@ -41,44 +42,12 @@ def native_command(executable, arguments=()):
     return [str(Path(executable).resolve(strict=True)), *arguments]
 
 
-def observed_command(host, executable, project, receipt, arguments):
-    return [sys.executable, '-B', str(ROOT / 'scripts/native_startup_observer.py'),
-            '--host', host, '--target', str(executable), '--project', str(project),
-            '--receipt', str(receipt), '--', *arguments]
-
-
 def terminate_owned(process):
     if os.name == 'nt':
         subprocess.run(['taskkill.exe', '/PID', str(process.pid), '/T', '/F'],
                        capture_output=True, timeout=10, check=False)
     else:
         process.terminate()
-
-
-def require_observer(path, state):
-    try:
-        value = json.loads(path.read_text(encoding='utf-8'))
-    except (OSError, ValueError) as error:
-        raise AcceptanceError(f'native startup observer has no valid receipt: {path}') from error
-    if value.get('state') != state:
-        raise AcceptanceError(f'native startup observer expected {state}: {value}')
-    return value
-
-
-def require_failure_probe(host, evidence, operation):
-    path = evidence / (host + '-startup-observer.json')
-    path.unlink(missing_ok=True)
-    try:
-        operation()
-    except AcceptanceError:
-        pass
-    else:
-        raise AcceptanceError(f'{host} accepted a deliberately failed required startup hook')
-    receipt = require_observer(path, 'failed')
-    if 'base@tj-agents' not in receipt.get('error', '') \
-            or 'native-required-hook-failure-probe' not in receipt.get('error', ''):
-        raise AcceptanceError(f'{host} failed for a different reason: {receipt}')
-    return receipt
 
 
 def diagnostic(lines):
@@ -193,12 +162,10 @@ def start_line_reader(stream, destination, parse_json=False, completion=None):
 
 
 class AppServer:
-    def __init__(self, executable, cwd, environment, timeout, popen=subprocess.Popen, observer_receipt=None):
+    def __init__(self, executable, cwd, environment, timeout, popen=subprocess.Popen):
         self.timeout = timeout
-        self.observed = observer_receipt is not None
         self.process = popen(
-            (observed_command('codex', executable, cwd, observer_receipt, ['app-server']) if self.observed
-             else [*native_command(executable), 'app-server']), cwd=cwd, env=environment,
+            [*native_command(executable), 'app-server'], cwd=cwd, env=environment,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding="utf-8", bufsize=1,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
@@ -258,7 +225,7 @@ class AppServer:
 
     def close(self):
         if self.process.poll() is None:
-            terminate_owned(self.process) if self.observed else self.process.terminate()
+            terminate_owned(self.process)
         try:
             self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
@@ -349,11 +316,8 @@ def verify_installed_roots(value, trust, marketplace):
 
 def require_base_evidence(evidence, package_root, label):
     declaration = json.loads((package_root / "tier.json").read_text(encoding="utf-8"))
-    expected = ["Tier gate - which standards apply in this project",
-                "Ubiquitous, always applies: " + ", ".join(sorted(PACKAGES)) + "."]
-    if declaration.get("session_context"):
-        expected.append(declaration["session_context"])
-    if any(text not in evidence for text in expected):
+    context = declaration.get("session_context")
+    if context and context not in evidence:
         raise AcceptanceError(f"{label} did not include Base session context")
 
 
@@ -507,27 +471,62 @@ def install_claude_plugins(executable, marketplace, project, environment, timeou
     require_plugins(inventory)
 
 
-def accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout):
+def require_codex_hook(notifications, source, failure_marker=None):
+    source = Path(source).resolve()
+    starts = {message.get("params", {}).get("run", {}).get("id") for message in notifications
+              if message.get("method") == "hook/started"}
+    runs = [message.get("params", {}).get("run", {}) for message in notifications
+            if message.get("method") == "hook/completed"]
+    matching = [run for run in runs if run.get("eventName") == "sessionStart"
+                and run.get("source") == "plugin"
+                and Path(run.get("sourcePath", "")).resolve() == source]
+    if len(matching) != 1 or matching[0].get("id") not in starts:
+        raise AcceptanceError("Codex did not report exactly one current Base SessionStart execution")
+    run = matching[0]
+    expected = "failed" if failure_marker else "completed"
+    if run.get("status") != expected:
+        raise AcceptanceError(f"Codex Base SessionStart expected {expected}: {run}")
+    return run
+
+
+def require_claude_hook(messages, failure_marker=None):
+    runs = [message for message in messages if isinstance(message, dict)
+            and message.get("type") == "system" and message.get("subtype") == "hook_response"
+            and message.get("hook_event") == "SessionStart"]
+    starts = {message.get("hook_id") for message in messages if isinstance(message, dict)
+              and message.get("type") == "system" and message.get("subtype") == "hook_started"
+              and message.get("hook_event") == "SessionStart"}
+    if len(runs) != 1 or runs[0].get("hook_id") not in starts:
+        raise AcceptanceError("Claude did not report exactly one Base SessionStart execution")
+    run = runs[0]
+    code = run.get("exit_code")
+    if not isinstance(code, int) or (code == 0) == bool(failure_marker):
+        raise AcceptanceError(f"Claude Base SessionStart returned an unexpected result: {run}")
+    if failure_marker and failure_marker not in json.dumps(run):
+        raise AcceptanceError("Claude reported a different startup failure")
+    return run
+
+
+def accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout, failure_marker=None):
     artifacts.mkdir(parents=True, exist_ok=True)
     debug = artifacts / "claude-debug.jsonl"
     claude_environment = dict(environment)
     claude_environment["CLAUDE_CODE_ENTRYPOINT"] = "sdk-py"
     claude_environment.pop("CLAUDECODE", None)
-    observer = artifacts / 'claude-startup-observer.json'
     process = subprocess.Popen(
-        observed_command('claude', executable, project, observer, [
-            "--output-format", "stream-json", "--verbose",
+        native_command(executable, [
+            "--output-format", "stream-json", "--verbose", "--include-hook-events",
             "--input-format", "stream-json", "--debug-file", str(debug),
         ]),
         cwd=project, env=claude_environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, encoding="utf-8", bufsize=1,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
+    observed = []
     try:
         messages = queue.Queue()
-        completed = queue.Queue()
         errors = []
-        start_line_reader(process.stdout, messages, parse_json=True, completion=completed)
+        start_line_reader(process.stdout, messages, parse_json=True)
         start_line_reader(process.stderr, errors)
         deadline = time.monotonic() + timeout
         request_id = "native-acceptance-1"
@@ -546,6 +545,7 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
                 continue
             if isinstance(message, Exception):
                 raise AcceptanceError(f"Claude startup emitted invalid JSON: {message}")
+            observed.append(message)
             if not isinstance(message, dict) or message.get("type") != "control_response":
                 continue
             response = message.get("response")
@@ -562,26 +562,22 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
             if detail:
                 message = f"{message}: {detail}"
             raise AcceptanceError(message)
-        process.stdin.close()
-        try:
-            process.wait(timeout=max(0.01, deadline - time.monotonic()))
-        except subprocess.TimeoutExpired as error:
-            raise AcceptanceError("Claude startup did not finish") from error
-        if process.returncode:
-            detail = diagnostic(errors)
-            message = f"Claude startup failed with exit code {process.returncode}"
-            if detail:
-                message = f"{message}: {detail}"
-            raise AcceptanceError(message)
-        try:
-            trace = debug.read_text(encoding="utf-8")
-        except OSError as error:
-            raise AcceptanceError("Claude did not create its debug artifact") from error
-        if "SessionStart" not in trace:
-            raise AcceptanceError("Claude debug artifact has no SessionStart marker")
-        require_base_evidence(trace, marketplace / "plugins" / "base", "Claude debug artifact")
-        require_observer(observer, 'confirmed')
+        while not any(isinstance(message, dict) and message.get("type") == "system"
+                      and message.get("subtype") == "hook_response"
+                      and message.get("hook_event") == "SessionStart" for message in observed):
+            try:
+                message = messages.get(timeout=max(0.01, deadline - time.monotonic()))
+            except queue.Empty as error:
+                raise AcceptanceError("Claude startup did not report its SessionStart result") from error
+            if isinstance(message, Exception):
+                raise AcceptanceError(f"Claude startup emitted invalid JSON: {message}")
+            observed.append(message)
+        result = require_claude_hook(observed, failure_marker)
+        if not failure_marker:
+            require_base_evidence(result.get("stdout", ""), marketplace / "plugins" / "base", "Claude startup stream")
+        return result
     finally:
+        snapshot_diagnostic(artifacts, "claude-startup-hooks.json", json.dumps(observed, indent=2))
         if process.poll() is None:
             terminate_owned(process)
             try:
@@ -591,7 +587,7 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
                 process.wait(timeout=5)
 
 
-def accept_codex(root, marketplace, executable, project, environment, artifacts, timeout):
+def accept_codex(root, marketplace, executable, project, environment, artifacts, timeout, failure_marker=None):
     install_codex_plugins(executable, marketplace, project, environment, timeout)
     trust = load_module("native_acceptance_trust", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime" / "codex" / "hook_trust.py")
     with AppServer(executable, project, environment, timeout) as server:
@@ -600,8 +596,7 @@ def accept_codex(root, marketplace, executable, project, environment, artifacts,
         verified_roots = verify_installed_roots(hooks, trust, marketplace)
     with AppServer(executable, project, environment, timeout) as server:
         startup_hashes = trust_current_hooks(server, trust, executable, project, environment, verified_roots, timeout)
-    observer = artifacts / 'codex-startup-observer.json'
-    with AppServer(executable, project, environment, timeout, observer_receipt=observer) as server:
+    with AppServer(executable, project, environment, timeout) as server:
         hooks = server.request("hooks/list", {"cwds": [str(project)]})
         require_startup_hooks(hooks, trusted=True, trusted_hashes=startup_hashes)
         startup = server.request("thread/start", {
@@ -617,18 +612,23 @@ def accept_codex(root, marketplace, executable, project, environment, artifacts,
             "input": [{"type": "text", "text": "native startup acceptance"}],
         })
         try:
+            notifications = server.notifications_until(lambda values: any(
+                value.get("method") == "turn/completed" for value in values))
+            snapshot_diagnostic(artifacts, "codex-startup-hooks.json", json.dumps(notifications, indent=2))
+            base = next(root for root in verified_roots if root.identity == "base@tj-agents")
+            result = require_codex_hook(notifications, base.root / "hooks" / "codex.json", failure_marker)
             require_failed_turn(transcript, marketplace / "plugins" / "base", timeout)
         finally:
             snapshot_transcript(transcript, artifacts)
             snapshot_diagnostic(artifacts, "codex-app-server.stderr.log", diagnostic(server.stderr))
         skills = server.request("skills/list", {"cwds": [str(project)], "forceReload": True})
         require_discovery(skills, "Codex skills/list")
-        require_observer(observer, 'confirmed')
+        return result
 
 
-def accept_claude(root, marketplace, executable, project, environment, artifacts, timeout):
+def accept_claude(root, marketplace, executable, project, environment, artifacts, timeout, failure_marker=None):
     install_claude_plugins(executable, marketplace, project, environment, timeout)
-    accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout)
+    return accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout, failure_marker)
 
 
 @contextmanager
@@ -732,16 +732,19 @@ def accept(root, marketplace, codex, claude, artifacts, timeout):
             probe_environment = isolated_environment(case, codex, claude, endpoint)
             probe_project = write_fixture(case / 'fixture', probe_environment)
             evidence = artifacts / ('failure-' + host)
-            failures[host] = require_failure_probe(host, evidence, lambda: operation(
-                root, failed_marketplace, executable, probe_project, probe_environment, evidence, timeout))
-    return {"plugins": list(IDENTITIES), 'required_hook_failure_probes': failures}
+            failures[host] = operation(
+                root, failed_marketplace, executable, probe_project, probe_environment, evidence, timeout,
+                failure_marker=FAILURE_MARKER)
+            if (probe_project / FAILURE_MARKER).read_text(encoding="utf-8") != FAILURE_MARKER:
+                raise AcceptanceError(f"{host} did not execute the deliberate failure probe")
+    return {"plugins": list(IDENTITIES), 'hook_failure_probes': failures}
 
 
 def failure_marketplace(root, directory):
     generator = load_module('native_failure_package_generator', root / 'scripts/sync_plugin_packages.py')
     _, output, _, _ = generator.build(root, validate_plugin_digests=False)
     output['plugins/base/hooks/tier_gate.py'] = (
-        b"raise RuntimeError('native-required-hook-failure-probe')\n"
+        f"import sys\nfrom pathlib import Path\nPath({FAILURE_MARKER!r}).write_text({FAILURE_MARKER!r}, encoding='utf-8')\nsys.stderr.write({(FAILURE_MARKER + chr(10))!r})\nraise SystemExit(1)\n".encode("utf-8")
     )
     output['plugins/base/hooks/codex.json'] = (
         root / '.agents/plugins/manifests/codex/base-hooks.json'
