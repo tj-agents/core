@@ -109,19 +109,6 @@ jobs:
         shell: pwsh
         run: python -B scripts/sync_harness_manifests.py --check
 
-      - name: native host startup and discovery acceptance
-        if: fromJSON(needs.select.outputs.plan).mode == 'full'
-        shell: pwsh
-        run: python -B scripts/ci_native_acceptance.py
-
-      - name: upload native host diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-host-acceptance-windows
-          path: ${{ runner.temp }}/tj-agents-native-acceptance/artifacts
-          if-no-files-found: warn
-
       - name: authored skill references resolve in the public corpus
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
@@ -142,14 +129,27 @@ jobs:
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/delivery-continuation.tests.ps1
 
       - name: source layout and package tests
-        if: fromJSON(needs.select.outputs.plan).mode == 'full'
+        if: ${{ !cancelled() && fromJSON(needs.select.outputs.plan).mode == 'full' }}
         shell: pwsh
         run: python -B -m unittest discover -s tests -p 'test_*.py' -v
 
       - name: shared runtime tests
-        if: fromJSON(needs.select.outputs.plan).mode == 'full'
+        if: ${{ !cancelled() && fromJSON(needs.select.outputs.plan).mode == 'full' }}
         shell: pwsh
         run: python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py' -v
+
+      - name: native host startup and discovery acceptance
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
+        shell: pwsh
+        run: python -B scripts/ci_native_acceptance.py
+
+      - name: upload native host diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-host-acceptance-windows
+          path: ${{ runner.temp }}/tj-agents-native-acceptance/artifacts
+          if-no-files-found: warn
 
       - name: selected source and package regressions
         if: fromJSON(needs.select.outputs.plan).mode == 'focused'
@@ -198,6 +198,14 @@ jobs:
       - name: harness declarations cover authored sources
         run: python -B scripts/sync_harness_manifests.py --check
 
+      - name: source layout and package tests
+        if: ${{ !cancelled() && fromJSON(needs.select.outputs.plan).mode == 'full' }}
+        run: python -B -m unittest discover -s tests -p 'test_*.py' -v < /dev/null
+
+      - name: shared runtime tests
+        if: ${{ !cancelled() && fromJSON(needs.select.outputs.plan).mode == 'full' }}
+        run: python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py' -v < /dev/null
+
       - name: native host startup and discovery acceptance
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: bash
@@ -210,16 +218,6 @@ jobs:
           name: native-host-acceptance-linux
           path: ${{ runner.temp }}/tj-agents-native-acceptance/artifacts
           if-no-files-found: warn
-
-      # Hook subprocesses in some tests read stdin as their payload; a closed stdin stands in for the host,
-      # which always closes it, so an inherited runner stdin can never leave a hook waiting.
-      - name: source layout and package tests
-        if: fromJSON(needs.select.outputs.plan).mode == 'full'
-        run: python -B -m unittest discover -s tests -p 'test_*.py' -v < /dev/null
-
-      - name: shared runtime tests
-        if: fromJSON(needs.select.outputs.plan).mode == 'full'
-        run: python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py' -v < /dev/null
 
       - name: selected source and package regressions
         if: fromJSON(needs.select.outputs.plan).mode == 'focused'
