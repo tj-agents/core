@@ -349,7 +349,7 @@ def verify_installed_roots(value, trust, marketplace):
 
 
 def require_base_evidence(evidence, package_root, label):
-    contract = package_root / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
+    contract = package_root / ".agents" / "base" / "skills" / "task-routing" / "SKILL.md"
     digest = hashlib.sha256(contract.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
     if "base:task-routing" not in evidence or digest not in evidence:
         raise AcceptanceError(f"{label} did not include Base task-routing context")

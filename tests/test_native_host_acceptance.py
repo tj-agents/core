@@ -82,7 +82,7 @@ class NativeHostAcceptanceTests(unittest.TestCase):
 
     def test_transcript_requires_base_context_and_unauthenticated_completion(self):
         package = self.root / "base"
-        contract = package / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
+        contract = package / ".agents" / "base" / "skills" / "task-routing" / "SKILL.md"
         contract.parent.mkdir(parents=True)
         contract.write_text("task routing", encoding="utf-8")
         transcript = self.root / "session.jsonl"
@@ -99,7 +99,7 @@ class NativeHostAcceptanceTests(unittest.TestCase):
 
     def test_transcript_waits_for_initial_appearance(self):
         package = self.root / "base"
-        contract = package / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
+        contract = package / ".agents" / "base" / "skills" / "task-routing" / "SKILL.md"
         contract.parent.mkdir(parents=True)
         contract.write_text("task routing", encoding="utf-8")
         digest = hashlib.sha256(b"task routing").hexdigest()
