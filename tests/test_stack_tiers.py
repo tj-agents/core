@@ -27,29 +27,29 @@ def load_module():
 gate = load_module()
 
 
+def predicate_match(root, predicate):
+    result = gate.evaluate_predicate(root, predicate)
+    return result.matched, result.evidence[0] if result.evidence else None
+
+
 DOTNET = {
-    "schema_version": 1,
     "tier": "dotnet",
     "stack": ".NET",
     "applies": "stack-present",
-    "owner_repository": "tomjseery/dotagents",
-    "detect": {"globs": ["*.sln", "*.csproj"], "files": ["global.json"]},
+    "detect": {'any': [{'file': "global.json"}, {'glob': "*.sln"}, {'glob': "*.csproj"}]},
 }
 REACT = {
-    "schema_version": 1,
     "tier": "react",
     "stack": "TypeScript/React",
     "applies": "stack-present",
-    "owner_repository": "tomjseery/react-agents",
-    "detect": {"content": [{"glob": "package.json", "pattern": r"\"react\"\s*:"}]},
+    "detect": {'content': {"glob": "package.json", "pattern": r"\"react\"\s*:"}},
 }
-BASE = {"schema_version": 1, "tier": "base", "stack": "any project", "applies": "always"}
+BASE = {"tier": "base", "stack": "any project", "applies": "always"}
 INFONETICA = {
-    "schema_version": 2,
     "tier": "infonetica",
     "stack": "Infonetica work",
     "applies": "stack-present",
-    "detect": {"remote": [r"^infonetica/"]},
+    "detect": {'remote': r"^infonetica/"},
 }
 
 
@@ -67,10 +67,10 @@ class DeclarationDiscovery(unittest.TestCase):
             native = cache / 'tj-agents/base/local'
             native.mkdir(parents=True)
             cleared = {name: '' for name in (*gate.PLUGIN_ROOT_VARIABLES, 'CLAUDE_CONFIG_DIR', 'CODEX_HOME')}
-            with unittest.mock.patch.dict(os.environ, dict(cleared, PLUGIN_ROOT=str(plugin))), \
+            with unittest.mock.patch.object(os, "environ", {**os.environ, **cleared, "PLUGIN_ROOT": str(plugin)}), \
                     unittest.mock.patch.object(gate.Path, 'home', return_value=home):
                 self.assertNotIn(plugin.parents[2], gate.cache_roots())
-            with unittest.mock.patch.dict(os.environ, dict(cleared, PLUGIN_ROOT=str(native))), \
+            with unittest.mock.patch.object(os, "environ", {**os.environ, **cleared, "PLUGIN_ROOT": str(native)}), \
                     unittest.mock.patch.object(gate.Path, 'home', return_value=home):
                 self.assertEqual(cache.resolve(), gate.cache_roots()[0])
 
@@ -102,7 +102,7 @@ class DeclarationDiscovery(unittest.TestCase):
             self.assertEqual([item.plugin for item in found], ["broken", "nameless", "future"])
             self.assertTrue(all(item.diagnostics for item in found))
 
-    def test_schema_version_two_is_accepted(self):
+    def test_a_remote_predicate_is_discovered_without_a_version(self):
         with tempfile.TemporaryDirectory() as cache:
             payload = Path(cache) / "infonetica" / "infonetica" / "1.0.0"
             payload.mkdir(parents=True)
@@ -211,7 +211,7 @@ class DeclarationDiscovery(unittest.TestCase):
             script.parent.mkdir(parents=True)
             (Path(home) / ".claude" / "plugins" / "cache").mkdir(parents=True)
             cleared = {name: "" for name in (*gate.PLUGIN_ROOT_VARIABLES, "CLAUDE_CONFIG_DIR", "CODEX_HOME")}
-            with unittest.mock.patch.dict(os.environ, cleared), \
+            with unittest.mock.patch.object(os, "environ", {**os.environ, **cleared}), \
                     unittest.mock.patch.object(gate, "__file__", str(script)), \
                     unittest.mock.patch.object(gate.Path, "home", return_value=Path(home)):
                 roots = gate.cache_roots()
@@ -237,9 +237,6 @@ class TemporaryProject(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.project = Path(directory.name)
-        patched = unittest.mock.patch.dict(os.environ, {gate.OVERRIDE_VARIABLE: ""})
-        patched.start()
-        self.addCleanup(patched.stop)
 
 
 class Detection(TemporaryProject):
@@ -255,19 +252,19 @@ class Detection(TemporaryProject):
 
     def test_a_marker_at_any_depth_proves_the_stack(self):
         project = self.populated("", ["src/api/Service.csproj"])
-        present, evidence = gate.stack_present(project, DOTNET["detect"])
+        present, evidence = predicate_match(project, DOTNET["detect"])
         self.assertTrue(present)
         self.assertIn("Service.csproj", evidence)
 
     def test_an_unrelated_project_does_not_match(self):
         project = self.populated("", ["README.md", "app/main.py"])
-        present, _ = gate.stack_present(project, DOTNET["detect"])
+        present, _ = predicate_match(project, DOTNET["detect"])
         self.assertFalse(present)
 
     def test_an_untracked_marker_in_a_repository_proves_the_stack(self):
         project = self.populated("", ["src/api/Service.csproj"])
         subprocess.run(["git", "init", "-q"], cwd=project, check=True)
-        present, evidence = gate.stack_present(project, DOTNET["detect"])
+        present, evidence = predicate_match(project, DOTNET["detect"])
         self.assertTrue(present)
         self.assertEqual(evidence, "src/api/Service.csproj")
 
@@ -275,17 +272,17 @@ class Detection(TemporaryProject):
         project = self.populated("", ["generated/App.csproj", "README.md"])
         (project / ".gitignore").write_text("generated/\n", encoding="utf-8")
         subprocess.run(["git", "init", "-q"], cwd=project, check=True)
-        present, _ = gate.stack_present(project, DOTNET["detect"])
+        present, _ = predicate_match(project, DOTNET["detect"])
         self.assertFalse(present)
 
     def test_content_matching_reads_the_file_not_its_name(self):
         project = self.populated(json.dumps({"dependencies": {"react": "18.3.1"}}), ["package.json"])
-        present, evidence = gate.stack_present(project, REACT["detect"])
+        present, evidence = predicate_match(project, REACT["detect"])
         self.assertTrue(present)
         self.assertEqual(evidence, "package.json")
 
         other = self.populated(json.dumps({"dependencies": {"vue": "3"}}), ["package.json"])
-        present, _ = gate.stack_present(other, REACT["detect"])
+        present, _ = predicate_match(other, REACT["detect"])
         self.assertFalse(present)
 
     def test_a_remote_matcher_reads_the_origin_identity_not_the_tree(self):
@@ -296,7 +293,7 @@ class Detection(TemporaryProject):
             cwd=project,
             check=True,
         )
-        present, evidence = gate.stack_present(project, INFONETICA["detect"])
+        present, evidence = predicate_match(project, INFONETICA["detect"])
         self.assertTrue(present)
         self.assertEqual(evidence, "origin infonetica/cris-preaward-app")
 
@@ -307,7 +304,7 @@ class Detection(TemporaryProject):
             cwd=unrelated,
             check=True,
         )
-        present, _ = gate.stack_present(unrelated, INFONETICA["detect"])
+        present, _ = predicate_match(unrelated, INFONETICA["detect"])
         self.assertFalse(present)
 
 
@@ -344,7 +341,7 @@ class Applicability(TemporaryProject):
             (self.project / "projects" / f"session-{index}").mkdir(parents=True)
             (self.project / "projects" / f"session-{index}" / "transcript.jsonl").write_text("{}\n", encoding="utf-8")
         found = [*self.found, *(declaration(f"stack{index}", "tj-agents", {**DOTNET, "tier": f"stack{index}",
-                                                                              "detect": {"globs": [f"*.ext{index}"]}})
+                                                                              "detect": {'glob': f"*.ext{index}"}})
                                 for index in range(8))]
         commands, walks = [], []
         real_git, real_walk = gate._run_git, gate.os.walk
@@ -364,13 +361,15 @@ class Applicability(TemporaryProject):
         self.assertFalse([command for command in commands if "--others" in command])
         self.assertEqual(1, len(walks))
 
-    def test_the_override_forces_one_session_without_configuring_the_project(self):
-        with unittest.mock.patch.dict(os.environ, {gate.OVERRIDE_VARIABLE: "dotnet"}):
+    def test_an_environment_override_does_not_bypass_the_predicate(self):
+        with unittest.mock.patch.object(os, "environ", {**os.environ, "AGENTS_TIER_OVERRIDE": "dotnet"}):
             _, applicable, blocked = gate.assess(self.project, self.found)
-        self.assertEqual([item.tier for item, _ in applicable], ["dotnet"])
-        self.assertEqual(blocked, [])
+        self.assertEqual(applicable, [])
+        self.assertEqual([item.tier for item in blocked], ["dotnet"])
 
     def test_a_tier_is_readable_inside_its_own_authoring_repository(self):
+        self.found[1] = declaration("dotnet", "dotagents", dict(DOTNET, detect={
+            "any": [DOTNET["detect"], {"remote": "^tomjseery/dotagents$"}]}))
         subprocess.run(["git", "init", "-q"], cwd=self.project, check=True)
         subprocess.run(
             ["git", "remote", "add", "origin", "https://github.com/tomjseery/dotagents.git"],
@@ -416,7 +415,7 @@ class ShippedDeclarations(unittest.TestCase):
         self.assertEqual(names, ["base", "docs", "engineering", "workflow"])
         for path in DECLARED.glob("*.json"):
             data = json.loads(path.read_text(encoding="utf-8"))
-            self.assertEqual(data["schema_version"], 1)
+            self.assertNotIn("schema_version", data)
             self.assertEqual(data["applies"], "always")
             self.assertEqual(data["tier"], path.stem)
 
@@ -428,7 +427,7 @@ class ShippedDeclarations(unittest.TestCase):
 
     def test_the_schema_describes_the_declarations_it_governs(self):
         schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
-        self.assertEqual(set(schema["required"]), {"schema_version", "tier", "applies"})
+        self.assertEqual(set(schema["required"]), {"tier", "applies"})
         self.assertEqual(set(schema["properties"]["applies"]["enum"]), {"always", "stack-present"})
         self.assertFalse(schema["additionalProperties"])
 

@@ -22,11 +22,10 @@ checker = load_module()
 
 
 TIER = {
-    "schema_version": 1,
     "tier": "dotnet",
     "stack": ".NET",
     "applies": "stack-present",
-    "detect": {"globs": ["*.csproj"]},
+    "detect": {'glob': "*.csproj"},
 }
 
 
@@ -93,29 +92,28 @@ class PayloadTree(unittest.TestCase):
         self.declare(["dotnet"])
         self.payload("dotnet", tier=dict(TIER, detect={}))
         problems = checker.check(self.root)
-        self.assertTrue(any("detect has no matcher" in problem for problem in problems), problems)
+        self.assertTrue(any("exactly one positive predicate" in problem for problem in problems), problems)
 
-    def test_legacy_routes_are_ignored_at_publication(self):
+    def test_retired_version_fields_are_rejected_at_publication(self):
         self.declare(["dotnet"])
-        self.payload("dotnet", tier=dict(TIER, routes=[{"path": "(", "skills": ["dotnet:style"]}]))
-        self.assertEqual(checker.check(self.root), [])
+        for version in (1, 2, 3):
+            with self.subTest(version=version):
+                self.payload("dotnet", tier=dict(TIER, schema_version=version))
+                self.assertTrue(any("Unknown declaration fields: schema_version" in problem
+                                    for problem in checker.check(self.root)))
 
-    def test_a_v3_tier_declaring_routes_is_a_malformed_declaration(self):
+    def test_a_tier_declaring_routes_is_a_malformed_declaration(self):
         self.declare(["dotnet"])
         self.payload("dotnet", tier={
-            "schema_version": 3, "tier": "dotnet", "applies": "stack-present",
+            "tier": "dotnet", "applies": "stack-present",
             "detect": {"glob": "*.csproj"}, "routes": [{"path": r"\.cs$", "skills": []}],
         })
         problems = checker.check(self.root)
         self.assertTrue(any("Unknown declaration fields: routes" in problem for problem in problems), problems)
 
-    def test_a_remote_matcher_requires_schema_version_two(self):
+    def test_a_remote_predicate_is_accepted_without_a_version(self):
         self.declare(["dotnet"])
-        self.payload("dotnet", tier=dict(TIER, detect={"remote": ["^infonetica/"]}))
-        problems = checker.check(self.root)
-        self.assertTrue(any("schema_version 1" in problem for problem in problems), problems)
-
-        self.payload("dotnet", tier=dict(TIER, schema_version=2, detect={"remote": ["^infonetica/"]}))
+        self.payload("dotnet", tier=dict(TIER, detect={'remote': "^infonetica/"}))
         self.assertEqual(checker.check(self.root), [])
 
     def test_front_matter_must_carry_the_kind_marker(self):

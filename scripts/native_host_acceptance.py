@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
-import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import importlib.util
 import json
@@ -349,10 +348,11 @@ def verify_installed_roots(value, trust, marketplace):
 
 
 def require_base_evidence(evidence, package_root, label):
-    contract = package_root / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
-    digest = hashlib.sha256(contract.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
-    if "base:task-routing" not in evidence or digest not in evidence:
-        raise AcceptanceError(f"{label} did not include Base task-routing context")
+    declaration = json.loads((package_root / "tier.json").read_text(encoding="utf-8"))
+    context = declaration.get("session_context")
+    if not isinstance(context, str) or not context or context not in evidence:
+        raise AcceptanceError(f"{label} did not include Base session context")
+
 
 
 def transcript_entries(path):

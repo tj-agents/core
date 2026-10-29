@@ -43,15 +43,15 @@ class ReviewRulesTests(unittest.TestCase):
             source = payload / ".agents" / name / "convention/style/SKILL.md"
             source.parent.mkdir(parents=True)
             source.write_text("---\nname: style\nkind: convention\n---\nCanonical rule body\n", encoding="utf-8")
-        declaration = data or {"schema_version": 1, "tier": name, "applies": "always"}
+        declaration = data or {"tier": name, "applies": "always"}
         return self.gate.Declaration(name, marketplace, declaration, payload)
 
     def test_no_route_table_still_loads_only_selected_applicable_conventions(self):
         self.selection("backend@selected", "frontend@selected", "tools@selected")
         declarations = [
             self.plugin("backend", canonical=True),
-            self.plugin("frontend", data={"schema_version": 1, "tier": "frontend",
-                                         "applies": "stack-present", "detect": {"files": ["package.json"]}}),
+            self.plugin("frontend", data={"tier": "frontend",
+                                         "applies": "stack-present", "detect": {'file': "package.json"}}),
             self.plugin("tools", kind="utility"),
             self.plugin("unrelated"),
             self.plugin("backend", marketplace="other"),
@@ -71,7 +71,7 @@ class ReviewRulesTests(unittest.TestCase):
         self.selection("stack@selected", "company@selected", "company-stack@selected")
         (self.project / "company.marker").write_text("company\n", encoding="utf-8")
         employer = self.plugin("company", data={
-            "schema_version": 3, "tier": "company", "applies": "stack-present",
+            "tier": "company", "applies": "stack-present",
             "detect": {"file": "company.marker"}, "employer": {"context_skill": "context"},
         }, kind="knowledge")
         context = employer.payload_dir / "skills/context/SKILL.md"
@@ -128,7 +128,7 @@ class ReviewRulesTests(unittest.TestCase):
             (payload / "skills/style").mkdir(parents=True)
             (payload / "skills/style/SKILL.md").write_text(
                 f"---\nname: style\nkind: convention\n---\n{version}\n", encoding="utf-8")
-            (payload / "tier.json").write_text(json.dumps({"schema_version": 1, "tier": "stack", "applies": "always"}),
+            (payload / "tier.json").write_text(json.dumps({"tier": "stack", "applies": "always"}),
                                                encoding="utf-8")
             installs[version] = str(payload)
         with mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(profile)}), mock.patch.object(
