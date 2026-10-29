@@ -86,7 +86,7 @@ class NativeHostAcceptanceTests(unittest.TestCase):
         contract.write_text(json.dumps({"tier": "base", "applies": "always", "session_context": "Use the clipboard."}), encoding="utf-8")
         transcript = self.root / "session.jsonl"
         transcript.write_text(
-            json.dumps({"type": "response_item", "payload": {"content": "Use the clipboard."}}) + "\n"
+            json.dumps({"type": "response_item", "payload": {"content": "Tier gate - which standards apply in this project\nUbiquitous, always applies: base, engineering, workflow.\nUse the clipboard."}}) + "\n"
             + json.dumps({"type": "event_msg", "payload": {"type": "task_complete", "error": {"message": "401 Unauthorized"}}}) + "\n",
             encoding="utf-8",
         )
@@ -101,7 +101,7 @@ class NativeHostAcceptanceTests(unittest.TestCase):
         contract.parent.mkdir(parents=True)
         contract.write_text(json.dumps({"tier": "base", "applies": "always", "session_context": "Use the clipboard."}), encoding="utf-8")
         entries = [
-            {"type": "response_item", "payload": {"content": "Use the clipboard."}},
+            {"type": "response_item", "payload": {"content": "Tier gate - which standards apply in this project\nUbiquitous, always applies: base, engineering, workflow.\nUse the clipboard."}},
             {"type": "event_msg", "payload": {"type": "task_complete", "error": {"message": "401 Unauthorized"}}},
         ]
         with mock.patch.object(NATIVE, "transcript_entries", side_effect=[None, entries]):
