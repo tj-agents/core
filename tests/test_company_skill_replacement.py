@@ -25,9 +25,9 @@ class CompanySkillReplacement(unittest.TestCase):
         self.remote("acme/project")
         self.profile = self.root / "profile"
         self.cache = self.profile / "plugins/cache"
-        self.install("stackx", {"schema_version": 3, "tier": "stackx", "applies": "stack-present",
+        self.install("stackx", {"tier": "stackx", "applies": "stack-present",
                                 "detect": {"file": "src/item.x"}}, ("style", "logging"))
-        self.install("acme", {"schema_version": 3, "tier": "acme", "applies": "stack-present",
+        self.install("acme", {"tier": "acme", "applies": "stack-present",
                               "detect": {"all": [{"remote_host": "example.test"},
                                                  {"remote": "^acme/"}]},
                               "employer": {"context_skill": "context"}}, ("context",))

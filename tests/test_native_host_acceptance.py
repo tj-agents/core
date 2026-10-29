@@ -1,4 +1,3 @@
-import hashlib
 import importlib.util
 import json
 import os
@@ -82,13 +81,12 @@ class NativeHostAcceptanceTests(unittest.TestCase):
 
     def test_transcript_requires_base_context_and_unauthenticated_completion(self):
         package = self.root / "base"
-        contract = package / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
+        contract = package / "tier.json"
         contract.parent.mkdir(parents=True)
-        contract.write_text("task routing", encoding="utf-8")
+        contract.write_text(json.dumps({"tier": "base", "applies": "always", "session_context": "Use the clipboard."}), encoding="utf-8")
         transcript = self.root / "session.jsonl"
-        digest = hashlib.sha256(b"task routing").hexdigest()
         transcript.write_text(
-            json.dumps({"type": "response_item", "payload": {"content": f"base:task-routing {digest}"}}) + "\n"
+            json.dumps({"type": "response_item", "payload": {"content": "Use the clipboard."}}) + "\n"
             + json.dumps({"type": "event_msg", "payload": {"type": "task_complete", "error": {"message": "401 Unauthorized"}}}) + "\n",
             encoding="utf-8",
         )
@@ -99,12 +97,11 @@ class NativeHostAcceptanceTests(unittest.TestCase):
 
     def test_transcript_waits_for_initial_appearance(self):
         package = self.root / "base"
-        contract = package / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
+        contract = package / "tier.json"
         contract.parent.mkdir(parents=True)
-        contract.write_text("task routing", encoding="utf-8")
-        digest = hashlib.sha256(b"task routing").hexdigest()
+        contract.write_text(json.dumps({"tier": "base", "applies": "always", "session_context": "Use the clipboard."}), encoding="utf-8")
         entries = [
-            {"type": "response_item", "payload": {"content": f"base:task-routing {digest}"}},
+            {"type": "response_item", "payload": {"content": "Use the clipboard."}},
             {"type": "event_msg", "payload": {"type": "task_complete", "error": {"message": "401 Unauthorized"}}},
         ]
         with mock.patch.object(NATIVE, "transcript_entries", side_effect=[None, entries]):

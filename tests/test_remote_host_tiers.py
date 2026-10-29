@@ -96,14 +96,14 @@ class RemoteHost(unittest.TestCase):
             self.assertTrue(gate.predicate_diagnostics({"remote_host": value}))
         self.assertTrue(gate.predicate_diagnostics({"remote_host": "github.com", "remote": "^owner/"}))
 
-    def test_legacy_remote_still_matches_owner_repository_without_host_restriction(self):
+    def test_remote_matches_owner_repository_without_host_restriction(self):
         self.origin("git@other.example:owner/repo.git")
         self.assertEqual(gate.repository_identity(self.root), "owner/repo")
         self.assertTrue(gate.evaluate_predicate(self.root, {"remote": "^owner/"}).matched)
         self.assertFalse(self.matches().matched)
-        matched, evidence = gate.stack_present(self.root, {"remote": ["^owner/"]})
-        self.assertTrue(matched)
-        self.assertEqual(evidence, "origin owner/repo")
+        result = gate.evaluate_predicate(self.root, {"remote": "^owner/"})
+        self.assertTrue(result.matched)
+        self.assertEqual(result.evidence, ("origin owner/repo",))
 
 
 if __name__ == "__main__":

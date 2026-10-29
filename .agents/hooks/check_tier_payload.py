@@ -34,12 +34,9 @@ import sys
 
 PAYLOADS_FILE = Path(".agents") / "plugins" / "payloads.json"
 PLUGINS_DIR = "plugins"
-TIER_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 KIND_PATTERN = re.compile(r"[a-z]+")
-OWNER_PATTERN = re.compile(r"^[^/ ]+/[^/ ]+$")
 FRONT_FIELD = r"^{0}:[ \t]*(\S[^\r\n]*?)[ \t]*$"
 INDEX_ENTRY = re.compile(r"^- `([^`]+)`", re.MULTILINE)
-SCHEMA_VERSIONS = (1, 2, 3)
 IGNORED_PAYLOAD_ENTRIES = {".gitkeep"}
 
 
@@ -69,61 +66,9 @@ def check_tier_declaration(payload, problems):
         problems.append(f"{payload.name}: tier.json is not an object")
         return
 
-    if data.get("schema_version") not in SCHEMA_VERSIONS:
-        problems.append(f"{payload.name}: tier.json schema_version must be one of {SCHEMA_VERSIONS}")
-    tier = data.get("tier")
-    if not isinstance(tier, str) or not TIER_PATTERN.match(tier):
-        problems.append(f"{payload.name}: tier.json tier must match {TIER_PATTERN.pattern}")
-    applies = data.get("applies")
-    if applies not in ("always", "stack-present"):
-        problems.append(f"{payload.name}: tier.json applies must be 'always' or 'stack-present'")
-
-    owner = data.get("owner_repository")
-    owners = [owner] if isinstance(owner, str) else owner if isinstance(owner, list) else []
-    if owner is not None and not isinstance(owner, (str, list)):
-        problems.append(f"{payload.name}: tier.json owner_repository must be a string or list")
-    for name in owners:
-        if not isinstance(name, str) or not OWNER_PATTERN.match(name):
-            problems.append(f"{payload.name}: tier.json owner_repository entry {name!r} is not owner/name")
-
-    detect = data.get("detect")
     gate = runpy.run_path(str(Path(__file__).with_name("tier_gate.py")))
-    if data.get("schema_version") == 3:
-        problems.extend(f"{payload.name}: {item['path']}: {item['message']}"
-                        for item in gate["v3_declaration_diagnostics"](data, payload_dir=payload))
-        return
-    for field in ("employer", "session_context"):
-        if field in data:
-            problems.append(f"{payload.name}: tier.json {field} requires schema_version 3")
-    if applies == "stack-present":
-        if not isinstance(detect, dict) or not any(detect.get(key) for key in ("files", "globs", "content", "remote")):
-            problems.append(f"{payload.name}: tier.json applies=stack-present but detect has no matcher")
-    if isinstance(detect, dict):
-        unknown = set(detect) - {"files", "globs", "content", "remote"}
-        if unknown:
-            problems.append(f"{payload.name}: tier.json detect has unknown matcher(s) {sorted(unknown)}")
-        for key in ("files", "globs"):
-            for value in detect.get(key) or []:
-                if not isinstance(value, str) or not value:
-                    problems.append(f"{payload.name}: tier.json detect.{key} entry {value!r} is not a non-empty string")
-        for value in detect.get("remote") or []:
-            if not isinstance(value, str) or not value:
-                problems.append(f"{payload.name}: tier.json detect.remote entry {value!r} is not a non-empty string")
-                continue
-            try:
-                re.compile(value)
-            except re.error as error:
-                problems.append(f"{payload.name}: tier.json detect.remote pattern {value!r} does not compile: {error}")
-        if detect.get("remote") and data.get("schema_version") == 1:
-            problems.append(f"{payload.name}: tier.json uses detect.remote but declares schema_version 1")
-        for rule in detect.get("content") or []:
-            if not isinstance(rule, dict) or not rule.get("glob") or not rule.get("pattern"):
-                problems.append(f"{payload.name}: tier.json detect.content entry needs glob and pattern")
-                continue
-            try:
-                re.compile(rule["pattern"])
-            except re.error as error:
-                problems.append(f"{payload.name}: tier.json detect.content pattern {rule['pattern']!r} does not compile: {error}")
+    problems.extend(f"{payload.name}: {item['path']}: {item['message']}"
+                    for item in gate["declaration_data_diagnostics"](data, payload_dir=payload))
 
 
 def check_skills(payload, problems):
