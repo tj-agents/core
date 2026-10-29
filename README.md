@@ -67,6 +67,13 @@ The packages have no release line or compatibility promise: machines follow each
 through automatic updates. Selection stays an
 independent user and repository setting; adding a marketplace does not select its full roster.
 
+## Start a CLI without tj-agents
+
+`claude --no-tj` or `codex --no-tj` starts the native CLI directly, skipping the plugin check, SessionStart
+handshake and session binding. The shell functions fall back to this automatically when the launcher
+Python is missing, and the launcher still starts the native CLI when session binding fails. Use it whenever
+a launch error blocks you.
+
 ## Repository auto-merge
 
 An engineering-enabled repository opts into guarded agent auto-merge in `.agents/settings.json`:
