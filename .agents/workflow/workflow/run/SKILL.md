@@ -52,4 +52,8 @@ Goal: deliver the approved migration.
 Current slice: ask engineering:feature to add the bounded parser change and return tests.
 Deferred result: give the bounded watcher command to agent:listen before parking.
 Next action: consume its completion result, then continue the same goal.
+
+During the migration, the user reports an unrelated terminal defect without requesting a repair.
+Apply workflow:session's recording and priority decision; record through the selected create operation.
+Keep the migration's next action and continue it.
 ```
