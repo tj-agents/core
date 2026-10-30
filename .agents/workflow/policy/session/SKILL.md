@@ -17,8 +17,7 @@ rules on top of this lifecycle.
 Answer the direct question first and correct the active task within its existing authorization.
 Questions ask for reasoning: explain and defend recommendations with evidence, change them only for new
 evidence or a stated user decision, and say what changed.
-Apply [Record noticed problems](#record-noticed-problems) to a reported side problem while preserving
-the active goal and next action.
+For a reported side problem, load [Incidental problems](../../resources/problem-records.md#incidental-problems).
 
 ## A task has an owning lifecycle — load it before the first edit
 
@@ -40,37 +39,15 @@ transitively. Use the host's native skill invocation when available or read its 
 Reuse an already-loaded body while its source identity is unchanged, including after compaction when the
 continuation preserves its relevant instructions. Read again only for changed instructions or missing context.
 
-## Record noticed problems
+## Incidental problems
 
-When a bug, mistake or deliberate debt is noticed or reported during item A, preserve A's goal and next
-action. Follow [the recording contract](../../resources/problem-records.md) to reconcile the affected
-source, existing record and repair owner, then invoke the selected profile's qualified creation operation
-for a new item B when its policy and user authority permit. A local Markdown entry is not a tracker
-operation. Keep unsent facts with A while recording is blocked, pending or declined; continue unaffected
-authorized work.
-
-Reporting, recording, repair authority, priority and handoff are separate decisions. A question,
-frustration or bug callout alone leaves A active. Creating B or having standing repair authority does
-not prioritize, implement or dispatch B. Honor an explicit request to fix, reprioritize or hand off B;
-retain A's remaining work and ownership unless the user replaces or transfers it.
-
-Correct defects required for A's existing acceptance condition within A's authorization. Establish that
-relationship with evidence before changing source. An issue number or severity alone establishes no
-dependency. If A cannot safely proceed, explain the concrete blocker, resolver and decision needed;
-continue independent authorized work without silently replacing A with a separate repair goal.
+When a side problem is noticed or reported, keep the active goal and load
+[Incidental problems](../../resources/problem-records.md#incidental-problems) before routing it.
 
 ```text
-A: add report export. B: an unrelated terminal-close bug is reported.
-Record B through the selected create-work-item operation; continue report export.
-"Why did the terminal stay open?" asks for an answer and recording, without starting B.
-The export's existing acceptance check fails because its CSV writer corrupts quoted fields:
-correct that defect within A, citing the failing export check.
-"Fix the terminal bug first": retain A's next action, then reconcile B's owner and enter its repair.
+A: add report export. B: an unrelated terminal-close bug.
+Keep report export active and read Incidental problems before routing B.
 ```
-
-Feature, story, task and untyped recording requests use the selected profile's creation operation. Its
-policy resolves intent and native type; [repository selection](../../resources/problem-records.md#repository-selection)
-never grants permission to start implementation.
 
 ## Preserve one owner through completion
 

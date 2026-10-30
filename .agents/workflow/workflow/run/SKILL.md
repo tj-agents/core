@@ -12,7 +12,7 @@ agent-authored slice limits, read one existing canonical goal, use `workflow:pla
 one next action, and continue independent authorized work across commits and pull requests. Direct short
 requests remain their selected operation without a ceremonial plan.
 For a side problem or user callout, apply
-[Workflow's recording and priority decision](../../policy/session/SKILL.md#record-noticed-problems)
+[Workflow's incidental-problems decision](../../resources/problem-records.md#incidental-problems)
 before changing this goal's next action.
 
 Read `agent:lanes` for bounded phase capability. The parent retains design, acceptance, diagnosis, and
@@ -54,6 +54,6 @@ Deferred result: give the bounded watcher command to agent:listen before parking
 Next action: consume its completion result, then continue the same goal.
 
 During the migration, the user reports an unrelated terminal defect without requesting a repair.
-Apply workflow:session's recording and priority decision; record through the selected create operation.
+Apply Workflow's incidental-problems decision; record through the selected create operation.
 Keep the migration's next action and continue it.
 ```

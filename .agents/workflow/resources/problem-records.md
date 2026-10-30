@@ -19,6 +19,37 @@ precedence. Both are read from the primary checkout, the first non-bare entry of
 Read the selection before any tracker operation. Selection requires repository authorization; installing
 Core never adopts a provider.
 
+## Incidental problems
+
+When a bug, mistake or deliberate debt is noticed or reported during item A, preserve A's goal and next
+action. Reconcile the affected source, existing record and repair owner, then invoke the selected
+profile's qualified creation operation for a new item B when its policy and user authority permit. A
+local Markdown entry is not a tracker operation. Keep unsent facts with A while recording is blocked,
+pending or declined; continue unaffected authorized work.
+
+Reporting, recording, repair authority, priority and handoff are separate decisions. A question,
+frustration or bug callout alone leaves A active. Creating B or having standing repair authority does
+not prioritize, implement or dispatch B. Honor an explicit request to fix, reprioritize or hand off B;
+retain A's remaining work and ownership unless the user replaces or transfers it.
+
+Correct defects required for A's existing acceptance condition within A's authorization. Establish that
+relationship with evidence before changing source. An issue number or severity alone establishes no
+dependency. If A cannot safely proceed, explain the concrete blocker, resolver and decision needed;
+continue independent authorized work without silently replacing A with a separate repair goal.
+
+```text
+A: add report export. B: an unrelated terminal-close bug is reported.
+Apply the selected profile's recording decision for B; continue report export.
+"Why did the terminal stay open?" asks for an answer; apply that decision without starting B.
+The export's existing acceptance check fails because its CSV writer corrupts quoted fields:
+correct that defect within A, citing the failing export check.
+"Fix the terminal bug first": retain A's next action, then reconcile B's owner and enter its repair.
+```
+
+Feature, story, task and untyped recording requests use the selected profile's creation operation. Its
+policy resolves intent and native type; [repository selection](#repository-selection) never grants
+permission to start implementation.
+
 ## Selected profile operations
 
 | Operation | Explicit personal scope | Selected Infonetica employer scope |
