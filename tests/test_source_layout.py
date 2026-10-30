@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import posixpath
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -235,8 +236,10 @@ class SourceLayoutTests(unittest.TestCase):
         _, output, _, _ = SYNC.build(self.root)
         runtime = ".agents/agent-store/runtime"
         staged = self.root / ".agents/dependencies/agent/.agents/agent-store/runtime"
+        modules = sorted(path.relative_to(staged).as_posix() for path in (staged / "tj_agent_store").glob("*.py"))
+        self.assertIn("tj_agent_store/__init__.py", modules)
         for plugin in ("workflow", "engineering"):
-            for name in ("session_store.py", "repository_identity.py", "reader.py"):
+            for name in modules:
                 self.assertEqual(
                     SYNC.canonical_output_bytes((staged / name).read_bytes()),
                     output[f"plugins/{plugin}/{runtime}/{name}"],
@@ -247,30 +250,28 @@ class SourceLayoutTests(unittest.TestCase):
                 destination = isolated / relative.removeprefix("plugins/workflow/")
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_bytes(body)
-        spec = importlib.util.spec_from_file_location(
-            "isolated_agent_store", isolated / runtime / "session_store.py"
-        )
-        store = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(store)
         database = self.root / "fixture state \u00e9" / "sessions.db"
-        connection = store.connect(database)
-        try:
-            store.upsert_work_item(
-                connection, "github.com/example/repo:fixture/task", "github.com/example/repo",
-                "fixture", "task", status="active", title="Fixture execution",
-            )
-            connection.commit()
-        finally:
-            connection.close()
-        before = database.read_bytes()
-        reader_spec = importlib.util.spec_from_file_location(
-            "isolated_reader", isolated / runtime / "reader.py"
+        probe = (
+            "import json, sys\n"
+            "sys.path.insert(0, sys.argv[1])\n"
+            "import tj_agent_store\n"
+            "with tj_agent_store.SessionStore(sys.argv[2]) as store:\n"
+            "    store.upsert_work_item('github.com/example/repo:fixture/task', 'github.com/example/repo',\n"
+            "                           'fixture', 'task', status='active', title='Fixture execution')\n"
+            "before = open(sys.argv[2], 'rb').read()\n"
+            "payload = tj_agent_store.ReadOnlyWorkItemStore(sys.argv[2]).inspect('github.com/example/repo:fixture/task')\n"
+            "print(json.dumps({'title': payload['work_items'][0]['title'], 'file': tj_agent_store.__file__,\n"
+            "                  'unchanged': before == open(sys.argv[2], 'rb').read()}))\n"
         )
-        reader = importlib.util.module_from_spec(reader_spec)
-        reader_spec.loader.exec_module(reader)
-        payload = reader.ReadOnlyWorkItemStore(database).inspect("github.com/example/repo:fixture/task")
-        self.assertEqual("Fixture execution", payload["work_items"][0]["title"])
-        self.assertEqual(before, database.read_bytes())
+        result = subprocess.run(
+            [sys.executable, "-I", "-B", "-c", probe, str(isolated / runtime), str(database)],
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertEqual("Fixture execution", value["title"])
+        self.assertEqual(isolated / runtime / "tj_agent_store" / "__init__.py", Path(value["file"]))
+        self.assertTrue(value["unchanged"])
 
     def test_generated_text_bytes_are_stable_across_checkout_line_endings(self):
         source = self.root / ".agents/workflow/contract/plan-artifacts/templates/PLAN.md"
