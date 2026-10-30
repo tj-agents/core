@@ -12,7 +12,7 @@ Own a bounded repair of reusable agent instructions or tooling. Answer the user'
 and correct the active task within its existing authority. Establish a causal source defect before
 changing a standard; a mistake alone does not prove the standard is defective. Do this before any
 host product feedback, which is only for a genuine host defect no tj-agents source can fix.
-Apply [Workflow's recording and priority decision](../../../workflow/policy/session/SKILL.md#record-noticed-problems)
+Apply [Workflow's recording and priority decision](https://github.com/tj-agents/core/blob/main/.agents/workflow/policy/session/SKILL.md#record-noticed-problems)
 before entering the repair phase. This workflow establishes source-repair authority; the active goal
 determines when that authority is exercised.
 
