@@ -93,6 +93,11 @@
       "destination": "hooks/hook_runtime.py"
     },
     {
+      "plugin": "base",
+      "source": ".agents/dependencies/cli/.agents/cli/runtime",
+      "destination": "hooks"
+    },
+    {
       "plugin": "engineering",
       "source": ".agents/dependencies/agent/.agents/agent/resources/lanes",
       "destination": ".agents/lanes"
@@ -136,6 +141,11 @@
       "plugin": "engineering",
       "source": ".agents/hooks/hook_runtime.py",
       "destination": "hooks/hook_runtime.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/dependencies/cli/.agents/cli/runtime",
+      "destination": "hooks"
     },
     {
       "plugin": "engineering",
@@ -226,6 +236,11 @@
       "plugin": "workflow",
       "source": ".agents/hooks/installed_skills.py",
       "destination": "hooks/installed_skills.py"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/dependencies/cli/.agents/cli/runtime",
+      "destination": "hooks"
     },
     {
       "plugin": "workflow",
