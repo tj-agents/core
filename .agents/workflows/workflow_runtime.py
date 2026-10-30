@@ -1,6 +1,7 @@
 import json
 import re
 import subprocess
+import sys
 import importlib.util
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Protocol
@@ -527,34 +528,21 @@ def _read_only_git(root, *arguments):
         return None
 
 
+def _agent_store():
+    package = Path(__file__).resolve().parent.parent
+    runtime = (package / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime"
+               if package.name == ".agents" else package / ".agents" / "agent-store" / "runtime")
+    if not (runtime / "tj_agent_store" / "__init__.py").is_file():
+        raise ContractViolation("work-item resolution requires the shipped Agent Store")
+    if str(runtime) not in sys.path:
+        sys.path.insert(0, str(runtime))
+    import tj_agent_store
+
+    return tj_agent_store
+
+
 def _repository_identity(root):
-    package = Path(__file__).resolve().parent.parent
-    runtime = (package / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime"
-               if package.name == ".agents" else package / ".agents" / "agent-store" / "runtime")
-    path = runtime / "repository_identity.py"
-    if not path.is_file():
-        raise ContractViolation("work-item resolution requires the shipped repository identity helper")
-    spec = importlib.util.spec_from_file_location("workflow_repository_identity", path)
-    if spec is None or spec.loader is None:
-        raise ContractViolation("work-item resolution cannot load the shipped repository identity helper")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.repository_identity(root, _read_only_git)
-
-
-def _read_only_store_module():
-    package = Path(__file__).resolve().parent.parent
-    runtime = (package / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime"
-               if package.name == ".agents" else package / ".agents" / "agent-store" / "runtime")
-    path = runtime / "reader.py"
-    if not path.is_file():
-        raise ContractViolation("work-item resolution requires the shipped read-only store")
-    spec = importlib.util.spec_from_file_location("workflow_agent_store_reader", path)
-    if spec is None or spec.loader is None:
-        raise ContractViolation("work-item resolution cannot load the shipped read-only store")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return _agent_store().repository_identity(root, _read_only_git)
 
 
 def _section(text, heading):
@@ -671,10 +659,10 @@ class RepositoryStateProvider:
         repository = _repository_identity(self.root)
         if not repository:
             raise ContractViolation("work-item resolution requires a repository identity")
-        reader = _read_only_store_module()
+        agent_store = _agent_store()
         try:
-            row = reader.ReadOnlyWorkItemStore().work_item(f"{repository}:{identifier}")
-        except reader.StoreReadError as error:
+            row = agent_store.ReadOnlyWorkItemStore().work_item(f"{repository}:{identifier}")
+        except agent_store.StoreReadError as error:
             raise ContractViolation(str(error)) from error
         return row["status"]
 
@@ -725,12 +713,12 @@ class RepositoryStateProvider:
         if not repository:
             raise ContractViolation("work-item resolution requires a repository identity")
         key = f"{repository}:{identifier}"
-        reader = _read_only_store_module()
+        agent_store = _agent_store()
         try:
-            store = reader.ReadOnlyWorkItemStore()
+            store = agent_store.ReadOnlyWorkItemStore()
             item = store.work_item(key)
             owner_record = store.owner(key)
-        except reader.StoreReadError as error:
+        except agent_store.StoreReadError as error:
             raise ContractViolation(str(error)) from error
         if owner_record:
             if owner_record.get("repo") and owner_record["repo"].casefold() != repository.casefold():
