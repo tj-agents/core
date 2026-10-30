@@ -79,7 +79,13 @@
         "Bash(python -B scripts/ci_native_acceptance.py)",
         "Bash(python3 -B scripts/ci_native_acceptance.py)",
         "PowerShell(python -B scripts/ci_native_acceptance.py)",
-        "PowerShell(python3 -B scripts/ci_native_acceptance.py)"
+        "PowerShell(python3 -B scripts/ci_native_acceptance.py)",
+        "Bash(uv sync --locked)",
+        "Bash(uv run --locked pytest tests -v)",
+        "Bash(uv run --locked python -B scripts/ci_selection.py run --group source)",
+        "PowerShell(uv sync --locked)",
+        "PowerShell(uv run --locked pytest tests -v)",
+        "PowerShell(uv run --locked python -B scripts/ci_selection.py run --group source)"
       ],
       "codex_prefix_rules": []
     }
