@@ -2,7 +2,6 @@ import hashlib
 import importlib.util
 import json
 import os
-from pathlib import Path
 import re
 import shlex
 import shutil
@@ -11,8 +10,8 @@ import sys
 import tempfile
 import threading
 import unittest
+from pathlib import Path
 from unittest.mock import patch
-
 
 ROOT = Path(__file__).resolve().parent.parent
 HOST_COMMAND = "commandWindows" if os.name == "nt" else "command"
@@ -30,7 +29,7 @@ def windows_code_argument(command):
     The generator emits it as one double-quoted token holding no double quote or backslash, and for
     such a token the Windows rules yield exactly the text between the quotes; anything else fails.
     """
-    match = re.match(r'python -I -B -c "([^"\\]*)" ', command)
+    match = re.match(r'tj_hook -- python -I -B -c "([^"\\]*)" ', command)
     if match is None:
         raise AssertionError(f"Unexpected commandWindows shape: {command[:80]}")
     return match.group(1)
@@ -221,7 +220,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
                                 self.assertIn(f'-c "{code}" ', hook[field])
                                 self.assertTrue(
                                     hook[field].startswith(
-                                        "python3 -I -B " if field == "command" else "python -I -B "
+                                        "tj_hook -- python3 -I -B " if field == "command" else "tj_hook -- python -I -B "
                                     )
                                 )
 
