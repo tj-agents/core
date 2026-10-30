@@ -278,6 +278,17 @@ class AppServer:
             self.notifications.append(self._next(deadline))
         return list(self.notifications)
 
+    def drain_notifications(self) -> None:
+        while True:
+            try:
+                value = self.messages.get_nowait()
+            except queue.Empty:
+                return
+            if isinstance(value, Exception):
+                self.notifications.append({"diagnosticError": str(value)})
+            else:
+                self.notifications.append(value)
+
     def close(self):
         if self.process.poll() is None:
             self.process.terminate()
@@ -832,6 +843,10 @@ def accept_codex(
             require_discovery(skills, "Codex skills/list")
             require_hook_completion(server.notifications)
         finally:
+            server.drain_notifications()
+            snapshot_diagnostic(
+                artifacts, "codex-hooks.json", json.dumps(hooks, indent=2)
+            )
             snapshot_transcript(transcript, artifacts)
             snapshot_diagnostic(
                 artifacts, "codex-app-server.stderr.log", diagnostic(server.stderr)
@@ -988,6 +1003,7 @@ def accept(root, marketplace, codex, claude, artifacts, timeout):
             evidence = artifacts / ("failure-" + host)
             evidence.mkdir(parents=True, exist_ok=True)
             failure_evidence = evidence / "tier-gate-failure.txt"
+            failure_evidence.unlink(missing_ok=True)
             probe_environment["TJ_NATIVE_GATE_FAILURE_EVIDENCE"] = str(failure_evidence)
             operation(
                 root,

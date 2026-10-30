@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import queue
 import subprocess
 import sys
 from pathlib import Path
@@ -306,3 +307,51 @@ def test_fail_open_probe_requires_fresh_exact_diagnostic(tmp_path: Path) -> None
     evidence.write_text("unrelated failure", encoding="utf-8")
     with pytest.raises(NATIVE.AcceptanceError, match="unrelated error"):
         NATIVE.require_failure_evidence(evidence)
+
+
+@pytest.mark.parametrize("host", ["codex", "claude"])
+def test_previous_failure_marker_cannot_satisfy_current_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, host: str
+) -> None:
+    marketplace = tmp_path / "marketplace"
+    (marketplace / "plugins").mkdir(parents=True)
+    artifacts = tmp_path / "artifacts"
+    for name in ("codex", "claude"):
+        evidence = artifacts / ("failure-" + name) / "tier-gate-failure.txt"
+        evidence.parent.mkdir(parents=True)
+        evidence.write_text(NATIVE.FAILURE_PROBE, encoding="utf-8")
+
+    def fixture(project: Path, _environment: dict) -> Path:
+        project.mkdir(parents=True, exist_ok=True)
+        return project
+
+    def operation(*args: object, **kwargs: object) -> None:
+        if kwargs.get("expected_context", True) is None:
+            evidence = Path(args[5]) / "tier-gate-failure.txt"
+            if evidence.parent.name != "failure-" + host:
+                evidence.write_text(NATIVE.FAILURE_PROBE, encoding="utf-8")
+
+    monkeypatch.setattr(NATIVE, "write_fixture", fixture)
+    monkeypatch.setattr(NATIVE, "isolated_environment", lambda *args: {})
+    monkeypatch.setattr(NATIVE, "context_marketplace", lambda *args: marketplace)
+    monkeypatch.setattr(NATIVE, "failure_marketplace", lambda *args: marketplace)
+    monkeypatch.setattr(NATIVE, "accept_codex", operation)
+    monkeypatch.setattr(NATIVE, "accept_claude", operation)
+    with pytest.raises(NATIVE.AcceptanceError, match="no diagnostic evidence"):
+        NATIVE.accept(ROOT, marketplace, SCRIPT, SCRIPT, artifacts, 1)
+
+
+def test_failure_diagnostics_drain_pending_hook_events_and_decode_errors() -> None:
+    server = object.__new__(NATIVE.AppServer)
+    server.messages = queue.Queue()
+    server.notifications = []
+    event = {"method": "hook/completed", "params": {"run": {"status": "failed"}}}
+    server.messages.put(event)
+    server.messages.put(ValueError("malformed hook response"))
+    server.drain_notifications()
+    assert server.notifications == [
+        event,
+        {"diagnosticError": "malformed hook response"},
+    ]
+    server.drain_notifications()
+    assert len(server.notifications) == 2
