@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -165,6 +166,33 @@ class ReviewRulesTests(unittest.TestCase):
             self.gate.native_plugins("codex", str(self.project))
         self.assertEqual(str((Path.cwd() / binary).resolve()), launch.call_args.args[0][0])
         self.assertEqual(str(self.project), launch.call_args.kwargs["cwd"])
+
+    def test_packaged_rules_load_the_adjacent_hidden_runtime_in_isolated_python(self):
+        package = self.root / "review package"
+        script = package / "skills/review/scripts/review_rules.py"
+        script.parent.mkdir(parents=True)
+        shutil.copy2(SCRIPT, script)
+        hooks = package / "hooks"
+        hooks.mkdir()
+        for name in ("tier_gate.py", "host_cli.py"):
+            shutil.copy2(ROOT / ".agents/hooks" / name, hooks / name)
+        shutil.copytree(ROOT / ".agents/dependencies/cli/.agents/cli/runtime/tj_cli", hooks / "tj_cli")
+        probe = package / "probe.py"
+        probe.write_text(
+            "import importlib.util\n"
+            "from pathlib import Path\n"
+            "path = Path(__file__).parent / 'skills/review/scripts/review_rules.py'\n"
+            "spec = importlib.util.spec_from_file_location('packaged_rules', path)\n"
+            "module = importlib.util.module_from_spec(spec)\n"
+            "spec.loader.exec_module(module)\n"
+            "print(module.tier_gate().__file__)\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, "-I", "-B", str(probe)], capture_output=True, text=True, timeout=30
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual((hooks / "tier_gate.py").resolve(), Path(result.stdout.strip()).resolve())
 
     def test_missing_native_inventory_never_falls_back_to_another_host(self):
         self.selection("stack@selected")

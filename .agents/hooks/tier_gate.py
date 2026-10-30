@@ -38,6 +38,8 @@ from contextvars import ContextVar
 from pathlib import Path
 from urllib.parse import urlsplit
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from host_cli import plugin_inventory_command
 from tj_cli import process
 
 SCHEMA_VERSIONS = (1, 2, 3)
@@ -928,11 +930,11 @@ def native_plugins(harness, project=None):
     binary = shutil.which(harness)
     if binary is None:
         return ()
-    binary = str(Path(binary).resolve())
+    command, environment = plugin_inventory_command(binary)
     try:
         result = process.run(
-            [binary, "plugin", "list", "--json"], capture_output=True, text=True,
-            cwd=project,
+            command, capture_output=True, text=True,
+            cwd=project, env=environment,
             encoding="utf-8", errors="replace", timeout=8,
         )
         if result.returncode:
