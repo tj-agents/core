@@ -1,13 +1,9 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
-import hashlib
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import importlib.util
 import json
 import os
-from pathlib import Path
 import queue
 import shutil
 import subprocess
@@ -15,13 +11,17 @@ import sys
 import tempfile
 import threading
 import time
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from types import SimpleNamespace
-
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("base", "workflow", "engineering")
 IDENTITIES = tuple(f"{package}@tj-agents" for package in PACKAGES)
 STARTUP_HOOKS = ("base@tj-agents",)
+CONTEXT_PROBE = "native-tier-gate-context-probe"
+FAILURE_PROBE = "native-tier-gate-failure-probe"
 
 
 class AcceptanceError(RuntimeError):
@@ -42,44 +42,16 @@ def native_command(executable, arguments=()):
     return [str(Path(executable).resolve(strict=True)), *arguments]
 
 
-def observed_command(host, executable, project, receipt, arguments):
-    return [sys.executable, '-B', str(ROOT / 'scripts/native_startup_observer.py'),
-            '--host', host, '--target', str(executable), '--project', str(project),
-            '--receipt', str(receipt), '--', *arguments]
-
-
 def terminate_owned(process):
-    if os.name == 'nt':
-        subprocess.run(['taskkill.exe', '/PID', str(process.pid), '/T', '/F'],
-                       capture_output=True, timeout=10, check=False)
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
     else:
         process.terminate()
-
-
-def require_observer(path, state):
-    try:
-        value = json.loads(path.read_text(encoding='utf-8'))
-    except (OSError, ValueError) as error:
-        raise AcceptanceError(f'native startup observer has no valid receipt: {path}') from error
-    if value.get('state') != state:
-        raise AcceptanceError(f'native startup observer expected {state}: {value}')
-    return value
-
-
-def require_failure_probe(host, evidence, operation):
-    path = evidence / (host + '-startup-observer.json')
-    path.unlink(missing_ok=True)
-    try:
-        operation()
-    except AcceptanceError:
-        pass
-    else:
-        raise AcceptanceError(f'{host} accepted a deliberately failed required startup hook')
-    receipt = require_observer(path, 'failed')
-    if 'base@tj-agents' not in receipt.get('error', '') \
-            or 'native-required-hook-failure-probe' not in receipt.get('error', ''):
-        raise AcceptanceError(f'{host} failed for a different reason: {receipt}')
-    return receipt
 
 
 def diagnostic(lines):
@@ -89,8 +61,14 @@ def diagnostic(lines):
 def run_native(arguments, cwd, environment, label, timeout):
     try:
         return subprocess.run(
-            arguments, cwd=cwd, env=environment, check=True, capture_output=True,
-            text=True, encoding="utf-8", timeout=timeout,
+            arguments,
+            cwd=cwd,
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=timeout,
         )
     except subprocess.CalledProcessError as error:
         detail = (error.stderr or error.stdout or "").strip()[-4000:]
@@ -119,10 +97,17 @@ def claude_plugin_inventory(completed):
         raise AcceptanceError("Claude plugin discovery did not return JSON") from error
     if not isinstance(value, list):
         raise AcceptanceError("Claude plugin discovery did not return a list")
-    return {"installed": [
-        {"pluginId": item.get("id"), "installed": isinstance(item.get("id"), str), "enabled": item.get("enabled") is True}
-        for item in value if isinstance(item, dict)
-    ]}
+    return {
+        "installed": [
+            {
+                "pluginId": item.get("id"),
+                "installed": isinstance(item.get("id"), str),
+                "enabled": item.get("enabled") is True,
+            }
+            for item in value
+            if isinstance(item, dict)
+        ]
+    }
 
 
 def installed_identities(inventory):
@@ -142,25 +127,41 @@ def installed_identities(inventory):
 def require_plugins(inventory):
     missing = sorted(set(IDENTITIES) - installed_identities(inventory))
     if missing:
-        raise AcceptanceError(f"native plugin discovery is missing enabled installed {', '.join(missing)}")
+        raise AcceptanceError(
+            f"native plugin discovery is missing enabled installed {', '.join(missing)}"
+        )
 
 
 def write_fixture(project, environment=None):
     selection = project / ".agents" / "plugins.json"
     selection.parent.mkdir(parents=True, exist_ok=True)
-    selection.write_text(json.dumps({
-        "schema_version": 1,
-        "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}},
-        "plugins": list(IDENTITIES),
-    }, indent=2) + "\n", encoding="utf-8")
+    selection.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}},
+                "plugins": list(IDENTITIES),
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     if environment is not None:
         try:
             subprocess.run(
-                ["git", "init", "--quiet", str(project)], cwd=project, env=environment,
-                check=True, capture_output=True, text=True, encoding="utf-8",
+                ["git", "init", "--quiet", str(project)],
+                cwd=project,
+                env=environment,
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
             )
         except (OSError, subprocess.SubprocessError) as error:
-            raise AcceptanceError(f"isolated fixture Git initialization failed: {error}") from error
+            raise AcceptanceError(
+                f"isolated fixture Git initialization failed: {error}"
+            ) from error
     return project
 
 
@@ -168,7 +169,11 @@ def session_id_from(value):
     if not isinstance(value, dict):
         raise AcceptanceError("native startup response is malformed")
     for candidate in (value.get("thread"), value.get("session"), value):
-        if isinstance(candidate, dict) and isinstance(candidate.get("id"), str) and candidate["id"]:
+        if (
+            isinstance(candidate, dict)
+            and isinstance(candidate.get("id"), str)
+            and candidate["id"]
+        ):
             return candidate["id"]
     raise AcceptanceError("native startup response did not include a session id")
 
@@ -190,18 +195,23 @@ def start_line_reader(stream, destination, parse_json=False, completion=None):
         finally:
             if completion is not None:
                 completion.put(None)
+
     threading.Thread(target=read, daemon=True).start()
 
 
 class AppServer:
-    def __init__(self, executable, cwd, environment, timeout, popen=subprocess.Popen, observer_receipt=None):
+    def __init__(self, executable, cwd, environment, timeout, popen=subprocess.Popen):
         self.timeout = timeout
-        self.observed = observer_receipt is not None
         self.process = popen(
-            (observed_command('codex', executable, cwd, observer_receipt, ['app-server']) if self.observed
-             else [*native_command(executable), 'app-server']), cwd=cwd, env=environment,
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", bufsize=1,
+            [*native_command(executable), "app-server"],
+            cwd=cwd,
+            env=environment,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            bufsize=1,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         self.messages = queue.Queue()
@@ -209,7 +219,12 @@ class AppServer:
         self.notifications = []
         self.stderr = []
         self.sequence = 0
-        start_line_reader(self.process.stdout, self.messages, parse_json=True, completion=self.completed)
+        start_line_reader(
+            self.process.stdout,
+            self.messages,
+            parse_json=True,
+            completion=self.completed,
+        )
         start_line_reader(self.process.stderr, self.stderr)
 
     def send(self, value):
@@ -245,10 +260,16 @@ class AppServer:
             return value["result"]
 
     def initialize(self):
-        self.request("initialize", {
-            "clientInfo": {"name": "tj-agents-native-acceptance", "version": "1.0.0"},
-            "capabilities": {"experimentalApi": True},
-        })
+        self.request(
+            "initialize",
+            {
+                "clientInfo": {
+                    "name": "tj-agents-native-acceptance",
+                    "version": "1.0.0",
+                },
+                "capabilities": {"experimentalApi": True},
+            },
+        )
         self.send({"method": "initialized", "params": {}})
 
     def notifications_until(self, predicate):
@@ -259,7 +280,7 @@ class AppServer:
 
     def close(self):
         if self.process.poll() is None:
-            terminate_owned(self.process) if self.observed else self.process.terminate()
+            self.process.terminate()
         try:
             self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
@@ -288,45 +309,74 @@ def require_startup_hooks(value, trusted=False, trusted_hashes=None):
         raise AcceptanceError("Codex hooks/list is malformed")
     hooks = [
         hook
-        for entry in value["data"] if isinstance(entry, dict)
-        for hook in entry.get("hooks", []) if isinstance(hook, dict)
+        for entry in value["data"]
+        if isinstance(entry, dict)
+        for hook in entry.get("hooks", [])
+        if isinstance(hook, dict)
         if hook.get("source") == "plugin" and hook.get("enabled") is True
     ]
     values = {hook.get("pluginId") for hook in hooks}
     missing = set(STARTUP_HOOKS) - values
     if missing:
-        raise AcceptanceError(f"Codex hooks/list is missing required startup hooks for {', '.join(sorted(missing))}")
+        raise AcceptanceError(
+            f"Codex hooks/list is missing required startup hooks for {', '.join(sorted(missing))}"
+        )
     if trusted:
         untrusted = [
-            hook.get("key", "unknown") for hook in hooks
+            hook.get("key", "unknown")
+            for hook in hooks
             if hook.get("pluginId") in STARTUP_HOOKS
             and (
                 hook.get("trustStatus") != "trusted"
-                or hook.get("currentHash") != (trusted_hashes or {}).get(hook.get("key"), {}).get("trusted_hash")
+                or hook.get("currentHash")
+                != (trusted_hashes or {}).get(hook.get("key"), {}).get("trusted_hash")
             )
         ]
         if untrusted:
-            raise AcceptanceError(f"Codex hooks/list did not trust current startup hooks: {', '.join(untrusted)}")
+            raise AcceptanceError(
+                f"Codex hooks/list did not trust current startup hooks: {', '.join(untrusted)}"
+            )
 
 
-def trust_current_hooks(server, trust, executable, project, environment, verified_roots, timeout):
-    inventory = json_result(run_native(
-        [*native_command(executable), "plugin", "list", "--json"],
-        project, environment, "Codex plugin discovery", timeout,
-    ), "Codex plugin discovery")
+def trust_current_hooks(
+    server, trust, executable, project, environment, verified_roots, timeout
+):
+    inventory = json_result(
+        run_native(
+            [*native_command(executable), "plugin", "list", "--json"],
+            project,
+            environment,
+            "Codex plugin discovery",
+            timeout,
+        ),
+        "Codex plugin discovery",
+    )
     hooks = server.request("hooks/list", {"cwds": [str(project)]})
-    updates = trust.trust_updates(inventory, hooks["data"], project.resolve(), verified_roots)
+    updates = trust.trust_updates(
+        inventory, hooks["data"], project.resolve(), verified_roots
+    )
     if not updates:
-        raise AcceptanceError("Codex trust update found no current verified startup hooks")
-    server.request("config/batchWrite", {
-        "edits": [{"keyPath": "hooks.state", "value": updates, "mergeStrategy": "upsert"}],
-        "reloadUserConfig": True,
-    })
+        raise AcceptanceError(
+            "Codex trust update found no current verified startup hooks"
+        )
+    server.request(
+        "config/batchWrite",
+        {
+            "edits": [
+                {"keyPath": "hooks.state", "value": updates, "mergeStrategy": "upsert"}
+            ],
+            "reloadUserConfig": True,
+        },
+    )
     return updates
+
 
 def verify_installed_roots(value, trust, marketplace):
     roots = {}
-    expected = {identity: marketplace / "plugins" / package for package, identity in zip(PACKAGES, IDENTITIES)}
+    expected = {
+        identity: marketplace / "plugins" / package
+        for package, identity in zip(PACKAGES, IDENTITIES)
+    }
     if not isinstance(value, dict) or not isinstance(value.get("data"), list):
         raise AcceptanceError("Codex hooks/list is malformed")
     for entry in value["data"]:
@@ -339,20 +389,50 @@ def verify_installed_roots(value, trust, marketplace):
             if identity not in expected or identity in roots:
                 continue
             installed = trust.installed_package(hook)
-            if trust.package_files(installed) != trust.package_files(expected[identity]):
-                raise AcceptanceError(f"installed {identity} plugin differs from the candidate package")
+            if trust.package_files(installed) != trust.package_files(
+                expected[identity]
+            ):
+                raise AcceptanceError(
+                    f"installed {identity} plugin differs from the candidate package"
+                )
             roots[identity] = SimpleNamespace(identity=identity, root=installed)
     for identity in STARTUP_HOOKS:
         if identity not in roots:
-            raise AcceptanceError(f"Codex hooks/list has no installed package root for {identity}")
+            raise AcceptanceError(
+                f"Codex hooks/list has no installed package root for {identity}"
+            )
     return list(roots.values())
 
 
-def require_base_evidence(evidence, package_root, label):
-    contract = package_root / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
-    digest = hashlib.sha256(contract.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
-    if "base:task-routing" not in evidence or digest not in evidence:
-        raise AcceptanceError(f"{label} did not include Base task-routing context")
+def require_hook_completion(notifications: list[dict]) -> None:
+    for notification in notifications:
+        if notification.get("method") != "hook/completed":
+            continue
+        run = notification.get("params", {}).get("run", {})
+        if run.get("eventName") != "sessionStart" or run.get("source") != "plugin":
+            continue
+        if "base" not in Path(run.get("sourcePath", "")).parts:
+            continue
+        if run.get("status") != "completed":
+            raise AcceptanceError(f"Base SessionStart did not complete: {run}")
+        return
+    raise AcceptanceError("Codex did not complete the Base SessionStart hook")
+
+
+def require_failure_evidence(path: Path) -> None:
+    try:
+        diagnostic = path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise AcceptanceError(
+            "tier-gate fail-open probe has no diagnostic evidence"
+        ) from error
+    if diagnostic != FAILURE_PROBE:
+        raise AcceptanceError("tier-gate fail-open probe recorded an unrelated error")
+
+
+def require_context(evidence: str, expected: str | None, label: str) -> None:
+    if expected is not None and expected not in evidence:
+        raise AcceptanceError(f"{label} did not include {expected}")
 
 
 def transcript_entries(path):
@@ -384,7 +464,7 @@ def snapshot_diagnostic(artifacts, name, value):
     (artifacts / name).write_text(value, encoding="utf-8")
 
 
-def require_failed_turn(path, package_root, timeout):
+def require_failed_turn(path, expected_context, timeout):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         entries = transcript_entries(path)
@@ -393,20 +473,27 @@ def require_failed_turn(path, package_root, timeout):
             continue
         evidence = json.dumps(entries, sort_keys=True)
         try:
-            require_base_evidence(evidence, package_root, "Codex session transcript")
+            require_context(evidence, expected_context, "Codex session transcript")
         except AcceptanceError:
             pass
         else:
             for entry in entries:
                 payload = entry.get("payload") if isinstance(entry, dict) else None
-                if not isinstance(payload, dict) or payload.get("type") != "task_complete":
+                if (
+                    not isinstance(payload, dict)
+                    or payload.get("type") != "task_complete"
+                ):
                     continue
                 error = payload.get("error")
                 if isinstance(error, dict) and "401" in str(error.get("message", "")):
                     return entries
-                raise AcceptanceError("Codex startup turn did not complete with the expected unauthenticated 401")
+                raise AcceptanceError(
+                    "Codex startup turn did not complete with the expected unauthenticated 401"
+                )
         time.sleep(0.05)
-    raise AcceptanceError("Codex startup turn did not record Base context and an unauthenticated 401 completion")
+    raise AcceptanceError(
+        "Codex startup turn did not record expected tier context and an unauthenticated 401 completion"
+    )
 
 
 def strings_at_keys(value, keys):
@@ -439,8 +526,10 @@ def require_discovery(value, label):
         found = False
         for record in records:
             values = {
-                item for key, item in record.items()
-                if key in {"id", "name", "skill", "qualifiedName", "command"} and isinstance(item, str)
+                item
+                for key, item in record.items()
+                if key in {"id", "name", "skill", "qualifiedName", "command"}
+                and isinstance(item, str)
             }
             if qualified in values:
                 found = True
@@ -448,21 +537,30 @@ def require_discovery(value, label):
             if skill not in values:
                 continue
             sources = {
-                item.replace("\\", "/").casefold() for key, item in record.items()
-                if key in {"pluginId", "plugin", "source", "path", "root", "location"} and isinstance(item, str)
+                item.replace("\\", "/").casefold()
+                for key, item in record.items()
+                if key in {"pluginId", "plugin", "source", "path", "root", "location"}
+                and isinstance(item, str)
             }
-            if any(source in {package, f"{package}@tj-agents"} or f"/plugins/{package}/" in source for source in sources):
+            if any(
+                source in {package, f"{package}@tj-agents"}
+                or f"/plugins/{package}/" in source
+                for source in sources
+            ):
                 found = True
                 break
         if not found:
-            raise AcceptanceError(f"{label} did not discover the required {package} skill")
+            raise AcceptanceError(
+                f"{label} did not discover the required {package} skill"
+            )
 
 
 def require_claude_discovery(response):
     if not isinstance(response, dict) or not isinstance(response.get("commands"), list):
         raise AcceptanceError("Claude initialize response has no command inventory")
     names = {
-        command.get("name") for command in response["commands"]
+        command.get("name")
+        for command in response["commands"]
         if isinstance(command, dict) and isinstance(command.get("name"), str)
     }
     for name in ("workflow:run", "engineering:commit"):
@@ -472,66 +570,139 @@ def require_claude_discovery(response):
 
 def install_codex_plugins(executable, marketplace, project, environment, timeout):
     run_native(
-        [*native_command(executable), "plugin", "marketplace", "add", str(marketplace), "--json"],
-        project, environment, "Codex marketplace registration", timeout,
+        [
+            *native_command(executable),
+            "plugin",
+            "marketplace",
+            "add",
+            str(marketplace),
+            "--json",
+        ],
+        project,
+        environment,
+        "Codex marketplace registration",
+        timeout,
     )
     for identity in IDENTITIES:
         run_native(
             [*native_command(executable), "plugin", "add", identity, "--json"],
-            project, environment, f"Codex plugin installation for {identity}", timeout,
+            project,
+            environment,
+            f"Codex plugin installation for {identity}",
+            timeout,
         )
-    inventory = json_result(run_native(
-        [*native_command(executable), "plugin", "list", "--json"],
-        project, environment, "Codex plugin discovery", timeout,
-    ), "Codex plugin discovery")
+    inventory = json_result(
+        run_native(
+            [*native_command(executable), "plugin", "list", "--json"],
+            project,
+            environment,
+            "Codex plugin discovery",
+            timeout,
+        ),
+        "Codex plugin discovery",
+    )
     require_plugins(inventory)
 
 
 def install_claude_plugins(executable, marketplace, project, environment, timeout):
     run_native(
-        [*native_command(executable), "plugin", "marketplace", "add", str(marketplace), "--scope", "user"],
-        project, environment, "Claude marketplace registration", timeout,
+        [
+            *native_command(executable),
+            "plugin",
+            "marketplace",
+            "add",
+            str(marketplace),
+            "--scope",
+            "user",
+        ],
+        project,
+        environment,
+        "Claude marketplace registration",
+        timeout,
     )
     for identity in IDENTITIES:
         run_native(
-            [*native_command(executable), "plugin", "install", identity, "--scope", "user"],
-            project, environment, f"Claude plugin installation for {identity}", timeout,
+            [
+                *native_command(executable),
+                "plugin",
+                "install",
+                identity,
+                "--scope",
+                "user",
+            ],
+            project,
+            environment,
+            f"Claude plugin installation for {identity}",
+            timeout,
         )
-    inventory = claude_plugin_inventory(run_native(
-        [*native_command(executable), "plugin", "list", "--json"],
-        project, environment, "Claude plugin discovery", timeout,
-    ))
+    inventory = claude_plugin_inventory(
+        run_native(
+            [*native_command(executable), "plugin", "list", "--json"],
+            project,
+            environment,
+            "Claude plugin discovery",
+            timeout,
+        )
+    )
     require_plugins(inventory)
 
 
-def accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout):
+def accept_claude_init(
+    root,
+    marketplace,
+    executable,
+    project,
+    environment,
+    artifacts,
+    timeout,
+    expected_context=CONTEXT_PROBE,
+):
     artifacts.mkdir(parents=True, exist_ok=True)
     debug = artifacts / "claude-debug.jsonl"
     claude_environment = dict(environment)
     claude_environment["CLAUDE_CODE_ENTRYPOINT"] = "sdk-py"
     claude_environment.pop("CLAUDECODE", None)
-    observer = artifacts / 'claude-startup-observer.json'
     process = subprocess.Popen(
-        observed_command('claude', executable, project, observer, [
-            "--output-format", "stream-json", "--verbose",
-            "--input-format", "stream-json", "--debug-file", str(debug),
-        ]),
-        cwd=project, env=claude_environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        text=True, encoding="utf-8", bufsize=1,
+        [
+            *native_command(executable),
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--input-format",
+            "stream-json",
+            "--debug-file",
+            str(debug),
+        ],
+        cwd=project,
+        env=claude_environment,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        bufsize=1,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     try:
         messages = queue.Queue()
         completed = queue.Queue()
         errors = []
-        start_line_reader(process.stdout, messages, parse_json=True, completion=completed)
+        start_line_reader(
+            process.stdout, messages, parse_json=True, completion=completed
+        )
         start_line_reader(process.stderr, errors)
         deadline = time.monotonic() + timeout
         request_id = "native-acceptance-1"
-        process.stdin.write(json.dumps({
-            "type": "control_request", "request_id": request_id,
-            "request": {"subtype": "initialize", "hooks": None},
-        }) + "\n")
+        process.stdin.write(
+            json.dumps(
+                {
+                    "type": "control_request",
+                    "request_id": request_id,
+                    "request": {"subtype": "initialize", "hooks": None},
+                }
+            )
+            + "\n"
+        )
         process.stdin.flush()
         initialized = None
         while time.monotonic() < deadline:
@@ -543,10 +714,16 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
                 continue
             if isinstance(message, Exception):
                 raise AcceptanceError(f"Claude startup emitted invalid JSON: {message}")
-            if not isinstance(message, dict) or message.get("type") != "control_response":
+            if (
+                not isinstance(message, dict)
+                or message.get("type") != "control_response"
+            ):
                 continue
             response = message.get("response")
-            if not isinstance(response, dict) or response.get("request_id") != request_id:
+            if (
+                not isinstance(response, dict)
+                or response.get("request_id") != request_id
+            ):
                 continue
             if response.get("subtype") != "success":
                 raise AcceptanceError("Claude initialize request was not accepted")
@@ -576,8 +753,7 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
             raise AcceptanceError("Claude did not create its debug artifact") from error
         if "SessionStart" not in trace:
             raise AcceptanceError("Claude debug artifact has no SessionStart marker")
-        require_base_evidence(trace, marketplace / "plugins" / "base", "Claude debug artifact")
-        require_observer(observer, 'confirmed')
+        require_context(trace, expected_context, "Claude debug artifact")
     finally:
         if process.poll() is None:
             terminate_owned(process)
@@ -588,44 +764,106 @@ def accept_claude_init(root, marketplace, executable, project, environment, arti
                 process.wait(timeout=5)
 
 
-def accept_codex(root, marketplace, executable, project, environment, artifacts, timeout):
+def accept_codex(
+    root,
+    marketplace,
+    executable,
+    project,
+    environment,
+    artifacts,
+    timeout,
+    expected_context=CONTEXT_PROBE,
+):
     install_codex_plugins(executable, marketplace, project, environment, timeout)
-    trust = load_module("native_acceptance_trust", root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime" / "codex" / "hook_trust.py")
+    trust = load_module(
+        "native_acceptance_trust",
+        root
+        / ".agents"
+        / "dependencies"
+        / "agent"
+        / ".agents"
+        / "agent"
+        / "runtime"
+        / "codex"
+        / "hook_trust.py",
+    )
     with AppServer(executable, project, environment, timeout) as server:
         hooks = server.request("hooks/list", {"cwds": [str(project)]})
         require_startup_hooks(hooks)
         verified_roots = verify_installed_roots(hooks, trust, marketplace)
     with AppServer(executable, project, environment, timeout) as server:
-        startup_hashes = trust_current_hooks(server, trust, executable, project, environment, verified_roots, timeout)
-    observer = artifacts / 'codex-startup-observer.json'
-    with AppServer(executable, project, environment, timeout, observer_receipt=observer) as server:
+        startup_hashes = trust_current_hooks(
+            server, trust, executable, project, environment, verified_roots, timeout
+        )
+    with AppServer(executable, project, environment, timeout) as server:
         hooks = server.request("hooks/list", {"cwds": [str(project)]})
         require_startup_hooks(hooks, trusted=True, trusted_hashes=startup_hashes)
-        startup = server.request("thread/start", {
-            "cwd": str(project), "approvalPolicy": "never", "sandbox": "read-only",
-        })
+        startup = server.request(
+            "thread/start",
+            {
+                "cwd": str(project),
+                "approvalPolicy": "never",
+                "sandbox": "read-only",
+            },
+        )
         session_id = session_id_from(startup)
         thread = startup.get("thread") if isinstance(startup, dict) else None
-        transcript = Path(thread.get("path")) if isinstance(thread, dict) and isinstance(thread.get("path"), str) else None
+        transcript = (
+            Path(thread.get("path"))
+            if isinstance(thread, dict) and isinstance(thread.get("path"), str)
+            else None
+        )
         if transcript is None:
-            raise AcceptanceError("Codex startup response did not include its session transcript")
-        server.request("turn/start", {
-            "threadId": session_id,
-            "input": [{"type": "text", "text": "native startup acceptance"}],
-        })
+            raise AcceptanceError(
+                "Codex startup response did not include its session transcript"
+            )
+        server.request(
+            "turn/start",
+            {
+                "threadId": session_id,
+                "input": [{"type": "text", "text": "native startup acceptance"}],
+            },
+        )
         try:
-            require_failed_turn(transcript, marketplace / "plugins" / "base", timeout)
+            require_failed_turn(transcript, expected_context, timeout)
+            skills = server.request(
+                "skills/list", {"cwds": [str(project)], "forceReload": True}
+            )
+            require_discovery(skills, "Codex skills/list")
+            require_hook_completion(server.notifications)
         finally:
             snapshot_transcript(transcript, artifacts)
-            snapshot_diagnostic(artifacts, "codex-app-server.stderr.log", diagnostic(server.stderr))
-        skills = server.request("skills/list", {"cwds": [str(project)], "forceReload": True})
-        require_discovery(skills, "Codex skills/list")
-        require_observer(observer, 'confirmed')
+            snapshot_diagnostic(
+                artifacts, "codex-app-server.stderr.log", diagnostic(server.stderr)
+            )
+            snapshot_diagnostic(
+                artifacts,
+                "codex-notifications.json",
+                json.dumps(server.notifications, indent=2),
+            )
 
 
-def accept_claude(root, marketplace, executable, project, environment, artifacts, timeout):
+def accept_claude(
+    root,
+    marketplace,
+    executable,
+    project,
+    environment,
+    artifacts,
+    timeout,
+    expected_context=CONTEXT_PROBE,
+):
     install_claude_plugins(executable, marketplace, project, environment, timeout)
-    accept_claude_init(root, marketplace, executable, project, environment, artifacts, timeout)
+    accept_claude_init(
+        root,
+        marketplace,
+        executable,
+        project,
+        environment,
+        artifacts,
+        timeout,
+        expected_context=expected_context,
+    )
 
 
 @contextmanager
@@ -635,21 +873,21 @@ def authentication_failure_endpoint():
             pass
 
         def do_POST(self):
-            self.rfile.read(int(self.headers.get('Content-Length', '0')))
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
             body = b'{"error":{"message":"native acceptance unauthenticated","type":"authentication_error"}}'
             self.send_response(401)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Content-Length', str(len(body)))
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
 
         do_GET = do_POST
 
-    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()
     try:
-        yield f'http://127.0.0.1:{server.server_port}/v1'
+        yield f"http://127.0.0.1:{server.server_port}/v1"
     finally:
         server.shutdown()
         server.server_close()
@@ -671,26 +909,32 @@ def isolated_environment(temporary_root, codex, claude, endpoint):
     (codex_home / "config.toml").write_text(
         'cli_auth_credentials_store = "file"\n'
         'model_provider = "native_startup"\n\n'
-        '[features]\n'
-        'hooks = true\n\n'
-        '[model_providers.native_startup]\n'
+        "[features]\n"
+        "hooks = true\n\n"
+        "[model_providers.native_startup]\n"
         'name = "OpenAI"\n'
-        'base_url = ' + json.dumps(endpoint) + '\n'
+        "base_url = " + json.dumps(endpoint) + "\n"
         'wire_api = "responses"\n'
-        'requires_openai_auth = false\n'
-        'supports_websockets = false\n',
+        "requires_openai_auth = false\n"
+        "supports_websockets = false\n",
         encoding="utf-8",
     )
     environment = dict(os.environ)
     for key in list(environment):
-        if (
-            key.startswith(("ANTHROPIC_", "CLAUDE_CODE_", "CODEX_", "OPENAI_", "GIT_CONFIG_"))
-            or key in {
-                "AGENT_PROFILE", "CLAUDE_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_PROFILE",
-                "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_PROFILE", "CODEX_PROFILE", "SESSION_ID",
-                "TJ_AGENTS_PROFILE", "TOOL_CALL_ID",
-            }
-        ):
+        if key.startswith(
+            ("ANTHROPIC_", "CLAUDE_CODE_", "CODEX_", "OPENAI_", "GIT_CONFIG_")
+        ) or key in {
+            "AGENT_PROFILE",
+            "CLAUDE_API_KEY",
+            "CLAUDE_CODE_OAUTH_TOKEN",
+            "CLAUDE_CODE_PROFILE",
+            "CLAUDE_CODE_USE_BEDROCK",
+            "CLAUDE_PROFILE",
+            "CODEX_PROFILE",
+            "SESSION_ID",
+            "TJ_AGENTS_PROFILE",
+            "TOOL_CALL_ID",
+        }:
             environment.pop(key, None)
     directories = list(dict.fromkeys((str(codex_path.parent), str(claude_path.parent))))
     inherited = environment.get("PATH", "")
@@ -705,7 +949,9 @@ def isolated_environment(temporary_root, codex, claude, endpoint):
         CODEX_HOME=str(codex_home),
         CLAUDE_CONFIG_DIR=str(claude_home),
         AGENT_STATE_DIRECTORY=str(state),
-        PATH=os.pathsep.join([*directories, inherited]) if inherited else os.pathsep.join(directories),
+        PATH=os.pathsep.join([*directories, inherited])
+        if inherited
+        else os.pathsep.join(directories),
     )
     return environment
 
@@ -715,40 +961,128 @@ def accept(root, marketplace, codex, claude, artifacts, timeout):
     marketplace = marketplace.resolve(strict=True)
     if not (marketplace / "plugins").is_dir():
         raise AcceptanceError("candidate marketplace has no generated plugin packages")
-    with tempfile.TemporaryDirectory(prefix="tj-agents-native-acceptance-") as temporary, \
-            authentication_failure_endpoint() as endpoint:
+    with (
+        tempfile.TemporaryDirectory(prefix="tj-agents-native-acceptance-") as temporary,
+        authentication_failure_endpoint() as endpoint,
+    ):
         temporary_root = Path(temporary)
         environment = isolated_environment(temporary_root, codex, claude, endpoint)
         project = write_fixture(temporary_root / "fixture", environment)
-        accept_codex(root, marketplace, codex, project, environment, artifacts, timeout)
-        accept_claude(root, marketplace, claude, project, environment, artifacts, timeout)
-        failed_marketplace = failure_marketplace(root, temporary_root / 'failure-marketplace')
-        failures = {}
-        for host, executable, operation in (('codex', codex, accept_codex), ('claude', claude, accept_claude)):
-            case = temporary_root / ('failure-' + host)
+        contextual = context_marketplace(
+            root, marketplace, temporary_root / "context-marketplace"
+        )
+        accept_codex(root, contextual, codex, project, environment, artifacts, timeout)
+        accept_claude(
+            root, contextual, claude, project, environment, artifacts, timeout
+        )
+        failed_marketplace = failure_marketplace(
+            root, contextual, temporary_root / "failure-marketplace"
+        )
+        for host, executable, operation in (
+            ("codex", codex, accept_codex),
+            ("claude", claude, accept_claude),
+        ):
+            case = temporary_root / ("failure-" + host)
             probe_environment = isolated_environment(case, codex, claude, endpoint)
-            probe_project = write_fixture(case / 'fixture', probe_environment)
-            evidence = artifacts / ('failure-' + host)
-            failures[host] = require_failure_probe(host, evidence, lambda: operation(
-                root, failed_marketplace, executable, probe_project, probe_environment, evidence, timeout))
-    return {"plugins": list(IDENTITIES), 'required_hook_failure_probes': failures}
+            probe_project = write_fixture(case / "fixture", probe_environment)
+            evidence = artifacts / ("failure-" + host)
+            evidence.mkdir(parents=True, exist_ok=True)
+            failure_evidence = evidence / "tier-gate-failure.txt"
+            probe_environment["TJ_NATIVE_GATE_FAILURE_EVIDENCE"] = str(failure_evidence)
+            operation(
+                root,
+                failed_marketplace,
+                executable,
+                probe_project,
+                probe_environment,
+                evidence,
+                timeout,
+                expected_context=None,
+            )
+            require_failure_evidence(failure_evidence)
+    return {
+        "plugins": list(IDENTITIES),
+        "tier_context_probe": CONTEXT_PROBE,
+        "fail_open_probes": ["codex", "claude"],
+    }
 
 
-def failure_marketplace(root, directory):
-    generator = load_module('native_failure_package_generator', root / 'scripts/sync_plugin_packages.py')
-    _, output, _, _ = generator.build(root, validate_plugin_digests=False)
-    output['plugins/base/hooks/tier_gate.py'] = (
-        b"raise RuntimeError('native-required-hook-failure-probe')\n"
+def fixture_marketplace(
+    root: Path, marketplace: Path, directory: Path, changes: dict[str, bytes]
+) -> Path:
+    shutil.copytree(marketplace / "plugins", directory / "plugins")
+    for relative in (
+        ".claude-plugin/marketplace.json",
+        ".agents/plugins/marketplace.json",
+    ):
+        source = marketplace / relative
+        target = directory / source.relative_to(marketplace)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+    generator = load_module(
+        "native_fixture_package_generator", root / "scripts/sync_plugin_packages.py"
     )
-    output['plugins/base/hooks/codex.json'] = (
-        root / '.agents/plugins/manifests/codex/base-hooks.json'
+    output = {
+        path.relative_to(directory).as_posix(): path.read_bytes()
+        for path in (directory / "plugins/base").rglob("*")
+        if path.is_file()
+    }
+    output.update(changes)
+    output["plugins/base/hooks/codex.json"] = (
+        root / ".agents/plugins/manifests/codex/base-hooks.json"
     ).read_bytes()
-    generator.bind_codex_hook_snapshots(root, output, {'base'})
+    generator.bind_codex_hook_snapshots(root, output, {"base"})
     for relative, content in output.items():
         target = directory / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
     return directory
+
+
+def context_marketplace(root: Path, marketplace: Path, directory: Path) -> Path:
+    declaration = json.loads(
+        (marketplace / "plugins/base/tier.json").read_text(encoding="utf-8")
+    )
+    declaration.update(schema_version=3, session_context=CONTEXT_PROBE)
+    return fixture_marketplace(
+        root,
+        marketplace,
+        directory,
+        {
+            "plugins/base/tier.json": (json.dumps(declaration) + "\n").encode("utf-8"),
+        },
+    )
+
+
+def failure_marketplace(root: Path, marketplace: Path, directory: Path) -> Path:
+    source = (marketplace / "plugins/base/hooks/tier_gate.py").read_text(
+        encoding="utf-8"
+    )
+    statement = "context = statement(project_root(payload))"
+    if source.count(statement) != 1:
+        raise AcceptanceError(
+            "tier-gate failure probe could not locate its protected statement"
+        )
+    source = source.replace(statement, f"raise RuntimeError({FAILURE_PROBE!r})")
+    handler = 'print(f"tier gate failed: {error}", file=sys.stderr)'
+    if source.count(handler) != 1:
+        raise AcceptanceError(
+            "tier-gate failure probe could not locate its diagnostic handler"
+        )
+    source = source.replace(
+        handler,
+        handler
+        + '\n        Path(os.environ["TJ_NATIVE_GATE_FAILURE_EVIDENCE"]).write_text('
+        + 'str(error), encoding="utf-8")',
+    )
+    return fixture_marketplace(
+        root,
+        marketplace,
+        directory,
+        {
+            "plugins/base/hooks/tier_gate.py": source.encode("utf-8"),
+        },
+    )
 
 
 def main(argv=None):
@@ -763,14 +1097,20 @@ def main(argv=None):
     if arguments.timeout <= 0:
         raise SystemExit("--timeout must be positive")
     arguments.artifacts.mkdir(parents=True, exist_ok=True)
-    (arguments.artifacts / 'native-host-acceptance.failure.log').unlink(missing_ok=True)
+    (arguments.artifacts / "native-host-acceptance.failure.log").unlink(missing_ok=True)
     try:
         result = accept(
-            arguments.root, arguments.marketplace, arguments.codex, arguments.claude,
-            arguments.artifacts, arguments.timeout,
+            arguments.root,
+            arguments.marketplace,
+            arguments.codex,
+            arguments.claude,
+            arguments.artifacts,
+            arguments.timeout,
         )
     except (AcceptanceError, OSError, ValueError, subprocess.SubprocessError) as error:
-        snapshot_diagnostic(arguments.artifacts, "native-host-acceptance.failure.log", f"{error}\n")
+        snapshot_diagnostic(
+            arguments.artifacts, "native-host-acceptance.failure.log", f"{error}\n"
+        )
         print(f"native-host-acceptance: {error}", file=sys.stderr)
         return 1
     print(json.dumps(result, sort_keys=True))
