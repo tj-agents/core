@@ -17,7 +17,7 @@ task has a future decision that may outlive the current session.
 
 For a suspected reusable agent-standard or tooling defect, load `engineering:self-repair` before any host
 product feedback, to establish source ownership, causal evidence and repair eligibility. Apply
-[Workflow's recording and priority decision](https://github.com/tj-agents/core/blob/main/.agents/workflow/policy/session/SKILL.md#record-noticed-problems)
+[Workflow's incidental-problems decision](https://github.com/tj-agents/core/blob/main/.agents/workflow/resources/problem-records.md#incidental-problems)
 before entering its repair phase. Self-repair owns source authority and the no-source-change outcome.
 Existing user limits and scope gates still apply. Personal application maintenance uses the existing engineering lifecycle within the
 authorized goal; it does not need a second repair workflow.
