@@ -6,8 +6,11 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from host_cli import plugin_inventory_command
 from tj_cli import process
 
 LINKED_SKILL_ROOTS = {
@@ -27,9 +30,10 @@ def _native_install_roots(harness):
     binary = shutil.which(harness)
     if binary is None:
         return NativePluginDiscoveryError(harness, "CLI executable is unavailable")
+    command, environment = plugin_inventory_command(binary)
     try:
         result = process.run(
-            [binary, "plugin", "list", "--json"], capture_output=True, text=True,
+            command, capture_output=True, text=True, env=environment,
             encoding="utf-8", errors="replace", timeout=8, check=False,
         )
         if result.returncode != 0:

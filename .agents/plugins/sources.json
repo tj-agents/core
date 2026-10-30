@@ -94,6 +94,11 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/hooks/host_cli.py",
+      "destination": "hooks/host_cli.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/dependencies/cli/.agents/cli/runtime",
       "destination": "hooks"
     },
@@ -141,6 +146,11 @@
       "plugin": "engineering",
       "source": ".agents/hooks/hook_runtime.py",
       "destination": "hooks/hook_runtime.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/host_cli.py",
+      "destination": "hooks/host_cli.py"
     },
     {
       "plugin": "engineering",
@@ -241,6 +251,11 @@
       "plugin": "workflow",
       "source": ".agents/dependencies/cli/.agents/cli/runtime",
       "destination": "hooks"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/hooks/host_cli.py",
+      "destination": "hooks/host_cli.py"
     },
     {
       "plugin": "workflow",

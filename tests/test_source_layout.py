@@ -165,6 +165,15 @@ class SourceLayoutTests(unittest.TestCase):
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertEqual(engineering["external_dependencies"]["required"], selection["external_prerequisites"])
 
+    def test_hidden_hook_runtime_prerequisites_are_declared_by_every_consumer(self):
+        roster = json.loads((self.root / ".agents/plugins/plugins.json").read_text(encoding="utf-8"))
+        packages = {package["name"]: package for package in roster["packages"]}
+        for name in ("base", "workflow", "engineering"):
+            with self.subTest(package=name):
+                required = packages[name]["external_prerequisites"]["required"]
+                self.assertIn("exe:tj_hook", required)
+                self.assertIn("python>=3.12", required)
+
     def test_external_dependencies_are_validated_per_owner(self):
         roster = json.loads((self.root / ".agents/plugins/plugins.json").read_text(encoding="utf-8"))
         packages = {package["id"]: package for package in roster["packages"]}
