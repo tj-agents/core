@@ -18,8 +18,10 @@ Marketplace owns the canonical plugin roster and dependency graph in
 [`plugins.json`](https://github.com/tj-agents/marketplace/blob/main/plugins.json). Do not edit plugin names
 or dependencies in Core.
 
-`engineering:skill-authoring` owns skill selection triggers, names, and sizing; the
-[`template:check` validator](https://github.com/tj-agents/template) owns required skill content and layout
+`skill:new` resolves a new skill's owner, name, sizing and discovery trigger before native authoring;
+`skill:update` applies the same selection rules to updates, splits, consolidations, renames and
+retirements. `skill:check` owns skill content and executable assets; the
+[`template:check` validator](https://github.com/tj-agents/template) owns repository layout and metadata
 validation. `engineering:docs` owns the generic guidance-writing convention.
 
 Global architecture and cross-repository designs live in [`tj-agents/docs`](https://github.com/tj-agents/docs)
