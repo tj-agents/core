@@ -253,15 +253,11 @@ class SourceLayoutTests(unittest.TestCase):
         store = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(store)
         database = self.root / "fixture state \u00e9" / "sessions.db"
-        connection = store.connect(database)
-        try:
-            store.upsert_work_item(
-                connection, "github.com/example/repo:fixture/task", "github.com/example/repo",
+        with store.SessionStore(database) as session_store:
+            session_store.upsert_work_item(
+                "github.com/example/repo:fixture/task", "github.com/example/repo",
                 "fixture", "task", status="active", title="Fixture execution",
             )
-            connection.commit()
-        finally:
-            connection.close()
         before = database.read_bytes()
         reader_spec = importlib.util.spec_from_file_location(
             "isolated_reader", isolated / runtime / "reader.py"
