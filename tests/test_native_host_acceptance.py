@@ -355,3 +355,51 @@ def test_failure_diagnostics_drain_pending_hook_events_and_decode_errors() -> No
     ]
     server.drain_notifications()
     assert len(server.notifications) == 2
+
+
+def test_native_failure_replay_records_stderr_without_claiming_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package = tmp_path / "verified base"
+    hooks = {
+        "data": [
+            {
+                "hooks": [
+                    {
+                        "key": "base",
+                        "enabled": True,
+                        "pluginId": "base@tj-agents",
+                        "command": 'python "${PLUGIN_ROOT}/hooks/tier_gate.py"',
+                    }
+                ]
+            }
+        ]
+    }
+    calls = []
+
+    def run(arguments: object, **kwargs: object) -> SimpleNamespace:
+        calls.append((arguments, kwargs))
+        return SimpleNamespace(returncode=1, stdout="", stderr="bootstrap failed")
+
+    monkeypatch.setattr(NATIVE.subprocess, "run", run)
+    environment = {
+        "CODEX_HOME": str(tmp_path / "profile"),
+        "PATH": os.environ.get("PATH", ""),
+    }
+    NATIVE.snapshot_hook_replay(
+        hooks,
+        SimpleNamespace(installed_package=lambda hook: package),
+        tmp_path,
+        environment,
+        tmp_path / "artifacts",
+        1,
+    )
+    result = json.loads(
+        (tmp_path / "artifacts/codex-hook-replay.json").read_text(encoding="utf-8")
+    )
+    assert result[0]["returncode"] == 1
+    assert result[0]["stderr"] == "bootstrap failed"
+    assert calls[0][1]["env"]["PLUGIN_ROOT"] == str(package)
+    assert calls[0][1]["cwd"] == tmp_path
+    assert json.loads(calls[0][1]["input"])["hook_event_name"] == "SessionStart"
+    assert "${PLUGIN_ROOT}" not in str(calls[0][0])

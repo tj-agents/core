@@ -775,6 +775,70 @@ def accept_claude_init(
                 process.wait(timeout=5)
 
 
+def snapshot_hook_replay(hooks, trust, project, environment, artifacts, timeout):
+    results = []
+    for entry in hooks["data"]:
+        for hook in entry.get("hooks", []):
+            if hook.get("pluginId") not in STARTUP_HOOKS or not hook.get("enabled"):
+                continue
+            root = trust.installed_package(hook)
+            command = hook["command"].replace("${PLUGIN_ROOT}", str(root))
+            probe_environment = dict(environment)
+            probe_environment["PLUGIN_ROOT"] = str(root)
+            probe_environment["PLUGIN_DATA"] = str(
+                Path(environment["CODEX_HOME"]) / "plugins/data/base-tj-agents"
+            )
+            if os.name == "nt":
+                shell = next(
+                    (
+                        value
+                        for key, value in environment.items()
+                        if key.casefold() == "comspec"
+                    ),
+                    "cmd.exe",
+                )
+                arguments = (
+                    subprocess.list2cmdline([shell, "/C"]) + ' "' + command + '"'
+                )
+            else:
+                arguments = ["/bin/sh", "-c", command]
+            result = {
+                "key": hook["key"],
+                "python": shutil.which("python", path=environment.get("PATH")),
+                "version": sys.version,
+            }
+            try:
+                completed = subprocess.run(
+                    arguments,
+                    cwd=project,
+                    env=probe_environment,
+                    input=json.dumps(
+                        {
+                            "cwd": str(project),
+                            "session_id": "native-diagnostic",
+                            "hook_event_name": "SessionStart",
+                        }
+                    ),
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    timeout=min(timeout, 30),
+                    check=False,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+                result.update(
+                    returncode=completed.returncode,
+                    stdout=completed.stdout,
+                    stderr=completed.stderr,
+                )
+            except (OSError, subprocess.SubprocessError) as error:
+                result["diagnosticError"] = str(error)
+            results.append(result)
+    snapshot_diagnostic(
+        artifacts, "codex-hook-replay.json", json.dumps(results, indent=2)
+    )
+
+
 def accept_codex(
     root,
     marketplace,
@@ -842,6 +906,9 @@ def accept_codex(
             )
             require_discovery(skills, "Codex skills/list")
             require_hook_completion(server.notifications)
+        except AcceptanceError:
+            snapshot_hook_replay(hooks, trust, project, environment, artifacts, timeout)
+            raise
         finally:
             server.drain_notifications()
             snapshot_diagnostic(
