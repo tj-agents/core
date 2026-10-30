@@ -670,6 +670,7 @@ def accept_claude_init(
 ):
     artifacts.mkdir(parents=True, exist_ok=True)
     debug = artifacts / "claude-debug.jsonl"
+    debug.unlink(missing_ok=True)
     claude_environment = dict(environment)
     claude_environment["CLAUDE_CODE_ENTRYPOINT"] = "sdk-py"
     claude_environment.pop("CLAUDECODE", None)
