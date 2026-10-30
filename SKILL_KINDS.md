@@ -23,9 +23,9 @@ command or a short checklist. A utility may perform several commands, delegate t
 verify its result. Those facts alone do not make a workflow. A policy may explain recovery without becoming
 a separate executor. A workflow selector or compatibility entry follows the role of the lifecycle it enters.
 
-Whether a responsibility gets its own skill is a sizing decision, owned by
-[`engineering:skill-authoring`](.agents/engineering/convention/skill-authoring/SKILL.md), not a kind
-decision. Do not invent one category per document format or a distinct kind for aliases. Existing
+Whether a responsibility gets its own skill is a selection and sizing decision, owned by `skill:new` for
+creation and `skill:update` for an existing identity, not a kind decision. Do not invent one category per
+document format or a distinct kind for aliases. Existing
 profile/applicability metadata and route/hook configuration select what loads.
 `kind: policy` does not mean always loaded, and `kind: utility` does not grant write, network or publication
 permission. `kind: convention` makes a skill eligible for convention discovery only after tier selection;
