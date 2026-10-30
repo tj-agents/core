@@ -2,7 +2,6 @@
 
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import sqlite3
@@ -10,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / '.agents/workflow/utility/status/scripts/status.py'
@@ -145,6 +144,15 @@ class WorkflowStatusHarness(unittest.TestCase):
             capture_output=True,
             text=True,
             env=dict(self.disposable_environment(), PYTHONPATH=''),
+        )
+
+    def isolated_capability_result(self, script):
+        return subprocess.run(
+            [sys.executable, '-I', '-B', str(script), '', '20', 'auto'],
+            cwd=str(self.here),
+            capture_output=True,
+            text=True,
+            env=self.disposable_environment(),
         )
 
 
@@ -473,6 +481,20 @@ class WorkItemStatusTests(WorkflowStatusHarness):
         for script in copies:
             with self.subTest(script=script):
                 self.assertIn('active', self.board(script=script))
+
+    def test_packaged_status_loads_the_adjacent_hidden_runtime_in_isolated_python(self):
+        package = self.home / 'packaged status'
+        script = package / 'skills/status/scripts/status.py'
+        script.parent.mkdir(parents=True)
+        shutil.copy2(SCRIPT, script)
+        hooks = package / 'hooks'
+        hooks.mkdir()
+        shutil.copy2(ROOT / '.agents/hooks/problem_records.py', hooks / 'problem_records.py')
+        shutil.copytree(ROOT / '.agents/dependencies/cli/.agents/cli/runtime/tj_cli', hooks / 'tj_cli')
+        runtime = package / '.agents/agent-store/runtime'
+        shutil.copytree(ROOT / '.agents/dependencies/agent/.agents/agent-store/runtime', runtime)
+        result = self.isolated_capability_result(script)
+        self.assertEqual(0, result.returncode, result.stderr)
 
     def test_missing_own_runtime_is_a_capability_failure(self):
         script = self.home / 'missing-runtime/.agents/workflow/utility/status/scripts/status.py'

@@ -21,7 +21,12 @@ _GIT_CWD = ["."]
 
 def git(*args):
     return process.run(
-        ["git", *args], capture_output=True, text=True, check=True, cwd=_GIT_CWD[0]
+        ["git", *args],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=_GIT_CWD[0],
+        timeout=5,
     ).stdout.strip()
 
 
