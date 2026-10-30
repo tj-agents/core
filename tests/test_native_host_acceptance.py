@@ -141,9 +141,12 @@ def test_native_fixture_changes_declaration_without_changing_candidate_code(
     assert declaration["schema_version"] == 3
     assert declaration["session_context"] == NATIVE.CONTEXT_PROBE
     assert (ROOT / "plugins/base/tier.json").read_bytes() == original
-    assert (contextual / "plugins/base/hooks/tier_gate.py").read_bytes() == (
-        ROOT / "plugins/base/hooks/tier_gate.py"
-    ).read_bytes()
+    candidate_code = (ROOT / "plugins/base/hooks/tier_gate.py").read_text(
+        encoding="utf-8"
+    )
+    assert (contextual / "plugins/base/hooks/tier_gate.py").read_text(
+        encoding="utf-8"
+    ) == candidate_code
     failed = NATIVE.failure_marketplace(ROOT, contextual, tmp_path / "failure")
     failure_evidence = tmp_path / "failure.txt"
     result = subprocess.run(
