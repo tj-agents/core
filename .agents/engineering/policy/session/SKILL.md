@@ -16,21 +16,22 @@ task has a future decision that may outlive the current session.
 ## When the user calls out a mistake
 
 For a suspected reusable agent-standard or tooling defect, load `engineering:self-repair` before any host
-product feedback, to establish source ownership, causal evidence and repair eligibility. It owns the
-automatic-repair boundary and the no-source-change outcome. Existing user limits and scope gates
-still apply. Personal application maintenance uses the existing engineering lifecycle within the
+product feedback, to establish source ownership, causal evidence and repair eligibility. Apply
+[Workflow's recording and priority decision](../../../workflow/policy/session/SKILL.md#record-noticed-problems)
+before entering its repair phase. Self-repair owns source authority and the no-source-change outcome.
+Existing user limits and scope gates still apply. Personal application maintenance uses the existing engineering lifecycle within the
 authorized goal; it does not need a second repair workflow.
 
 During normal work, when an applicable standard is ambiguous, silent or improvable, propose its
 refinement in the same turn as a question to the user: name the standard, the gap, concrete wording or a
 snippet, and why. Continue the current task under the existing standard while awaiting the decision. If
-accepted, make the refinement in this session under the standing authorization.
+accepted, apply the same Workflow priority decision before implementing the refinement.
 Established standards defects follow `engineering:self-repair`'s source and authority decision.
 
 ```text
-Standard: engineering:failing-tests. Gap: silent on timeouts under parallel test load.
-Proposed: "Rerun a timed-out test file alone before treating it as a regression."
-Why: three hook test files timed out at 6-way load and passed when run alone.
+During report export, the user points out an unrelated reusable close-tool defect.
+Load self-repair to assess the source, record through the selected operation, and keep export active.
+If the user asks to fix the close tool first, reconcile its repair owner before implementation.
 ```
 
 ## Select the engineering lifecycle before the first edit

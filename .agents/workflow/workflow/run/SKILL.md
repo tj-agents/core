@@ -11,6 +11,9 @@ Own the whole authorized goal through actual acceptance and authorized delivery.
 agent-authored slice limits, read one existing canonical goal, use `workflow:plan-artifacts` for recovery, keep
 one next action, and continue independent authorized work across commits and pull requests. Direct short
 requests remain their selected operation without a ceremonial plan.
+For a side problem or user callout, apply
+[Workflow's recording and priority decision](../../policy/session/SKILL.md#record-noticed-problems)
+before changing this goal's next action.
 
 Read `agent:lanes` for bounded phase capability. The parent retains design, acceptance, diagnosis, and
 severity. Delegate only specified implementation or independent evidence under exact disjoint leases, and

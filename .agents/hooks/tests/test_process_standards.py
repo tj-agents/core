@@ -129,7 +129,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "`tj-agents/infonetica` is employer tooling and remains outside automatic repair",
             "Conclude with no standards change when no reusable source defect is established",
             "Reconcile that owner and contribute the evidence without creating a duplicate writer",
-            "Fix the standard or tool in the current session",
+            "When the repair is selected under Workflow's active-goal decision, fix the standard or tool in the current session",
             "Hand the repair off only when the user asks",
             "For an eligible automatic repair, standing authorization covers implementation, tests, review, pull "
             "request, merge and publication in that source repository once its gates pass",
@@ -149,7 +149,7 @@ class ProcessStandardsTests(unittest.TestCase):
         for phrase in (
             "`engineering:self-repair`",
             "source ownership, causal evidence and repair eligibility",
-            "the automatic-repair boundary and the no-source-change outcome",
+            "Self-repair owns source authority and the no-source-change outcome",
             "Existing user limits and scope gates still apply",
         ):
             with self.subTest(phrase=phrase):

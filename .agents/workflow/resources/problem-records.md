@@ -5,6 +5,12 @@ and record policy. Core never installs or selects a profile on a repository's be
 
 ## Repository selection
 
+Identify the affected system, intended outcome and responsible source repository before choosing a
+tracker root. The observation's checkout is evidence of where it occurred, not of who owns its cause.
+Use that source repository's selection below. If ownership or scope is unclear, ask what system and
+outcome the user means before making a remote record; retain facts and continue independent work.
+Preserve employer evidence boundaries throughout source and destination selection.
+
 Selecting `personal@tj-agents`, with the `tj-agents` marketplace at `tj-agents/marketplace`, in the source
 repository's `.agents/plugins.json` selects `personal:work-item`. Any other profile is selected by a committed `.problem-records.json` naming its
 qualified read operation, for example `{"schema_version":1,"provider":"infonetica:work-item"}`; it takes
@@ -64,6 +70,9 @@ where evidence may go; employer-owned facts stay within the selected employer pr
 The primary checkout selects personal:work-item. A new defect uses personal:create-work-item with bug
 intent; a repeated observation updates its existing GitHub identity. An explicit repair request uses
 personal:address-work-item and keeps the existing repair owner. Reading the item creates no execution.
+A shared Workflow recording failure observed during CLI work belongs to Core's selected tracker,
+after verifying Core owns that policy. Reconcile an existing CLI issue and its history before deciding
+whether to transfer it; do not create a second issue merely to change repositories.
 An employer profile requires a creation decision: retain the observation in the current task until that
 decision is supplied; selecting the profile does not satisfy it.
 ```
