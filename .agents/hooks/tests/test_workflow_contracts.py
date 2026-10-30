@@ -1,5 +1,4 @@
 import hashlib
-import importlib.util
 import json
 import os
 import shutil
@@ -21,7 +20,10 @@ ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / ".agents" / "workflows"
 PLUGIN_WORKFLOWS = ROOT / "plugins" / "engineering" / "workflows"
 sys.path.insert(0, str(WORKFLOWS))
+sys.path.insert(0, str(ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime"))
 
+import tj_agent_store
+from tj_agent_store import ReadOnlyWorkItemStore, StoreReadError
 from workflow_runtime import (
     ContractViolation,
     RepositoryStateProvider,
@@ -29,13 +31,6 @@ from workflow_runtime import (
     select_state_provider,
 )
 import workflow_runtime
-READER_SPEC = importlib.util.spec_from_file_location(
-    "agent_store_reader", ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "reader.py"
-)
-READER = importlib.util.module_from_spec(READER_SPEC)
-READER_SPEC.loader.exec_module(READER)
-ReadOnlyWorkItemStore = READER.ReadOnlyWorkItemStore
-StoreReadError = READER.StoreReadError
 from host_runtime import HostAdapterRegistry, WriterLeaseRegistry
 from fixtures.lane_expectations import authored_skill
 
@@ -1959,14 +1954,10 @@ class RepositoryProviderTests(unittest.TestCase):
         return state
 
     def write_session_store_with_writer(self, status):
-        path = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
-        spec = importlib.util.spec_from_file_location("workflow_contract_session_store", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
         state = self.root / "writer-state"
-        with module.SessionStore(state / "sessions.db") as store:
-            repository = module.identify_repository(self.root)
-            key = module.work_item_key(repository, "runtime-bridge", "readme-reader")
+        with tj_agent_store.SessionStore(state / "sessions.db") as store:
+            repository = tj_agent_store.identify_repository(self.root)
+            key = tj_agent_store.work_item_key(repository, "runtime-bridge", "readme-reader")
             store.upsert_work_item(
                 key,
                 repository,
@@ -2017,15 +2008,11 @@ class RepositoryProviderTests(unittest.TestCase):
         state = self.root / "v4-store-reader-state"
         state.mkdir()
         database = state / "sessions.db"
-        source = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
-        spec = importlib.util.spec_from_file_location("workflow_contract_v4_session_store", source)
-        session_store = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(session_store)
         key = "github.com/example/runtime:runtime-bridge/readme-reader"
         connection = sqlite3.connect(database)
-        connection.executescript(session_store.WORK_ITEMS_SCHEMA)
-        connection.executescript(session_store.SESSIONS_SCHEMA)
-        connection.executescript(session_store.WORK_ITEM_REFERENCES_SCHEMA)
+        connection.executescript(tj_agent_store.WORK_ITEMS_SCHEMA)
+        connection.executescript(tj_agent_store.SESSIONS_SCHEMA)
+        connection.executescript(tj_agent_store.WORK_ITEM_REFERENCES_SCHEMA)
         connection.execute("PRAGMA user_version = 4")
         connection.execute(
             "INSERT INTO work_items "
@@ -2250,15 +2237,11 @@ class RepositoryProviderTests(unittest.TestCase):
             "Done when: the runtime work item is verified.\n",
             encoding="utf-8",
         )
-        path = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
-        spec = importlib.util.spec_from_file_location("linked_worktree_session_store", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
         state = linked / "state"
-        with module.SessionStore(state / "sessions.db") as store:
-            repository = module.identify_repository(linked)
+        with tj_agent_store.SessionStore(state / "sessions.db") as store:
+            repository = tj_agent_store.identify_repository(linked)
             store.upsert_work_item(
-                module.work_item_key(repository, "runtime-bridge", "readme-reader"),
+                tj_agent_store.work_item_key(repository, "runtime-bridge", "readme-reader"),
                 repository,
                 "runtime-bridge",
                 "readme-reader",

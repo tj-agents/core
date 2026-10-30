@@ -125,14 +125,13 @@ class WorkflowStatusHarness(unittest.TestCase):
         script = skill / 'scripts' / 'status.py'
         script.parent.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
-        runtime = root / '.agents' / 'agent-store' / 'runtime'
-        runtime.mkdir(parents=True)
-        (runtime / 'reader.py').write_text(reader_text or (
+        package = root / '.agents' / 'agent-store' / 'runtime' / 'tj_agent_store'
+        package.mkdir(parents=True)
+        (package / '__init__.py').write_text((reader_text or (
             'class StoreReadError(ValueError):\n    pass\n\n'
             'class ReadOnlyWorkItemStore:\n    def work_item(self, key):\n        return {"status": "active"}\n'
-        ), encoding='utf-8')
-        (runtime / 'repository_identity.py').write_text(
-            'def repository_identity(directory, git):\n    return "github.com/example/demo"\n', encoding='utf-8')
+        )) + '\ndef repository_identity(directory, git):\n    return "github.com/example/demo"\n',
+            encoding='utf-8')
         hooks = root / '.agents' / 'hooks'
         hooks.mkdir(parents=True)
         shutil.copy2(ROOT / '.agents/hooks/problem_records.py', hooks / 'problem_records.py')
