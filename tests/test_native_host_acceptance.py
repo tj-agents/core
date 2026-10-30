@@ -2,6 +2,8 @@ import importlib.util
 import json
 import os
 import queue
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -357,49 +359,36 @@ def test_failure_diagnostics_drain_pending_hook_events_and_decode_errors() -> No
     assert len(server.notifications) == 2
 
 
-def test_native_failure_replay_records_stderr_without_claiming_success(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_fixture_hashes_canonical_text_and_preserves_binary_members(
+    tmp_path: Path,
 ) -> None:
-    package = tmp_path / "verified base"
-    hooks = {
-        "data": [
-            {
-                "hooks": [
-                    {
-                        "key": "base",
-                        "enabled": True,
-                        "pluginId": "base@tj-agents",
-                        "command": 'python "${PLUGIN_ROOT}/hooks/tier_gate.py"',
-                    }
-                ]
-            }
-        ]
-    }
-    calls = []
-
-    def run(arguments: object, **kwargs: object) -> SimpleNamespace:
-        calls.append((arguments, kwargs))
-        return SimpleNamespace(returncode=1, stdout="", stderr="bootstrap failed")
-
-    monkeypatch.setattr(NATIVE.subprocess, "run", run)
-    environment = {
-        "CODEX_HOME": str(tmp_path / "profile"),
-        "PATH": os.environ.get("PATH", ""),
-    }
-    NATIVE.snapshot_hook_replay(
-        hooks,
-        SimpleNamespace(installed_package=lambda hook: package),
-        tmp_path,
-        environment,
-        tmp_path / "artifacts",
-        1,
+    candidate = tmp_path / "candidate"
+    shutil.copytree(ROOT / "plugins/base", candidate / "plugins/base")
+    for relative in (
+        ".agents/plugins/marketplace.json",
+        ".claude-plugin/marketplace.json",
+    ):
+        target = candidate / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, target)
+    payload = candidate / "plugins/base/payload.txt"
+    payload.write_bytes(b"first\r\nsecond\r\n")
+    binary = b"\xff\x00\r\n"
+    (candidate / "plugins/base/payload.bin").write_bytes(binary)
+    fixture = NATIVE.fixture_marketplace(
+        ROOT,
+        candidate,
+        tmp_path / "fixture",
+        {"plugins/base/changed.txt": b"changed\r\ntext\r"},
     )
-    result = json.loads(
-        (tmp_path / "artifacts/codex-hook-replay.json").read_text(encoding="utf-8")
+    package = fixture / "plugins/base"
+    manifest = json.loads((package / "hooks/codex.json").read_text(encoding="utf-8"))
+    command = manifest["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"]
+    expected = re.findall(r"sha256:[a-f0-9]{64}", command)
+    snapshot = NATIVE.load_module(
+        "native_fixture_snapshot", ROOT / ".codex/hooks/snapshot.py"
     )
-    assert result[0]["returncode"] == 1
-    assert result[0]["stderr"] == "bootstrap failed"
-    assert calls[0][1]["env"]["PLUGIN_ROOT"] == str(package)
-    assert calls[0][1]["cwd"] == tmp_path
-    assert json.loads(calls[0][1]["input"])["hook_event_name"] == "SessionStart"
-    assert "${PLUGIN_ROOT}" not in str(calls[0][0])
+    assert expected == [snapshot.digest_tree(package)]
+    assert (package / "payload.txt").read_bytes() == b"first\nsecond\n"
+    assert (package / "changed.txt").read_bytes() == b"changed\ntext\n"
+    assert (package / "payload.bin").read_bytes() == binary
