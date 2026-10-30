@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import json
 import os
 import queue
@@ -392,3 +393,43 @@ def test_fixture_hashes_canonical_text_and_preserves_binary_members(
     assert (package / "payload.txt").read_bytes() == b"first\nsecond\n"
     assert (package / "changed.txt").read_bytes() == b"changed\ntext\n"
     assert (package / "payload.bin").read_bytes() == binary
+
+
+@pytest.mark.parametrize("fresh", [False, True])
+def test_claude_requires_debug_evidence_from_current_startup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fresh: bool
+) -> None:
+    debug = tmp_path / "claude-debug.jsonl"
+    debug.write_text("SessionStart " + NATIVE.CONTEXT_PROBE, encoding="utf-8")
+    response = {
+        "type": "control_response",
+        "response": {
+            "request_id": "native-acceptance-1",
+            "subtype": "success",
+            "response": {
+                "commands": [{"name": "workflow:run"}, {"name": "engineering:commit"}]
+            },
+        },
+    }
+
+    def popen(*args: object, **kwargs: object) -> SimpleNamespace:
+        assert not debug.exists()
+        if fresh:
+            debug.write_text("SessionStart " + NATIVE.CONTEXT_PROBE, encoding="utf-8")
+        return SimpleNamespace(
+            stdin=io.StringIO(),
+            stdout=io.StringIO(json.dumps(response) + "\n"),
+            stderr=io.StringIO(),
+            returncode=0,
+            wait=lambda timeout: 0,
+            poll=lambda: 0,
+        )
+
+    monkeypatch.setattr(NATIVE.subprocess, "Popen", popen)
+    if fresh:
+        NATIVE.accept_claude_init(ROOT, ROOT, SCRIPT, tmp_path, {}, tmp_path, 1)
+    else:
+        with pytest.raises(
+            NATIVE.AcceptanceError, match="did not create its debug artifact"
+        ):
+            NATIVE.accept_claude_init(ROOT, ROOT, SCRIPT, tmp_path, {}, tmp_path, 1)
