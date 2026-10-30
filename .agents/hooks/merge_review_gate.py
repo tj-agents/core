@@ -14,14 +14,13 @@ import json
 import re
 from pathlib import Path
 
-from hook_runtime import run_command
-
+from tj_cli import process
 
 _GIT_CWD = ["."]
 
 
 def git(*args):
-    return run_command(
+    return process.run(
         ["git", *args], capture_output=True, text=True, check=True, cwd=_GIT_CWD[0]
     ).stdout.strip()
 

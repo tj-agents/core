@@ -1,17 +1,15 @@
 """Per-prompt and per-tool Claude hooks stay cheap to launch and bounded in what they touch."""
-from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
 import uuid
-
+from datetime import datetime, timezone
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGINS = ("base",)
@@ -50,9 +48,9 @@ class HookLaunchShape(unittest.TestCase):
                 for group in groups:
                     for hook in group["hooks"]:
                         with self.subTest(plugin=plugin, event=event):
-                            self.assertEqual("python", hook["command"])
+                            self.assertEqual("tj_hook", hook["command"])
                             self.assertIsInstance(hook["args"], list)
-                            self.assertEqual("-B", hook["args"][0])
+                            self.assertEqual(["--", "python", "-B"], hook["args"][:3])
 
     def test_each_plugin_launches_at_most_one_interpreter_per_prompt_or_tool_event(self):
         for plugin in PLUGINS:
@@ -133,7 +131,7 @@ class HookBudgetUnderLoad(unittest.TestCase):
                 environment["HOOK_AUDIT"] = str(audit)
                 started = time.perf_counter()
                 result = subprocess.run(
-                    [hook["command"], "-B", "-c", AUDIT, *arguments[1:]],
+                    [hook["command"], *arguments[:2], "-B", "-c", AUDIT, *arguments[3:]],
                     input=json.dumps(data), capture_output=True, text=True, encoding="utf-8",
                     cwd=self.cwd, env=environment, timeout=hook["timeout"],
                 )
@@ -145,7 +143,7 @@ class HookBudgetUnderLoad(unittest.TestCase):
     def assert_bounded(self, runs):
         plans = str(self.home / ".claude" / "plans").lower()
         for hook, result, elapsed, events in runs:
-            with self.subTest(hook=hook["args"][1]):
+            with self.subTest(hook=hook["args"][3]):
                 self.assertNotEqual(2, result.returncode, result.stderr)
                 self.assertLess(elapsed, BUDGET_SECONDS)
                 touched = [path for event, path in events

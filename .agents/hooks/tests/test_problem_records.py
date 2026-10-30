@@ -1,15 +1,21 @@
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from problem_records import RecordError, declaration, main, operation_skill, primary_checkout, read_record
+from problem_records import (
+    RecordError,
+    declaration,
+    main,
+    operation_skill,
+    primary_checkout,
+    read_record,
+)
 
 
 class ProblemRecordTests(unittest.TestCase):
@@ -50,7 +56,7 @@ class ProblemRecordTests(unittest.TestCase):
     def test_both_hosts_resolve_the_declared_skill_and_run_its_reader_without_shell(self):
         self.select()
         for host in ("codex", "claude"):
-            with self.subTest(host=host), patch("installed_skills.resolved_skill", return_value=(self.skill, "provider")) as resolve, patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 0, json.dumps(self.value), "")) as run:
+            with self.subTest(host=host), patch("installed_skills.resolved_skill", return_value=(self.skill, "provider")) as resolve, patch("problem_records.process.run", return_value=subprocess.CompletedProcess([], 0, json.dumps(self.value), "")) as run:
                 self.assertEqual(self.value, read_record(self.root, self.reference, host))
                 resolve.assert_called_once_with("optional:manage", host)
                 self.assertEqual([sys.executable, "-B", str(self.reader), "--root", str(self.root), "--record", self.reference], run.call_args.args[0])
@@ -82,11 +88,11 @@ class ProblemRecordTests(unittest.TestCase):
                   json.dumps({**self.value, "body": " "}), json.dumps({**self.value, "extra": True})]
         with patch("installed_skills.resolved_skill", return_value=(self.skill, "provider")):
             for value in values:
-                with self.subTest(value=value), patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 0, value, "")), self.assertRaises(RecordError):
+                with self.subTest(value=value), patch("problem_records.process.run", return_value=subprocess.CompletedProcess([], 0, value, "")), self.assertRaises(RecordError):
                     read_record(self.root, self.reference, "codex")
-            with patch("problem_records.subprocess.run", side_effect=subprocess.TimeoutExpired("reader", 15)), self.assertRaises(RecordError):
+            with patch("problem_records.process.run", side_effect=subprocess.TimeoutExpired("reader", 15)), self.assertRaises(RecordError):
                 read_record(self.root, self.reference, "codex")
-            with patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 1, "", "private details")), self.assertRaisesRegex(RecordError, "could not read"):
+            with patch("problem_records.process.run", return_value=subprocess.CompletedProcess([], 1, "", "private details")), self.assertRaisesRegex(RecordError, "could not read"):
                 read_record(self.root, self.reference, "codex")
 
     def test_personal_selection_implies_the_personal_provider_and_a_declaration_wins(self):
@@ -207,7 +213,7 @@ class PrimaryCheckoutTests(unittest.TestCase):
     def test_non_repository_and_unavailable_git_fail_visibly(self):
         with tempfile.TemporaryDirectory() as directory, self.assertRaises(RecordError):
             primary_checkout(directory)
-        with patch("problem_records.subprocess.run", side_effect=OSError("unavailable")), self.assertRaises(RecordError):
+        with patch("problem_records.process.run", side_effect=OSError("unavailable")), self.assertRaises(RecordError):
             primary_checkout(".")
 
 

@@ -3,10 +3,12 @@
 import functools
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
+from pathlib import Path
+
+from tj_cli import process
 
 LINKED_SKILL_ROOTS = {
     "claude": ("skills",),
@@ -26,10 +28,9 @@ def _native_install_roots(harness):
     if binary is None:
         return NativePluginDiscoveryError(harness, "CLI executable is unavailable")
     try:
-        result = subprocess.run(
+        result = process.run(
             [binary, "plugin", "list", "--json"], capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=8, check=False,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
         if result.returncode != 0:
             return NativePluginDiscoveryError(harness, f"CLI exited with status {result.returncode}")
