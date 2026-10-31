@@ -25,19 +25,22 @@ stack's normal project markers.
 from __future__ import annotations
 
 import argparse
-import functools
-from contextvars import ContextVar
 import fnmatch
+import functools
 import json
 import os
-from pathlib import Path
 import re
 import runpy
 import shutil
 import subprocess
 import sys
+from contextvars import ContextVar
+from pathlib import Path
 from urllib.parse import urlsplit
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from host_cli import plugin_inventory_command
+from tj_cli import process
 
 SCHEMA_VERSIONS = (1, 2, 3)
 DECLARATION_NAME = "tier.json"
@@ -583,7 +586,7 @@ def _git(root, arguments):
 
 def _run_git(root, arguments):
     try:
-        completed = subprocess.run(
+        completed = process.run(
             ["git", "-C", str(root), *arguments],
             capture_output=True,
             text=True,
@@ -681,7 +684,7 @@ def _walked_matches(root, patterns):
 
 def _ignored(root, paths):
     try:
-        completed = subprocess.run(
+        completed = process.run(
             ["git", "-C", str(root), "check-ignore", "-z", "--stdin"],
             input="\0".join(paths),
             capture_output=True,
@@ -927,13 +930,12 @@ def native_plugins(harness, project=None):
     binary = shutil.which(harness)
     if binary is None:
         return ()
-    binary = str(Path(binary).resolve())
+    command, environment = plugin_inventory_command(binary)
     try:
-        result = subprocess.run(
-            [binary, "plugin", "list", "--json"], capture_output=True, text=True,
-            cwd=project,
+        result = process.run(
+            command, capture_output=True, text=True,
+            cwd=project, env=environment,
             encoding="utf-8", errors="replace", timeout=8,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
         if result.returncode:
             return ()

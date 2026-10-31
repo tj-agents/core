@@ -60,14 +60,18 @@ def package_root():
 def owned_module(name, path):
     if not path.is_file():
         raise RuntimeError(f"status capability failure: own {name} is unavailable at {path}")
-    spec = importlib.util.spec_from_file_location(f"workflow_status_{name}", path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"status capability failure: own {name} cannot be loaded")
-    module = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, str(path.parent))
     try:
-        spec.loader.exec_module(module)
-    except (ImportError, OSError, ValueError) as error:
-        raise RuntimeError(f"status capability failure: own {name} cannot be loaded: {error}") from error
+        spec = importlib.util.spec_from_file_location(f"workflow_status_{name}", path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"status capability failure: own {name} cannot be loaded")
+        module = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(module)
+        except (ImportError, OSError, ValueError) as error:
+            raise RuntimeError(f"status capability failure: own {name} cannot be loaded: {error}") from error
+    finally:
+        del sys.path[0]
     return module
 
 
