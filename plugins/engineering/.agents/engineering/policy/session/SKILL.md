@@ -17,20 +17,21 @@ task has a future decision that may outlive the current session.
 
 For a suspected reusable agent-standard or tooling defect, establish its source owner and causal
 evidence before any host product feedback, then follow that source repository's own repair process and
-authority. An adequate standard the agent overlooked needs a task correction, not a source change.
-Existing user limits and scope gates still apply. Application defects use the existing engineering
-lifecycle within the authorized goal.
+authority. Apply [Workflow's incidental-problems decision](https://github.com/tj-agents/core/blob/main/.agents/workflow/resources/problem-records.md#incidental-problems)
+before entering a repair phase. An adequate standard the agent overlooked needs a task correction, not a
+source change. Existing user limits and scope gates still apply. Application defects use the existing
+engineering lifecycle within the authorized goal.
 
 During normal work, when an applicable standard is ambiguous, silent or improvable, propose its
 refinement in the same turn as a question to the user: name the standard, the gap, concrete wording or a
 snippet, and why. Continue the current task under the existing standard while awaiting the decision. If
-accepted, make the refinement in this session under the standing authorization.
+accepted, apply that same priority decision before implementing the refinement.
 Established standards defects follow their source repository's repair process.
 
 ```text
-Standard: engineering:failing-tests. Gap: silent on timeouts under parallel test load.
-Proposed: "Rerun a timed-out test file alone before treating it as a regression."
-Why: three hook test files timed out at 6-way load and passed when run alone.
+During report export, the user points out an unrelated reusable close-tool defect.
+Establish its source owner and causal evidence, apply the existing Workflow decision, and keep export active.
+If the user asks to fix the close tool first, reconcile its repair owner before implementation.
 ```
 
 ## Select the engineering lifecycle before the first edit
