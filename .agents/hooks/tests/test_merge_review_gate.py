@@ -5,7 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-
+from unittest import mock
 
 HOOK = Path(__file__).resolve().parents[1] / "merge_review_gate.py"
 sys.path.insert(0, str(HOOK.parent))
@@ -20,6 +20,16 @@ def load_gate():
 
 
 gate = load_gate()
+
+
+class GitInvocationTests(unittest.TestCase):
+    def test_git_uses_the_bounded_hidden_process_api_and_propagates_a_timeout(self):
+        with mock.patch.object(gate.process, "run", side_effect=subprocess.TimeoutExpired("git", 5)) as run:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                gate.git("rev-parse", "HEAD")
+        self.assertEqual(["git", "rev-parse", "HEAD"], run.call_args.args[0])
+        self.assertEqual(5, run.call_args.kwargs["timeout"])
+        self.assertTrue(run.call_args.kwargs["check"])
 
 
 class ReviewWorkOrderStateTests(unittest.TestCase):

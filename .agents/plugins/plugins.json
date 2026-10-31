@@ -27,7 +27,8 @@
       },
       "external_prerequisites": {
         "required": [
-          "python>=3.9"
+          "exe:tj_hook",
+          "python>=3.12"
         ],
         "optional": []
       },
@@ -94,8 +95,9 @@
       },
       "external_prerequisites": {
         "required": [
+          "exe:tj_hook",
           "exe:git",
-          "python>=3.9"
+          "python>=3.12"
         ],
         "optional": []
       },
@@ -260,8 +262,9 @@
       },
       "external_prerequisites": {
         "required": [
+          "exe:tj_hook",
           "exe:git",
-          "python>=3.9"
+          "python>=3.12"
         ],
         "optional": [
           "exe:bash",
