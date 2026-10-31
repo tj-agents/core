@@ -15,7 +15,7 @@ engine.
 1. Use the selected profile provider's read/list/update/close commands. Reconcile the named incident, or
    select one actionable high-value record quickly. Do not deep-rank
    every record. Prefer an unblocked `P0` or `P1`, then the first useful `P2` or `P3`; priority alone does not
-   pause unrelated work. `engineering:self-repair` owns suspension of affected unsafe lifecycle operations.
+   pause unrelated work. Suspend only the operations a defect makes unsafe.
 2. Reconcile the existing goal, session, branch, PR, or writer before writing or dispatching. If a repair
    already owns the cause, link it and append evidence rather than creating a second writer. Keep blocked
    and deferred incidents current with their real reason, resolver, and observable resume condition.

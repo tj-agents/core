@@ -8,9 +8,9 @@ domain: process
 
 # Skill authoring
 
-For creating, splitting, consolidating or renaming a skill, enter `template:new-skill` first.
-That selected gate resolves the authoring brief and delegates to the current host's native creator.
-This convention supplies selection, sizing and naming rules to that gate and to reviews.
+For creating a skill, enter `skill:new` first; for splitting, consolidating or renaming one, enter `skill:update`.
+Those selected gates resolve the authoring brief and delegate to the current host's native creator.
+This convention supplies selection, sizing and naming rules to those gates and to reviews.
 
 A skill is loaded only when an agent selects it, and every installed skill's name and description is in
 every session's listing. A skill therefore costs discovery before it delivers anything: one more entry to

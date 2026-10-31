@@ -36,7 +36,6 @@ Generated from canonical `.agents/` definitions.
 - `remote-validation` — policy — `.agents/engineering/policy/remote-validation/SKILL.md`
 - `review` — utility — `.agents/engineering/utility/review/SKILL.md`
 - `review-lifecycle` — convention — `.agents/engineering/convention/review-lifecycle/SKILL.md`
-- `self-repair` — workflow — `.agents/engineering/workflow/self-repair/SKILL.md`
 - `session` — policy — `.agents/engineering/policy/session/SKILL.md`
 - `skill-authoring` — convention — `.agents/engineering/convention/skill-authoring/SKILL.md`
 - `stack` — operation — `.agents/engineering/operation/stack/SKILL.md`
