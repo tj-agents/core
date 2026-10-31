@@ -86,7 +86,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(57, len(skills))
+        self.assertEqual(56, len(skills))
         self.assertEqual("workflow", skills["workflow:session"]["plugin"])
         self.assertNotIn("agent:background-listener", skills)
         for tree in ("skills", "codex-skills"):
@@ -253,15 +253,11 @@ class SourceLayoutTests(unittest.TestCase):
         store = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(store)
         database = self.root / "fixture state \u00e9" / "sessions.db"
-        connection = store.connect(database)
-        try:
-            store.upsert_work_item(
-                connection, "github.com/example/repo:fixture/task", "github.com/example/repo",
+        with store.SessionStore(database) as session_store:
+            session_store.upsert_work_item(
+                "github.com/example/repo:fixture/task", "github.com/example/repo",
                 "fixture", "task", status="active", title="Fixture execution",
             )
-            connection.commit()
-        finally:
-            connection.close()
         before = database.read_bytes()
         reader_spec = importlib.util.spec_from_file_location(
             "isolated_reader", isolated / runtime / "reader.py"
