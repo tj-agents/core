@@ -37,7 +37,6 @@ Generated from canonical `.agents/` definitions.
 - `review` — utility — `.agents/engineering/utility/review/SKILL.md`
 - `review-lifecycle` — convention — `.agents/engineering/convention/review-lifecycle/SKILL.md`
 - `session` — policy — `.agents/engineering/policy/session/SKILL.md`
-- `skill-authoring` — convention — `.agents/engineering/convention/skill-authoring/SKILL.md`
 - `stack` — operation — `.agents/engineering/operation/stack/SKILL.md`
 - `staged-review` — workflow — `.agents/engineering/workflow/staged-review/SKILL.md`
 - `staged-review-all` — workflow — `.agents/engineering/workflow/staged-review-all/SKILL.md`
