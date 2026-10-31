@@ -189,7 +189,11 @@ class ReviewRulesTests(unittest.TestCase):
             encoding="utf-8",
         )
         result = subprocess.run(
-            [sys.executable, "-I", "-B", str(probe)], capture_output=True, text=True, timeout=30
+            [sys.executable, "-I", "-X", "utf8", "-B", str(probe)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
         )
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual((hooks / "tier_gate.py").resolve(), Path(result.stdout.strip()).resolve())
