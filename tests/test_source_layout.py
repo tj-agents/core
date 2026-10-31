@@ -326,10 +326,17 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertNotIn("engineering", workflow_selection["prerequisites"])
         engineering_selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertIn("workflow", engineering_selection["prerequisites"])
+        self.assertIn(
+            "tj-agents/cli",
+            {entry["id"] for entry in engineering_selection["external_prerequisites"]},
+        )
+        self.assertNotIn("base:cd", skills)
+        for tree in ("skills", "codex-skills"):
+            self.assertNotIn(f"plugins/base/{tree}/cd/SKILL.md", output)
 
         required = set(compatibility["fresh_required_skills"])
         owners = {skill["name"]: skill["plugin"] for skill in skills.values()}
-        self.assertEqual({"cd", "handoff"}, required)
+        self.assertEqual({"handoff"}, required)
         self.assertLessEqual(required, selection_skills)
         for tree in ("skills", "codex-skills"):
             for name in required:
@@ -373,9 +380,9 @@ class SourceLayoutTests(unittest.TestCase):
         cases = {
             "missing": None,
             "empty": [],
-            "wrong-type": "cd",
-            "incomplete": ["cd"],
-            "expanded": ["cd", "handoff", "handoff-codex"],
+            "wrong-type": "handoff",
+            "wrong-owner": ["navigation"],
+            "expanded": ["handoff", "handoff-codex"],
         }
         for name, required in cases.items():
             with self.subTest(name=name):

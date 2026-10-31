@@ -337,28 +337,22 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(retired=retired):
                 self.assertNotIn(retired, cleanup)
 
-    def test_cd_and_handoff_transfer_active_directory_removal_to_the_successor(self):
-        cd = " ".join(authored_skill("cd").read_text(encoding="utf-8").split())
+    def test_handoff_transfers_active_directory_removal_after_predecessor_release(self):
         handoff = " ".join(authored_skill("handoff").read_text(encoding="utf-8").split())
         cleanup = " ".join(authored_skill("merging").read_text(encoding="utf-8").split())
 
-        self.assertIn("Retarget the host **before** any helper or native command", cd)
-        self.assertIn(
-            "the successor the sole owner of the removal and final filesystem verification",
-            cd,
-        )
-        self.assertIn(
-            "the original stops repository-scoped work; a completed delivery closes its own session "
-            "through `engineering:merge` Step 5's `finish`; only when that is unavailable does the "
-            "`handoff` successor own the removal, closing the predecessor through `agent:peer`",
-            cd,
-        )
         self.assertIn("follow `engineering:merging` under Transferred checkout cleanup", handoff)
         self.assertIn(
             "Put the exact operation and final filesystem verification in the successor's `## Next Steps`",
             handoff,
         )
         self.assertIn("The predecessor must not perform it after launch", handoff)
+        self.assertIn("The successor waits for that marker before releasing the predecessor", cleanup)
+        self.assertIn(
+            "Run the filesystem operation from a verified surviving checkout after the predecessor "
+            "no longer holds the old directory",
+            cleanup,
+        )
         self.assertIn("a command error or residual path as incomplete", cleanup)
 
 
