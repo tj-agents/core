@@ -19,7 +19,7 @@ CI_BOOTSTRAP_STEPS = {
 def verify_job_block(name):
     lines = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8").splitlines()
     start = lines.index(f"  {name}:")
-    end = next(index for index in range(start + 1, len(lines)) if re.match(r"  \S", lines[index]))
+    end = next((index for index in range(start + 1, len(lines)) if re.match(r"  \S", lines[index])), len(lines))
     return lines[start:end]
 
 
@@ -103,6 +103,14 @@ class RepositoryPermissionTests(unittest.TestCase):
                     block.index("$pythonDirectory >> $env:GITHUB_PATH"),
                     block.index("- name: regenerate the workspace from authored sources"),
                 )
+
+    def test_regeneration_validates_with_locked_hook_dependencies(self):
+        block = "\n".join(verify_job_block("regenerate"))
+        self.assertIn("astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884", block)
+        self.assertIn("python-version-file: .python-version", block)
+        validator = "uv run --locked python -B .agents/hooks/check_tier_payload.py --root ."
+        self.assertIn(validator, block)
+        self.assertLess(block.index("astral-sh/setup-uv@"), block.index(validator))
 
     def test_project_settings_never_auto_approve_destructive_delivery(self):
         for tool in ("Bash", "PowerShell"):

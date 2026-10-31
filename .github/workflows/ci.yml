@@ -320,6 +320,10 @@ jobs:
           ref: main
           ssh-key: ${{ secrets.REGENERATE_DEPLOY_KEY }}
 
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          python-version-file: .python-version
+
       - name: regenerate committed packages from authored sources
         shell: pwsh
         run: |
@@ -337,7 +341,7 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           ./.agents/sync-generated.ps1 -Check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -B .agents/hooks/check_tier_payload.py --root .
+          uv run --locked python -B .agents/hooks/check_tier_payload.py --root .
           python -B scripts/update_plugin_digests.py --check
           python -B scripts/sync_harness_manifests.py --check
 
