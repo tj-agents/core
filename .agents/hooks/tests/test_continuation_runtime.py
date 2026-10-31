@@ -12,6 +12,8 @@ import unittest
 from unittest import mock
 from types import SimpleNamespace
 
+import tj_cli
+
 ROOT = Path(__file__).resolve().parents[3]
 RUNTIME = ROOT / ".codex/runtime/continuation/continuation_runtime.py"
 WORKFLOWS = ROOT / ".agents/workflows"
@@ -319,6 +321,42 @@ class ContinuationTests(unittest.TestCase):
         stdout, stderr = first.communicate(timeout=10)
         self.assertEqual(first.returncode, 0, stderr)
         self.assertEqual(json.loads(stdout)["launches"], 1)
+
+    def test_supervisor_pid_and_python_environment_match_the_owned_process(self) -> None:
+        probe = self.root / "supervisor_probe.py"
+        report = self.root / "supervisor-identity.json"
+        probe.write_text(
+            "import json, os, runpy, sys, tj_cli\n"
+            "from pathlib import Path\n"
+            "Path(sys.argv[1]).write_text(json.dumps({"
+            "'pid': os.getpid(), 'prefix': sys.prefix, "
+            "'dependency': tj_cli.__file__}), encoding='utf-8')\n"
+            "sys.argv = sys.argv[2:]\n"
+            "runpy.run_path(sys.argv[0], run_name='__main__')\n",
+            encoding="utf-8",
+        )
+        popen = subprocess.Popen
+        supervisors = []
+
+        def start(command, *args, **kwargs):
+            supervisor = command[2:4] == [str(RUNTIME), "_child"]
+            if supervisor:
+                command = [*command[:2], str(probe), str(report), *command[2:]]
+            process = popen(command, *args, **kwargs)
+            if supervisor:
+                supervisors.append(process)
+                self.processes.append(process)
+            return process
+
+        state = self.state()
+        with mock.patch.object(runtime.subprocess, "Popen", side_effect=start):
+            runtime.launch(self.owner, state, None, {}, [sys.executable, str(FIXTURE), "host"])
+        observed = json.loads(report.read_text(encoding="utf-8"))
+        self.assertEqual(1, len(supervisors))
+        self.assertEqual(supervisors[0].pid, observed["pid"])
+        self.assertEqual(Path(sys.prefix), Path(observed["prefix"]))
+        self.assertEqual(Path(tj_cli.__file__), Path(observed["dependency"]))
+        self.assertEqual("complete", state["state"])
 
     @unittest.skipUnless(os.name == "nt", "Windows sharing violations are Windows-only")
     def test_owner_read_recovers_from_a_crt_sharing_violation(self):
