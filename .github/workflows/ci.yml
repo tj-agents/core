@@ -176,7 +176,7 @@ jobs:
       - name: source layout and package tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
-        run: python -B -m unittest discover -s tests -p 'test_*.py' -v
+        run: uv run --locked pytest tests -v
 
       - name: shared runtime tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
@@ -185,7 +185,7 @@ jobs:
 
       - name: selected source and package regressions
         if: fromJSON(needs.select.outputs.plan).mode == 'focused'
-        run: python -B scripts/ci_selection.py run --group source
+        run: uv run --locked python -B scripts/ci_selection.py run --group source
 
       - name: selected shared runtime regressions
         if: fromJSON(needs.select.outputs.plan).mode == 'focused'
@@ -276,7 +276,7 @@ jobs:
       # which always closes it, so an inherited runner stdin can never leave a hook waiting.
       - name: source layout and package tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
-        run: python -B -m unittest discover -s tests -p 'test_*.py' -v < /dev/null
+        run: uv run --locked pytest tests -v < /dev/null
 
       - name: shared runtime tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
@@ -284,7 +284,7 @@ jobs:
 
       - name: selected source and package regressions
         if: fromJSON(needs.select.outputs.plan).mode == 'focused'
-        run: python3 -B scripts/ci_selection.py run --group source < /dev/null
+        run: uv run --locked python -B scripts/ci_selection.py run --group source < /dev/null
 
       - name: selected shared runtime regressions
         if: fromJSON(needs.select.outputs.plan).mode == 'focused'
