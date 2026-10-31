@@ -9,28 +9,28 @@ domain: process
 
 These conventions apply when engineering is selected for the current scope, on top of
 `workflow:session`. They grant no implementation, publication or installation authority beyond
-the eligible internal repair authority in `engineering:self-repair`. Product profiles and compatibility
-policy remain with the project. `workflow:run` selects `workflow:continue` when an authorized
+what the user and the owning source repository grant. Product profiles and compatibility policy remain
+with the project. `workflow:run` selects `workflow:continue` when an authorized
 task has a future decision that may outlive the current session.
 
 ## When the user calls out a mistake
 
-For a suspected reusable agent-standard or tooling defect, load `engineering:self-repair` before any host
-product feedback, to establish source ownership, causal evidence and repair eligibility. Apply
-[Workflow's incidental-problems decision](https://github.com/tj-agents/core/blob/main/.agents/workflow/resources/problem-records.md#incidental-problems)
-before entering its repair phase. Self-repair owns source authority and the no-source-change outcome.
-Existing user limits and scope gates still apply. Personal application maintenance uses the existing engineering lifecycle within the
-authorized goal; it does not need a second repair workflow.
+For a suspected reusable agent-standard or tooling defect, establish its source owner and causal
+evidence before any host product feedback, then follow that source repository's own repair process and
+authority. Apply [Workflow's incidental-problems decision](https://github.com/tj-agents/core/blob/main/.agents/workflow/resources/problem-records.md#incidental-problems)
+before entering a repair phase. An adequate standard the agent overlooked needs a task correction, not a
+source change. Existing user limits and scope gates still apply. Application defects use the existing
+engineering lifecycle within the authorized goal.
 
 During normal work, when an applicable standard is ambiguous, silent or improvable, propose its
 refinement in the same turn as a question to the user: name the standard, the gap, concrete wording or a
 snippet, and why. Continue the current task under the existing standard while awaiting the decision. If
-accepted, apply the same Workflow priority decision before implementing the refinement.
-Established standards defects follow `engineering:self-repair`'s source and authority decision.
+accepted, apply that same priority decision before implementing the refinement.
+Established standards defects follow their source repository's repair process.
 
 ```text
 During report export, the user points out an unrelated reusable close-tool defect.
-Load self-repair to assess the source, record through the selected operation, and keep export active.
+Establish its source owner and causal evidence, apply the existing Workflow decision, and keep export active.
 If the user asks to fix the close tool first, reconcile its repair owner before implementation.
 ```
 
@@ -93,11 +93,10 @@ diagnose, repair and focused verification loop. Do not weaken a check merely to 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
 out-of-scope defects with an objective resolution condition through the relevant shared writer. Plans
 link the canonical record under [the shared recording contract](../../../workflow/resources/problem-records.md).
-A defect in a consumed agent standard or tool is diagnosed at its source. Use `engineering:self-repair`
-to establish causal evidence and whether its internal repair authority applies. Follow that decision
-before starting a source change; outside automatic scope, explain the proposed repair and continue
-unaffected authorized work while awaiting a decision. That workflow owns the repair authorization and
-delivery procedure; explicit user limits still hold.
+A defect in a consumed agent standard or tool is diagnosed at its source. Establish causal evidence and
+follow the source repository's own repair process and authority before starting a source change; without
+that authority, explain the proposed repair and continue unaffected authorized work while awaiting a
+decision. Explicit user limits still hold.
 Before committing or returning a terminal result, check the work against the standards that governed it and reconcile every problem encountered: it is fixed, routed to an existing
 owner, recorded when authorized, or retained in the active task pending the profile's recording decision. The shared recording contract defines that destination. Do not create a second
 ledger for a standalone goal just to satisfy a repository-oriented procedure.
