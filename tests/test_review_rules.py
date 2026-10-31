@@ -2,13 +2,13 @@ import hashlib
 import importlib.util
 import json
 import os
-import sys
+import shutil
 import subprocess
-from pathlib import Path
+import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / ".agents/engineering/utility/review/scripts/review_rules.py"
@@ -151,7 +151,8 @@ class ReviewRulesTests(unittest.TestCase):
         )
         self.gate.native_plugins.cache_clear()
         self.addCleanup(self.gate.native_plugins.cache_clear)
-        with mock.patch.object(self.gate.shutil, "which", return_value=sys.executable):
+        with mock.patch.object(self.gate, "shutil", wraps=self.gate.shutil) as shutil:
+            shutil.which.return_value = sys.executable
             entries = self.gate.native_plugins("codex", str(self.project))
         self.assertEqual(self.project.resolve(), Path(entries[0]["name"]).resolve())
 
@@ -161,10 +162,41 @@ class ReviewRulesTests(unittest.TestCase):
         self.addCleanup(self.gate.native_plugins.cache_clear)
         completed = subprocess.CompletedProcess([], 0, '{"installed": [{"enabled": true}]}', '')
         with mock.patch.object(self.gate.shutil, "which", return_value=binary), mock.patch.object(
-                self.gate.subprocess, "run", return_value=completed) as launch:
+                self.gate.process, "run", return_value=completed) as launch:
             self.gate.native_plugins("codex", str(self.project))
         self.assertEqual(str((Path.cwd() / binary).resolve()), launch.call_args.args[0][0])
         self.assertEqual(str(self.project), launch.call_args.kwargs["cwd"])
+
+    def test_packaged_rules_load_the_adjacent_hidden_runtime_in_isolated_python(self):
+        package = self.root / "review package"
+        script = package / "skills/review/scripts/review_rules.py"
+        script.parent.mkdir(parents=True)
+        shutil.copy2(SCRIPT, script)
+        hooks = package / "hooks"
+        hooks.mkdir()
+        for name in ("tier_gate.py", "host_cli.py"):
+            shutil.copy2(ROOT / ".agents/hooks" / name, hooks / name)
+        shutil.copytree(ROOT / ".agents/dependencies/cli/.agents/cli/runtime/tj_cli", hooks / "tj_cli")
+        probe = package / "probe.py"
+        probe.write_text(
+            "import importlib.util\n"
+            "from pathlib import Path\n"
+            "path = Path(__file__).parent / 'skills/review/scripts/review_rules.py'\n"
+            "spec = importlib.util.spec_from_file_location('packaged_rules', path)\n"
+            "module = importlib.util.module_from_spec(spec)\n"
+            "spec.loader.exec_module(module)\n"
+            "print(module.tier_gate().__file__)\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, "-I", "-X", "utf8", "-B", str(probe)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual((hooks / "tier_gate.py").resolve(), Path(result.stdout.strip()).resolve())
 
     def test_missing_native_inventory_never_falls_back_to_another_host(self):
         self.selection("stack@selected")

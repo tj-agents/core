@@ -7,10 +7,9 @@ import ast
 import hashlib
 import importlib.util
 import json
-from pathlib import Path, PurePosixPath
 import re
 import sys
-
+from pathlib import Path, PurePosixPath
 
 FRONTMATTER = re.compile(r"\A---\n(?P<header>.*?)\n---\n(?P<body>.*)\Z", re.DOTALL)
 DEFAULT_HANDOFF_SKILLS = frozenset({"handoff"})
@@ -130,6 +129,10 @@ def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[s
                                         "command plus an args list, never a shell command line"
                                     )
                                 parts.extend(arguments)
+                                if host == "claude" and (command != "tj_hook" or arguments[:3] != ["--", "python", "-B"]):
+                                    raise ValueError(f"{hook_path}: {host} hooks must use the tj_hook hidden boundary")
+                            elif host == "codex" and not command.startswith("tj_hook -- python"):
+                                raise ValueError(f"{hook_path}: {host} hooks must use the tj_hook hidden boundary")
                             if any(token != root_token and token in part for part in parts for token in known_roots):
                                 raise ValueError(f"{hook_path}: {field} uses the wrong plugin root")
                             matches = [match for part in parts for match in script_pattern.finditer(part)]
@@ -330,6 +333,24 @@ def codex_snapshot_bootstrap(root: Path, loader: str) -> str:
     return command
 
 
+def bind_claude_hook_launchers(output: dict[str, bytes], plugins: set[str]) -> None:
+    for plugin in sorted(plugins):
+        hook_path = f"plugins/{plugin}/hooks/claude.json"
+        if hook_path not in output:
+            continue
+        payload = json.loads(output[hook_path])
+        for groups in payload["hooks"].values():
+            for group in groups:
+                for hook in group["hooks"]:
+                    command = hook["command"]
+                    arguments = hook["args"]
+                    if command != "python" or arguments[:1] != ["-B"]:
+                        raise ValueError(f"Unsupported Claude command for {plugin}: {command}")
+                    hook["command"] = "tj_hook"
+                    hook["args"] = ["--", command, *arguments]
+        output[hook_path] = canonical_output_bytes(json.dumps(payload, indent=2) + "\n")
+
+
 def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set[str]) -> None:
     loader = read(inside(root, CODEX_HOOK_LOADER))
     bootstrap = codex_snapshot_bootstrap(root, loader)
@@ -345,7 +366,7 @@ def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set
                     for field in ("command", "commandWindows"):
                         command = hook[field]
                         source_prefix = "python3 -B " if field == "command" else "python -B "
-                        launcher_prefix = "python3 -I -B " if field == "command" else "python -I -B "
+                        launcher_prefix = "tj_hook -- python3 -I -B " if field == "command" else "tj_hook -- python -I -B "
                         if not command.startswith(source_prefix + '"${PLUGIN_ROOT}/'):
                             raise ValueError(f"Unsupported Codex {field} for {plugin}: {command}")
                         hook[field] = (
@@ -990,6 +1011,7 @@ def build(root: Path, validate_plugin_digests: bool = True, roster=None):
         if resolved not in output:
             raise ValueError(f"{path}: missing packaged canonical definition {resolved}")
 
+    bind_claude_hook_launchers(output, plugins)
     bind_codex_hook_snapshots(root, output, plugins)
     validate_hook_outputs(output, config, plugins)
 
