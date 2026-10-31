@@ -13,7 +13,7 @@ import sys
 
 
 FRONTMATTER = re.compile(r"\A---\n(?P<header>.*?)\n---\n(?P<body>.*)\Z", re.DOTALL)
-DEFAULT_HANDOFF_SKILLS = frozenset({"cd", "handoff"})
+DEFAULT_HANDOFF_SKILLS = frozenset({"handoff"})
 
 
 def read(path: Path) -> str:
