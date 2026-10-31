@@ -17,6 +17,7 @@
       "repository": "tj-agents/cli",
       "package": "plugins/cli",
       "exports": [
+        ".agents/cli/runtime",
         ".agents/cli/utility/close/scripts",
         ".agents/cli/utility/closeout/scripts"
       ]
