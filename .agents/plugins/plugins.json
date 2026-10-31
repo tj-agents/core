@@ -102,7 +102,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:28899db2e48a481312450a77c454487a9ffcf14bcefa56bc12c9766122c51086",
+      "digest": "sha256:6fd68d7a236542bae8e59f51256621417b08ef30d9e550fbccc1111b455e68fd",
       "harness": {
         "marketplaces": [
           {
@@ -243,7 +243,6 @@
         "remote-validation",
         "review",
         "review-lifecycle",
-        "self-repair",
         "session",
         "skill-authoring",
         "stack",
@@ -275,7 +274,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:30b854d6e39ab3064352d748e8e0cebc4c9fd3c077f54bdf67f224ab27e309d4",
+      "digest": "sha256:32e6c6fc888928cf1436d88fc55c303c3a3182cafec482d209d53ea891041e37",
       "harness": {
         "marketplaces": [
           {

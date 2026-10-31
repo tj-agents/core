@@ -183,15 +183,26 @@ def run_tests(root, value, group):
         print(f"No {group} regression modules selected")
         return 0
     suite = unittest.TestSuite()
+    failed = False
     for path in selected:
         target = root / path
         if not target.is_file() or target.is_symlink() or not target.resolve().is_relative_to(root.resolve()):
             raise ValueError(f"selected test is unavailable: {path}")
+        if group == "source":
+            completed = subprocess.run(
+                [sys.executable, "-B", "-m", "pytest", str(target), "-v"], cwd=root, check=False
+            )
+            if completed.returncode == 5:
+                raise ValueError(f"selected regression module discovered no tests: {path}")
+            failed |= completed.returncode != 0
+            continue
         loader = unittest.TestLoader()
         discovered = loader.discover(str(target.parent), pattern=target.name)
         if not discovered.countTestCases():
             raise ValueError(f"selected regression module discovered no tests: {path}")
         suite.addTests(discovered)
+    if group == "source":
+        return int(failed)
     return 0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1
 
 
