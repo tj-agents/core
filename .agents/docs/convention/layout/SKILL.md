@@ -21,6 +21,30 @@ an "In 30 seconds" list of three to five bullets. A reader who stops there has t
 One subject per numbered `##` section, a `---` rule between sections, and `### 2.1`-style subsections.
 Numbers let a reader say "see 4.2" and let an index link to stable anchors.
 
+## Link reading instructions to their destination
+
+When directing a reader to another page or section, put a descriptive link in that instruction.
+Link to the exact heading when naming a section, including sections on the same page; link to the
+whole page when the whole page is the destination. An earlier index link does not replace a link
+where the reader is told to act. Apply this to summaries, reading-order tables and follow-up prompts.
+
+Use the destination's subject as the label, such as "deployment options", rather than "here" or an
+unlinked section number. Verify the target page and anchor against the rendered heading's permalink,
+especially for punctuation or duplicate headings, and update incoming links when headings move.
+This applies to navigation instructions; ordinary prose need not link every repeated term.
+
+Check representative same-page and cross-page section links in the reader's actual Markdown viewer.
+The destination heading must become visible; opening the correct file at the top is a failed section
+jump. A static anchor check alone does not establish viewer support. If the viewer ignores fragments,
+record that limitation and offer a verified supported reading route; keep standard links portable.
+
+```text
+Input: [Design options](#3-options)
+Action: click the link in the rendered page.
+Pass: the heading "3. Options" is visible at the destination.
+If only the page top opens: check the rendered anchor and the viewer's fragment support.
+```
+
 ## Put parallel items in a table
 
 Items with the same shape (options, problems, decisions, risks, steps, owners) go in a table whose
@@ -35,8 +59,26 @@ topic as the summary. Keep the glossary as the last section.
 ## Draw flows
 
 Draw any flow across three or more parts as a Mermaid diagram: `sequenceDiagram` for order over time,
-`flowchart` for structure. One idea per diagram. Colour only through `classDef` with `fill`, `stroke`
-and `color` set together so it reads in light and dark themes. Never draw ASCII art.
+`flowchart` for structure. One idea per diagram. Never draw ASCII art.
+
+For flowcharts, set custom node colours through `classDef`, pairing `fill`, `color` and `stroke`.
+Use the palette below for failure and repair nodes; let the viewer theme style ordinary nodes and
+connectors. Custom fills need explicit text colours because a dark viewer may otherwise put pale text
+on a pale background. Keep the meaning in the labels as well as the colours.
+
+```mermaid
+flowchart LR
+    request[Read stored reference] --> failed[Failure: reference missing]:::bad
+    failed --> repair[Fix: resolve the stored version]:::fix
+    classDef bad fill:#fee2e2,color:#7f1d1d,stroke:#b91c1c,stroke-width:2px
+    classDef fix fill:#dcfce7,color:#14532d,stroke:#15803d,stroke-width:2px
+```
+
+When changing a palette, render a representative diagram in both light and dark themes and inspect
+node text, multiline labels, arrows and edge labels at reading size. Aim for at least 4.5:1 text-to-fill
+contrast. Check the actual Markdown viewer when available; a standalone render does not prove that
+every viewer applies the same CSS. Mermaid's [class styling](https://mermaid.js.org/syntax/flowchart.html#styling-and-classes)
+is the syntax reference.
 
 ## Keep state distinct
 
@@ -58,6 +100,7 @@ an owner each. End with the sources and the date they were read.
 - Orders are keyed by one id across services.
 - Consumers record event ids to handle repeated delivery safely.
 - Journal retention remains an open decision owned by Ana.
+- Follow [event delivery](#2-event-delivery), then compare the [design options](#3-options).
 
 ---
 
