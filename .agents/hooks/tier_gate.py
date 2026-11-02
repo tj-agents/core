@@ -974,8 +974,7 @@ def personal_adoption(root: Path | str) -> PredicateResult:
         return PredicateResult(root, diagnostics=(diagnostic("invalid-repository-adoption", str(path), str(error)),))
 
 
-def _legacy_result(root, declaration) -> PredicateResult:
-    inventory = workspace_repositories(root)
+def _legacy_result(root, declaration, inventory) -> PredicateResult:
     scopes = inventory or [Path(root)]
     if inventory and not inventory.complete:
         return PredicateResult(root, prerequisites=("workspace-inventory",), diagnostics=(
@@ -997,6 +996,11 @@ def assess(root, found=None, facts=None, contexts=None):
 
 
 def _assess(root, found=None, facts=None, contexts=None):
+    if not Path(root).is_dir():
+        anchor = _existing_path(Path(root))
+        boundary, error = _repository_boundary(anchor)
+        inventory = WorkspaceInventory([boundary] if boundary else (), error is None, error)
+        return _assess_one(boundary or anchor, found, facts, contexts, inventory=inventory)
     inventory = workspace_repositories(root)
     if not inventory.complete:
         return _incomplete_selection(root, found, inventory)
@@ -1066,8 +1070,9 @@ def _aggregate_selection(root, inventory, results):
                            scope_state, results)
 
 
-def _assess_one(root, found=None, facts=None, contexts=None):
-    inventory = workspace_repositories(root)
+def _assess_one(root, found=None, facts=None, contexts=None, inventory=None):
+    if inventory is None:
+        inventory = workspace_repositories(root)
     if not inventory.complete:
         return _incomplete_selection(root, found, inventory)
     diagnostics = []
@@ -1134,13 +1139,12 @@ def _assess_one(root, found=None, facts=None, contexts=None):
             applicable.append((declaration, "forced by " + OVERRIDE_VARIABLE))
             continue
         if declaration.owner_repositories:
-            inventory = workspace_repositories(root)
             scopes = inventory or [Path(root)]
             identities = [repository_identity(scope) or "" for scope in scopes]
             if scopes and all(identity in declaration.owner_repositories for identity in identities):
                 applicable.append((declaration, "this is the tier's own repository"))
                 continue
-        result = _legacy_result(root, declaration)
+        result = _legacy_result(root, declaration, inventory)
         if result.matched:
             found_at = " (" + result.evidence[0] + ")" if result.evidence else ""
             applicable.append((declaration, declaration.stack + " detected" + found_at))
@@ -1349,14 +1353,16 @@ def _existing_path(path: Path) -> Path:
 def path_selection(path: str, cwd=None) -> dict[str, object]:
     raw = Path(path)
     try:
-        anchor = _existing_path((Path(cwd) / raw) if cwd and not raw.is_absolute() else raw)
+        target = (Path(cwd) / raw) if cwd and not raw.is_absolute() else raw
+        target = target.expanduser().resolve(strict=False)
+        anchor = _existing_path(target)
     except (OSError, ValueError, RuntimeError) as error:
         return {"path": path, "repository": None, "scope": "undetermined", "scope_state": "undetermined",
                 "complete": False, "context": "Target path is unresolved; resolve it before applying standards.",
                 "diagnostics": [diagnostic("target-path", path, str(error))]}
     boundary, error = _repository_boundary(anchor)
     scope = boundary or anchor
-    result = assess(scope)
+    result = assess(scope if target.is_dir() else target)
     return {
         "path": str(raw),
         "anchor": str(anchor),
