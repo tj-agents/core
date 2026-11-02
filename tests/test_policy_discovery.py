@@ -1,4 +1,5 @@
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -8,6 +9,26 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / ".agents" / "hooks"))
 import installed_skills
+
+
+@pytest.mark.parametrize("host", ["claude", "codex"])
+def test_bundled_skill_is_resolved_without_a_native_cli(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, host: str
+) -> None:
+    package = tmp_path / "optional"
+    skill = package / "skills/manage/SKILL.md"
+    skill.parent.mkdir(parents=True)
+    body = "---\ndescription: Bundled recording provider\n---\n"
+    skill.write_text(body, encoding="utf-8")
+    monkeypatch.setattr(
+        installed_skills, "__file__", str(package / "hooks/installed_skills.py")
+    )
+    monkeypatch.setattr(shutil, "which", lambda _: None)
+    installed_skills._native_install_roots.cache_clear()
+    try:
+        assert installed_skills.resolved_skill("optional:manage", host) == (skill, body)
+    finally:
+        installed_skills._native_install_roots.cache_clear()
 
 
 @pytest.mark.parametrize("host", ["claude", "codex"])
