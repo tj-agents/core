@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import json
 import subprocess
 from pathlib import Path
@@ -20,6 +21,31 @@ def _load_gate() -> ModuleType:
 
 
 gate = _load_gate()
+
+
+def test_native_utf8_payload_is_independent_of_windows_console_encoding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "tool_name": "Read",
+        "tool_input": {"file_path": "workspace café/東京.py"},
+    }
+    stream = io.TextIOWrapper(
+        io.BytesIO(json.dumps(payload, ensure_ascii=False).encode("utf-8")),
+        encoding="cp1252",
+    )
+    monkeypatch.setattr(gate.sys, "stdin", stream)
+
+    assert gate._stdin_payload() == payload
+
+
+def test_unicode_repository_boundary_survives_git_output(tmp_path: Path) -> None:
+    repository = _repository(tmp_path / "workspace café 東京", "personal")
+
+    selection = gate.path_selection(str(repository / "new.py"))
+
+    assert selection["repository"] == str(repository)
+    assert selection["complete"]
 
 
 @pytest.fixture(autouse=True)
