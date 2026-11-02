@@ -134,6 +134,31 @@ def test_complete_all_work_folder_applies_only_common_employer_context(
     )
 
 
+@pytest.mark.parametrize("target", ["", "marker.txt"])
+def test_non_git_markers_establish_only_technical_scope(
+    project: Path, cache: Path, target: str
+) -> None:
+    marker_predicate = {"file": "marker.txt"}
+    _install_payload(cache, "employer-a", {**EMPLOYER, "detect": marker_predicate})
+    _install_payload(
+        cache,
+        "technical",
+        {
+            "schema_version": 3,
+            "tier": "technical",
+            "applies": "stack-present",
+            "detect": marker_predicate,
+        },
+    )
+    (project / "marker.txt").write_text("local marker", encoding="utf-8")
+
+    result = gate.assess(project / target, _found(cache, project))
+
+    assert result.scope_state == "undetermined"
+    assert result.employers == ()
+    assert {item.plugin for item, _ in result.applicable} == {"technical"}
+
+
 def test_complete_all_personal_folder_requires_each_repository_to_adopt(
     project: Path, cache: Path
 ) -> None:
@@ -430,7 +455,9 @@ def test_project_installation_is_selected_for_each_child(
     assert not result.applicable
 
 
-@pytest.mark.parametrize("scope", ["folder", "repository", "subdirectory"])
+@pytest.mark.parametrize(
+    "scope", ["folder", "repository", "subdirectory", "file", "new-file"]
+)
 def test_corrupt_repository_boundary_is_undetermined(
     project: Path, cache: Path, scope: str
 ) -> None:
@@ -440,15 +467,27 @@ def test_corrupt_repository_boundary_is_undetermined(
     (child / ".git/config").write_text("[broken\n", encoding="utf-8")
     directory = child / "src"
     directory.mkdir()
+    existing_file = directory / "existing.py"
+    existing_file.touch()
 
     result = gate.assess(
-        {"folder": project, "repository": child, "subdirectory": directory}[scope],
+        {
+            "folder": project,
+            "repository": child,
+            "subdirectory": directory,
+            "file": existing_file,
+            "new-file": directory / "new.py",
+        }[scope],
         _found(cache, project),
     )
 
     assert result.scope_state == "undetermined"
     assert not result.applicable
     assert nested not in result.inventory
+    if scope == "folder":
+        assert not result.repository_results[0].inventory.complete
+    else:
+        assert not result.inventory.complete
 
 
 def test_folder_marker_cannot_combine_with_child_remote(
