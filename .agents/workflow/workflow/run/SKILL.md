@@ -63,7 +63,8 @@ dismissal intent; refresh uses a restart intent and preserves the same conversat
 Ordinary Stop only records activity and may acknowledge an already armed request. It never asks a model to
 decide completion, blocks a reply, or starts a session.
 
-Use the Core receipt CLI from the selected package root (`python3` on Linux/macOS). It snapshots the goal,
+Use the Core receipt CLI at `<workflow-plugin-root>/workflows/completion.py`; `<core-runtime>` below is
+`<workflow-plugin-root>/workflows` (`python3` on Linux/macOS, `python` on Windows). It snapshots the goal,
 responsibility aggregate, declared evidence, and later audit result outside the checkout. Keep the returned
 absolute receipt path and reservation id as evidence; do not recreate either when resuming the same candidate.
 

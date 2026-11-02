@@ -242,12 +242,15 @@ known responsibility aggregate, audit result, and cleanup disposition. A missing
 stale receipt keeps the recovery artifacts. `engineering:persistent-delivery` retains its own delivery
 binding and does not become a second completion authority.
 
-On an accepted current receipt, record retirement permission without deleting the goal. This consumes the
-same audit; it never requests another one. Engineering removes only an eligible plan or goal afterward,
-while the external acceptance checkpoint remains the recovery source.
+On an accepted current receipt, record retirement permission before deleting the goal or its eligible
+plan-and-ledger pair. Declare the companion plan as an `--artifact` during preparation, then name it with
+`--retire-source` at retirement; repeat that option for each eligible declared plan artifact being removed.
+This consumes the same audit. Only the goal and explicitly named artifacts may use preserved snapshots;
+the responsibility aggregate and other evidence remain live. Engineering removes those eligible files
+afterward, while the external acceptance checkpoint remains the recovery source.
 
 ```text
-python -B <core-runtime>/completion.py retire-goal --receipt <accepted-current-receipt>
+python -B <core-runtime>/completion.py retire-goal --receipt <accepted-current-receipt> --retire-source <declared-companion-plan>
 ```
 
 Terminal selected Engineering evidence names implementation, validation, review, PR, merge commit, remaining

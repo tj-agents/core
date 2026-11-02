@@ -53,6 +53,16 @@
   ],
   "resources": [
     {
+      "plugin": "workflow",
+      "source": ".agents/workflows/completion.py",
+      "destination": "workflows/completion.py"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/workflows/pr_body.py",
+      "destination": "workflows/pr_body.py"
+    },
+    {
       "plugin": "base",
       "source": ".agents/dependencies/agent/.agents/agent/runtime",
       "destination": "dependencies/agent/.agents/agent/runtime"
