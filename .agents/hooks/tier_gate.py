@@ -697,9 +697,12 @@ def workspace_repositories(root: Path | str) -> list[Path]:
         for parent in (root, *root.parents):
             if _git_timeout() <= 0:
                 break
-            if (parent / ".git").exists() or (parent / ".git").is_symlink():
-                enclosed = True
-                break
+            try:
+                (parent / ".git").lstat()
+            except FileNotFoundError:
+                continue
+            enclosed = True
+            break
         if (not enclosed and _git_timeout() > 0
                 and _git(root, ["rev-parse", "--is-inside-work-tree"]) is None
                 and _git_timeout() > 0):
