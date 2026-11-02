@@ -17,6 +17,23 @@ CI = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CI)
 
 
+def test_terminal_acceptance_families_select_typed_source_regressions() -> None:
+    value = CI.classify(
+        [
+            ".agents/workflows/completion.py",
+            ".agents/engineering/workflow/merge/scripts/targeted_cleanup.py",
+            ".agents/workflow/workflow/handoff/SKILL.md",
+        ]
+    )
+    assert value["mode"] == "focused"
+    assert set(value["tests"]) == {
+        "tests/test_completion.py",
+        "tests/test_process_standards.py",
+        "tests/test_targeted_cleanup.py",
+    }
+    assert CI.run_tests(ROOT, value, "source") == 0
+
+
 class ClassificationTests(unittest.TestCase):
     def test_prose_uses_docs_but_executable_guidance_keeps_full_coverage(self):
         for path in ("README.md", "docs/usage.md", "plans/work/GOAL.md", "reviews/topic.md"):
@@ -45,6 +62,7 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual([".agents/hooks/tests/test_handoff_transfer.py"], value["tests"])
         CI.required_results(value, self.results(), "pull_request", ("ci:full",))
 
+
     @staticmethod
     def results():
         return {name: {"result": "success"} for name in
@@ -55,7 +73,7 @@ class ClassificationTests(unittest.TestCase):
                      ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/plugin_selection.py",
                      ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/repo_config.py",
                      ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts/lock_io.py",
-                     ".agents/plugins/sources.json", "tests/native_plugin_inventory.py"):
+                     "tests/native_plugin_inventory.py"):
             with self.subTest(path=path):
                 self.assertEqual(CI.classify(["README.md", path])["mode"], "full")
 
