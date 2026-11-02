@@ -1,10 +1,13 @@
 import json
 import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import installed_skills
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / ".agents" / "hooks"))
+import installed_skills
 
 
 @pytest.mark.parametrize("host", ["claude", "codex"])

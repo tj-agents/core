@@ -142,7 +142,9 @@ def installed_skill(
 
     try:
         found = (
-            resolved_skill(name, harness, include_disabled=True)
+            resolved_skill(
+                name, harness, include_disabled=True, identity="personal@tj-agents"
+            )
             if policy_only
             else resolved_skill(name, harness)
         )

@@ -28,7 +28,7 @@ class NativePluginDiscoveryError(Exception):
 
 @functools.lru_cache(maxsize=4)
 def _native_install_roots(
-    harness: str, include_disabled: bool = False
+    harness: str, include_disabled: bool = False, identity: str | None = None
 ) -> tuple[Path, ...] | NativePluginDiscoveryError:
     binary = shutil.which(harness)
     if binary is None:
@@ -69,6 +69,13 @@ def _native_install_roots(
             not include_disabled and not plugin.get("enabled")
         ):
             continue
+        native_identity = (
+            f"{plugin.get('name')}@{plugin.get('marketplaceName')}"
+            if harness == "codex"
+            else plugin.get("id")
+        )
+        if identity is not None and native_identity != identity:
+            continue
         if harness == "codex":
             marketplace, name, version = (
                 plugin.get("marketplaceName"),
@@ -98,15 +105,21 @@ def _native_install_roots(
 
 
 def native_install_roots(
-    harness: str, include_disabled: bool = False
+    harness: str, include_disabled: bool = False, identity: str | None = None
 ) -> tuple[Path, ...]:
-    roots = _native_install_roots(harness, include_disabled)
+    roots = _native_install_roots(harness, include_disabled, identity)
     if isinstance(roots, NativePluginDiscoveryError):
         raise roots
     return roots
 
 
-def skill_search_dirs(harness: str, include_disabled: bool = False) -> Iterator[Path]:
+def skill_search_dirs(
+    harness: str, include_disabled: bool = False, identity: str | None = None
+) -> Iterator[Path]:
+    if identity is not None:
+        for root in native_install_roots(harness, include_disabled, identity):
+            yield root / "skills"
+        return
     yield Path(__file__).resolve().parent.parent / "skills"
     configured = os.environ.get("CLAUDE_CONFIG_DIR")
     home = Path.home()
@@ -137,11 +150,21 @@ def description_of(body: str) -> str | None:
 
 
 def resolved_skill(
-    name: str, harness: str, *, include_disabled: bool = False
+    name: str,
+    harness: str,
+    *,
+    include_disabled: bool = False,
+    identity: str | None = None,
 ) -> tuple[Path, str] | None:
     wanted_plugin, _, bare = name.rpartition(":")
+    roots = tuple(skill_search_dirs(harness, include_disabled, identity))
+    if identity is not None and (
+        identity.partition("@")[0] != wanted_plugin
+        or len({root.resolve() for root in roots}) != 1
+    ):
+        return None
     first: tuple[Path, str] | None = None
-    for root in skill_search_dirs(harness, include_disabled):
+    for root in roots:
         if wanted_plugin and plugin_of(root) != wanted_plugin:
             continue
         skill = root / bare / "SKILL.md"
