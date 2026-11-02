@@ -14,6 +14,9 @@ requests remain their selected operation without a ceremonial plan.
 For a side problem or user callout, apply
 [Workflow's incidental-problems decision](../../resources/problem-records.md#incidental-problems)
 before changing this goal's next action.
+At work start and each material progress transition, apply
+[the source's selected work-item policy](../../resources/problem-records.md#work-progress)
+without creating another goal or repair owner.
 
 Read `agent:lanes` for bounded phase capability. The parent retains design, acceptance, diagnosis, and
 severity. Delegate only specified implementation or independent evidence under exact disjoint leases, and
