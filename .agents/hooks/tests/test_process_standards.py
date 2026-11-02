@@ -265,13 +265,12 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("Continue in the current context by default for small and medium plans", plans)
         self.assertIn("The parent retains ownership", plans)
         self.assertIn("massive plan whose design was a substantial phase", plans)
-        self.assertIn("normally hand execution to one fresh harness", plans)
-        self.assertIn("even when the checkout stays the same", plans)
-        self.assertIn("Judge plans between these cases", plans)
-        self.assertIn("plan length alone is not a mechanical threshold", plans)
+        self.assertIn("keep the execution owner unless an actual transfer condition below applies", plans)
+        self.assertIn("bounded native background work", plans)
+        self.assertIn("does not create a handoff requirement", plans)
         self.assertIn("changes owner, repository, worktree, PR, or logical workstream", plans)
         self.assertIn("Do not select a handoff as routine phase-ending ceremony", execution)
-        self.assertIn("a massive plan has completed substantial design", execution)
+        self.assertNotIn("normally hand execution to one fresh harness", execution)
 
     def test_plan_artifacts_always_reach_merged_default_branch(self):
         plans = authored_skill("plans").read_text(encoding="utf-8")
@@ -312,48 +311,41 @@ class ProcessStandardsTests(unittest.TestCase):
             "do not create a second branch solely to change the type prefix to `Docs`", flat
         )
 
-    def test_merge_cleanup_runs_the_proving_worktree_sweep(self):
+    def test_merge_cleanup_targets_one_proven_worktree(self):
         body = authored_skill("merge").read_text(encoding="utf-8")
         cleanup = body.split(
-            "### 5. Return to a clean base and retire any isolated checkout",
+            "### 5. Return to a clean base and record targeted checkout cleanup",
             maxsplit=1,
         )[1].split("### 6. Follow the publish", maxsplit=1)[0]
         flat = " ".join(cleanup.split())
 
         for required in (
             "never remove that path",
-            "scripts/worktree_sweep.py --repo <primary-checkout>",
-            "`cleanup_proof.py` proves its PR merged at exactly its head",
-            "archiving any leftovers under `<state>/merge-cleanup/set-aside/` first",
-            "while a registered session still works inside it",
-            "while an open PR is based on its branch",
-            "removed by the sweep that runs once the session closes",
-            "never force a removal",
+            "Classify only the checkout this delivery owns",
+            "exact merged-head obligation",
+            "every recorded holder released",
+            "launch the deterministic worker before arming frontend release",
+            "recent-edit guard",
+            "verifies the target path is absent",
+            "Do not run a repository-wide sweep as a closeout shortcut",
+            "`pending`, with its resolver and resume condition",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
 
-        for retired in ("finish.py", "close.py", "machine:close", "worktrees.ps1", "worktree remove --force"):
+        for retired in ("scripts/worktree_sweep.py", "finish.py", "scripts/close.py", "machine:close", "worktrees.ps1", "worktree remove --force"):
             with self.subTest(retired=retired):
                 self.assertNotIn(retired, cleanup)
 
-    def test_handoff_transfers_active_directory_removal_after_predecessor_release(self):
+    def test_handoff_does_not_create_a_routine_cleanup_successor(self):
         handoff = " ".join(authored_skill("handoff").read_text(encoding="utf-8").split())
         cleanup = " ".join(authored_skill("merging").read_text(encoding="utf-8").split())
 
-        self.assertIn("follow `engineering:merging` under Transferred checkout cleanup", handoff)
-        self.assertIn(
-            "Put the exact operation and final filesystem verification in the successor's `## Next Steps`",
-            handoff,
-        )
-        self.assertIn("The predecessor must not perform it after launch", handoff)
-        self.assertIn("The successor waits for that marker before releasing the predecessor", cleanup)
-        self.assertIn(
-            "Run the filesystem operation from a verified surviving checkout after the predecessor "
-            "no longer holds the old directory",
-            cleanup,
-        )
-        self.assertIn("a command error or residual path as incomplete", cleanup)
+        self.assertIn("explicit transfer may include a checkout operation", handoff)
+        self.assertIn("generic handoff neither requires nor creates a separate cleanup successor", handoff)
+        self.assertIn("deterministic worker running outside the target", cleanup)
+        self.assertIn("Host exit, scheduler submission, or partial Git cleanup is not evidence", cleanup)
+        self.assertIn("Do not create a routine handoff or new session for cleanup", cleanup)
 
 
 

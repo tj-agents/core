@@ -211,10 +211,9 @@ transfer, reconcile the completed attempt and current owner before recording a n
    side-workstream writer lease, retain the original task's writer lease, and continue the original task.
    On failure, retain both task records and continue only work independent of the unlaunched side task.
 
-For a selected Engineering delivery lifecycle, follow `engineering:merging` under Transferred checkout
-cleanup when the handoff must release a checkout before it is moved, renamed, or deleted. Put the exact operation and final filesystem
-verification in the successor's `## Next Steps`. The predecessor must not perform it after launch. A generic
-handoff neither requires nor invents those Engineering capabilities.
+An explicit transfer may include a checkout operation when its own goal requires one. `engineering:merge`
+owns the exact-target cleanup proof and durable result; a generic handoff neither requires nor creates a
+separate cleanup successor.
 
 If native discovery cannot resolve the launcher, report the missing capability and required selection.
 Continue independent authorized work where possible. Never claim transfer occurred or silently substitute a

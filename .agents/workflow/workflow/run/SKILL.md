@@ -38,6 +38,67 @@ continues.
 For a deferred command or condition, invoke `agent:listen` before parking or moving to
 independent work. It owns deterministic background waiting and the native result notification.
 
+## Terminal acceptance and frontend release
+
+At the real end of an authorized goal, this workflow owns one terminal acceptance checkpoint. Prepare a
+candidate receipt from the current goal, exact artifacts and digests, delivery evidence, known ownership,
+children, waits, and cleanup disposition. The Store's one mutable `work_item` field is session evidence,
+not the aggregate of responsibilities; an unknown responsibility inventory refuses automatic release.
+
+Run the bounded deterministic checks against that candidate. Current generic completion criteria are
+semantic, so they require one read-only native audit for every new candidate. Reserve that audit before
+starting a same-session background child. Start the child only when the reservation response has outer
+`dispatch_allowed: true`; a false value means reuse or reconcile the existing slot. Record its native
+identity before treating it as in flight. After observing an existing child for an unknown reservation, bind
+it with the reconciled path; never silently retry a spawn. The child returns findings or acceptance evidence;
+it cannot release a frontend, retire a goal, remove a checkout, or transfer ownership.
+
+An accepted receipt remains reusable while its candidate inputs remain unchanged. Agent rechecks that same
+receipt against the current frontend and then arms a separately generated release request. A `pending`
+cleanup disposition needs a separately acknowledged live cleanup worker bound to the exact session,
+obligation, and target before that arm; a bare pending disposition refuses release. A new prompt cancels an
+armed release before interpretation but does not invalidate unchanged acceptance evidence. A persistent
+keep-open policy prevents release until revoked. An incomplete user dismissal preserves the goal with a
+dismissal intent; refresh uses a restart intent and preserves the same conversation and owner.
+Ordinary Stop only records activity and may acknowledge an already armed request. It never asks a model to
+decide completion, blocks a reply, or starts a session.
+
+Use the Core receipt CLI from the selected package root (`python3` on Linux/macOS). It snapshots the goal,
+responsibility aggregate, declared evidence, and later audit result outside the checkout. Keep the returned
+absolute receipt path and reservation id as evidence; do not recreate either when resuming the same candidate.
+
+```text
+python -B <core-runtime>/completion.py prepare --goal <goal> --aggregate <responsibilities.json> --owner-host codex --owner-session-id <session> --root <checkout>
+python -B <core-runtime>/completion.py reserve-audit --receipt <receipt>
+python -B <core-runtime>/completion.py bind-audit --receipt <receipt> --reservation-id <reservation> --native-child-id <child>
+python -B <core-runtime>/completion.py record-audit --receipt <receipt> --reservation-id <reservation> --result <child-result.json>
+python -B <core-runtime>/completion.py recheck --receipt <receipt>
+
+python -B <agent-runtime>/close_lifecycle.py prepare --host codex --session-id <session> --profile <profile> --intent task-completion --receipt <receipt>
+python -B <agent-runtime>/close_lifecycle.py recheck --host codex --session-id <session> --profile <profile> --release-generation <generation>
+python -B <agent-runtime>/close_lifecycle.py arm --host codex --session-id <session> --profile <profile> --release-generation <generation>
+python -B <agent-runtime>/close_lifecycle.py policy --host codex --session-id <session> --profile <profile> --action keep-open --reason <reason>
+python -B <agent-runtime>/close_lifecycle.py dismiss --host codex --session-id <session> --profile <profile> --receipt <receipt> --reason <reason>
+```
+
+The child result contains `candidate_id`, `reservation_id`, `native_child_id`, `sources_sha256`,
+`state` (`passed` or `failed`), and `findings`. Store that result outside the checkout. A reconciled bind
+adds `--reconciled` only after observing the same native child for an unknown reservation.
+
+Use `policy --action keep-open|revoke` for the persistent release policy. `dismiss` records an explicit
+incomplete user dismissal. Refresh restart prepares, rechecks, and arms its own release generation without a
+completion receipt.
+
+Cleanup is a separate result: `unnecessary`, `retained`, `pending`, or `verified`. `engineering:merge`
+owns an exact targeted checkout removal after release. A pending or refused cleanup remains durable and does
+not turn into success because a host exited.
+
+```text
+Candidate: deterministic checks establish delivery and all known responsibilities.
+Audit: reserve the candidate; only `dispatch_allowed: true` permits one same-session child. Reuse a completed audit for the same candidate.
+Release: recheck the unchanged receipt, then arm the attributable frontend only.
+```
+
 Use only a supported host continuation. Do not claim unattended execution before the selected native or
 host-specific continuation is established and its wake observed. `workflow:continue` selects and establishes
 the next supported wake for this goal. Foreground execution remains valid without unattended capability.
