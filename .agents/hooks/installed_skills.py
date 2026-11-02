@@ -157,12 +157,15 @@ def resolved_skill(
     identity: str | None = None,
 ) -> tuple[Path, str] | None:
     wanted_plugin, _, bare = name.rpartition(":")
-    roots = tuple(skill_search_dirs(harness, include_disabled, identity))
-    if identity is not None and (
-        identity.partition("@")[0] != wanted_plugin
-        or len({root.resolve() for root in roots}) != 1
-    ):
-        return None
+    roots = skill_search_dirs(harness, include_disabled, identity)
+    if identity is not None:
+        selected = tuple(roots)
+        if (
+            identity.partition("@")[0] != wanted_plugin
+            or len({root.resolve() for root in selected}) != 1
+        ):
+            return None
+        roots = iter(selected)
     first: tuple[Path, str] | None = None
     for root in roots:
         if wanted_plugin and plugin_of(root) != wanted_plugin:
