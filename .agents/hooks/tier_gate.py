@@ -35,7 +35,9 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Sequence
 from contextvars import ContextVar
+from itertools import islice
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -58,6 +60,7 @@ CONTENT_CANDIDATES = 20
 CONTENT_BYTES = 256 * 1024
 GIT_TIMEOUT = 10
 WORKSPACE_REPOSITORIES = 64
+WORKSPACE_ENTRIES = 1024
 REMOTE_OPERATORS = ("remote", "remote_host")
 REMOTE_HOST_PATTERN = r"(?=.{1,253}\.?(?![\s\S]))[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.?"
 
@@ -354,15 +357,35 @@ def evaluate_predicate(root, node, facts=None, contexts=None, path="detect"):
 def _evaluate_in_workspace(
         root: Path | str, node: dict[str, object], facts: dict[str, PredicateResult] | None = None,
         contexts: dict[str, str | list[str]] | None = None,
-        employer_result: PredicateResult | None = None) -> PredicateResult:
+        employer_result: PredicateResult | None = None,
+        employer_declarations: Sequence[Declaration] = ()) -> PredicateResult:
     result = _evaluate_predicate(root, node, facts, contexts, employer_result=employer_result)
     if result.matched or not predicate_uses_remote(node):
         return result
     for repository in workspace_repositories(root):
-        candidate = _evaluate_predicate(repository, node, facts, contexts, employer_result=employer_result)
+        if _git_timeout() <= 0:
+            break
+        scoped_employer = None
+        if employer_result is not None and predicate_uses_fact(node, "employer"):
+            matches = []
+            for declaration in employer_declarations:
+                if _git_timeout() <= 0:
+                    break
+                employer = _evaluate_predicate(repository, declaration.detect, facts, contexts)
+                if employer.matched:
+                    matches.append((declaration, employer))
+            scoped_employer = _employer_fact(repository, matches)
+        candidate = _evaluate_predicate(repository, node, facts, contexts, employer_result=scoped_employer)
         if candidate.matched:
             return candidate
     return result
+
+
+def _employer_fact(
+        root: Path | str, employers: Sequence[tuple[Declaration, PredicateResult]]) -> PredicateResult:
+    return PredicateResult(root, bool(employers),
+                           [declaration.id + ": " + item for declaration, result in employers
+                            for item in result.evidence])
 
 
 def _evaluate_predicate(root, node, facts=None, contexts=None, path="detect", employer_result=None):
@@ -663,18 +686,28 @@ def repository_host(root):
 
 
 def workspace_repositories(root: Path | str) -> list[Path]:
-    root = Path(root)
+    root = Path(root).resolve()
     cache = GIT_RESULTS.get()
     key = (str(root), ("workspace-repositories",))
     if cache is not None and key in cache:
         return cache[key]
     children = []
-    if _git(root, ["rev-parse", "--is-inside-work-tree"]) is None:
-        try:
-            children = sorted(child for child in root.iterdir() if child.is_dir() and (child / ".git").exists())
-        except OSError:
-            pass
-    repositories = children[:WORKSPACE_REPOSITORIES]
+    try:
+        enclosed = any((parent / ".git").exists() or (parent / ".git").is_symlink()
+                       for parent in (root, *root.parents))
+        if not enclosed and _git(root, ["rev-parse", "--is-inside-work-tree"]) is None:
+            with os.scandir(root) as entries:
+                for entry in islice(entries, WORKSPACE_ENTRIES):
+                    if _git_timeout() <= 0:
+                        break
+                    child = Path(entry.path)
+                    if entry.is_dir() and (child / ".git").exists():
+                        children.append(child)
+                        if len(children) == WORKSPACE_REPOSITORIES:
+                            break
+    except OSError:
+        children = []
+    repositories = sorted(children)
     if cache is not None:
         cache[key] = repositories
     return repositories
@@ -865,16 +898,14 @@ def _assess(root, found=None, facts=None, contexts=None):
     problems_by_id = {declaration.id: declaration_diagnostics(declaration) for declaration in found}
     employers = []
     employer_predicates = {}
-    for declaration in found:
-        if declaration.employer is None or problems_by_id[declaration.id]:
-            continue
+    employer_declarations = [declaration for declaration in found
+                             if declaration.employer is not None and not problems_by_id[declaration.id]]
+    for declaration in employer_declarations:
         result = _evaluate_in_workspace(root, declaration.detect, facts, contexts)
         employer_predicates[declaration.id] = result
         if result.matched:
             employers.append((declaration, result))
-    employer_result = PredicateResult(root, bool(employers),
-                                     [declaration.id + ": " + item for declaration, result in employers
-                                      for item in result.evidence])
+    employer_result = _employer_fact(root, employers)
     for declaration in found:
         problems = problems_by_id[declaration.id]
         if problems:
@@ -890,7 +921,8 @@ def _assess(root, found=None, facts=None, contexts=None):
         if declaration.schema_version == 3:
             result = employer_predicates.get(declaration.id)
             if result is None:
-                result = _evaluate_in_workspace(root, declaration.detect, facts, contexts, employer_result)
+                result = _evaluate_in_workspace(root, declaration.detect, facts, contexts,
+                                                employer_result, employer_declarations)
             selections.append({"plugin_id": declaration.id, "scope": result.scope,
                                "predicate": declaration.detect, "matched": result.matched,
                                "prerequisites": result.prerequisites, "evidence": result.evidence,
@@ -913,6 +945,8 @@ def _assess(root, found=None, facts=None, contexts=None):
         present, evidence = stack_present(root, declaration.detect)
         if not present and declaration.detect.get("remote"):
             for repository in workspace_repositories(root):
+                if _git_timeout() <= 0:
+                    break
                 present, evidence = stack_present(repository, declaration.detect)
                 if present:
                     break
