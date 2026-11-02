@@ -34,6 +34,7 @@ import runpy
 import shutil
 import subprocess
 import sys
+import time
 from contextvars import ContextVar
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -56,6 +57,8 @@ WALK_SKIP = frozenset({
 CONTENT_CANDIDATES = 20
 CONTENT_BYTES = 256 * 1024
 GIT_TIMEOUT = 10
+WORKSPACE_REPOSITORIES = 64
+REMOTE_OPERATORS = ("remote", "remote_host")
 REMOTE_HOST_PATTERN = r"(?=.{1,253}\.?(?![\s\S]))[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.?"
 
 
@@ -157,6 +160,15 @@ def predicate_uses_fact(node, name):
     if node.get("fact") == name:
         return True
     return any(predicate_uses_fact(child, name) for operator in ("all", "any")
+               for child in (node[operator] if isinstance(node.get(operator), list) else []))
+
+
+def predicate_uses_remote(node: object) -> bool:
+    if not isinstance(node, dict):
+        return False
+    if any(operator in node for operator in REMOTE_OPERATORS):
+        return True
+    return any(predicate_uses_remote(child) for operator in ("all", "any")
                for child in (node[operator] if isinstance(node.get(operator), list) else []))
 
 
@@ -337,6 +349,20 @@ def evaluate_project(graph, identity, node, definitions=None, context=None, fact
 
 def evaluate_predicate(root, node, facts=None, contexts=None, path="detect"):
     return _evaluate_predicate(root, node, facts, contexts, path)
+
+
+def _evaluate_in_workspace(
+        root: Path | str, node: dict[str, object], facts: dict[str, PredicateResult] | None = None,
+        contexts: dict[str, str | list[str]] | None = None,
+        employer_result: PredicateResult | None = None) -> PredicateResult:
+    result = _evaluate_predicate(root, node, facts, contexts, employer_result=employer_result)
+    if result.matched or not predicate_uses_remote(node):
+        return result
+    for repository in workspace_repositories(root):
+        candidate = _evaluate_predicate(repository, node, facts, contexts, employer_result=employer_result)
+        if candidate.matched:
+            return candidate
+    return result
 
 
 def _evaluate_predicate(root, node, facts=None, contexts=None, path="detect", employer_result=None):
@@ -571,6 +597,7 @@ def project_root(payload):
 
 
 GIT_RESULTS = ContextVar("tier_git_results", default=None)
+GIT_DEADLINE = ContextVar("tier_git_deadline", default=None)
 
 
 def _git(root, arguments):
@@ -584,13 +611,21 @@ def _git(root, arguments):
     return result
 
 
+def _git_timeout() -> float:
+    deadline = GIT_DEADLINE.get()
+    return GIT_TIMEOUT if deadline is None else min(GIT_TIMEOUT, deadline - time.monotonic())
+
+
 def _run_git(root, arguments):
+    timeout = _git_timeout()
+    if timeout <= 0:
+        return None
     try:
         completed = process.run(
             ["git", "-C", str(root), *arguments],
             capture_output=True,
             text=True,
-            timeout=GIT_TIMEOUT,
+            timeout=timeout,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -625,6 +660,24 @@ def repository_host(root):
     if not re.fullmatch(REMOTE_HOST_PATTERN, host) or not path or any(part in ("", ".", "..") for part in path.rstrip("/").split("/")):
         return None
     return host.rstrip(".").lower()
+
+
+def workspace_repositories(root: Path | str) -> list[Path]:
+    root = Path(root)
+    cache = GIT_RESULTS.get()
+    key = (str(root), ("workspace-repositories",))
+    if cache is not None and key in cache:
+        return cache[key]
+    children = []
+    if _git(root, ["rev-parse", "--is-inside-work-tree"]) is None:
+        try:
+            children = sorted(child for child in root.iterdir() if child.is_dir() and (child / ".git").exists())
+        except OSError:
+            pass
+    repositories = children[:WORKSPACE_REPOSITORIES]
+    if cache is not None:
+        cache[key] = repositories
+    return repositories
 
 
 def repository_identity(root):
@@ -683,13 +736,16 @@ def _walked_matches(root, patterns):
 
 
 def _ignored(root, paths):
+    timeout = _git_timeout()
+    if timeout <= 0:
+        return set()
     try:
         completed = process.run(
             ["git", "-C", str(root), "check-ignore", "-z", "--stdin"],
             input="\0".join(paths),
             capture_output=True,
             text=True,
-            timeout=GIT_TIMEOUT,
+            timeout=timeout,
         )
     except (OSError, subprocess.SubprocessError):
         return set()
@@ -788,9 +844,11 @@ def declaration_diagnostics(declaration):
 
 def assess(root, found=None, facts=None, contexts=None):
     token = GIT_RESULTS.set({})
+    deadline_token = GIT_DEADLINE.set(time.monotonic() + GIT_TIMEOUT)
     try:
         return _assess(root, found, facts, contexts)
     finally:
+        GIT_DEADLINE.reset(deadline_token)
         GIT_RESULTS.reset(token)
 
 
@@ -810,7 +868,7 @@ def _assess(root, found=None, facts=None, contexts=None):
     for declaration in found:
         if declaration.employer is None or problems_by_id[declaration.id]:
             continue
-        result = evaluate_predicate(root, declaration.detect, facts, contexts)
+        result = _evaluate_in_workspace(root, declaration.detect, facts, contexts)
         employer_predicates[declaration.id] = result
         if result.matched:
             employers.append((declaration, result))
@@ -832,7 +890,7 @@ def _assess(root, found=None, facts=None, contexts=None):
         if declaration.schema_version == 3:
             result = employer_predicates.get(declaration.id)
             if result is None:
-                result = _evaluate_predicate(root, declaration.detect, facts, contexts, employer_result=employer_result)
+                result = _evaluate_in_workspace(root, declaration.detect, facts, contexts, employer_result)
             selections.append({"plugin_id": declaration.id, "scope": result.scope,
                                "predicate": declaration.detect, "matched": result.matched,
                                "prerequisites": result.prerequisites, "evidence": result.evidence,
@@ -853,6 +911,11 @@ def _assess(root, found=None, facts=None, contexts=None):
                 applicable.append((declaration, "this is the tier's own repository"))
                 continue
         present, evidence = stack_present(root, declaration.detect)
+        if not present and declaration.detect.get("remote"):
+            for repository in workspace_repositories(root):
+                present, evidence = stack_present(repository, declaration.detect)
+                if present:
+                    break
         if present:
             found_at = " (" + evidence + ")" if evidence else ""
             applicable.append((declaration, declaration.stack + " detected" + found_at))
