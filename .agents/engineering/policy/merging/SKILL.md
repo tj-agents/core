@@ -112,24 +112,21 @@ An adjacent queue entry, a similarly named branch or a newer PR never silently b
 The executable monitor is `.agents/workflows/workflow_ops.py`; `engineering:merge` supplies its exact
 PR and head identity.
 
-## Transferred checkout cleanup
+## Targeted checkout cleanup
 
-Use `engineering:merge` Step 5's `finish` when the current owner can release its checkout itself. When
-that capability is unavailable and an authorized `workflow:handoff` transfers cleanup, the successor owns
-the exact removal, rename or move and final filesystem verification recorded in `## Next Steps`.
-The predecessor ends repository-scoped activity and emits a recorded release marker; it never performs
-the operation after launch. The successor waits for that marker before releasing the predecessor through
-`agent:peer`. Resolve the registry entry by the old checkout and any recorded session or terminal
-identity. The native close operation must verify the recorded PID and start time; tab closure uses its
-exact native terminal identity. An unverifiable entry stays open with the user named as resolver.
+`engineering:merge` Step 5 owns cleanup for the exact checkout attached to the delivery binding. It is
+separate from terminal acceptance and frontend release. After all recorded holders release, an acknowledged
+deterministic worker running outside the target verifies the exact merged head, ownership, and recent-edit
+guards, removes that one target, verifies its filesystem absence, and records the result outside the target.
 
-Run the filesystem operation from a verified surviving checkout after the predecessor no longer holds
-the old directory. Treat a command error or residual path as incomplete cleanup. Launcher submission or
-partial Git cleanup does not establish release of the host or removal of the directory.
+`unnecessary` and deliberate `retained` dispositions are terminal. A command error, an unverified holder,
+or a residual path is `pending`, with a resolver and observable resume condition. Host exit, scheduler
+submission, or partial Git cleanup is not evidence of removal. Do not create a routine handoff or new
+session for cleanup; an explicit transfer remains a normal `workflow:handoff` decision.
 
 ```text
-Next Steps: wait for the predecessor's recorded release, verify and close that exact native session,
-then remove the named old checkout from the surviving checkout and verify the old path is absent.
+Cleanup result: pending — the recorded holder is still live.
+Resume: after its verified release, run the exact-target worker and prove the path is absent.
 ```
 
 ## Whoever merges owns only the generated downstream PR that merge caused

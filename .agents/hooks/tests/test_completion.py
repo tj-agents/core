@@ -8,7 +8,9 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "workflows"))
-from completion import CompletionError, completion_check, visible_tasks
+from completion import (CompletionError, bind_terminal_audit, completion_check, prepare_terminal_acceptance,
+                        receipt_lock, record_terminal_audit, recheck_terminal_acceptance,
+                        reserve_terminal_audit, retire_terminal_goal, visible_tasks)
 
 
 HEAD = "a" * 40
@@ -31,6 +33,13 @@ def goal(acceptance=None, deliveries=None, open_tasks=None, extra=""):
 
 
 class CompletionTests(unittest.TestCase):
+    def setUp(self):
+        state = tempfile.TemporaryDirectory()
+        self.addCleanup(state.cleanup)
+        environment = mock.patch.dict(os.environ, {'AGENT_STATE_DIRECTORY': state.name})
+        environment.start()
+        self.addCleanup(environment.stop)
+
     def write_goal(self, content):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
@@ -220,6 +229,202 @@ class CompletionTests(unittest.TestCase):
         result = json.loads(completed.stdout)
         self.assertFalse(result["ready"])
         self.assertEqual("fixture owner", result["open_tasks"][0]["owner"])
+
+    def terminal_files(self, aggregate=None):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        goal_path = root / "GOAL.md"
+        goal_path.write_text(goal(deliveries=[]), encoding="utf-8")
+        aggregate_path = root / "aggregate.json"
+        aggregate_path.write_text(json.dumps(aggregate if aggregate is not None else {
+            "known": True,
+            "owned": [],
+            "responsibilities": [],
+            "children": [],
+            "waits": [],
+        }), encoding="utf-8")
+        artifact = root / "evidence.txt"
+        artifact.write_text("passed\n", encoding="utf-8")
+        return root, goal_path, aggregate_path, artifact
+
+    def test_terminal_acceptance_requires_a_bound_passing_audit_then_rechecks(self):
+        root, goal_path, aggregate_path, artifact = self.terminal_files()
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state}):
+            receipt_path, receipt = prepare_terminal_acceptance(
+                goal_path, aggregate_path, {"host": "codex", "session_id": "s1"}, root, [artifact], None)
+            self.assertEqual("candidate", receipt["state"])
+            self.assertEqual("required", receipt["audit"]["state"])
+            self.assertEqual(3, len(receipt["sources"]))
+            reserved, _dispatch = reserve_terminal_audit(receipt_path)
+            bound = bind_terminal_audit(receipt_path, reserved["audit"]["reservation_id"], "native-1")
+            result = root / "audit.json"
+            result.write_text(json.dumps({
+                "candidate_id": bound["candidate_id"], "state": "passed", "findings": [],
+                "reservation_id": bound["audit"]["reservation_id"],
+                "native_child_id": bound["audit"]["native_child_id"],
+                "sources_sha256": bound["audit"]["sources_sha256"],
+            }), encoding="utf-8")
+            recorded = record_terminal_audit(receipt_path, bound["audit"]["reservation_id"], result)
+            self.assertEqual("passed", recorded["audit"]["state"])
+            accepted = recheck_terminal_acceptance(receipt_path)
+            accepted_again = recheck_terminal_acceptance(receipt_path)
+            reused, dispatch = reserve_terminal_audit(receipt_path)
+            self.assertEqual('accepted', accepted_again['state'])
+            self.assertEqual(bound['audit']['reservation_id'], reused['audit']['reservation_id'])
+            self.assertFalse(dispatch)
+        self.assertEqual("accepted", accepted["state"])
+        self.assertEqual("passed", accepted["audit"]["state"])
+
+    def test_terminal_acceptance_rejects_changed_sources_after_audit(self):
+        root, goal_path, aggregate_path, artifact = self.terminal_files()
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state}):
+            receipt_path, _receipt = prepare_terminal_acceptance(
+                goal_path, aggregate_path, {"host": "codex", "session_id": "s1"}, root, [artifact], None)
+            reserved, _dispatch = reserve_terminal_audit(receipt_path)
+            bound = bind_terminal_audit(receipt_path, reserved["audit"]["reservation_id"], "native-1")
+            result = root / "audit.json"
+            result.write_text(json.dumps({
+                "candidate_id": bound["candidate_id"], "state": "passed", "findings": [],
+                "reservation_id": bound["audit"]["reservation_id"],
+                "native_child_id": bound["audit"]["native_child_id"],
+                "sources_sha256": bound["audit"]["sources_sha256"],
+            }), encoding="utf-8")
+            record_terminal_audit(receipt_path, bound["audit"]["reservation_id"], result)
+            artifact.write_text("changed\n", encoding="utf-8")
+            rechecked = recheck_terminal_acceptance(receipt_path)
+        self.assertEqual("candidate", rechecked["state"])
+        self.assertEqual("failed", rechecked["audit"]["state"])
+        self.assertIn("frozen terminal acceptance sources changed", rechecked["deterministic"]["blockers"])
+
+    def test_terminal_acceptance_fails_closed_for_unknown_aggregate_or_unbound_reservation(self):
+        root, goal_path, aggregate_path, artifact = self.terminal_files({
+            "known": False,
+            "owned": [],
+            "responsibilities": [],
+            "children": [],
+            "waits": [],
+        })
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state}):
+            receipt_path, receipt = prepare_terminal_acceptance(
+                goal_path, aggregate_path, {"host": "codex", "session_id": "s1"}, root, [artifact], None)
+            self.assertIn("aggregate responsibility inventory is unknown", receipt["deterministic"]["blockers"])
+            with self.assertRaisesRegex(CompletionError, "deterministic blockers"):
+                reserve_terminal_audit(receipt_path)
+        self.assertEqual("required", receipt["audit"]["state"])
+
+    def test_terminal_acceptance_marks_an_unbound_audit_reservation_unknown(self):
+        root, goal_path, aggregate_path, artifact = self.terminal_files()
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state}):
+            receipt_path, _receipt = prepare_terminal_acceptance(
+                goal_path, aggregate_path, {"host": "codex", "session_id": "s1"}, root, [artifact], None)
+            reserved, _dispatch = reserve_terminal_audit(receipt_path)
+            rechecked = recheck_terminal_acceptance(receipt_path)
+            with self.assertRaises(CompletionError):
+                bind_terminal_audit(receipt_path, reserved['audit']['reservation_id'], 'native-1')
+            bound = bind_terminal_audit(receipt_path, reserved['audit']['reservation_id'],
+                                        'native-1', reconciled=True)
+            self.assertEqual('bound', bound['audit']['state'])
+        self.assertEqual("reserved", reserved["audit"]["state"])
+        self.assertEqual("unknown", rechecked["audit"]["state"])
+        self.assertIn("native audit reservation has no bound child", rechecked["deterministic"]["blockers"])
+
+    def test_only_the_first_reservation_can_dispatch_a_native_audit(self):
+        root, goal_path, aggregate_path, artifact = self.terminal_files()
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(os.environ, {'AGENT_STATE_DIRECTORY': state}):
+            path, _ = prepare_terminal_acceptance(goal_path, aggregate_path,
+                                                  {'host': 'codex', 'session_id': 's1'}, root, [artifact])
+            first, dispatch_first = reserve_terminal_audit(path)
+            repeated, dispatch_again = reserve_terminal_audit(path)
+        self.assertTrue(dispatch_first)
+        self.assertFalse(dispatch_again)
+        self.assertEqual(first['audit']['reservation_id'], repeated['audit']['reservation_id'])
+
+    def test_a_concurrent_receipt_writer_cannot_reserve_an_audit(self):
+        root, goal_path, aggregate_path, artifact = self.terminal_files()
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(os.environ, {'AGENT_STATE_DIRECTORY': state}):
+            path, _ = prepare_terminal_acceptance(goal_path, aggregate_path,
+                                                  {'host': 'codex', 'session_id': 's1'}, root, [artifact])
+            with receipt_lock(path):
+                with self.assertRaisesRegex(CompletionError, 'another terminal receipt operation'):
+                    reserve_terminal_audit(path)
+            _, dispatch = reserve_terminal_audit(path)
+            self.assertTrue(dispatch)
+
+    def test_retired_goal_reuses_the_accepted_audit_and_preserves_evidence(self):
+        root, goal_path, aggregate_path, artifact = self.terminal_files()
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(os.environ, {'AGENT_STATE_DIRECTORY': state}):
+            path, _ = prepare_terminal_acceptance(goal_path, aggregate_path,
+                                                  {'host': 'codex', 'session_id': 's1'}, root, [artifact])
+            with self.assertRaisesRegex(CompletionError, 'only an accepted goal'):
+                retire_terminal_goal(path)
+            reserved, _ = reserve_terminal_audit(path)
+            bound = bind_terminal_audit(path, reserved['audit']['reservation_id'], 'native-1')
+            result = root / 'audit.json'
+            result.write_text(json.dumps({
+                'candidate_id': bound['candidate_id'], 'reservation_id': bound['audit']['reservation_id'],
+                'native_child_id': 'native-1', 'sources_sha256': bound['audit']['sources_sha256'],
+                'state': 'passed', 'findings': [],
+            }), encoding='utf-8')
+            record_terminal_audit(path, bound['audit']['reservation_id'], result)
+            accepted = recheck_terminal_acceptance(path)
+            retired = retire_terminal_goal(path)
+            self.assertTrue(goal_path.exists())
+            self.assertTrue(retired['checkpoint']['retired_goal'])
+            for snapshot in retired['checkpoint']['sources']:
+                self.assertFalse(Path(snapshot['path']).is_relative_to(root))
+                self.assertTrue(Path(snapshot['path']).is_file())
+            goal_path.unlink()
+            result.unlink()
+            rechecked = recheck_terminal_acceptance(path)
+            self.assertEqual('accepted', rechecked['state'])
+            self.assertEqual(accepted['audit'], rechecked['audit'])
+            self.assertFalse(reserve_terminal_audit(path)[1])
+            Path(retired['checkpoint']['sources'][0]['path']).write_text('changed', encoding='utf-8')
+            self.assertEqual('candidate', recheck_terminal_acceptance(path)['state'])
+
+    def test_audit_from_another_native_child_cannot_accept_the_candidate(self):
+        root, goal_path, aggregate_path, artifact = self.terminal_files()
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(os.environ, {'AGENT_STATE_DIRECTORY': state}):
+            path, _ = prepare_terminal_acceptance(goal_path, aggregate_path,
+                                                  {'host': 'codex', 'session_id': 's1'}, root, [artifact])
+            reserved, _ = reserve_terminal_audit(path)
+            bound = bind_terminal_audit(path, reserved['audit']['reservation_id'], 'native-1')
+            result = root / 'audit.json'
+            result.write_text(json.dumps({'candidate_id': bound['candidate_id'],
+                                         'reservation_id': bound['audit']['reservation_id'],
+                                         'native_child_id': 'other-native-child',
+                                         'sources_sha256': bound['audit']['sources_sha256'],
+                                         'state': 'passed', 'findings': []}), encoding='utf-8')
+            with self.assertRaisesRegex(CompletionError, 'reserved child'):
+                record_terminal_audit(path, bound['audit']['reservation_id'], result)
+            self.assertEqual('candidate', recheck_terminal_acceptance(path)['state'])
+
+    def test_terminal_acceptance_keeps_cleanup_separate_from_acceptance(self):
+        root, goal_path, aggregate_path, artifact = self.terminal_files()
+        with tempfile.TemporaryDirectory() as state, mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state}):
+            obligations = Path(state) / "merge-cleanup" / "targeted-obligations"
+            obligations.mkdir(parents=True)
+            obligations.joinpath("pending.json").write_text(json.dumps({
+                "kind": "targeted-cleanup", "obligation_id": "cleanup-1", "state": "pending",
+                "owner": {"host": "codex", "session_id": "s1"}, "worktree": str(root),
+            }), encoding="utf-8")
+            cleanup = obligations / "pending.json"
+            receipt_path, _receipt = prepare_terminal_acceptance(
+                goal_path, aggregate_path, {"host": "codex", "session_id": "s1"}, root, [artifact], None, cleanup)
+            reserved, _dispatch = reserve_terminal_audit(receipt_path)
+            bound = bind_terminal_audit(receipt_path, reserved["audit"]["reservation_id"], "native-1")
+            result = root / "audit.json"
+            result.write_text(json.dumps({
+                "candidate_id": bound["candidate_id"], "state": "passed", "findings": [],
+                "reservation_id": bound["audit"]["reservation_id"],
+                "native_child_id": bound["audit"]["native_child_id"],
+                "sources_sha256": bound["audit"]["sources_sha256"],
+            }), encoding="utf-8")
+            record_terminal_audit(receipt_path, bound["audit"]["reservation_id"], result)
+            accepted = recheck_terminal_acceptance(receipt_path)
+        self.assertEqual("accepted", accepted["state"])
+        self.assertEqual("pending", accepted["cleanup"]["state"])
 
 
 if __name__ == "__main__":
