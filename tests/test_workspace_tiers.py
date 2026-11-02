@@ -9,7 +9,6 @@ from types import ModuleType
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 WORK = {
     "schema_version": 3,
@@ -100,7 +99,7 @@ def test_folder_of_employer_repositories_applies_employer_and_work(
     employer = _install_payload(cache, "employer-a", EMPLOYER)
     _repository(project / "personal-tool", "git@example.test:personal/tool.git")
     child = _repository(
-        project / "service α", "git@example.test:employer-a/service.git"
+        project / "service 東京", "git@example.test:employer-a/service.git"
     )
     (project / "service.worktrees").mkdir()
     found = list(gate.declarations([cache], project=project))
@@ -440,14 +439,12 @@ def test_workspace_ancestor_discovery_stops_when_the_assessment_budget_expires(
     def resolve(path: Path) -> Path:
         return path
 
-    def exists(path: Path) -> bool:
+    def lstat(path: Path) -> os.stat_result:
         nonlocal elapsed
+        assert elapsed < gate.GIT_TIMEOUT
         probes.append(path)
         elapsed += 1
-        return False
-
-    def is_symlink(path: Path) -> bool:
-        return False
+        raise FileNotFoundError(path)
 
     def monotonic() -> float:
         return elapsed
@@ -460,8 +457,7 @@ def test_workspace_ancestor_discovery_stops_when_the_assessment_budget_expires(
 
     with monkeypatch.context() as scoped:
         scoped.setattr(gate.Path, "resolve", resolve)
-        scoped.setattr(gate.Path, "exists", exists)
-        scoped.setattr(gate.Path, "is_symlink", is_symlink)
+        scoped.setattr(gate.Path, "lstat", lstat)
         scoped.setattr(gate.time, "monotonic", monotonic)
         scoped.setattr(gate, "_run_git", git)
         scoped.setattr(gate.os, "scandir", scandir)
