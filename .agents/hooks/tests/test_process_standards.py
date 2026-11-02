@@ -318,6 +318,7 @@ class ProcessStandardsTests(unittest.TestCase):
             maxsplit=1,
         )[1].split("### 6. Follow the publish", maxsplit=1)[0]
         flat = " ".join(cleanup.split())
+        self.assertEqual(2, cleanup.count('--session-close <agent-peer-skill>/scripts/session_close.py'))
 
         for required in (
             "never remove that path",
@@ -329,6 +330,9 @@ class ProcessStandardsTests(unittest.TestCase):
             "verifies the target path is absent",
             "Do not run a repository-wide sweep as a closeout shortcut",
             "`pending`, with its resolver and resume condition",
+            "Preparation preserves each delivery's obligation and terminal receipt",
+            "every previously launched worker is observed exited",
+            "an exact `verified` receipt",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
@@ -336,6 +340,15 @@ class ProcessStandardsTests(unittest.TestCase):
         for retired in ("scripts/worktree_sweep.py", "finish.py", "scripts/close.py", "machine:close", "worktrees.ps1", "worktree remove --force"):
             with self.subTest(retired=retired):
                 self.assertNotIn(retired, cleanup)
+
+    def test_plan_pair_retirement_names_declared_sources_before_removal(self):
+        plans = ' '.join(authored_skill('plans').read_text(encoding='utf-8').split())
+        run = ' '.join(authored_skill('workflow:run').read_text(encoding='utf-8').split())
+        for required in ('--artifact', '--retire-source', 'before deleting the goal',
+                         'responsibility aggregate and other evidence remain live'):
+            with self.subTest(required=required):
+                self.assertIn(required, plans)
+        self.assertIn('<workflow-plugin-root>/workflows/completion.py', run)
 
     def test_handoff_does_not_create_a_routine_cleanup_successor(self):
         handoff = " ".join(authored_skill("handoff").read_text(encoding="utf-8").split())

@@ -102,8 +102,129 @@ class TargetedCleanupTests(unittest.TestCase):
         self.assertEqual(first["obligation_id"], second["obligation_id"])
         self.assertEqual(first["launch_token"], second["launch_token"])
 
+    def prepare_next_delivery(self):
+        return TARGETED.prepare(
+            self.primary, self.worktree, 'Fix/Next', 'b' * 40, 43, 'example/test',
+            {'host': 'codex', 'session_id': 's2'}, [], session_close_path='declared-helper.py')
+
+    def test_later_delivery_preserves_a_retained_terminal_obligation(self):
+        path, original = self.prepare(retained=True)
+        next_path, next_obligation = self.prepare_next_delivery()
+        self.assertNotEqual(path, next_path)
+        self.assertEqual(original, TARGETED.load(path))
+        self.assertEqual(original, TARGETED.load(TARGETED.receipt_path(original)))
+        self.assertEqual('pending', next_obligation['state'])
+        with self.assertRaisesRegex(TARGETED.CleanupError, 'unresolved obligation'):
+            TARGETED.prepare(
+                self.primary, self.worktree, 'Fix/Third', 'c' * 40, 44, 'example/test',
+                {'host': 'codex', 'session_id': 's3'})
+
+    def test_later_delivery_reconciles_the_exited_verified_worker(self):
+        path, _ = self.prepare()
+        self.arm(path)
+        original = self.acknowledge_worker(path)
+        original = TARGETED.save(path, original, 'verified', None)
+        self.session_close.states[(original['worker']['pid'], original['worker']['started_at'])] = 'exited'
+        with mock.patch.object(TARGETED, 'load_session_close', return_value=self.session_close) as loader:
+            next_path, next_obligation = self.prepare_next_delivery()
+        loader.assert_called_once_with('declared-helper.py')
+        self.assertNotEqual(path, next_path)
+        self.assertEqual(original, TARGETED.load(path))
+        self.assertEqual(original, TARGETED.load(TARGETED.receipt_path(original)))
+        self.assertEqual('pending', next_obligation['state'])
+
+    def test_later_delivery_never_replaces_an_unresolved_or_unsafe_worker(self):
+        path, original = self.prepare()
+        for state in ('pending', 'running', 'refused', 'timed_out'):
+            with self.subTest(state=state):
+                original = TARGETED.save(path, original, state, 'fixture')
+                with self.assertRaisesRegex(TARGETED.CleanupError, 'unresolved obligation'):
+                    self.prepare_next_delivery()
+                self.assertEqual(original, TARGETED.load(path))
+        self.arm(path)
+        original = self.acknowledge_worker(path)
+        for terminal in ('retained', 'verified'):
+            original = TARGETED.save(path, original, terminal, None)
+            for worker_state in ('live', 'unknown', 'reused'):
+                with self.subTest(terminal=terminal, worker_state=worker_state):
+                    self.session_close.states[(original['worker']['pid'], original['worker']['started_at'])] = worker_state
+                    with mock.patch.object(TARGETED, 'load_session_close', return_value=self.session_close):
+                        with self.assertRaisesRegex(TARGETED.CleanupError, 'not safely reconciled'):
+                            self.prepare_next_delivery()
+                    self.assertEqual(original, TARGETED.load(path))
+        original['worker'] = None
+        TARGETED.save(path, original, 'verified', None)
+        with self.assertRaisesRegex(TARGETED.CleanupError, 'no worker acknowledgement'):
+            self.prepare_next_delivery()
+
+    def test_fast_verified_worker_acknowledges_launch_after_exit(self):
+        path, _ = self.prepare()
+
+        def finish(_script, _arguments, extra=()):
+            obligation = self.acknowledge_worker(path)
+            self.session_close.states[(obligation['worker']['pid'], obligation['worker']['started_at'])] = 'exited'
+            TARGETED.save(path, obligation, 'verified', None)
+
+        self.session_close.start_detached = finish
+        with mock.patch.object(TARGETED, 'load_session_close', return_value=self.session_close):
+            self.assertEqual('verified', TARGETED.launch(path, 'ignored', acknowledgement_timeout=0.1)['state'])
+
+    def test_pending_worker_acknowledgement_requires_exact_live_start(self):
+        path, _ = self.prepare()
+        self.arm(path)
+        obligation = self.acknowledge_worker(path)
+        for worker_state in ('exited', 'unknown', 'reused'):
+            with self.subTest(worker_state=worker_state):
+                self.session_close.states[(obligation['worker']['pid'], obligation['worker']['started_at'])] = worker_state
+                with self.assertRaisesRegex(TARGETED.CleanupError, 'did not acknowledge launch'):
+                    TARGETED.wait_for_worker(path, self.session_close, obligation['launch_token'],
+                                             obligation['identity_sha256'], 0.01)
+
+    def test_fast_worker_failure_is_reported_explicitly(self):
+        path, _ = self.prepare()
+        self.arm(path)
+        obligation = self.acknowledge_worker(path)
+        for terminal in ('refused', 'timed_out'):
+            with self.subTest(terminal=terminal):
+                TARGETED.save(path, obligation, terminal, 'fixture failure')
+                with self.assertRaisesRegex(TARGETED.CleanupError, f'ended with {terminal}: fixture failure'):
+                    TARGETED.wait_for_worker(path, self.session_close, obligation['launch_token'],
+                                             obligation['identity_sha256'], 0.1)
+
+    def test_fast_success_refuses_a_different_token_or_immutable_identity(self):
+        path, _ = self.prepare()
+        self.arm(path)
+        obligation = self.acknowledge_worker(path)
+        TARGETED.save(path, obligation, 'verified', None)
+        for token, identity, message in (
+            ('wrong-token', obligation['identity_sha256'], 'launch token changed'),
+            (obligation['launch_token'], '0' * 64, 'identity changed'),
+        ):
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(TARGETED.CleanupError, message):
+                    TARGETED.wait_for_worker(path, self.session_close, token, identity, 0.1)
+
+    def test_fast_success_receipt_requires_the_pinned_worker_and_launch(self):
+        path, _ = self.prepare()
+        self.arm(path)
+        obligation = self.acknowledge_worker(path)
+        obligation = TARGETED.save(path, obligation, 'verified', None)
+        receipt = dict(obligation)
+        receipt['worker'] = {'pid': 92, 'started_at': 22.0}
+        TARGETED.atomic_json(TARGETED.receipt_path(obligation), receipt)
+        with self.assertRaisesRegex(TARGETED.CleanupError, 'different worker ownership'):
+            TARGETED.wait_for_worker(path, self.session_close, obligation['launch_token'],
+                                     obligation['identity_sha256'], 0.1)
+        receipt = dict(obligation)
+        receipt['launch_token'] = 'other-launch-token'
+        receipt['launch'] = {**receipt['launch'], 'token': receipt['launch_token']}
+        TARGETED.atomic_json(TARGETED.receipt_path(obligation), receipt)
+        with self.assertRaisesRegex(TARGETED.CleanupError, 'launch token changed'):
+            TARGETED.wait_for_worker(path, self.session_close, obligation['launch_token'],
+                                     obligation['identity_sha256'], 0.1)
+
     def test_unknown_lock_file_is_not_deleted(self):
-        path = TARGETED.obligation_path(self.worktree)
+        path = TARGETED.obligation_path(self.worktree, 'a' * 64).parent / TARGETED.target_key(self.worktree)
         path.parent.mkdir(parents=True, exist_ok=True)
         lock = TARGETED.lock_path(path)
         lock.write_text("not-an-identity", encoding="utf-8")
@@ -113,7 +234,7 @@ class TargetedCleanupTests(unittest.TestCase):
         self.assertTrue(lock.is_file())
 
     def test_lock_acquisition_times_out(self):
-        path = TARGETED.obligation_path(self.worktree)
+        path = TARGETED.obligation_path(self.worktree, 'a' * 64)
         fake_msvcrt = types.SimpleNamespace(
             LK_NBLCK=1,
             LK_UNLCK=2,

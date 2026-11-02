@@ -394,8 +394,8 @@ def checkpoint_source(recorded: dict[str, str]) -> dict[str, str]:
 def receipt_source_path(receipt: dict[str, Any], index: int) -> Path:
     original = Path(receipt['sources'][index]['path'])
     checkpoint = receipt['checkpoint']
-    if index == 0 and not original.exists() and checkpoint['retired_goal'] is True:
-        return Path(checkpoint['sources'][0]['path'])
+    if str(original) in checkpoint['retired_sources'] and not original.exists():
+        return Path(checkpoint['sources'][index]['path'])
     return original
 
 
@@ -498,6 +498,10 @@ def receipt_sources_match(receipt: Json) -> tuple[bool, list[dict[str, str]], st
         if not isinstance(recorded, dict) or set(recorded) != {"path", "sha256"}:
             return False, [], "receipt sources are unreadable"
         try:
+            if recorded['path'] in receipt['checkpoint']['retired_sources']:
+                preserved = receipt['checkpoint']['sources'][index]
+                if source(preserved['path'], 'retired source checkpoint') != preserved:
+                    return False, [], 'retired source checkpoint changed'
             observed = source(receipt_source_path(receipt, index), "receipt source")
             observed['path'] = recorded['path']
         except CompletionError as error:
@@ -529,10 +533,21 @@ def load_terminal_receipt(path: str | Path) -> Json:
         if not isinstance(recorded, dict) or set(recorded) != {"path", "sha256"} or not nonempty(recorded["path"]):
             raise CompletionError("terminal acceptance receipt has invalid sources")
     checkpoint = receipt['checkpoint']
-    if (not isinstance(checkpoint, dict) or type(checkpoint.get('retired_goal')) is not bool
+    if (not isinstance(checkpoint, dict)
+            or set(checkpoint) != {'sources', 'retired_sources'}
+            or not isinstance(checkpoint.get('retired_sources'), list)
             or not isinstance(checkpoint.get('sources'), list)
             or len(checkpoint['sources']) != len(receipt['sources'])):
         raise CompletionError('terminal acceptance checkpoint is unreadable')
+    eligible = {
+        recorded['path'] for index, recorded in enumerate(receipt['sources']) if index != 1
+    }
+    retired = checkpoint['retired_sources']
+    if (not all(isinstance(item, str) and item in eligible for item in retired)
+            or len(retired) != len(set(retired))):
+        raise CompletionError(
+            'terminal acceptance checkpoint has invalid retired sources'
+        )
     for original, preserved in zip(receipt['sources'], checkpoint['sources'], strict=True):
         if (not isinstance(preserved, dict) or set(preserved) != {'path', 'sha256'}
                 or not nonempty(preserved.get('path')) or preserved.get('sha256') != original['sha256']
@@ -601,7 +616,9 @@ def _prepare_terminal_acceptance(path: Path, goal: Path, aggregate: Json, source
         "state": "candidate",
         "owner": owner,
         "sources": sources,
-        'checkpoint': {'sources': [checkpoint_source(item) for item in sources], 'retired_goal': False},
+        'checkpoint': {
+            'sources': [checkpoint_source(item) for item in sources], 'retired_sources': [],
+        },
         "aggregate": aggregate,
         "audit": initial_audit(candidate_id, sources),
         "cleanup": cleanup,
@@ -623,6 +640,8 @@ def reserve_terminal_audit(path: str | Path) -> tuple[Json, bool]:
     receipt = load_terminal_receipt(path)
     if receipt['state'] == 'accepted' or receipt['audit'].get('state') == 'passed':
         return receipt, False
+    refresh_terminal_conditions(receipt)
+    save_terminal_receipt(Path(path), receipt)
     if receipt["deterministic"].get("blockers"):
         raise CompletionError("deterministic blockers prevent native audit reservation")
     audit = receipt["audit"]
@@ -681,9 +700,7 @@ def record_terminal_audit(path: str | Path, reservation_id: str, result_path: st
     return save_terminal_receipt(Path(path), receipt)
 
 
-@locked_receipt
-def recheck_terminal_acceptance(path: str | Path) -> Json:
-    receipt = load_terminal_receipt(path)
+def refresh_terminal_conditions(receipt: Json) -> tuple[bool, list[dict[str, str]]]:
     root_value = receipt['deterministic'].get('root')
     valid, sources, reason = receipt_sources_match(receipt)
     blockers: list[str] = [] if valid else [reason or 'terminal acceptance sources are unreadable']
@@ -698,6 +715,17 @@ def recheck_terminal_acceptance(path: str | Path) -> Json:
             blockers, completion = terminal_check(goal_path, root, receipt["bound_delivery"], aggregate)
     else:
         completion = None
+    receipt["deterministic"] = {
+        "blockers": blockers, "completion": completion, 'root': root_value,
+    }
+    return valid, sources
+
+
+@locked_receipt
+def recheck_terminal_acceptance(path: str | Path) -> Json:
+    receipt = load_terminal_receipt(path)
+    _valid, sources = refresh_terminal_conditions(receipt)
+    blockers: list[str] = []
     audit = receipt["audit"]
     if audit.get("state") == "reserved" and not audit.get("native_child_id"):
         audit["state"] = "unknown"
@@ -723,23 +751,38 @@ def recheck_terminal_acceptance(path: str | Path) -> Json:
         blockers.append("native audit has no trusted full-predicate proof")
     if audit.get("state") not in {"passed", "unnecessary"}:
         blockers.append("native audit is not accepted")
-    receipt["deterministic"] = {"blockers": blockers, "completion": completion, 'root': root_value}
-    receipt["state"] = "accepted" if not blockers else "candidate"
+    audit['blockers'] = blockers
+    ready = not blockers and not receipt['deterministic']['blockers']
+    receipt["state"] = "accepted" if ready else "candidate"
     return save_terminal_receipt(Path(path), receipt)
 
 
 @locked_receipt
-def retire_terminal_goal(path: str | Path) -> dict[str, Any]:
+def retire_terminal_goal(
+    path: str | Path, retire_sources: Sequence[str | Path] = (),
+) -> dict[str, Any]:
     receipt = load_terminal_receipt(path)
     if receipt['state'] != 'accepted':
         raise CompletionError('only an accepted goal can be retired')
     valid, _sources, reason = receipt_sources_match(receipt)
     if not valid:
         raise CompletionError(reason)
-    preserved = receipt['checkpoint']['sources'][0]
-    if source(preserved['path'], 'retired goal checkpoint') != preserved:
-        raise CompletionError('retired goal checkpoint changed')
-    receipt['checkpoint']['retired_goal'] = True
+    selected = {receipt['sources'][0]['path']}
+    eligible = {recorded['path'] for recorded in receipt['sources'][2:]}
+    for requested in retire_sources:
+        resolved = resolve_path(requested)
+        if resolved is None or str(resolved) not in eligible:
+            raise CompletionError(
+                'retirement requires an explicitly declared evidence artifact'
+            )
+        selected.add(str(resolved))
+    for index, original in enumerate(receipt['sources']):
+        if original['path'] in selected:
+            preserved = receipt['checkpoint']['sources'][index]
+            if source(preserved['path'], 'retired source checkpoint') != preserved:
+                raise CompletionError('retired source checkpoint changed')
+    retired = set(receipt['checkpoint']['retired_sources']) | selected
+    receipt['checkpoint']['retired_sources'] = sorted(retired)
     atomic_json(Path(path), receipt)
     return receipt
 
@@ -783,6 +826,7 @@ def terminal_parser() -> argparse.ArgumentParser:
     recheck.add_argument("--receipt", required=True)
     retire = commands.add_parser('retire-goal')
     retire.add_argument('--receipt', required=True)
+    retire.add_argument('--retire-source', action='append', default=[])
     return result
 
 
@@ -821,7 +865,7 @@ def terminal_main(argv: list[str]) -> int:
         receipt = record_terminal_audit(path, arguments.reservation_id, arguments.result)
     elif arguments.command == 'retire-goal':
         path = Path(arguments.receipt)
-        receipt = retire_terminal_goal(path)
+        receipt = retire_terminal_goal(path, arguments.retire_source)
     else:
         path = Path(arguments.receipt)
         receipt = recheck_terminal_acceptance(path)

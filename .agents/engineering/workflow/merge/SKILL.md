@@ -264,9 +264,15 @@ Agent package's peer `session_close.py` as the launcher dependency. A repeated p
 a launch without acknowledgement remains pending for explicit reconciliation.
 
 ```text
-python -B <merge-skill>/scripts/targeted_cleanup.py prepare --primary <primary> --worktree <target> --branch <branch> --head <merged-head> --pr <pr> --repository <owner/repo> --owner-host codex --owner-session-id <session> --holder <pid>:<started-at>
+python -B <merge-skill>/scripts/targeted_cleanup.py prepare --primary <primary> --worktree <target> --branch <branch> --head <merged-head> --pr <pr> --repository <owner/repo> --owner-host codex --owner-session-id <session> --holder <pid>:<started-at> --session-close <agent-peer-skill>/scripts/session_close.py
 python -B <merge-skill>/scripts/targeted_cleanup.py launch --obligation <obligation> --session-close <agent-peer-skill>/scripts/session_close.py
 ```
+
+Preparation preserves each delivery's obligation and terminal receipt. A later delivery may reuse the
+target path only after earlier obligations are `retained` or `verified` and every previously launched
+worker is observed exited through the same `--session-close` helper. An unacknowledged, live, or unknown
+worker keeps the earlier obligation in force. Launch acknowledgement also accepts an exact `verified`
+receipt when that worker completed and exited before the first poll.
 
 If plan work remains, reconcile and continue an existing successor stack layer, including its base,
 head, review evidence and delivery binding. When no successor exists, start the next branch from the
