@@ -1,8 +1,8 @@
 {
   "external_skills": {
-    "personal:work-item": "Optional repository-selected personal operation; Core never selects or installs this profile.",
-    "personal:create-work-item": "Optional repository-selected personal operation; Core never selects or installs this profile.",
-    "personal:address-work-item": "Optional repository-selected personal operation; Core never selects or installs this profile.",
+    "github:work-item": "Source-selected neutral GitHub operation; does not adopt Personal for the observing task.",
+    "github:create-work-item": "Source-selected neutral GitHub operation; does not adopt Personal for the observing task.",
+    "github:address-work-item": "Source-selected neutral GitHub operation; does not adopt Personal for the observing task.",
     "infonetica:work-item": "Optional repository-selected infonetica operation; Core never selects or installs this profile.",
     "infonetica:create-work-item": "Optional repository-selected infonetica operation; Core never selects or installs this profile.",
     "infonetica:address-work-item": "Optional repository-selected infonetica operation; Core never selects or installs this profile."

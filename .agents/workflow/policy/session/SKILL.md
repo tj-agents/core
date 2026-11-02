@@ -49,6 +49,17 @@ A: add report export. B: an unrelated terminal-close bug.
 Keep report export active and read Incidental problems before routing B.
 ```
 
+## Work-item progress
+
+At authorized work start and material progress transitions, apply
+[the source's selected work-item policy](../../resources/problem-records.md#work-progress).
+Keep the existing goal and owner while recording the work and maintaining its tracker state.
+
+```text
+A personal feature starts: apply its source policy to reconcile its item and starting board state.
+Its review blocks: preserve the same goal and item, record the blocker, and verify the board update.
+```
+
 ## Preserve one owner through completion
 
 Coordinate with another agent when its verified responsibility needs the information. Before sending,
