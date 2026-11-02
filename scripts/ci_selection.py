@@ -27,6 +27,32 @@ FAMILIES = {
         "sources": {".agents/workflow/workflow/handoff/scripts/transfer.py"},
         "tests": {".agents/hooks/tests/test_handoff_transfer.py"},
     },
+    "terminal-acceptance": {
+        "sources": {
+            ".agents/plugins/runtime-sources.json",
+            ".agents/plugins/sources.json",
+            ".agents/workflow/workflow/run/SKILL.md",
+            ".agents/workflows/completion.py",
+        },
+        "tests": {"tests/test_completion.py"},
+    },
+    "targeted-cleanup": {
+        "sources": {
+            ".agents/engineering/workflow/merge/scripts/targeted_cleanup.py",
+            ".agents/engineering/workflow/merge/scripts/worktree_sweep.py",
+        },
+        "tests": {"tests/test_targeted_cleanup.py"},
+    },
+    "terminal-cleanup-guidance": {
+        "sources": {
+            ".agents/engineering/convention/plans/SKILL.md",
+            ".agents/engineering/policy/merging/SKILL.md",
+            ".agents/engineering/workflow/merge/SKILL.md",
+            ".agents/workflow/policy/session/SKILL.md",
+            ".agents/workflow/workflow/handoff/SKILL.md",
+        },
+        "tests": {"tests/test_process_standards.py"},
+    },
 }
 
 
