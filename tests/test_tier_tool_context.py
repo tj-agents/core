@@ -174,6 +174,43 @@ def test_new_file_uses_nearest_existing_parent_repository(tmp_path: Path) -> Non
     assert selection["repository"] == str(repository)
 
 
+@pytest.mark.parametrize("existing", [True, False])
+def test_file_beside_repositories_does_not_inherit_their_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, existing: bool
+) -> None:
+    repository = _repository(tmp_path / "personal", "personal")
+    (repository / ".agents").mkdir()
+    (repository / ".agents/plugins.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "plugins": ["personal@tj-agents"],
+                "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    declarations = [
+        gate.Declaration(
+            "personal",
+            "tj-agents",
+            {"schema_version": 1, "tier": "personal", "applies": "always"},
+        )
+    ]
+    monkeypatch.setattr(gate, "declarations", lambda project: declarations)
+    target = tmp_path / "notes.txt"
+    if existing:
+        target.write_text("outside the repository", encoding="utf-8")
+
+    assert gate.path_selection(str(tmp_path))["scope_state"] == "personal"
+    selection = gate.path_selection(str(target))
+
+    assert selection["repository"] is None
+    assert selection["scope_state"] == "undetermined"
+    assert selection["applicable"] == []
+    assert selection["repositories"] == []
+
+
 def test_cli_path_output_is_json_and_repeatable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
