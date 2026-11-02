@@ -5,7 +5,9 @@ from pathlib import Path
 HOST_CLI_VARIABLE = "TJ_AGENTS_HOST_CLI"
 
 
-def plugin_inventory_command(binary):
+def plugin_inventory_command(
+    binary: str | Path,
+) -> tuple[list[str], dict[str, str] | None]:
     binary = str(Path(binary).resolve())
     if sys.platform != "win32" or Path(binary).suffix.casefold() not in {
         ".bat",
