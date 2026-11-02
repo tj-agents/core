@@ -95,12 +95,12 @@ class ProblemRecordTests(unittest.TestCase):
             with patch("problem_records.process.run", return_value=subprocess.CompletedProcess([], 1, "", "private details")), self.assertRaisesRegex(RecordError, "could not read"):
                 read_record(self.root, self.reference, "codex")
 
-    def test_personal_selection_implies_the_personal_provider_and_a_declaration_wins(self):
+    def test_personal_selection_implies_the_github_provider_and_a_declaration_wins(self):
         agents = self.root / ".agents"
         agents.mkdir()
         (agents / "plugins.json").write_text(json.dumps({"schema_version": 1, "plugins": ["personal@tj-agents"],
                                                          "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}}), encoding="utf-8")
-        self.assertEqual({"schema_version": 1, "provider": "personal:work-item"}, declaration(self.root))
+        self.assertEqual({"schema_version": 1, "provider": "github:work-item"}, declaration(self.root))
         self.select()
         self.assertEqual("optional:manage", declaration(self.root)["provider"])
         self.selection.unlink()
@@ -114,15 +114,15 @@ class ProblemRecordTests(unittest.TestCase):
         self.assertIsNone(declaration(self.root))
 
     def test_operation_uses_a_work_item_providers_dedicated_skill_and_never_falls_back(self):
-        self.select({"schema_version": 1, "provider": "personal:work-item"})
-        installed = {"personal:create-work-item": self.root / "create" / "SKILL.md", "personal:work-item": self.skill}
+        self.select({"schema_version": 1, "provider": "github:work-item"})
+        installed = {"github:create-work-item": self.root / "create" / "SKILL.md", "github:work-item": self.skill}
         with patch("installed_skills.resolved_skill", side_effect=lambda name, host: (installed[name], "") if name in installed else None):
-            for operation, expected in (("create", "personal:create-work-item"), ("read", "personal:work-item")):
+            for operation, expected in (("create", "github:create-work-item"), ("read", "github:work-item")):
                 with self.subTest(operation=operation):
                     found = operation_skill(self.root, operation, "claude")
-                    self.assertEqual((expected, str(installed[expected]), "personal:work-item", str(self.root)),
+                    self.assertEqual((expected, str(installed[expected]), "github:work-item", str(self.root)),
                                      (found["operation"], found["skill"], found["provider"], found["primary"]))
-            with self.assertRaisesRegex(RecordError, "personal:address-work-item is not installed"):
+            with self.assertRaisesRegex(RecordError, "github:address-work-item is not installed"):
                 operation_skill(self.root, "address", "claude")
         self.select({"schema_version": 1, "provider": "fixture:manage"})
         with patch("installed_skills.resolved_skill", return_value=(self.skill, "")) as resolve:

@@ -101,6 +101,7 @@
     "base@tj-agents": true,
     "cli@tj-agents": true,
     "engineering@tj-agents": true,
+    "github@tj-agents": true,
     "personal@tj-agents": true,
     "python@tj-agents": true,
     "skill@tj-agents": true,
