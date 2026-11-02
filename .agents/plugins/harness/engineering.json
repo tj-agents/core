@@ -29,7 +29,15 @@
       "tj-agents/engineering",
       "tj-agents/workflow"
     ],
-    "hooks": [],
+    "hooks": [
+      {
+        "path": "dependencies/agent/.agents/agent/runtime/managed_admission.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      }
+    ],
     "permissions": {
       "claude_allow": [
         "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
@@ -222,6 +230,9 @@
           }
         ]
       }
+    },
+    "setup": {
+      "script": ".agents/hooks/admission_setup.py"
     }
   }
 }
