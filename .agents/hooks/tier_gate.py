@@ -693,9 +693,16 @@ def workspace_repositories(root: Path | str) -> list[Path]:
         return cache[key]
     children = []
     try:
-        enclosed = any((parent / ".git").exists() or (parent / ".git").is_symlink()
-                       for parent in (root, *root.parents))
-        if not enclosed and _git(root, ["rev-parse", "--is-inside-work-tree"]) is None:
+        enclosed = False
+        for parent in (root, *root.parents):
+            if _git_timeout() <= 0:
+                break
+            if (parent / ".git").exists() or (parent / ".git").is_symlink():
+                enclosed = True
+                break
+        if (not enclosed and _git_timeout() > 0
+                and _git(root, ["rev-parse", "--is-inside-work-tree"]) is None
+                and _git_timeout() > 0):
             with os.scandir(root) as entries:
                 for entry in islice(entries, WORKSPACE_ENTRIES):
                     if _git_timeout() <= 0:
