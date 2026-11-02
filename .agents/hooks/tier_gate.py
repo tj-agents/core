@@ -620,9 +620,10 @@ def _run_git(root, arguments):
             ["git", "-C", str(root), *arguments],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             timeout=timeout,
         )
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, UnicodeError, subprocess.SubprocessError):
         return None
     if completed.returncode != 0:
         return None
@@ -849,6 +850,7 @@ def _ignored(root, paths):
             input="\0".join(paths),
             capture_output=True,
             text=True,
+            encoding="utf-8",
             timeout=timeout,
         )
     except (OSError, subprocess.SubprocessError):
@@ -1466,7 +1468,7 @@ def tool_context(payload: object) -> str:
 
 def _stdin_payload():
     try:
-        value = sys.stdin.read()
+        value = sys.stdin.buffer.read().decode("utf-8-sig")
         return json.loads(value) if value.strip() else {}
     except (OSError, UnicodeError, ValueError):
         return {}

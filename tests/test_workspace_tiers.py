@@ -547,7 +547,12 @@ def test_git_queries_share_one_deadline_and_cache(
     calls = []
 
     def run(
-        arguments: list[str], *, capture_output: bool, text: bool, timeout: float
+        arguments: list[str],
+        *,
+        capture_output: bool,
+        text: bool,
+        encoding: str,
+        timeout: float,
     ) -> subprocess.CompletedProcess[str]:
         nonlocal elapsed
         calls.append((arguments[3:], timeout))
