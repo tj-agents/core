@@ -21,10 +21,15 @@ chain add nothing.
 | Idea | Kind |
 | --- | --- |
 | Messages between parts over time | `sequenceDiagram` |
-| Systems, stores and what flows between them | `flowchart` with numbered, labelled edges |
+| Systems, stores and what flows between them | `flowchart` with numbered edges |
 | States and their transitions | `stateDiagram-v2` |
 
-One idea per diagram: today and after are two diagrams. Label nodes and edges in the reader's words.
+One idea per diagram: today and after are two diagrams.
+
+## Readable at page width
+
+A wide diagram is shrunk to fit and long labels are truncated. Use `flowchart TB` beyond about four nodes,
+keep labels to a few of the reader's words, and put the detail in a table under it keyed to the edge numbers.
 
 ## Colour only for meaning, through `classDef`
 
@@ -42,11 +47,18 @@ Text boxes and arrows break when wrapped, ignore the theme and cannot be edited 
 Keep each diagram as `diagrams/NAME.mmd` beside its page, so a change edits and re-renders the source.
 
 ```mermaid
-flowchart LR
-    W[Order worker]:::ours -->|1. write order and outbox row| DB[(Orders database)]:::ours
-    DB -->|2. relay outbox event| T[[order-created topic]]
-    T -->|3. deliver| B[Billing service]:::theirs
-    B -->|4. store invoice| IDB[(Billing database)]:::theirs
+flowchart TB
+    W[Order worker]:::ours -->|1| DB[(Orders database)]:::ours
+    DB -->|2| T[[order-created topic]]
+    T -->|3| B[Billing service]:::theirs
+    B -->|4| IDB[(Billing database)]:::theirs
     classDef ours fill:#1F6FEB,stroke:#0B3D91,color:#FFFFFF
     classDef theirs fill:#F2CC60,stroke:#9A6700,color:#1F2328
 ```
+
+| # | What moves |
+| --- | --- |
+| 1 | The worker writes the order and its outbox row in one transaction |
+| 2 | The relay publishes the outbox row as an event |
+| 3 | The topic delivers the event to billing |
+| 4 | Billing stores the invoice |
