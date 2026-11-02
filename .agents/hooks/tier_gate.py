@@ -999,7 +999,7 @@ def _assess(root, found=None, facts=None, contexts=None):
     if not Path(root).is_dir():
         anchor = _existing_path(Path(root))
         boundary, error = _repository_boundary(anchor)
-        inventory = WorkspaceInventory([boundary] if boundary else (), error is None, error)
+        inventory = workspace_repositories(boundary) if boundary else WorkspaceInventory((), error is None, error)
         return _assess_one(boundary or anchor, found, facts, contexts, inventory=inventory)
     inventory = workspace_repositories(root)
     if not inventory.complete:
@@ -1087,7 +1087,7 @@ def _assess_one(root, found=None, facts=None, contexts=None, inventory=None):
     employer_declarations = [declaration for declaration in found
                              if declaration.employer is not None and not problems_by_id[declaration.id]]
     for declaration in employer_declarations:
-        result = _evaluate_predicate(root, declaration.detect, facts, contexts)
+        result = _evaluate_predicate(root, declaration.detect, facts, contexts) if inventory else PredicateResult(root)
         employer_predicates[declaration.id] = result
         if result.matched:
             employers.append((declaration, result))
