@@ -1,9 +1,8 @@
-import contextlib
 import importlib.util
 import json
 import os
 import subprocess
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
 
@@ -25,6 +24,7 @@ EMPLOYER = {
     "detect": {"all": [{"remote_host": "example.test"}, {"remote": "^employer-a/"}]},
     "employer": {"context_skill": "communication-context"},
 }
+PERSONAL = {"schema_version": 1, "tier": "personal", "applies": "always"}
 
 
 def _load_gate() -> ModuleType:
@@ -40,8 +40,10 @@ def _load_gate() -> ModuleType:
 gate = _load_gate()
 
 
-def _install_payload(cache: Path, plugin: str, data: dict[str, object]) -> Path:
-    payload = cache / "test-market" / plugin / "1"
+def _install_payload(
+    cache: Path, plugin: str, data: dict[str, object], marketplace: str = "test-market"
+) -> Path:
+    payload = cache / marketplace / plugin / "1"
     skill = payload / "skills/communication-context"
     skill.mkdir(parents=True, exist_ok=True)
     (skill / "SKILL.md").write_text(
@@ -55,7 +57,7 @@ def _install_payload(cache: Path, plugin: str, data: dict[str, object]) -> Path:
         if registry_path.exists()
         else {"plugins": {}}
     )
-    registry["plugins"][plugin + "@test-market"] = [{"installPath": str(payload)}]
+    registry["plugins"][plugin + "@" + marketplace] = [{"installPath": str(payload)}]
     registry_path.write_text(json.dumps(registry), encoding="utf-8")
     return payload
 
@@ -78,6 +80,17 @@ def _repository(path: Path, url: str) -> Path:
     return path
 
 
+def _adopt_personal(root: Path) -> None:
+    selection = {
+        "schema_version": 1,
+        "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}},
+        "plugins": ["personal@tj-agents"],
+    }
+    path = root / ".agents/plugins.json"
+    path.parent.mkdir()
+    path.write_text(json.dumps(selection), encoding="utf-8")
+
+
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
     path = tmp_path / "project"
@@ -93,77 +106,397 @@ def cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return path
 
 
-def test_folder_of_employer_repositories_applies_employer_and_work(
+def _found(cache: Path, project: Path) -> list[object]:
+    return list(gate.declarations([cache], project=project))
+
+
+def test_complete_all_work_folder_applies_only_common_employer_context(
     project: Path, cache: Path
 ) -> None:
     employer = _install_payload(cache, "employer-a", EMPLOYER)
-    _repository(project / "personal-tool", "git@example.test:personal/tool.git")
-    child = _repository(
-        project / "service 東京", "git@example.test:employer-a/service.git"
+    first = _repository(
+        project / "services" / "first", "git@example.test:employer-a/first.git"
     )
-    (project / "service.worktrees").mkdir()
-    found = list(gate.declarations([cache], project=project))
+    _repository(
+        project / "services" / "second", "git@example.test:employer-a/second.git"
+    )
 
-    result = gate.assess(project, found)
+    result = gate.assess(project, _found(cache, project))
 
     assert {item.plugin for item, _ in result.applicable} == {"work", "employer-a"}
-    selection = next(
-        item
-        for item in result.selections
-        if item["plugin_id"] == "employer-a@test-market"
-    )
-    assert selection["scope"] == str(child)
-    context = gate.statement(project, found)
+    assert result.inventory.complete
+    assert result.scope_state == "work"
+    assert set(result.inventory) == {first, project / "services" / "second"}
+    context = gate.statement(project, _found(cache, project))
     assert WORK["session_context"] in context
     assert (
         str((employer / "skills/communication-context/SKILL.md").resolve()) in context
     )
 
 
-def test_workspace_host_and_owner_must_match_the_same_repository(
+def test_complete_all_personal_folder_requires_each_repository_to_adopt(
+    project: Path, cache: Path
+) -> None:
+    _install_payload(cache, "personal", PERSONAL, marketplace="tj-agents")
+    first = _repository(project / "one", "git@example.test:personal/one.git")
+    second = _repository(project / "two", "git@example.test:personal/two.git")
+    _adopt_personal(first)
+    _adopt_personal(second)
+
+    result = gate.assess(project, _found(cache, project))
+
+    assert [item.plugin for item, _ in result.applicable] == ["personal"]
+    assert [item.plugin for item in result.ubiquitous] == []
+    assert result.scope_state == "personal"
+
+
+def test_mixed_folder_does_not_apply_work_or_personal_to_every_repository(
+    project: Path, cache: Path
+) -> None:
+    _install_payload(cache, "employer-a", EMPLOYER)
+    _install_payload(cache, "personal", PERSONAL, marketplace="tj-agents")
+    _repository(project / "work", "git@example.test:employer-a/service.git")
+    personal = _repository(project / "personal", "git@example.test:personal/tool.git")
+    _adopt_personal(personal)
+
+    result = gate.assess(project, _found(cache, project))
+    context = gate.statement(project, _found(cache, project))
+
+    assert {item.plugin for item, _ in result.applicable}.isdisjoint(
+        {"work", "employer-a", "personal"}
+    )
+    assert result.scope_state == "mixed"
+    assert "Organizational scope is mixed" in context
+    assert "Work or Personal standards" in context
+
+
+def test_personal_adoption_conflicts_with_employer_evidence(
+    project: Path, cache: Path
+) -> None:
+    _install_payload(cache, "employer-a", EMPLOYER)
+    _install_payload(cache, "personal", PERSONAL, marketplace="tj-agents")
+    repository = _repository(project, "git@example.test:employer-a/service.git")
+    _adopt_personal(repository)
+
+    result = gate.assess(project, _found(cache, project))
+
+    assert {item.plugin for item, _ in result.applicable}.isdisjoint(
+        {"work", "employer-a", "personal"}
+    )
+    assert result.scope_state == "undetermined"
+    personal = next(
+        item for item in result.selections if item["plugin_id"] == "personal@tj-agents"
+    )
+    assert personal["diagnostics"][0]["code"] == "organizational-scope-conflict"
+
+
+def test_over_repository_limit_is_undetermined_not_non_work(
+    project: Path, cache: Path
+) -> None:
+    _install_payload(cache, "employer-a", EMPLOYER)
+    for index in range(gate.WORKSPACE_REPOSITORIES + 1):
+        (project / f"repository-{index:03}" / ".git").mkdir(parents=True)
+
+    result = gate.assess(project, _found(cache, project))
+
+    assert not result.inventory.complete
+    assert result.inventory.reason == "repository limit reached"
+    assert result.scope_state == "undetermined"
+    assert {item.plugin for item, _ in result.applicable}.isdisjoint(
+        {"work", "employer-a"}
+    )
+    assert any(
+        problem["code"] == "incomplete-workspace-inventory"
+        for problem in result.diagnostics
+    )
+
+
+def test_nested_wrappers_are_scanned_until_a_repository_boundary(
+    project: Path, cache: Path
+) -> None:
+    _install_payload(cache, "employer-a", EMPLOYER)
+    child = _repository(
+        project / "wrappers" / "team" / "service",
+        "git@example.test:employer-a/service.git",
+    )
+    nested = _repository(child / "nested", "git@example.test:personal/nested.git")
+
+    result = gate.assess(project, _found(cache, project))
+
+    assert set(result.inventory) == {child}
+    assert nested not in result.inventory
+    assert {item.plugin for item, _ in result.applicable} == {"work", "employer-a"}
+
+
+def test_repository_subdirectory_cannot_borrow_nested_employer_remote(
+    project: Path, cache: Path
+) -> None:
+    _install_payload(cache, "employer-a", EMPLOYER)
+    _repository(project, "git@example.test:personal/project.git")
+    scope = project / "workspace"
+    _repository(scope / "vendored", "git@example.test:employer-a/service.git")
+
+    result = gate.assess(scope, _found(cache, scope))
+
+    assert result.applicable == []
+
+
+def test_employer_predicate_keeps_host_and_repository_identity_in_one_repository(
     project: Path, cache: Path
 ) -> None:
     _install_payload(cache, "employer-a", EMPLOYER)
     _repository(project / "wrong-host", "git@other.test:employer-a/service.git")
-    _repository(project / "personal-tool", "git@example.test:personal/tool.git")
+    _repository(project / "wrong-owner", "git@example.test:personal/tool.git")
 
-    result = gate.assess(project, gate.declarations([cache], project=project))
-
-    assert result.applicable == []
-
-
-@pytest.mark.parametrize("relative_scope", [".", "workspace"])
-def test_repository_and_subdirectory_never_borrow_a_nested_employer_remote(
-    project: Path, cache: Path, relative_scope: str
-) -> None:
-    _install_payload(cache, "employer-a", EMPLOYER)
-    _repository(project, "git@example.test:personal/project.git")
-    scope = project / relative_scope
-    _repository(scope / "vendored", "git@example.test:employer-a/service.git")
-
-    result = gate.assess(scope, gate.declarations([cache], project=scope))
+    result = gate.assess(project, _found(cache, project))
 
     assert result.applicable == []
 
 
-def test_workspace_predicate_cannot_combine_a_root_marker_with_a_child_remote(
+def test_composite_employer_predicate_uses_each_repositorys_own_facts(
     project: Path, cache: Path
 ) -> None:
-    predicate = {"all": [{"file": "marker"}, {"remote": "^employer-a/"}]}
-    _install_payload(cache, "employer-a", dict(EMPLOYER, detect=predicate))
+    _install_payload(cache, "employer-a", EMPLOYER)
+    _install_payload(
+        cache,
+        "combined",
+        dict(
+            WORK,
+            tier="combined",
+            detect={"all": [{"fact": "employer"}, {"remote": "^employer-a/"}]},
+        ),
+    )
+    _repository(project / "first", "git@example.test:employer-a/first.git")
+    _repository(project / "second", "git@example.test:employer-a/second.git")
+
+    result = gate.assess(project, _found(cache, project))
+
+    assert {item.plugin for item, _ in result.applicable} == {
+        "work",
+        "employer-a",
+        "combined",
+    }
+
+
+def test_non_git_project_keeps_its_own_technical_marker_without_organizational_scope(
+    project: Path, cache: Path
+) -> None:
+    _install_payload(
+        cache,
+        "python",
+        {
+            "schema_version": 1,
+            "tier": "python",
+            "applies": "stack-present",
+            "detect": {"files": ["pyproject.toml"]},
+        },
+    )
+    (project / "pyproject.toml").write_text(
+        "[project]\nname='test'\n", encoding="utf-8"
+    )
+
+    result = gate.assess(project, _found(cache, project))
+
+    assert [item.plugin for item, _ in result.applicable] == ["python"]
+    assert result.scope_state == "undetermined"
+
+
+def test_repeated_assessments_re_read_changed_adoption_without_sticky_scope(
+    project: Path, cache: Path
+) -> None:
+    _install_payload(cache, "personal", PERSONAL, marketplace="tj-agents")
+    _repository(project, "git@example.test:personal/project.git")
+
+    assert [
+        item.plugin
+        for item, _ in gate.assess(project, _found(cache, project)).applicable
+    ] == []
+    _adopt_personal(project)
+    assert [
+        item.plugin
+        for item, _ in gate.assess(project, _found(cache, project)).applicable
+    ] == ["personal"]
+
+
+def test_workspace_inventory_marks_unreadable_frontiers_incomplete(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = os.scandir
+
+    def scan(path: Path) -> Iterator[os.DirEntry[str]]:
+        if Path(path) == project / "blocked":
+            raise PermissionError(path)
+        return original(path)
+
+    (project / "blocked").mkdir()
+    monkeypatch.setattr(gate.os, "scandir", scan)
+
+    result = gate.assess(project, [])
+
+    assert not result.inventory.complete
+    assert result.inventory.reason == "directory could not be read"
+
+
+def test_known_work_and_unknown_repository_remain_undetermined(
+    project: Path, cache: Path
+) -> None:
+    _install_payload(cache, "employer-a", EMPLOYER)
+    _repository(project / "work", "git@example.test:employer-a/service.git")
+    _repository(project / "unknown", "git@example.test:personal/tool.git")
+
+    result = gate.assess(project, _found(cache, project))
+
+    assert result.scope_state == "undetermined"
+    assert not result.applicable
+
+
+def test_different_employers_share_work_but_not_employer_context(
+    project: Path, cache: Path
+) -> None:
+    _install_payload(cache, "employer-a", EMPLOYER)
+    _install_payload(
+        cache,
+        "employer-b",
+        dict(EMPLOYER, tier="employer-b", detect={"remote": "^employer-b/"}),
+    )
+    _repository(project / "one", "git@example.test:employer-a/service.git")
+    _repository(project / "two", "git@example.test:employer-b/service.git")
+
+    result = gate.assess(project, _found(cache, project))
+
+    assert result.scope_state == "work"
+    assert [item.plugin for item, _ in result.applicable] == ["work"]
+    assert result.employers == ()
+
+
+def test_adoption_establishes_scope_even_without_installed_personal(
+    project: Path, cache: Path
+) -> None:
+    _repository(project, "git@example.test:personal/tool.git")
+    _adopt_personal(project)
+
+    assert gate.assess(project, _found(cache, project)).scope_state == "personal"
+    _install_payload(cache, "employer-a", EMPLOYER)
+    _git(
+        project,
+        "config",
+        "remote.origin.url",
+        "git@example.test:employer-a/service.git",
+    )
+    result = gate.assess(project, _found(cache, project))
+    assert result.scope_state == "undetermined"
+    assert not result.applicable
+
+
+@pytest.mark.parametrize("schema", [True, "1", 2])
+def test_invalid_personal_adoption_cannot_establish_scope(
+    project: Path, cache: Path, schema: object
+) -> None:
+    _install_payload(cache, "personal", PERSONAL, marketplace="tj-agents")
+    _repository(project, "git@example.test:personal/tool.git")
+    _adopt_personal(project)
+    path = project / ".agents/plugins.json"
+    selection = json.loads(path.read_text(encoding="utf-8"))
+    selection["schema_version"] = schema
+    path.write_text(json.dumps(selection), encoding="utf-8")
+
+    result = gate.assess(project, _found(cache, project))
+
+    assert result.scope_state == "undetermined"
+    assert not result.applicable
+    assert result.diagnostics[0]["code"] == "invalid-repository-adoption"
+
+
+def test_project_installation_is_selected_for_each_child(
+    project: Path, cache: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = _repository(project / "one", "git@example.test:employer-a/first.git")
+    second = _repository(project / "two", "git@example.test:employer-a/second.git")
+    payload = _install_payload(cache, "employer-a", EMPLOYER)
+    registry_path = cache.parent / "installed_plugins.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["plugins"]["employer-a@test-market"][0]["projectPath"] = str(first)
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    monkeypatch.setattr(gate, "cache_roots", lambda: [cache])
+
+    result = gate.assess(project)
+
+    assert payload.exists()
+    assert result.scope_state == "undetermined"
+    assert {item.scope: item.scope_state for item in result.repository_results} == {
+        str(first): "work",
+        str(second): "unclassified",
+    }
+    assert not result.applicable
+
+
+@pytest.mark.parametrize("scope", ["folder", "repository", "subdirectory"])
+def test_corrupt_repository_boundary_is_undetermined(
+    project: Path, cache: Path, scope: str
+) -> None:
+    _install_payload(cache, "employer-a", EMPLOYER)
+    child = _repository(project / "broken", "git@example.test:employer-a/service.git")
+    nested = _repository(child / "nested", "git@example.test:employer-a/nested.git")
+    (child / ".git/config").write_text("[broken\n", encoding="utf-8")
+    directory = child / "src"
+    directory.mkdir()
+
+    result = gate.assess(
+        {"folder": project, "repository": child, "subdirectory": directory}[scope],
+        _found(cache, project),
+    )
+
+    assert result.scope_state == "undetermined"
+    assert not result.applicable
+    assert nested not in result.inventory
+
+
+def test_folder_marker_cannot_combine_with_child_remote(
+    project: Path, cache: Path
+) -> None:
+    _install_payload(
+        cache,
+        "employer-a",
+        dict(
+            EMPLOYER, detect={"all": [{"file": "marker"}, {"remote": "^employer-a/"}]}
+        ),
+    )
     (project / "marker").touch()
     child = _repository(project / "service", "git@example.test:employer-a/service.git")
-    found = list(gate.declarations([cache], project=project))
-
-    assert gate.assess(project, found).applicable == []
-
+    assert not gate.assess(project, _found(cache, project)).applicable
     (child / "marker").touch()
-    result = gate.assess(project, found)
-
-    assert {item.plugin for item, _ in result.applicable} == {"work", "employer-a"}
+    assert gate.assess(project, _found(cache, project)).scope_state == "work"
 
 
-def test_workspace_detects_a_linked_worktree(project: Path, cache: Path) -> None:
+@pytest.mark.parametrize(
+    "detect",
+    [
+        {"files": ["nested/marker.py"]},
+        {"globs": ["*.py"]},
+        {"content": [{"glob": "*.py", "pattern": "marker"}]},
+    ],
+)
+def test_nested_git_markers_do_not_establish_outer_technical_tiers(
+    project: Path, cache: Path, detect: dict[str, object]
+) -> None:
+    _repository(project, "git@example.test:personal/tool.git")
+    nested = _repository(project / "nested", "git@example.test:personal/nested.git")
+    (nested / "marker.py").write_text("marker", encoding="utf-8")
+    _install_payload(
+        cache,
+        "technical",
+        {
+            "schema_version": 1,
+            "tier": "technical",
+            "applies": "stack-present",
+            "detect": detect,
+        },
+    )
+
+    assert not gate.assess(project, _found(cache, project)).applicable
+
+
+def test_linked_worktree_is_a_repository_boundary(project: Path, cache: Path) -> None:
     _install_payload(cache, "employer-a", EMPLOYER)
     source = _repository(project / "source", "git@example.test:employer-a/service.git")
     _git(
@@ -184,326 +517,100 @@ def test_workspace_detects_a_linked_worktree(project: Path, cache: Path) -> None
     workspace.mkdir()
     child = workspace / "service"
     _git(source, "worktree", "add", "--quiet", "--detach", str(child))
-    assert (child / ".git").is_file()
 
-    result = gate.assess(workspace, gate.declarations([cache], project=workspace))
+    result = gate.assess(workspace, _found(cache, workspace))
 
-    selection = next(
-        item
-        for item in result.selections
-        if item["plugin_id"] == "employer-a@test-market"
-    )
-    assert selection["matched"]
-    assert selection["scope"] == str(child)
+    assert result.scope_state == "work"
+    assert result.inventory == [child]
 
 
-@pytest.mark.parametrize("schema_version", [1, 2])
-def test_legacy_remote_declarations_detect_workspace_repositories(
-    project: Path, cache: Path, schema_version: int
-) -> None:
-    _install_payload(
-        cache,
-        "legacy",
-        {
-            "schema_version": schema_version,
-            "tier": "legacy",
-            "applies": "stack-present",
-            "detect": {"remote": ["^employer-a/"]},
-        },
-    )
-    _repository(project / "service", "git@example.test:employer-a/service.git")
-
-    result = gate.assess(project, gate.declarations([cache], project=project))
-
-    assert [item.plugin for item, _ in result.applicable] == ["legacy"]
-
-
-def test_workspace_employer_fact_cannot_borrow_evidence_from_a_sibling(
-    project: Path, cache: Path
-) -> None:
-    _install_payload(cache, "employer-a", EMPLOYER)
-    _install_payload(
-        cache,
-        "combined",
-        dict(
-            WORK,
-            tier="combined",
-            detect={"all": [{"fact": "employer"}, {"remote": "^personal/"}]},
-        ),
-    )
-    _repository(project / "a-employer", "git@example.test:employer-a/service.git")
-    _repository(project / "b-personal", "git@example.test:personal/tool.git")
-
-    result = gate.assess(project, gate.declarations([cache], project=project))
-
-    assert {item.plugin for item, _ in result.applicable} == {"work", "employer-a"}
-    selection = next(
-        item
-        for item in result.selections
-        if item["plugin_id"] == "combined@test-market"
-    )
-    assert not selection["matched"]
-
-
-def test_workspace_composite_uses_the_second_matching_childs_own_employer_evidence(
-    project: Path, cache: Path
-) -> None:
-    _install_payload(cache, "employer-a", EMPLOYER)
-    _install_payload(
-        cache,
-        "combined",
-        dict(
-            WORK,
-            tier="combined",
-            detect={"all": [{"fact": "employer"}, {"remote": "^employer-a/second$"}]},
-        ),
-    )
-    _repository(project / "a-first", "git@example.test:employer-a/first.git")
-    second = _repository(project / "z-second", "git@example.test:employer-a/second.git")
-
-    result = gate.assess(project, gate.declarations([cache], project=project))
-
-    assert {item.plugin for item, _ in result.applicable} == {
-        "work",
-        "employer-a",
-        "combined",
-    }
-    selection = next(
-        item
-        for item in result.selections
-        if item["plugin_id"] == "combined@test-market"
-    )
-    assert selection["matched"]
-    assert selection["scope"] == str(second)
-    assert selection["evidence"] == (
-        "employer-a@test-market: origin host example.test",
-        "employer-a@test-market: origin employer-a/second",
-        "origin employer-a/second",
-    )
-
-
-@pytest.mark.parametrize("relative_scope", [".", "workspace"])
-def test_failed_parent_git_probe_does_not_allow_a_nested_employer_remote(
-    project: Path, cache: Path, relative_scope: str
-) -> None:
-    _install_payload(cache, "employer-a", EMPLOYER)
-    _repository(project, "git@example.test:personal/project.git")
-    scope = project / relative_scope
-    _repository(scope / "vendored", "git@example.test:employer-a/service.git")
-    (project / ".git/config").write_text("[broken\n", encoding="utf-8")
-    probe = subprocess.run(
-        ["git", "-C", str(scope), "rev-parse", "--is-inside-work-tree"],
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=10,
-    )
-    assert probe.returncode != 0
-
-    result = gate.assess(scope, gate.declarations([cache], project=scope))
-
-    assert result.applicable == []
-
-
-def test_workspace_repository_discovery_and_remote_queries_are_bounded_and_cached(
-    project: Path, cache: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _install_payload(cache, "employer-a", EMPLOYER)
-    _install_payload(cache, "employer-b", dict(EMPLOYER, tier="employer-b"))
-    for index in range(gate.WORKSPACE_REPOSITORIES + 5):
-        (project / f"repository-{index:03}" / ".git").mkdir(parents=True)
-    found = list(gate.declarations([cache], project=project))
-    calls: list[tuple[Path, tuple[str, ...]]] = []
-    scans: list[Path] = []
-    visited: list[str] = []
-    scandir = os.scandir
-
-    def git(root: Path, arguments: Sequence[str]) -> None:
-        calls.append((root, tuple(arguments)))
-
-    def entries(source: Iterator[os.DirEntry[str]]) -> Iterator[os.DirEntry[str]]:
-        for entry in source:
-            visited.append(entry.name)
-            yield entry
-
-    @contextlib.contextmanager
-    def scan(path: Path) -> Iterator[Iterator[os.DirEntry[str]]]:
-        scans.append(path)
-        with scandir(path) as source:
-            yield entries(source)
-
-    def monotonic() -> float:
-        return 0.0
-
-    monkeypatch.setattr(gate, "_run_git", git)
-    monkeypatch.setattr(gate.os, "scandir", scan)
-    monkeypatch.setattr(gate.time, "monotonic", monotonic)
-
-    assert gate.assess(project, found).applicable == []
-
-    assert scans == [project]
-    assert len(visited) == gate.WORKSPACE_REPOSITORIES
-    assert len(calls) == gate.WORKSPACE_REPOSITORIES + 2
-    assert len(set(calls)) == len(calls)
-
-
-def test_workspace_directory_enumeration_stops_at_the_entry_limit_and_is_cached(
-    project: Path, cache: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _install_payload(cache, "employer-a", EMPLOYER)
-    _install_payload(cache, "employer-b", dict(EMPLOYER, tier="employer-b"))
-    (project / "ordinary-directory").mkdir()
-    found = list(gate.declarations([cache], project=project))
-    scans: list[Path] = []
-    visited: list[int] = []
-    scandir = os.scandir
-
-    def entries(entry: os.DirEntry[str]) -> Iterator[os.DirEntry[str]]:
-        for index in range(gate.WORKSPACE_ENTRIES + 5):
-            visited.append(index)
-            yield entry
-
-    @contextlib.contextmanager
-    def scan(path: Path) -> Iterator[Iterator[os.DirEntry[str]]]:
-        scans.append(path)
-        with scandir(path) as source:
-            yield entries(next(source))
-
-    def git(root: Path, arguments: Sequence[str]) -> None:
-        return None
-
-    def monotonic() -> float:
-        return 0.0
-
-    monkeypatch.setattr(gate, "_run_git", git)
-    monkeypatch.setattr(gate.os, "scandir", scan)
-    monkeypatch.setattr(gate.time, "monotonic", monotonic)
-
-    assert gate.assess(project, found).applicable == []
-
-    assert scans == [project]
-    assert len(visited) == gate.WORKSPACE_ENTRIES
-
-
-def test_workspace_directory_enumeration_stops_when_the_assessment_budget_expires(
-    project: Path, cache: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _install_payload(cache, "employer-a", EMPLOYER)
-    _install_payload(cache, "employer-b", dict(EMPLOYER, tier="employer-b"))
-    (project / "ordinary-directory").mkdir()
-    found = list(gate.declarations([cache], project=project))
-    scans: list[Path] = []
-    visited: list[int] = []
-    elapsed = 0.0
-    scandir = os.scandir
-
-    def entries(entry: os.DirEntry[str]) -> Iterator[os.DirEntry[str]]:
-        nonlocal elapsed
-        for index in range(gate.WORKSPACE_ENTRIES + 5):
-            elapsed += 1
-            visited.append(index)
-            yield entry
-
-    @contextlib.contextmanager
-    def scan(path: Path) -> Iterator[Iterator[os.DirEntry[str]]]:
-        scans.append(path)
-        with scandir(path) as source:
-            yield entries(next(source))
-
-    def git(root: Path, arguments: Sequence[str]) -> None:
-        return None
-
-    def monotonic() -> float:
-        return elapsed
-
-    monkeypatch.setattr(gate, "_run_git", git)
-    monkeypatch.setattr(gate.os, "scandir", scan)
-    monkeypatch.setattr(gate.time, "monotonic", monotonic)
-
-    assert gate.assess(project, found).applicable == []
-
-    assert scans == [project]
-    assert len(visited) == gate.GIT_TIMEOUT
-    assert elapsed == gate.GIT_TIMEOUT
-    assert gate.GIT_DEADLINE.get() is None
-
-
-def test_workspace_ancestor_discovery_stops_when_the_assessment_budget_expires(
+def test_entry_limit_never_produces_a_negative_scope(
     project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    root = project.joinpath(*(f"level-{index}" for index in range(20)))
-    elapsed = 0.0
-    probes: list[Path] = []
+    for index in range(4):
+        (project / str(index)).touch()
+    monkeypatch.setattr(gate, "WORKSPACE_ENTRIES", 3)
 
-    def resolve(path: Path) -> Path:
-        return path
+    result = gate.assess(project, [])
 
-    def lstat(path: Path) -> os.stat_result:
-        nonlocal elapsed
-        assert elapsed < gate.GIT_TIMEOUT
-        probes.append(path)
-        elapsed += 1
-        raise FileNotFoundError(path)
-
-    def monotonic() -> float:
-        return elapsed
-
-    def git(root: Path, arguments: Sequence[str]) -> None:
-        pytest.fail("Git must not run after ancestor discovery exhausts the budget")
-
-    def scandir(path: Path) -> None:
-        pytest.fail("Directory enumeration must not start after the budget expires")
-
-    with monkeypatch.context() as scoped:
-        scoped.setattr(gate.Path, "resolve", resolve)
-        scoped.setattr(gate.Path, "lstat", lstat)
-        scoped.setattr(gate.time, "monotonic", monotonic)
-        scoped.setattr(gate, "_run_git", git)
-        scoped.setattr(gate.os, "scandir", scandir)
-        deadline = gate.GIT_DEADLINE.set(gate.GIT_TIMEOUT)
-        try:
-            assert gate.workspace_repositories(root) == []
-        finally:
-            gate.GIT_DEADLINE.reset(deadline)
-
-    assert len(probes) == gate.GIT_TIMEOUT
-    assert elapsed == gate.GIT_TIMEOUT
+    assert result.scope_state == "undetermined"
+    assert not result.inventory.complete
+    assert result.inventory.reason == "directory entry limit reached"
 
 
-def test_git_timeouts_share_one_assessment_budget(
+def test_git_queries_share_one_deadline_and_cache(
     project: Path, cache: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _install_payload(cache, "employer-a", EMPLOYER)
-    for name in ("first", "second"):
-        (project / name / ".git").mkdir(parents=True)
-    found = list(gate.declarations([cache], project=project))
+    _repository(project, "git@example.test:employer-a/service.git")
     elapsed = 0.0
-    timeouts: list[float] = []
+    calls = []
 
     def run(
-        arguments: list[str],
-        *,
-        capture_output: bool,
-        text: bool,
-        timeout: float,
+        arguments: list[str], *, capture_output: bool, text: bool, timeout: float
     ) -> subprocess.CompletedProcess[str]:
         nonlocal elapsed
-        timeouts.append(timeout)
-        if len(timeouts) < 3:
+        calls.append((arguments[3:], timeout))
+        if arguments[3] == "rev-parse":
             elapsed += 1
-            return subprocess.CompletedProcess(arguments, 1, stdout="")
+            return subprocess.CompletedProcess(arguments, 0, stdout=str(project))
         elapsed += timeout
         raise subprocess.TimeoutExpired(arguments, timeout)
 
-    def monotonic() -> float:
-        return elapsed
-
-    monkeypatch.setattr(gate.time, "monotonic", monotonic)
+    monkeypatch.setattr(gate.time, "monotonic", lambda: elapsed)
     monkeypatch.setattr(gate.process, "run", run)
+    result = gate.assess(project, _found(cache, project))
 
-    assert gate.assess(project, found).applicable == []
-
-    assert timeouts == [gate.GIT_TIMEOUT, gate.GIT_TIMEOUT - 1, gate.GIT_TIMEOUT - 2]
-    assert elapsed == gate.GIT_TIMEOUT
+    assert result.scope_state == "undetermined"
+    assert not result.inventory.complete
+    assert [timeout for _, timeout in calls] == [gate.GIT_TIMEOUT, gate.GIT_TIMEOUT - 1]
     assert gate.GIT_DEADLINE.get() is None
+
+
+def _directory_link(link: Path, target: Path) -> None:
+    if os.name == "nt":
+        subprocess.run(
+            ["cmd.exe", "/d", "/c", "mklink", "/J", str(link), str(target)],
+            check=True,
+            capture_output=True,
+            timeout=10,
+        )
+    else:
+        link.symlink_to(target, target_is_directory=True)
+
+
+def test_directory_links_are_deduplicated_without_escaping_workspace(
+    project: Path,
+    tmp_path: Path,
+    cache: Path,
+) -> None:
+    _install_payload(cache, "employer-a", EMPLOYER)
+    child = _repository(project / "service", "git@example.test:employer-a/service.git")
+    _directory_link(project / "alias", child)
+    result = gate.assess(project, _found(cache, project))
+    assert result.inventory == [child]
+    assert result.scope_state == "work"
+
+    outside = _repository(tmp_path / "outside", "git@example.test:personal/tool.git")
+    _directory_link(project / "outside-link", outside)
+    result = gate.assess(project, _found(cache, project))
+    assert not result.inventory.complete
+    assert result.scope_state == "undetermined"
+    assert not result.applicable
+
+
+def test_personal_adoption_cannot_be_borrowed_through_directory_link(
+    project: Path,
+    tmp_path: Path,
+    cache: Path,
+) -> None:
+    _install_payload(cache, "personal", PERSONAL, marketplace="tj-agents")
+    _repository(project, "git@example.test:personal/tool.git")
+    outside = _repository(tmp_path / "outside", "git@example.test:personal/outside.git")
+    _adopt_personal(outside)
+    _directory_link(project / ".agents", outside / ".agents")
+
+    result = gate.assess(project, _found(cache, project))
+
+    assert result.scope_state == "undetermined"
+    assert not result.applicable
