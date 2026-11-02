@@ -430,6 +430,51 @@ def test_workspace_directory_enumeration_stops_when_the_assessment_budget_expire
     assert gate.GIT_DEADLINE.get() is None
 
 
+def test_workspace_ancestor_discovery_stops_when_the_assessment_budget_expires(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = project.joinpath(*(f"level-{index}" for index in range(20)))
+    elapsed = 0.0
+    probes: list[Path] = []
+
+    def resolve(path: Path) -> Path:
+        return path
+
+    def exists(path: Path) -> bool:
+        nonlocal elapsed
+        probes.append(path)
+        elapsed += 1
+        return False
+
+    def is_symlink(path: Path) -> bool:
+        return False
+
+    def monotonic() -> float:
+        return elapsed
+
+    def git(root: Path, arguments: Sequence[str]) -> None:
+        pytest.fail("Git must not run after ancestor discovery exhausts the budget")
+
+    def scandir(path: Path) -> None:
+        pytest.fail("Directory enumeration must not start after the budget expires")
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(gate.Path, "resolve", resolve)
+        scoped.setattr(gate.Path, "exists", exists)
+        scoped.setattr(gate.Path, "is_symlink", is_symlink)
+        scoped.setattr(gate.time, "monotonic", monotonic)
+        scoped.setattr(gate, "_run_git", git)
+        scoped.setattr(gate.os, "scandir", scandir)
+        deadline = gate.GIT_DEADLINE.set(gate.GIT_TIMEOUT)
+        try:
+            assert gate.workspace_repositories(root) == []
+        finally:
+            gate.GIT_DEADLINE.reset(deadline)
+
+    assert len(probes) == gate.GIT_TIMEOUT
+    assert elapsed == gate.GIT_TIMEOUT
+
+
 def test_git_timeouts_share_one_assessment_budget(
     project: Path, cache: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
