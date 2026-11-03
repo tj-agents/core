@@ -21,7 +21,15 @@ not record migration complete until installed acceptance is observed. Existing s
 work remains with its prior owner. Current source router tests pass 35; regenerated completion tests pass 22; transport tests pass 46 with
 6 platform skips; standards routing tests pass 18. Full exact-head remote and installed acceptance remain
 pending. Next action: complete package checks, freeze source review, then push the existing PR #521.
-The broader tests remain under observation; no remote CI success is inferred from these local checks.
+Native source review and fresh Workflow/API and security readers found no actionable introduced defect
+at `21008147092ca498489f7d6f2e2223752ad0da9f`; the canonical private receipt records that completed pass.
+Exact-head CI `41621767120` passed startup/discovery on Windows and Linux, then failed the same two
+packaging fixture assumptions on both platforms. The targeted fixture repairs now pass locally (2 tests):
+preserve the shipped Codex continuation directory when copying source and verify continuation identity
+rather than an obsolete hard-coded skill count. Next action: commit and incrementally review that delta,
+push the same PR, and observe fresh exact-head CI before guarded merge and installed-host acceptance.
+The broad local workflow-contracts run hit inherited Git environment and concurrent temporary-directory
+copying failures; it is not reported green. Source-host coverage remains distinct from installed evidence.
 
 ```agent-host-coverage
 {
