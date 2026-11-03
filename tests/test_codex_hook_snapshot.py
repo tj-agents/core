@@ -232,7 +232,12 @@ class CodexHookSnapshotTests(unittest.TestCase):
             data = temporary / "data"
             marker = temporary / "loader-executed"
             manifest = json.loads((payload / "hooks" / "codex.json").read_text(encoding="utf-8"))
-            command = manifest["hooks"]["SessionStart"][0]["hooks"][0][HOST_COMMAND]
+            command = next(
+                hook[HOST_COMMAND]
+                for group in manifest["hooks"]["SessionStart"]
+                for hook in group["hooks"]
+                if "/hooks/tier_gate.py" in hook[HOST_COMMAND]
+            )
             command = command.replace("${PLUGIN_ROOT}", str(payload))
             environment = dict(os.environ, PLUGIN_DATA=str(data))
 
@@ -329,7 +334,12 @@ class CodexHookSnapshotTests(unittest.TestCase):
             shutil.copytree(ROOT / "plugins" / "base", payload)
             data = temporary / "data"
             manifest = json.loads((payload / "hooks" / "codex.json").read_text(encoding="utf-8"))
-            command = manifest["hooks"]["SessionStart"][0]["hooks"][0][HOST_COMMAND]
+            command = next(
+                hook[HOST_COMMAND]
+                for group in manifest["hooks"]["SessionStart"]
+                for hook in group["hooks"]
+                if "/hooks/tier_gate.py" in hook[HOST_COMMAND]
+            )
             command = command.replace("${PLUGIN_ROOT}", str(payload))
             environment = dict(os.environ, PLUGIN_DATA=str(data))
 
@@ -366,7 +376,12 @@ class CodexHookSnapshotTests(unittest.TestCase):
             shutil.copytree(ROOT / "plugins" / "base", payload)
             data = temporary / "data"
             manifest = json.loads((payload / "hooks" / "codex.json").read_text(encoding="utf-8"))
-            template = manifest["hooks"]["SessionStart"][0]["hooks"][0][HOST_COMMAND]
+            template = next(
+                hook[HOST_COMMAND]
+                for group in manifest["hooks"]["SessionStart"]
+                for hook in group["hooks"]
+                if "/hooks/tier_gate.py" in hook[HOST_COMMAND]
+            )
             template = template.replace("${PLUGIN_ROOT}", str(payload))
             original = re.search(r"sha256:[0-9a-f]{64}", template).group()
             environment = dict(os.environ, PLUGIN_DATA=str(data))
