@@ -13,15 +13,21 @@ not resume, merge, rebase or close anything. Continuing a named goal afterwards 
 
 1. **Inventory this conversation's leftovers** from its transcript: pull requests, branches, worktrees,
    plan files, records, background tasks and every question or proposal still awaiting the user.
-2. **Re-read each against live state.** Fetch, then read the forge and repository: PR state and merge
-   commit, issue state, whether the change is on the default branch, whether the worktree or branch still
-   exists. The conversation's own account of an item is never evidence of its current state.
+2. **Re-read each against live state** with the shipped script, one call for every item. It reads PR,
+   issue and branch state in one GitHub query and searches Agent's session store for each branch:
+
+   ```text
+   python -B "<skill-directory>/scripts/catch_up.py" --pr https://github.com/tj-agents/core/pull/551 --branch tj-agents/template:Refactor/SubjectSkillLayout --issue https://github.com/tj-agents/personal/issues/49
+   ```
+
+   Use `python3` on Linux/macOS. Its JSON lists each item's `state` and every matching session; a
+   `stalled` session is closed while its work item is active or its branch is unmerged, with its `reopen`
+   action. Check local worktrees and plan files directly. The conversation's own account of an item is
+   never evidence of its current state.
 3. **Find what happened since on the same subjects.** Search newer commits, PRs and issues in every
    repository the conversation touched, by subject as well as by name. A later change may have merged,
    closed, reverted or replaced an item under a different title. Name what was searched.
-   Query the session store through `agent:recover` by each branch, PR and work item touched: a closed
-   session whose work item is still active or whose PR is unmerged is stalled work, reported with its
-   session id and reopen action.
+   Add `--topic` to the script for a work item whose sessions do not share its branch name.
 4. **Report one line per item, then stop**: done, superseded by a named change, still open with its next
    action and owner, or an obsolete question. Lead with whether the requested work is done. Acting on any
    item is a separate request.
