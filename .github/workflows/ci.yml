@@ -67,7 +67,7 @@ jobs:
     needs: select
     if: >-
       needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
-      && contains(github.event.pull_request.labels.*.name, 'ci:full')
+      && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: windows-latest
     env:
       CI_SELECTION: ${{ needs.select.outputs.plan }}
@@ -195,7 +195,7 @@ jobs:
     needs: select
     if: >-
       needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
-      && contains(github.event.pull_request.labels.*.name, 'ci:full')
+      && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
     env:
       CI_SELECTION: ${{ needs.select.outputs.plan }}
@@ -306,22 +306,24 @@ jobs:
         run: python3 -B scripts/ci_selection.py required
 
   regenerate:
-    if: github.event_name == 'push'
+    if: >-
+      github.event_name == 'push'
+      && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      && !startsWith(github.event.head_commit.message, 'Regenerate packages for ')
+    needs: ci-required
     runs-on: windows-latest
-    environment: regenerate
-    permissions:
-      contents: write
+    environment: update-pins
     concurrency:
       group: regenerate-main
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: main
-          ssh-key: ${{ secrets.REGENERATE_DEPLOY_KEY }}
-
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-
+        with:
+          python-version: '3.12'
       - name: regenerate committed packages from authored sources
         shell: pwsh
         run: |
@@ -330,41 +332,31 @@ jobs:
           python -B scripts/runtime_sources.py
           python -B scripts/update_plugin_digests.py
           ./.agents/sync-generated.ps1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
       - name: verify the regenerated tree
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           ./.agents/sync-generated.ps1 -Check
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           uv run --locked python -B .agents/hooks/check_tier_payload.py --root .
           python -B scripts/update_plugin_digests.py --check
           python -B scripts/sync_harness_manifests.py --check
-
-      - name: commit and push the regeneration
-        id: publish-packages
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .agents/plugins/plugins.json plugins .agents/plugins/marketplace.json .claude-plugin/marketplace.json CAPABILITIES.md
-          $staged = git diff --cached --name-only
-          if ($staged) {
-            git commit -m "Regenerate packages for $env:GITHUB_SHA"
-            python -B scripts/update_plugin_digests.py --check
-            git push origin HEAD:main
-            "changed=true" >> $env:GITHUB_OUTPUT
-          } else {
-            "Generated output already current."
-          }
-
-      - name: Publish the generated package hint
-        if: steps.publish-packages.outputs.changed == 'true' && vars.UPDATE_TOPIC != ''
-        uses: tj-agents/github-actions/.github/actions/publish-update@8d0f28a33f6340f1cfa82dfb40796473ff3a1f27
+      - name: mint the updater token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
-          topic: ${{ secrets.UPDATE_TOPIC }}
-          published: 'true'
+          client-id: ${{ vars.UPDATE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.UPDATE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - name: publish generated files
+        uses: tj-agents/github-actions/.github/actions/publish-generated@1a8099ab95aaf609704f892087081c35d15b331a
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          source-sha: ${{ github.sha }}
+          branch: ${{ github.event.repository.default_branch }}
+          paths: |
+            .agents/plugins/plugins.json
+            plugins
+            .agents/plugins/marketplace.json
+            .claude-plugin/marketplace.json
+            CAPABILITIES.md
