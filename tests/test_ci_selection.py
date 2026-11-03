@@ -109,11 +109,15 @@ class AggregateTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     CI.required_results(value, broken, "pull_request", ("ci:full",))
 
-    def test_suites_run_only_on_request(self):
+    def test_default_push_requires_suites_and_pr_suites_remain_explicit(self):
         results = ClassificationTests.results()
         results["guard"]["result"] = "skipped"
         results["verify-windows"]["result"] = results["verify-linux"]["result"] = "skipped"
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("full", "main"), results, "push")
+        results["verify-windows"]["result"] = results["verify-linux"]["result"] = "success"
         CI.required_results(CI.plan("full", "main"), results, "push")
+        results["verify-windows"]["result"] = results["verify-linux"]["result"] = "skipped"
         results["guard"]["result"] = "success"
         CI.required_results(CI.plan("full", "unlabelled"), results, "pull_request")
         with self.assertRaises(ValueError):
