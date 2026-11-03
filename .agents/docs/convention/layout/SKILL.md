@@ -34,9 +34,7 @@ topic as the summary. Keep the glossary as the last section.
 
 ## Draw flows
 
-Draw any flow across three or more parts as a Mermaid diagram: `sequenceDiagram` for order over time,
-`flowchart` for structure. One idea per diagram. Colour only through `classDef` with `fill`, `stroke`
-and `color` set together so it reads in light and dark themes. Never draw ASCII art.
+Draw any flow with `docs:diagram`.
 
 ## Keep state distinct
 
