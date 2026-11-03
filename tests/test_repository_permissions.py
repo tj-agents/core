@@ -142,5 +142,15 @@ class RepositoryPermissionTests(unittest.TestCase):
                 self.assertTrue(not editable or path in denied)
 
 
+def test_repository_harness_covers_ci_verify_commands() -> None:
+    manifest = json.loads(
+        (ROOT / ".agents/repository-harness.json").read_text(encoding="utf-8")
+    )
+    allowed = manifest["requires"]["permissions"]["claude_allow"]
+    for command in verify_job_commands():
+        assert any(fnmatchcase(f"PowerShell({command})", rule) for rule in allowed)
+        assert any(fnmatchcase(f"Bash({bash_form(command)})", rule) for rule in allowed)
+
+
 if __name__ == "__main__":
     unittest.main()
