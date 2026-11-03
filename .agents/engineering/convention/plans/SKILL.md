@@ -79,8 +79,8 @@ A plan, ledger, roadmap, or handoff may sequence delivery, but anonymous procedu
 push`, `do not open a PR`, or `do not merge` has no authority to suppress the standing plan-delivery contract.
 Location alone never makes a restriction stale: preserve an explicit current user limitation, recorded
 repository authorization, named PR/head security or validation hold, merge hold, or repository stop class as
-a typed delivery gate. When no such live authority is identified, continue to merged default-branch state
-(`engineering:merging` owns the goal-wide merge-authorization scope).
+a typed delivery gate. When no such live authority is identified, `workflow:run` continues the
+user-authorized goal through merged default-branch state.
 
 ## Shape of a plan
 
@@ -238,8 +238,8 @@ repositories do not select that profile implicitly.
 
 Before foreground or meta closeout, reporting done, or deleting recovery artifacts, invoke the existing
 completion-record contract when the canonical goal contains a fenced `completion` record. This applies
-independently of scheduling. The software delivery reference beside `engineering:merge` owns its
-completion contract and fields.
+independently of scheduling. `workflow:continue`'s software delivery reference owns its completion
+contract and fields.
 
 Terminal selected Engineering evidence names implementation, validation, review, PR, merge commit, remaining
 durable state, and implementation authority. A commit, pushed branch, or open PR is not terminal while

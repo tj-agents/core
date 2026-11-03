@@ -1,8 +1,9 @@
 # Software delivery evidence
 
 Owns software delivery identity, completion evidence and authorized decisions across wakes. Load
-`workflow:continue` to establish supported host continuation. Engineering packages the Codex CLI transport
-under `.codex/runtime/continuation/`; this reference supplies its PR safety and completion rules.
+`workflow:continue` to establish supported host continuation. Workflow packages the Codex CLI transport
+under `.codex/runtime/continuation/`; Engineering supplies the technical review and merge checks this
+reference binds.
 
 A continuation goal may exist before a PR or delivery binding. Keep its repository, worktree, canonical
 goal, completion condition and authorized actions in the existing goal record; add the exact PR/head/run
@@ -49,7 +50,7 @@ python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree>
 ```
 
 Resolve `<completion-check>` to `.agents/workflows/completion.py` in source or
-`workflows/completion.py` in an installed engineering package.
+`workflows/completion.py` in an installed Workflow package.
 
 The record has this shape; `follow_up` may be omitted when empty. Every string is nonempty, every head is a forty-character SHA, acceptance
 and delivery records are unique, and empty evidence keeps its acceptance item open with an owner and next
@@ -119,7 +120,7 @@ same. A new head created by this owner replaces its binding. A head changed by s
 or a different worktree ends ownership and surfaces a human decision; never silently follow it.
 
 Resolve authority from the repository's recorded standing instruction, the user authorization kept in
-the owning goal record (`engineering:merging` owns that goal-wide scope), or an observed user approval
+the owning goal record (`workflow:run` owns that goal-wide scope), or an observed user approval
 for this exact PR. The source command below, or packaged `workflows/workflow_ops.py`, is the single writer of
 the binding artifact. Run this helper with `python` on Windows or `python3` on Linux/macOS:
 
@@ -146,7 +147,7 @@ owning checkout identity, permitted merge mode, user's wording and observed mess
 checkout and remote PR. `mode` is `merge` or `auto`, according to the actual approval; an authorization
 naming no mode records `auto`, because unattended completion is what it requests. A goal file's bare
 existence never invents merge authority; the user's recorded authorization of the goal does, for the
-goal's own PRs (`engineering:merging`) — write it as this record, with its wording and provenance, for
+goal's own PRs (`workflow:run`) — write it as this record, with its wording and provenance, for
 each PR the goal creates. Invalid explicit input fails before any standing-authority fallback. Without a
 standing instruction, goal authorization, or matching scoped approval, authority remains `absent` and
 merge requires a user decision.
@@ -240,7 +241,7 @@ worktrees is outside the runtime's supported transition.
 
 The successor is a new delivery binding with its own checks, review watermark, and merge authorization.
 A completed PR's binding never carries over; the successor re-resolves authority from the same recorded
-sources, and the goal's authorization covers each PR the goal itself creates (`engineering:merging`). The
+sources, and the goal's authorization covers each PR the goal itself creates (`workflow:run`). The
 workflow owner may implement, validate, push, open, and review that successor without intervention when
 those actions are already in scope, and stops at its merge gate only when no recorded goal, standing, or
 scoped authority covers it.
@@ -252,15 +253,17 @@ process, hook, or ordinary model turn provides persistence.
 ## Authorization and terminals
 
 Persistent delivery may implement, test, commit, push, diagnose exact-head CI, and obtain the required review.
-It must not merge, enable auto-merge, approve, deploy, delete, or widen scope without the recorded authority.
+It must not merge, enable auto-merge, approve, deploy, delete, or widen scope without the user-authorized
+goal scope and recorded authority for that action.
 An authorized auto-merge request awaiting GitHub's required review stays `waiting`, with its binding and
 scheduled owner intact. The user approves in GitHub; approval alone requires no agent turn. A merge
 observation wakes the same owner to finish the authorized post-merge steps. Report the approval link once;
 do not ask the user to announce approval. A rejected review, changed head, explicit hold or missing task
 authorization retains its existing repair or human-gate behavior.
 
-A merge authorization never covers publishing: releasing to a package feed stays an explicit human call
-whatever the standing instruction says about merging.
+Merge authority does not independently add publishing. When the user's authorized outcome includes a package
+release, update, or installation, retain that acceptance item and its repository gates until it is observed;
+otherwise publishing requires a separate user decision.
 The ordinary review/merge skills remain authoritative. Keep one monitor and one read per wake. Launch
 `.agents/workflows/workflow_ops.py monitor` for the exact binding; it persists state across disconnects and
 wakes the owner only for a material transition or terminal result.

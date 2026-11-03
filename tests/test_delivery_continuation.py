@@ -828,7 +828,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         resources.mkdir(parents=True, exist_ok=True)
         (package / ".codex-plugin").mkdir()
         (package / ".codex-plugin/plugin.json").write_text("{}")
-        (package / ".agents/engineering").mkdir(parents=True)
+        (package / ".agents/workflow").mkdir(parents=True)
         shutil.copy2(ADAPTER, scripts / ADAPTER.name)
         shutil.copy2(SCHEDULER, resources / SCHEDULER.name)
         shutil.copy2(ROOT / ".codex/runtime/continuation/continuation_runtime.py", resources / "continuation_runtime.py")
@@ -840,7 +840,8 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertNotIn("GH_TOKEN", receipt["profile_environment"])
 
     def test_generated_continuation_transport_is_codex_only(self):
-        package = ROOT / "plugins/engineering"
+        package = ROOT / "plugins/workflow"
+        self.assertFalse((ROOT / "plugins/engineering/.codex/runtime/continuation").exists())
         self.assertTrue((package / ".codex/runtime/continuation/delivery_continuation.py").is_file())
         self.assertTrue((package / ".codex/runtime/continuation/continuation_runtime.py").is_file())
         self.assertTrue((package / ".codex/runtime/continuation/continuation_scheduler.py").is_file())
@@ -860,12 +861,12 @@ class DeliveryContinuationTests(unittest.TestCase):
         resources.mkdir(parents=True, exist_ok=True)
         (outer / ".codex-plugin").mkdir()
         (outer / ".codex-plugin/plugin.json").write_text("{}")
-        (outer / ".agents/engineering").mkdir(parents=True)
+        (outer / ".agents/workflow").mkdir(parents=True)
         shutil.copytree(ROOT / ".agents/workflows", outer / "workflows")
         nested = outer / "nested"
         runtime = nested / ".codex/runtime/continuation/continuation_runtime.py"
         runtime.parent.mkdir(parents=True)
-        (nested / ".agents/engineering").mkdir(parents=True)
+        (nested / ".agents/workflow").mkdir(parents=True)
         shutil.copy2(ROOT / ".codex/runtime/continuation/continuation_runtime.py", runtime)
         result = subprocess.run([sys.executable, "-B", str(runtime), "--help"],
                                 capture_output=True, text=True, timeout=10)
@@ -890,7 +891,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         for package in (outer, outer / "nested"):
             scripts = package / ".codex/runtime/continuation"
             scripts.mkdir(parents=True)
-            (package / ".agents/engineering").mkdir(parents=True)
+            (package / ".agents/workflow").mkdir(parents=True)
             (package / ".codex-plugin").mkdir()
             (package / ".codex-plugin/plugin.json").write_text("{}")
             shutil.copy2(ADAPTER, scripts / ADAPTER.name)

@@ -8,26 +8,17 @@ domain: process
 
 # Merging
 
-## What authorizes a merge
+## Goal authority and technical gates
 
-Merge authorization is scoped to the goal, not the PR. A user authorization to implement, execute, or
-deliver a goal is merge authorization for every PR that goal itself creates: each lands once its own
-review and required checks pass, with no per-PR re-approval. The authorization survives handoffs, fresh
-sessions, and successive delivery bindings of the same goal — each new PR's binding re-records it as
-mechanics, not a fresh approval. This section owns that scope rule; no delivery standard adds a per-PR
-approval requirement on top of it.
-
-A goal file's bare existence authorizes nothing — the authority is the user's observed instruction,
-recorded with the goal. What still gates a merge keeps its own typed owner: an explicit user limitation
-or merge hold, a repository's stop classes, stop paths, hold labels and stricter recorded delivery rules,
-and the ordinary gates — current-head review and green checks. Outside the goal's own PRs nothing is
-covered: not another repository, not a PR the goal did not create, and never publishing to a package feed.
+`workflow:run` owns the user's goal-wide authority, its acceptance condition, and the decision to continue
+after a waiting approval. This policy owns the technical gates: current-head review, green checks, queue
+state, repository stop paths, labels, and recorded delivery rules. Read `workflow:run` for authorization;
+a CI event alone does not grant it.
 
 ## Persistent continuation
 
 When a queue, check, publication, or generated sync will resolve after this turn, enter the current harness's
-`workflow:continue` skill. Its software delivery reference beside `engineering:merge` binds this exact
-PR/head/worktree; the continuation selects the native
+`workflow:continue` skill. Its software delivery reference binds this exact PR/head/worktree; the continuation selects the native
 continuation mechanism. That owner classifies a real failure by test tier, dispatches its corresponding debug
 skill in a fresh context, rebinds after a push, obtains the required review, and reaches merge under the
 goal-scoped authorization above. The shared monitor is the only foreground or persistent forge-wait mechanism.
@@ -165,7 +156,8 @@ nothing.
 
 Marking a PR ready for review changes its review state, not its merge authorization. **No CI workflow may
 enable auto-merge or merge an ordinary PR in response to a PR lifecycle event** — `opened`, `reopened`,
-`synchronize`, or `ready_for_review`. Only an explicit merge instruction starts the delivery. The one
+`synchronize`, or `ready_for_review`. A user-authorized `workflow:run` goal enters delivery after its
+source and technical gates are ready; the CI event itself never starts it. The one
 exception is a repository-owned **generated** PR — the `platform-sync`/version-bump kind above: its own
 workflow may arm auto-merge for itself as part of the already-authorized producer chain, and that scoped
 automation must never generalise to ordinary PRs.
