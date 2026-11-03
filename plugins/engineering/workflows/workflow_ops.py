@@ -1797,7 +1797,7 @@ def goal_evaluator_scopes(root):
 
 
 def goal_preflight(root, workflow_run_id):
-    """`persistent-workflow`'s `/goal` prerequisite, executed rather than asserted in prose."""
+    """`workflow:continue`'s `/goal` prerequisite, executed rather than asserted in prose."""
     scopes = []
     persisted = None
     for name, path in goal_evaluator_scopes(root):
@@ -1896,7 +1896,7 @@ def pending_evidence(rollup, head):
     """Every not-yet-terminal check as an exact `(check id, run id, head)` triple.
 
     A CheckRun's run and job ids are only published in its details URL, and that pair is precisely
-    the identity `persistent-delivery` refuses to merge without.
+    the exact identity required by the software delivery contract.
     """
     evidence = []
     seen = set()
