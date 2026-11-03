@@ -17,9 +17,13 @@ def tier_gate():
     for parent in (here.parents[2], here.parents[3]):
         path = parent / "hooks/tier_gate.py"
         if path.is_file():
-            spec = importlib.util.spec_from_file_location("review_tier_gate", path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            sys.path.insert(0, str(path.parent))
+            try:
+                spec = importlib.util.spec_from_file_location("review_tier_gate", path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+            finally:
+                del sys.path[0]
             return module
     raise ValueError("The installed review package is missing hooks/tier_gate.py")
 

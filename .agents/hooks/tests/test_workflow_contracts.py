@@ -1978,12 +1978,10 @@ class RepositoryProviderTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         state = self.root / "writer-state"
-        connection = module.connect(state / "sessions.db")
-        try:
-            repository = module.repo_identity(self.root)
+        with module.SessionStore(state / "sessions.db") as store:
+            repository = module.identify_repository(self.root)
             key = module.work_item_key(repository, "runtime-bridge", "readme-reader")
-            module.upsert_work_item(
-                connection,
+            store.upsert_work_item(
                 key,
                 repository,
                 "runtime-bridge",
@@ -1991,8 +1989,6 @@ class RepositoryProviderTests(unittest.TestCase):
                 status=status,
                 branch="Feature/provider-fixture",
             )
-        finally:
-            connection.close()
         return state
 
     def test_repository_provider_resolves_portable_state_and_git_identity(self):
@@ -2273,11 +2269,9 @@ class RepositoryProviderTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         state = linked / "state"
-        connection = module.connect(state / "sessions.db")
-        try:
-            repository = module.repo_identity(linked)
-            module.upsert_work_item(
-                connection,
+        with module.SessionStore(state / "sessions.db") as store:
+            repository = module.identify_repository(linked)
+            store.upsert_work_item(
                 module.work_item_key(repository, "runtime-bridge", "readme-reader"),
                 repository,
                 "runtime-bridge",
@@ -2285,8 +2279,6 @@ class RepositoryProviderTests(unittest.TestCase):
                 status="active",
                 branch="Feature/provider-linked",
             )
-        finally:
-            connection.close()
         provider = RepositoryStateProvider(linked, WorkflowContract(WORKFLOWS))
         with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
             self.assertEqual(

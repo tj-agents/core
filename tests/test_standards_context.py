@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 import tempfile
 import unittest
-from test_tier_predicates import gate
+from tests.test_tier_predicates import gate
 
 
 class StandardsContexts(unittest.TestCase):

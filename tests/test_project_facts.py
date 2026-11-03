@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from test_tier_predicates import gate, checker
+from tests.test_tier_predicates import gate, checker
 
 
 class ProjectFacts(unittest.TestCase):

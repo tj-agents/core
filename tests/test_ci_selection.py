@@ -220,6 +220,14 @@ class ExecutionTests(unittest.TestCase):
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(CI.run_tests(root, CI.plan("focused", "test", [target.relative_to(root).as_posix()]), "source"), 1)
 
+    def test_selected_pytest_function_executes_and_propagates_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            (root / "tests").mkdir()
+            target = root / "tests/test_ci_pytest_fixture.py"
+            target.write_text("def test_selected():\n assert False, 'observed regression'\n", encoding="utf-8")
+            self.assertEqual(CI.run_tests(root, CI.plan("focused", "test", [target.relative_to(root).as_posix()]), "source"), 1)
+
     def test_zero_discovery_or_missing_selected_module_fails(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

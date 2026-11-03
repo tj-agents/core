@@ -1,164 +1,438 @@
-import hashlib
 import importlib.util
+import io
 import json
 import os
-from pathlib import Path
+import queue
+import re
+import shutil
 import subprocess
 import sys
-import tempfile
+from pathlib import Path
 from types import SimpleNamespace
-import unittest
-from unittest import mock
 
+import pytest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "native_host_acceptance.py"
-OBSERVER = Path(__file__).resolve().parents[1] / "scripts" / "native_startup_observer.py"
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "scripts/native_host_acceptance.py"
 specification = importlib.util.spec_from_file_location("native_host_acceptance", SCRIPT)
+assert specification is not None and specification.loader is not None
 NATIVE = importlib.util.module_from_spec(specification)
 specification.loader.exec_module(NATIVE)
 
 
-class NativeHostAcceptanceTests(unittest.TestCase):
-    def test_observer_runs_the_staged_agent_startup_binding_without_installed_state(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            result = subprocess.run([sys.executable, '-B', str(OBSERVER), '--help'], capture_output=True,
-                                    text=True, encoding='utf-8', env={**os.environ,
-                                                                       'AGENT_STATE_DIRECTORY': temporary})
-        self.assertEqual(0, result.returncode, result.stderr)
+def test_fixture_selects_required_packages_without_personal(tmp_path: Path) -> None:
+    NATIVE.write_fixture(tmp_path)
+    value = json.loads((tmp_path / ".agents/plugins.json").read_text(encoding="utf-8"))
+    assert value["plugins"] == list(NATIVE.IDENTITIES)
+    assert "personal@tj-agents" not in value["plugins"]
 
-    def test_an_early_failure_cannot_reuse_a_previous_failed_observer_receipt(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            evidence = Path(temporary)
-            receipt = evidence / 'codex-startup-observer.json'
-            receipt.write_text(json.dumps({'state': 'failed', 'error':
-                'workflow@tj-agents native-required-hook-failure-probe'}), encoding='utf-8')
-            operation = mock.Mock(side_effect=NATIVE.AcceptanceError('installation failed before launch'))
-            with self.assertRaisesRegex(NATIVE.AcceptanceError, 'no valid receipt'):
-                NATIVE.require_failure_probe('codex', evidence, operation)
-            self.assertFalse(receipt.exists())
 
-    def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
-        self.project = self.root / "project"
-        self.project.mkdir()
-        self.state = self.root / "state"
+def test_claude_plugin_inventory_requires_listed_enabled_identities() -> None:
+    completed = SimpleNamespace(
+        stdout=json.dumps(
+            [{"id": identity, "enabled": True} for identity in NATIVE.IDENTITIES]
+        )
+    )
+    NATIVE.require_plugins(NATIVE.claude_plugin_inventory(completed))
+    completed = SimpleNamespace(stdout=json.dumps({"installed": []}))
+    with pytest.raises(NATIVE.AcceptanceError, match="did not return a list"):
+        NATIVE.claude_plugin_inventory(completed)
 
-    def receipt(self):
-        path = self.state / "cli-sessions" / "session.json"
-        path.parent.mkdir(parents=True)
-        value = {
-            "host": "codex", "session_id": "session", "cwd": str(self.project),
-            "pid": 42, "pid_started_at": 100.0,
-        }
-        path.write_text(json.dumps(value), encoding="utf-8")
-        return value
 
-    def test_fixture_selects_required_packages_without_personal(self):
-        NATIVE.write_fixture(self.project)
-        value = json.loads((self.project / ".agents" / "plugins.json").read_text(encoding="utf-8"))
-        self.assertEqual(list(NATIVE.IDENTITIES), value["plugins"])
-        self.assertNotIn("personal@tj-agents", value["plugins"])
-
-    def test_claude_plugin_inventory_requires_listed_enabled_identities(self):
-        completed = SimpleNamespace(stdout=json.dumps([
-            {"id": identity, "enabled": True} for identity in NATIVE.IDENTITIES
-        ]))
-        NATIVE.require_plugins(NATIVE.claude_plugin_inventory(completed))
-        completed = SimpleNamespace(stdout=json.dumps({"installed": []}))
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "did not return a list"):
-            NATIVE.claude_plugin_inventory(completed)
-
-    def test_plugin_discovery_requires_enabled_installed_identities(self):
-        inventory = {"installed": [
+def test_plugin_discovery_requires_enabled_installed_identities() -> None:
+    inventory = {
+        "installed": [
             {"pluginId": identity, "installed": True, "enabled": True}
             for identity in NATIVE.IDENTITIES
-        ]}
-        NATIVE.require_plugins(inventory)
-        inventory["installed"][-1]["enabled"] = False
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "engineering@tj-agents"):
-            NATIVE.require_plugins(inventory)
-
-    def test_transcript_requires_base_context_and_unauthenticated_completion(self):
-        package = self.root / "base"
-        contract = package / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
-        contract.parent.mkdir(parents=True)
-        contract.write_text("task routing", encoding="utf-8")
-        transcript = self.root / "session.jsonl"
-        digest = hashlib.sha256(b"task routing").hexdigest()
-        transcript.write_text(
-            json.dumps({"type": "response_item", "payload": {"content": f"base:task-routing {digest}"}}) + "\n"
-            + json.dumps({"type": "event_msg", "payload": {"type": "task_complete", "error": {"message": "401 Unauthorized"}}}) + "\n",
-            encoding="utf-8",
-        )
-        NATIVE.require_failed_turn(transcript, package, 0.1)
-        transcript.write_text(json.dumps({"type": "event_msg", "payload": {"type": "task_complete", "error": None}}) + "\n", encoding="utf-8")
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "Base context"):
-            NATIVE.require_failed_turn(transcript, package, 0.1)
-
-    def test_transcript_waits_for_initial_appearance(self):
-        package = self.root / "base"
-        contract = package / ".agents" / "base" / "policy" / "task-routing" / "SKILL.md"
-        contract.parent.mkdir(parents=True)
-        contract.write_text("task routing", encoding="utf-8")
-        digest = hashlib.sha256(b"task routing").hexdigest()
-        entries = [
-            {"type": "response_item", "payload": {"content": f"base:task-routing {digest}"}},
-            {"type": "event_msg", "payload": {"type": "task_complete", "error": {"message": "401 Unauthorized"}}},
         ]
-        with mock.patch.object(NATIVE, "transcript_entries", side_effect=[None, entries]):
-            NATIVE.require_failed_turn(self.root / "session.jsonl", package, 0.2)
+    }
+    NATIVE.require_plugins(inventory)
+    inventory["installed"][-1]["enabled"] = False
+    with pytest.raises(NATIVE.AcceptanceError, match="engineering@tj-agents"):
+        NATIVE.require_plugins(inventory)
 
-    def test_claude_initialize_requires_qualified_command_inventory(self):
-        NATIVE.require_claude_discovery({"commands": [
-            {"name": "workflow:run"}, {"name": "engineering:commit"},
-        ]})
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "workflow:run"):
-            NATIVE.require_claude_discovery({"commands": [{"name": "run"}, {"name": "engineering:commit"}]})
 
-    def test_discovery_rejects_substrings_without_exact_skill_names(self):
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "workflow skill"):
-            NATIVE.require_discovery({"description": "workflow run engineering commit"}, "native")
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "workflow skill"):
-            NATIVE.require_discovery({"commands": [{"name": "run"}, {"name": "commit"}]}, "native")
-        NATIVE.require_discovery({"commands": [
-            {"name": "run", "pluginId": "workflow@tj-agents"},
-            {"name": "commit", "path": "/cache/plugins/engineering/skills/commit/SKILL.md"},
-        ]}, "native")
+def test_tier_context_requires_the_probe_in_actual_host_evidence() -> None:
+    NATIVE.require_context(
+        "prefix " + NATIVE.CONTEXT_PROBE, NATIVE.CONTEXT_PROBE, "host"
+    )
+    with pytest.raises(NATIVE.AcceptanceError, match="did not include"):
+        NATIVE.require_context(
+            "base:task-routing old-policy-hash", NATIVE.CONTEXT_PROBE, "host"
+        )
 
-    def test_restarted_startup_hooks_require_trusted_current_hashes(self):
-        hooks = {"data": [{"hooks": [
-            {"pluginId": "base@tj-agents", "source": "plugin", "enabled": True, "key": "base", "trustStatus": "trusted", "currentHash": "sha256:base", "trustedHash": "sha256:base"},
-        ]}]}
-        trusted = {
-            "base": {"trusted_hash": "sha256:base"},
+
+@pytest.mark.parametrize("error", [None, {"message": "500 Server Error"}])
+def test_transcript_rejects_an_unexpected_completion(
+    tmp_path: Path, error: object
+) -> None:
+    transcript = tmp_path / "session.jsonl"
+    transcript.write_text(
+        json.dumps(
+            {"type": "response_item", "payload": {"content": NATIVE.CONTEXT_PROBE}}
+        )
+        + "\n"
+        + json.dumps(
+            {"type": "event_msg", "payload": {"type": "task_complete", "error": error}}
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(NATIVE.AcceptanceError, match="expected unauthenticated 401"):
+        NATIVE.require_failed_turn(transcript, NATIVE.CONTEXT_PROBE, 0.1)
+
+
+def test_transcript_requires_tier_context_and_unauthenticated_completion(
+    tmp_path: Path,
+) -> None:
+    transcript = tmp_path / "session.jsonl"
+    completion = (
+        json.dumps(
+            {
+                "type": "event_msg",
+                "payload": {
+                    "type": "task_complete",
+                    "error": {"message": "401 Unauthorized"},
+                },
+            }
+        )
+        + "\n"
+    )
+    transcript.write_text(completion, encoding="utf-8")
+    with pytest.raises(NATIVE.AcceptanceError, match="expected tier context"):
+        NATIVE.require_failed_turn(transcript, NATIVE.CONTEXT_PROBE, 0.01)
+    transcript.write_text(
+        json.dumps(
+            {"type": "response_item", "payload": {"content": NATIVE.CONTEXT_PROBE}}
+        )
+        + "\n"
+        + completion,
+        encoding="utf-8",
+    )
+    NATIVE.require_failed_turn(transcript, NATIVE.CONTEXT_PROBE, 0.1)
+
+
+def test_transcript_waits_for_initial_appearance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entries = [
+        {"type": "response_item", "payload": {"content": NATIVE.CONTEXT_PROBE}},
+        {
+            "type": "event_msg",
+            "payload": {
+                "type": "task_complete",
+                "error": {"message": "401 Unauthorized"},
+            },
+        },
+    ]
+    reads = iter([None, entries])
+    monkeypatch.setattr(NATIVE, "transcript_entries", lambda _path: next(reads))
+    NATIVE.require_failed_turn(tmp_path / "session.jsonl", NATIVE.CONTEXT_PROBE, 0.2)
+
+
+def test_native_fixture_changes_declaration_without_changing_candidate_code(
+    tmp_path: Path,
+) -> None:
+    original = (ROOT / "plugins/base/tier.json").read_bytes()
+    contextual = NATIVE.context_marketplace(ROOT, ROOT, tmp_path / "context")
+    declaration = json.loads(
+        (contextual / "plugins/base/tier.json").read_text(encoding="utf-8")
+    )
+    assert declaration["schema_version"] == 3
+    assert declaration["session_context"] == NATIVE.CONTEXT_PROBE
+    assert (ROOT / "plugins/base/tier.json").read_bytes() == original
+    candidate_code = (ROOT / "plugins/base/hooks/tier_gate.py").read_text(
+        encoding="utf-8"
+    )
+    assert (contextual / "plugins/base/hooks/tier_gate.py").read_text(
+        encoding="utf-8"
+    ) == candidate_code
+    failed = NATIVE.failure_marketplace(ROOT, contextual, tmp_path / "failure")
+    failure_evidence = tmp_path / "failure.txt"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            str(failed / "plugins/base/hooks/tier_gate.py"),
+            "--session-context",
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=10,
+        check=False,
+        env={**os.environ, "TJ_NATIVE_GATE_FAILURE_EVIDENCE": str(failure_evidence)},
+    )
+    assert result.returncode == 0
+    assert "tier gate failed: " + NATIVE.FAILURE_PROBE in result.stderr
+    assert result.stdout == ""
+    NATIVE.require_failure_evidence(failure_evidence)
+
+
+def test_failure_probe_cannot_claim_an_unrelated_startup_error() -> None:
+    with pytest.raises(NATIVE.AcceptanceError, match="did not include"):
+        NATIVE.require_context(
+            "unrelated startup failure", NATIVE.FAILURE_PROBE, "hook"
+        )
+
+
+def test_claude_initialize_requires_qualified_command_inventory() -> None:
+    NATIVE.require_claude_discovery(
+        {
+            "commands": [
+                {"name": "workflow:run"},
+                {"name": "engineering:commit"},
+            ]
         }
+    )
+    with pytest.raises(NATIVE.AcceptanceError, match="workflow:run"):
+        NATIVE.require_claude_discovery(
+            {"commands": [{"name": "run"}, {"name": "engineering:commit"}]}
+        )
+
+
+def test_discovery_rejects_substrings_without_exact_skill_names() -> None:
+    with pytest.raises(NATIVE.AcceptanceError, match="workflow skill"):
+        NATIVE.require_discovery(
+            {"description": "workflow run engineering commit"}, "native"
+        )
+    with pytest.raises(NATIVE.AcceptanceError, match="workflow skill"):
+        NATIVE.require_discovery(
+            {"commands": [{"name": "run"}, {"name": "commit"}]}, "native"
+        )
+    NATIVE.require_discovery(
+        {
+            "commands": [
+                {"name": "run", "pluginId": "workflow@tj-agents"},
+                {
+                    "name": "commit",
+                    "path": "/cache/plugins/engineering/skills/commit/SKILL.md",
+                },
+            ]
+        },
+        "native",
+    )
+
+
+def test_restarted_startup_hooks_require_trusted_current_hashes() -> None:
+    hooks = {
+        "data": [
+            {
+                "hooks": [
+                    {
+                        "pluginId": "base@tj-agents",
+                        "source": "plugin",
+                        "enabled": True,
+                        "key": "base",
+                        "trustStatus": "trusted",
+                        "currentHash": "sha256:base",
+                        "trustedHash": "sha256:base",
+                    }
+                ]
+            }
+        ]
+    }
+    trusted = {"base": {"trusted_hash": "sha256:base"}}
+    NATIVE.require_startup_hooks(hooks, trusted=True, trusted_hashes=trusted)
+    trusted["base"]["trusted_hash"] = "sha256:stale"
+    with pytest.raises(NATIVE.AcceptanceError, match="did not trust"):
         NATIVE.require_startup_hooks(hooks, trusted=True, trusted_hashes=trusted)
-        trusted["base"]["trusted_hash"] = "sha256:stale"
-        with self.assertRaisesRegex(NATIVE.AcceptanceError, "did not trust"):
-            NATIVE.require_startup_hooks(hooks, trusted=True, trusted_hashes=trusted)
-
-    def test_isolated_environment_precedes_direct_native_directories(self):
-        codex = self.root / "codex" / "codex"
-        claude = self.root / "claude" / "claude"
-        codex.parent.mkdir()
-        claude.parent.mkdir()
-        codex.write_text("", encoding="utf-8")
-        claude.write_text("", encoding="utf-8")
-        temporary = self.root / "temporary"
-        environment = NATIVE.isolated_environment(temporary, codex, claude, 'http://127.0.0.1:1/v1')
-        self.assertEqual([str(codex.resolve().parent), str(claude.resolve().parent)], environment["PATH"].split(__import__("os").pathsep)[:2])
-        self.assertEqual(Path(environment["HOME"]), self.root / "temporary" / "home")
-        self.assertEqual(Path(environment["USERPROFILE"]), self.root / "temporary" / "home")
-        self.assertTrue(Path(environment["CODEX_HOME"]).is_dir())
-        self.assertTrue(Path(environment["CLAUDE_CONFIG_DIR"]).is_dir())
-        self.assertTrue(Path(environment["AGENT_STATE_DIRECTORY"]).is_dir())
-        config = (Path(environment["CODEX_HOME"]) / "config.toml").read_text(encoding="utf-8")
-        self.assertIn('cli_auth_credentials_store = "file"', config)
-        self.assertIn('hooks = true', config)
 
 
+def test_isolated_environment_precedes_direct_native_directories(
+    tmp_path: Path,
+) -> None:
+    codex = tmp_path / "codex/codex"
+    claude = tmp_path / "claude/claude"
+    codex.parent.mkdir()
+    claude.parent.mkdir()
+    codex.write_text("", encoding="utf-8")
+    claude.write_text("", encoding="utf-8")
+    environment = NATIVE.isolated_environment(
+        tmp_path / "temporary", codex, claude, "http://127.0.0.1:1/v1"
+    )
+    assert environment["PATH"].split(os.pathsep)[:2] == [
+        str(codex.resolve().parent),
+        str(claude.resolve().parent),
+    ]
+    assert Path(environment["HOME"]) == tmp_path / "temporary/home"
+    assert Path(environment["USERPROFILE"]) == tmp_path / "temporary/home"
+    for key in ("CODEX_HOME", "CLAUDE_CONFIG_DIR", "AGENT_STATE_DIRECTORY"):
+        assert Path(environment[key]).is_dir()
+    config = (Path(environment["CODEX_HOME"]) / "config.toml").read_text(
+        encoding="utf-8"
+    )
+    assert 'cli_auth_credentials_store = "file"' in config
+    assert "hooks = true" in config
 
-if __name__ == "__main__":
-    unittest.main()
+
+@pytest.mark.parametrize("status", ["failed", "blocked", "stopped"])
+def test_native_hook_failure_is_rejected(status: str) -> None:
+    with pytest.raises(NATIVE.AcceptanceError, match="did not complete"):
+        NATIVE.require_hook_completion(
+            [
+                {
+                    "method": "hook/completed",
+                    "params": {
+                        "run": {
+                            "eventName": "sessionStart",
+                            "source": "plugin",
+                            "sourcePath": "/cache/base/local/hooks/codex.json",
+                            "status": status,
+                        }
+                    },
+                }
+            ]
+        )
+
+
+def test_native_startup_requires_completed_base_hook() -> None:
+    with pytest.raises(NATIVE.AcceptanceError, match="did not complete"):
+        NATIVE.require_hook_completion([])
+    NATIVE.require_hook_completion(
+        [
+            {
+                "method": "hook/completed",
+                "params": {
+                    "run": {
+                        "eventName": "sessionStart",
+                        "source": "plugin",
+                        "sourcePath": "/cache/base/local/hooks/codex.json",
+                        "status": "completed",
+                    }
+                },
+            }
+        ]
+    )
+
+
+def test_fail_open_probe_requires_fresh_exact_diagnostic(tmp_path: Path) -> None:
+    evidence = tmp_path / "failure.txt"
+    with pytest.raises(NATIVE.AcceptanceError, match="no diagnostic evidence"):
+        NATIVE.require_failure_evidence(evidence)
+    evidence.write_text("unrelated failure", encoding="utf-8")
+    with pytest.raises(NATIVE.AcceptanceError, match="unrelated error"):
+        NATIVE.require_failure_evidence(evidence)
+
+
+@pytest.mark.parametrize("host", ["codex", "claude"])
+def test_previous_failure_marker_cannot_satisfy_current_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, host: str
+) -> None:
+    marketplace = tmp_path / "marketplace"
+    (marketplace / "plugins").mkdir(parents=True)
+    artifacts = tmp_path / "artifacts"
+    for name in ("codex", "claude"):
+        evidence = artifacts / ("failure-" + name) / "tier-gate-failure.txt"
+        evidence.parent.mkdir(parents=True)
+        evidence.write_text(NATIVE.FAILURE_PROBE, encoding="utf-8")
+
+    def fixture(project: Path, _environment: dict) -> Path:
+        project.mkdir(parents=True, exist_ok=True)
+        return project
+
+    def operation(*args: object, **kwargs: object) -> None:
+        if kwargs.get("expected_context", True) is None:
+            evidence = Path(args[5]) / "tier-gate-failure.txt"
+            if evidence.parent.name != "failure-" + host:
+                evidence.write_text(NATIVE.FAILURE_PROBE, encoding="utf-8")
+
+    monkeypatch.setattr(NATIVE, "write_fixture", fixture)
+    monkeypatch.setattr(NATIVE, "isolated_environment", lambda *args: {})
+    monkeypatch.setattr(NATIVE, "context_marketplace", lambda *args: marketplace)
+    monkeypatch.setattr(NATIVE, "failure_marketplace", lambda *args: marketplace)
+    monkeypatch.setattr(NATIVE, "accept_codex", operation)
+    monkeypatch.setattr(NATIVE, "accept_claude", operation)
+    with pytest.raises(NATIVE.AcceptanceError, match="no diagnostic evidence"):
+        NATIVE.accept(ROOT, marketplace, SCRIPT, SCRIPT, artifacts, 1)
+
+
+def test_failure_diagnostics_drain_pending_hook_events_and_decode_errors() -> None:
+    server = object.__new__(NATIVE.AppServer)
+    server.messages = queue.Queue()
+    server.notifications = []
+    event = {"method": "hook/completed", "params": {"run": {"status": "failed"}}}
+    server.messages.put(event)
+    server.messages.put(ValueError("malformed hook response"))
+    server.drain_notifications()
+    assert server.notifications == [
+        event,
+        {"diagnosticError": "malformed hook response"},
+    ]
+    server.drain_notifications()
+    assert len(server.notifications) == 2
+
+
+def test_fixture_hashes_canonical_text_and_preserves_binary_members(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "candidate"
+    shutil.copytree(ROOT / "plugins/base", candidate / "plugins/base")
+    for relative in (
+        ".agents/plugins/marketplace.json",
+        ".claude-plugin/marketplace.json",
+    ):
+        target = candidate / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, target)
+    payload = candidate / "plugins/base/payload.txt"
+    payload.write_bytes(b"first\r\nsecond\r\n")
+    binary = b"\xff\x00\r\n"
+    (candidate / "plugins/base/payload.bin").write_bytes(binary)
+    fixture = NATIVE.fixture_marketplace(
+        ROOT,
+        candidate,
+        tmp_path / "fixture",
+        {"plugins/base/changed.txt": b"changed\r\ntext\r"},
+    )
+    package = fixture / "plugins/base"
+    manifest = json.loads((package / "hooks/codex.json").read_text(encoding="utf-8"))
+    command = manifest["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"]
+    expected = re.findall(r"sha256:[a-f0-9]{64}", command)
+    snapshot = NATIVE.load_module(
+        "native_fixture_snapshot", ROOT / ".codex/hooks/snapshot.py"
+    )
+    assert expected == [snapshot.digest_tree(package)]
+    assert (package / "payload.txt").read_bytes() == b"first\nsecond\n"
+    assert (package / "changed.txt").read_bytes() == b"changed\ntext\n"
+    assert (package / "payload.bin").read_bytes() == binary
+
+
+@pytest.mark.parametrize("fresh", [False, True])
+def test_claude_requires_debug_evidence_from_current_startup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fresh: bool
+) -> None:
+    debug = tmp_path / "claude-debug.jsonl"
+    debug.write_text("SessionStart " + NATIVE.CONTEXT_PROBE, encoding="utf-8")
+    response = {
+        "type": "control_response",
+        "response": {
+            "request_id": "native-acceptance-1",
+            "subtype": "success",
+            "response": {
+                "commands": [{"name": "workflow:run"}, {"name": "engineering:commit"}]
+            },
+        },
+    }
+
+    def popen(*args: object, **kwargs: object) -> SimpleNamespace:
+        assert not debug.exists()
+        if fresh:
+            debug.write_text("SessionStart " + NATIVE.CONTEXT_PROBE, encoding="utf-8")
+        return SimpleNamespace(
+            stdin=io.StringIO(),
+            stdout=io.StringIO(json.dumps(response) + "\n"),
+            stderr=io.StringIO(),
+            returncode=0,
+            wait=lambda timeout: 0,
+            poll=lambda: 0,
+        )
+
+    monkeypatch.setattr(NATIVE.subprocess, "Popen", popen)
+    if fresh:
+        NATIVE.accept_claude_init(ROOT, ROOT, SCRIPT, tmp_path, {}, tmp_path, 1)
+    else:
+        with pytest.raises(
+            NATIVE.AcceptanceError, match="did not create its debug artifact"
+        ):
+            NATIVE.accept_claude_init(ROOT, ROOT, SCRIPT, tmp_path, {}, tmp_path, 1)

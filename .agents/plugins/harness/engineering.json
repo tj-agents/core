@@ -4,6 +4,7 @@
   "source_roots": [
     ".agents/dependencies/agent/.agents/agent-store/runtime",
     ".agents/dependencies/agent/.agents/agent/runtime/repository_configuration.py",
+    ".agents/dependencies/cli/.agents/cli/runtime",
     ".agents/engineering",
     ".agents/hooks/docs_reachability.py",
     ".agents/hooks/installed_skills.py",

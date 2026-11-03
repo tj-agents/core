@@ -230,6 +230,10 @@ class EmployerScope(unittest.TestCase):
                 self.assertTrue(any('cannot depend' in item for item in problems))
 
     def test_multiple_matching_employers_are_all_reported(self):
+        subprocess.run(
+            ['git', 'init', '--quiet', str(self.project)],
+            check=True, capture_output=True, timeout=10,
+        )
         (self.project / 'marker').touch()
         payloads = [self.install(name, dict(EMPLOYER, tier=name, detect={'file': 'marker'}))
                     for name in ('employer-a', 'employer-b')]
