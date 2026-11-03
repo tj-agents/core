@@ -89,7 +89,8 @@
         "required": [
           "tj-agents/base",
           "tj-agents/agent-store",
-          "tj-agents/agent"
+          "tj-agents/agent",
+          "tj-agents/cli"
         ],
         "optional": []
       },
@@ -113,6 +114,7 @@
           "tj-agents/agent",
           "tj-agents/agent-store",
           "tj-agents/base",
+          "tj-agents/cli",
           "tj-agents/workflow"
         ],
         "hooks": [],
@@ -129,7 +131,9 @@
             "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)"
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)"
           ],
           "codex_prefix_rules": [
             {
@@ -174,6 +178,34 @@
                   "payments"
                 ]
               ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ],
+              "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ]
             }
           ]
         }
@@ -189,6 +221,11 @@
             "id": "tj-agents/agent",
             "marketplace": "tj-agents",
             "repository": "tj-agents/agent"
+          },
+          {
+            "id": "tj-agents/cli",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/cli"
           }
         ],
         "optional": []
@@ -231,7 +268,6 @@
         "merging",
         "open-pr",
         "open-worktree",
-        "persistent-delivery",
         "plans",
         "pr-preflight",
         "pr-screenshots",
@@ -291,8 +327,6 @@
         "hooks": [],
         "permissions": {
           "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
             "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
@@ -311,34 +345,6 @@
             "PowerShell(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)"
           ],
           "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ],
-              "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ]
-            },
             {
               "pattern": [
                 [
