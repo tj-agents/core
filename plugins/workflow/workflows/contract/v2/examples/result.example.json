@@ -1,0 +1,35 @@
+{
+  "contract_version": "v2",
+  "workflow_id": "plan-execution",
+  "workflow_run_id": "agent-workflows/runtime-001",
+  "stage_id": "contract-discovery",
+  "dispatch_id": "dispatch-001",
+  "status": "complete",
+  "summary": "The canonical generator owns plugin payload and drift validation.",
+  "claims": [
+    {
+      "claim": "The generator consumes the authored payload manifest.",
+      "evidence_ids": ["generator-input"],
+      "confidence": 100,
+      "uncertainty": "",
+      "alternatives": []
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "generator-input",
+      "kind": "repository",
+      "locator": ".agents/sync-generated.ps1",
+      "detail": "The generator loads .agents/plugins/payloads.json before constructing outputs."
+    }
+  ],
+  "acceptance_conditions": [
+    {
+      "condition": "Every claim cites a repository path or immutable artifact.",
+      "passed": true,
+      "evidence_ids": ["generator-input"],
+      "detail": "The only claim cites generator-input."
+    }
+  ],
+  "open_questions": []
+}
