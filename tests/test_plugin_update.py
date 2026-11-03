@@ -17,8 +17,12 @@ class PluginUpdateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             for name in (".agents", ".codex", ".claude"):
-                shutil.copytree(ROOT / name, root / name,
-                                ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "continuation"))
+                patterns = ["__pycache__", "*.pyc"]
+                if name == ".agents":
+                    patterns.append("continuation")
+                shutil.copytree(
+                    ROOT / name, root / name, ignore=shutil.ignore_patterns(*patterns)
+                )
             path = root / ".agents/plugins/harness/engineering.json"
             manifest = json.loads(path.read_text(encoding="utf-8"))
             manifest["requires"]["permissions"]["claude_allow"].append("Bash(python -B fixture.py)")
