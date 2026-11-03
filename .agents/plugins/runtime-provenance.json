@@ -326,7 +326,7 @@
       "adaptation": "Codex host behavior extends and references the canonical .agents workflow definition."
     },
     {
-      "path": ".codex/skills/engineering/persistent-delivery/scripts/delivery_continuation.py",
+      "path": ".codex/runtime/continuation/delivery_continuation.py",
       "source_path": "scripts/delivery_continuation.py",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "0cb3df64b4a9bc7753aab288dc7948f0841e202d635471899ff542ca04bdf1af",
