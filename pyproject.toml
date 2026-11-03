@@ -3,7 +3,7 @@ name = "tj-agents-core"
 version = "0.1.0"
 description = "Common agent behavior, engineering process and machine utilities for tj-agents"
 requires-python = ">=3.12"
-dependencies = ["tj-base"]
+dependencies = ["tj-base", "tj-cli"]
 
 [tool.uv]
 package = false
@@ -13,6 +13,7 @@ members = ["packages/tj-base"]
 
 [tool.uv.sources]
 tj-base = { workspace = true }
+tj-cli = { git = "https://github.com/tj-agents/cli", rev = "f2bdde9a4705c9455e10d5bb044dca5e1f25b2a3", subdirectory = "packages/tj-cli" }
 
 [dependency-groups]
 dev = [
@@ -35,6 +36,7 @@ exclude = ["^plugins/"]
 
 [tool.pytest]
 strict = true
+pythonpath = ["."]
 testpaths = ["tests", ".agents/hooks/tests"]
 addopts = ["--import-mode=importlib", "-ra"]
 filterwarnings = ["error"]

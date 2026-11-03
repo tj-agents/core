@@ -341,6 +341,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "tj-base" },
+    { name = "tj-cli" },
 ]
 
 [package.dev-dependencies]
@@ -351,7 +352,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "tj-base", editable = "packages/tj-base" }]
+requires-dist = [{ name = "tj-base", editable = "packages/tj-base" }, { name = "tj-cli", git = "https://github.com/tj-agents/cli?subdirectory=packages%2Ftj-cli&rev=f2bdde9a4705c9455e10d5bb044dca5e1f25b2a3" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -364,6 +365,11 @@ dev = [
 name = "tj-base"
 version = "0.1.0"
 source = { editable = "packages/tj-base" }
+
+[[package]]
+name = "tj-cli"
+version = "0.1.0"
+source = { git = "https://github.com/tj-agents/cli?subdirectory=packages%2Ftj-cli&rev=f2bdde9a4705c9455e10d5bb044dca5e1f25b2a3#f2bdde9a4705c9455e10d5bb044dca5e1f25b2a3" }
 
 [[package]]
 name = "typing-extensions"

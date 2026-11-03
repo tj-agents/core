@@ -3,6 +3,7 @@
   "plugin": "tj-agents/workflow",
   "source_roots": [
     ".agents/dependencies/agent/.agents/agent-store/runtime",
+    ".agents/dependencies/cli/.agents/cli/runtime",
     ".agents/hooks/installed_skills.py",
     ".agents/hooks/problem_records.py",
     ".agents/tiers/workflow.json",
