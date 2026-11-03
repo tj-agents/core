@@ -1,0 +1,41 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex"
+          }
+        ],
+        "matcher": "*"
+      }
+    ]
+  }
+}

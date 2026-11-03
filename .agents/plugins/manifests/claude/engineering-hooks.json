@@ -1,0 +1,59 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py",
+              "hook",
+              "--host",
+              "claude"
+            ]
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py",
+              "hook",
+              "--host",
+              "claude"
+            ]
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py",
+              "hook",
+              "--host",
+              "claude"
+            ]
+          }
+        ],
+        "matcher": "*"
+      }
+    ]
+  }
+}

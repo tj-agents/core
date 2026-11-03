@@ -29,6 +29,18 @@ another plugin or depend on the author checkout.
 Workflow loads this embedded store implementation from its own package. Agent Store owns the source,
 schema and transaction contract.
 
+Runtime sources can declare an immutable published `revision` in
+`.agents/plugins/runtime-sources.json`. Staging fetches that exact commit and offline verification
+checks both its recorded revision and exported content digest. Local overrides for a pinned source
+must point to that same clean publication.
+
+Managed Agent/Core admission is owned by the embedded Agent export. Each participating Core package
+ships synchronous session, prompt and tool guards plus a `requires.setup` check for refreshers.
+The session guards establish individual bindings; ordinary work requires the complete selected guard
+set. A partial publication or expired binding leaves deterministic native plugin and installer
+maintenance available. Publish Agent first, then advance Core's declared revision to that verified
+publication before publishing Core. Marketplace activates the published pair together.
+
 Resolve shipped files relative to the installed skill or package. Scripts use `$PSScriptRoot`, their own
 file location, or an explicit package-root input. Instructions use `<skill-directory>`. They do not resolve
 repository-owned code through `$env:USERPROFILE`, `$HOME`, `~`, the caller's current directory, or a
