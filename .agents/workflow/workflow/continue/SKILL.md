@@ -35,7 +35,7 @@ A session-local loop does not establish execution after that session exits. If a
 unavailable, continue independent authorized work in the foreground and retain its concrete resolver and
 observable resume condition under `workflow:run`.
 
-Use the selected discipline's existing completion and delivery contract when one applies. Software remote
-delivery reads `references/delivery.md` beside the selected `engineering:merge` entry for PR identity,
-completion evidence, repair, review and merge authority. That package also supplies the Codex CLI transport. Other goals use their own acceptance evidence;
-they do not acquire a PR requirement by selecting this skill.
+For software remote delivery, read [software delivery evidence](references/delivery.md) for PR identity,
+completion evidence, binding, and wake decisions. Engineering still owns the technical review and merge
+checks named there. The installed Workflow package supplies the Codex CLI transport. Other goals use their
+own acceptance evidence; they do not acquire a PR requirement by selecting this skill.

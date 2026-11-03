@@ -85,8 +85,8 @@ out, every test in a suite failing at once) rather than as the defect itself.
    when it fails, so run it in a suitable environment before enqueuing.
 6. On failure, read the remote log first, reproduce only the failing scope in a suitable environment, fix it, run its focused
    regression, and push once. Do not run every local suite before pushing the fix.
-7. Mark the PR ready only once review is clean and exact-head CI is green. Enqueue or merge only on an
-   explicit instruction.
+7. Mark the PR ready only once review is clean and exact-head CI is green. `workflow:run` owns whether the
+   user-authorized goal continues to `engineering:merge`; a CI event alone grants no authority.
 
 Opening a draft PR and pushing checkpoints is part of an authorized implementation workflow. It does not
 authorize merge, deployment, destructive operations, or unrelated external changes.
@@ -94,10 +94,9 @@ authorize merge, deployment, destructive operations, or unrelated external chang
 ## Persistent continuation owns a future delivery decision
 
 When CI, queue, review, publication, or merge will resolve after this turn, load
-`workflow:continue` to select and establish the supported host wake. For software work, its delivery
-reference beside `engineering:merge` supplies exact PR/head identity, completion evidence, authorization
-and the next delivery decision. Harness-specific continuation belongs to that host's Workflow entry;
-the selected Engineering package supplies its required durable Codex CLI transport.
+`workflow:continue` to select and establish the supported host wake. Its software delivery reference
+supplies exact PR/head identity, completion evidence, authority evidence, and the next delivery decision.
+Harness-specific continuation and the durable Codex CLI transport belong to the installed Workflow package.
 
 Bind every remote wait through the shared reconnect-safe monitor before leaving the stage:
 

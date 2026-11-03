@@ -21,7 +21,7 @@ def package_root():
         raise RuntimeError("continuation adapter layout unavailable")
     root = here.parents[3]
     markers = (root / ".agents" / "plugins" / "sources.json", root / ".codex-plugin" / "plugin.json")
-    if not any(marker.is_file() for marker in markers) or not (root / ".agents" / "engineering").is_dir():
+    if not any(marker.is_file() for marker in markers) or not (root / ".agents" / "workflow").is_dir():
         raise RuntimeError("continuation package root unavailable")
     return root
 

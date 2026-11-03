@@ -126,7 +126,7 @@ class CompletionTests(unittest.TestCase):
     def test_generated_package_retains_follow_up_and_allows_completed_exit(self):
         follow_up = self.publisher_follow_up()
         path = self.write_goal(goal(deliveries=[], follow_up=follow_up))
-        package = Path(__file__).resolve().parents[3] / "plugins/engineering/workflows/completion.py"
+        package = Path(__file__).resolve().parents[3] / "plugins/workflow/workflows/completion.py"
         completed = subprocess.run(
             [sys.executable, "-B", str(package), "--goal", str(path), "--root", str(path.parent)],
             capture_output=True, text=True, check=False,
@@ -307,7 +307,7 @@ class CompletionTests(unittest.TestCase):
             {"id": "verified", "criterion": "A result is observed.", "evidence": [],
              "owner": "fixture owner", "next_action": "Run the focused check."},
         ], deliveries=[]))
-        package = Path(__file__).resolve().parents[3] / "plugins/engineering/workflows/completion.py"
+        package = Path(__file__).resolve().parents[3] / "plugins/workflow/workflows/completion.py"
         completed = subprocess.run(
             [sys.executable, "-B", str(package), "--goal", str(path), "--root", str(path.parent)],
             capture_output=True,

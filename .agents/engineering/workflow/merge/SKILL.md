@@ -8,7 +8,8 @@ domain: process
 
 # Landing a PR through the merge queue
 
-Read [software delivery evidence](references/delivery.md) when binding, waiting on or completing a PR.
+Read the software delivery evidence in `workflow:continue`'s `references/delivery.md` when binding,
+waiting on or completing a PR.
 
 The executable counterpart of `engineering:merging`: one pass that takes the current branch's PR
 from green to landed and leaves the workstation on a clean, current base ready for the next task. `merging`
@@ -177,7 +178,7 @@ present:
   the skip took, because those suites never run on a PR at all; only the label, or a correctly-blocked
   trailer, changes what the *queue* runs.
 
-Use the guarded command from [software delivery evidence](references/delivery.md), with `python` on Windows or `python3`
+Use the guarded command from the software delivery evidence in `workflow:continue`'s `references/delivery.md`, with `python` on Windows or `python3`
 on Linux/macOS. It admits a conflict-free, green PR awaiting required review while retaining the exact-head,
 independent-review, repository preference and authorization checks. GitHub still enforces its ruleset.
 
@@ -212,7 +213,7 @@ identity after interruption. The compact transition or terminal document is the 
 unchanged observations remain silent and never create a model turn or user-facing update.
 
 - **A failed check dispatches; it does not retry.** When `workflow:continue` owns the wake, route the
-  exact failed check/run through the software delivery reference beside `engineering:merge`, classify its tier, and immediately dispatch one fresh
+  exact failed check/run through its software delivery reference, classify its tier, and immediately dispatch one fresh
   debugging context with the complete binding and failure signature. Only in the explicit foreground fallback
   with no persistent host capability, emit a ready-to-paste dispatch prompt for a dedicated
   debug session — worktree path, branch, PR, failing scenarios, failure signature — as soon as the failure is
@@ -234,7 +235,7 @@ the merged PR binding, checkpoints the merge, and transfers to the recorded `wor
 stage reconciles an existing successor layer or starts the next branch in a checkout selected under
 `engineering:branching`, before rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
 watermark or delivery binding into the successor; the successor re-resolves merge authorization from the
-goal's recorded authorization (`engineering:merging`).
+goal's recorded authorization under `workflow:run`.
 
 Resolve the primary checkout from the first `worktree` record in `git worktree list --porcelain`; never
 remove that path. When it sits on the merged branch or the default, move it to the fetched remote default

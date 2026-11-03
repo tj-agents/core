@@ -119,7 +119,7 @@ class ProcessStandardsTests(unittest.TestCase):
         remote = authored_skill("remote-validation").read_text(
             encoding="utf-8"
         )
-        shared = (self.root / ".agents/engineering/workflow/merge/references/delivery.md").read_text(encoding="utf-8")
+        shared = (self.root / ".agents/workflow/workflow/continue/references/delivery.md").read_text(encoding="utf-8")
         workflow = authored_skill("workflow:continue").read_text(encoding="utf-8")
         claude = (
             self.root / ".claude/skills/workflow/continue/SKILL.md"
@@ -164,63 +164,17 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("bound PR source head", merging)
 
     def test_merge_authorization_is_goal_scoped_with_one_owner(self):
-        merging = authored_skill("merging").read_text(encoding="utf-8")
-        flat_merging = " ".join(merging.split())
+        run = authored_skill("workflow:run").read_text(encoding="utf-8")
         corpus = " ".join(self.corpus().split())
-
-        self.assertIn("## What authorizes a merge", merging)
-        self.assertIn("Merge authorization is scoped to the goal, not the PR", flat_merging)
-        self.assertIn(
-            "merge authorization for every PR that goal itself creates", flat_merging
-        )
-        self.assertIn("no per-PR re-approval", flat_merging)
-        self.assertIn(
-            "no delivery standard adds a per-PR approval requirement", flat_merging
-        )
-        self.assertEqual(
-            1, corpus.count("Merge authorization is scoped to the goal, not the PR")
-        )
-
-        bodies = {
-            name: " ".join(authored_skill(name).read_text(encoding="utf-8").split())
-            for name in (
-                "merge",
-                "plans",
-                "feature",
-                "bugfix",
-            )
-        }
-        bodies["delivery"] = " ".join((self.root / ".agents/engineering/workflow/merge/references/delivery.md").read_text(encoding="utf-8").split())
-        self.assertIn(
-            "an authorization naming no mode records `auto`",
-            bodies["delivery"],
-        )
-        for referrer, pointer in (
-            (
-                "delivery",
-                "the owning goal record (`engineering:merging` owns that goal-wide scope)",
-            ),
-            (
-                "merge",
-                "re-resolves merge authorization from the goal's recorded "
-                "authorization (`engineering:merging`)",
-            ),
-            (
-                "plans",
-                "default-branch state (`engineering:merging` owns the goal-wide "
-                "merge-authorization scope)",
-            ),
-            (
-                "feature",
-                "covers delivery (`engineering:merging` owns that goal-wide scope)",
-            ),
-            (
-                "bugfix",
-                "covers delivery (`engineering:merging` owns that goal-wide scope)",
-            ),
-        ):
-            with self.subTest(referrer=referrer):
-                self.assertIn(pointer, bodies[referrer])
+        self.assertIn("## Authority and acceptance", run)
+        self.assertEqual(1, corpus.count("## Authority and acceptance"))
+        self.assertNotIn("## What authorizes a merge", corpus)
+        for identity in ("merging", "merge", "plans", "feature", "bugfix", "open-pr", "remote-validation"):
+            with self.subTest(identity=identity):
+                body = authored_skill(identity).read_text(encoding="utf-8")
+                self.assertIn("`workflow:run`", body)
+        delivery = (self.root / ".agents/workflow/workflow/continue/references/delivery.md").read_text(encoding="utf-8")
+        self.assertIn("`workflow:run`", delivery)
 
         for per_pr_reading in (
             "implementation approval never invents merge authority",
