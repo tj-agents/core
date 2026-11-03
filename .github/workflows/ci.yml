@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: tj-agents/template
-          ref: main
+          ref: 187a9ac58b0bb8a176116a74668bcff1162419ba
           path: .template
           persist-credentials: false
 
@@ -111,7 +111,7 @@ jobs:
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         with:
           repository: tj-agents/template
-          ref: main
+          ref: 187a9ac58b0bb8a176116a74668bcff1162419ba
           path: .template
           persist-credentials: false
 
