@@ -1,0 +1,37 @@
+{
+  "contract_version": "v2",
+  "workflow_id": "plan-execution",
+  "workflow_run_id": "agent-workflows/runtime-001",
+  "stage_id": "contract-runtime",
+  "status": "active",
+  "provider_id": "repository",
+  "owner": {
+    "repository": "agents",
+    "worktree": "C:/work/agents",
+    "branch": "Feature/agent-workflows_contract-runtime",
+    "head": "27460f1518ea945d7c0215fdf65b36854103098a"
+  },
+  "artifacts": {
+    "plan": "plans/agent-workflows/AUTOMATED_AGENT_WORKFLOW_FRAMEWORK_PLAN.md",
+    "ledger": "plans/agent-workflows/AUTOMATED_AGENT_WORKFLOW_FRAMEWORK_PROGRESS.md",
+    "roadmap": "plans/agent-workflows/AGENT_WORKFLOWS_ROADMAP.md",
+    "reviews": []
+  },
+  "decisions": ["The repository provider creates no workflow sidecar."],
+  "open_findings": [],
+  "next_action": {
+    "kind": "continue",
+    "description": "Implement the repository-native runtime primitives.",
+    "scope": "whole plan through all remaining phases and terminal delivery.",
+    "current_slice": "Implement the repository-native runtime primitives.",
+    "remaining_scope": "Later phases, review, delivery, and closeout remain.",
+    "done_when": "The full plan reaches its documented terminal state."
+  },
+  "transition": {
+    "contract_version": "v2",
+    "transition": "continue",
+    "owner": "parent",
+    "reason": "The next action is resolved, safe, reversible, and authorized.",
+    "target_stage_id": "contract-runtime"
+  }
+}

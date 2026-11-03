@@ -1,0 +1,10 @@
+{
+  "contract_version": "v2",
+  "record_type": "host-reconciliation-required",
+  "host": "claude",
+  "dispatch_id": "dispatch-001",
+  "writer_lease_id": "lease-001",
+  "reason_code": "invalid-result",
+  "detail": "The writer changed an unleased repository path.",
+  "observed_paths": [".agents/workflows/unleased.txt"]
+}

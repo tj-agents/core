@@ -20,7 +20,7 @@ def runtime_paths():
     if here.parent.parts[-3:] != (".codex", "runtime", "continuation"):
         raise RuntimeError("continuation runtime layout unavailable")
     root = here.parents[3]
-    if not (root / ".agents" / "engineering").is_dir():
+    if not (root / ".agents" / "workflow").is_dir():
         raise RuntimeError("continuation package root unavailable")
     if (root / ".codex-plugin" / "plugin.json").is_file():
         workflows = root / "workflows"
@@ -410,7 +410,7 @@ def launch(path, state, binding, evidence, executable):
               "before deletion, with the same PR and current repo/worktree/branch/head. "
               "A released snapshot cannot override an existing binding or authorize a waiting release. "
               "Successful process exit is not completion. "
-              "For a PR, load persistent-delivery and honor its review/evidence/authority decisions. "
+              "For a PR, read workflow:continue and its software delivery reference and honor its review/evidence/authority decisions. "
               "The supervisor already owns the writer and scheduler; do not recursively initialize, "
               "claim, register or wake this owner. Preserve user host safeguards. "
               "Do not claim same-chat continuation. Stop at an actual authority or human decision gate. "
