@@ -511,13 +511,15 @@
       "id": "tj-agents/docs",
       "name": "docs",
       "package_path": "plugins/docs",
-      "description": "Layout conventions for pages people read.",
+      "description": "Layout, diagram and design-page conventions for pages people read.",
       "platforms": [
         "windows",
         "linux",
         "macos"
       ],
       "skills": [
+        "design",
+        "diagram",
         "layout"
       ],
       "dependencies": {
