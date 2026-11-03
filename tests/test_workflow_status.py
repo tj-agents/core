@@ -495,6 +495,7 @@ class WorkItemStatusTests(WorkflowStatusHarness):
 
     def test_packaged_status_loads_the_adjacent_hidden_runtime_in_isolated_python(self):
         package = self.home / 'packaged status'
+        self.declare_package(package, '.claude-plugin/plugin.json')
         script = package / 'skills/status/scripts/status.py'
         script.parent.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
