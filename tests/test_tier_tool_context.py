@@ -266,7 +266,7 @@ def test_personal_work_personal_operations_use_current_target_scope(
     context = payload / "skills/communication-context"
     context.mkdir(parents=True)
     (context / "SKILL.md").write_text(
-        "---\nname: communication-context\nkind: knowledge\n---\nEmployer contacts.\n",
+        "---\nname: communication-context\nmetadata:\n  tj-agents-kind: reference\n---\nEmployer contacts.\n",
         encoding="utf-8",
     )
     declarations = [
