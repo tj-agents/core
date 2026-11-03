@@ -34,6 +34,8 @@ import runpy
 import shutil
 import subprocess
 import sys
+import time
+from collections.abc import Sequence
 from contextvars import ContextVar
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -56,6 +58,8 @@ WALK_SKIP = frozenset({
 CONTENT_CANDIDATES = 20
 CONTENT_BYTES = 256 * 1024
 GIT_TIMEOUT = 10
+WORKSPACE_REPOSITORIES = 64
+WORKSPACE_ENTRIES = 1024
 REMOTE_HOST_PATTERN = r"(?=.{1,253}\.?(?![\s\S]))[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.?"
 
 
@@ -339,6 +343,13 @@ def evaluate_predicate(root, node, facts=None, contexts=None, path="detect"):
     return _evaluate_predicate(root, node, facts, contexts, path)
 
 
+def _employer_fact(
+        root: Path | str, employers: Sequence[tuple[Declaration, PredicateResult]]) -> PredicateResult:
+    return PredicateResult(root, bool(employers),
+                           [declaration.id + ": " + item for declaration, result in employers
+                            for item in result.evidence])
+
+
 def _evaluate_predicate(root, node, facts=None, contexts=None, path="detect", employer_result=None):
     problems = predicate_diagnostics(node, path)
     if problems:
@@ -394,7 +405,7 @@ def _evaluate_predicate(root, node, facts=None, contexts=None, path="detect", em
 
 
 class SelectionResult:
-    def __init__(self, scope, ubiquitous=(), applicable=(), blocked=(), diagnostics=(), selections=(), employers=()):
+    def __init__(self, scope, ubiquitous=(), applicable=(), blocked=(), diagnostics=(), selections=(), employers=(), inventory=None, scope_state="unclassified", repository_results=()):
         self.scope = str(scope)
         self.ubiquitous = list(ubiquitous)
         self.applicable = list(applicable)
@@ -402,9 +413,19 @@ class SelectionResult:
         self.diagnostics = tuple(diagnostics)
         self.selections = tuple(selections)
         self.employers = tuple(employers)
+        self.inventory = inventory
+        self.scope_state = scope_state
+        self.repository_results = tuple(repository_results)
 
     def __iter__(self):
         return iter((self.ubiquitous, self.applicable, self.blocked))
+
+
+class WorkspaceInventory(list):
+    def __init__(self, repositories=(), complete=True, reason=None):
+        super().__init__(repositories)
+        self.complete = complete
+        self.reason = reason
 
 
 def cache_roots():
@@ -571,6 +592,7 @@ def project_root(payload):
 
 
 GIT_RESULTS = ContextVar("tier_git_results", default=None)
+GIT_DEADLINE = ContextVar("tier_git_deadline", default=None)
 
 
 def _git(root, arguments):
@@ -584,15 +606,24 @@ def _git(root, arguments):
     return result
 
 
+def _git_timeout() -> float:
+    deadline = GIT_DEADLINE.get()
+    return GIT_TIMEOUT if deadline is None else min(GIT_TIMEOUT, deadline - time.monotonic())
+
+
 def _run_git(root, arguments):
+    timeout = _git_timeout()
+    if timeout <= 0:
+        return None
     try:
         completed = process.run(
             ["git", "-C", str(root), *arguments],
             capture_output=True,
             text=True,
-            timeout=GIT_TIMEOUT,
+            encoding="utf-8",
+            timeout=timeout,
         )
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, UnicodeError, subprocess.SubprocessError):
         return None
     if completed.returncode != 0:
         return None
@@ -627,6 +658,117 @@ def repository_host(root):
     return host.rstrip(".").lower()
 
 
+def _repository_boundary(root: Path | str):
+    try:
+        path = Path(root).resolve()
+    except (OSError, ValueError, RuntimeError):
+        return None, "target path could not be resolved"
+    for parent in (path, *path.parents):
+        if _git_timeout() <= 0:
+            return None, "time limit reached while finding the repository boundary"
+        try:
+            (parent / ".git").lstat()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            return None, "repository boundary could not be read"
+        return parent, None
+    return None, None
+
+
+def workspace_repositories(root: Path | str) -> WorkspaceInventory:
+    try:
+        root = Path(root).resolve()
+    except (OSError, ValueError, RuntimeError):
+        return WorkspaceInventory((), False, "target path could not be resolved")
+    cache = GIT_RESULTS.get()
+    key = (str(root), ("workspace-repositories",))
+    if cache is not None and key in cache:
+        return cache[key]
+
+    boundary, boundary_error = _repository_boundary(root)
+    if boundary_error:
+        inventory = WorkspaceInventory((), False, boundary_error)
+    elif boundary is not None:
+        top = _git(boundary, ["rev-parse", "--show-toplevel"])
+        if top is None:
+            inventory = WorkspaceInventory((), False, "repository boundary could not be validated")
+        else:
+            try:
+                resolved = Path(top.strip()).resolve()
+            except (OSError, ValueError):
+                resolved = None
+            if resolved != boundary:
+                inventory = WorkspaceInventory((), False, "repository boundary could not be validated")
+            else:
+                inventory = WorkspaceInventory((boundary,), True)
+    elif _git_timeout() <= 0:
+        inventory = WorkspaceInventory((), False, "time limit reached before inventory")
+    else:
+        repositories = []
+        pending = [root]
+        seen = {_resolved_key(root)}
+        entries_seen = 0
+        reason = None
+        while pending and reason is None:
+            current = pending.pop()
+            try:
+                with os.scandir(current) as entries:
+                    for entry in entries:
+                        entries_seen += 1
+                        if entries_seen > WORKSPACE_ENTRIES:
+                            reason = "directory entry limit reached"
+                            break
+                        if _git_timeout() <= 0:
+                            reason = "time limit reached while inventorying repositories"
+                            break
+                        try:
+                            directory = entry.is_dir(follow_symlinks=False)
+                            linked = entry.is_symlink()
+                        except OSError:
+                            reason = "directory entry could not be read"
+                            break
+                        child = Path(entry.path)
+                        if linked or directory:
+                            try:
+                                child = child.resolve(strict=True)
+                            except (OSError, ValueError, RuntimeError):
+                                reason = "directory or link frontier could not be resolved"
+                                break
+                            if not _within(_resolved_key(child), _resolved_key(root)):
+                                reason = "directory link leaves the workspace"
+                                break
+                            try:
+                                directory = child.is_dir()
+                            except OSError:
+                                reason = "symbolic link frontier could not be read"
+                                break
+                        if not directory:
+                            continue
+                        child_key = _resolved_key(child)
+                        if child_key in seen:
+                            continue
+                        seen.add(child_key)
+                        try:
+                            (child / ".git").lstat()
+                        except FileNotFoundError:
+                            pending.append(child)
+                            continue
+                        except OSError:
+                            reason = "repository boundary could not be read"
+                            break
+                        repositories.append(child)
+                        if len(repositories) > WORKSPACE_REPOSITORIES:
+                            reason = "repository limit reached"
+                            break
+            except OSError:
+                reason = "directory could not be read"
+        inventory = WorkspaceInventory(sorted(repositories[:WORKSPACE_REPOSITORIES]), reason is None, reason)
+    if cache is not None:
+        cache[key] = inventory
+    return inventory
+
+
 def repository_identity(root):
     output = _git(root, ["config", "--get", "remote.origin.url"])
     if output is None:
@@ -646,7 +788,19 @@ def _tracked_matches(root, patterns):
     output = _git(root, ["ls-files", "-z", "--cached", "--", *patterns])
     if output is None:
         return None
-    return [entry for entry in output.split("\0") if entry]
+    return [entry for entry in output.split("\0") if entry and _local_path(root, entry)]
+
+
+def _local_path(root, relative):
+    try:
+        root = Path(root).resolve()
+        target = (root / relative).resolve()
+        target.relative_to(root)
+        boundary, error = _repository_boundary(target if target.is_dir() else target.parent)
+        root_boundary, root_error = _repository_boundary(root)
+        return error is None and root_error is None and boundary == root_boundary
+    except (OSError, ValueError, RuntimeError):
+        return False
 
 
 def _walked_files(root):
@@ -663,9 +817,13 @@ def _walked_files(root):
             directories[:] = []
         else:
             directories[:] = [
-                name for name in directories if name not in WALK_SKIP and not name.startswith(".")
+                name for name in directories
+                if name not in WALK_SKIP and not name.startswith(".")
+                and not (Path(current) / name / ".git").exists()
+                and _local_path(root, relative / name)
             ]
-        files.extend(((relative / name).as_posix(), os.path.normcase(name)) for name in names)
+        files.extend(((relative / name).as_posix(), os.path.normcase(name)) for name in names
+                     if _local_path(root, relative / name))
     if cache is not None:
         cache[key] = files
     return files
@@ -683,13 +841,17 @@ def _walked_matches(root, patterns):
 
 
 def _ignored(root, paths):
+    timeout = _git_timeout()
+    if timeout <= 0:
+        return set()
     try:
         completed = process.run(
             ["git", "-C", str(root), "check-ignore", "-z", "--stdin"],
             input="\0".join(paths),
             capture_output=True,
             text=True,
-            timeout=GIT_TIMEOUT,
+            encoding="utf-8",
+            timeout=timeout,
         )
     except (OSError, subprocess.SubprocessError):
         return set()
@@ -721,7 +883,7 @@ def stack_present(root, detect):
         if not isinstance(name, str):
             continue
         try:
-            if (root / name).exists():
+            if (root / name).exists() and _local_path(root, name):
                 return True, name
         except OSError:
             continue
@@ -786,37 +948,155 @@ def declaration_diagnostics(declaration):
     return tuple(problems)
 
 
+def personal_adoption(root: Path | str) -> PredicateResult:
+    boundary, error = _repository_boundary(root)
+    if boundary is None or error:
+        return PredicateResult(root)
+    path = boundary / ".agents" / "plugins.json"
+    try:
+        if path.is_symlink() or path.parent.is_symlink() or not _local_path(boundary, path):
+            raise ValueError("Personal adoption must be repository-local")
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+        if (not isinstance(value, dict) or type(value.get("schema_version")) is not int
+                or value["schema_version"] != 1):
+            raise ValueError("Expected repository plugin selection schema 1")
+        plugins, marketplaces = value.get("plugins"), value.get("marketplaces")
+        if (not isinstance(plugins, list) or not all(isinstance(item, str) for item in plugins)
+                or not isinstance(marketplaces, dict)):
+            raise ValueError("Repository plugin selection is malformed")
+        marketplace = marketplaces.get("tj-agents")
+        matched = ("personal@tj-agents" in plugins and isinstance(marketplace, dict)
+                   and marketplace.get("repository") == "tj-agents/marketplace")
+        return PredicateResult(root, matched, ("explicit Personal adoption",) if matched else ())
+    except FileNotFoundError:
+        return PredicateResult(root)
+    except (OSError, UnicodeError, ValueError, RuntimeError) as error:
+        return PredicateResult(root, diagnostics=(diagnostic("invalid-repository-adoption", str(path), str(error)),))
+
+
+def _legacy_result(root, declaration, inventory) -> PredicateResult:
+    scopes = inventory or [Path(root)]
+    if inventory and not inventory.complete:
+        return PredicateResult(root, prerequisites=("workspace-inventory",), diagnostics=(
+            diagnostic("incomplete-workspace-inventory", str(root), inventory.reason or "Repository inventory is incomplete"),))
+    results = [stack_present(scope, declaration.detect) for scope in scopes]
+    if not all(present for present, _ in results):
+        return PredicateResult(root)
+    return PredicateResult(root, True, (evidence for _, evidence in results if evidence))
+
+
 def assess(root, found=None, facts=None, contexts=None):
     token = GIT_RESULTS.set({})
+    deadline_token = GIT_DEADLINE.set(time.monotonic() + GIT_TIMEOUT)
     try:
         return _assess(root, found, facts, contexts)
     finally:
+        GIT_DEADLINE.reset(deadline_token)
         GIT_RESULTS.reset(token)
 
 
 def _assess(root, found=None, facts=None, contexts=None):
+    if not Path(root).is_dir():
+        anchor = _existing_path(Path(root))
+        boundary, error = _repository_boundary(anchor)
+        inventory = workspace_repositories(boundary) if boundary else WorkspaceInventory((), error is None, error)
+        return _assess_one(boundary or anchor, found, facts, contexts, inventory=inventory)
+    inventory = workspace_repositories(root)
+    if not inventory.complete:
+        return _incomplete_selection(root, found, inventory)
+    if inventory:
+        boundary, error = _repository_boundary(root)
+        if boundary is not None and error is None:
+            return _assess_one(boundary, found, facts, contexts)
+        results = [_assess_one(repository, found, facts, contexts) for repository in inventory]
+        return _aggregate_selection(root, inventory, results)
+    return _assess_one(root, found, facts, contexts)
+
+
+def _incomplete_selection(root, found, inventory):
+    declarations_here = list(declarations(project=root) if found is None else found)
+    diagnostic_entry = diagnostic("incomplete-workspace-inventory", str(root), inventory.reason or "Repository inventory is incomplete")
+    ubiquitous = [declaration for declaration in declarations_here
+                  if not (declaration.plugin == "personal" and declaration.marketplace == "tj-agents")
+                  and not declaration.gated and not declaration_diagnostics(declaration)]
+    blocked = [declaration for declaration in declarations_here if declaration not in ubiquitous]
+    problems = [problem for declaration in declarations_here for problem in declaration_diagnostics(declaration)]
+    return SelectionResult(root, ubiquitous, (), blocked, (diagnostic_entry, *problems), inventory=inventory,
+                           scope_state="undetermined")
+
+
+def _aggregate_selection(root, inventory, results):
+    def common(items):
+        def declaration(item):
+            return item if isinstance(item, Declaration) else item[0]
+
+        identifiers = set.intersection(*(set(declaration(item).id for item in result) for result in items))
+        first = {declaration(item).id: item for item in items[0]}
+        return [first[identifier] for identifier in sorted(identifiers)
+                if all(any(declaration(item).id == identifier
+                           and declaration(item).data == declaration(first[identifier]).data
+                           and declaration(item).payload_dir == declaration(first[identifier]).payload_dir
+                           for item in result) for result in items)]
+
+    ubiquitous = common([result.ubiquitous for result in results])
+    applicable = common([result.applicable for result in results])
+    blocked = []
+    for result in results:
+        for declaration in result.blocked:
+            if declaration.id not in {item.id for item in blocked}:
+                blocked.append(declaration)
+    employers = common([result.employers for result in results])
+    diagnostics = tuple(problem for result in results for problem in result.diagnostics)
+    established = {result.scope_state for result in results if result.scope_state in {"work", "personal"}}
+    if any(result.scope_state == "undetermined" for result in results):
+        scope_state = "undetermined"
+    elif len(established) > 1:
+        scope_state = "mixed"
+    elif len(established) == 1 and all(result.scope_state == next(iter(established)) for result in results):
+        scope_state = next(iter(established))
+    else:
+        scope_state = "undetermined"
+    organizational = lambda declaration: ((declaration.plugin == "personal" and declaration.marketplace == "tj-agents")
+                                           or declaration.employer is not None
+                                           or predicate_uses_fact(declaration.detect, "employer"))
+    if scope_state not in {"work", "personal"}:
+        applicable = [item for item in applicable if not organizational(item[0])]
+        employers = []
+    elif scope_state == "personal":
+        applicable = [item for item in applicable if not (item[0].employer is not None or predicate_uses_fact(item[0].detect, "employer"))]
+        employers = []
+    selections = results[0].selections if len(results) == 1 else ()
+    return SelectionResult(root, ubiquitous, applicable, blocked, diagnostics, selections, employers, inventory,
+                           scope_state, results)
+
+
+def _assess_one(root, found=None, facts=None, contexts=None, inventory=None):
+    if inventory is None:
+        inventory = workspace_repositories(root)
+    if not inventory.complete:
+        return _incomplete_selection(root, found, inventory)
     diagnostics = []
     selections = []
     found = list(declarations(project=root) if found is None else found)
-    if not found:
-        return SelectionResult(root, diagnostics=diagnostics)
 
     forced = overridden()
-    identity = None
     ubiquitous, applicable, blocked = [], [], []
     problems_by_id = {declaration.id: declaration_diagnostics(declaration) for declaration in found}
     employers = []
     employer_predicates = {}
-    for declaration in found:
-        if declaration.employer is None or problems_by_id[declaration.id]:
-            continue
-        result = evaluate_predicate(root, declaration.detect, facts, contexts)
+    employer_declarations = [declaration for declaration in found
+                             if declaration.employer is not None and not problems_by_id[declaration.id]]
+    for declaration in employer_declarations:
+        result = _evaluate_predicate(root, declaration.detect, facts, contexts) if inventory else PredicateResult(root)
         employer_predicates[declaration.id] = result
         if result.matched:
             employers.append((declaration, result))
-    employer_result = PredicateResult(root, bool(employers),
-                                     [declaration.id + ": " + item for declaration, result in employers
-                                      for item in result.evidence])
+    employer_result = _employer_fact(root, employers)
+    adoption = personal_adoption(root)
+    if adoption.matched and employers:
+        adoption = PredicateResult(root, diagnostics=(diagnostic("organizational-scope-conflict", str(root),
+                                   "Employer evidence conflicts with Personal adoption"),))
+    diagnostics.extend(adoption.diagnostics)
     for declaration in found:
         problems = problems_by_id[declaration.id]
         if problems:
@@ -826,13 +1106,25 @@ def _assess(root, found=None, facts=None, contexts=None):
                                "prerequisites": (), "evidence": (), "diagnostics": problems})
             blocked.append(declaration)
             continue
+        if declaration.plugin == "personal" and declaration.marketplace == "tj-agents":
+            result = adoption
+            selections.append({"plugin_id": declaration.id, "scope": result.scope,
+                               "predicate": {"repository_adoption": "personal@tj-agents"},
+                               "matched": result.matched, "prerequisites": result.prerequisites,
+                               "evidence": result.evidence, "diagnostics": result.diagnostics})
+            if result.matched:
+                applicable.append((declaration, "explicit repository adoption"))
+            else:
+                blocked.append(declaration)
+            continue
         if not declaration.gated:
             ubiquitous.append(declaration)
             continue
         if declaration.schema_version == 3:
             result = employer_predicates.get(declaration.id)
             if result is None:
-                result = _evaluate_predicate(root, declaration.detect, facts, contexts, employer_result=employer_result)
+                result = _evaluate_predicate(root, declaration.detect, facts, contexts,
+                                             employer_result=employer_result)
             selections.append({"plugin_id": declaration.id, "scope": result.scope,
                                "predicate": declaration.detect, "matched": result.matched,
                                "prerequisites": result.prerequisites, "evidence": result.evidence,
@@ -847,18 +1139,35 @@ def _assess(root, found=None, facts=None, contexts=None):
             applicable.append((declaration, "forced by " + OVERRIDE_VARIABLE))
             continue
         if declaration.owner_repositories:
-            if identity is None:
-                identity = repository_identity(root) or ""
-            if identity and identity in declaration.owner_repositories:
+            scopes = inventory or [Path(root)]
+            identities = [repository_identity(scope) or "" for scope in scopes]
+            if scopes and all(identity in declaration.owner_repositories for identity in identities):
                 applicable.append((declaration, "this is the tier's own repository"))
                 continue
-        present, evidence = stack_present(root, declaration.detect)
-        if present:
-            found_at = " (" + evidence + ")" if evidence else ""
+        result = _legacy_result(root, declaration, inventory)
+        if result.matched:
+            found_at = " (" + result.evidence[0] + ")" if result.evidence else ""
             applicable.append((declaration, declaration.stack + " detected" + found_at))
         else:
+            diagnostics.extend(result.diagnostics)
             blocked.append(declaration)
-    return SelectionResult(root, ubiquitous, applicable, blocked, diagnostics, selections, employers)
+    if _git_timeout() <= 0:
+        return _incomplete_selection(root, found, WorkspaceInventory(inventory, False, "time limit reached while evaluating repositories"))
+    conflict = any(problem["code"] == "organizational-scope-conflict" for problem in diagnostics)
+    scope_state = "unclassified"
+    if conflict:
+        scope_state = "undetermined"
+        applicable = [item for item in applicable if item[0].employer is None
+                      and not predicate_uses_fact(item[0].detect, "employer")]
+        employers = []
+    elif adoption.matched:
+        scope_state = "personal"
+    elif employers:
+        scope_state = "work"
+    elif not inventory or diagnostics:
+        scope_state = "undetermined"
+    return SelectionResult(root, ubiquitous, applicable, blocked, diagnostics, selections, employers,
+                           inventory, scope_state)
 
 
 def statement(root, found=None):
@@ -868,7 +1177,15 @@ def statement(root, found=None):
             declaration.session_context for declaration in ubiquitous):
         return ""
 
-    lines = ["Tier gate - which standards apply in this project"]
+    lines = ["Tier gate - standards for: " + result.scope]
+    if result.repository_results:
+        lines.append("Shared context applies only to the repositories in this completed inventory.")
+    else:
+        lines.append("Repository context excludes nested Git roots.")
+    lines.append("Typed file operations resolve their target paths. Before an opaque shell operation, "
+                 "an unsupported tool, or an edit crossing repositories, query this hook with "
+                 "`--path <target>` for every target and apply only that repository's context. "
+                 "A previous repository's context does not apply to another repository.")
     lines.extend("Configuration diagnostic: " + problem["path"] + ": " + problem["message"]
                  for problem in result.diagnostics)
     if ubiquitous:
@@ -887,18 +1204,32 @@ def statement(root, found=None):
     for declaration in [*ubiquitous, *(item for item, _ in applicable)]:
         if declaration.session_context:
             lines.append(declaration.session_context)
-    if blocked:
+    if result.scope_state == "mixed":
+        lines.append("Organizational scope is mixed across the repositories in this folder. Resolve each target "
+                     "repository before applying Work or Personal standards.")
+    elif result.scope_state == "undetermined":
+        reason = result.inventory.reason if result.inventory and result.inventory.reason else "repository scope could not be established"
+        lines.append("Organizational scope is undetermined: " + reason + ". Resolve each target repository "
+                     "before applying Work or Personal standards.")
+    elif result.scope_state == "unclassified" and result.inventory and result.inventory:
+        lines.append("Organizational scope is unclassified across the repositories in this folder. Resolve each "
+                     "target repository before applying Work or Personal standards.")
+    organizational = [declaration for declaration in blocked
+                      if (declaration.plugin == "personal" and declaration.marketplace == "tj-agents")
+                      or declaration.employer is not None or predicate_uses_fact(declaration.detect, "employer")]
+    technical = [declaration for declaration in blocked if declaration not in organizational]
+    if (technical and result.inventory is not None and result.inventory.complete
+            and not result.diagnostics and len(result.repository_results) <= 1):
         names = ", ".join(
             "`" + declaration.plugin + ":*` (no " + declaration.stack + " here)"
-            for declaration in blocked
+            for declaration in technical
         )
         lines.append(
             "Does not apply here: " + names + ". Those standards describe code this project does "
             "not contain; do not invoke them or apply their rules to this project's code. "
             "For an explicitly requested standards-source audit, read canonical source files as "
             "the subject of the investigation and cite them as evidence. That inspection does not "
-            "load them as governing instructions or make their tier applicable. Installed skill "
-            "invocations and cached skill loads remain gated."
+            "load them as governing instructions or make their tier applicable."
         )
     return "\n".join(lines)
 
@@ -1007,14 +1338,170 @@ def front_matter(text):
     return text[:end] if end != -1 else ""
 
 
+def _existing_path(path: Path) -> Path:
+    candidate = path.expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    candidate = candidate.resolve(strict=False)
+    if candidate.exists() and not candidate.is_dir():
+        candidate = candidate.parent
+    while not candidate.exists() and candidate != candidate.parent:
+        candidate = candidate.parent
+    return candidate
+
+
+def path_selection(path: str, cwd=None) -> dict[str, object]:
+    raw = Path(path)
+    try:
+        target = (Path(cwd) / raw) if cwd and not raw.is_absolute() else raw
+        target = target.expanduser().resolve(strict=False)
+        anchor = _existing_path(target)
+    except (OSError, ValueError, RuntimeError) as error:
+        return {"path": path, "repository": None, "scope": "undetermined", "scope_state": "undetermined",
+                "complete": False, "context": "Target path is unresolved; resolve it before applying standards.",
+                "diagnostics": [diagnostic("target-path", path, str(error))]}
+    boundary, error = _repository_boundary(anchor)
+    scope = boundary or anchor
+    result = assess(scope if target.is_dir() else target)
+    return {
+        "path": str(raw),
+        "anchor": str(anchor),
+        "repository": str(boundary) if boundary else None,
+        "scope": "repository" if boundary else "directory",
+        "scope_state": result.scope_state,
+        "complete": result.inventory is not None and result.inventory.complete and error is None,
+        "applicable": [declaration.id for declaration, _ in result.applicable],
+        "repositories": [{"repository": item.scope, "scope_state": item.scope_state,
+                          "applicable": [declaration.id for declaration, _ in item.applicable]}
+                         for item in result.repository_results],
+        "context": _target_context(anchor, boundary, result),
+        "diagnostics": [*result.diagnostics, *([] if error is None else [
+            diagnostic("repository-boundary", str(anchor), error)])],
+    }
+
+
+def _target_context(anchor, boundary, result) -> str:
+    if boundary:
+        lines = ["Tier gate - target repository: " + str(boundary),
+                 "Repository scope excludes nested Git roots."]
+    else:
+        lines = ["Tier gate - target directory or search scope: " + str(anchor)]
+    lines.append("Organizational scope: " + result.scope_state + ".")
+    for declaration, reason in result.applicable:
+        lines.append("Applies here: `" + declaration.plugin + ":*` - " + reason + ".")
+    for declaration, _ in result.employers:
+        path = employer_context_path(declaration.payload_dir, declaration.employer["context_skill"])
+        lines.append("Employer context: `" + declaration.plugin + ":" + declaration.employer["context_skill"]
+                     + "` - " + str(path))
+    for declaration, _ in result.applicable:
+        if declaration.session_context:
+            lines.append(declaration.session_context)
+    if result.scope_state in {"mixed", "unclassified", "undetermined"}:
+        lines.append("Resolve this repository before applying Work or Personal standards.")
+    lines.extend("Configuration diagnostic: " + problem["path"] + ": " + problem["message"]
+                 for problem in result.diagnostics)
+    return "\n".join(lines)
+
+
+def _patch_paths(value: object) -> list[str]:
+    if not isinstance(value, str):
+        return []
+    lines = value.strip().splitlines()
+    if len(lines) < 3 or lines[0] != "*** Begin Patch" or lines[-1] != "*** End Patch":
+        return []
+    paths = []
+    operation = None
+    can_move = False
+    for line in lines[1:-1]:
+        match = re.fullmatch(r"\*\*\* (Update|Add|Delete) File: (.+)", line)
+        if match is not None:
+            operation = match.group(1)
+            can_move = operation == "Update"
+            paths.append(match.group(2))
+            continue
+        match = re.fullmatch(r"\*\*\* Move to: (.+)", line)
+        if match is not None:
+            if not can_move:
+                return []
+            paths.append(match.group(1))
+            can_move = False
+            continue
+        can_move = False
+        if operation == "Add" and line.startswith("+"):
+            continue
+        if operation == "Update" and (line.startswith((" ", "+", "-", "@@"))
+                                      or line == "*** End of File" or line == ""):
+            continue
+        return []
+    return paths
+
+
+def tool_paths(payload: object) -> list[str]:
+    if not isinstance(payload, dict):
+        return []
+    name = _text(payload.get("tool_name"))
+    tool_input = payload.get("tool_input")
+    if not isinstance(tool_input, dict):
+        return []
+    if name in {"Read", "Edit", "Write"}:
+        value = _text(tool_input.get("file_path"))
+        return [value] if value else []
+    if name in {"Glob", "Grep"}:
+        value = _text(tool_input.get("path")) or _payload_cwd(payload)
+        return [value] if value else []
+    if name == "apply_patch":
+        return _patch_paths(tool_input.get("command"))
+    return []
+
+
+def _payload_cwd(payload: dict[str, object]) -> str:
+    tool_input = payload.get("tool_input")
+    values = (payload.get("cwd"), payload.get("project_dir"),
+              tool_input.get("cwd") if isinstance(tool_input, dict) else None)
+    return next((value for value in values if isinstance(value, str) and value), "")
+
+
+def tool_context(payload: object) -> str:
+    if not isinstance(payload, dict):
+        return "Resolve target paths with tier_gate.py --path before applying standards."
+    contexts = []
+    for path in tool_paths(payload):
+        context = path_selection(path, _payload_cwd(payload))["context"]
+        if isinstance(context, str) and context and context not in contexts:
+            contexts.append(context)
+    return "\n\n".join(contexts) or "Resolve target paths with tier_gate.py --path before applying standards."
+
+
+def _stdin_payload():
+    try:
+        value = sys.stdin.buffer.read().decode("utf-8-sig")
+        return json.loads(value) if value.strip() else {}
+    except (OSError, UnicodeError, ValueError):
+        return {}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--session-context", action="store_true")
+    parser.add_argument("--tool-context", action="store_true")
+    parser.add_argument("--path", action="append", default=[])
     parser.add_argument("--project", default=None)
     arguments = parser.parse_args()
 
     if sys.version_info < (3, 9):
         print("tier gate: Python 3.9 or newer is required.", file=sys.stderr)
+        return 0
+
+    if arguments.path:
+        print(json.dumps({"paths": [path_selection(path) for path in arguments.path]}, ensure_ascii=True))
+        return 0
+
+    if arguments.tool_context:
+        context = tool_context(_stdin_payload())
+        if context:
+            print(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "PreToolUse", "additionalContext": context
+            }}, ensure_ascii=True))
         return 0
 
     if not arguments.session_context:
