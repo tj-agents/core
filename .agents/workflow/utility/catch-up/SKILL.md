@@ -19,6 +19,9 @@ not resume, merge, rebase or close anything. Continuing a named goal afterwards 
 3. **Find what happened since on the same subjects.** Search newer commits, PRs and issues in every
    repository the conversation touched, by subject as well as by name. A later change may have merged,
    closed, reverted or replaced an item under a different title. Name what was searched.
+   Query the session store through `agent:recover` by each branch, PR and work item touched: a closed
+   session whose work item is still active or whose PR is unmerged is stalled work, reported with its
+   session id and reopen action.
 4. **Report one line per item, then stop**: done, superseded by a named change, still open with its next
    action and owner, or an obsolete question. Lead with whether the requested work is done. Acting on any
    item is a separate request.
@@ -29,4 +32,5 @@ Self-repair move: done, template#60 and core#535 merged; installed template list
 Approval-command rule: superseded by personal#58, whose gh wrapper prints the command.
 Question "rebase personal#50?": obsolete, #50 closed by #58.
 core#532: still open and unreviewed; probably obsolete after #58, the user's decision.
+Stalled: template#56 and core#528 draft, owner codex:01a187bc closed since 10-30; reopen it to finish.
 ```
