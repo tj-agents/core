@@ -119,7 +119,7 @@ class ProcessStandardsTests(unittest.TestCase):
         remote = authored_skill("remote-validation").read_text(
             encoding="utf-8"
         )
-        shared = (self.root / ".agents/workflow/workflow/continue/references/delivery.md").read_text(encoding="utf-8")
+        shared = (self.root / ".agents/workflow/skills/continue/references/delivery.md").read_text(encoding="utf-8")
         workflow = authored_skill("workflow:continue").read_text(encoding="utf-8")
         claude = (
             self.root / ".claude/skills/workflow/continue/SKILL.md"
@@ -173,7 +173,7 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(identity=identity):
                 body = authored_skill(identity).read_text(encoding="utf-8")
                 self.assertIn("`workflow:run`", body)
-        delivery = (self.root / ".agents/workflow/workflow/continue/references/delivery.md").read_text(encoding="utf-8")
+        delivery = (self.root / ".agents/workflow/skills/continue/references/delivery.md").read_text(encoding="utf-8")
         self.assertIn("`workflow:run`", delivery)
 
         for per_pr_reading in (
