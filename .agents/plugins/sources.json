@@ -42,6 +42,18 @@
     "base": {
       "codex": ".agents/plugins/manifests/codex/base-hooks.json",
       "claude": ".agents/plugins/manifests/claude/base-hooks.json"
+    },
+    "workflow": {
+      "claude": ".agents/plugins/manifests/claude/workflow-hooks.json",
+      "codex": ".agents/plugins/manifests/codex/workflow-hooks.json"
+    },
+    "engineering": {
+      "claude": ".agents/plugins/manifests/claude/engineering-hooks.json",
+      "codex": ".agents/plugins/manifests/codex/engineering-hooks.json"
+    },
+    "docs": {
+      "claude": ".agents/plugins/manifests/claude/docs-hooks.json",
+      "codex": ".agents/plugins/manifests/codex/docs-hooks.json"
     }
   },
   "generated_roots": [
@@ -291,6 +303,51 @@
       "plugin": "engineering",
       "source": ".codex/runtime/continuation",
       "destination": ".codex/runtime/continuation"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/hooks/admission_setup.py",
+      "destination": ".agents/hooks/admission_setup.py"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/dependencies/agent/.agents/agent/runtime",
+      "destination": "dependencies/agent/.agents/agent/runtime"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".codex/hooks/snapshot.py",
+      "destination": "hooks/codex/snapshot.py"
+    },
+    {
+      "plugin": "workflow",
+      "source": ".agents/hooks/admission_setup.py",
+      "destination": ".agents/hooks/admission_setup.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".codex/hooks/snapshot.py",
+      "destination": "hooks/codex/snapshot.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/admission_setup.py",
+      "destination": ".agents/hooks/admission_setup.py"
+    },
+    {
+      "plugin": "docs",
+      "source": ".agents/dependencies/agent/.agents/agent/runtime",
+      "destination": "dependencies/agent/.agents/agent/runtime"
+    },
+    {
+      "plugin": "docs",
+      "source": ".codex/hooks/snapshot.py",
+      "destination": "hooks/codex/snapshot.py"
+    },
+    {
+      "plugin": "docs",
+      "source": ".agents/hooks/admission_setup.py",
+      "destination": ".agents/hooks/admission_setup.py"
     }
   ],
   "prerequisites": {

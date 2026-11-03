@@ -15,10 +15,21 @@
     "plugins": [
       "tj-agents/docs"
     ],
-    "hooks": [],
+    "hooks": [
+      {
+        "path": "dependencies/agent/.agents/agent/runtime/managed_admission.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      }
+    ],
     "permissions": {
       "claude_allow": [],
       "codex_prefix_rules": []
+    },
+    "setup": {
+      "script": ".agents/hooks/admission_setup.py"
     }
   }
 }

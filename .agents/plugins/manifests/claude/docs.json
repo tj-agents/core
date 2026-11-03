@@ -10,5 +10,6 @@
     "layout"
   ],
   "displayName": "Documentation",
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "hooks": "./hooks/claude.json"
 }

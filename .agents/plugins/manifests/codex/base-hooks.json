@@ -5,11 +5,46 @@
         "hooks": [
           {
             "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context",
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context",
             "timeout": 30
           }
         ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py\" hook --host codex"
+          }
+        ],
+        "matcher": "*"
       }
     ]
   }

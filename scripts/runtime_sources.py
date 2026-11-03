@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
+import io
 import json
-from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import sys
 import tempfile
-
+from pathlib import Path, PurePosixPath
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 TIMEOUT = 120
@@ -37,12 +39,22 @@ def relative(value: object) -> str:
     return value
 
 
+def generated_cache(path: Path) -> bool:
+    if path.parent.name != "__pycache__" or path.suffix != ".pyc":
+        return False
+    try:
+        importlib.util.source_from_cache(str(path))
+    except ValueError:
+        return False
+    return True
+
+
 def files(directory: Path) -> dict[str, bytes]:
     result = {}
     for path in sorted(directory.rglob("*")):
         if path.is_symlink() or getattr(path, "is_junction", lambda: False)():
             raise ValueError(f"Runtime source contains a link: {path}")
-        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc":
+        if path.is_file() and not generated_cache(path):
             result[path.relative_to(directory).as_posix()] = path.read_bytes()
     return result
 
@@ -50,32 +62,60 @@ def files(directory: Path) -> dict[str, bytes]:
 def digest(contents: dict[str, bytes]) -> str:
     value = hashlib.sha256()
     for name, body in sorted(contents.items()):
-        value.update(name.encode("utf-8") + b"\0" + str(len(body)).encode("ascii") + b"\0" + body)
+        value.update(
+            name.encode("utf-8") + b"\0" + str(len(body)).encode("ascii") + b"\0" + body
+        )
     return value.hexdigest()
 
 
-def declarations(root: Path) -> dict[str, dict]:
+def declarations(root: Path) -> dict[str, dict[str, Any]]:
     path = root / ".agents/plugins/runtime-sources.json"
     if not path.exists():
         return {}
     document = json.loads(path.read_text(encoding="utf-8"))
-    if set(document) != {"schema_version", "sources"} or document["schema_version"] != 1:
+    if (
+        set(document) != {"schema_version", "sources"}
+        or document["schema_version"] != 1
+    ):
         raise ValueError("Invalid runtime source declaration")
-    sources = document["sources"]
+    sources: dict[str, dict[str, Any]] = document["sources"]
     if not isinstance(sources, dict):
         raise ValueError("Runtime sources must be an object")
     for name, source in sources.items():
-        if not name.isascii() or not name.replace("-", "").isalnum() or name.lower() != name:
+        if (
+            not name.isascii()
+            or not name.replace("-", "").isalnum()
+            or name.lower() != name
+        ):
             raise ValueError(f"Invalid runtime source name: {name!r}")
-        if not isinstance(source, dict) or set(source) != {"repository", "package", "exports"}:
+        if (
+            not isinstance(source, dict)
+            or set(source) - {"repository", "package", "exports", "revision"}
+            or not {"repository", "package", "exports"}.issubset(source)
+        ):
             raise ValueError(f"Invalid runtime source: {name}")
+        revision = source.get("revision")
+        if "revision" in source and (
+            not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision)
+        ):
+            raise ValueError(f"Invalid immutable runtime revision: {name}")
         repository = source["repository"]
-        if not isinstance(repository, str) or not re.fullmatch(r"tj-agents/[a-z][a-z0-9-]*", repository):
+        if not isinstance(repository, str) or not re.fullmatch(
+            r"tj-agents/[a-z][a-z0-9-]*", repository
+        ):
             raise ValueError(f"Unapproved runtime publisher: {repository!r}")
-        if not isinstance(source["package"], str) or not relative(source["package"]).startswith("plugins/"):
-            raise ValueError(f"Runtime package must belong to plugins: {source['package']!r}")
+        if not isinstance(source["package"], str) or not relative(
+            source["package"]
+        ).startswith("plugins/"):
+            raise ValueError(
+                f"Runtime package must belong to plugins: {source['package']!r}"
+            )
         exports = source["exports"]
-        if not isinstance(exports, list) or not exports or len(set(exports)) != len(exports):
+        if (
+            not isinstance(exports, list)
+            or not exports
+            or len(set(exports)) != len(exports)
+        ):
             raise ValueError(f"Runtime exports must be nonempty and unique: {name}")
         for export in exports:
             if not relative(export).startswith(".agents/"):
@@ -98,15 +138,90 @@ def export_contents(source: Path, exports: list[str]) -> dict[str, bytes]:
     return result
 
 
-def git(*arguments: str) -> str:
-    result = subprocess.run(["git", *arguments], stdin=subprocess.DEVNULL, capture_output=True,
-                            text=True, encoding="utf-8", errors="replace", timeout=TIMEOUT, check=False)
+def git_output(*arguments: str, input_bytes: bytes | None = None) -> bytes:
+    result = subprocess.run(
+        ["git", "--no-replace-objects", *arguments],
+        stdin=subprocess.DEVNULL if input_bytes is None else None,
+        input=input_bytes,
+        capture_output=True,
+        timeout=TIMEOUT,
+        check=False,
+    )
     if result.returncode:
-        raise ValueError(result.stderr.strip() or "Runtime source Git command failed")
-    return result.stdout.strip()
+        raise ValueError(
+            result.stderr.decode("utf-8", errors="replace").strip()
+            or "Runtime source Git command failed"
+        )
+    return result.stdout
 
 
-def stage(root: Path, overrides: dict[str, Path], check: bool = False) -> list[dict]:
+def git(*arguments: str) -> str:
+    return git_output(*arguments).decode("utf-8", errors="replace").strip()
+
+
+def pinned_contents(
+    checkout: Path, source: dict[str, Any], revision: str
+) -> dict[str, bytes]:
+    entries = {}
+    for export in source["exports"]:
+        prefix = source["package"] + "/"
+        path = prefix + export
+        listing = git_output(
+            "-C",
+            str(checkout),
+            "ls-tree",
+            "-r",
+            "-z",
+            "--full-tree",
+            revision,
+            "--",
+            path,
+        )
+        if not listing:
+            raise ValueError(f"Missing runtime export: {path}")
+        for record in listing.rstrip(b"\0").split(b"\0"):
+            metadata, name_bytes = record.split(b"\t", 1)
+            mode, kind, object_id = metadata.decode("ascii").split()
+            name = name_bytes.decode("utf-8")
+            if mode not in {"100644", "100755"} or kind != "blob":
+                raise ValueError(
+                    f"Runtime source contains a link or unsupported entry: {name}"
+                )
+            if not name.startswith(prefix):
+                raise ValueError(f"Runtime source escapes its package: {name}")
+            name = relative(name[len(prefix) :])
+            if generated_cache(Path(name)):
+                continue
+            if name in entries:
+                raise ValueError(f"Overlapping runtime export: {name}")
+            entries[name] = object_id
+    object_ids = list(dict.fromkeys(entries.values()))
+    contents = {}
+    if object_ids:
+        output = io.BytesIO(
+            git_output(
+                "-C",
+                str(checkout),
+                "cat-file",
+                "--batch",
+                input_bytes=("\n".join(object_ids) + "\n").encode("ascii"),
+            )
+        )
+        for object_id in object_ids:
+            header = output.readline().decode("ascii").split()
+            if len(header) != 3 or header[:2] != [object_id, "blob"]:
+                raise ValueError("Invalid pinned runtime blob")
+            size = int(header[2])
+            body = output.read(size)
+            if len(body) != size or output.read(1) != b"\n":
+                raise ValueError("Incomplete pinned runtime blob")
+            contents[object_id] = body
+    return {name: contents[object_id] for name, object_id in entries.items()}
+
+
+def stage(
+    root: Path, overrides: dict[str, Path], check: bool = False
+) -> list[dict[str, Any]]:
     sources = declarations(root)
     if set(overrides) - set(sources):
         raise ValueError("Undeclared runtime source override")
@@ -117,33 +232,120 @@ def stage(root: Path, overrides: dict[str, Path], check: bool = False) -> list[d
         if check:
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             contents = export_contents(destination, source["exports"])
-            if (receipt.get("repository") != source["repository"]
-                    or receipt.get("package") != source["package"]
-                    or receipt.get("exports") != source["exports"]
-                    or receipt.get("sha256") != digest(contents)):
-                raise ValueError(f"Stale or modified staged runtime: {name}; run scripts/runtime_sources.py")
-            results.append({"name": name, "status": "verified", "revision": receipt["revision"]})
+            if (
+                receipt.get("repository") != source["repository"]
+                or receipt.get("package") != source["package"]
+                or receipt.get("exports") != source["exports"]
+                or receipt.get("sha256") != digest(contents)
+                or (
+                    source.get("revision") is not None
+                    and receipt.get("revision") != source["revision"]
+                )
+            ):
+                raise ValueError(
+                    f"Stale or modified staged runtime: {name}; "
+                    "run scripts/runtime_sources.py"
+                )
+            results.append(
+                {"name": name, "status": "verified", "revision": receipt["revision"]}
+            )
             continue
         with tempfile.TemporaryDirectory(prefix="tj-runtime-") as temporary:
             if name in overrides:
                 checkout = overrides[name].resolve()
-                revision = "local:" + digest(export_contents(safe_path(checkout, source["package"]), source["exports"]))
+                if source.get("revision") is not None:
+                    revision = git("-C", str(checkout), "rev-parse", "HEAD")
+                    if revision != source["revision"] or git(
+                        "-C",
+                        str(checkout),
+                        "status",
+                        "--porcelain",
+                        "--",
+                        source["package"],
+                    ):
+                        raise ValueError(
+                            "Runtime override is not the declared immutable "
+                            f"publication: {name}"
+                        )
+                else:
+                    revision = "local:" + digest(
+                        export_contents(
+                            safe_path(checkout, source["package"]), source["exports"]
+                        )
+                    )
             else:
                 checkout = Path(temporary) / "source"
-                git("clone", "--quiet", "--depth", "1", "--branch", "main",
-                    f"https://github.com/{source['repository']}.git", str(checkout))
+                if source.get("revision") is None:
+                    git(
+                        "clone",
+                        "--quiet",
+                        "--depth",
+                        "1",
+                        "--branch",
+                        "main",
+                        f"https://github.com/{source['repository']}.git",
+                        str(checkout),
+                    )
+                else:
+                    git("init", "--quiet", str(checkout))
+                    git(
+                        "-C",
+                        str(checkout),
+                        "fetch",
+                        "--quiet",
+                        "--depth",
+                        "1",
+                        f"https://github.com/{source['repository']}.git",
+                        source["revision"],
+                    )
+                    git(
+                        "-C",
+                        str(checkout),
+                        "checkout",
+                        "--quiet",
+                        "--detach",
+                        "FETCH_HEAD",
+                    )
                 revision = git("-C", str(checkout), "rev-parse", "HEAD")
-            contents = export_contents(safe_path(checkout, source["package"]), source["exports"])
-            receipt = {"repository": source["repository"], "package": source["package"], "revision": revision,
-                       "exports": source["exports"], "sha256": digest(contents),
-                       "files": {name: hashlib.sha256(body).hexdigest() for name, body in contents.items()}}
+                if (
+                    source.get("revision") is not None
+                    and revision != source["revision"]
+                ):
+                    raise ValueError(
+                        "Fetched runtime publication does not match declaration: "
+                        + name
+                    )
+            contents = (
+                pinned_contents(checkout, source, revision)
+                if source.get("revision") is not None
+                else export_contents(
+                    safe_path(checkout, source["package"]), source["exports"]
+                )
+            )
+            receipt = {
+                "repository": source["repository"],
+                "package": source["package"],
+                "revision": revision,
+                "exports": source["exports"],
+                "sha256": digest(contents),
+                "files": {
+                    name: hashlib.sha256(body).hexdigest()
+                    for name, body in contents.items()
+                },
+            }
             destination.mkdir(parents=True, exist_ok=True)
             previous = files(destination)
-            expected = {**contents, "source.json": (json.dumps(receipt, indent=2) + "\n").encode("utf-8")}
+            expected = {
+                **contents,
+                "source.json": (json.dumps(receipt, indent=2) + "\n").encode("utf-8"),
+            }
             for path in set(previous) - set(expected):
                 safe_path(destination, path).unlink()
-            directories = sorted((path for path in destination.rglob("*") if path.is_dir()),
-                                 key=lambda path: len(path.parts), reverse=True)
+            directories = sorted(
+                (path for path in destination.rglob("*") if path.is_dir()),
+                key=lambda path: len(path.parts),
+                reverse=True,
+            )
             for directory in directories:
                 safe_path(destination, directory.relative_to(destination).as_posix())
                 if not any(directory.iterdir()):
@@ -157,18 +359,30 @@ def stage(root: Path, overrides: dict[str, Path], check: bool = False) -> list[d
     return results
 
 
-def ensure(root: Path) -> list[dict]:
+def ensure(root: Path) -> list[dict[str, Any]]:
     sources = declarations(root)
-    present = all((root / ".agents/dependencies" / name / "source.json").is_file() for name in sources)
+    present = all(
+        (root / ".agents/dependencies" / name / "source.json").is_file()
+        for name in sources
+    )
     return stage(root, {}, check=present)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
-    parser.add_argument("--source", action="append", default=[], metavar="NAME=CHECKOUT",
-                        help="Explicit local build input; never used by installed runtime")
-    parser.add_argument("--check", action="store_true", help="Verify staged bytes offline without writing")
+    parser.add_argument(
+        "--source",
+        action="append",
+        default=[],
+        metavar="NAME=CHECKOUT",
+        help="Explicit local build input; never used by installed runtime",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Verify staged bytes offline without writing",
+    )
     args = parser.parse_args()
     try:
         overrides = {}
@@ -177,7 +391,12 @@ def main() -> int:
             if not separator or not name or not path or name in overrides:
                 raise ValueError("Each --source must be a unique NAME=CHECKOUT")
             overrides[name] = Path(path)
-        print(json.dumps({"sources": stage(args.root.resolve(), overrides, args.check)}, separators=(",", ":")))
+        print(
+            json.dumps(
+                {"sources": stage(args.root.resolve(), overrides, args.check)},
+                separators=(",", ":"),
+            )
+        )
         return 0
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         print(json.dumps({"error": str(error)}), file=sys.stderr)
