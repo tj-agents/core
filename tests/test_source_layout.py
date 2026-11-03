@@ -86,7 +86,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(57, len(skills))
+        self.assertEqual(54, len(skills))
         self.assertEqual("workflow", skills["workflow:session"]["plugin"])
         self.assertNotIn("agent:background-listener", skills)
         for tree in ("skills", "codex-skills"):
@@ -164,6 +164,15 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertEqual(["tj-agents/agent", "tj-agents/agent-store", "tj-agents/base", "tj-agents/cli", "tj-agents/engineering", "tj-agents/workflow"], harness["requires"]["plugins"])
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertEqual(engineering["external_dependencies"]["required"], selection["external_prerequisites"])
+
+    def test_hidden_hook_runtime_prerequisites_are_declared_by_every_consumer(self):
+        roster = json.loads((self.root / ".agents/plugins/plugins.json").read_text(encoding="utf-8"))
+        packages = {package["name"]: package for package in roster["packages"]}
+        for name in ("base", "workflow", "engineering"):
+            with self.subTest(package=name):
+                required = packages[name]["external_prerequisites"]["required"]
+                self.assertIn("exe:tj_hook", required)
+                self.assertIn("python>=3.12", required)
 
     def test_external_dependencies_are_validated_per_owner(self):
         roster = json.loads((self.root / ".agents/plugins/plugins.json").read_text(encoding="utf-8"))
@@ -253,15 +262,11 @@ class SourceLayoutTests(unittest.TestCase):
         store = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(store)
         database = self.root / "fixture state \u00e9" / "sessions.db"
-        connection = store.connect(database)
-        try:
-            store.upsert_work_item(
-                connection, "github.com/example/repo:fixture/task", "github.com/example/repo",
+        with store.SessionStore(database) as session_store:
+            session_store.upsert_work_item(
+                "github.com/example/repo:fixture/task", "github.com/example/repo",
                 "fixture", "task", status="active", title="Fixture execution",
             )
-            connection.commit()
-        finally:
-            connection.close()
         before = database.read_bytes()
         reader_spec = importlib.util.spec_from_file_location(
             "isolated_reader", isolated / runtime / "reader.py"
@@ -330,10 +335,17 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertNotIn("engineering", workflow_selection["prerequisites"])
         engineering_selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertIn("workflow", engineering_selection["prerequisites"])
+        self.assertIn(
+            "tj-agents/cli",
+            {entry["id"] for entry in engineering_selection["external_prerequisites"]},
+        )
+        self.assertNotIn("base:cd", skills)
+        for tree in ("skills", "codex-skills"):
+            self.assertNotIn(f"plugins/base/{tree}/cd/SKILL.md", output)
 
         required = set(compatibility["fresh_required_skills"])
         owners = {skill["name"]: skill["plugin"] for skill in skills.values()}
-        self.assertEqual({"cd", "handoff"}, required)
+        self.assertEqual({"handoff"}, required)
         self.assertLessEqual(required, selection_skills)
         for tree in ("skills", "codex-skills"):
             for name in required:
@@ -377,9 +389,9 @@ class SourceLayoutTests(unittest.TestCase):
         cases = {
             "missing": None,
             "empty": [],
-            "wrong-type": "cd",
-            "incomplete": ["cd"],
-            "expanded": ["cd", "handoff", "handoff-codex"],
+            "wrong-type": "handoff",
+            "wrong-owner": ["navigation"],
+            "expanded": ["handoff", "handoff-codex"],
         }
         for name, required in cases.items():
             with self.subTest(name=name):

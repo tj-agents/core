@@ -423,10 +423,15 @@ def launch(path, state, binding, evidence, executable):
     atomic_json(payload_path, {"command": args, "child_path": str(child_path), "environment": {
         "CONTINUATION_RESULT_PATH": str(result), "CONTINUATION_NONCE": nonce,
         "CONTINUATION_OWNER_ID": state["owner_id"]}})
+    python = sys.executable
+    environment = None
+    if os.name == "nt" and Path(sys.executable) != Path(sys._base_executable):
+        python = sys._base_executable
+        environment = dict(os.environ, __PYVENV_LAUNCHER__=sys.executable)
     with (path.parent / f"launch-{nonce}.log").open("wb") as output:
-        process = subprocess.Popen([sys.executable, "-B", str(Path(__file__).resolve()), "_child",
+        process = subprocess.Popen([python, "-B", str(Path(__file__).resolve()), "_child",
                                     "--owner", str(path), "--payload", str(payload_path)],
-                                   stdout=output, stderr=output,
+                                   stdout=output, stderr=output, env=environment,
                                    start_new_session=os.name != "nt")
         state["child"] = {"pid": process.pid, "identity": process_identity(process.pid)}
         save(path, state, "launch")

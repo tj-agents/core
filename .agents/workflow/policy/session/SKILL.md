@@ -17,6 +17,7 @@ rules on top of this lifecycle.
 Answer the direct question first and correct the active task within its existing authorization.
 Questions ask for reasoning: explain and defend recommendations with evidence, change them only for new
 evidence or a stated user decision, and say what changed.
+For a reported side problem, load [Incidental problems](../../resources/problem-records.md#incidental-problems).
 
 ## A task has an owning lifecycle — load it before the first edit
 
@@ -38,18 +39,15 @@ transitively. Use the host's native skill invocation when available or read its 
 Reuse an already-loaded body while its source identity is unchanged, including after compaction when the
 continuation preserves its relevant instructions. Read again only for changed instructions or missing context.
 
-## Record noticed problems
+## Incidental problems
 
-When a bug, mistake or deliberate debt is noticed or reported, preserve the facts in the active task and
-follow [the recording contract](../../resources/problem-records.md) for the selected profile's recording
-decision. Never record in a Markdown file. Reconcile an existing record and repair owner first. Record or update only when that profile
-and the user's authority permit it; a provider selection does not itself authorize creation. Preserve
-the original task while a recording decision is pending or declined. Recording grants no separate
-authority to repair, publish, dispatch or schedule work.
+When a side problem is noticed or reported, keep the active goal and load
+[Incidental problems](../../resources/problem-records.md#incidental-problems) before routing it.
 
-Feature, story, task and untyped recording requests use the selected profile's creation operation. Its
-policy resolves intent and native type; [repository selection](../../resources/problem-records.md#repository-selection)
-never grants permission to start implementation.
+```text
+A: add report export. B: an unrelated terminal-close bug.
+Keep report export active and read Incidental problems before routing B.
+```
 
 ## Preserve one owner through completion
 

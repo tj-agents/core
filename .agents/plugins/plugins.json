@@ -17,7 +17,6 @@
       ],
       "skills": [
         "agent-files",
-        "cd",
         "project-setup",
         "solution-assessment",
         "task-routing"
@@ -28,11 +27,12 @@
       },
       "external_prerequisites": {
         "required": [
-          "python>=3.9"
+          "exe:tj_hook",
+          "python>=3.12"
         ],
         "optional": []
       },
-      "digest": "sha256:5b24268610a53466e03b699c2f7d6a354892afeeaa640d5eabbf5a325867d6bf",
+      "digest": "sha256:cdbc6ab518853a74651c6ed761f57de0e29de27c47bb04422a829133f5ec85aa",
       "harness": {
         "marketplaces": [
           {
@@ -95,12 +95,13 @@
       },
       "external_prerequisites": {
         "required": [
+          "exe:tj_hook",
           "exe:git",
-          "python>=3.9"
+          "python>=3.12"
         ],
         "optional": []
       },
-      "digest": "sha256:f6126fdbc05056713f56648f5774e5d6423068fc0527af98b14a229516371e8d",
+      "digest": "sha256:ee89854f269468321467502fc07c9bb7183411fb1e7704c202b9d625c5bef3a9",
       "harness": {
         "marketplaces": [
           {
@@ -241,9 +242,7 @@
         "remote-validation",
         "review",
         "review-lifecycle",
-        "self-repair",
         "session",
-        "skill-authoring",
         "stack",
         "staged-review",
         "staged-review-all",
@@ -263,8 +262,9 @@
       },
       "external_prerequisites": {
         "required": [
+          "exe:tj_hook",
           "exe:git",
-          "python>=3.9"
+          "python>=3.12"
         ],
         "optional": [
           "exe:bash",
@@ -272,7 +272,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:f6a144a71c690383788aab752e7d8682fa0ef4d82e677adb7ca6b4291ba56fc6",
+      "digest": "sha256:2abc0a21aa2de722789c943cf6f95a36ce07fc396608b43388c1be8bbc1aa532",
       "harness": {
         "marketplaces": [
           {
@@ -511,13 +511,15 @@
       "id": "tj-agents/docs",
       "name": "docs",
       "package_path": "plugins/docs",
-      "description": "Layout conventions for pages people read.",
+      "description": "Layout, diagram and design-page conventions for pages people read.",
       "platforms": [
         "windows",
         "linux",
         "macos"
       ],
       "skills": [
+        "design",
+        "diagram",
         "layout"
       ],
       "dependencies": {
@@ -528,7 +530,7 @@
         "required": [],
         "optional": []
       },
-      "digest": "sha256:89fca42f8ada1645b85a51dde697ee8f46d9d97808e5a33e1218ac780a010b67",
+      "digest": "sha256:d39e2dfd3ebc58213e2e1c1dbeabf80ec3246764d9c8b1b6e0b8d35ed2a0a3c3",
       "harness": {
         "marketplaces": [
           {
