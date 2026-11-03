@@ -43,7 +43,7 @@ class CompanySkillReplacement(unittest.TestCase):
             path = payload / "skills" / name / "SKILL.md"
             path.parent.mkdir(parents=True)
             path.write_text("---\nname: " + name + "\ndescription: " + name
-                            + " rule.\nkind: convention\n---\n", encoding="utf-8")
+                            + " rule.\nkind: standard\n---\n", encoding="utf-8")
         if tier is not None:
             (payload / "tier.json").write_text(json.dumps(tier), encoding="utf-8")
         registry = self.cache.parent / "installed_plugins.json"

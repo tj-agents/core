@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / '.agents/workflow/utility/status/scripts/status.py'
+SCRIPT = ROOT / '.agents/workflow/skills/status/scripts/status.py'
 ROW = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2} .*$', re.M)
 
 
@@ -120,7 +120,8 @@ class WorkflowStatusHarness(unittest.TestCase):
 
     def status_skill_directory(self, reader_text=None):
         root = self.home / 'runtime-fixture'
-        skill = root / '.agents' / 'workflow' / 'utility' / 'status'
+        self.declare_package(root, '.agents/plugins/sources.json')
+        skill = root / '.agents' / 'workflow' / 'skills' / 'status'
         script = skill / 'scripts' / 'status.py'
         script.parent.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
@@ -136,6 +137,11 @@ class WorkflowStatusHarness(unittest.TestCase):
         hooks.mkdir(parents=True)
         shutil.copy2(ROOT / '.agents/hooks/problem_records.py', hooks / 'problem_records.py')
         return script
+
+    def declare_package(self, root, relative):
+        declaration = root / relative
+        declaration.parent.mkdir(parents=True, exist_ok=True)
+        declaration.write_text('{}\n', encoding='utf-8')
 
     def capability_result(self, script):
         return subprocess.run(
@@ -462,12 +468,17 @@ class WorkItemStatusTests(WorkflowStatusHarness):
         self.write_work_item_status('reader-bridge', 'status-reader', 'active')
         copies = [SCRIPT]
         layouts = (
-            '.agents/workflow/utility/status',
-            'skills/status',
-            'codex-skills/status',
+            ('.agents/workflow/skills/status', '.agents/plugins/sources.json'),
+            (
+                '.agents/renamed/skills/plans/report/status',
+                '.agents/plugins/sources.json',
+            ),
+            ('skills/status', '.claude-plugin/plugin.json'),
+            ('codex-skills/status', '.codex-plugin/plugin.json'),
         )
-        for layout in layouts:
+        for layout, declaration in layouts:
             package = self.home / layout.replace('/', '-')
+            self.declare_package(package, declaration)
             script = package / layout / 'scripts/status.py'
             script.parent.mkdir(parents=True)
             shutil.copy2(SCRIPT, script)
@@ -484,6 +495,7 @@ class WorkItemStatusTests(WorkflowStatusHarness):
 
     def test_packaged_status_loads_the_adjacent_hidden_runtime_in_isolated_python(self):
         package = self.home / 'packaged status'
+        self.declare_package(package, '.claude-plugin/plugin.json')
         script = package / 'skills/status/scripts/status.py'
         script.parent.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
@@ -497,12 +509,17 @@ class WorkItemStatusTests(WorkflowStatusHarness):
         self.assertEqual(0, result.returncode, result.stderr)
 
     def test_missing_own_runtime_is_a_capability_failure(self):
-        script = self.home / 'missing-runtime/.agents/workflow/utility/status/scripts/status.py'
+        outer = self.home / 'outer'
+        self.declare_package(outer, '.agents/plugins/sources.json')
+        package = outer / 'plugins/missing-runtime'
+        self.declare_package(package, '.codex-plugin/plugin.json')
+        script = package / 'codex-skills/status/scripts/status.py'
         script.parent.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
         result = self.capability_result(script)
         self.assertEqual(2, result.returncode)
-        self.assertIn('status capability failure', result.stderr)
+        reader = package / '.agents/agent-store/runtime/reader.py'
+        self.assertIn('own reader is unavailable at %s' % reader, result.stderr)
 
     def select(self, repo, text=None):
         (repo / '.problem-records.json').write_text(

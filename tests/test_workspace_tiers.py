@@ -47,7 +47,7 @@ def _install_payload(
     skill = payload / "skills/communication-context"
     skill.mkdir(parents=True, exist_ok=True)
     (skill / "SKILL.md").write_text(
-        "---\nname: communication-context\nkind: knowledge\n---\nEmployer contacts.\n",
+        "---\nname: communication-context\nmetadata:\n  tj-agents-kind: reference\n---\nEmployer contacts.\n",
         encoding="utf-8",
     )
     (payload / "tier.json").write_text(json.dumps(data), encoding="utf-8")

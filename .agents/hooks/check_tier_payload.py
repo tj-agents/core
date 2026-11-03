@@ -2,8 +2,8 @@ r"""Enforce the canonical built-payload shape every tier repository must ship.
 
 The review and the tier gate both read installed payloads, so their shape is a cross-repository
 contract: `tier.json` beside flat `skills/<name>/SKILL.md` bodies whose front matter carries the
-`kind:` marker, indexed by `INDEX.md` and `selection.json`. A repo that drifts from this ships
-standards the gate cannot gate and conventions the review cannot find - silently. So each tier
+kind metadata, indexed by `INDEX.md` and `selection.json`. A repo that drifts ships
+standards the gate cannot gate and the review cannot find. So each tier
 repository runs this check in its own CI against its generated `plugins/` output and fails loudly.
 
 Checks, per payload named in `.agents/plugins/payloads.json` — or, for a repository authored directly
@@ -13,8 +13,8 @@ as its payloads with no generator and no payloads.json, per directory found unde
   output looks exactly like a real plugin to an installer);
 - `tier.json` exists and satisfies the shipped schema contract - a payload without one is a tier
   the gate can never see, which is how `cpp` spent a year ungated;
-- every `skills/*/SKILL.md` has front matter whose `name:` matches its directory and whose `kind:`
-  is one lowercase word (the taxonomy is open; the shape is not);
+- every `skills/*/SKILL.md` has a front-matter `name:` matching its directory and a kind
+  is policy, standard, operation, workflow, learning or reference;
 - `INDEX.md` lists exactly the skills that exist;
 - `selection.json` parses and names only skills that exist.
 
@@ -35,24 +35,10 @@ import sys
 PAYLOADS_FILE = Path(".agents") / "plugins" / "payloads.json"
 PLUGINS_DIR = "plugins"
 TIER_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
-KIND_PATTERN = re.compile(r"[a-z]+")
 OWNER_PATTERN = re.compile(r"^[^/ ]+/[^/ ]+$")
-FRONT_FIELD = r"^{0}:[ \t]*(\S[^\r\n]*?)[ \t]*$"
 INDEX_ENTRY = re.compile(r"^- `([^`]+)`", re.MULTILINE)
 SCHEMA_VERSIONS = (1, 2, 3)
 IGNORED_PAYLOAD_ENTRIES = {".gitkeep"}
-
-
-def front_matter(text):
-    if not text.startswith("---"):
-        return ""
-    end = text.find("\n---", 3)
-    return text[:end] if end != -1 else ""
-
-
-def front_field(block, field):
-    match = re.search(FRONT_FIELD.format(field), block, re.MULTILINE)
-    return match.group(1) if match else None
 
 
 def check_tier_declaration(payload, problems):
@@ -127,6 +113,7 @@ def check_tier_declaration(payload, problems):
 
 
 def check_skills(payload, problems):
+    gate = runpy.run_path(str(Path(__file__).with_name("tier_gate.py")))
     skills_dir = payload / "skills"
     if not skills_dir.is_dir():
         problems.append(f"{payload.name}: no skills/ directory")
@@ -145,19 +132,27 @@ def check_skills(payload, problems):
         except (OSError, UnicodeError) as error:
             problems.append(f"{payload.name}: skills/{entry.name}/SKILL.md is unreadable: {error}")
             continue
-        block = front_matter(text)
+        block = gate["front_matter"](text)
         if not block:
             problems.append(f"{payload.name}: skills/{entry.name}/SKILL.md has no front matter")
             continue
-        name = front_field(block, "name")
+        try:
+            fields = gate["skill_fields"](block)
+        except ValueError as error:
+            problems.append(
+                f"{payload.name}: skills/{entry.name}/SKILL.md "
+                f"invalid kind or metadata: {error}"
+            )
+            continue
+        name = fields.get("name")
         if name != entry.name:
             problems.append(
                 f"{payload.name}: skills/{entry.name}/SKILL.md front-matter name is {name!r}, not its directory"
             )
-        kind = front_field(block, "kind")
-        if not kind or not KIND_PATTERN.fullmatch(kind):
+        kind = fields.get("kind")
+        if kind not in gate["SKILL_KINDS"]:
             problems.append(
-                f"{payload.name}: skills/{entry.name}/SKILL.md kind {kind!r} is not one lowercase word"
+                f"{payload.name}: skills/{entry.name}/SKILL.md has no supported kind"
             )
     if not names:
         problems.append(f"{payload.name}: skills/ is empty")

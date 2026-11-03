@@ -417,7 +417,7 @@ class WorkflowGenerationTests(unittest.TestCase):
                 self.assertTrue(entry.is_file())
         self.assertTrue((ROOT / "plugins/workflow/.codex/runtime/continuation/delivery_continuation.py").is_file())
         self.assertFalse((ROOT / "plugins/engineering/.codex/runtime/continuation").exists())
-        self.assertFalse((ROOT / ".agents/engineering/workflow/merge/references/delivery.md").exists())
+        self.assertFalse((ROOT / ".agents/engineering/skills/merge/references/delivery.md").exists())
 
     def test_extended_host_adapter_preserves_one_public_identity(self):
         config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))

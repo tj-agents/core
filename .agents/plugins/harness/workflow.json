@@ -9,9 +9,9 @@
     ".agents/hooks/merge_review_gate.py",
     ".agents/hooks/problem_records.py",
     ".agents/tiers/workflow.json",
-    ".agents/workflow",
-    ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
     ".agents/workflow/resources/problem-records.md",
+    ".agents/workflow/skills",
+    ".agents/workflow/skills/plan-artifacts/scripts/host_coverage.py",
     ".agents/workflows",
     ".codex/runtime/continuation"
   ],
@@ -32,16 +32,16 @@
     "hooks": [],
     "permissions": {
       "claude_allow": [
-        "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/skills/status/scripts/status.py:*)",
         "Bash(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
         "Bash(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/workflow/skills/status/scripts/status.py:*)",
         "PowerShell(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
         "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/workflow/skills/status/scripts/status.py:*)",
         "Bash(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
         "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/skills/status/scripts/status.py:*)",
         "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
         "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
         "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
@@ -56,7 +56,7 @@
             ],
             "-B",
             [
-              "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+              "${PLUGIN_ROOT}/.agents/workflow/skills/status/scripts/status.py",
               "${PLUGIN_ROOT}/skills/status/scripts/status.py",
               "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
             ]
@@ -72,7 +72,7 @@
             [
               "python3",
               "-B",
-              "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
+              "${PLUGIN_ROOT}/.agents/workflow/skills/status/scripts/status.py",
               "payments",
               "20",
               "all"

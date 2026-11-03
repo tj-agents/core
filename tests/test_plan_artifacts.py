@@ -4,9 +4,9 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILL = ROOT / ".agents/workflow/contract/plan-artifacts/SKILL.md"
-TEMPLATE = ROOT / ".agents/workflow/contract/plan-artifacts/templates/PLAN.md"
-SCRIPT = ROOT / ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py"
+SKILL = ROOT / ".agents/workflow/skills/plan-artifacts/SKILL.md"
+TEMPLATE = ROOT / ".agents/workflow/skills/plan-artifacts/templates/PLAN.md"
+SCRIPT = ROOT / ".agents/workflow/skills/plan-artifacts/scripts/host_coverage.py"
 
 
 class PlanArtifactTests(unittest.TestCase):
