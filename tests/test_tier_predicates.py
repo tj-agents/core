@@ -150,7 +150,7 @@ class Predicates(unittest.TestCase):
             with self.subTest(body=body):
                 plugin = "invalid" + str(len(list((self.root / "config").glob("**/tier.json"))))
                 cache, payload = self.install(plugin, body)
-                with patch.object(gate, "cache_roots", return_value=[cache]):
+                with patch.object(gate, "enabled_declarations", lambda project: (gate.declarations([cache], project=project), [])):
                     result = gate.assess(self.root)
                     selection = next(item for item in result.selections if item["plugin_id"] == plugin + "@test-market")
                     self.assertFalse(selection["matched"])
@@ -164,7 +164,7 @@ class Predicates(unittest.TestCase):
         self.install("invalid", {"schema_version": 3, "tier": "invalid", "applies": "stack-present", "detect": {"all": []}})
         self.install("unknown", {"schema_version": 3, "tier": "unknown", "applies": "stack-present", "detect": {"fact": "missing"}})
         self.install("ordinary", None)
-        with patch.object(gate, "cache_roots", return_value=[cache]):
+        with patch.object(gate, "enabled_declarations", lambda project: (gate.declarations([cache], project=project), [])):
             result = gate.assess(self.root)
             self.assertEqual([item.plugin for item, _ in result.applicable], ["valid1", "valid2", "valid3"])
             self.assertNotIn("ordinary", [item.plugin for item in result.blocked])

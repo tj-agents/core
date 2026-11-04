@@ -442,7 +442,7 @@ def test_project_installation_is_selected_for_each_child(
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
     registry["plugins"]["employer-a@test-market"][0]["projectPath"] = str(first)
     registry_path.write_text(json.dumps(registry), encoding="utf-8")
-    monkeypatch.setattr(gate, "cache_roots", lambda: [cache])
+    monkeypatch.setattr(gate, "enabled_declarations", lambda root: (gate.declarations([cache], project=root), []))
 
     result = gate.assess(project)
 
