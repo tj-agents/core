@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://concertable.dev/agent-workflows/v2/provider.schema.json",
+  "title": "Agent workflow provider probe",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "record_type",
+    "provider_id",
+    "status",
+    "supported_contract_versions",
+    "capabilities",
+    "authoritative_fields"
+  ],
+  "properties": {
+    "contract_version": {"const": "v2"},
+    "record_type": {"const": "probe"},
+    "provider_id": {"enum": ["repository"]},
+    "status": {"enum": ["available", "unavailable", "incompatible", "unhealthy"]},
+    "supported_contract_versions": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "discover",
+          "resolve-task",
+          "read-state",
+          "checkpoint-state",
+          "bind-worktree"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "authoritative_fields": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "reason": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"status": {"enum": ["unavailable", "incompatible", "unhealthy"]}},
+        "required": ["status"]
+      },
+      "then": {"required": ["reason"]},
+      "else": {"not": {"required": ["reason"]}}
+    }
+  ]
+}

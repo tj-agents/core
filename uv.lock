@@ -6,6 +6,12 @@ resolution-markers = [
     "python_full_version < '3.15'",
 ]
 
+[manifest]
+members = [
+    "tj-agents-core",
+    "tj-base",
+]
+
 [[package]]
 name = "ast-serialize"
 version = "0.13.1"
@@ -334,6 +340,7 @@ name = "tj-agents-core"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "tj-base" },
     { name = "tj-cli" },
 ]
 
@@ -345,7 +352,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "tj-cli", git = "https://github.com/tj-agents/cli?subdirectory=packages%2Ftj-cli&rev=f2bdde9a4705c9455e10d5bb044dca5e1f25b2a3" }]
+requires-dist = [{ name = "tj-base", editable = "packages/tj-base" }, { name = "tj-cli", git = "https://github.com/tj-agents/cli?subdirectory=packages%2Ftj-cli&rev=f2bdde9a4705c9455e10d5bb044dca5e1f25b2a3" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -353,6 +360,11 @@ dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff", specifier = ">=0.17.1" },
 ]
+
+[[package]]
+name = "tj-base"
+version = "0.1.0"
+source = { editable = "packages/tj-base" }
 
 [[package]]
 name = "tj-cli"
