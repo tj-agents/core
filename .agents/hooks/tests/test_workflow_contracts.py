@@ -460,6 +460,9 @@ class WorkflowGenerationTests(unittest.TestCase):
                         bundle,
                         ignore=shutil.ignore_patterns("__pycache__"),
                     )
+                    (root / ".codex-plugin").mkdir()
+                    (root / ".codex-plugin/plugin.json").write_text("{}", encoding="utf-8")
+                    shutil.copytree(ROOT / ".agents/dependencies/cli/.agents/cli/runtime", root / "hooks")
                     completed = subprocess.run(
                         [sys.executable, str(bundle / "verify.py"), "--root", str(root)],
                         capture_output=True,
@@ -482,6 +485,7 @@ class WorkflowGenerationTests(unittest.TestCase):
                     else:
                         for relative in (".agents/workflows", ".agents/workflow",
                                          ".codex/runtime/continuation",
+                                         ".agents/dependencies/cli",
                                          ".agents/dependencies/agent/.agents/agent/resources/lanes"):
                             shutil.copytree(ROOT / relative, root / relative,
                                             ignore=shutil.ignore_patterns("__pycache__"))

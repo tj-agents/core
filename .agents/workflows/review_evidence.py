@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from tj_cli import process
+from process_runtime import process
 
 
 class ReviewEvidenceError(RuntimeError):

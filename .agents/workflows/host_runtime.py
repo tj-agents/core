@@ -7,7 +7,7 @@ import threading
 import weakref
 from pathlib import Path
 
-from tj_cli import process
+from process_runtime import process
 from workflow_runtime import ContractViolation, WorkflowContract, _load_json, _repository_path_key
 
 

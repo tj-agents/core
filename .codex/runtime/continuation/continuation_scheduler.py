@@ -1,4 +1,4 @@
-"""Receipt-owned scheduler primitives for persistent continuation (Python 3.9+)."""
+"""Receipt-owned scheduler primitives for persistent continuation (Python 3.12+)."""
 
 import contextlib
 import hashlib

@@ -1,3 +1,5 @@
+"""Supervise one bounded Codex continuation owner (Python 3.12+)."""
+
 import argparse
 import contextlib
 import ctypes
@@ -12,7 +14,8 @@ import sys
 import time
 import uuid
 
-from tj_cli import process
+if sys.version_info < (3, 12):  # noqa: UP036
+    raise RuntimeError("continuation_runtime requires Python 3.12 or later")
 
 sys.dont_write_bytecode = True
 
@@ -32,13 +35,14 @@ def runtime_paths():
         lanes = root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "resources" / "lanes" / "codex.json"
     else:
         raise RuntimeError("continuation package root unavailable")
-    if not all((workflows / name).is_file() for name in ("delivery_runtime.py", "completion.py", "workflow_ops.py")):
+    if not all((workflows / name).is_file() for name in ("delivery_runtime.py", "completion.py", "workflow_ops.py", "process_runtime.py")):
         raise RuntimeError("continuation shared runtime unavailable")
     return workflows, lanes
 
 
 WORKFLOWS, LANES = runtime_paths()
 sys.path.insert(0, str(WORKFLOWS))
+from process_runtime import process
 from delivery_runtime import BINDING_FILE, PersistentDeliveryRouter, binding_from_artifact, DeliveryContractViolation
 from completion import CompletionError, completion_check
 from workflow_ops import atomic_json, parse_status_checks, repository_slug, retry_windows_sharing_violation
