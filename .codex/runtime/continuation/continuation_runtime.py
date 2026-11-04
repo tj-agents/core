@@ -12,6 +12,8 @@ import sys
 import time
 import uuid
 
+from tj_cli import process
+
 sys.dont_write_bytecode = True
 
 
@@ -47,8 +49,8 @@ class Gate(RuntimeError):
 
 
 def command(args, root, timeout=30):
-    result = subprocess.run(args, cwd=root, capture_output=True, text=True,
-                            encoding="utf-8", errors="replace", timeout=timeout)
+    result = process.run(args, cwd=root, capture_output=True, text=True,
+                         encoding="utf-8", errors="replace", timeout=timeout)
     if result.returncode:
         raise RuntimeError(f"{args[0]} exited {result.returncode}")
     return result.stdout.strip()
@@ -105,6 +107,19 @@ def process_identity(pid):
 def alive(record):
     current = process_identity(record["pid"])
     return current is not None and (current == "unknown" or current == record["identity"])
+
+
+def child_admitted(record):
+    if not isinstance(record, dict):
+        return False
+    if record.get("pid") == os.getpid():
+        return True
+    if os.name != "nt":
+        return False
+    parent = os.getppid()
+    parent_identity = process_identity(parent)
+    return (record.get("pid") == parent and record.get("identity") is not None
+            and parent_identity == record["identity"])
 
 
 @contextlib.contextmanager
@@ -303,7 +318,7 @@ def child(args):
         state = read(path)
         if state.get("harness") != "codex":
             raise Gate("unsupported-host")
-        if (state.get("child") or {}).get("pid") == os.getpid():
+        if child_admitted(state.get("child")):
             break
         time.sleep(0.05)
     else:
@@ -311,30 +326,30 @@ def child(args):
     payload = read(args.payload)
     env = dict(os.environ, **payload["environment"])
     job = windows_job() if os.name == "nt" else None
-    process = subprocess.Popen(payload["command"], cwd=state["worktree"], env=env,
-                               creationflags=4 if job else 0,
-                               preexec_fn=parent_death_signal if os.name == "posix" else None)
+    host_process = subprocess.Popen(payload["command"], cwd=state["worktree"], env=env,
+                                    creationflags=4 if job else 0,
+                                    preexec_fn=parent_death_signal if os.name == "posix" else None)
     assigned = False
     try:
         if job:
             kernel, handle = job
-            if not kernel.AssignProcessToJobObject(handle, int(process._handle)):
+            if not kernel.AssignProcessToJobObject(handle, int(host_process._handle)):
                 raise OSError("cannot assign supervised host to lifetime job")
             assigned = True
-        atomic_json(Path(payload["child_path"]), {"pid": process.pid,
-                                                "identity": process_identity(process.pid)})
+        atomic_json(Path(payload["child_path"]), {"pid": host_process.pid,
+                                                    "identity": process_identity(host_process.pid)})
         if job:
             ntdll = ctypes.WinDLL("ntdll")
             ntdll.NtResumeProcess.argtypes = [ctypes.c_void_p]
-            if ntdll.NtResumeProcess(int(process._handle)) != 0:
+            if ntdll.NtResumeProcess(int(host_process._handle)) != 0:
                 raise OSError("cannot resume supervised host")
-        return process.wait()
+        return host_process.wait()
     except BaseException:
         if job and assigned:
             kernel.TerminateJobObject(handle, 1)
-        elif process.poll() is None:
-            process.kill()
-        process.wait(timeout=15)
+        elif host_process.poll() is None:
+            host_process.kill()
+        host_process.wait(timeout=15)
         raise
     finally:
         if job:
@@ -379,16 +394,16 @@ def windows_job():
     return kernel, handle
 
 
-def stop_child(process):
+def stop_child(worker):
     if os.name == "nt":
-        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                       capture_output=True, timeout=15)
+        process.run(["taskkill", "/PID", str(worker.pid), "/T", "/F"],
+                    capture_output=True, timeout=15)
     else:
         try:
-            os.killpg(process.pid, signal.SIGKILL)
+            os.killpg(worker.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-    process.wait(timeout=15)
+    worker.wait(timeout=15)
 
 
 def launch(path, state, binding, evidence, executable):
@@ -429,16 +444,16 @@ def launch(path, state, binding, evidence, executable):
         python = sys._base_executable
         environment = dict(os.environ, __PYVENV_LAUNCHER__=sys.executable)
     with (path.parent / f"launch-{nonce}.log").open("wb") as output:
-        process = subprocess.Popen([python, "-B", str(Path(__file__).resolve()), "_child",
-                                    "--owner", str(path), "--payload", str(payload_path)],
-                                   stdout=output, stderr=output, env=environment,
-                                   start_new_session=os.name != "nt")
-        state["child"] = {"pid": process.pid, "identity": process_identity(process.pid)}
+        worker = process.start([python, "-B", str(Path(__file__).resolve()), "_child",
+                                "--owner", str(path), "--payload", str(payload_path)],
+                               stdout=output, stderr=output, env=environment,
+                               start_new_session=os.name != "nt")
+        state["child"] = {"pid": worker.pid, "identity": process_identity(worker.pid)}
         save(path, state, "launch")
         try:
-            code = process.wait(timeout=min(state["timeout_seconds"], max(1, state["deadline"] - time.time())))
+            code = worker.wait(timeout=min(state["timeout_seconds"], max(1, state["deadline"] - time.time())))
         except subprocess.TimeoutExpired:
-            stop_child(process)
+            stop_child(worker)
             code = -1
     state["child"] = None
     if code != 0:

@@ -7,6 +7,7 @@ import threading
 import weakref
 from pathlib import Path
 
+from tj_cli import process
 from workflow_runtime import ContractViolation, WorkflowContract, _load_json, _repository_path_key
 
 
@@ -23,7 +24,7 @@ class RepositoryWriterLock:
 
     def acquire(self):
         try:
-            completed = subprocess.run(
+            completed = process.run(
                 [
                     "git",
                     "-C",
@@ -155,7 +156,7 @@ class RepositoryChangeObserver:
 
     def _git(self, *arguments):
         try:
-            completed = subprocess.run(
+            completed = process.run(
                 ["git", "-C", str(self.repository_root), *arguments],
                 check=True,
                 capture_output=True,
@@ -201,7 +202,7 @@ class HostAdapterRegistry:
             repository_root=self.repository_root,
         )
         self.executable_resolver = executable_resolver or shutil.which
-        self.command_runner = command_runner or subprocess.run
+        self.command_runner = command_runner or process.run
         self.lease_registry = lease_registry or WriterLeaseRegistry.for_repository(self.repository_root)
         self.repository_observer = repository_observer or RepositoryChangeObserver(self.repository_root)
         self.profile_roots = dict(profile_roots or {})
