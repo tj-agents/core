@@ -307,6 +307,35 @@ class EnabledPlugins(unittest.TestCase):
         self.assertEqual(result.disabled, [])
         self.assertEqual(text, "")
 
+    def codex_context(self):
+        target = str(self.project / "module.py")
+        with unittest.mock.patch.dict(os.environ, {"CLAUDE_PLUGIN_ROOT": "", "PLUGIN_ROOT": str(self.codex)}):
+            return gate.statement(self.project), gate.tool_context({"tool_name": "apply_patch", "tool_input": {
+                "command": "*** Begin Patch\n*** Add File: " + target + "\n+x\n*** End Patch"}})
+
+    def test_codex_enablement_without_tomllib_is_reported_not_silently_empty(self):
+        with unittest.mock.patch.dict(sys.modules, {"tomllib": None}):
+            texts = self.codex_context()
+
+        for text in texts:
+            self.assertIn("Tier gate could not read Codex plugin enablement: Python 3.11+ is required.", text)
+
+    def test_malformed_codex_enablement_is_reported(self):
+        (self.codex / "config.toml").write_text("[plugins\n", encoding="utf-8")
+
+        for text in self.codex_context():
+            self.assertIn("Tier gate could not read Codex plugin enablement: "
+                          + str(self.codex / "config.toml") + " is unreadable or malformed.", text)
+
+    def test_an_undetermined_host_is_reported_not_silently_empty(self):
+        target = str(self.project / "module.py")
+        with unittest.mock.patch.dict(os.environ, {"CLAUDE_PLUGIN_ROOT": ""}):
+            texts = (gate.statement(self.project),
+                     gate.tool_context({"tool_name": "Read", "tool_input": {"file_path": target}}))
+
+        for text in texts:
+            self.assertIn("Tier gate could not determine the running host; plugin standards are unknown.", text)
+
     def test_personal_follows_adoption_and_never_reports_as_not_enabled(self):
         subprocess.run(["git", "init", "-q", str(self.project)], check=True)
         self.assertNotIn("personal", gate.statement(self.project).split("Ubiquitous but not enabled:")[1].splitlines()[0])
