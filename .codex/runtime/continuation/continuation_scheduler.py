@@ -8,6 +8,8 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+from tj_cli import process
+
 TASK_PREFIX = "AgentStandards-Continuation-"
 PROFILE_VARIABLES = ("CODEX_HOME", "CLAUDE_CONFIG_DIR", "GH_CONFIG_DIR", "PATH", "TJ_AGENT")
 CONTROL_VARIABLES = ("CONTINUATION_OWNER_ID", "CONTINUATION_NONCE", "CONTINUATION_RESULT_PATH")
@@ -129,9 +131,9 @@ def lifecycle_lock(directory):
 
 class SchedulerTransport:
     def run(self, args, *, input_text=None, timeout=15, environment=None):
-        return subprocess.run(args, input=input_text, capture_output=True, text=True,
-                              encoding="utf-8", errors="replace", timeout=timeout,
-                              env=environment, check=False)
+        return process.run(args, input=input_text, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=timeout,
+                           env=environment, check=False)
 
     def write(self, path, text):
         atomic_text(path, text)
