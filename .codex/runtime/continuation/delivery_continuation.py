@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Register deterministic, receipt-owned delivery continuation wakes (Python 3.9+)."""
+"""Register deterministic, receipt-owned delivery continuation wakes (Python 3.12+)."""
 
 import sys
 
-if sys.version_info < (3, 9):
-    raise RuntimeError("delivery_continuation requires Python 3.9 or later")
+if sys.version_info < (3, 12):  # noqa: UP036
+    raise RuntimeError("delivery_continuation requires Python 3.12 or later")
 
 import argparse
 import contextlib
@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 import subprocess
 
-from tj_cli import process
+sys.dont_write_bytecode = True
 
 
 def package_root():
@@ -38,6 +38,13 @@ def resource(name):
 
 
 SCHEDULER_PATH = resource("continuation_scheduler.py")
+PACKAGE = package_root()
+WORKFLOWS = PACKAGE / ("workflows" if (PACKAGE / ".codex-plugin/plugin.json").is_file() else ".agents/workflows")
+if not (WORKFLOWS / "process_runtime.py").is_file():
+    raise RuntimeError("continuation shared runtime unavailable")
+sys.path.insert(0, str(WORKFLOWS))
+from process_runtime import process
+
 spec = importlib.util.spec_from_file_location("continuation_scheduler", SCHEDULER_PATH)
 scheduler = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = scheduler

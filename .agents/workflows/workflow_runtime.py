@@ -5,7 +5,7 @@ import importlib.util
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Protocol
 
-from tj_cli import process
+from process_runtime import process
 
 CONTRACT_VERSION = "v2"
 IDENTITY_FIELDS = ("contract_version", "workflow_id", "workflow_run_id", "stage_id", "dispatch_id")

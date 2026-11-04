@@ -17,10 +17,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from tj_cli import process
-
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from process_runtime import process
 import delivery_runtime
 import delivery_policy
 import workflow_runtime
