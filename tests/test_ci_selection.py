@@ -267,6 +267,17 @@ class ExecutionTests(unittest.TestCase):
 
 
 class WorkflowWiringTests(unittest.TestCase):
+    def test_publication_runs_after_successful_aggregate_with_skipped_ancestors(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        job = workflow.split("\n  regenerate:\n", 1)[1]
+        condition = job.split("    if: >-\n", 1)[1].split("\n    needs:", 1)[0]
+        self.assertIn("!cancelled()", condition)
+        self.assertIn("needs.ci-required.result == 'success'", condition)
+        self.assertIn("github.event_name == 'push'", condition)
+        self.assertIn("github.ref == format('refs/heads/{0}', github.event.repository.default_branch)", condition)
+        self.assertIn("!startsWith(github.event.head_commit.message, 'Regenerate packages for ')", condition)
+        self.assertIn("    needs: ci-required\n", job)
+
     def test_aggregate_runs_after_all_selection_outcomes_without_path_filters(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:|\Z)",
