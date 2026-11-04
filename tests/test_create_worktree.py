@@ -147,6 +147,17 @@ def test_remote_only_branch_is_created_with_tracking(repo: Path, remote: Path) -
     )
 
 
+def test_deleted_remote_branch_is_pruned_before_casing_check(
+    repo: Path, remote: Path
+) -> None:
+    git(repo, "push", "origin", "HEAD:refs/heads/feature/Gone")
+    git(repo, "fetch", "origin")
+    git(remote, "update-ref", "-d", "refs/heads/feature/Gone")
+    result = create(repo, "Feature/Gone")
+    assert Path(result["path"]) == repo / ".worktrees" / "Feature-Gone"
+    assert result["base"] == "origin/trunk"
+
+
 @pytest.mark.parametrize("branch", ["../Escape", "Bad?Branch", "Bad Branch"])
 def test_invalid_branch_fails_before_fetch_or_creation(repo: Path, branch: str) -> None:
     git(repo, "remote", "add", "origin", str(repo / "missing-origin"))
