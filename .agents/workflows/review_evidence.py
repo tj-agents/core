@@ -6,13 +6,15 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from tj_cli import process
+
 
 class ReviewEvidenceError(RuntimeError):
     pass
 
 
 def git_text(root, *arguments):
-    return subprocess.run(
+    return process.run(
         ["git", *arguments], cwd=str(root), check=True, capture_output=True,
         text=True, encoding="utf-8", errors="replace", timeout=30,
     ).stdout.strip()

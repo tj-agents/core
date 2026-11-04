@@ -14,6 +14,8 @@ import os
 from pathlib import Path
 import subprocess
 
+from tj_cli import process
+
 
 def package_root():
     here = Path(__file__).resolve()
@@ -57,8 +59,8 @@ def owner_path(args):
         if not path.is_absolute():
             raise scheduler.SchedulerError("worktree must be absolute")
         return path.resolve() / ".agents/continuation/owner.json"
-    result = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-                            encoding="utf-8", timeout=10, check=False)
+    result = process.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
+                         encoding="utf-8", timeout=10, check=False)
     if result.returncode:
         raise scheduler.SchedulerError("specify --worktree or --owner outside a git checkout")
     return Path(result.stdout.strip()).resolve() / ".agents/continuation/owner.json"
@@ -296,8 +298,8 @@ def wake(owner, root, path, args, transport):
             raise scheduler.SchedulerError("registered package prerequisite is missing: " + receipt[item])
     if args.dry_run:
         return {"action": "wake", "dry_run": True}
-    result = subprocess.run(receipt["runtime_command"], cwd=str(root), capture_output=True, text=True,
-                            encoding="utf-8", errors="replace", timeout=930, env=wake_environment(receipt), check=False)
+    result = process.run(receipt["runtime_command"], cwd=str(root), capture_output=True, text=True,
+                         encoding="utf-8", errors="replace", timeout=930, env=wake_environment(receipt), check=False)
     if result.returncode:
         raise scheduler.SchedulerError("continuation runtime wake failed with exit code " + str(result.returncode))
     state = read_json(path)

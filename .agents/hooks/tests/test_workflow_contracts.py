@@ -2237,7 +2237,7 @@ class RepositoryProviderTests(unittest.TestCase):
 
     def test_read_only_git_uses_utf8_replacement_decoding(self):
         completed = subprocess.CompletedProcess([], 0, "github.com/example/runtime", "")
-        with mock.patch.object(workflow_runtime.subprocess, "run", return_value=completed) as run:
+        with mock.patch.object(workflow_runtime.process, "run", return_value=completed) as run:
             self.assertEqual(
                 "github.com/example/runtime",
                 workflow_runtime._read_only_git(self.root / "linked-\u00e9", "config", "--get", "remote.origin.url"),

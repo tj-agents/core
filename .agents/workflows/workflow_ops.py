@@ -9,7 +9,6 @@ import os
 import re
 import shutil
 import stat
-import subprocess
 import sys
 import tarfile
 import tempfile
@@ -17,6 +16,8 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+from tj_cli import process
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -153,7 +154,7 @@ def redact(text):
 
 def run_process(arguments, cwd, text=True, check=True):
     executable = shutil.which(arguments[0]) or arguments[0]
-    completed = subprocess.run(
+    completed = process.run(
         [executable, *arguments[1:]],
         cwd=str(cwd),
         capture_output=True,
