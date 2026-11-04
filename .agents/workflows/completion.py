@@ -4,7 +4,7 @@ import os
 import re
 from pathlib import Path
 
-from tj_cli import process
+from process_runtime import process
 
 from pr_body import unchecked_tasks
 
