@@ -57,6 +57,9 @@ def validate_branch(repo: Path, branch: str) -> None:
     checked = git(repo, "check-ref-format", "--branch", branch)
     if checked.returncode or checked.stdout.strip() != branch:
         raise CreateWorktreeError(f"invalid branch name: {branch!r}")
+
+
+def validate_branch_casing(repo: Path, branch: str) -> None:
     refs = run(
         repo, "for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes/origin"
     )
@@ -87,7 +90,7 @@ def create(
     has_origin = "origin" in run(repo, "remote").splitlines()
     if has_origin:
         run(repo, "fetch", "origin", "--prune")
-        validate_branch(repo, branch)
+    validate_branch_casing(repo, branch)
     if ref_exists(repo, f"refs/heads/{branch}"):
         base = "(existing branch)"
         base_head = run(repo, "rev-parse", f"refs/heads/{branch}^{{commit}}")
