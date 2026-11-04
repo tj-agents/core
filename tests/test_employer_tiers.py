@@ -108,7 +108,7 @@ class EmployerScope(unittest.TestCase):
         for identity, applies in (('employer-a/service', True), ('personal/project', False)):
             self.remote(identity)
             output = io.StringIO()
-            with patch.object(gate, 'cache_roots', return_value=[self.cache]), \
+            with patch.object(gate, 'enabled_declarations', lambda project: (self.found(), [])), \
                     patch.object(gate.sys, 'argv', ['tier_gate.py', '--session-context', '--project', str(self.project)]), \
                     contextlib.redirect_stdout(output):
                 self.assertEqual(gate.main(), 0)

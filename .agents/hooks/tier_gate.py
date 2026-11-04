@@ -10,8 +10,8 @@ per consuming repository. Both were ruled out: the rule has to travel inside the
 machine picks it up by syncing, with nothing hand-placed anywhere.
 
 So each tier ships the condition itself, as `tier.json` at the root of its own plugin payload, and
-this script reads whatever declarations are installed. A tier repository added later is gated
-the moment it is installed, with no change here and no release of `base`.
+this script reads whatever declarations the running host has installed and enabled for the project. A
+tier repository added later is gated the moment it is enabled, with no change here and no release of `base`.
 Plugin and marketplace identity come from the installed path, never from the declaration, so a
 declaration cannot claim to be a plugin it is not.
 
@@ -48,7 +48,9 @@ SCHEMA_VERSIONS = (1, 2, 3)
 DECLARATION_NAME = "tier.json"
 ORPHAN_MARKER = ".orphaned_at"
 FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
-PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
+HOST_PROFILES = {"claude": ("CLAUDE_CONFIG_DIR", ".claude"), "codex": ("CODEX_HOME", ".codex")}
+HOST_VARIABLES = (("codex", ("PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")), ("claude", ("CLAUDE_PLUGIN_ROOT",)),
+                  ("codex", ("CODEX_THREAD_ID",)), ("claude", ("CLAUDE_CODE_SESSION_ID",)))
 OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
 WALK_DEPTH = 4
 WALK_SKIP = frozenset({
@@ -405,9 +407,10 @@ def _evaluate_predicate(root, node, facts=None, contexts=None, path="detect", em
 
 
 class SelectionResult:
-    def __init__(self, scope, ubiquitous=(), applicable=(), blocked=(), diagnostics=(), selections=(), employers=(), inventory=None, scope_state="unclassified", repository_results=()):
+    def __init__(self, scope, ubiquitous=(), applicable=(), blocked=(), diagnostics=(), selections=(), employers=(), inventory=None, scope_state="unclassified", repository_results=(), disabled=()):
         self.scope = str(scope)
         self.ubiquitous = list(ubiquitous)
+        self.disabled = list(disabled)
         self.applicable = list(applicable)
         self.blocked = list(blocked)
         self.diagnostics = tuple(diagnostics)
@@ -428,41 +431,80 @@ class WorkspaceInventory(list):
         self.reason = reason
 
 
+def host_profile(host):
+    variable, directory = HOST_PROFILES[host]
+    return Path(os.environ.get(variable) or Path.home() / directory)
+
+
+def active_host():
+    here = _resolved_key(__file__)
+    containing = [host for host in HOST_PROFILES if _within(here, _resolved_key(host_profile(host)))]
+    if len(containing) == 1:
+        return containing[0]
+    for host, variables in HOST_VARIABLES:
+        if any(os.environ.get(variable) for variable in variables):
+            return host
+    return None
+
+
 def cache_roots():
-    roots = []
+    host = active_host()
+    if host is None:
+        return []
+    try:
+        cache = (host_profile(host) / "plugins" / "cache").resolve()
+    except (OSError, ValueError):
+        return []
+    return [cache] if cache.is_dir() else []
 
-    def add(path):
-        try:
-            resolved = Path(path).resolve()
-        except (OSError, ValueError):
-            return
-        if resolved.is_dir() and resolved not in roots:
-            roots.append(resolved)
 
-    for variable in PLUGIN_ROOT_VARIABLES:
-        value = os.environ.get(variable)
-        if not value:
-            continue
-        try:
-            plugin_root = Path(value).resolve()
-        except (OSError, ValueError):
-            continue
-        if len(plugin_root.parents) >= 3 and plugin_root.parents[2].name == 'cache':
-            add(plugin_root.parents[2])
+@functools.lru_cache(maxsize=None)
+def _settings(path):
+    try:
+        if path.endswith(".toml"):
+            import tomllib
+            with open(path, "rb") as stream:
+                value = tomllib.load(stream)
+        else:
+            value = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    except (ImportError, OSError, UnicodeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
 
-    here = Path(__file__).resolve()
-    if len(here.parents) > 4 and here.parents[4].name == "cache":
-        add(here.parents[4])
 
-    for variable in ("CLAUDE_CONFIG_DIR", "CODEX_HOME"):
-        value = os.environ.get(variable)
-        if value:
-            add(Path(value) / "plugins" / "cache")
+def plugin_states(host, project):
+    profile, project = host_profile(host), Path(project)
+    if host == "claude":
+        states = {}
+        for path in (profile / "settings.json", project / ".claude" / "settings.json",
+                     project / ".claude" / "settings.local.json"):
+            enabled = _settings(str(path)).get("enabledPlugins")
+            if isinstance(enabled, dict):
+                states.update((identity, flag is True) for identity, flag in enabled.items())
+        return states
+    merged = {}
+    for path in (profile / "config.toml", project / ".codex" / "config.toml"):
+        plugins = _settings(str(path)).get("plugins")
+        for identity, entry in plugins.items() if isinstance(plugins, dict) else ():
+            if isinstance(entry, dict):
+                merged.setdefault(identity, {}).update(entry)
+    return {identity: entry.get("enabled") is True for identity, entry in merged.items()}
 
-    home = Path.home()
-    add(home / ".claude" / "plugins" / "cache")
-    add(home / ".codex" / "plugins" / "cache")
-    return roots
+
+def enabled_declarations(project):
+    """The installed declarations this host enables for the project, and the ubiquitous ones it does not."""
+    host = active_host()
+    if host is None:
+        return [], []
+    states = plugin_states(host, project)
+    found = declarations(project=project)
+    if host == "codex":
+        found = [declaration for declaration in found if declaration.id in states]
+    enabled = [declaration for declaration in found if states.get(declaration.id) is True]
+    disabled = [declaration for declaration in found
+                if declaration not in enabled and declaration.applies == "always"
+                and not (declaration.plugin == "personal" and declaration.marketplace == "tj-agents")]
+    return enabled, disabled
 
 
 def _key(path):
@@ -1013,8 +1055,10 @@ def _assess(root, found=None, facts=None, contexts=None):
     return _assess_one(root, found, facts, contexts)
 
 
-def _incomplete_selection(root, found, inventory):
-    declarations_here = list(declarations(project=root) if found is None else found)
+def _incomplete_selection(root, found, inventory, disabled=()):
+    if found is None:
+        found, disabled = enabled_declarations(root)
+    declarations_here = list(found)
     diagnostic_entry = diagnostic("incomplete-workspace-inventory", str(root), inventory.reason or "Repository inventory is incomplete")
     ubiquitous = [declaration for declaration in declarations_here
                   if not (declaration.plugin == "personal" and declaration.marketplace == "tj-agents")
@@ -1022,7 +1066,7 @@ def _incomplete_selection(root, found, inventory):
     blocked = [declaration for declaration in declarations_here if declaration not in ubiquitous]
     problems = [problem for declaration in declarations_here for problem in declaration_diagnostics(declaration)]
     return SelectionResult(root, ubiquitous, (), blocked, (diagnostic_entry, *problems), inventory=inventory,
-                           scope_state="undetermined")
+                           scope_state="undetermined", disabled=disabled)
 
 
 def _aggregate_selection(root, inventory, results):
@@ -1040,11 +1084,14 @@ def _aggregate_selection(root, inventory, results):
 
     ubiquitous = common([result.ubiquitous for result in results])
     applicable = common([result.applicable for result in results])
-    blocked = []
+    blocked, disabled = [], []
     for result in results:
         for declaration in result.blocked:
             if declaration.id not in {item.id for item in blocked}:
                 blocked.append(declaration)
+        for declaration in result.disabled:
+            if declaration.id not in {item.id for item in disabled}:
+                disabled.append(declaration)
     employers = common([result.employers for result in results])
     diagnostics = tuple(problem for result in results for problem in result.diagnostics)
     established = {result.scope_state for result in results if result.scope_state in {"work", "personal"}}
@@ -1067,17 +1114,20 @@ def _aggregate_selection(root, inventory, results):
         employers = []
     selections = results[0].selections if len(results) == 1 else ()
     return SelectionResult(root, ubiquitous, applicable, blocked, diagnostics, selections, employers, inventory,
-                           scope_state, results)
+                           scope_state, results, disabled)
 
 
 def _assess_one(root, found=None, facts=None, contexts=None, inventory=None):
     if inventory is None:
         inventory = workspace_repositories(root)
+    disabled = []
+    if found is None:
+        found, disabled = enabled_declarations(root)
     if not inventory.complete:
-        return _incomplete_selection(root, found, inventory)
+        return _incomplete_selection(root, found, inventory, disabled)
     diagnostics = []
     selections = []
-    found = list(declarations(project=root) if found is None else found)
+    found = list(found)
 
     forced = overridden()
     ubiquitous, applicable, blocked = [], [], []
@@ -1152,7 +1202,8 @@ def _assess_one(root, found=None, facts=None, contexts=None, inventory=None):
             diagnostics.extend(result.diagnostics)
             blocked.append(declaration)
     if _git_timeout() <= 0:
-        return _incomplete_selection(root, found, WorkspaceInventory(inventory, False, "time limit reached while evaluating repositories"))
+        return _incomplete_selection(root, found, WorkspaceInventory(inventory, False, "time limit reached while evaluating repositories"),
+                                     disabled)
     conflict = any(problem["code"] == "organizational-scope-conflict" for problem in diagnostics)
     scope_state = "unclassified"
     if conflict:
@@ -1167,13 +1218,13 @@ def _assess_one(root, found=None, facts=None, contexts=None, inventory=None):
     elif not inventory or diagnostics:
         scope_state = "undetermined"
     return SelectionResult(root, ubiquitous, applicable, blocked, diagnostics, selections, employers,
-                           inventory, scope_state)
+                           inventory, scope_state, disabled=disabled)
 
 
 def statement(root, found=None):
     result = assess(root, found)
     ubiquitous, applicable, blocked = result
-    if not applicable and not blocked and not result.diagnostics and not any(
+    if not applicable and not blocked and not result.diagnostics and not result.disabled and not any(
             declaration.session_context for declaration in ubiquitous):
         return ""
 
@@ -1191,6 +1242,9 @@ def statement(root, found=None):
     if ubiquitous:
         names = ", ".join(declaration.tier for declaration in ubiquitous)
         lines.append("Ubiquitous, always applies: " + names + ".")
+    if result.disabled:
+        names = ", ".join(declaration.tier for declaration in result.disabled)
+        lines.append("Ubiquitous but not enabled: " + names + ". Run agent:refresh-plugins, then start a fresh session.")
     for declaration, reason in applicable:
         lines.append("Applies here: `" + declaration.plugin + ":*` - " + reason + ".")
     for declaration, _ in result.employers:
@@ -1245,15 +1299,6 @@ def replacement_skill(selection, name, available):
         return name
     candidate = company + "-" + stack + ":" + skill
     return candidate if available(candidate) else name
-
-
-def active_host():
-    parts = Path(__file__).resolve().parts
-    if ".codex" in parts or os.environ.get("PLUGIN_ROOT") or os.environ.get("CODEX_PLUGIN_ROOT"):
-        return "codex"
-    if ".claude" in parts or os.environ.get("CLAUDE_PLUGIN_ROOT"):
-        return "claude"
-    return None
 
 
 @functools.lru_cache(maxsize=2)

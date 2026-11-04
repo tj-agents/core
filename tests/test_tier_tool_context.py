@@ -197,7 +197,7 @@ def test_file_beside_repositories_does_not_inherit_their_scope(
             {"schema_version": 1, "tier": "personal", "applies": "always"},
         )
     ]
-    monkeypatch.setattr(gate, "declarations", lambda project: declarations)
+    monkeypatch.setattr(gate, "enabled_declarations", lambda project: (declarations, []))
     target = tmp_path / "notes.txt"
     if existing:
         target.write_text("outside the repository", encoding="utf-8")
@@ -298,7 +298,7 @@ def test_personal_work_personal_operations_use_current_target_scope(
             payload,
         ),
     ]
-    monkeypatch.setattr(gate, "declarations", lambda project: declarations)
+    monkeypatch.setattr(gate, "enabled_declarations", lambda project: (declarations, []))
 
     selections = [
         gate.path_selection(str(path / "new.py")) for path in (personal, work, personal)
