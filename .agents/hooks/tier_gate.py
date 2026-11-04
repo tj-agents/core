@@ -407,10 +407,11 @@ def _evaluate_predicate(root, node, facts=None, contexts=None, path="detect", em
 
 
 class SelectionResult:
-    def __init__(self, scope, ubiquitous=(), applicable=(), blocked=(), diagnostics=(), selections=(), employers=(), inventory=None, scope_state="unclassified", repository_results=(), disabled=()):
+    def __init__(self, scope, ubiquitous=(), applicable=(), blocked=(), diagnostics=(), selections=(), employers=(), inventory=None, scope_state="unclassified", repository_results=(), disabled=(), unavailable=()):
         self.scope = str(scope)
         self.ubiquitous = list(ubiquitous)
         self.disabled = list(disabled)
+        self.unavailable = tuple(unavailable)
         self.applicable = list(applicable)
         self.blocked = list(blocked)
         self.diagnostics = tuple(diagnostics)
@@ -458,22 +459,42 @@ def cache_roots():
     return [cache] if cache.is_dir() else []
 
 
+class EnablementUnavailable(Exception):
+    pass
+
+
 @functools.lru_cache(maxsize=None)
 def _settings(path):
-    try:
-        if path.endswith(".toml"):
-            import tomllib
-            with open(path, "rb") as stream:
-                value = tomllib.load(stream)
-        else:
-            value = json.loads(Path(path).read_text(encoding="utf-8-sig"))
-    except (ImportError, OSError, UnicodeError, ValueError):
+    file = Path(path)
+    if not file.is_file():
         return {}
-    return value if isinstance(value, dict) else {}
+    try:
+        text = file.read_text(encoding="utf-8-sig")
+        if file.suffix == ".toml":
+            try:
+                import tomllib
+            except ImportError:
+                raise EnablementUnavailable("Python 3.11+ is required") from None
+            value = tomllib.loads(text)
+        else:
+            value = json.loads(text)
+    except (OSError, UnicodeError, ValueError):
+        raise EnablementUnavailable(str(file) + " is unreadable or malformed") from None
+    if not isinstance(value, dict):
+        raise EnablementUnavailable(str(file) + " is unreadable or malformed")
+    return value
 
 
 def plugin_states(host, project):
-    profile, project = host_profile(host), Path(project)
+    try:
+        return _plugin_states(host, Path(project))
+    except EnablementUnavailable as error:
+        raise EnablementUnavailable("Tier gate could not read " + host.capitalize()
+                                    + " plugin enablement: " + str(error) + ".") from None
+
+
+def _plugin_states(host, project):
+    profile = host_profile(host)
     if host == "claude":
         states = {}
         for path in (profile / "settings.json", project / ".claude" / "settings.json",
@@ -495,7 +516,7 @@ def enabled_declarations(project):
     """The installed declarations this host enables for the project, and the ubiquitous ones it does not."""
     host = active_host()
     if host is None:
-        return [], []
+        raise EnablementUnavailable("Tier gate could not determine the running host; plugin standards are unknown.")
     states = plugin_states(host, project)
     found = declarations(project=project)
     if host == "codex":
@@ -505,6 +526,13 @@ def enabled_declarations(project):
                 if declaration not in enabled and declaration.applies == "always"
                 and not (declaration.plugin == "personal" and declaration.marketplace == "tj-agents")]
     return enabled, disabled
+
+
+def _enabled(project):
+    try:
+        return (*enabled_declarations(project), ())
+    except EnablementUnavailable as error:
+        return [], [], (str(error),)
 
 
 def _key(path):
@@ -1055,9 +1083,9 @@ def _assess(root, found=None, facts=None, contexts=None):
     return _assess_one(root, found, facts, contexts)
 
 
-def _incomplete_selection(root, found, inventory, disabled=()):
+def _incomplete_selection(root, found, inventory, disabled=(), unavailable=()):
     if found is None:
-        found, disabled = enabled_declarations(root)
+        found, disabled, unavailable = _enabled(root)
     declarations_here = list(found)
     diagnostic_entry = diagnostic("incomplete-workspace-inventory", str(root), inventory.reason or "Repository inventory is incomplete")
     ubiquitous = [declaration for declaration in declarations_here
@@ -1066,7 +1094,7 @@ def _incomplete_selection(root, found, inventory, disabled=()):
     blocked = [declaration for declaration in declarations_here if declaration not in ubiquitous]
     problems = [problem for declaration in declarations_here for problem in declaration_diagnostics(declaration)]
     return SelectionResult(root, ubiquitous, (), blocked, (diagnostic_entry, *problems), inventory=inventory,
-                           scope_state="undetermined", disabled=disabled)
+                           scope_state="undetermined", disabled=disabled, unavailable=unavailable)
 
 
 def _aggregate_selection(root, inventory, results):
@@ -1094,6 +1122,7 @@ def _aggregate_selection(root, inventory, results):
                 disabled.append(declaration)
     employers = common([result.employers for result in results])
     diagnostics = tuple(problem for result in results for problem in result.diagnostics)
+    unavailable = tuple(dict.fromkeys(message for result in results for message in result.unavailable))
     established = {result.scope_state for result in results if result.scope_state in {"work", "personal"}}
     if any(result.scope_state == "undetermined" for result in results):
         scope_state = "undetermined"
@@ -1114,17 +1143,17 @@ def _aggregate_selection(root, inventory, results):
         employers = []
     selections = results[0].selections if len(results) == 1 else ()
     return SelectionResult(root, ubiquitous, applicable, blocked, diagnostics, selections, employers, inventory,
-                           scope_state, results, disabled)
+                           scope_state, results, disabled, unavailable)
 
 
 def _assess_one(root, found=None, facts=None, contexts=None, inventory=None):
     if inventory is None:
         inventory = workspace_repositories(root)
-    disabled = []
+    disabled, unavailable = [], ()
     if found is None:
-        found, disabled = enabled_declarations(root)
+        found, disabled, unavailable = _enabled(root)
     if not inventory.complete:
-        return _incomplete_selection(root, found, inventory, disabled)
+        return _incomplete_selection(root, found, inventory, disabled, unavailable)
     diagnostics = []
     selections = []
     found = list(found)
@@ -1203,7 +1232,7 @@ def _assess_one(root, found=None, facts=None, contexts=None, inventory=None):
             blocked.append(declaration)
     if _git_timeout() <= 0:
         return _incomplete_selection(root, found, WorkspaceInventory(inventory, False, "time limit reached while evaluating repositories"),
-                                     disabled)
+                                     disabled, unavailable)
     conflict = any(problem["code"] == "organizational-scope-conflict" for problem in diagnostics)
     scope_state = "unclassified"
     if conflict:
@@ -1218,13 +1247,13 @@ def _assess_one(root, found=None, facts=None, contexts=None, inventory=None):
     elif not inventory or diagnostics:
         scope_state = "undetermined"
     return SelectionResult(root, ubiquitous, applicable, blocked, diagnostics, selections, employers,
-                           inventory, scope_state, disabled=disabled)
+                           inventory, scope_state, disabled=disabled, unavailable=unavailable)
 
 
 def statement(root, found=None):
     result = assess(root, found)
     ubiquitous, applicable, blocked = result
-    if not applicable and not blocked and not result.diagnostics and not result.disabled and not any(
+    if not applicable and not blocked and not result.diagnostics and not result.disabled and not result.unavailable and not any(
             declaration.session_context for declaration in ubiquitous):
         return ""
 
@@ -1237,6 +1266,7 @@ def statement(root, found=None):
                  "an unsupported tool, or an edit crossing repositories, query this hook with "
                  "`--path <target>` for every target and apply only that repository's context. "
                  "A previous repository's context does not apply to another repository.")
+    lines.extend(result.unavailable)
     lines.extend("Configuration diagnostic: " + problem["path"] + ": " + problem["message"]
                  for problem in result.diagnostics)
     if ubiquitous:
@@ -1443,6 +1473,7 @@ def _target_context(anchor, boundary, result) -> str:
             lines.append(declaration.session_context)
     if result.scope_state in {"mixed", "unclassified", "undetermined"}:
         lines.append("Resolve this repository before applying Work or Personal standards.")
+    lines.extend(result.unavailable)
     lines.extend("Configuration diagnostic: " + problem["path"] + ": " + problem["message"]
                  for problem in result.diagnostics)
     return "\n".join(lines)
