@@ -9,6 +9,8 @@ lane: L7
 
 # Checkout isolation for active work
 
+Owns checkout selection, deterministic worktree creation and safe closure.
+
 `engineering:branching` owns sequential delivery, required stack relationships and checkout allocation.
 Reuse an available checkout for sequential work after preserving its previous work and verifying that no
 writer, build, monitor or active session still owns it. Create a separate worktree when concurrent execution,
@@ -67,21 +69,15 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
    `-` in the folder name, and always lands the result at `<repository-root>/.worktrees/<flattened-branch>`
    — **the only supported location.** It independently chooses the right start point (an existing local
    branch, an existing remote-only branch's tracking ref, or the fetched remote default) and prints the
-   resulting branch, path, HEAD and base as JSON; read that JSON rather than re-deriving the path yourself.
+   resulting branch, path, HEAD, base and base SHA as JSON; read that JSON rather than re-deriving the path yourself.
    For a dependent stack layer, pass `--from <parent-ref>` with the verified parent ref and record its SHA.
    Do not merge main separately into each layer as a substitute for reconciling the stack.
 
-4. **Never create a sibling `<repo-root-parent>/<repo-name>.worktrees/<branch>` folder, and never place one
-   under a directory the agent harness reserves for its own ephemeral worktrees.** A sibling folder sits
-   outside the repository's own directory tree. The native host resolves project-local settings and plugin
-   registrations by walking up the physical filesystem from the working directory; a worktree nested under
-   the repository root inherits the main checkout's registration for free by that walk, while a sibling
-   folder never reaches it — skills enabled in the main checkout silently stay unavailable there,
-   permanently, because no session refresh changes where the host looks. A directory the harness reserves
-   for its own ephemeral worktrees causes a different failure: manual trees collide with it and land as
-   stray gitlinks that break submodule-aware checkouts. Inventory still reports both shapes — see the table
-   above — so an already-misplaced sibling worktree can be found and relocated into the nested location
-   with `git worktree move`; that inventory coverage is for cleanup, not a second accepted creation target.
+4. **Always use `<primary-repository>/.worktrees/<flattened-branch>`.** Do not create sibling
+   `<repo-name>.worktrees` directories or use a directory reserved for the agent harness's ephemeral trees.
+   Physical nesting does not establish plugin discovery: verify the checkout's selected declarations and
+   actual host loading separately. Inventory still reports old sibling worktrees so their existing owner
+   can relocate them with `git worktree move`; new creation always uses the shared script's nested path.
 5. **Verify** the resulting path, branch, HEAD, base or existing remote head, and clean status. Use absolute
    paths for every subsequent tool call in the session.
 
