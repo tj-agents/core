@@ -166,7 +166,7 @@ def required_results(value, needs, event, labels=()):
         "guard": "success" if event == "pull_request" else "skipped",
         "guidance-examples": "success",
     }
-    suites = event == "pull_request" and FULL_LABEL in labels and value["mode"] != "docs"
+    suites = (event != "pull_request" or FULL_LABEL in labels) and value["mode"] != "docs"
     expected.update({name: "success" if suites else "skipped" for name in ("verify-windows", "verify-linux")})
     for name, result in expected.items():
         if not isinstance(needs.get(name), dict) or needs[name].get("result") != result:
