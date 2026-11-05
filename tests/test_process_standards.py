@@ -9,6 +9,7 @@ def authored_skill(name: str) -> Path:
         "merging": ".agents/engineering/policy/merging/SKILL.md",
         "plans": ".agents/engineering/convention/plans/SKILL.md",
         "workflow:run": ".agents/workflow/workflow/run/SKILL.md",
+        "workflow:continue": ".agents/workflow/workflow/continue/SKILL.md",
         "handoff": ".agents/workflow/workflow/handoff/SKILL.md",
     }
     return ROOT / paths[name]
@@ -77,3 +78,26 @@ def test_handoff_does_not_create_a_routine_cleanup_successor() -> None:
         in cleanup
     )
     assert "Do not create a routine handoff or new session for cleanup" in cleanup
+
+
+def test_continuation_completion_requires_acceptance_before_private_release() -> None:
+    continuation = authored_skill("workflow:continue")
+    reference = continuation.parent / "references/delivery.md"
+    body = reference.read_text(encoding="utf-8")
+    flat = " ".join(body.split())
+    assert (
+        "[software delivery evidence](references/delivery.md)"
+        in continuation.read_text(encoding="utf-8")
+    )
+    assert (
+        "`workflow:run`'s [terminal acceptance checkpoint]"
+        "(../../run/SKILL.md#terminal-acceptance-and-frontend-release)"
+    ) in flat
+    assert "Its accepted receipt gates the private Agent release contract" in flat
+    example = body.split("```text", maxsplit=1)[1].split("```", maxsplit=1)[0]
+    assert "enter workflow:run terminal acceptance" in example
+    assert "only an accepted receipt proceeds to private Agent release" in example
+    assert "agent:close" not in body
+    assert (reference.parent / "../../run/SKILL.md").resolve() == authored_skill(
+        "workflow:run"
+    ).resolve()
