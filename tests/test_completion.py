@@ -101,19 +101,21 @@ def test_workflow_package_invokes_completion_without_an_author_checkout(
     mappings = json.loads(
         (ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8")
     )["resources"]
+    mapping = next(
+        item
+        for item in mappings
+        if item["plugin"] == "workflow" and item["destination"] == "workflows"
+    )
     root = tmp_path / "package"
     root.mkdir()
     for filename in ("completion.py", "pr_body.py"):
-        mapping = next(
-            item
-            for item in mappings
-            if item["plugin"] == "workflow"
-            and item["destination"] == f"workflows/{filename}"
-        )
-        destination = root / mapping["destination"]
+        relative = Path(mapping["destination"]) / filename
+        destination = root / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
-        packaged = ROOT / "plugins/workflow" / mapping["destination"]
-        assert (ROOT / mapping["source"]).read_bytes() == packaged.read_bytes()
+        packaged = ROOT / "plugins/workflow" / relative
+        assert (
+            ROOT / mapping["source"] / filename
+        ).read_bytes() == packaged.read_bytes()
         shutil.copyfile(packaged, destination)
     goal_path = root / "GOAL.md"
     goal_path.write_text(goal(), encoding="utf-8")
@@ -175,6 +177,37 @@ def test_terminal_acceptance_requires_a_bound_passing_audit_then_rechecks(
     assert accepted_again["state"] == "accepted"
     assert not dispatch
     assert reused["audit"]["state"] == "passed"
+
+
+def test_terminal_acceptance_binds_main_follow_up_to_the_audited_goal(
+    tmp_path: Path, state: Path
+) -> None:
+    root, goal_path, aggregate_path, artifact = terminal_files(tmp_path)
+    _, document = COMPLETION.completion_document(goal_path)
+    document["follow_up"] = [
+        {
+            "repository": "example/publisher",
+            "pr": 9,
+            "head": HEAD,
+            "text": "Publish the independent next version.",
+            "owner": "publisher owner",
+            "next_action": "Continue in the publisher work item.",
+            "scope_evidence": "The requested delivery is complete at its recorded pin.",
+        }
+    ]
+    goal_path.write_text(
+        f"# Goal\n\n```completion\n{json.dumps(document)}\n```\n", encoding="utf-8"
+    )
+    receipt_path, _ = COMPLETION.prepare_terminal_acceptance(
+        goal_path,
+        aggregate_path,
+        {"host": "codex", "session_id": "s1"},
+        root,
+        [artifact],
+    )
+    assert accept(receipt_path, root)["state"] == "accepted"
+    goal_path.write_text(goal(), encoding="utf-8")
+    assert COMPLETION.recheck_terminal_acceptance(receipt_path)["state"] == "candidate"
 
 
 def test_terminal_acceptance_rejects_changed_sources_after_audit(

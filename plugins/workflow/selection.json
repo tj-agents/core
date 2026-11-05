@@ -16,9 +16,15 @@
       "id": "tj-agents/agent",
       "marketplace": "tj-agents",
       "repository": "tj-agents/agent"
+    },
+    {
+      "id": "tj-agents/cli",
+      "marketplace": "tj-agents",
+      "repository": "tj-agents/cli"
     }
   ],
   "skills": [
+    "catch-up",
     "continue",
     "handoff",
     "plan",

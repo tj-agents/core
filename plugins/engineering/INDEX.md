@@ -25,7 +25,6 @@ Generated from canonical `.agents/` definitions.
 - `merging` — policy — `.agents/engineering/policy/merging/SKILL.md`
 - `open-pr` — operation — `.agents/engineering/operation/open-pr/SKILL.md`
 - `open-worktree` — operation — `.agents/engineering/operation/open-worktree/SKILL.md`
-- `persistent-delivery` — policy — `.agents/engineering/policy/persistent-delivery/SKILL.md`
 - `plans` — convention — `.agents/engineering/convention/plans/SKILL.md`
 - `pr-preflight` — operation — `.agents/engineering/operation/pr-preflight/SKILL.md`
 - `pr-screenshots` — contract — `.agents/engineering/contract/pr-screenshots/SKILL.md`

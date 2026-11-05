@@ -32,24 +32,6 @@
         ]
       }
     ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 15,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py",
-              "hook",
-              "--host",
-              "claude"
-            ]
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "hooks": [
@@ -67,6 +49,39 @@
           }
         ],
         "matcher": "*"
+      },
+      {
+        "matcher": "Read|Edit|Write|Glob|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
+              "--tool-context"
+            ]
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/dependencies/agent/.agents/agent/runtime/managed_admission.py",
+              "hook",
+              "--host",
+              "claude"
+            ]
+          }
+        ]
       }
     ]
   }
