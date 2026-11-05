@@ -19,9 +19,7 @@
       "revision": "dcf80a25864e354106e542de2230721668eab05b",
       "package": "plugins/cli",
       "exports": [
-        ".agents/cli/runtime",
-        ".agents/cli/utility/close/scripts",
-        ".agents/cli/utility/closeout/scripts"
+        ".agents/cli/runtime"
       ]
     }
   }

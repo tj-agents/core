@@ -68,6 +68,10 @@ class ReviewRulesTests(unittest.TestCase):
                          result["selection"]["plugins"])
 
     def test_selected_company_replaces_the_whole_generic_skill(self):
+        subprocess.run(
+            ["git", "init", "--quiet", str(self.project)],
+            check=True, capture_output=True, timeout=10,
+        )
         self.selection("stack@selected", "company@selected", "company-stack@selected")
         (self.project / "company.marker").write_text("company\n", encoding="utf-8")
         employer = self.plugin("company", data={
