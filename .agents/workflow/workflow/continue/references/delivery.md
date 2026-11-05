@@ -25,13 +25,16 @@ without waiting for it or refreshing its PR. It rejects overlap with an owned de
 This validates the current declared record; scope evidence references do not independently prove authority.
 An external owner does not waive acceptance: when the requested outcome requires that work, keep the
 unmet criterion in `acceptance` and its action in `open_tasks`. Do not add independent future work to the
-current goal's acceptance merely to retain it. A successful completion check proceeds to the session's
-`agent:close` decision; independent follow-up alone is no reason to keep the frontend open.
+current goal's acceptance merely to retain it. A successful completion check proceeds to
+`workflow:run`'s [terminal acceptance checkpoint](../../run/SKILL.md#terminal-acceptance-and-frontend-release).
+Its accepted receipt gates the private Agent release contract; independent follow-up alone is no reason
+to keep the frontend open.
 
 ```text
 User requests reviewed parser PRs; both are merged and verified.
 Another owner retains a separate dashboard PR: record it in follow_up with that ownership evidence.
-Result: the parser delivery may complete and enter agent:close.
+Result: the parser delivery may complete and enter workflow:run terminal acceptance;
+only an accepted receipt proceeds to private Agent release.
 User instead requests the working dashboard: its missing acceptance still blocks completion,
 even when another owner is implementing it.
 ```
