@@ -79,8 +79,8 @@ A plan, ledger, roadmap, or handoff may sequence delivery, but anonymous procedu
 push`, `do not open a PR`, or `do not merge` has no authority to suppress the standing plan-delivery contract.
 Location alone never makes a restriction stale: preserve an explicit current user limitation, recorded
 repository authorization, named PR/head security or validation hold, merge hold, or repository stop class as
-a typed delivery gate. When no such live authority is identified, continue to merged default-branch state
-(`engineering:merging` owns the goal-wide merge-authorization scope).
+a typed delivery gate. When no such live authority is identified, `workflow:run` continues the
+user-authorized goal through merged default-branch state.
 
 ## Shape of a plan
 
@@ -239,8 +239,8 @@ repositories do not select that profile implicitly.
 Before foreground or meta closeout, reporting done, or deleting recovery artifacts, use `workflow:run`'s
 terminal acceptance checkpoint. Its candidate receipt binds the exact goal, artifacts, delivery evidence,
 known responsibility aggregate, audit result, and cleanup disposition. A missing, invalid, blocked, or
-stale receipt keeps the recovery artifacts. `engineering:persistent-delivery` retains its own delivery
-binding and does not become a second completion authority.
+stale receipt keeps the recovery artifacts. `workflow:continue`'s software delivery reference retains its
+own delivery binding and does not become a second completion authority.
 
 On an accepted current receipt, record retirement permission before deleting the goal or its eligible
 plan-and-ledger pair. Declare the companion plan as an `--artifact` during preparation, then name it with

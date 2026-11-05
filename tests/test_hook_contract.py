@@ -26,7 +26,7 @@ class HookContractTests(unittest.TestCase):
     def test_all_declared_hooks_have_valid_pointers_commands_and_scripts(self) -> None:
         self.validate(self.output)
 
-    def test_only_base_ships_a_hooks_manifest_and_it_registers_only_session_start(self) -> None:
+    def test_admission_hooks_preserve_base_only_tier_context(self) -> None:
         hook_manifests = {}
         for path, payload in self.output.items():
             if not (path.startswith("plugins/") and path.endswith(".json") and path.split("/")[2:3] == ["hooks"]):
@@ -34,10 +34,30 @@ class HookContractTests(unittest.TestCase):
             document = json.loads(payload)
             if isinstance(document, dict) and isinstance(document.get("hooks"), dict):
                 hook_manifests[path] = document
-        self.assertEqual({"plugins/base/hooks/claude.json", "plugins/base/hooks/codex.json"}, set(hook_manifests))
+        self.assertEqual(
+            {
+                f"plugins/{plugin}/hooks/{host}.json"
+                for plugin in ("base", "workflow", "engineering", "docs")
+                for host in ("claude", "codex")
+            },
+            set(hook_manifests),
+        )
         for path, manifest in hook_manifests.items():
             with self.subTest(path=path):
-                self.assertEqual({"SessionStart"}, set(manifest["hooks"]))
+                self.assertEqual(
+                    {"SessionStart", "UserPromptSubmit", "PreToolUse"},
+                    set(manifest["hooks"]),
+                )
+                for event, groups in manifest["hooks"].items():
+                    hooks = [hook for group in groups for hook in group["hooks"]]
+                    self.assertIn("managed_admission.py", json.dumps(hooks[0]))
+                    expected_tier_hooks = int(
+                        path.startswith("plugins/base/") and event != "UserPromptSubmit"
+                    )
+                    self.assertEqual(
+                        expected_tier_hooks,
+                        sum("hooks/tier_gate.py" in json.dumps(hook) for hook in hooks),
+                    )
 
     def test_generated_hooks_use_the_hidden_boundary(self) -> None:
         claude = json.loads(self.output["plugins/base/hooks/claude.json"])
@@ -80,8 +100,14 @@ class HookContractTests(unittest.TestCase):
         output = copy.deepcopy(self.output)
         path = "plugins/base/hooks/codex.json"
         payload = json.loads(output[path])
-        command = payload["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"]
-        payload["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"] = command.replace(
+        hook = next(
+            hook
+            for group in payload["hooks"]["SessionStart"]
+            for hook in group["hooks"]
+            if "hooks/tier_gate.py" in hook["commandWindows"]
+        )
+        command = hook["commandWindows"]
+        hook["commandWindows"] = command.replace(
             "hooks/tier_gate.py", "hooks/does-not-exist.py"
         )
         output[path] = json.dumps(payload).encode()

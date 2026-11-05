@@ -190,7 +190,7 @@ class AutoMergeTests(unittest.TestCase):
                 "instruction": binding["merge_authorization"]["instruction"],
                 "source": "test scoped approval",
             }
-            (agents / "persistent-workflow-binding.json").write_text(
+            (agents / "delivery-binding.json").write_text(
                 json.dumps({"scoped_approval": approval}), encoding="utf-8"
             )
             value = {"files": [{"path": "README.md"}], "changedFiles": 1, "labels": []}
