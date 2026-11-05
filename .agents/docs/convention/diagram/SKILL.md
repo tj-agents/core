@@ -26,6 +26,26 @@ chain add nothing.
 
 One idea per diagram: today and after are two diagrams.
 
+## Sequence diagrams use UML notation
+
+Number messages (`autonumber`), show activation on whoever is working, frame repetition and branches in
+`loop`, `alt` or `opt`, draw async messages with `-)` and calls as `->>` with dashed `-->>` returns, drop
+the bottom participant row, and keep notes off lifelines.
+
+```mermaid
+%%{init: {"sequence": {"mirrorActors": false}}}%%
+sequenceDiagram
+    autonumber
+    participant W as Worker
+    participant DB as Orders database
+    participant T as order-created topic
+    W->>+DB: Insert order and outbox row
+    DB-->>-W: Committed
+    alt outbox row pending
+        W-)T: Publish event
+    end
+```
+
 ## Readable at page width
 
 A wide diagram is shrunk to fit and long labels are truncated. Use `flowchart TB` beyond about four nodes,
