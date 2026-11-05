@@ -1,4 +1,4 @@
-"""The stack-tier gate decides applicability from shipped declarations, never from local settings."""
+"""The stack-tier gate decides applicability from shipped declarations the running host enables."""
 
 import importlib.util
 import json
@@ -53,26 +53,35 @@ INFONETICA = {
 }
 
 
+HOST_VARIABLES = ("PLUGIN_ROOT", "CODEX_PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT", "CODEX_THREAD_ID",
+                  "CLAUDE_CODE_SESSION_ID", "CLAUDE_CONFIG_DIR", "CODEX_HOME")
+SKILL = {"schema_version": 1, "tier": "skill", "applies": "always"}
+TEMPLATE = {"schema_version": 1, "tier": "template", "applies": "always"}
+PERSONAL = {"schema_version": 1, "tier": "personal", "applies": "always"}
+PYTHON = {"schema_version": 1, "tier": "python", "stack": "Python", "applies": "stack-present",
+          "detect": {"files": ["pyproject.toml"]}}
+
+
 def declaration(plugin, marketplace, data):
     return gate.Declaration(plugin, marketplace, data)
 
 
 class DeclarationDiscovery(unittest.TestCase):
-    def test_an_uncached_plugin_root_never_promotes_an_unrelated_ancestor_to_a_cache(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            home = Path(temporary)
-            plugin = home / 'scratch' / 'engineering'
-            plugin.mkdir(parents=True)
-            cache = home / '.codex/plugins/cache'
-            native = cache / 'tj-agents/base/local'
-            native.mkdir(parents=True)
-            cleared = {name: '' for name in (*gate.PLUGIN_ROOT_VARIABLES, 'CLAUDE_CONFIG_DIR', 'CODEX_HOME')}
-            with unittest.mock.patch.dict(os.environ, dict(cleared, PLUGIN_ROOT=str(plugin))), \
-                    unittest.mock.patch.object(gate.Path, 'home', return_value=home):
-                self.assertNotIn(plugin.parents[2], gate.cache_roots())
-            with unittest.mock.patch.dict(os.environ, dict(cleared, PLUGIN_ROOT=str(native))), \
-                    unittest.mock.patch.object(gate.Path, 'home', return_value=home):
-                self.assertEqual(cache.resolve(), gate.cache_roots()[0])
+    def test_only_the_running_hosts_cache_is_read(self):
+        with tempfile.TemporaryDirectory() as home:
+            codex = Path(home) / ".codex" / "plugins" / "cache"
+            claude = Path(home) / ".claude" / "plugins" / "cache"
+            codex.mkdir(parents=True)
+            claude.mkdir(parents=True)
+            script = codex / "tj-agents" / "engineering" / "1.0.0" / "hooks" / "tier_gate.py"
+            cleared = {name: "" for name in HOST_VARIABLES}
+            with unittest.mock.patch.dict(os.environ, cleared), \
+                    unittest.mock.patch.object(gate.Path, "home", return_value=Path(home)):
+                with unittest.mock.patch.object(gate, "__file__", str(script)):
+                    self.assertEqual([codex.resolve()], gate.cache_roots())
+                with unittest.mock.patch.dict(os.environ, {"CLAUDE_PLUGIN_ROOT": home}):
+                    self.assertEqual([claude.resolve()], gate.cache_roots())
+                self.assertEqual([], gate.cache_roots())
 
     def test_identity_comes_from_the_installed_path_not_the_declaration(self):
         with tempfile.TemporaryDirectory() as cache:
@@ -204,20 +213,6 @@ class DeclarationDiscovery(unittest.TestCase):
 
         self.assertEqual([item.payload_dir.name for item in found], ["inner"])
 
-    def test_the_gates_own_install_cache_precedes_the_home_caches(self):
-        with tempfile.TemporaryDirectory() as home:
-            own = Path(home) / ".codex" / "plugins" / "cache"
-            script = own / "tj-agents" / "engineering" / "1.0.0" / "hooks" / "tier_gate.py"
-            script.parent.mkdir(parents=True)
-            (Path(home) / ".claude" / "plugins" / "cache").mkdir(parents=True)
-            cleared = {name: "" for name in (*gate.PLUGIN_ROOT_VARIABLES, "CLAUDE_CONFIG_DIR", "CODEX_HOME")}
-            with unittest.mock.patch.dict(os.environ, cleared), \
-                    unittest.mock.patch.object(gate, "__file__", str(script)), \
-                    unittest.mock.patch.object(gate.Path, "home", return_value=Path(home)):
-                roots = gate.cache_roots()
-
-        self.assertEqual(own.resolve(), roots[0])
-
     def test_the_first_cache_root_answers_for_a_plugin_both_hosts_cache(self):
         with tempfile.TemporaryDirectory() as claude, tempfile.TemporaryDirectory() as codex:
             payloads = []
@@ -230,6 +225,149 @@ class DeclarationDiscovery(unittest.TestCase):
             found = gate.declarations([claude, codex])
 
         self.assertEqual([item.payload_dir for item in found], [payloads[0]])
+
+
+class EnabledPlugins(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        self.claude, self.codex, self.project = root / "claude", root / "codex", root / "project"
+        self.project.mkdir()
+        payloads = {plugin: self.install(self.claude, plugin, data) for plugin, data in (
+            ("base", BASE), ("skill", SKILL), ("template", TEMPLATE), ("python", PYTHON), ("personal", PERSONAL))}
+        registry = {"plugins": {plugin + "@tj-agents": [{"scope": "user", "installPath": str(payload)}]
+                                for plugin, payload in payloads.items()}}
+        (self.claude / "plugins" / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+        self.write(self.claude / "settings.json", {"base@tj-agents": True})
+        for plugin in ("kit", "machine"):
+            self.install(self.codex, plugin, {"schema_version": 1, "tier": plugin, "applies": "always"})
+        (self.codex / "config.toml").write_text('[plugins."kit@tj-agents"]\nenabled = true\n', encoding="utf-8")
+        self.environment = dict({name: "" for name in HOST_VARIABLES}, CLAUDE_CONFIG_DIR=str(self.claude),
+                                CODEX_HOME=str(self.codex), CLAUDE_PLUGIN_ROOT=str(payloads["base"]))
+        environment = unittest.mock.patch.dict(os.environ, dict(self.environment, **{gate.OVERRIDE_VARIABLE: ""}))
+        environment.start()
+        self.addCleanup(environment.stop)
+        gate._settings.cache_clear()
+        self.addCleanup(gate._settings.cache_clear)
+
+    def install(self, profile, plugin, data):
+        payload = profile / "plugins" / "cache" / "tj-agents" / plugin / "1"
+        payload.mkdir(parents=True)
+        (payload / "tier.json").write_text(json.dumps(data), encoding="utf-8")
+        return payload
+
+    def write(self, path, enabled):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"enabledPlugins": enabled}), encoding="utf-8")
+        gate._settings.cache_clear()
+
+    def test_only_enabled_ubiquitous_packages_apply_and_the_rest_fail_loudly(self):
+        result = gate.assess(self.project)
+        text = gate.statement(self.project)
+
+        self.assertEqual([item.tier for item in result.ubiquitous], ["base"])
+        self.assertEqual([item.tier for item in result.disabled], ["skill", "template"])
+        self.assertEqual([line for line in text.splitlines() if line.startswith("Ubiquitous")], [
+            "Ubiquitous, always applies: base.",
+            "Ubiquitous but not enabled: skill, template. Run agent:refresh-plugins, then start a fresh session.",
+        ])
+        self.assertNotIn("`python:*`", text)
+        self.assertNotIn("`personal:*`", text)
+
+    def test_project_settings_enable_a_package_for_that_project_only(self):
+        self.write(self.project / ".claude" / "settings.json", {"skill@tj-agents": True, "python@tj-agents": True})
+        (self.project / "pyproject.toml").write_text("", encoding="utf-8")
+        other = self.project.parent / "other"
+        other.mkdir()
+
+        here = gate.assess(self.project)
+        elsewhere = gate.assess(other)
+
+        self.assertEqual([item.tier for item in here.ubiquitous], ["base", "skill"])
+        self.assertEqual([item.tier for item, _ in here.applicable], ["python"])
+        self.assertEqual([item.tier for item in here.disabled], ["template"])
+        self.assertEqual([item.tier for item in elsewhere.ubiquitous], ["base"])
+
+    def test_a_later_settings_scope_overrides_an_earlier_one(self):
+        self.write(self.project / ".claude" / "settings.json", {"skill@tj-agents": True})
+        self.write(self.project / ".claude" / "settings.local.json", {"skill@tj-agents": False})
+
+        result = gate.assess(self.project)
+
+        self.assertEqual([item.tier for item in result.ubiquitous], ["base"])
+        self.assertEqual([item.tier for item in result.disabled], ["skill", "template"])
+
+    def test_a_codex_session_reads_only_codex_enablement(self):
+        with unittest.mock.patch.dict(os.environ, {"CLAUDE_PLUGIN_ROOT": "", "PLUGIN_ROOT": str(self.codex)}):
+            result = gate.assess(self.project)
+            text = gate.statement(self.project)
+
+        self.assertEqual([item.tier for item in result.ubiquitous], ["kit"])
+        self.assertEqual(result.disabled, [])
+        self.assertEqual(text, "")
+
+    def codex_context(self):
+        target = str(self.project / "module.py")
+        with unittest.mock.patch.dict(os.environ, {"CLAUDE_PLUGIN_ROOT": "", "PLUGIN_ROOT": str(self.codex)}):
+            return gate.statement(self.project), gate.tool_context({"tool_name": "apply_patch", "tool_input": {
+                "command": "*** Begin Patch\n*** Add File: " + target + "\n+x\n*** End Patch"}})
+
+    def test_codex_enablement_without_tomllib_is_reported_not_silently_empty(self):
+        with unittest.mock.patch.dict(sys.modules, {"tomllib": None}):
+            texts = self.codex_context()
+
+        for text in texts:
+            self.assertIn("Tier gate could not read Codex plugin enablement: Python 3.11+ is required.", text)
+
+    def test_malformed_codex_enablement_is_reported(self):
+        (self.codex / "config.toml").write_text("[plugins\n", encoding="utf-8")
+
+        for text in self.codex_context():
+            self.assertIn("Tier gate could not read Codex plugin enablement: "
+                          + str(self.codex / "config.toml") + " is unreadable or malformed.", text)
+
+    def test_an_undetermined_host_is_reported_not_silently_empty(self):
+        target = str(self.project / "module.py")
+        with unittest.mock.patch.dict(os.environ, {"CLAUDE_PLUGIN_ROOT": ""}):
+            texts = (gate.statement(self.project),
+                     gate.tool_context({"tool_name": "Read", "tool_input": {"file_path": target}}))
+
+        for text in texts:
+            self.assertIn("Tier gate could not determine the running host; plugin standards are unknown.", text)
+
+    def test_personal_follows_adoption_and_never_reports_as_not_enabled(self):
+        subprocess.run(["git", "init", "-q", str(self.project)], check=True)
+        self.assertNotIn("personal", gate.statement(self.project).split("Ubiquitous but not enabled:")[1].splitlines()[0])
+
+        self.write(self.project / ".claude" / "settings.json", {"personal@tj-agents": True})
+        self.assertEqual([item.tier for item, _ in gate.assess(self.project).applicable], [])
+
+        (self.project / ".agents").mkdir()
+        (self.project / ".agents" / "plugins.json").write_text(json.dumps({
+            "schema_version": 1, "plugins": ["personal@tj-agents"],
+            "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}}), encoding="utf-8")
+        self.assertIn("Applies here: `personal:*` - explicit repository adoption.", gate.statement(self.project))
+
+    def test_path_and_tool_context_apply_the_target_repositorys_enablement(self):
+        (self.project / "pyproject.toml").write_text("", encoding="utf-8")
+        target = str(self.project / "module.py")
+        self.assertEqual(gate.path_selection(target)["applicable"], [])
+
+        self.write(self.project / ".claude" / "settings.json", {"python@tj-agents": True})
+        self.assertEqual(gate.path_selection(target)["applicable"], ["python@tj-agents"])
+        context = gate.tool_context({"tool_name": "Read", "tool_input": {"file_path": target}})
+        self.assertIn("Applies here: `python:*`", context)
+
+    def test_the_session_hook_reports_packages_this_host_has_not_enabled(self):
+        completed = subprocess.run(
+            [sys.executable, "-B", str(SCRIPT), "--session-context", "--project", str(self.project)],
+            capture_output=True, text=True, timeout=120, env=dict(os.environ, **self.environment),
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        context = json.loads(completed.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("Ubiquitous, always applies: base.", context)
+        self.assertIn("Ubiquitous but not enabled: skill, template.", context)
 
 
 class TemporaryProject(unittest.TestCase):

@@ -50,10 +50,16 @@ class CompanySkillReplacement(unittest.TestCase):
         data = json.loads(registry.read_text(encoding="utf-8")) if registry.exists() else {"plugins": {}}
         data["plugins"][plugin + "@market"] = [{"installPath": str(payload)}]
         registry.write_text(json.dumps(data), encoding="utf-8")
+        settings = self.profile / "settings.json"
+        enabled = json.loads(settings.read_text(encoding="utf-8")) if settings.exists() else {"enabledPlugins": {}}
+        enabled["enabledPlugins"][plugin + "@market"] = True
+        settings.write_text(json.dumps(enabled), encoding="utf-8")
         return payload
 
     def environment(self):
-        return dict(os.environ, CLAUDE_CONFIG_DIR=str(self.profile),
+        environment = {name: value for name, value in os.environ.items()
+                       if name not in ("PLUGIN_ROOT", "CODEX_PLUGIN_ROOT", "CODEX_THREAD_ID")}
+        return dict(environment, CLAUDE_CONFIG_DIR=str(self.profile), CLAUDE_PLUGIN_ROOT=str(self.root),
                     CODEX_HOME=str(self.profile), HOME=str(self.root), USERPROFILE=str(self.root))
 
     def run_hook(self, path, *arguments, payload=None):
