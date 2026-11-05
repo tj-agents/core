@@ -12,7 +12,7 @@ Use the packaged `<workflow-package-root>/.codex/runtime/continuation/continuati
 package, resolving the package root from the installed host skill entry, or its source counterpart
 `.codex/runtime/continuation/continuation_runtime.py` in a checkout. Initialize the durable owner with the canonical
 goal path, completion condition, exact authorized actions, authority record and Codex host. Run it with
-`python` on Windows or `python3` on Linux/macOS:
+Python 3.12 or newer, using `python` on Windows or `python3` on Linux/macOS:
 
 ```text
 python -B "<workflow-package-root>/.codex/runtime/continuation/continuation_runtime.py" init --root ROOT --goal GOALPATH --completion TEXT --actions ACTION [ACTION ...] --authority TEXT --harness codex

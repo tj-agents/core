@@ -4,6 +4,7 @@ from fnmatch import fnmatchcase
 import json
 from pathlib import Path
 import re
+import tomllib
 import unittest
 
 
@@ -81,6 +82,8 @@ class RepositoryPermissionTests(unittest.TestCase):
                 self.assertTrue(self.auto_approved("Bash", bash_form(command)))
 
     def test_verify_jobs_provision_hidden_hook_runtime(self):
+        project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        cli_revision = project["tool"]["uv"]["sources"]["tj-cli"]["rev"]
         for name in ("verify-windows", "verify-linux"):
             with self.subTest(job=name):
                 block = "\n".join(verify_job_block(name))
@@ -90,7 +93,7 @@ class RepositoryPermissionTests(unittest.TestCase):
                 )
                 self.assertIn("python-version: '3.12'", block)
                 self.assertIn("repository: tj-agents/cli", block)
-                self.assertIn("ref: cd8c726e2aadc321251de599b75c4e72e21cecb9", block)
+                self.assertIn(f"ref: {cli_revision}", block)
                 self.assertIn("cargo build --locked --release --bin tj_hook", block)
                 self.assertIn("uv sync --locked", block)
                 self.assertIn("$binaryDirectory >> $env:GITHUB_PATH", block)

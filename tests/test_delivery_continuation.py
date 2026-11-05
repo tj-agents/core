@@ -1,5 +1,4 @@
 import importlib.util
-import io
 import json
 import os
 from pathlib import Path
@@ -9,7 +8,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
 from unittest.mock import patch
 
 
@@ -670,7 +668,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         receipt["adapter_command"] = scheduler.adapter_command(receipt)
         receipt["runtime_command"] = scheduler.runtime_command(receipt)
         scheduler.atomic_json(self.owner_path.parent / "scheduler.json", receipt)
-        with patch.object(adapter.subprocess, "run") as runtime:
+        with patch.object(adapter.process, "run") as runtime:
             with self.assertRaisesRegex(RuntimeError, "unavailable"):
                 adapter.wake(self.owner, self.root, self.owner_path,
                              self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(alternate)),
@@ -685,9 +683,10 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertIn("timeout=930", ADAPTER.read_text(encoding="utf-8"))
 
     def test_python_version_guard_runs_before_scheduler_import(self):
-        with patch.object(sys, "version_info", (3, 8, 0)):
-            with self.assertRaisesRegex(RuntimeError, "Python 3.9"):
-                load("delivery_continuation_python38", ADAPTER)
+        for version in ((3, 8, 0), (3, 11, 0)):
+            with self.subTest(version=version), patch.object(sys, "version_info", version):
+                with self.assertRaisesRegex(RuntimeError, "Python 3.12"):
+                    load("delivery_continuation_unsupported_python", ADAPTER)
 
     def test_windows_registration_and_cleanup_are_exact_without_runtime_recursion(self):
         receipt = self.windows_receipt()
@@ -730,7 +729,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.owner["state"] = "complete"
         self.owner_path.write_text(json.dumps(self.owner), encoding="utf-8")
         calls = []
-        with patch.object(adapter.subprocess, "run", side_effect=lambda *args, **kwargs: calls.append((args, kwargs)) or Result()), \
+        with patch.object(adapter.process, "run", side_effect=lambda *args, **kwargs: calls.append((args, kwargs)) or Result()), \
              patch.object(adapter, "read_json", side_effect=[receipt, self.owner, FileNotFoundError]):
             result = adapter.wake(self.owner, self.root, self.owner_path,
                                   self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(self.host)), transport)
@@ -750,7 +749,7 @@ class DeliveryContinuationTests(unittest.TestCase):
                               {"previous": None, "proposed": {"owner_id": "foreign"}})
         self.owner["state"] = "complete"
         self.owner_path.write_text(json.dumps(self.owner), encoding="utf-8")
-        with patch.object(adapter.subprocess, "run", return_value=Result()):
+        with patch.object(adapter.process, "run", return_value=Result()):
             with self.assertRaisesRegex(RuntimeError, "foreign pending"):
                 adapter.wake(self.owner, self.root, self.owner_path,
                              self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(self.host)), transport)
@@ -832,6 +831,8 @@ class DeliveryContinuationTests(unittest.TestCase):
         shutil.copy2(ADAPTER, scripts / ADAPTER.name)
         shutil.copy2(SCHEDULER, resources / SCHEDULER.name)
         shutil.copy2(ROOT / ".codex/runtime/continuation/continuation_runtime.py", resources / "continuation_runtime.py")
+        shutil.copytree(ROOT / ".agents/workflows", package / "workflows")
+        shutil.copytree(ROOT / ".agents/dependencies/cli/.agents/cli/runtime", package / "hooks")
         installed = load("installed_delivery_continuation", scripts / ADAPTER.name)
         self.assertEqual(resources / "continuation_scheduler.py", installed.resource("continuation_scheduler.py"))
         self.assertEqual(resources / "continuation_runtime.py", installed.resource("continuation_runtime.py"))

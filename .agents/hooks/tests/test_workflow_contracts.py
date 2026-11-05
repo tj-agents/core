@@ -460,6 +460,9 @@ class WorkflowGenerationTests(unittest.TestCase):
                         bundle,
                         ignore=shutil.ignore_patterns("__pycache__"),
                     )
+                    (root / ".codex-plugin").mkdir()
+                    (root / ".codex-plugin/plugin.json").write_text("{}", encoding="utf-8")
+                    shutil.copytree(ROOT / ".agents/dependencies/cli/.agents/cli/runtime", root / "hooks")
                     completed = subprocess.run(
                         [sys.executable, str(bundle / "verify.py"), "--root", str(root)],
                         capture_output=True,
@@ -482,6 +485,7 @@ class WorkflowGenerationTests(unittest.TestCase):
                     else:
                         for relative in (".agents/workflows", ".agents/workflow",
                                          ".codex/runtime/continuation",
+                                         ".agents/dependencies/cli",
                                          ".agents/dependencies/agent/.agents/agent/resources/lanes"):
                             shutil.copytree(ROOT / relative, root / relative,
                                             ignore=shutil.ignore_patterns("__pycache__"))
@@ -2237,7 +2241,7 @@ class RepositoryProviderTests(unittest.TestCase):
 
     def test_read_only_git_uses_utf8_replacement_decoding(self):
         completed = subprocess.CompletedProcess([], 0, "github.com/example/runtime", "")
-        with mock.patch.object(workflow_runtime.subprocess, "run", return_value=completed) as run:
+        with mock.patch.object(workflow_runtime.process, "run", return_value=completed) as run:
             self.assertEqual(
                 "github.com/example/runtime",
                 workflow_runtime._read_only_git(self.root / "linked-\u00e9", "config", "--get", "remote.origin.url"),

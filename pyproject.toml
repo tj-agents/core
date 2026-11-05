@@ -13,7 +13,7 @@ members = ["packages/tj-base"]
 
 [tool.uv.sources]
 tj-base = { workspace = true }
-tj-cli = { git = "https://github.com/tj-agents/cli", rev = "f2bdde9a4705c9455e10d5bb044dca5e1f25b2a3", subdirectory = "packages/tj-cli" }
+tj-cli = { git = "https://github.com/tj-agents/cli", rev = "92e29a7589a5dcf462af36d960684e49146d9d3b", subdirectory = "packages/tj-cli" }
 
 [dependency-groups]
 dev = [
