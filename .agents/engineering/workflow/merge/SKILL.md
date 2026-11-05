@@ -41,7 +41,7 @@ procedure that goes stale in the repo that renames one.
   flow), or a wedged queue. Never because the queue is slow. **Skipping a suite is not the same as skipping
   the queue:** to run less, apply the tier label below and enqueue normally so the hard floor still builds
   against current base.
-- **A required approval is Tommy's, and `--auto` waits for it.** Before arming auto-merge, establish
+- **A required approval is Tommy's; enabled auto-merge can wait for it.** Before arming auto-merge, establish
   and observe the supported host continuation through `workflow:continue`, retaining the exact PR/head
   binding and authorized post-merge steps under `workflow:continue`. Use the guarded command below and report the approval link
   once. GitHub's required review remains a waiting dependency; retain the binding and scheduler so a
@@ -178,7 +178,8 @@ present:
   the skip took, because those suites never run on a PR at all; only the label, or a correctly-blocked
   trailer, changes what the *queue* runs.
 
-Use the guarded command from the software delivery evidence in `workflow:continue`'s `references/delivery.md`, with `python` on Windows or `python3`
+When auto-merge is enabled, use the guarded command from the software delivery evidence in
+`workflow:continue`'s `references/delivery.md`, with `python` on Windows or `python3`
 on Linux/macOS. It admits a conflict-free, green PR awaiting required review while retaining the exact-head,
 independent-review, repository preference and authorization checks. GitHub still enforces its ruleset.
 
@@ -186,13 +187,26 @@ independent-review, repository preference and authorization checks. GitHub still
 python -B <engineering-package-root>/workflows/auto_merge.py --root <absolute-worktree>
 ```
 
-When the repository's `.github/merge-policy.json` sets `agents_may_merge: false`, the merge needs the
-owner's PR approval under [github-actions:merge-policy](https://github.com/tj-agents/github-actions/blob/main/.agents/github-actions/utility/merge-policy/SKILL.md).
-Enable auto-merge as above, request the owner's review
-(`gh pr edit <n> --add-reviewer <owner>`), report that the PR waits on that approval, and keep the 4b monitor
-running; GitHub merges once the approval and checks are in. Never use `--admin` or merge by another route.
+The repository's `.github/merge-policy.json` declares `requires_approval: true` when a PR needs human
+approval under [github-actions:merge-policy](https://github.com/tj-agents/github-actions/blob/main/.agents/github-actions/utility/merge-policy/SKILL.md).
+Once the actual required human approval exists, an agent may merge under that policy. Required checks
+must be terminal and green, and current-head review must be complete with no open findings.
 
-Verify **actual queue admission** for the recorded PR and remote head. If admission fails or the head moved,
+If the repository's `auto_merge` preference is disabled, perform the authorized ordinary merge after
+those gates pass. Resolve the exact delivery binding, task authorization, standing stops and explicit holds
+through the same software delivery evidence before invoking it. Keep repository settings, credentials,
+merge method and queue protections unchanged; a disabled unattended preference does not authorize changing
+them. Never enable auto-merge or use `--admin` to get past a blocked route.
+
+```text
+pushd "<absolute-worktree>" && gh pr merge <n> --repo <owner/repository> --merge --match-head-commit <remote-head>
+```
+
+If required approval is missing, request the owner's review (`gh pr edit <n> --add-reviewer <owner>`),
+report the approval dependency, and retain the exact binding through `workflow:continue`. Arm the guarded
+command only when auto-merge is enabled; otherwise wait for approval before the ordinary merge.
+
+Verify **actual queue admission or merge** for the recorded PR and remote head. If admission fails or the head moved,
 reconcile before the next source update; never push an observation-only commit, and never silently enqueue a
 different head.
 
