@@ -199,31 +199,16 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("the bundling test below is applied after that pick", flat)
         self.assertNotIn("Survey every `TECH_DEBT.md` in the repo, then choose", flat)
 
-    def test_ownership_or_repository_change_selects_a_real_handoff(self):
+    def test_engineering_defers_execution_routing_to_workflow(self):
         plans = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
         handoff = " ".join(
             authored_skill("handoff").read_text(encoding="utf-8").split()
         )
 
-        self.assertIn("changes owner, repository, worktree, PR, or logical workstream", plans)
-        self.assertIn("execute the `handoff` workflow", plans)
-        self.assertIn("a pointer in the response alone does not transfer ownership", plans)
-        self.assertIn("It prepares the exact `workflow:handoff` pointer", plans)
+        self.assertIn("`workflow:plan` owns", plans)
+        self.assertIn("`workflow:handoff` owns", plans)
         self.assertIn("Stop owned-path writes before invoking the launcher", handoff)
         self.assertIn("Preparing a pointer alone does not complete a handoff", handoff)
-    def test_planning_to_execution_uses_scale_and_context(self):
-        plans = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
-        execution = plans
-        self.assertIn("Continue in the current context by default for small and medium plans", plans)
-        self.assertIn("The parent retains ownership", plans)
-        self.assertIn("massive plan whose design was a substantial phase", plans)
-        self.assertIn("normally hand execution to one fresh harness", plans)
-        self.assertIn("even when the checkout stays the same", plans)
-        self.assertIn("Judge plans between these cases", plans)
-        self.assertIn("plan length alone is not a mechanical threshold", plans)
-        self.assertIn("changes owner, repository, worktree, PR, or logical workstream", plans)
-        self.assertIn("Do not select a handoff as routine phase-ending ceremony", execution)
-        self.assertIn("a massive plan has completed substantial design", execution)
 
     def test_plan_artifacts_always_reach_merged_default_branch(self):
         plans = authored_skill("plans").read_text(encoding="utf-8")
