@@ -125,9 +125,9 @@ handoff edits do not claim other owners. Otherwise continue in the current conte
    instructions in that goal. For plan-managed work, preserve the plan and ledger as the executable source;
    do not restate their branch checks, gates, commands, or next action in the prompt.
 3. For an explicit prompt-only request, return the pointer or prompt without launching or reserving an
-   executor. For a substantial-design execution transfer selected by `workflow:plan`, use the verified
-   execution pickup procedure below. Otherwise write the prompt to a UTF-8 file and invoke the selected
-   launcher's packaged script once, following its loaded instructions. Never launch a second successor
+   executor. For any implementation-owner transfer, use the verified execution pickup procedure below.
+   Otherwise write the prompt to a UTF-8 file and invoke the selected launcher's packaged script once,
+   following its loaded instructions. Never launch a second successor
    because startup is slow or acknowledgement is delayed.
 4. Stop owned-path writes before invoking the launcher. Verify the launch result. A definite failure before
    invocation leaves ownership here; an interrupted or ambiguous invocation requires reconciliation.
@@ -136,8 +136,10 @@ handoff edits do not claim other owners. Otherwise continue in the current conte
 
 ## Verified execution pickup
 
-Use this procedure for the substantial-design execution transfer selected by `workflow:plan`. The packaged
-`scripts/transfer.py` beside this skill requires Python 3.9+. It validates identity and serializes receipt
+Use this procedure for every authorized implementation-owner transfer, including a bounded side workstream.
+`workflow:plan` owns the post-planning route choice. The unresolved-architecture dispatch path above remains
+available without a ready verdict or receipt. The packaged `scripts/transfer.py` beside this skill requires
+Python 3.9+. It validates identity and serializes receipt
 changes; it does not evaluate design quality, grant authority, launch a host, schedule work, or enforce a
 general writer lease. Hook and prompt delivery are guidance; only observed host execution establishes host
 acceptance.
@@ -159,7 +161,7 @@ acceptance.
    and the full authorized completion boundary. Keep the receipt outside tracked source; it contains
    transport evidence only. Set an explicit pickup observation budget in the goal, honoring tighter user
    limits; without a user limit, allow five minutes of bounded read-only observations. Planning-only,
-   prompt-only, and inline work create no receipt.
+   prompt-only, and retain-owner work create no receipt.
 2. Run the helper from the owning checkout, using its absolute path for every command. Use `python` on
    Windows and `python3` on Linux/macOS:
 
@@ -209,10 +211,24 @@ acceptance.
    and evidence needed to reconcile its existing successor.
 
 When a continuation owner already exists, carry its reference with `prepare --owner-reference <reference>`
-and use that owner's supported foreground release or claim procedure. This receipt is not its ownership lock,
-job, completion record, or delivery binding. If that interface is unavailable, keep the transfer
-capability-gated instead of launching outside its exclusion mechanism. Without such an owner, the
+and use that owner's supported foreground release or claim procedure to verify successor ownership.
+Acknowledgement and first-action evidence do not prove that release; this receipt is not its ownership lock,
+job, completion record, or delivery binding. If that interface is unavailable or required release cannot be
+verified, keep the transfer capability-gated and the predecessor open. Without such an owner, the
 predecessor's stopped writes and matching successor acknowledgement define this bounded transfer.
+
+Only after matching pickup, recorded first-action evidence, and actual ownership release invoke `agent:close`
+for the current-session assessment; close the predecessor only when it has no other owned work or pending
+waits. Launcher submission alone, uncertain pickup, or missing first-action evidence keeps the predecessor
+open with its pickup accountability. A side-workstream origin with remaining work stays open and continues
+its own goal.
+
+```text
+Input: matching successor pickup and first-action evidence; ownership released; no other work or waits.
+Route: invoke agent:close for current-session assessment and closure when that assessment permits it.
+Input: the launcher submitted, but pickup is uncertain.
+Route: keep the predecessor open and reconcile the reserved attempt; no second successor or closure.
+```
 
 Existing runtime-managed ledgers retain `Transfer:`, `Transfer to:`, `Resume stage:`, and `Resume when:` and
 point to this receipt. The successor restores their normal actionable next step after pickup. On an
@@ -230,12 +246,14 @@ transfer, reconcile the completed attempt and current owner before recording a n
 2. Create or update the side workstream's canonical goal or brief with its authorization, starting checkout,
    relevant context, autonomous completion boundary, gates, and one next action. The successor owns that
    workstream through completion; it does not adopt, close, or rewrite the originating goal.
-3. Write the self-contained side-workstream prompt to UTF-8 and invoke the selected launcher once. An
-   explicit prompt-only request returns that prompt without launching. Preserve an explicit model, effort,
+3. For an implementation-owner transfer, use verified execution pickup above. For other transfers, write
+   the self-contained side-workstream prompt to UTF-8 and invoke the selected launcher once. An explicit
+   prompt-only request returns that prompt without launching. Preserve an explicit model, effort,
    frontier, or harness request; otherwise select a lane under `agent:lanes` when remaining work warrants
    it.
-4. Verify submission. Success proves launch, not that the successor has read its goal. Release only the
-   side-workstream writer lease, retain the original task's writer lease, and continue the original task.
+4. Verify submission and apply the applicable pickup and release requirements above. Success proves launch,
+   not that the successor has read its goal. Release only the side-workstream writer lease, retain the
+   original task's writer lease, and continue the original task.
    On failure, retain both task records and continue only work independent of the unlaunched side task.
 
 For a selected Engineering delivery lifecycle, follow `engineering:merging` under Transferred checkout

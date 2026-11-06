@@ -26,9 +26,20 @@ dependency order, readiness, and one next action. Keep one canonical Markdown ar
 clickable path. Preserve publication and installation limits. Planning-only work returns its authorized
 artifact, outcome evidence, remaining authority, and any typed gate; a ready verdict adds no authority.
 
-After planning, small and medium work normally continues inline when the same owner can safely execute the
-next authorized action. For critical implementation transfer, the canonical goal or existing progress owner
-must contain `## Execution readiness` with authority provenance, source and standards references, constraints, budgets,
+For authorized execution after planning, choose one of two routes. Record a short reason, the lane selected
+through `agent:lanes`, and the next authorized action in the existing canonical goal or readiness section. Judge
+ownership, usable context, and remaining work; a lane or cost change alone does not select a handoff.
+
+1. **Retain owner:** keep the same canonical goal and plan, and continue in the same session when suitable.
+   When authorized implementation needs a different lane, use a bounded native lane subagent. The parent
+   integrates, verifies, and accepts its result and remains the goal owner.
+2. **Transfer owner:** hand the agreed implementation-ready plan and explicitly authorized implementation
+   to one successor at the selected lane through `workflow:handoff`'s verified execution pickup procedure.
+   That skill owns pickup, first-action evidence, and the conditions for release and invoking `agent:close`.
+   A recipient begins the agreed next action rather than recursively handing off to change lane.
+
+For an implementation transfer, the canonical goal or existing progress owner must contain
+`## Execution readiness` with authority provenance, source and standards references, constraints, budgets,
 stop and escalation conditions, execution lane, transfer reason, exact next action, and a ready verdict with
 evidence or an unresolved decision with its resolver. Selected Engineering software details such as checkout,
 branch, review, graph, and delivery belong to `engineering:plans`.
@@ -50,4 +61,8 @@ Input: transfer a separately authorized cache migration to an independent owner 
 Route: workflow:handoff in bounded side-workstream mode; billing stays with its owner.
 Input: revise the same cache plan, whose planning owner already exists.
 Route: reuse that owner and canonical plan; no duplicate planning session.
+Input: an authorized parser implementation needs an L4 slice; this parent will integrate and accept it.
+Route: retain owner; use a bounded native L4 subagent and continue the same goal here.
+Input: the user requested a plan only, and the plan is ready.
+Route: return the plan; no implementation or implementation transfer is authorized.
 ```
