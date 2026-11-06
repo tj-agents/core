@@ -10,12 +10,12 @@ domain: process
 Read `workflow:plan-artifacts` and use a selected technical discipline conditionally. Standalone work needs
 no repository, roadmap, or ledger.
 
-Before exploration or design, resolve the goal and existing owner through `workflow:handoff`'s admission
-checks. Same-goal follow-ups and plan revisions stay with their existing planning owner; reuse that owner
-rather than create another plan or session. A distinct new substantive planning goal begins in a fresh
-managed session through `workflow:handoff`. Use its bounded side-workstream mode when the origin retains
-another active goal. A recipient already launched fresh for this planning goal proceeds without another
-transfer. Resuming or forking an earlier conversation does not establish a fresh planning context.
+Before exploration or design, resolve the goal and existing owner. Same-goal follow-ups and plan revisions
+stay with their existing planning owner and canonical plan. Apply `workflow:handoff`'s ownership boundary
+when selecting a context: use a native subagent when the owner needs a fresh planning context and a result
+back; use handoff only for an actual transfer of responsibility. A fresh recipient proceeds without another
+transfer. Resuming or forking an earlier conversation does not establish a fresh planning context. Carry
+planning inputs under that skill's decision-provenance rules for either form of delegation.
 
 Before selecting a reusable tool, infrastructure capability, or general technical mechanism, explicitly
 load `base:solution-assessment` and apply it against the actual requirements. Carry a completed assessment
@@ -44,10 +44,10 @@ priority from list order or turn planning into implementation. `engineering:upda
 Engineering roadmap fact reconciliation.
 
 ```text
-Input: while implementing billing, plan an independent cache migration.
+Input: while implementing billing, get a fresh assessment of its cache design and use the result here.
+Route: native subagent returns the assessment; this owner retains billing and its canonical plan.
+Input: transfer a separately authorized cache migration to an independent owner through completion.
 Route: workflow:handoff in bounded side-workstream mode; billing stays with its owner.
-Input: a fresh recipient receives that cache-planning goal.
-Route: plan here; load base:solution-assessment before selecting the cache mechanism.
 Input: revise the same cache plan, whose planning owner already exists.
 Route: reuse that owner and canonical plan; no duplicate planning session.
 ```

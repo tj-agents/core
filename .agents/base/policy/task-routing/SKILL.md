@@ -12,7 +12,7 @@ Choose the qualified advertised owner for the request and preserve its existing 
 1. Route planning or design-only work to `workflow:plan` for its goal ownership and planning-context decision; it grants no implementation authority.
 2. Route authorized sustained or multiphase work to `workflow:run`, with or without a named plan. Keep the same goal through commits, phases and context changes.
 3. Route explicit reconstruction or resumption after interruption to `workflow:resume`; ordinary ongoing work stays with `workflow:run`.
-4. Route open-work and progress queries to `workflow:status`; route an explicit handoff to `workflow:handoff`. A prompt-only request does not launch a process.
+4. Route open-work and progress queries to `workflow:status`. Apply `workflow:handoff`'s ownership boundary to distinguish native subagent delegation from an actual handoff. A prompt-only request does not launch a process.
 5. Use the appropriate selected operation directly for quick answers and one-step tasks. Selected Engineering owns software implementation, diagnosis, review and delivery; Workflow has no generic review operation.
 6. Resolve and load the qualified advertised skill. If Workflow is unavailable, report the concrete missing selection or capability, preserve the goal and continue independent authorized work. Do not fall back to retired lifecycle names, invent availability, install a package, or treat selection as activation.
 
@@ -24,6 +24,12 @@ Route: workflow:plan for the planning owner and context decision; planning-only 
 
 Request: revise that migration plan
 Route: workflow:plan for the existing goal; planning-only authority.
+
+Request: get a fresh assessment and return it so this agent can finish the current migration
+Route: native subagent under workflow:handoff's ownership boundary; the current owner integrates the result.
+
+Request: transfer ownership of the migration to a successor through completion
+Route: workflow:handoff; the successor owns the migration.
 
 Request: implement the migration through completion
 Route: workflow:run. Retain the current goal and continue authorized work through its acceptance condition.

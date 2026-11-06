@@ -1,15 +1,33 @@
 ---
 name: handoff
-description: Transfer the current goal or a distinct authorized side workstream to one selected harness session. Checkpoint and launch for a handoff request; format text only when explicitly asked for a prompt.
+description: Transfer responsibility for the current goal or an independently owned workstream to a managed session. Use for an actual ownership handoff; bounded work returning to the current owner uses a native subagent.
 kind: workflow
 domain: process
 ---
 
-# Transfer a context or bounded side workstream
+# Transfer responsibility to an independent session
 
-An explicit request to hand off means performing the transfer, even when the current session could do the
-work. Without an explicit request, hand off only when the work needs a separate session. Preparing a
-pointer alone does not complete a handoff. Respect an explicitly named target harness; otherwise select
+Owns the boundary between native subagent delegation and an independent managed-session handoff.
+
+When the current agent retains the task and will use a bounded result to continue it, use a native subagent.
+This includes research, planning, validation, and implementation slices. A fresh context, different topic,
+or separate artifact alone does not transfer responsibility. The current owner integrates the result and
+remains accountable for the task; do not launch a managed session for that delegation.
+
+Use handoff to replace the current owner or give a truly distinct authorized workstream its own owner and
+autonomous completion boundary. An explicit request for that transfer means performing it even when the
+current session could do the work. Preparing a pointer alone does not complete a handoff.
+
+```text
+Input: get a fresh planning assessment and return evidence for this agent to finish its current task.
+Route: native subagent; the originating agent receives the result and retains ownership.
+Input: transfer the current migration to a successor that will own it through completion.
+Route: full context handoff; the predecessor stops owned-path writes.
+Input: independently complete a separately authorized documentation migration while this agent ships billing.
+Route: bounded side-workstream handoff; each session owns its own outcome and deliverables.
+```
+
+For an actual handoff, respect an explicitly named target harness; otherwise select
 Codex through `agent:handoff --host codex`. The Agent publisher and that launcher's documented platform and CLI
 prerequisites must be available. Resolve the selected launcher through native discovery and load its
 instructions; do not guess a sibling-plugin or author-checkout path.
@@ -22,12 +40,13 @@ decisions and execution setup, including isolation before deliverable writes. Do
 require a completed design, implementation plan, new delivery checkout, or prepared critical receipt before
 launching. Preserve explicit user limits.
 
-For a planning handoff selected by `workflow:plan`, carry the problem, evidence, constraints, open questions,
+For delegated planning selected by `workflow:plan`, carry the problem, evidence, constraints, open questions,
 and explicit user decisions with their provenance in the owning goal or brief. Distinguish what the user
 chose from a predecessor's proposal. Mark an unaccepted proposed mechanism as an assumption to assess;
-it must not dictate the successor's exploration or design. The successor owns those decisions within the
-user's constraints. An implementation handoff may carry the agreed plan for execution. Planning-only
-authority remains planning-only through either transfer mode.
+it must not dictate the recipient's exploration or design. The recipient assesses those choices within the
+user's constraints and loads `base:solution-assessment` before selecting a mechanism. An implementation
+handoff may carry the agreed plan for execution. Planning-only authority remains planning-only through
+native subagent delegation and either handoff mode.
 
 ```text
 Input: the user selected Redis; the predecessor proposed a custom coordinator without user acceptance.
@@ -37,11 +56,10 @@ Input: the user approved the resulting plan and authorized implementation.
 Implementation transfer: successor executes the agreed plan within that authority.
 ```
 
-When an active task surfaces a distinct independently actionable side workstream with separate authorization,
-select this workflow in **bounded side-workstream** mode immediately. Give the side workstream one successor
+For an independently owned autonomous workstream, use **bounded side-workstream** mode. Give it one successor
 and isolate its deliverable writes; the originating session retains its active goal and remains its only
-writer. This is not a full-goal transfer. Do not offload a step inseparable from the original task's next
-action, create duplicate writers, or hand off work that overlaps the original checkout's owned paths.
+writer. A bounded result needed to continue the originating task follows the native subagent route above.
+Do not create duplicate writers or hand off work that overlaps the original checkout's owned paths.
 
 Prompt-only requests remain prompt-only. They return a self-contained pointer or prompt without launching or
 reserving an executor. Preserve a user-selected model, effort, frontier, or harness choice. Otherwise select
@@ -210,8 +228,8 @@ transfer, reconcile the completed attempt and current owner before recording a n
    the selected Engineering worktree operation when that software lifecycle applies. It must not write side
    workstream deliverables in the original active checkout.
 2. Create or update the side workstream's canonical goal or brief with its authorization, starting checkout,
-   relevant context, completion expectation, gates, and one next action. The successor owns only that
-   workstream and returns its outcome; it does not adopt, close, or rewrite the originating goal.
+   relevant context, autonomous completion boundary, gates, and one next action. The successor owns that
+   workstream through completion; it does not adopt, close, or rewrite the originating goal.
 3. Write the self-contained side-workstream prompt to UTF-8 and invoke the selected launcher once. An
    explicit prompt-only request returns that prompt without launching. Preserve an explicit model, effort,
    frontier, or harness request; otherwise select a lane under `agent:lanes` when remaining work warrants
