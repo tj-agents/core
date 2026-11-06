@@ -109,11 +109,15 @@ class AggregateTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     CI.required_results(value, broken, "pull_request", ("ci:full",))
 
-    def test_suites_run_only_on_request(self):
+    def test_default_push_requires_suites_and_pr_suites_remain_explicit(self):
         results = ClassificationTests.results()
         results["guard"]["result"] = "skipped"
         results["verify-windows"]["result"] = results["verify-linux"]["result"] = "skipped"
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("full", "main"), results, "push")
+        results["verify-windows"]["result"] = results["verify-linux"]["result"] = "success"
         CI.required_results(CI.plan("full", "main"), results, "push")
+        results["verify-windows"]["result"] = results["verify-linux"]["result"] = "skipped"
         results["guard"]["result"] = "success"
         CI.required_results(CI.plan("full", "unlabelled"), results, "pull_request")
         with self.assertRaises(ValueError):
@@ -219,6 +223,14 @@ class ExecutionTests(unittest.TestCase):
                               encoding="utf-8")
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(CI.run_tests(root, CI.plan("focused", "test", [target.relative_to(root).as_posix()]), "source"), 1)
+
+    def test_selected_pytest_function_executes_and_propagates_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            (root / "tests").mkdir()
+            target = root / "tests/test_ci_pytest_fixture.py"
+            target.write_text("def test_selected():\n assert False, 'observed regression'\n", encoding="utf-8")
+            self.assertEqual(CI.run_tests(root, CI.plan("focused", "test", [target.relative_to(root).as_posix()]), "source"), 1)
 
     def test_zero_discovery_or_missing_selected_module_fails(self):
         with tempfile.TemporaryDirectory() as raw:

@@ -17,7 +17,6 @@
       ],
       "skills": [
         "agent-files",
-        "cd",
         "project-setup",
         "solution-assessment",
         "task-routing"
@@ -28,11 +27,12 @@
       },
       "external_prerequisites": {
         "required": [
-          "python>=3.9"
+          "exe:tj_hook",
+          "python>=3.12"
         ],
         "optional": []
       },
-      "digest": "sha256:5b24268610a53466e03b699c2f7d6a354892afeeaa640d5eabbf5a325867d6bf",
+      "digest": "sha256:dd80d235b19055cd14aeac80689756d95875f284661ee76773009e4b920e62c6",
       "harness": {
         "marketplaces": [
           {
@@ -76,6 +76,7 @@
         "macos"
       ],
       "skills": [
+        "catch-up",
         "continue",
         "handoff",
         "plan",
@@ -89,18 +90,20 @@
         "required": [
           "tj-agents/base",
           "tj-agents/agent-store",
-          "tj-agents/agent"
+          "tj-agents/agent",
+          "tj-agents/cli"
         ],
         "optional": []
       },
       "external_prerequisites": {
         "required": [
+          "exe:tj_hook",
           "exe:git",
-          "python>=3.9"
+          "python>=3.12"
         ],
         "optional": []
       },
-      "digest": "sha256:f6126fdbc05056713f56648f5774e5d6423068fc0527af98b14a229516371e8d",
+      "digest": "sha256:6ac6f5c5e8d77e9a1ede3c5c03715ca9c87cd11e2b91a9194c1ba3f53648ab51",
       "harness": {
         "marketplaces": [
           {
@@ -112,6 +115,7 @@
           "tj-agents/agent",
           "tj-agents/agent-store",
           "tj-agents/base",
+          "tj-agents/cli",
           "tj-agents/workflow"
         ],
         "hooks": [],
@@ -128,7 +132,9 @@
             "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)"
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)"
           ],
           "codex_prefix_rules": [
             {
@@ -173,6 +179,34 @@
                   "payments"
                 ]
               ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ],
+              "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ]
             }
           ]
         }
@@ -188,6 +222,11 @@
             "id": "tj-agents/agent",
             "marketplace": "tj-agents",
             "repository": "tj-agents/agent"
+          },
+          {
+            "id": "tj-agents/cli",
+            "marketplace": "tj-agents",
+            "repository": "tj-agents/cli"
           }
         ],
         "optional": []
@@ -230,7 +269,6 @@
         "merging",
         "open-pr",
         "open-worktree",
-        "persistent-delivery",
         "plans",
         "pr-preflight",
         "pr-screenshots",
@@ -241,9 +279,7 @@
         "remote-validation",
         "review",
         "review-lifecycle",
-        "self-repair",
         "session",
-        "skill-authoring",
         "stack",
         "staged-review",
         "staged-review-all",
@@ -263,8 +299,9 @@
       },
       "external_prerequisites": {
         "required": [
+          "exe:tj_hook",
           "exe:git",
-          "python>=3.9"
+          "python>=3.12"
         ],
         "optional": [
           "exe:bash",
@@ -272,7 +309,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:f6a144a71c690383788aab752e7d8682fa0ef4d82e677adb7ca6b4291ba56fc6",
+      "digest": "sha256:8309736f8faac835085c281c6d43c723c34dce7e046c2800b04ea159a4732f12",
       "harness": {
         "marketplaces": [
           {
@@ -291,8 +328,6 @@
         "hooks": [],
         "permissions": {
           "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
             "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
@@ -311,34 +346,6 @@
             "PowerShell(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)"
           ],
           "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ],
-              "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ]
-            },
             {
               "pattern": [
                 [
@@ -511,13 +518,15 @@
       "id": "tj-agents/docs",
       "name": "docs",
       "package_path": "plugins/docs",
-      "description": "Layout conventions for pages people read.",
+      "description": "Layout, diagram and design-page conventions for pages people read.",
       "platforms": [
         "windows",
         "linux",
         "macos"
       ],
       "skills": [
+        "design",
+        "diagram",
         "layout"
       ],
       "dependencies": {
@@ -528,7 +537,7 @@
         "required": [],
         "optional": []
       },
-      "digest": "sha256:89fca42f8ada1645b85a51dde697ee8f46d9d97808e5a33e1218ac780a010b67",
+      "digest": "sha256:d39e2dfd3ebc58213e2e1c1dbeabf80ec3246764d9c8b1b6e0b8d35ed2a0a3c3",
       "harness": {
         "marketplaces": [
           {

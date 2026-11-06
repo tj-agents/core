@@ -12,6 +12,8 @@ import unittest
 from unittest import mock
 from types import SimpleNamespace
 
+import tj_cli
+
 ROOT = Path(__file__).resolve().parents[3]
 RUNTIME = ROOT / ".codex/runtime/continuation/continuation_runtime.py"
 WORKFLOWS = ROOT / ".agents/workflows"
@@ -60,7 +62,7 @@ class ContinuationTests(unittest.TestCase):
                         "--completion", "CI repaired and boundary recorded", "--authority", "Isolated test",
                         "--harness", "codex", "--actions", "edit", "test", *extra)
 
-    def write_completion_goal(self, deliveries=None, evidence=None):
+    def write_completion_goal(self, deliveries=None, evidence=None, follow_up=None):
         document = {
             "outcome": "The fixture records a verified completion boundary.",
             "acceptance": [{
@@ -73,6 +75,8 @@ class ContinuationTests(unittest.TestCase):
             "deliveries": deliveries or [],
             "open_tasks": [],
         }
+        if follow_up is not None:
+            document["follow_up"] = follow_up
         (self.root / "goal.md").write_text("```completion\n" + json.dumps(document) + "\n```\n")
 
     def cli(self, *args, code=0, env=None):
@@ -100,12 +104,12 @@ class ContinuationTests(unittest.TestCase):
         binding.update(pr=42, pr_url="https://github.com/example/test/pull/42",
                        pending_evidence=[], review={"work_order": "review", "work_order_order": ["review"], "reviewed_sha": None},
                        merge_authorization={"mode": "absent", "instruction": None}, completion_condition="Boundary recorded")
-        (self.root / ".agents/persistent-workflow-binding.json").write_text(json.dumps(binding))
+        (self.root / ".agents/delivery-binding.json").write_text(json.dumps(binding))
         self.write_completion_goal([{"repository": state["repo"], "pr": 42, "head": state["head"]}])
         self.observation(status, conclusion)
 
     def observation(self, status, conclusion=None):
-        binding = json.loads((self.root / ".agents/persistent-workflow-binding.json").read_text())
+        binding = json.loads((self.root / ".agents/delivery-binding.json").read_text())
         value = {"number": 42, "headRefName": "feature", "headRefOid": binding["head"],
                  "url": "https://github.com/example/test/pull/42", "state": "OPEN",
                  "statusCheckRollup": [{"name": "CI", "status": status, "conclusion": conclusion}]}
@@ -225,11 +229,27 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(claimed["reason"], after["reason"])
         self.assertIn("completion-unverified: acceptance fixture lacks evidence", result["reason"])
 
+    def test_foreground_complete_checkpoint_releases_claim_with_independent_follow_up(self):
+        self.write_completion_goal(follow_up=[{
+            "repository": "example/publisher", "pr": 34, "head": "b" * 40,
+            "text": "Publish update hints.", "owner": "publisher delivery owner",
+            "next_action": "Complete the separate publisher delivery.",
+            "scope_evidence": "This session owns the verified refresh delivery; the publisher goal has its own owner.",
+        }])
+        claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
+        self.cli("checkpoint", "--owner", str(self.owner), "--token", claimed["foreground"]["token"],
+                 "--state", "complete", "--reason", "Owned delivery complete")
+        after = self.state()
+        self.assertEqual("complete", after["state"])
+        self.assertIsNone(after["foreground"])
+        self.assertTrue(after["completion_snapshot"]["report_ready"])
+        self.assertTrue(after["completion_snapshot"]["ready"])
+
     def test_parent_exit_delayed_failure_repair_success_complete(self):
         self.binding()
         parent = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
         self.processes.append(parent)
-        claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(parent.pid))
+        self.cli("claim", "--owner", str(self.owner), "--pid", str(parent.pid))
         self.assertEqual(self.wake()["launches"], 0)
         parent.kill()
         parent.wait()
@@ -319,6 +339,60 @@ class ContinuationTests(unittest.TestCase):
         stdout, stderr = first.communicate(timeout=10)
         self.assertEqual(first.returncode, 0, stderr)
         self.assertEqual(json.loads(stdout)["launches"], 1)
+
+    def test_supervisor_wrapper_admits_child_and_preserves_host_identity(self) -> None:
+        probe = self.root / "supervisor_probe.py"
+        report = self.root / "supervisor-identity.json"
+        probe.write_text(
+            "import json, os, runpy, sys, tj_cli\n"
+            "from pathlib import Path\n"
+            "Path(sys.argv[1]).write_text(json.dumps({"
+            "'pid': os.getpid(), 'parent': os.getppid(), 'prefix': sys.prefix, "
+            "'dependency': tj_cli.__file__}), encoding='utf-8')\n"
+            "sys.argv = sys.argv[2:]\n"
+            "runpy.run_path(sys.argv[0], run_name='__main__')\n",
+            encoding="utf-8",
+        )
+        start_process = runtime.process.start
+        supervisors = []
+
+        def start(command, *args, **kwargs):
+            supervisor = command[2:4] == [str(RUNTIME), "_child"]
+            if supervisor:
+                command = [*command[:2], str(probe), str(report), *command[2:]]
+            process = start_process(command, *args, **kwargs)
+            if supervisor:
+                supervisors.append(process)
+                self.processes.append(process)
+            return process
+
+        state = self.state()
+        with mock.patch.object(runtime.process, "start", side_effect=start):
+            runtime.launch(self.owner, state, None, {}, [sys.executable, str(FIXTURE), "host"])
+        observed = json.loads(report.read_text(encoding="utf-8"))
+        self.assertEqual(1, len(supervisors))
+        if os.name == "nt":
+            self.assertEqual(supervisors[0].pid, observed["parent"])
+            self.assertNotEqual(supervisors[0].pid, observed["pid"])
+        else:
+            self.assertEqual(supervisors[0].pid, observed["pid"])
+        self.assertEqual(Path(sys.prefix), Path(observed["prefix"]))
+        self.assertEqual(Path(tj_cli.__file__), Path(observed["dependency"]))
+        self.assertEqual("complete", state["state"])
+
+    @unittest.skipUnless(os.name == "nt", "Windows tj_hook wrapper parent admission")
+    def test_wrapper_parent_admission_requires_the_exact_recorded_identity(self):
+        record = {"pid": 100, "identity": "wrapper-start"}
+        with mock.patch.object(runtime.os, "getpid", return_value=200), \
+                mock.patch.object(runtime.os, "getppid", return_value=100), \
+                mock.patch.object(runtime, "process_identity", return_value="wrapper-start"):
+            self.assertTrue(runtime.child_admitted(record))
+        for pid, identity in ((101, "wrapper-start"), (100, "different-start"), (100, None)):
+            with self.subTest(pid=pid, identity=identity), \
+                    mock.patch.object(runtime.os, "getpid", return_value=200), \
+                    mock.patch.object(runtime.os, "getppid", return_value=pid), \
+                    mock.patch.object(runtime, "process_identity", return_value=identity):
+                self.assertFalse(runtime.child_admitted(record))
 
     @unittest.skipUnless(os.name == "nt", "Windows sharing violations are Windows-only")
     def test_owner_read_recovers_from_a_crt_sharing_violation(self):
@@ -601,7 +675,7 @@ class ContinuationTests(unittest.TestCase):
             self.assertEqual(initialized["goal"], str(goal))
             self.binding()
             goal.write_text((self.root / "goal.md").read_text())
-            binding_path = self.root / ".agents/persistent-workflow-binding.json"
+            binding_path = self.root / ".agents/delivery-binding.json"
             binding = json.loads(binding_path.read_text())
             binding["merge_authorization"] = {"mode": "merge", "instruction": "Merge this PR when reviewed and green"}
             binding_path.write_text(json.dumps(binding))
@@ -707,12 +781,31 @@ class ContinuationTests(unittest.TestCase):
         kernel.CloseHandle.assert_called_once_with(456)
         write.assert_not_called()
 
+    def test_child_records_the_raw_supervised_host_identity(self):
+        state = self.state()
+        state["child"] = {"pid": os.getpid()}
+        runtime.atomic_json(self.owner, state)
+        payload = self.root / "host-payload.json"
+        host_path = self.root / "host.json"
+        payload.write_text(json.dumps({"command": ["fixture"], "environment": {},
+                                       "child_path": str(host_path)}))
+        host_process = mock.Mock(pid=12345, _handle=123)
+        host_process.wait.return_value = 0
+        args = SimpleNamespace(owner=str(self.owner), payload=str(payload))
+        with mock.patch.object(runtime, "windows_job", return_value=None), \
+                mock.patch.object(runtime.subprocess, "Popen", return_value=host_process), \
+                mock.patch.object(runtime, "process_identity", return_value="host-start") as identity, \
+                mock.patch.object(runtime, "atomic_json") as write:
+            self.assertEqual(0, runtime.child(args))
+        identity.assert_called_once_with(12345)
+        write.assert_called_once_with(host_path, {"pid": 12345, "identity": "host-start"})
+
     def released_child(self, status):
         self.binding("COMPLETED", "SUCCESS")
         self.fixture("gate" if status == "blocked" else "complete",
                      release_binding=True, release_state=status)
         result = self.wake()
-        self.assertFalse((self.root / ".agents/persistent-workflow-binding.json").exists())
+        self.assertFalse((self.root / ".agents/delivery-binding.json").exists())
         self.assertEqual(result["launches"], 1)
         return result
 
@@ -753,7 +846,7 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(result["state"], "complete")
         self.assertNotEqual(result["head"], old_head)
         self.assertEqual(result["head"], self.git("rev-parse", "HEAD"))
-        self.assertFalse((self.root / ".agents/persistent-workflow-binding.json").exists())
+        self.assertFalse((self.root / ".agents/delivery-binding.json").exists())
 
     def test_repaired_terminal_release_preserves_human_gate(self):
         result = self.repaired_release("blocked", receipt={"reason": "Approve repaired release",
@@ -771,7 +864,7 @@ class ContinuationTests(unittest.TestCase):
         old = {key: state[key] for key in ("repo", "worktree", "branch", "head")}
         self.git("commit", "--allow-empty", "-m", "Repaired head")
         new = dict(old, head=self.git("rev-parse", "HEAD"))
-        binding_path = self.root / ".agents/persistent-workflow-binding.json"
+        binding_path = self.root / ".agents/delivery-binding.json"
         snapshot = dict(json.loads(binding_path.read_text()), head=new["head"])
         binding_path.unlink()
         receipt = {"nonce": state["launch_nonce"], "owner_id": state["owner_id"], "state": "complete",
