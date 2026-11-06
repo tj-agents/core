@@ -63,8 +63,9 @@ class PolicyContextTests(unittest.TestCase):
                 handler = self.handler(host)
                 self.assertTrue((self.plugin / "hooks/tier_gate.py").is_file())
                 if host == "claude":
+                    self.assertEqual("tj_hook", handler["command"])
                     self.assertEqual(
-                        ["-B", f"${{{variable}}}/hooks/tier_gate.py", "--session-context"],
+                        ["--", "python", "-B", f"${{{variable}}}/hooks/tier_gate.py", "--session-context"],
                         handler["args"],
                     )
                 else:

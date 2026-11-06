@@ -161,8 +161,8 @@ python <workflow-ops> --root <delivery-checkout> --workflow-run-id delivery-bind
 ```
 
 It resolves the repository's recorded standing merge authorization against this head and writes the binding
-artifact; `engineering:persistent-delivery` owns what that means. Enter the
-harness's `workflow:continue` skill to give that binding a continuation.
+artifact described by `workflow:continue`'s software delivery reference. Enter the harness's
+`workflow:continue` skill to give that binding a continuation.
 
 ### 7. Report and continue
 
@@ -197,5 +197,5 @@ Personal project: select personal:bot-identity for the approval command accompan
 
 Opening a draft is not a context boundary: continue implementing, reviewing, or observing
 the candidate when the current authorization and context still cover that work. If landing is genuinely next,
-`engineering:merge` owns it. Update a plan only if PR creation is part of a material ownership handoff or
+`workflow:run` continues the goal through `engineering:merge`'s technical procedure. Update a plan only if PR creation is part of a material ownership handoff or
 context-ending state; never merely because this procedure reported.

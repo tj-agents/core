@@ -162,14 +162,7 @@ def check(project: Path, host: Host, executable: str | None = None,
     binary = executable or shutil.which(host.value)
     if not binary:
         raise RequiredPluginsError(f"Required standards cannot be verified: {host} executable is unavailable")
-    entries = []
-    deadline = time.monotonic() + INVENTORY_TIMEOUT_SECONDS
-    for marketplace in plugins.inventory_marketplaces(required):
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise RequiredPluginsError(f"Required {host} plugin inventory exceeded its {INVENTORY_TIMEOUT_SECONDS}-second budget")
-        entries.extend(inventory(binary, plugins, launch_directory, inventory_options, marketplace, timeout=remaining))
-    roots = enabled_roots(plugins, launch_directory, entries)
+    roots = inventory_roots(launch_directory, host, binary, inventory_options, identities=required)
     missing = sorted(set(required) - roots.keys())
     if missing:
         raise MissingRequiredPluginsError(
@@ -181,14 +174,25 @@ def check(project: Path, host: Host, executable: str | None = None,
 
 
 def inventory_roots(project: Path, host: Host, executable: str | None = None,
-                    inventory_options: tuple[str, ...] = ()) -> dict[str, Path]:
-    """Return the host's enabled, verified inventory without project selection filtering."""
+                    inventory_options: tuple[str, ...] = (), *, identities: Sequence[str] | None = None) -> dict[str, Path]:
+    """Return verified enabled roots, optionally limited to selected marketplaces and identities."""
     plugins = host_plugins.PLUGINS[host]
     launch_directory = project.resolve()
     binary = executable or shutil.which(host.value)
     if not binary:
         raise RequiredPluginsError(f"Required standards cannot be verified: {host} executable is unavailable")
-    return enabled_roots(plugins, launch_directory, inventory(binary, plugins, launch_directory, inventory_options))
+    if identities is None:
+        return enabled_roots(plugins, launch_directory, inventory(binary, plugins, launch_directory, inventory_options))
+    plugins.require_inventory_options(inventory_options)
+    entries = []
+    deadline = time.monotonic() + INVENTORY_TIMEOUT_SECONDS
+    for marketplace in plugins.inventory_marketplaces(identities):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RequiredPluginsError(f"Required {host} plugin inventory exceeded its {INVENTORY_TIMEOUT_SECONDS}-second budget")
+        entries.extend(inventory(binary, plugins, launch_directory, inventory_options, marketplace, timeout=remaining))
+    return {identity: root for identity, root in enabled_roots(plugins, launch_directory, entries).items()
+            if identity in identities}
 
 
 def inventory(binary: str, plugins: host_plugins.Plugins, launch_directory: Path, inventory_options: tuple[str, ...],
@@ -371,19 +375,50 @@ def collect(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str
     return ([] if errors else [reference[key] for key in sorted(reference)]), errors
 
 
-def invoke(target: Target, arguments: list[str], timeout: int, inherit: bool = False) -> subprocess.CompletedProcess:
+def invoke(target: Target, arguments: list[str], timeout: int, project: Path,
+           inherit: bool = False) -> subprocess.CompletedProcess:
     command = [sys.executable, "-B", str(target.script), "setup", *arguments]
     if inherit:
-        return subprocess.run(command, timeout=timeout, check=False)
+        return subprocess.run(command, cwd=project, timeout=timeout, check=False)
     return subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                          timeout=timeout, check=False)
+                          cwd=project, timeout=timeout, check=False)
+
+
+def reconcile_selection(project: Path, *, check_only: bool = False) -> list[str]:
+    project = project_root(project)
+    if not (project / ".agents/plugins.json").is_file():
+        return []
+    script = Path(__file__).resolve().parents[1] / "utility/plugins/scripts/adopt_plugins.py"
+    try:
+        result = subprocess.run(
+            [sys.executable, "-B", str(script), "--root", str(project), "--converge-existing",
+             "--mode", "check" if check_only else "write"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise RequiredPluginsError(f"Repository plugin selection could not converge: {error}") from error
+    detail = (result.stderr or result.stdout).strip()
+    if result.returncode:
+        if check_only and result.returncode == 1 and result.stdout.startswith("Drift in:"):
+            return [detail]
+        raise RequiredPluginsError(f"Repository plugin selection could not converge: {detail}")
+    if detail and not check_only:
+        print(f"plugins: {detail}", file=sys.stderr)
+    return []
 
 
 def check_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None]) -> list[str]:
+    project = project_root(project)
+    try:
+        drift = reconcile_selection(project, check_only=True)
+    except RequiredPluginsError as error:
+        return [str(error)]
+    if drift:
+        return drift
     targets_found, errors = collect(project, hosts, executables)
     for target in targets_found:
         try:
-            result = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS)
+            result = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS, project)
             if result.returncode:
                 errors.append(f"{target.identity}: setup --check failed: {bounded(result)}")
         except (OSError, subprocess.SubprocessError) as error:
@@ -392,17 +427,18 @@ def check_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host,
 
 
 def converge_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None], onboard: bool = False) -> list[str]:
+    project = project_root(project)
     targets_found, errors = collect(project, hosts, executables, repair=True)
     for target in targets_found:
         try:
-            checked = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS)
+            checked = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS, project)
             if checked.returncode:
                 applied = invoke(target, ["--onboard"] if onboard else [],
-                                 ONBOARD_TIMEOUT_SECONDS if onboard else CHECK_TIMEOUT_SECONDS, inherit=onboard)
+                                 ONBOARD_TIMEOUT_SECONDS if onboard else CHECK_TIMEOUT_SECONDS, project, inherit=onboard)
                 if applied.returncode:
                     errors.append(f"{target.identity}: setup failed: {bounded(applied)}")
                     continue
-                checked = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS)
+                checked = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS, project)
             if checked.returncode:
                 errors.append(f"{target.identity}: setup did not converge: {bounded(checked)}")
         except (OSError, subprocess.SubprocessError) as error:
