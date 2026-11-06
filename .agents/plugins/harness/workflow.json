@@ -3,12 +3,17 @@
   "plugin": "tj-agents/workflow",
   "source_roots": [
     ".agents/dependencies/agent/.agents/agent-store/runtime",
+    ".agents/dependencies/agent/.agents/agent/resources/lanes",
+    ".agents/dependencies/cli/.agents/cli/runtime",
     ".agents/hooks/installed_skills.py",
+    ".agents/hooks/merge_review_gate.py",
     ".agents/hooks/problem_records.py",
     ".agents/tiers/workflow.json",
     ".agents/workflow",
     ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
-    ".agents/workflow/resources/problem-records.md"
+    ".agents/workflow/resources/problem-records.md",
+    ".agents/workflows",
+    ".codex/runtime/continuation"
   ],
   "requires": {
     "marketplaces": [
@@ -21,6 +26,7 @@
       "tj-agents/agent",
       "tj-agents/agent-store",
       "tj-agents/base",
+      "tj-agents/cli",
       "tj-agents/workflow"
     ],
     "hooks": [],
@@ -37,7 +43,9 @@
         "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
         "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
         "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)"
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)"
       ],
       "codex_prefix_rules": [
         {
@@ -80,6 +88,34 @@
               "python",
               "${PLUGIN_ROOT}/skills/status/scripts/status.py",
               "payments"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python.exe",
+              "python3",
+              "py"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/workflows/completion.py"
+            ]
+          ],
+          "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
+          "match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/workflows/completion.py"
+            ]
+          ],
+          "not_match": [
+            [
+              "python",
+              "${PLUGIN_ROOT}/workflows/completion.py"
             ]
           ]
         }

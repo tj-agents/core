@@ -85,8 +85,8 @@ out, every test in a suite failing at once) rather than as the defect itself.
    when it fails, so run it in a suitable environment before enqueuing.
 6. On failure, read the remote log first, reproduce only the failing scope in a suitable environment, fix it, run its focused
    regression, and push once. Do not run every local suite before pushing the fix.
-7. Mark the PR ready only once review is clean and exact-head CI is green. Enqueue or merge only on an
-   explicit instruction.
+7. Mark the PR ready only once review is clean and exact-head CI is green. `workflow:run` owns whether the
+   user-authorized goal continues to `engineering:merge`; a CI event alone grants no authority.
 
 Opening a draft PR and pushing checkpoints is part of an authorized implementation workflow. It does not
 authorize merge, deployment, destructive operations, or unrelated external changes.
@@ -94,10 +94,9 @@ authorize merge, deployment, destructive operations, or unrelated external chang
 ## Persistent continuation owns a future delivery decision
 
 When CI, queue, review, publication, or merge will resolve after this turn, load
-`engineering:persistent-delivery` for exact PR/head identity, completion evidence, authorization and the
-next delivery decision. Use `workflow:continue` to select and establish the supported host wake.
-Harness-specific native continuation belongs to that host's Workflow entry; Engineering's Codex delivery
-entry supplies its required durable CLI transport.
+`workflow:continue` to select and establish the supported host wake. Its software delivery reference
+supplies exact PR/head identity, completion evidence, authority evidence, and the next delivery decision.
+Harness-specific continuation and the durable Codex CLI transport belong to the installed Workflow package.
 
 Bind every remote wait through the shared reconnect-safe monitor before leaving the stage:
 
@@ -115,7 +114,7 @@ bounded timeout. Direct `gh run watch`, ad hoc sleeping forge loops, and model-t
 ### Notify before parking a listener
 
 Invoke `agent:listen` with the existing bound monitor. That skill owns the generic
-execution and native completion callback; `engineering:persistent-delivery` owns durable delivery.
+execution and native completion callback; `workflow:continue` owns durable delivery.
 
 Read forge status for a PR, head, or run once, again only after a real wake or observed state change, and
 keep one shared monitor per identity.

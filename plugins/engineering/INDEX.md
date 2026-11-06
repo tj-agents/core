@@ -25,7 +25,6 @@ Generated from canonical `.agents/` definitions.
 - `merging` — policy — `.agents/engineering/policy/merging/SKILL.md`
 - `open-pr` — operation — `.agents/engineering/operation/open-pr/SKILL.md`
 - `open-worktree` — operation — `.agents/engineering/operation/open-worktree/SKILL.md`
-- `persistent-delivery` — policy — `.agents/engineering/policy/persistent-delivery/SKILL.md`
 - `plans` — convention — `.agents/engineering/convention/plans/SKILL.md`
 - `pr-preflight` — operation — `.agents/engineering/operation/pr-preflight/SKILL.md`
 - `pr-screenshots` — contract — `.agents/engineering/contract/pr-screenshots/SKILL.md`
@@ -36,9 +35,7 @@ Generated from canonical `.agents/` definitions.
 - `remote-validation` — policy — `.agents/engineering/policy/remote-validation/SKILL.md`
 - `review` — utility — `.agents/engineering/utility/review/SKILL.md`
 - `review-lifecycle` — convention — `.agents/engineering/convention/review-lifecycle/SKILL.md`
-- `self-repair` — workflow — `.agents/engineering/workflow/self-repair/SKILL.md`
 - `session` — policy — `.agents/engineering/policy/session/SKILL.md`
-- `skill-authoring` — convention — `.agents/engineering/convention/skill-authoring/SKILL.md`
 - `stack` — operation — `.agents/engineering/operation/stack/SKILL.md`
 - `staged-review` — workflow — `.agents/engineering/workflow/staged-review/SKILL.md`
 - `staged-review-all` — workflow — `.agents/engineering/workflow/staged-review-all/SKILL.md`

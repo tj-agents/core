@@ -18,8 +18,10 @@ Marketplace owns the canonical plugin roster and dependency graph in
 [`plugins.json`](https://github.com/tj-agents/marketplace/blob/main/plugins.json). Do not edit plugin names
 or dependencies in Core.
 
-`engineering:skill-authoring` owns skill selection triggers, names, and sizing; the
-[`template:check` validator](https://github.com/tj-agents/template) owns required skill content and layout
+`skill:new` resolves a new skill's owner, name, sizing and discovery trigger before native authoring;
+`skill:update` applies the same selection rules to updates, splits, consolidations, renames and
+retirements. `skill:check` owns skill content and executable assets; the
+[`template:check` validator](https://github.com/tj-agents/template) owns repository layout and metadata
 validation. `engineering:docs` owns the generic guidance-writing convention.
 
 Global architecture and cross-repository designs live in [`tj-agents/docs`](https://github.com/tj-agents/docs)
@@ -42,9 +44,10 @@ Core publishes generic work status as Workflow and reusable engineering lifecycl
 Installing Engineering does not select or install a recording
 profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
 registers remain evidence only.
-Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.9+
+Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.12+
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
-current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or
+current manifest uses `python` on all platforms. Core packages also require the CLI-provided `tj_hook`
+executable on PATH; Agent must install CLI before it activates Core packages. Codex skips new or
 changed plugin hooks until they are reviewed and trusted in `/hooks`; a fresh missing-marketplace write
 probe is required before claiming enforcement.
 Codex hook commands use a per-session temporary snapshot preseeded for the running session's hooks.

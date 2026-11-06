@@ -9,7 +9,6 @@ import os
 import re
 import shutil
 import stat
-import subprocess
 import sys
 import tarfile
 import tempfile
@@ -20,6 +19,7 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from process_runtime import process
 import delivery_runtime
 import delivery_policy
 import workflow_runtime
@@ -153,7 +153,7 @@ def redact(text):
 
 def run_process(arguments, cwd, text=True, check=True):
     executable = shutil.which(arguments[0]) or arguments[0]
-    completed = subprocess.run(
+    completed = process.run(
         [executable, *arguments[1:]],
         cwd=str(cwd),
         capture_output=True,
@@ -1797,7 +1797,7 @@ def goal_evaluator_scopes(root):
 
 
 def goal_preflight(root, workflow_run_id):
-    """`persistent-workflow`'s `/goal` prerequisite, executed rather than asserted in prose."""
+    """`workflow:continue`'s `/goal` prerequisite, executed rather than asserted in prose."""
     scopes = []
     persisted = None
     for name, path in goal_evaluator_scopes(root):
@@ -1896,7 +1896,7 @@ def pending_evidence(rollup, head):
     """Every not-yet-terminal check as an exact `(check id, run id, head)` triple.
 
     A CheckRun's run and job ids are only published in its details URL, and that pair is precisely
-    the identity `persistent-delivery` refuses to merge without.
+    the exact identity required by the software delivery contract.
     """
     evidence = []
     seen = set()

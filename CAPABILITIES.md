@@ -25,4 +25,4 @@ Selected engineering workflows, reviews and Git operations.
 
 Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
 
-Layout conventions for pages people read.
+Layout, diagram and design-page conventions for pages people read.

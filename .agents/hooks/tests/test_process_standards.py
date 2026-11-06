@@ -106,37 +106,6 @@ class ProcessStandardsTests(unittest.TestCase):
             flat,
         )
 
-    def test_standards_repair_requires_internal_source_authority(self):
-        instructions = authored_skill("engineering:session").read_text(
-            encoding="utf-8"
-        )
-        flat = " ".join(instructions.split())
-
-        for phrase in (
-            "A defect in a consumed agent standard or tool is diagnosed at its source",
-            "Use `engineering:self-repair` to establish causal evidence and whether its internal repair authority applies",
-            "outside automatic scope, explain the proposed repair and continue unaffected authorized work",
-            "That workflow owns the repair authorization and delivery procedure",
-            "explicit user limits still hold",
-        ):
-            with self.subTest(phrase=phrase):
-                self.assertIn(phrase, flat)
-
-        self_repair = " ".join(authored_skill("self-repair").read_text(encoding="utf-8").split())
-        for phrase in (
-            "Its owning source is an explicitly authorized `tj-agents` standards or tooling repository",
-            "Both the originating task and the source repository have explicitly adopted personal scope",
-            "`tj-agents/infonetica` is employer tooling and remains outside automatic repair",
-            "Conclude with no standards change when no reusable source defect is established",
-            "Reconcile that owner and contribute the evidence without creating a duplicate writer",
-            "Fix the standard or tool in the current session",
-            "Hand the repair off only when the user asks",
-            "For an eligible automatic repair, standing authorization covers implementation, tests, review, pull "
-            "request, merge and publication in that source repository once its gates pass",
-        ):
-            with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self_repair)
-
     def test_callout_corrects_task_before_optional_standards_repair(self):
         def callout(skill):
             instructions = authored_skill(skill).read_text(encoding="utf-8")
@@ -145,34 +114,12 @@ class ProcessStandardsTests(unittest.TestCase):
             )
 
         self.assertTrue(callout("workflow:session").startswith("Answer the direct question first"))
-        section = callout("engineering:session")
-        for phrase in (
-            "`engineering:self-repair`",
-            "source ownership, causal evidence and repair eligibility",
-            "the automatic-repair boundary and the no-source-change outcome",
-            "Existing user limits and scope gates still apply",
-        ):
-            with self.subTest(phrase=phrase):
-                self.assertIn(phrase, section)
-
-        self_repair = " ".join(authored_skill("self-repair").read_text(encoding="utf-8").split())
-        for phrase in (
-            "a demonstrated defect in a reusable agent standard, skill, route, hook or lifecycle tool",
-            "An employer task does not grant automatic repair authority",
-            "monitoring-only",
-            "Monitoring does not grant delivery authority",
-            "never authorizes taking over an unrelated pending delivery",
-        ):
-            with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self_repair)
 
     def test_harness_specific_persistent_continuation_is_routed(self):
         remote = authored_skill("remote-validation").read_text(
             encoding="utf-8"
         )
-        shared = authored_skill("persistent-delivery").read_text(
-            encoding="utf-8"
-        )
+        shared = (self.root / ".agents/workflow/workflow/continue/references/delivery.md").read_text(encoding="utf-8")
         workflow = authored_skill("workflow:continue").read_text(encoding="utf-8")
         claude = (
             self.root / ".claude/skills/workflow/continue/SKILL.md"
@@ -181,10 +128,10 @@ class ProcessStandardsTests(unittest.TestCase):
             self.root / ".codex/skills/workflow/continue/SKILL.md"
         ).read_text(encoding="utf-8")
 
-        delivery = (self.root / ".codex/skills/engineering/persistent-delivery/SKILL.md").read_text(encoding="utf-8")
+        delivery = (self.root / ".codex/runtime/continuation/README.md").read_text(encoding="utf-8")
 
         self.assertIn("`workflow:continue`", remote)
-        self.assertIn("persistent-delivery", remote)
+        self.assertIn("`workflow:continue`", remote)
         self.assertIn("one persistent owner for a PR/head pair", shared)
         self.assertIn("init --root ROOT --goal GOALPATH", delivery)
         self.assertIn("CONTINUATION_RESULT_PATH", delivery)
@@ -217,63 +164,17 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("bound PR source head", merging)
 
     def test_merge_authorization_is_goal_scoped_with_one_owner(self):
-        merging = authored_skill("merging").read_text(encoding="utf-8")
-        flat_merging = " ".join(merging.split())
+        run = authored_skill("workflow:run").read_text(encoding="utf-8")
         corpus = " ".join(self.corpus().split())
-
-        self.assertIn("## What authorizes a merge", merging)
-        self.assertIn("Merge authorization is scoped to the goal, not the PR", flat_merging)
-        self.assertIn(
-            "merge authorization for every PR that goal itself creates", flat_merging
-        )
-        self.assertIn("no per-PR re-approval", flat_merging)
-        self.assertIn(
-            "no delivery standard adds a per-PR approval requirement", flat_merging
-        )
-        self.assertEqual(
-            1, corpus.count("Merge authorization is scoped to the goal, not the PR")
-        )
-
-        bodies = {
-            name: " ".join(authored_skill(name).read_text(encoding="utf-8").split())
-            for name in (
-                "persistent-delivery",
-                "merge",
-                "plans",
-                "feature",
-                "bugfix",
-            )
-        }
-        self.assertIn(
-            "an authorization naming no mode records `auto`",
-            bodies["persistent-delivery"],
-        )
-        for referrer, pointer in (
-            (
-                "persistent-delivery",
-                "the owning goal record (`engineering:merging` owns that goal-wide scope)",
-            ),
-            (
-                "merge",
-                "re-resolves merge authorization from the goal's recorded "
-                "authorization (`engineering:merging`)",
-            ),
-            (
-                "plans",
-                "default-branch state (`engineering:merging` owns the goal-wide "
-                "merge-authorization scope)",
-            ),
-            (
-                "feature",
-                "covers delivery (`engineering:merging` owns that goal-wide scope)",
-            ),
-            (
-                "bugfix",
-                "covers delivery (`engineering:merging` owns that goal-wide scope)",
-            ),
-        ):
-            with self.subTest(referrer=referrer):
-                self.assertIn(pointer, bodies[referrer])
+        self.assertIn("## Authority and acceptance", run)
+        self.assertEqual(1, corpus.count("## Authority and acceptance"))
+        self.assertNotIn("## What authorizes a merge", corpus)
+        for identity in ("merging", "merge", "plans", "feature", "bugfix", "open-pr", "remote-validation"):
+            with self.subTest(identity=identity):
+                body = authored_skill(identity).read_text(encoding="utf-8")
+                self.assertIn("`workflow:run`", body)
+        delivery = (self.root / ".agents/workflow/workflow/continue/references/delivery.md").read_text(encoding="utf-8")
+        self.assertIn("`workflow:run`", delivery)
 
         for per_pr_reading in (
             "implementation approval never invents merge authority",
@@ -388,28 +289,22 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(retired=retired):
                 self.assertNotIn(retired, cleanup)
 
-    def test_cd_and_handoff_transfer_active_directory_removal_to_the_successor(self):
-        cd = " ".join(authored_skill("cd").read_text(encoding="utf-8").split())
+    def test_handoff_transfers_active_directory_removal_after_predecessor_release(self):
         handoff = " ".join(authored_skill("handoff").read_text(encoding="utf-8").split())
         cleanup = " ".join(authored_skill("merging").read_text(encoding="utf-8").split())
 
-        self.assertIn("Retarget the host **before** any helper or native command", cd)
-        self.assertIn(
-            "the successor the sole owner of the removal and final filesystem verification",
-            cd,
-        )
-        self.assertIn(
-            "the original stops repository-scoped work; a completed delivery closes its own session "
-            "through `engineering:merge` Step 5's `finish`; only when that is unavailable does the "
-            "`handoff` successor own the removal, closing the predecessor through `agent:peer`",
-            cd,
-        )
         self.assertIn("follow `engineering:merging` under Transferred checkout cleanup", handoff)
         self.assertIn(
             "Put the exact operation and final filesystem verification in the successor's `## Next Steps`",
             handoff,
         )
         self.assertIn("The predecessor must not perform it after launch", handoff)
+        self.assertIn("The successor waits for that marker before releasing the predecessor", cleanup)
+        self.assertIn(
+            "Run the filesystem operation from a verified surviving checkout after the predecessor "
+            "no longer holds the old directory",
+            cleanup,
+        )
         self.assertIn("a command error or residual path as incomplete", cleanup)
 
 

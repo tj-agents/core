@@ -5,6 +5,8 @@ import importlib.util
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Protocol
 
+from process_runtime import process
+
 CONTRACT_VERSION = "v2"
 IDENTITY_FIELDS = ("contract_version", "workflow_id", "workflow_run_id", "stage_id", "dispatch_id")
 WORK_ITEM_STATUSES = ("proposed", "active", "delivery-gated", "blocked", "paused", "done")
@@ -509,7 +511,7 @@ class WorkflowContract:
 
 
 def _git(root, *arguments):
-    completed = subprocess.run(
+    completed = process.run(
         ["git", "-C", str(root), *arguments],
         check=True,
         capture_output=True,

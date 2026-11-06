@@ -1,5 +1,4 @@
 import importlib.util
-import io
 import json
 import os
 from pathlib import Path
@@ -9,12 +8,11 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
 from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ADAPTER = ROOT / ".codex/skills/engineering/persistent-delivery/scripts/delivery_continuation.py"
+ADAPTER = ROOT / ".codex/runtime/continuation/delivery_continuation.py"
 SCHEDULER = ROOT / ".codex/runtime/continuation/continuation_scheduler.py"
 
 
@@ -670,7 +668,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         receipt["adapter_command"] = scheduler.adapter_command(receipt)
         receipt["runtime_command"] = scheduler.runtime_command(receipt)
         scheduler.atomic_json(self.owner_path.parent / "scheduler.json", receipt)
-        with patch.object(adapter.subprocess, "run") as runtime:
+        with patch.object(adapter.process, "run") as runtime:
             with self.assertRaisesRegex(RuntimeError, "unavailable"):
                 adapter.wake(self.owner, self.root, self.owner_path,
                              self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(alternate)),
@@ -685,9 +683,10 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertIn("timeout=930", ADAPTER.read_text(encoding="utf-8"))
 
     def test_python_version_guard_runs_before_scheduler_import(self):
-        with patch.object(sys, "version_info", (3, 8, 0)):
-            with self.assertRaisesRegex(RuntimeError, "Python 3.9"):
-                load("delivery_continuation_python38", ADAPTER)
+        for version in ((3, 8, 0), (3, 11, 0)):
+            with self.subTest(version=version), patch.object(sys, "version_info", version):
+                with self.assertRaisesRegex(RuntimeError, "Python 3.12"):
+                    load("delivery_continuation_unsupported_python", ADAPTER)
 
     def test_windows_registration_and_cleanup_are_exact_without_runtime_recursion(self):
         receipt = self.windows_receipt()
@@ -730,7 +729,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.owner["state"] = "complete"
         self.owner_path.write_text(json.dumps(self.owner), encoding="utf-8")
         calls = []
-        with patch.object(adapter.subprocess, "run", side_effect=lambda *args, **kwargs: calls.append((args, kwargs)) or Result()), \
+        with patch.object(adapter.process, "run", side_effect=lambda *args, **kwargs: calls.append((args, kwargs)) or Result()), \
              patch.object(adapter, "read_json", side_effect=[receipt, self.owner, FileNotFoundError]):
             result = adapter.wake(self.owner, self.root, self.owner_path,
                                   self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(self.host)), transport)
@@ -750,7 +749,7 @@ class DeliveryContinuationTests(unittest.TestCase):
                               {"previous": None, "proposed": {"owner_id": "foreign"}})
         self.owner["state"] = "complete"
         self.owner_path.write_text(json.dumps(self.owner), encoding="utf-8")
-        with patch.object(adapter.subprocess, "run", return_value=Result()):
+        with patch.object(adapter.process, "run", return_value=Result()):
             with self.assertRaisesRegex(RuntimeError, "foreign pending"):
                 adapter.wake(self.owner, self.root, self.owner_path,
                              self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(self.host)), transport)
@@ -822,16 +821,18 @@ class DeliveryContinuationTests(unittest.TestCase):
 
     def test_installed_package_resources_and_custom_profile_are_portable(self):
         package = (Path(self.temp.name) / "installed package £").resolve()
-        scripts = package / "codex-skills/persistent-delivery/scripts"
+        scripts = package / ".codex/runtime/continuation"
         resources = package / ".codex/runtime/continuation"
         scripts.mkdir(parents=True)
-        resources.mkdir(parents=True)
+        resources.mkdir(parents=True, exist_ok=True)
         (package / ".codex-plugin").mkdir()
         (package / ".codex-plugin/plugin.json").write_text("{}")
-        (package / ".agents/engineering").mkdir(parents=True)
+        (package / ".agents/workflow").mkdir(parents=True)
         shutil.copy2(ADAPTER, scripts / ADAPTER.name)
         shutil.copy2(SCHEDULER, resources / SCHEDULER.name)
         shutil.copy2(ROOT / ".codex/runtime/continuation/continuation_runtime.py", resources / "continuation_runtime.py")
+        shutil.copytree(ROOT / ".agents/workflows", package / "workflows")
+        shutil.copytree(ROOT / ".agents/dependencies/cli/.agents/cli/runtime", package / "hooks")
         installed = load("installed_delivery_continuation", scripts / ADAPTER.name)
         self.assertEqual(resources / "continuation_scheduler.py", installed.resource("continuation_scheduler.py"))
         self.assertEqual(resources / "continuation_runtime.py", installed.resource("continuation_runtime.py"))
@@ -840,15 +841,16 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertNotIn("GH_TOKEN", receipt["profile_environment"])
 
     def test_generated_continuation_transport_is_codex_only(self):
-        package = ROOT / "plugins/engineering"
-        self.assertTrue((package / "codex-skills/persistent-delivery/scripts/delivery_continuation.py").is_file())
+        package = ROOT / "plugins/workflow"
+        self.assertFalse((ROOT / "plugins/engineering/.codex/runtime/continuation").exists())
+        self.assertTrue((package / ".codex/runtime/continuation/delivery_continuation.py").is_file())
         self.assertTrue((package / ".codex/runtime/continuation/continuation_runtime.py").is_file())
         self.assertTrue((package / ".codex/runtime/continuation/continuation_scheduler.py").is_file())
-        self.assertFalse((package / "skills/persistent-delivery/scripts").exists())
-        self.assertFalse((package / ".agents/engineering/policy/persistent-delivery/scripts").exists())
+        self.assertFalse((package / "skills/continue/scripts").exists())
+        self.assertFalse((package / ".agents/workflow/workflow/continue/scripts").exists())
         self.assertFalse((package / "workflows/continuation_runtime.py").exists())
         installed = load("generated_delivery_continuation",
-                         package / "codex-skills/persistent-delivery/scripts/delivery_continuation.py")
+                         package / ".codex/runtime/continuation/delivery_continuation.py")
         for module in (adapter, installed):
             runtime, python = module.prerequisites(self.owner, str(self.host))
             self.assertEqual(module.package_root() / ".codex/runtime/continuation/continuation_runtime.py", runtime)
@@ -857,15 +859,15 @@ class DeliveryContinuationTests(unittest.TestCase):
     def test_runtime_does_not_use_outer_package_marker_or_shared_resources(self):
         outer = self.root / "outer-runtime"
         resources = outer / ".codex/runtime/continuation"
-        resources.mkdir(parents=True)
+        resources.mkdir(parents=True, exist_ok=True)
         (outer / ".codex-plugin").mkdir()
         (outer / ".codex-plugin/plugin.json").write_text("{}")
-        (outer / ".agents/engineering").mkdir(parents=True)
+        (outer / ".agents/workflow").mkdir(parents=True)
         shutil.copytree(ROOT / ".agents/workflows", outer / "workflows")
         nested = outer / "nested"
         runtime = nested / ".codex/runtime/continuation/continuation_runtime.py"
         runtime.parent.mkdir(parents=True)
-        (nested / ".agents/engineering").mkdir(parents=True)
+        (nested / ".agents/workflow").mkdir(parents=True)
         shutil.copy2(ROOT / ".codex/runtime/continuation/continuation_runtime.py", runtime)
         result = subprocess.run([sys.executable, "-B", str(runtime), "--help"],
                                 capture_output=True, text=True, timeout=10)
@@ -879,7 +881,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertIn("shared runtime unavailable", result.stderr)
 
     def test_adapter_rejects_claude_layout(self):
-        scripts = self.root / "skills/persistent-delivery/scripts"
+        scripts = self.root / "skills/continue/scripts"
         scripts.mkdir(parents=True)
         shutil.copy2(ADAPTER, scripts / ADAPTER.name)
         with self.assertRaisesRegex(RuntimeError, "adapter layout unavailable"):
@@ -888,17 +890,17 @@ class DeliveryContinuationTests(unittest.TestCase):
     def test_adapter_does_not_use_outer_package_resources_or_marker(self):
         outer = self.root / "outer"
         for package in (outer, outer / "nested"):
-            scripts = package / "codex-skills/persistent-delivery/scripts"
+            scripts = package / ".codex/runtime/continuation"
             scripts.mkdir(parents=True)
-            (package / ".agents/engineering").mkdir(parents=True)
+            (package / ".agents/workflow").mkdir(parents=True)
             (package / ".codex-plugin").mkdir()
             (package / ".codex-plugin/plugin.json").write_text("{}")
             shutil.copy2(ADAPTER, scripts / ADAPTER.name)
         resources = outer / ".codex/runtime/continuation"
-        resources.mkdir(parents=True)
+        resources.mkdir(parents=True, exist_ok=True)
         shutil.copy2(SCHEDULER, resources / SCHEDULER.name)
         nested = outer / "nested"
-        script = nested / "codex-skills/persistent-delivery/scripts" / ADAPTER.name
+        script = nested / ".codex/runtime/continuation" / ADAPTER.name
         with self.assertRaisesRegex(RuntimeError, "resource unavailable"):
             load("nested_delivery_continuation", script)
         (nested / ".codex-plugin/plugin.json").unlink()

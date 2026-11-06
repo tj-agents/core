@@ -1,9 +1,12 @@
 import copy
 import importlib.util
 import json
-from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("sync_plugin_packages", ROOT / "scripts/sync_plugin_packages.py")
@@ -23,7 +26,7 @@ class HookContractTests(unittest.TestCase):
     def test_all_declared_hooks_have_valid_pointers_commands_and_scripts(self) -> None:
         self.validate(self.output)
 
-    def test_only_base_ships_a_hooks_manifest_and_it_registers_only_session_start(self) -> None:
+    def test_only_base_ships_startup_and_tool_context_hooks(self) -> None:
         hook_manifests = {}
         for path, payload in self.output.items():
             if not (path.startswith("plugins/") and path.endswith(".json") and path.split("/")[2:3] == ["hooks"]):
@@ -34,7 +37,29 @@ class HookContractTests(unittest.TestCase):
         self.assertEqual({"plugins/base/hooks/claude.json", "plugins/base/hooks/codex.json"}, set(hook_manifests))
         for path, manifest in hook_manifests.items():
             with self.subTest(path=path):
-                self.assertEqual({"SessionStart"}, set(manifest["hooks"]))
+                self.assertEqual({"SessionStart", "PreToolUse"}, set(manifest["hooks"]))
+
+    def test_generated_hooks_use_the_hidden_boundary(self) -> None:
+        claude = json.loads(self.output["plugins/base/hooks/claude.json"])
+        claude_hook = claude["hooks"]["SessionStart"][0]["hooks"][0]
+        self.assertEqual("tj_hook", claude_hook["command"])
+        self.assertEqual(["--", "python", "-B"], claude_hook["args"][:3])
+        codex = json.loads(self.output["plugins/base/hooks/codex.json"])
+        codex_hook = codex["hooks"]["SessionStart"][0]["hooks"][0]
+        self.assertTrue(codex_hook["command"].startswith("tj_hook -- python3 -I -B "))
+        self.assertTrue(codex_hook["commandWindows"].startswith("tj_hook -- python -I -B "))
+
+    def test_packaged_hook_imports_tj_cli_in_isolated_python(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            package = Path(directory) / "base"
+            shutil.copytree(ROOT / "plugins/base", package)
+            result = subprocess.run(
+                [sys.executable, "-I", "-B", str(package / "hooks/tier_gate.py"), "--session-context", "--project", directory],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        self.assertEqual(0, result.returncode, result.stderr)
 
     def test_shipped_hook_without_manifest_pointer_is_rejected(self) -> None:
         output = copy.deepcopy(self.output)
@@ -77,7 +102,7 @@ class HookContractTests(unittest.TestCase):
         path = "plugins/base/hooks/codex.json"
         payload = json.loads(output[path])
         payload["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"] = (
-            'python -B "%PLUGIN_ROOT%/hooks/tier_gate.py"'
+            'tj_hook -- python -B "%PLUGIN_ROOT%/hooks/tier_gate.py"'
         )
         output[path] = json.dumps(payload).encode()
         with self.assertRaisesRegex(ValueError, "wrong plugin root"):

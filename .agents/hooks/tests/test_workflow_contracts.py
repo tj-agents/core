@@ -382,17 +382,46 @@ class WorkflowGenerationTests(unittest.TestCase):
         self.assertNotIn("version", codex)
         self.assertNotIn("version", claude)
         self.assertEqual("./codex-skills/", codex["skills"])
-        self.assertTrue((plugin / "codex-skills" / "persistent-delivery" / "SKILL.md").is_file())
-        self.assertTrue((plugin / "skills" / "persistent-delivery" / "SKILL.md").is_file())
+        self.assertTrue((ROOT / "plugins/workflow/skills/continue/references/delivery.md").is_file())
         self.assertTrue((plugin / "codex-agents" / "review-lens.toml").is_file())
         self.assertTrue((plugin / "agents" / "review-lens.md").is_file())
         self.assertTrue((plugin / "workflows" / "delivery_runtime.py").is_file())
         self.assertNotIn("workflows", codex)
         self.assertNotIn("workflows", claude)
 
+    def test_continuation_retired_names_are_absent_from_public_discovery(self):
+        retired = {"persistent-delivery", "persistent-workflow"}
+        config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
+        authored_roots = [ROOT / scope["root"] for scope in config["scopes"]]
+        authored_roots.extend(ROOT / f".{host}/skills" for host in ("claude", "codex"))
+        authored_roots.append(ROOT / ".codex/runtime/continuation")
+        active = [ROOT / ".agents/plugins/sources.json", ROOT / ".agents/plugins/plugins.json"]
+        for root in authored_roots:
+            active.extend(path for path in root.rglob("*") if path.is_file() and path.suffix in {".md", ".json", ".py", ".toml"})
+        for path in active:
+            with self.subTest(source=path.relative_to(ROOT)):
+                body = path.read_text(encoding="utf-8")
+                for name in retired:
+                    self.assertNotIn(name, path.parts)
+                    self.assertNotIn(name, body)
+        for plugin in (ROOT / "plugins").iterdir():
+            if not plugin.is_dir():
+                continue
+            for tree in ("skills", "codex-skills"):
+                for path in (plugin / tree).glob("*/SKILL.md"):
+                    with self.subTest(path=path):
+                        self.assertNotIn(path.parent.name, retired)
+        for host, tree in (("claude", "skills"), ("codex", "codex-skills")):
+            entry = ROOT / "plugins/workflow" / tree / "continue/SKILL.md"
+            with self.subTest(host=host):
+                self.assertTrue(entry.is_file())
+        self.assertTrue((ROOT / "plugins/workflow/.codex/runtime/continuation/delivery_continuation.py").is_file())
+        self.assertFalse((ROOT / "plugins/engineering/.codex/runtime/continuation").exists())
+        self.assertFalse((ROOT / ".agents/engineering/workflow/merge/references/delivery.md").exists())
+
     def test_extended_host_adapter_preserves_one_public_identity(self):
         config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
-        self.assertEqual(["workflow:continue", "engineering:persistent-delivery", "engineering:review"],
+        self.assertEqual(["workflow:continue", "engineering:review"],
                          config["extended_host_adapters"])
         for identity in config["extended_host_adapters"]:
             plugin, skill = identity.split(":")
@@ -431,6 +460,9 @@ class WorkflowGenerationTests(unittest.TestCase):
                         bundle,
                         ignore=shutil.ignore_patterns("__pycache__"),
                     )
+                    (root / ".codex-plugin").mkdir()
+                    (root / ".codex-plugin/plugin.json").write_text("{}", encoding="utf-8")
+                    shutil.copytree(ROOT / ".agents/dependencies/cli/.agents/cli/runtime", root / "hooks")
                     completed = subprocess.run(
                         [sys.executable, str(bundle / "verify.py"), "--root", str(root)],
                         capture_output=True,
@@ -447,12 +479,13 @@ class WorkflowGenerationTests(unittest.TestCase):
                 with tempfile.TemporaryDirectory(dir=ROOT) as temp:
                     root = Path(temp) / "bundle"
                     if packaged:
-                        shutil.copytree(ROOT / "plugins/engineering", root,
+                        shutil.copytree(ROOT / "plugins/workflow", root,
                                         ignore=shutil.ignore_patterns("__pycache__"))
                         workflows = root / "workflows"
                     else:
-                        for relative in (".agents/workflows", ".agents/engineering",
+                        for relative in (".agents/workflows", ".agents/workflow",
                                          ".codex/runtime/continuation",
+                                         ".agents/dependencies/cli",
                                          ".agents/dependencies/agent/.agents/agent/resources/lanes"):
                             shutil.copytree(ROOT / relative, root / relative,
                                             ignore=shutil.ignore_patterns("__pycache__"))
@@ -1964,12 +1997,10 @@ class RepositoryProviderTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         state = self.root / "writer-state"
-        connection = module.connect(state / "sessions.db")
-        try:
-            repository = module.repo_identity(self.root)
+        with module.SessionStore(state / "sessions.db") as store:
+            repository = module.identify_repository(self.root)
             key = module.work_item_key(repository, "runtime-bridge", "readme-reader")
-            module.upsert_work_item(
-                connection,
+            store.upsert_work_item(
                 key,
                 repository,
                 "runtime-bridge",
@@ -1977,8 +2008,6 @@ class RepositoryProviderTests(unittest.TestCase):
                 status=status,
                 branch="Feature/provider-fixture",
             )
-        finally:
-            connection.close()
         return state
 
     def test_repository_provider_resolves_portable_state_and_git_identity(self):
@@ -2212,7 +2241,7 @@ class RepositoryProviderTests(unittest.TestCase):
 
     def test_read_only_git_uses_utf8_replacement_decoding(self):
         completed = subprocess.CompletedProcess([], 0, "github.com/example/runtime", "")
-        with mock.patch.object(workflow_runtime.subprocess, "run", return_value=completed) as run:
+        with mock.patch.object(workflow_runtime.process, "run", return_value=completed) as run:
             self.assertEqual(
                 "github.com/example/runtime",
                 workflow_runtime._read_only_git(self.root / "linked-\u00e9", "config", "--get", "remote.origin.url"),
@@ -2259,11 +2288,9 @@ class RepositoryProviderTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         state = linked / "state"
-        connection = module.connect(state / "sessions.db")
-        try:
-            repository = module.repo_identity(linked)
-            module.upsert_work_item(
-                connection,
+        with module.SessionStore(state / "sessions.db") as store:
+            repository = module.identify_repository(linked)
+            store.upsert_work_item(
                 module.work_item_key(repository, "runtime-bridge", "readme-reader"),
                 repository,
                 "runtime-bridge",
@@ -2271,8 +2298,6 @@ class RepositoryProviderTests(unittest.TestCase):
                 status="active",
                 branch="Feature/provider-linked",
             )
-        finally:
-            connection.close()
         provider = RepositoryStateProvider(linked, WorkflowContract(WORKFLOWS))
         with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
             self.assertEqual(
