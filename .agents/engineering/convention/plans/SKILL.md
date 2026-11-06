@@ -414,39 +414,18 @@ carrying forward written into the doc that owns it. Anything you'd be annoyed to
 worked, a gotcha hit — belongs in the commit message or that doc, not left implicit in the context. A phase
 boundary makes the conversation disposable; it does not require disposing of it.
 
-**Continue in the current context by default for small and medium plans** when the next action belongs to
-the same logical workstream, the loaded goals, constraints, decisions, and evidence remain relevant and
-coherent, and the user's existing authorization covers the next phase. The parent retains ownership.
-Move directly into that work after the durable
-checkpoint; do not stop for a handoff merely because planning or another phase completed.
-
 For a massive plan whose design was a substantial phase of its own, write a durable phased execution plan
-and normally hand execution to one fresh harness, even when the checkout stays the same. The successor
-resumes that plan as its owner. Judge plans between these cases by the size and complexity of the remaining
-execution, how much planning context is useful, and whether a fresh owner can act from the checkpoint.
-Record the reason when choosing the less usual path; plan length alone is not a mechanical threshold.
+and link it from the current progress checkpoint.
 
-`workflow:plan` owns the critical-plan readiness decision and compact execution goalpost.
-Apply it before a substantial-design transfer. `workflow:handoff` owns the matching acknowledgement
-and first-action evidence; launcher submission alone does not establish an accountable executor.
+`workflow:plan` owns the two post-planning execution routes and their readiness decision.
+`workflow:handoff` owns the boundary between bounded delegation and responsibility transfer, including
+verified pickup and ownership release. Apply those owners to select the next authorized action after the
+durable Engineering checkpoint; completing a phase does not automatically select a handoff.
 
-Transfer to a fresh context only when at least one of these conditions is true:
-
-- the user explicitly asks to clear, restart, or hand the work to another context;
-- the next action changes owner, repository, worktree, PR, or logical workstream, or a workflow deliberately
-  requires an independent context for unbiased review or isolated judgment;
-- the next plan section is materially separate and the earlier reasoning would distract from, rather than
-  help with, the new work;
-- a massive plan has completed substantial design and its durable phased plan makes execution ready for a
-  fresh owner, even when the repository and worktree stay the same;
-- the context is genuinely degraded: repeated compaction has lost needed detail, important facts are being
-  re-derived, conflicting stale assumptions remain loaded, or too little usable capacity remains to execute
-  the next slice safely.
-
-Age, transcript length, an actionable ledger, or a phase boundary by itself is not evidence that context is
-degraded. When a transfer condition does apply, make the checkpoint durable and execute the `handoff` workflow.
-It prepares the exact `workflow:handoff` pointer and invokes one selected launcher; a pointer in the response alone
-does not transfer ownership. Do not select a handoff as routine phase-ending ceremony.
+```text
+Input: the design phase is complete and the ledger names the next implementation action.
+Route: workflow:plan selects the execution route; retain the phased plan and progress checkpoint.
+```
 
 ## Finishing, superseding, abandoning
 
