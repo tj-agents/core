@@ -22,10 +22,19 @@ decisions and execution setup, including isolation before deliverable writes. Do
 require a completed design, implementation plan, new delivery checkout, or prepared critical receipt before
 launching. Preserve explicit user limits.
 
+For a planning handoff selected by `workflow:plan`, carry the problem, evidence, constraints, open questions,
+and explicit user decisions with their provenance in the owning goal or brief. Distinguish what the user
+chose from a predecessor's proposal. Mark an unaccepted proposed mechanism as an assumption to assess;
+it must not dictate the successor's exploration or design. The successor owns those decisions within the
+user's constraints. An implementation handoff may carry the agreed plan for execution. Planning-only
+authority remains planning-only through either transfer mode.
+
 ```text
-Request: Hand off the architecture decision; keep this CLI and checkout open.
-Predecessor: Launch one successor with the objective, constraints, and unresolved questions.
-Successor: Decide the architecture and establish isolated execution before deliverable writes.
+Input: the user selected Redis; the predecessor proposed a custom coordinator without user acceptance.
+Planning transfer: Redis is a user decision with its source; the coordinator is an unaccepted assumption.
+Route: successor assesses the coordinator choice within the Redis requirement; planning-only authority.
+Input: the user approved the resulting plan and authorized implementation.
+Implementation transfer: successor executes the agreed plan within that authority.
 ```
 
 When an active task surfaces a distinct independently actionable side workstream with separate authorization,
@@ -42,7 +51,7 @@ one-line reason beside the next action when a lane is selected.
 
 ## Admit work before dispatch
 
-Resolve an existing canonical repair owner, exact native session, goal, worktree, and launch attempt before a
+Resolve an existing canonical goal owner, exact native session, goal, worktree, and launch attempt before a
 new handoff. Reuse an in-flight owner. Reopen a verified closed context through its supported open skill. An
 unknown identity, ambiguous launch, or pending attempt keeps the existing reservation for reconciliation and
 never permits a second writer.
