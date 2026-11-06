@@ -217,17 +217,17 @@ job, completion record, or delivery binding. If that interface is unavailable or
 verified, keep the transfer capability-gated and the predecessor open. Without such an owner, the
 predecessor's stopped writes and matching successor acknowledgement define this bounded transfer.
 
-Only after matching pickup, recorded first-action evidence, and actual ownership release invoke `agent:close`
-for the current-session assessment; close the predecessor only when it has no other owned work or pending
-waits. Launcher submission alone, uncertain pickup, or missing first-action evidence keeps the predecessor
-open with its pickup accountability. A side-workstream origin with remaining work stays open and continues
-its own goal.
+Apply `workflow:session`'s current-input `agent:close` assessment before any final reply, including failed or
+uncertain transfers. Terminal closure of the predecessor requires matching pickup, recorded first-action
+evidence, actual ownership release, and no other owned work or pending waits. Launcher submission alone,
+uncertain pickup, or missing first-action evidence keeps the predecessor open with its pickup accountability.
+A side-workstream origin with remaining work stays open and continues its own goal.
 
 ```text
 Input: matching successor pickup and first-action evidence; ownership released; no other work or waits.
-Route: invoke agent:close for current-session assessment and closure when that assessment permits it.
+Route: agent:close assessment before final; terminal closure is eligible when that assessment permits it.
 Input: the launcher submitted, but pickup is uncertain.
-Route: keep the predecessor open and reconcile the reserved attempt; no second successor or closure.
+Route: agent:close assessment before final; keep open and reconcile the reserved attempt, without relaunch.
 ```
 
 Existing runtime-managed ledgers retain `Transfer:`, `Transfer to:`, `Resume stage:`, and `Resume when:` and
