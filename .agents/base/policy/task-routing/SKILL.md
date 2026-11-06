@@ -9,7 +9,7 @@ domain: behavior
 
 Choose the qualified advertised owner for the request and preserve its existing goal and authority.
 
-1. Route planning or design-only work to `workflow:plan`; it grants no implementation authority.
+1. Route planning or design-only work to `workflow:plan` for its goal ownership and planning-context decision; it grants no implementation authority.
 2. Route authorized sustained or multiphase work to `workflow:run`, with or without a named plan. Keep the same goal through commits, phases and context changes.
 3. Route explicit reconstruction or resumption after interruption to `workflow:resume`; ordinary ongoing work stays with `workflow:run`.
 4. Route open-work and progress queries to `workflow:status`; route an explicit handoff to `workflow:handoff`. A prompt-only request does not launch a process.
@@ -19,8 +19,11 @@ Choose the qualified advertised owner for the request and preserve its existing 
 This establishes no scheduler, enforcement, authority, or continuation.
 
 ```text
-Request: plan the migration
-Route: workflow:plan. Produce the authorized planning artifact; do not implement migration files.
+Request: plan a migration while another goal is active
+Route: workflow:plan for the planning owner and context decision; planning-only authority.
+
+Request: revise that migration plan
+Route: workflow:plan for the existing goal; planning-only authority.
 
 Request: implement the migration through completion
 Route: workflow:run. Retain the current goal and continue authorized work through its acceptance condition.
