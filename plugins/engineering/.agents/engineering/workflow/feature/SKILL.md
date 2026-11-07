@@ -42,7 +42,9 @@ criteria. Update its progress and verified acceptance through that contract befo
 delivered PR alone does not close the item.
 
 1. Discover repository ownership, applicable standards, analogous implementations, dependencies, and test
-   impact. Parallelize only independent bounded reads.
+   impact. Parallelize only independent bounded reads. Before choosing how to build a reusable tool,
+   capability or technical mechanism, including one added to an existing repository, load
+   `base:solution-assessment` and apply it.
 2. Keep requirement interpretation, architecture, public contracts, data/security/migration implications,
    validation sufficiency, and final judgment with the parent.
 3. Implement directly. A `mechanical-worker` may receive only a disjoint transformation under an exclusive
