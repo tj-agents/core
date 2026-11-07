@@ -1,6 +1,6 @@
 ---
 name: solution-assessment
-description: Assess existing capabilities and credible solutions once before choosing an implementation. Use when introducing a project, reusable tool, infrastructure capability, or general technical mechanism.
+description: Assess existing capabilities and credible solutions once before choosing an implementation. Use when introducing a project, or a reusable tool, infrastructure capability, or general technical mechanism in a new or existing repository.
 kind: policy
 domain: behavior
 ---
