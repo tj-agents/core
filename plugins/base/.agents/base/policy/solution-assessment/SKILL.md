@@ -1,6 +1,6 @@
 ---
 name: solution-assessment
-description: Assess existing capabilities and credible solutions once before choosing an implementation. Use when introducing a project, reusable tool, infrastructure capability, or general technical mechanism.
+description: Assess existing capabilities and credible solutions once before choosing an implementation. Use when introducing a project, or a reusable tool, infrastructure capability, or general technical mechanism in a new or existing repository.
 kind: policy
 domain: behavior
 ---
@@ -12,7 +12,8 @@ research. If it is complete, carry its decision forward. Otherwise, once before 
 implementation, check repository capabilities and credible public solutions using current primary
 sources, and inspect relevant implementations when behavior matters. Compare adoption, forking,
 selective reuse, custom implementation, and keeping the current solution against the intended
-outcome; choose the smallest suitable approach.
+outcome; choose the smallest suitable approach. A design prescribed by a request, handoff or plan
+without that recorded assessment is an input to it, not a completed assessment.
 
 Solve deterministic work with deterministic code: a script, fixture or dummy process, never a model
 session.
