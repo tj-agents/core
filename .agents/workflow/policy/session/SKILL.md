@@ -86,12 +86,11 @@ remain prompt-only. Missing runtime capabilities must be reported accurately, no
 
 ## Finish the session
 
-Before any final reply, select `agent:close` and prepare its assessment of the current input. It owns
-the final-action ordering, keep-open requests and terminal closure. A new mistake callout is answered
-and corrected first; completion is then reassessed.
+Choose completion only when delivery, validation and any authorized handoff are finished. A merged PR,
+a Stop event or a question about a missed close-out does not by itself establish completion. A new
+mistake callout is answered and corrected first; completion is then reassessed.
 
 ```text
-Delivery and validation complete, no owned wait: apply agent:close before the final reply.
-Question or unfinished cleanup: prepare the assessment and keep closure unarmed.
+Delivery and validation complete, no owned wait: finish normally.
 User calls out a mistake: answer and correct the active task, then reassess completion.
 ```
