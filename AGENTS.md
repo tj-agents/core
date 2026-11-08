@@ -8,8 +8,12 @@ from elsewhere. Agent code reaches Core only as the staged, git-ignored `.agents
 
 Read `README.md` before changing repository structure.
 Personal applies only to explicitly adopted personal projects. GitHub ownership and permission to commit
-`tj-agents/company` plugin source repository and every worktree: never select or inject Personal there.
-Read the target repository's README.md and AGENTS.md before selecting its policy profiles.
+agent configuration do not establish personal scope. Tommy has explicitly adopted Personal for all
+`tj-agents` source repositories. A published profile's intended consumers do not redefine its source scope:
+`tj-agents/work` publishes generic local, Git-ignored employer-project assistance and
+`tj-agents/company` publishes employer-specific context, while actual employer projects remain outside
+Personal unless the user explicitly extends that scope. Read the target repository's README.md and AGENTS.md
+before selecting its policy profiles.
 Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts or hooks.
 Shipped code must run on Windows and Linux; follow
 [Supported platforms](CODE_CONVENTIONS.md#supported-platforms).
