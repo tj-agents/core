@@ -24,6 +24,18 @@
           }
         ]
       }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --compacted",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --compacted",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }
