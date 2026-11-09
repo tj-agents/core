@@ -2,6 +2,7 @@
   "schema_version": 1,
   "plugin": "tj-agents/engineering",
   "source_roots": [
+    ".agents/dependencies/agent/.agents/agent-store/runtime",
     ".agents/dependencies/agent/.agents/agent/runtime/repository_configuration.py",
     ".agents/dependencies/cli/.agents/cli/runtime",
     ".agents/engineering",
@@ -22,6 +23,7 @@
     ],
     "plugins": [
       "tj-agents/agent",
+      "tj-agents/agent-store",
       "tj-agents/base",
       "tj-agents/cli",
       "tj-agents/engineering",

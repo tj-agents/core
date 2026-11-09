@@ -92,11 +92,9 @@ def closure(root: Path, exports: list[str]) -> dict[str, bytes]:
         target = _safe(root, export, allow_missing=False)
         paths = target.rglob("*") if target.is_dir() else (target,)
         for path in sorted(paths):
-            if "__pycache__" in path.parts or path.suffix == ".pyc":
-                continue
             if is_reparse(path):
                 raise DeliveryError(f"runtime source contains a link: {path}")
-            if not path.is_file():
+            if not path.is_file() or "__pycache__" in path.parts or path.suffix == ".pyc":
                 continue
             name = path.relative_to(root).as_posix()
             alias = _key(name)
@@ -193,35 +191,14 @@ def _atomic(path: Path, body: bytes) -> None:
             temporary.unlink()
 
 
-def acquire_lock(path: Path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    stream = path.open("a+b")
-    try:
-        if os.name == "nt":
-            import msvcrt
-
-            stream.seek(0)
-            if not stream.read(1):
-                stream.write(b"0")
-                stream.flush()
-            stream.seek(0)
-            msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-
-            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        stream.close()
-        return None
-    return stream
-
-
 def _lock(root: Path):
+    import plugin_autoupdate
+
     path = root.parent / ".agent-runtime-delivery.lock"
     deadline = time.monotonic() + 30
     lock = None
     while lock is None and time.monotonic() < deadline:
-        lock = acquire_lock(path)
+        lock = plugin_autoupdate.acquire_lock(path)
         if lock is None:
             time.sleep(0.02)
     if lock is None:

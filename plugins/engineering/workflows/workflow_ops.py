@@ -1629,6 +1629,8 @@ def delivery_owner(root, workflow_run_id, ledger=None, pr_url=None):
     if ledger:
         provider = workflow_runtime.RepositoryStateProvider(root, workflow_runtime.WorkflowContract())
         state = provider.resolve(ledger, workflow_run_id, "delivery-preflight")
+        if provider.work_item_status(ledger) == "delivery-gated":
+            raise WorkflowOperationError("work item is delivery-gated and does not grant delivery authority")
         artifacts = state["artifacts"]
         new_slice = "pull_request" in artifacts and artifacts["pull_request"] is None
         if artifacts.get("pull_request"):

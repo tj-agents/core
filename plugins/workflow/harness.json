@@ -2,6 +2,7 @@
   "schema_version": 1,
   "plugin": "tj-agents/workflow",
   "source_roots": [
+    ".agents/dependencies/agent/.agents/agent-store/runtime",
     ".agents/dependencies/agent/.agents/agent/resources/lanes",
     ".agents/dependencies/cli/.agents/cli/runtime",
     ".agents/hooks/installed_skills.py",
@@ -23,6 +24,7 @@
     ],
     "plugins": [
       "tj-agents/agent",
+      "tj-agents/agent-store",
       "tj-agents/base",
       "tj-agents/cli",
       "tj-agents/workflow"
@@ -59,7 +61,7 @@
               "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
             ]
           ],
-          "justification": "Read work-item tracker state and supporting plans without changing them.",
+          "justification": "Read selected work-item state and supporting plans without creating or changing agent-store records.",
           "match": [
             [
               "python",

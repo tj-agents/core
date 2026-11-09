@@ -1,6 +1,5 @@
 import json
 import re
-import shutil
 import subprocess
 import importlib.util
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -10,14 +9,7 @@ from process_runtime import process
 
 CONTRACT_VERSION = "v2"
 IDENTITY_FIELDS = ("contract_version", "workflow_id", "workflow_run_id", "stage_id", "dispatch_id")
-WORK_ITEM_ACTIONS = {
-    "To Do": {"continue", "transfer", "pause"},
-    "In Progress": {"continue", "transfer", "pause"},
-    "In Review": {"continue", "transfer", "pause"},
-    "Blocked": {"block"},
-    "Done": {"complete"},
-}
-CLI_TIMEOUT_SECONDS = 60
+WORK_ITEM_STATUSES = ("proposed", "active", "delivery-gated", "blocked", "paused", "done")
 WORK_ITEM_SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 
 
@@ -537,78 +529,34 @@ def _read_only_git(root, *arguments):
         return None
 
 
-def _cli_json(root, *arguments):
-    executable = shutil.which(arguments[0])
-    if executable is None:
-        raise ContractViolation(f"work-item resolution requires {arguments[0]} on PATH")
-    command = " ".join(arguments[:2])
-    try:
-        completed = process.run(
-            [executable, *arguments[1:]],
-            cwd=str(root),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=CLI_TIMEOUT_SECONDS,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
-        raise ContractViolation(f"{command} failed: {error}") from error
-    if completed.returncode:
-        detail = (completed.stderr or completed.stdout).strip()
-        raise ContractViolation(f"{command} exited {completed.returncode}: {detail}")
-    try:
-        return json.loads(completed.stdout)
-    except ValueError as error:
-        raise ContractViolation(f"{command} printed invalid JSON") from error
+def _repository_identity(root):
+    package = Path(__file__).resolve().parent.parent
+    runtime = (package / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime"
+               if package.name == ".agents" else package / ".agents" / "agent-store" / "runtime")
+    path = runtime / "repository_identity.py"
+    if not path.is_file():
+        raise ContractViolation("work-item resolution requires the shipped repository identity helper")
+    spec = importlib.util.spec_from_file_location("workflow_repository_identity", path)
+    if spec is None or spec.loader is None:
+        raise ContractViolation("work-item resolution cannot load the shipped repository identity helper")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.repository_identity(root, _read_only_git)
 
 
-def _tracker_item(root, reference):
-    item = _cli_json(root, "tj", "item", "resolve", reference)
-    if not isinstance(item, dict) or not isinstance(item.get("ref"), str):
-        raise ContractViolation("tj item resolve returned no work-item ref")
-    if item.get("state") not in WORK_ITEM_ACTIONS:
-        raise ContractViolation(
-            f"tracker state {item.get('native_state')!r} of {item['ref']} has no canonical work-item state"
-        )
-    return item
-
-
-def _same_ref(left, right):
-    return isinstance(left, str) and left.casefold() == right.casefold()
-
-
-def _owner_session(root, ref):
-    document = _cli_json(root, "agent-store", "sessions", "--item", ref)
-    data = document.get("data") if isinstance(document, dict) and document.get("ok") is True else None
-    sessions = data.get("sessions") if isinstance(data, dict) else None
-    if not isinstance(sessions, list):
-        raise ContractViolation("agent-store sessions returned no session list")
-    owners = [
-        session for session in sessions
-        if isinstance(session, dict) and session.get("state") == "active" and any(
-            isinstance(link, dict) and link.get("role") == "owner"
-            and isinstance(link.get("item"), dict) and _same_ref(link["item"].get("ref"), ref)
-            for link in session.get("links") or []
-        )
-    ]
-    if len(owners) > 1:
-        raise ContractViolation(f"several live sessions own {ref}")
-    return owners[0] if owners else None
-
-
-def _owning_pull_request(root, ref, branch):
-    linked = _cli_json(root, "tj", "item", "prs", ref)
-    pulls = linked.get("prs") if isinstance(linked, dict) else None
-    if not isinstance(pulls, list):
-        raise ContractViolation("tj item prs returned no pull request list")
-    open_pulls = [pull for pull in pulls if isinstance(pull, dict) and pull.get("state") == "open" and pull.get("url")]
-    if len(open_pulls) > 1:
-        open_pulls = [pull for pull in open_pulls if pull.get("head") == branch]
-        if len(open_pulls) != 1:
-            raise ContractViolation(f"{ref} links several open pull requests and none uniquely uses {branch}")
-    return open_pulls[0]["url"] if open_pulls else None
+def _read_only_store_module():
+    package = Path(__file__).resolve().parent.parent
+    runtime = (package / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime"
+               if package.name == ".agents" else package / ".agents" / "agent-store" / "runtime")
+    path = runtime / "reader.py"
+    if not path.is_file():
+        raise ContractViolation("work-item resolution requires the shipped read-only store")
+    spec = importlib.util.spec_from_file_location("workflow_agent_store_reader", path)
+    if spec is None or spec.loader is None:
+        raise ContractViolation("work-item resolution cannot load the shipped read-only store")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _section(text, heading):
@@ -717,11 +665,26 @@ class RepositoryStateProvider:
         }
         return self.contract.validate("provider", record)
 
+    def work_item_status(self, ledger):
+        document = _work_item_document(self.root, ledger)
+        if document is None:
+            return None
+        _path, identifier, _roadmap = document
+        repository = _repository_identity(self.root)
+        if not repository:
+            raise ContractViolation("work-item resolution requires a repository identity")
+        reader = _read_only_store_module()
+        try:
+            row = reader.ReadOnlyWorkItemStore().work_item(f"{repository}:{identifier}")
+        except reader.StoreReadError as error:
+            raise ContractViolation(str(error)) from error
+        return row["status"]
+
     def _resolve_work_item(self, ledger, workflow_run_id, stage_id, document):
         ledger_path, identifier, roadmap = document
         text = ledger_path.read_text(encoding="utf-8")
         headers = _headers(text)
-        required = ("Worktree", "Branch", "Work item")
+        required = ("Worktree", "Branch")
         missing = [name for name in required if not headers.get(name)]
         if missing:
             raise ContractViolation(f"work-item README is missing headers {missing!r}")
@@ -760,11 +723,24 @@ class RepositoryStateProvider:
         action_steps = "\n".join(
             line for line in next_steps.splitlines() if not line.startswith(scope_prefixes)
         ).strip()
-        item = _tracker_item(self.root, headers["Work item"])
-        owner_record = _owner_session(self.root, item["ref"])
-        owner_worktree = owner_record and (owner_record.get("worktree") or owner_record.get("cwd"))
-        if owner_worktree and str(Path(owner_worktree).resolve()).casefold() != str(actual_worktree).casefold():
-            raise ContractViolation("session owner worktree does not match the work-item worktree")
+        repository = _repository_identity(self.root)
+        if not repository:
+            raise ContractViolation("work-item resolution requires a repository identity")
+        key = f"{repository}:{identifier}"
+        reader = _read_only_store_module()
+        try:
+            store = reader.ReadOnlyWorkItemStore()
+            item = store.work_item(key)
+            owner_record = store.owner(key)
+        except reader.StoreReadError as error:
+            raise ContractViolation(str(error)) from error
+        if owner_record:
+            if owner_record.get("repo") and owner_record["repo"].casefold() != repository.casefold():
+                raise ContractViolation("session owner repository does not match the work-item repository")
+            if owner_record.get("branch") and owner_record["branch"] != branch:
+                raise ContractViolation("session owner branch does not match the work-item branch")
+            if owner_record.get("cwd") and Path(owner_record["cwd"]).resolve() != actual_worktree:
+                raise ContractViolation("session owner worktree does not match the work-item worktree")
         next_kind = "continue"
         status = "active"
         transition_kind = "continue"
@@ -815,9 +791,17 @@ class RepositoryStateProvider:
             next_kind = "complete"
             status = "complete"
             transition_kind = "complete"
-        if next_kind not in WORK_ITEM_ACTIONS[item["state"]]:
+        expected_actions = {
+            "proposed": {"continue", "transfer"},
+            "active": {"continue", "transfer"},
+            "delivery-gated": {"continue", "transfer"},
+            "blocked": {"block"},
+            "paused": {"pause"},
+            "done": {"complete"},
+        }
+        if next_kind not in expected_actions[item["status"]]:
             raise ContractViolation(
-                f"work-item state {item['state']!r} conflicts with Next Steps action {next_kind!r}"
+                f"work-item status {item['status']!r} conflicts with Next Steps action {next_kind!r}"
             )
         reviews_text = _section(text, "Reviews")
         reviews = []
@@ -861,9 +845,10 @@ class RepositoryStateProvider:
         }
         if owner:
             state["next_action"]["owner"] = owner
-        if owner_record and owner_record.get("session"):
-            state["owner"]["session_id"] = owner_record["session"]
-        state["artifacts"]["pull_request"] = _owning_pull_request(self.root, item["ref"], branch)
+        if owner_record and owner_record.get("handle"):
+            state["owner"]["session_id"] = owner_record["handle"]
+        if "pr" in item:
+            state["artifacts"]["pull_request"] = item["pr"]
         if resume_condition:
             state["next_action"]["resume_condition"] = resume_condition
         if blocker:

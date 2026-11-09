@@ -164,15 +164,6 @@ It resolves the repository's recorded standing merge authorization against this 
 artifact described by `workflow:continue`'s software delivery reference. Enter the harness's
 `workflow:continue` skill to give that binding a continuation.
 
-When the PR delivers a tracked work item, move it to In Review after creating the PR:
-
-```bash
-tj item progress <work-item-ref> --state "In Review"
-```
-
-The repository's profile selects the tracker. Report the returned state; a tracker error (exit 3) never blocks
-the PR.
-
 ### 7. Report and continue
 
 For pending CI, invoke `agent:listen` with the bound monitor before reporting the wait.

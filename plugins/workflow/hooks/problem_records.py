@@ -14,6 +14,7 @@ if sys.version_info < (3, 9):
 
 CONFIG = ".problem-records.json"
 PROVIDER = re.compile(r"[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*")
+REFERENCE = re.compile(r"[a-z][a-z0-9+.-]*://[^\s]+")
 PERSONAL = {"schema_version": 1, "provider": "personal:work-item"}
 OPERATIONS = {"read": (), "create": ("create-work-item",), "address": ("address-work-item",)}
 
@@ -111,6 +112,35 @@ def operation_skill(root, operation, harness):
     if skill is None:
         raise RecordError(name + " is not installed")
     return {"primary": str(root), "provider": provider, "operation": name, "skill": str(skill)}
+
+
+def read_record(root, reference, harness):
+    root, provider = selected_provider(root)
+    if harness not in {"codex", "claude"} or not isinstance(reference, str) or not REFERENCE.fullmatch(reference):
+        raise RecordError("provider reads require the actual host and a canonical record URI")
+    skill = installed_skill(provider, harness)
+    if skill is None:
+        raise RecordError("selected problem-record provider is not installed")
+    skill_root = skill.parent.resolve()
+    reader = skill_root / "scripts/read_problem_record.py"
+    if not reader.is_file() or not reader.resolve().is_relative_to(skill_root):
+        raise RecordError("selected provider does not ship its record reader")
+    try:
+        result = process.run([sys.executable, "-B", str(reader), "--root", str(root), "--record", reference],
+                                capture_output=True, text=True, encoding="utf-8", timeout=15, check=False)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise RecordError("selected provider record read failed") from error
+    if result.returncode:
+        raise RecordError("selected provider could not read the canonical record")
+    try:
+        value = json.loads(result.stdout)
+    except ValueError as error:
+        raise RecordError("selected provider returned invalid JSON") from error
+    if not isinstance(value, dict) or set(value) != {"record", "kind", "state", "body"}:
+        raise RecordError("selected provider returned an invalid record shape")
+    if value["record"] != reference or not isinstance(value["kind"], str) or value["kind"] not in {"bug", "mistake", "debt"} or value["state"] != "open" or not isinstance(value["body"], str) or not value["body"].strip():
+        raise RecordError("selected provider returned an unrelated, closed or invalid problem record")
+    return value
 
 
 def main(argv=None):
