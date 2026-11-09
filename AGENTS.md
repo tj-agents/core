@@ -4,7 +4,8 @@ Core authors and publishes only the `base`, `workflow`, `engineering` and `docs`
 agent session belongs in `tj-agents/agent`, deterministic CLI and OS mechanics in `tj-agents/cli`, plugin
 generation and checks in `tj-agents/template`, and stack standards in their stack repository. Never author,
 copy or refactor another repository's package here; the generator rejects a scope the marketplace publishes
-from elsewhere. Agent code reaches Core only as the staged, git-ignored `.agents/dependencies/` export.
+from elsewhere. Agent code reaches Core only as the staged, git-ignored `.agents/dependencies/` export,
+pinned in `.agents/plugins/runtime-sources.json` and bumped only by a Renovate PR carrying `ci:full`.
 
 Read `README.md` before changing repository structure.
 Personal applies only to explicitly adopted personal projects. GitHub ownership and permission to commit
