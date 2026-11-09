@@ -113,10 +113,10 @@ goal digest, checkout, Git identity, harness and attempt. Matching acknowledgeme
 evidence are separate states. An interrupted launch becomes uncertain and cannot be retried blindly.
 The helper explicitly does not implement a general writer lease or prove host acceptance.
 
-The [Codex launcher](../../.agents/machine/utility/handoff-codex/scripts/launch_codex.py) selects a native
+The [Codex launcher](https://github.com/tj-agents/agent/blob/main/.agents/agent/resources/handoff/launch_codex.py) selects a native
 binary, resolves the requested model/effort, refreshes standards, launches through the terminal adapter
 and prints submission evidence. The
-[Claude launcher](../../.agents/machine/utility/handoff-claude/scripts/launch_claude.py) uses the same
+[Claude launcher](https://github.com/tj-agents/agent/blob/main/.agents/agent/resources/handoff/launch_claude.py) uses the same
 adapter. Ordinary transfers and side workstreams do not automatically acquire the critical-transfer
 receipt. Integration still depends on the agent following multiple procedure steps correctly.
 
