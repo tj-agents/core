@@ -17,6 +17,9 @@ import tempfile
 import threading
 import time
 
+from tj_agent.host import Host
+from tj_cli import process
+
 
 GITHUB_SOURCE = re.compile(
     r"(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)?"
@@ -44,24 +47,27 @@ def command(executable):
 
 
 def run(arguments, cwd, timeout=TIMEOUT):
-    return subprocess.run(
+    return process.run(
         arguments, cwd=cwd, check=True, capture_output=True,
         text=True, encoding="utf-8", timeout=timeout,
     ).stdout.strip()
 
 
 class AppServer:
-    def __init__(self, executable, cwd, launch_args=(), environment=None, timeout=TIMEOUT, existing=False):
+    def __init__(self, executable, cwd, launch_args=(), environment=None, timeout=TIMEOUT, existing=False,
+                 socket_path=None):
+        if socket_path is not None and not existing:
+            raise ValueError("An owned socket requires an existing native app server")
         if existing:
             from codex.websocket import WebSocketStdio
 
         self.timeout = timeout
-        self.process = subprocess.Popen(
-            [*command(executable), *launch_args, "app-server", *(["proxy"] if existing else [])], cwd=cwd,
+        self.process = process.start(
+            [*command(executable), *launch_args, "app-server", *(["proxy"] if existing else []),
+             *(["--sock", str(socket_path)] if socket_path is not None else [])], cwd=cwd,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=not existing, encoding=None if existing else "utf-8", bufsize=-1 if existing else 1,
             env=dict(os.environ, **(environment or {})),
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
         self.messages = queue.Queue()
         self.sequence = 0
@@ -207,7 +213,7 @@ def normalized_bytes(content):
 
 def committed_files(root, revision, relative, cwd):
     tree = revision if relative == "." else f"{revision}:{relative}"
-    archive = subprocess.run(
+    archive = process.run(
         ["git", "-C", str(root), "archive", "--format=tar", tree],
         cwd=cwd, check=True, capture_output=True, timeout=TIMEOUT,
     ).stdout
@@ -312,8 +318,7 @@ def required_definitions(root, identity):
         sources = ["hooks/hooks.json"] if (root / "hooks/hooks.json").is_file() else []
     if not isinstance(sources, list):
         sources = [sources]
-    profile = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
-    data = profile / "plugins/data" / identity.replace("@", "-")
+    data = Host.CODEX.configuration_root / "plugins/data" / identity.replace("@", "-")
     result = []
     for source in sources:
         if isinstance(source, str):
@@ -330,7 +335,8 @@ def required_definitions(root, identity):
                     native_kind = parts[0] + "".join(part.title() for part in parts[1:])
                     cmd = handler.get("commandWindows", handler.get("command")) if os.name == "nt" else handler.get("command")
                     if isinstance(cmd, str):
-                        for variable, value in (("PLUGIN_ROOT", root), ("CLAUDE_PLUGIN_ROOT", root),
+                        for variable, value in ((Host.CODEX.plugin_root_variable, root),
+                                                (Host.CLAUDE.plugin_root_variable, root),
                                                 ("PLUGIN_DATA", data), ("CLAUDE_PLUGIN_DATA", data)):
                             cmd = cmd.replace("${" + variable + "}", str(value))
                     result.append((event[0].lower() + event[1:], group.get("matcher"), native_kind, cmd))
@@ -393,7 +399,7 @@ def apply_trust(executable, cwd, preview=False, verified_roots=None, launch_args
         if not launch_args and not environment:
             inventory = json.loads(run([*command(executable), "plugin", "list", "--json"], cwd, limit))
         else:
-            completed = subprocess.run(
+            completed = process.run(
                 [*command(executable), *launch_args, "plugin", "list", "--json"], cwd=cwd,
                 env=dict(os.environ, **(environment or {})), check=True, capture_output=True,
                 text=True, encoding="utf-8", timeout=limit,
@@ -412,7 +418,7 @@ def apply_trust(executable, cwd, preview=False, verified_roots=None, launch_args
 
 
 def reload_running(executable, cwd, required, session_id=None, timeout=TIMEOUT):
-    identity = session_id or os.environ.get("CODEX_THREAD_ID")
+    identity = session_id or os.environ.get(Host.CODEX.session_variable)
     if not identity or not required:
         return
     deadline = time.monotonic() + timeout

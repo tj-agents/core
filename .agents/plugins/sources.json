@@ -234,11 +234,6 @@
     },
     {
       "plugin": "workflow",
-      "source": ".agents/dependencies/agent/.agents/agent/utility/peer/scripts",
-      "destination": ".agents/agent/utility/peer/scripts"
-    },
-    {
-      "plugin": "workflow",
       "source": ".agents/hooks/problem_records.py",
       "destination": "hooks/problem_records.py"
     },
