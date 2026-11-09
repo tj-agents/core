@@ -23,11 +23,10 @@ one authored owner and are covered by each package fingerprint. Runtime referenc
 another plugin or depend on the author checkout.
 
 ```json
-{"plugin":"workflow","source":".agents/dependencies/agent/.agents/agent-store/runtime","destination":".agents/agent-store/runtime"}
+{"plugin":"workflow","source":".agents/dependencies/agent/.agents/agent/resources/lanes","destination":".agents/lanes"}
 ```
 
-Workflow loads this embedded store implementation from its own package. Agent Store owns the source,
-schema and transaction contract.
+Workflow loads these embedded lane tables from its own package. Agent owns their source.
 
 Resolve shipped files relative to the installed skill or package. Scripts use `$PSScriptRoot`, their own
 file location, or an explicit package-root input. Instructions use `<skill-directory>`. They do not resolve

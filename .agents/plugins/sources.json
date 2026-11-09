@@ -218,11 +218,6 @@
       "destination": "schemas/standards-context.schema.json"
     },
     {
-      "plugin": "engineering",
-      "source": ".agents/dependencies/agent/.agents/agent-store/runtime",
-      "destination": ".agents/agent-store/runtime"
-    },
-    {
       "plugin": "workflow",
       "source": ".agents/dependencies/agent/.agents/agent/runtime/repository_configuration.py",
       "destination": "resources/agent/runtime/repository_configuration.py"
@@ -231,11 +226,6 @@
       "plugin": "engineering",
       "source": ".agents/dependencies/agent/.agents/agent/runtime/repository_configuration.py",
       "destination": "resources/agent/runtime/repository_configuration.py"
-    },
-    {
-      "plugin": "workflow",
-      "source": ".agents/dependencies/agent/.agents/agent-store/runtime",
-      "destination": ".agents/agent-store/runtime"
     },
     {
       "plugin": "workflow",
@@ -333,11 +323,6 @@
     "base": [],
     "workflow": [
       {
-        "id": "tj-agents/agent-store",
-        "marketplace": "tj-agents",
-        "repository": "tj-agents/agent"
-      },
-      {
         "id": "tj-agents/agent",
         "marketplace": "tj-agents",
         "repository": "tj-agents/agent"
@@ -349,11 +334,6 @@
       }
     ],
     "engineering": [
-      {
-        "id": "tj-agents/agent-store",
-        "marketplace": "tj-agents",
-        "repository": "tj-agents/agent"
-      },
       {
         "id": "tj-agents/agent",
         "marketplace": "tj-agents",
