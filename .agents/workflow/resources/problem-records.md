@@ -78,10 +78,10 @@ or concrete task. The profile maps that intent to its actual tracker types; Core
 remote schema. Recording never starts implementation. An explicit addressing request reuses the item's
 existing repair, feature or plan owner and the applicable engineering lifecycle.
 
-A read returns persisted details without creating an agent execution. When work begins, use Agent's
-shared session registry to associate the profile-verified qualified external reference with the existing
-execution and its agent sessions. Keep ownership, execution status and resume IDs in the original SQLite
-store; keep backlog content and acceptance evidence in the profile's remote tracker.
+A read returns persisted details without creating an agent execution. When work begins, `agent-store`
+links the profile-verified qualified external reference to the agent sessions working it. Keep session
+ownership and resume IDs in `agent-store`; keep backlog content, status and acceptance evidence in the
+profile's remote tracker.
 
 An invalid declaration or a missing, unavailable or offline profile blocks the record operation. Retain
 unsent facts in the active task or goal with the resolver and observable resume condition. Do not install
