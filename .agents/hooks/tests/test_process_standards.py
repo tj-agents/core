@@ -262,7 +262,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "scripts/worktree_sweep.py --repo <primary-checkout>",
             "`cleanup_proof.py` proves its PR merged at exactly its head",
             "archiving any leftovers under `<state>/merge-cleanup/set-aside/` first",
-            "while a registered session still works inside it",
+            "while an active `agent-store` launch still works inside it",
             "while an open PR is based on its branch",
             "removed by the sweep that runs once the session closes",
             "never force a removal",
@@ -284,7 +284,7 @@ class ProcessStandardsTests(unittest.TestCase):
             handoff,
         )
         self.assertIn("The predecessor must not perform it after launch", handoff)
-        self.assertIn("The successor waits for that marker before releasing the predecessor", cleanup)
+        self.assertIn("The successor waits for that marker and never stops the predecessor's session", cleanup)
         self.assertIn(
             "Run the filesystem operation from a verified surviving checkout after the predecessor "
             "no longer holds the old directory",

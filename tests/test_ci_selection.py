@@ -123,6 +123,24 @@ class AggregateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             CI.required_results(CI.plan("full", "requested"), results, "pull_request", ("ci:full",))
 
+    def test_red_default_branch_admits_only_a_pull_request_passing_the_full_verify(self):
+        results = ClassificationTests.results()
+        results["verify-windows"]["result"] = results["verify-linux"]["result"] = "skipped"
+        url = "https://github.com/tj-agents/core/actions/runs/1"
+        for conclusion in ("failure", "cancelled", "timed_out", None):
+            with self.subTest(conclusion=conclusion), self.assertRaisesRegex(ValueError, f"{url}.*ci:full"):
+                CI.required_results(CI.plan("docs", "prose"), results, "pull_request", (),
+                                    {"conclusion": conclusion, "url": url})
+        CI.required_results(CI.plan("docs", "prose"), results, "pull_request", (), {"conclusion": "success"})
+        CI.required_results(CI.plan("docs", "prose"), results, "pull_request", (), None)
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("docs", "prose"), results, "pull_request", (), ["failure"])
+        red = {"conclusion": "failure", "url": url}
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("full", "requested"), results, "pull_request", ("ci:full",), red)
+        results["verify-windows"]["result"] = results["verify-linux"]["result"] = "success"
+        CI.required_results(CI.plan("full", "requested"), results, "pull_request", ("ci:full",), red)
+
     def test_non_pr_event_cannot_accept_a_narrowed_plan(self):
         results = ClassificationTests.results()
         results["guard"]["result"] = "skipped"
@@ -277,6 +295,10 @@ class WorkflowWiringTests(unittest.TestCase):
                          {"select", "guard", "guidance-examples", "verify-windows", "verify-linux"})
         self.assertIn("CI_NEEDS: ${{ toJSON(needs) }}", jobs["ci-required"])
         self.assertIn("CI_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}", jobs["ci-required"])
+        self.assertIn("      actions: read\n", jobs["ci-required"])
+        self.assertIn("--workflow ci.yml --branch \"$DEFAULT_BRANCH\"", jobs["ci-required"])
+        self.assertIn("--event push --status completed --limit 1", jobs["ci-required"])
+        self.assertIn("CI_DEFAULT_BRANCH_RUN: ${{ steps.default-branch.outputs.run }}", jobs["ci-required"])
         self.assertIn("scripts/ci_selection.py required", jobs["ci-required"])
         self.assertNotRegex(workflow.split("jobs:\n", 1)[0], r"paths(?:-ignore)?:")
         self.assertNotIn("cancel-in-progress: true", workflow)

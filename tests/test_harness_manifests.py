@@ -21,7 +21,7 @@ RUNTIME_SCRIPTS = ROOT / ".agents/dependencies/agent/.agents/agent/runtime"
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 import harness_permissions  # noqa: E402
-import plugin_autoupdate  # noqa: E402
+import plugin_selection  # noqa: E402
 
 INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("workflow", "status.py"))
 HOST_ENTRY_SKILLS = {"engineering": "merge", "workflow": "status"}
@@ -123,13 +123,13 @@ class HarnessManifestTests(unittest.TestCase):
 
     def test_core_marketplace_identity_matches_plugin_selection(self):
         config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
-        self.assertEqual(plugin_autoupdate.MARKETPLACE_NAME, HARNESS.PACKAGES.core_marketplace(ROOT, config))
-        self.assertEqual(plugin_autoupdate.MARKETPLACE_REPOSITORY, HARNESS.DISTRIBUTION_REPOSITORY)
+        self.assertEqual(plugin_selection.MARKETPLACE_NAME, HARNESS.PACKAGES.core_marketplace(ROOT, config))
+        self.assertEqual(plugin_selection.MARKETPLACE_REPOSITORY, HARNESS.DISTRIBUTION_REPOSITORY)
         for path in (ROOT / ".agents/plugins/harness").glob("*.json"):
             with self.subTest(path=path.name):
                 manifest = json.loads(path.read_text(encoding="utf-8"))
-                self.assertEqual(f"{plugin_autoupdate.MARKETPLACE_NAME}/{path.stem}", manifest["plugin"])
-                self.assertEqual([{"id": plugin_autoupdate.MARKETPLACE_NAME, "repository": plugin_autoupdate.MARKETPLACE_REPOSITORY}],
+                self.assertEqual(f"{plugin_selection.MARKETPLACE_NAME}/{path.stem}", manifest["plugin"])
+                self.assertEqual([{"id": plugin_selection.MARKETPLACE_NAME, "repository": plugin_selection.MARKETPLACE_REPOSITORY}],
                                  manifest["requires"]["marketplaces"])
 
 
