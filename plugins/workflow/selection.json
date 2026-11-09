@@ -8,6 +8,11 @@
   ],
   "external_prerequisites": [
     {
+      "id": "tj-agents/agent-store",
+      "marketplace": "tj-agents",
+      "repository": "tj-agents/agent"
+    },
+    {
       "id": "tj-agents/agent",
       "marketplace": "tj-agents",
       "repository": "tj-agents/agent"
