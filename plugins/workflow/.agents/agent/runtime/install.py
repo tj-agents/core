@@ -22,6 +22,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from types import ModuleType
 from typing import Callable
 
@@ -29,28 +30,24 @@ RUNTIME = Path(__file__).resolve().parent
 ROOT = RUNTIME.parents[2]
 sys.path.insert(0, str(RUNTIME))
 
-from host import Host
-import launch_check
-import plugin_autoupdate
-import machine_events
-import event_service
+from tj_agent.host import Host
 import host_permissions
 import required_plugins
+import retired_machine_events
 import runtime_delivery
 import native_runtime
+import agent_store
 from tj_agent import content
+from tj_cli import process
 
 COMMAND_TIMEOUT_SECONDS = 60
 INSTALLER_TIMEOUT_SECONDS = 600
-TOPIC_REPOSITORY = "tj-agents/core"
 RUNTIME_EXPORTS = (
     ".agents/agent/runtime",
     ".agents/agent/resources",
     ".agents/agent/utility/plugins/scripts",
-    ".agents/agent/utility/peer/scripts",
-    ".agents/agent/utility/close/scripts",
-    ".agents/agent-store/runtime",
 )
+LIFECYCLE_COMMANDS = {"start": "tj_start.py", "status": "tj_status.py", "reload": "tj_reload.py"}
 PROFILE_START = "# >>> tj-agents >>>"
 PROFILE_END = "# <<< tj-agents <<<"
 PROFILE_BACKUP = ".pre-tj-agents.bak"
@@ -58,6 +55,90 @@ PROFILE_NAMES = ("WindowsPowerShell", "PowerShell")
 DEFAULT_GIT_BASH = r"C:\Program Files\Git\bin\bash.exe"
 HIDDEN_BASH_PROBE = ("-c", "printf HIDDEN_BASH_OK; exit 73")
 WINDOWS_ONLY = "Windows only: shell/ is the Windows PowerShell profile and its tools"
+
+
+def read_json(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def write_json(path: Path, value: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+            stream.write(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def load_toml(path: Path) -> dict:
+    try:
+        import tomllib
+    except ImportError:
+        return {}
+
+    try:
+        with path.open("rb") as stream:
+            return tomllib.load(stream)
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+
+
+def project_directories(config: dict, temporary: Path | None = None) -> list[Path]:
+    projects = config.get("projects", {})
+    if not isinstance(projects, dict):
+        return []
+    temporary = (temporary or Path(tempfile.gettempdir())).resolve()
+    return sorted({Path(path).resolve() for path, settings in projects.items()
+                   if isinstance(settings, dict) and settings.get("trust_level") == "trusted"
+                   and (Path(path) / ".codex/config.toml").is_file()
+                   and not Path(path).resolve().is_relative_to(temporary)})
+
+
+def declarations(config: dict) -> list[tuple[Path, dict]]:
+    found = [(Path.home(), config)]
+    user_file = (Host.CODEX.configuration_root / "config.toml").resolve()
+    for project in project_directories(config):
+        path = project / ".codex" / "config.toml"
+        if path.resolve() != user_file:
+            found.append((project, load_toml(path)))
+    return found
+
+
+def installed_plugin_roots(plugin: str, claude_config: Path, codex_config: dict) -> list[Path]:
+    roots = []
+    prefix = plugin + "@"
+    settings = read_json(claude_config / "settings.json").get("enabledPlugins")
+    installed = read_json(claude_config / "plugins" / "installed_plugins.json").get("plugins")
+    if isinstance(settings, dict) and isinstance(installed, dict):
+        for identity, on in settings.items():
+            entries = installed.get(identity)
+            if on is True and identity.startswith(prefix) and isinstance(entries, list):
+                roots.extend(Path(entry["installPath"]) for entry in entries
+                             if isinstance(entry, dict) and isinstance(entry.get("installPath"), str))
+    plugins = codex_config.get("plugins")
+    if isinstance(plugins, dict):
+        for identity, settings in plugins.items():
+            if identity.startswith(prefix) and isinstance(settings, dict) and settings.get("enabled") is True:
+                roots.append(Host.CODEX.configuration_root / "plugins" / "cache" / identity.split("@", 1)[1] / plugin / "local")
+    return roots
+
+
+def newest_existing(paths: list[Path]) -> Path | None:
+    existing = [path for path in paths if path.is_file()]
+    return max(existing, key=lambda path: path.stat().st_mtime) if existing else None
+
+
+def console_python() -> str:
+    executable = Path(sys.executable)
+    console = executable.with_name("python.exe")
+    return str(console) if executable.name.lower() == "pythonw.exe" and console.is_file() else sys.executable
 
 
 class InstallError(RuntimeError):
@@ -69,7 +150,7 @@ class Context:
     home: Path
     environ: dict
     windows: bool
-    run: Callable = subprocess.run
+    run: Callable = process.run
     which: Callable = shutil.which
     documents: Path | None = None
     user_environment: object = None
@@ -211,7 +292,7 @@ def profile_paths(context: Context) -> list[Path]:
             context.home / ".config" / "powershell" / "Microsoft.PowerShell_profile.ps1"]
 
 
-def powershell_block(python: str, script: Path, loader: Path | None, newline: str) -> str:
+def powershell_block(loader: Path | None, newline: str) -> str:
     def quoted(value: object) -> str:
         return "'" + str(value).replace("'", "''") + "'"
 
@@ -227,35 +308,11 @@ def powershell_block(python: str, script: Path, loader: Path | None, newline: st
             "if (Test-Path -LiteralPath $tjAgentsShell) { . $tjAgentsShell }",
             'else { Write-Host "profile: tj-agents missing at $tjAgentsShell" -ForegroundColor Red }',
         ]
-    for name in map(str, Host):
-        lines += [
-            f"function global:{name} {{",
-            f"    $tjAgentsTarget = Get-Command {name} -CommandType Application, ExternalScript"
-            " -ErrorAction SilentlyContinue | Select-Object -First 1",
-            f"    if (-not $tjAgentsTarget) {{ Write-Error '{name} was not found on PATH'; return }}",
-            f"    $tjAgentsBypass = $args -contains '{launch_check.BYPASS_FLAG}'",
-            f"    if (-not $tjAgentsBypass -and -not (Test-Path -LiteralPath {quoted(python)})) {{ Write-Warning 'tj-agents Python is unavailable; starting {name} without tj-agents'; $tjAgentsBypass = $true }}",
-            f"    if ($tjAgentsBypass) {{ & $tjAgentsTarget.Source @($args | Where-Object {{ $_ -ne '{launch_check.BYPASS_FLAG}' }}); return }}",
-            f"    try {{ $env:{launch_check.HOST_VARIABLE} = '{name}';"
-            f" & {quoted(python)} -I -B {quoted(script)} --host {name} --project (Get-Location).Path"
-            " --target $tjAgentsTarget.Source --require-session-start -- @args }"
-            f" finally {{ Remove-Item Env:{launch_check.HOST_VARIABLE} -ErrorAction SilentlyContinue }}",
-            "}",
-        ]
     return newline.join([*lines, PROFILE_END])
 
 
-def posix_block(python: str, script: Path) -> str:
-    def quoted(value: object) -> str:
-        return "'" + str(value).replace("'", "'\\''") + "'"
-
-    runtime_bin = script.parents[3] if len(script.parents) > 3 else script.parent
-    return "\n".join([PROFILE_START, f'export PATH={quoted(runtime_bin)}:"$PATH"', *(
-        f'{name}() {{ _tj_bypass=; for _tj_arg in "$@"; do shift; if [ "$_tj_arg" = {launch_check.BYPASS_FLAG} ]; then _tj_bypass=1; else set -- "$@" "$_tj_arg"; fi; done; '
-        f'if [ -z "$_tj_bypass" ] && [ ! -x {quoted(python)} ]; then printf "%s\\n" "tj-agents Python is unavailable; starting {name} without tj-agents" >&2; _tj_bypass=1; fi; '
-        f'if [ -n "$_tj_bypass" ]; then command {name} "$@"; return; fi; '
-        f'{launch_check.HOST_VARIABLE}={name} {quoted(python)} -I -B {quoted(script)} --host {name} --project "$PWD" --target "$(command -v {name})" --require-session-start -- "$@"; }}'
-        for name in map(str, Host)), PROFILE_END])
+def posix_block(runtime_bin: Path) -> str:
+    return "\n".join([PROFILE_START, f'export PATH={shlex.quote(str(runtime_bin))}:"$PATH"', PROFILE_END])
 
 
 def wired_profile(text: str, block: str, newline: str) -> str:
@@ -274,7 +331,7 @@ def wired_profile(text: str, block: str, newline: str) -> str:
     return result + text[cursor:]
 
 
-def shell_profile_updates(paths: list[Path], python: str, script: Path, loader: Path | None,
+def shell_profile_updates(paths: list[Path], runtime_bin: Path, loader: Path | None,
                           windows: bool) -> tuple[list[tuple[Path, str, str, bool]], list[str]]:
     targets = paths if windows else [path for path in paths if path.is_file()] or paths[:1]
     updates = []
@@ -289,10 +346,10 @@ def shell_profile_updates(paths: list[Path], python: str, script: Path, loader: 
         text, encoding, bom = current if current is not None else ("", "utf-8", windows and powershell)
         if powershell:
             newline = "\r\n" if "\r\n" in text or ("\n" not in text and windows) else "\n"
-            block = powershell_block(python, script, loader, newline)
+            block = powershell_block(loader, newline)
         else:
             newline = "\n"
-            block = posix_block(python, script)
+            block = posix_block(runtime_bin)
         wired = wired_profile(text, block, newline)
         if wired != text:
             updates.append((path, wired, encoding, bom))
@@ -305,13 +362,13 @@ def profile_loader(context: Context) -> Path | None:
     return context.state_directory / "bin" / ".agents/agent/resources/shell/profile.ps1"
 
 
-def launch_script(context: Context) -> Path:
-    return context.state_directory / "bin" / ".agents" / "agent" / "runtime" / "startup_binding.py"
+def runtime_bin(context: Context) -> Path:
+    return context.state_directory / "bin"
 
 
 def profile_updates(context: Context) -> tuple[list[tuple[Path, str, str, bool]], list[str]]:
-    return shell_profile_updates(profile_paths(context), plugin_autoupdate.console_python(), launch_script(context),
-                                 profile_loader(context), context.windows)
+    return shell_profile_updates(profile_paths(context), runtime_bin(context), profile_loader(context),
+                                 context.windows)
 
 
 def check_profile(context: Context) -> list[str]:
@@ -364,6 +421,29 @@ def hidden_bash_plan(context: Context) -> tuple[bool, dict[str, str]]:
     return stale, variables
 
 
+def global_git_config(context: Context) -> Path:
+    return context.path_from("GIT_CONFIG_GLOBAL", context.home / ".gitconfig")
+
+
+def git_longpaths(context: Context) -> bool:
+    result = context.run(["git", "config", "--file", str(global_git_config(context)), "--type=bool", "--get",
+                          "core.longpaths"], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                         timeout=30, check=False)
+    return result.returncode == 0 and result.stdout.strip() == "true"
+
+
+def check_git_longpaths(context: Context) -> list[str]:
+    return [] if git_longpaths(context) else [f"set core.longpaths in {global_git_config(context)}"]
+
+
+def apply_git_longpaths(context: Context) -> list[str]:
+    if git_longpaths(context):
+        return []
+    context.run(["git", "config", "--file", str(global_git_config(context)), "core.longpaths", "true"],
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30, check=True)
+    return [f"core.longpaths is true in {global_git_config(context)}"]
+
+
 def check_hidden_bash(context: Context) -> list[str]:
     stale, variables = hidden_bash_plan(context)
     return (["build shell/hidden-bash.exe"] if stale else []) + [f"set user {name}" for name in variables]
@@ -413,7 +493,7 @@ def build_hidden_bash(context: Context, real: str) -> None:
         if compiled.returncode or not build.is_file():
             raise InstallError(f"Failed to build {build}: {compiled.stderr.strip()}")
         probe = context.run([str(build), *HIDDEN_BASH_PROBE], capture_output=True, text=True, encoding="utf-8",
-                            errors="replace", timeout=10, check=False, creationflags=plugin_autoupdate.NO_WINDOW,
+                            errors="replace", timeout=10, check=False,
                             env={**context.environ, "TJ_AGENTS_REAL_GIT_BASH": real})
         if probe.returncode != 73 or probe.stdout != "HIDDEN_BASH_OK":
             raise InstallError("The hidden Bash proxy did not preserve Bash output and exit status")
@@ -438,7 +518,7 @@ def apply_hidden_bash(context: Context) -> list[str]:
 
 def run_installer(context: Context, command: list[str]) -> subprocess.CompletedProcess:
     return context.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       timeout=INSTALLER_TIMEOUT_SECONDS, check=False, creationflags=plugin_autoupdate.NO_WINDOW)
+                       timeout=INSTALLER_TIMEOUT_SECONDS, check=False)
 
 
 def output_lines(result: subprocess.CompletedProcess) -> list[str]:
@@ -446,10 +526,10 @@ def output_lines(result: subprocess.CompletedProcess) -> list[str]:
 
 
 def codex_agents_installer(context: Context) -> Path | None:
-    config = plugin_autoupdate.load_toml(context.codex_home / "config.toml")
-    roots = [root for _, declaration in plugin_autoupdate.declarations(config)
-             for root in plugin_autoupdate.installed_plugin_roots("engineering", context.claude_home, declaration)]
-    return plugin_autoupdate.newest_existing([root / "scripts" / "install-codex-agents.ps1" for root in roots])
+    config = load_toml(context.codex_home / "config.toml")
+    roots = [root for _, declaration in declarations(config)
+             for root in installed_plugin_roots("engineering", context.claude_home, declaration)]
+    return newest_existing([root / "scripts" / "install-codex-agents.ps1" for root in roots])
 
 
 def skip_codex_agents(context: Context) -> str | None:
@@ -509,103 +589,20 @@ def synchronize_permissions(context: Context, mode: str) -> list[str]:
 
 
 def enable_claude_autoupdate(config: Path, apply: bool = True) -> list[str]:
-    settings = plugin_autoupdate.read_json(config / "settings.json")
+    settings = read_json(config / "settings.json")
     enabled = settings.get("enabledPlugins")
     if not isinstance(enabled, dict):
         return []
     wanted = {identity.rsplit("@", 1)[1] for identity, on in enabled.items() if on is True and "@" in identity}
     path = config / "plugins" / "known_marketplaces.json"
-    known = plugin_autoupdate.read_json(path)
+    known = read_json(path)
     changed = sorted(name for name in wanted
                      if isinstance(known.get(name), dict) and known[name].get("autoUpdate") is not True)
     if changed and apply:
         for name in changed:
             known[name]["autoUpdate"] = True
-        plugin_autoupdate.write_json(path, known)
+        write_json(path, known)
     return changed
-
-
-def remote_topic(api: Callable) -> str | None:
-    values = api([f"repos/{TOPIC_REPOSITORY}/actions/variables?per_page=100"])
-    return next((item["value"] for item in values["variables"] if item["name"] == machine_events.TOPIC_VARIABLE), None)
-
-
-def configure_topic(directory: Path, api: Callable = machine_events.gh) -> str:
-    endpoint = f"repos/{TOPIC_REPOSITORY}/actions/variables"
-    remote = remote_topic(api)
-    saved = plugin_autoupdate.read_json(directory / "machine-events.json").get("topic")
-    topic = machine_events.topic_value(remote or saved or secrets.token_hex(24))
-    if not remote:
-        api(["--method", "POST", endpoint, "--input", "-"],
-            {"name": machine_events.TOPIC_VARIABLE, "value": topic})
-    if saved != topic:
-        plugin_autoupdate.write_json(directory / "machine-events.json", {"topic": topic})
-    return topic
-
-
-def set_topic_secret(repository: str, topic: str) -> None:
-    machine_events.github_cli(["secret", "set", machine_events.TOPIC_VARIABLE, "--repo", repository], input=topic)
-
-
-def configure_publishers(topic: str, repositories, api: Callable = machine_events.gh,
-                         secret: Callable = set_topic_secret, dry_run: bool = False) -> int:
-    changed = 0
-    for repository in repositories:
-        if repository.get("isArchived") or repository.get("isFork"):
-            continue
-        name = repository["nameWithOwner"]
-        if not machine_events.valid_repository(name):
-            raise ValueError("Unsupported publisher repository")
-        endpoint = f"repos/{name}/actions/variables"
-        values = api([endpoint + "?per_page=100"])
-        existing = next((item for item in values["variables"]
-                         if item["name"] == machine_events.TOPIC_VARIABLE), None)
-        different = existing is None or existing["value"] != topic
-        stored = api([f"repos/{name}/actions/secrets?per_page=100"])
-        saved = next((item for item in stored["secrets"]
-                      if item["name"] == machine_events.TOPIC_VARIABLE), None)
-        stale = bool(existing and saved and existing.get("updated_at", "") > saved.get("updated_at", ""))
-        if dry_run:
-            changed += int(different or saved is None or stale)
-            continue
-        if different:
-            if existing:
-                endpoint += "/" + machine_events.TOPIC_VARIABLE
-            api(["--method", "PATCH" if existing else "POST", endpoint, "--input", "-"],
-                {"name": machine_events.TOPIC_VARIABLE, "value": topic})
-        if different or saved is None or stale:
-            secret(name, topic)
-            changed += 1
-    return changed
-
-
-def publisher_repositories(context: Context) -> list:
-    if "repositories" not in context.cache:
-        context.cache["repositories"] = list(machine_events.catch_up_states(api=machine_events.gh))
-    return context.cache["repositories"]
-
-
-def check_channel(context: Context) -> list[str]:
-    directory = context.state_directory
-    remote = remote_topic(machine_events.gh)
-    saved = plugin_autoupdate.read_json(directory / "machine-events.json").get("topic")
-    pending = [] if remote else [f"create the UPDATE_TOPIC variable on {TOPIC_REPOSITORY}"]
-    if remote and saved != remote:
-        pending.append(f"save the shared topic in {directory / 'machine-events.json'}")
-    topic = remote or saved
-    if not topic:
-        return pending + ["configure the repository publishers"]
-    stale = configure_publishers(topic, publisher_repositories(context), api=machine_events.gh, dry_run=True)
-    if stale:
-        pending.append(f"configure {stale} repository publishers")
-    return pending
-
-
-def apply_channel(context: Context) -> list[str]:
-    topic = configure_topic(context.state_directory, api=machine_events.gh)
-    configured = configure_publishers(topic, publisher_repositories(context), api=machine_events.gh,
-                                      secret=set_topic_secret)
-    return [f"channel configured for {configured} repository publishers"]
 
 
 def check_autoupdate(context: Context) -> list[str]:
@@ -627,11 +624,10 @@ def runtime_receipt(root: Path) -> dict:
             "sha256": digest, "files": {name: hashlib.sha256(body).hexdigest() for name, body in contents.items()}}
 
 
-def install_runtime(directory: Path, root: Path) -> Path:
+def install_runtime(directory: Path, root: Path) -> None:
     errors = runtime_delivery.apply(directory, root, runtime_receipt(root))
     if errors:
         raise InstallError("; ".join(errors))
-    return directory / ".agents" / "agent" / "runtime" / "startup_binding.py"
 
 
 def check_runtime(context: Context) -> list[str]:
@@ -741,47 +737,49 @@ def apply_runtime(context: Context) -> list[str]:
     return [f"installed the Agent runtime in {directory}"]
 
 
-def stale_repositories(context: Context) -> list[str]:
-    state = plugin_autoupdate.read_json(context.state_directory / "machine-events-state.json")
-    stale = []
-    for current in publisher_repositories(context):
-        name = current.get("nameWithOwner")
-        branch = current.get("defaultBranchRef")
-        if current.get("isArchived") or current.get("isFork") or not branch or not machine_events.valid_repository(name):
-            continue
-        saved = state.get(name)
-        if not isinstance(saved, dict) or saved.get("revision") != branch["target"]["oid"]:
-            stale.append(name)
-    return stale
+def check_agent_store(context: Context) -> list[str]:
+    pending = agent_store.pending()
+    return [pending] if pending else []
 
 
-def check_catch_up(context: Context) -> list[str]:
-    return [f"catch up {name}" for name in stale_repositories(context)]
+def apply_agent_store(context: Context) -> list[str]:
+    return [f"installed agent-store {agent_store.install()} into {agent_store.executable().parent}"]
 
 
-def apply_catch_up(context: Context) -> list[str]:
+def command_shim(command: str, script: Path, windows: bool) -> tuple[str, str]:
+    python = console_python()
+    if windows:
+        return f"tj-{command}.cmd", f'@"{python}" -B "{script}" %*\r\n'
+    return f"tj-{command}", f'#!/bin/sh\nexec {shlex.quote(python)} -B {shlex.quote(str(script))} "$@"\n'
+
+
+def lifecycle_shims(context: Context) -> dict[Path, str]:
+    directory = agent_store.executable().parent
+    scripts = runtime_bin(context) / ".agents" / "agent" / "runtime"
+    shims = (command_shim(command, scripts / script, context.windows)
+             for command, script in LIFECYCLE_COMMANDS.items())
+    return {directory / name: text for name, text in shims}
+
+
+def check_lifecycle_commands(context: Context) -> list[str]:
+    return [f"write {path}" for path, text in lifecycle_shims(context).items()
+            if not path.is_file() or path.read_text(encoding="utf-8") != text]
+
+
+def apply_lifecycle_commands(context: Context) -> list[str]:
     changes = []
-    try:
-        if launch_check.mark_current():
-            changes.append("launch checks start from the newest published event")
-    except (OSError, ValueError) as error:
-        changes.append(f"event channel unreachable ({type(error).__name__}); the first launch replays recent events")
-    if machine_events.main([]):
-        raise InstallError("catch-up left failures; see machine-events.log")
-    return changes + ["plugins are current"]
-
-
-def check_preconditions(context: Context) -> list[str]:
-    machine_events.require_tommy(api=machine_events.gh)
-    return []
+    for path, text in lifecycle_shims(context).items():
+        if path.is_file() and path.read_text(encoding="utf-8") == text:
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8", newline="")
+        path.chmod(0o755)
+        changes.append(f"wrote {path}")
+    return changes
 
 
 def windows_only(context: Context) -> str | None:
     return None if context.windows else WINDOWS_ONLY
-
-
-def nothing(context: Context) -> list[str]:
-    return []
 
 
 def codex_config_path(context: Context) -> Path:
@@ -819,7 +817,7 @@ def plugin_setup_executables(context: Context) -> dict[Host, str | None]:
 
 
 def check_plugin_setup(context: Context) -> list[str]:
-    if native_runtime.missing():
+    if native_runtime.pending():
         return check_native_cli(context)
     return required_plugins.check_setup(plugin_setup_project(context), tuple(Host), plugin_setup_executables(context))
 
@@ -831,28 +829,10 @@ def apply_plugin_setup(context: Context) -> list[str]:
     return []
 
 
-def background_receipt(context: Context) -> dict:
-    return event_service.receipt(context.state_directory, context.claude_home, context.codex_home,
-                                 context.environ.get("PATH", os.defpath))
-
-
-def check_background(context: Context) -> list[str]:
-    pending = event_service.check(context)
-    if plugin_autoupdate.read_json(context.state_directory / "machine-events-service.json") != background_receipt(context):
-        pending.append("record machine-event supervisor installation")
-    return pending
-
-
-def apply_background(context: Context) -> list[str]:
-    pending = event_service.apply(context)
-    plugin_autoupdate.write_json(context.state_directory / "machine-events-service.json", background_receipt(context))
-    return pending + ["machine-event supervisor installation verified"]
-
-
 def check_native_cli(context: Context) -> list[str]:
-    absent = native_runtime.missing()
-    if absent:
-        return ["install native CLI binaries: " + ", ".join(absent)]
+    pending = native_runtime.pending()
+    if pending:
+        return ["install or update native CLI binaries: " + ", ".join(pending)]
     return []
 
 
@@ -863,20 +843,19 @@ def apply_native_cli(context: Context) -> list[str]:
 
 
 STEPS = (
-    Step("preconditions", check_preconditions, nothing, required=True),
-    Step("native CLI", check_native_cli, apply_native_cli),
+    Step("Git long paths", check_git_longpaths, apply_git_longpaths, windows_only),
+    Step("native CLI", check_native_cli, apply_native_cli, required=True),
     Step("native permission defaults", check_native_permissions, apply_native_permissions),
-    Step("event channel and publishers", check_channel, apply_channel),
     Step("Claude marketplace auto-update", check_autoupdate, apply_autoupdate),
+    Step("agent-store CLI", check_agent_store, apply_agent_store),
     Step("launch-check runtime", check_runtime, apply_runtime),
+    Step("tj lifecycle commands", check_lifecycle_commands, apply_lifecycle_commands),
     Step("shell profiles", check_profile, apply_profile),
     Step("hidden Git Bash for Claude", check_hidden_bash, apply_hidden_bash, windows_only),
     Step("Codex profile agents", check_codex_agents, apply_codex_agents, skip_codex_agents),
-    Step("plugin catch-up", check_catch_up, apply_catch_up),
     Step("harness permissions", lambda context: synchronize_permissions(context, "check"),
          lambda context: synchronize_permissions(context, "apply")),
     Step("plugin setup", check_plugin_setup, apply_plugin_setup),
-    Step("background machine events", check_background, apply_background),
 )
 
 
@@ -887,14 +866,9 @@ def run_steps(steps, context: Context, check_only: bool, out=sys.stdout, err=sys
     failed_steps = set()
     for step in steps:
         if "native CLI" in failed_steps:
-            print(f"n/a    {step.name}: native CLI prerequisite failed", file=out)
+            print(f"n/a    {step.name}: native CLI prerequisite unavailable", file=out)
             continue
-        if step.name == "background machine events" and failed_steps & {
-                "event channel and publishers", "launch-check runtime", "plugin catch-up",
-                "harness permissions", "plugin setup"}:
-            print("n/a    background machine events: prerequisite install step failed", file=out)
-            continue
-        if step.name == "plugin setup" and failed_steps & {"plugin catch-up", "harness permissions"}:
+        if step.name == "plugin setup" and failed_steps & {"harness permissions"}:
             print("n/a    plugin setup: prerequisite install step failed", file=out)
             continue
         try:
@@ -908,6 +882,8 @@ def run_steps(steps, context: Context, check_only: bool, out=sys.stdout, err=sys
                 continue
             if check_only:
                 drift = True
+                if step.name == "native CLI":
+                    failed_steps.add(step.name)
                 for item in pending:
                     print(f"drift  {step.name}: {item}", file=out)
                 continue
@@ -926,14 +902,10 @@ def run_steps(steps, context: Context, check_only: bool, out=sys.stdout, err=sys
 
 def selected_steps(names: set[str]) -> tuple[Step, ...]:
     selected = set(names)
-    if "background machine events" in selected:
-        selected.update({"launch-check runtime", "event channel and publishers"})
-    if "shell profiles" in selected:
+    if selected & {"shell profiles", "tj lifecycle commands"}:
         selected.add("launch-check runtime")
     if "plugin setup" in selected:
-        selected.update({"plugin catch-up", "harness permissions"})
-    if selected & {"plugin setup", "plugin catch-up", "background machine events"}:
-        selected.add("native CLI")
+        selected.add("harness permissions")
     return tuple(step for step in STEPS if not selected or step.required or step.name in selected)
 
 
@@ -974,11 +946,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--step", action="append", choices=[step.name for step in STEPS],
                         help="run named steps with their dependencies and required preconditions; repeat to select several")
     parsed = parser.parse_args(arguments)
-    native_runtime.prepare_git_environment()
     context = machine_context()
     context.onboard = parsed.onboard
     native_runtime.expose()
     context.environ["PATH"] = native_runtime.search_path(context.environ.get("PATH", os.defpath))
+    if not parsed.check:
+        for removed in retired_machine_events.remove(context.state_directory, windows=context.windows,
+                                                     home=context.home):
+            print(f"apply  retired machine events: removed {removed}")
     return run_steps(selected_steps(set(parsed.step or ())), context, parsed.check)
 
 

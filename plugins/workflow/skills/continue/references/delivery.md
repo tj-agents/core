@@ -25,13 +25,13 @@ without waiting for it or refreshing its PR. It rejects overlap with an owned de
 This validates the current declared record; scope evidence references do not independently prove authority.
 An external owner does not waive acceptance: when the requested outcome requires that work, keep the
 unmet criterion in `acceptance` and its action in `open_tasks`. Do not add independent future work to the
-current goal's acceptance merely to retain it. A successful completion check proceeds to the session's
-`agent:close` decision; independent follow-up alone is no reason to keep the frontend open.
+current goal's acceptance merely to retain it. A successful completion check means the delivery may be
+reported complete; independent follow-up alone is no reason to keep the frontend open.
 
 ```text
 User requests reviewed parser PRs; both are merged and verified.
 Another owner retains a separate dashboard PR: record it in follow_up with that ownership evidence.
-Result: the parser delivery may complete and enter agent:close.
+Result: the parser delivery may be reported complete.
 User instead requests the working dashboard: its missing acceptance still blocks completion,
 even when another owner is implementing it.
 ```
