@@ -787,17 +787,12 @@ def accept_codex(
     expected_context=CONTEXT_PROBE,
 ):
     install_codex_plugins(executable, marketplace, project, environment, timeout)
+    runtime = root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime"
+    if str(runtime) not in sys.path:
+        sys.path.insert(0, str(runtime))
     trust = load_module(
         "native_acceptance_trust",
-        root
-        / ".agents"
-        / "dependencies"
-        / "agent"
-        / ".agents"
-        / "agent"
-        / "runtime"
-        / "codex"
-        / "hook_trust.py",
+        runtime / "codex" / "hook_trust.py",
     )
     with AppServer(executable, project, environment, timeout) as server:
         hooks = server.request("hooks/list", {"cwds": [str(project)]})
