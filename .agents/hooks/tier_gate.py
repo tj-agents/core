@@ -43,7 +43,7 @@ from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from host_cli import plugin_inventory_command
 from selected_standards import (
-    INJECTION_CHARACTERS,
+    HOOK_CONTEXT_CHARACTERS,
     AgentIdentity,
     InjectionLedger,
     PluginSelection,
@@ -1621,7 +1621,7 @@ def path_standards(path: str, cwd: str) -> list[Standard]:
     return list(standards.values())
 
 
-def write_standards(payload: dict[str, object], state_directory: Path) -> str:
+def write_standards(payload: dict[str, object], state_directory: Path, limit: int) -> str:
     standards: dict[str, Standard] = {}
     notes: list[str] = []
     for path in tool_paths(payload):
@@ -1641,7 +1641,7 @@ def write_standards(payload: dict[str, object], state_directory: Path) -> str:
     if not pending:
         return "\n\n".join(notes)
     try:
-        injection = compose_injection(pending, INJECTION_CHARACTERS)
+        injection = compose_injection(pending, limit - len("\n\n".join(["", *notes])))
     except OSError as error:
         return "\n\n".join([*notes, f"Stack standards could not be read: {error}"])
     sections = [injection.text, *notes]
@@ -1679,7 +1679,8 @@ def _typed_tool_context(payload: object, state_directory: Path) -> str:
         if isinstance(context, str) and context and context not in contexts:
             contexts.append(context)
     if _text(payload.get("tool_name")) in WRITE_TOOLS:
-        standards = write_standards(payload, state_directory)
+        remaining = HOOK_CONTEXT_CHARACTERS - len("\n\n".join([*contexts, ""]))
+        standards = write_standards(payload, state_directory, remaining)
         if standards:
             contexts.append(standards)
     return "\n\n".join(contexts) or "Resolve target paths with tier_gate.py --path before applying standards."

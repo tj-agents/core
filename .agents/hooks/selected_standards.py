@@ -20,7 +20,10 @@ FRONT_MATTER = re.compile(
 )
 LEDGER_DIRECTORY = "standards-injection"
 LEDGER_RETENTION_SECONDS = 7 * 24 * 60 * 60
-INJECTION_CHARACTERS = 40_000
+# Claude Code inlines at most 10,000 characters of one hook's additionalContext and
+# saves anything longer to a file the model only sees a preview of; Codex's limit is
+# raised in the hook manifest to carry the same text.
+HOOK_CONTEXT_CHARACTERS = 10_000
 INJECTION_HEADER = (
     "Stack standards selected by this repository's `.agents/plugins.json` for the "
     "file being written. They govern this write and every later change to that "
@@ -187,29 +190,36 @@ class Injection:
 
 
 def compose_injection(standards: Sequence[Standard], limit: int) -> Injection:
+    separator = "\n\n"
+    budget = (
+        limit
+        - len(INJECTION_HEADER)
+        - len(separator)
+        - len(_deferral_note(standards, limit))
+    )
     blocks: list[str] = []
     delivered: list[str] = []
     deferred: list[Standard] = []
-    size = 0
     for standard in standards:
-        if deferred:
-            deferred.append(standard)
-            continue
         block = (
             f'<standard name="{standard.name}" source="{standard.path}">\n'
             f"{standard.body()}\n</standard>"
         )
-        if blocks and size + len(block) > limit:
+        if len(separator) + len(block) > budget:
             deferred.append(standard)
             continue
         blocks.append(block)
         delivered.append(standard.name)
-        size += len(block)
+        budget -= len(separator) + len(block)
     sections = [INJECTION_HEADER, *blocks]
     if deferred:
-        names = ", ".join(f"`{item.name}` ({item.path})" for item in deferred)
-        sections.append(
-            f"Deferred by the {limit}-character injection bound and injected on "
-            f"later writes; read one now when this change depends on it: {names}."
-        )
-    return Injection(tuple(delivered), "\n\n".join(sections))
+        sections.append(_deferral_note(deferred, limit))
+    return Injection(tuple(delivered), separator.join(sections))
+
+
+def _deferral_note(standards: Sequence[Standard], limit: int) -> str:
+    names = ", ".join(f"`{item.name}`" for item in standards)
+    return (
+        f"Deferred by the {limit}-character hook context bound and injected on later "
+        f"writes; load one now as a skill when this change depends on it: {names}."
+    )

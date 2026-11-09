@@ -13,7 +13,7 @@ from types import ModuleType
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-LARGE = 25_000
+LARGE = 6_000
 
 
 def _load_gate() -> ModuleType:
@@ -324,9 +324,69 @@ def test_size_bound_injects_the_most_specific_first_and_names_the_rest(
         ["actions:workflows"],
         [],
     ]
-    deferred = writes[0].split("Deferred by the 40000-character injection bound")[1]
+    deferred = writes[0].split("character hook context bound")[1]
     assert deferred.index("`python:extras`") < deferred.index("`actions:workflows`")
-    assert len(writes[0]) < gate.INJECTION_CHARACTERS + 2 * len(deferred) + 1_000
+    assert max(len(context) for context in writes) <= selected.HOOK_CONTEXT_CHARACTERS
+
+
+def test_an_oversized_standard_is_named_without_blocking_smaller_ones(
+    tmp_path: Path, state: Path, cache: PluginCache
+) -> None:
+    oversized = selected.HOOK_CONTEXT_CHARACTERS + 1
+    cache.install(
+        "python",
+        PYTHON,
+        [Skill("errors", "E" * oversized), Skill("style", "Small style body.")],
+    )
+    repository = _repository(tmp_path / "oversized", "tommy", ["python@market"])
+    target = repository / "src" / "app.py"
+
+    writes = [gate.tool_context(_write(target), state) for _ in range(2)]
+
+    assert [_injected(context) for context in writes] == [["python:style"], []]
+    assert all("`python:errors`" in context for context in writes)
+    assert max(len(context) for context in writes) <= selected.HOOK_CONTEXT_CHARACTERS
+
+
+@pytest.mark.parametrize(
+    "sizes", [(1,), (9_000,), (4_000, 4_000, 4_000), (12_000, 10, 3_000)]
+)
+def test_an_injection_never_exceeds_its_limit(
+    tmp_path: Path, sizes: tuple[int, ...]
+) -> None:
+    standards = []
+    for index, size in enumerate(sizes):
+        path = tmp_path / f"standard-{index}.md"
+        path.write_text("x" * size, encoding="utf-8")
+        standards.append(
+            selected.Standard(f"stack:standard-{index}", "stack", path, "core")
+        )
+
+    injection = selected.compose_injection(standards, selected.HOOK_CONTEXT_CHARACTERS)
+
+    assert len(injection.text) <= selected.HOOK_CONTEXT_CHARACTERS
+
+
+def test_codex_inlines_at_least_the_hook_context_bound() -> None:
+    manifest = json.loads(
+        (ROOT / ".agents/plugins/manifests/codex/base-hooks.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    handlers = [
+        handler
+        for entry in manifest["hooks"]["PreToolUse"]
+        for handler in entry["hooks"]
+        if "--tool-context" in handler["command"]
+    ]
+    worst_case_characters_per_token = 2
+
+    assert handlers
+    assert all(
+        handler["additionalContextLimit"] * worst_case_characters_per_token
+        >= selected.HOOK_CONTEXT_CHARACTERS
+        for handler in handlers
+    )
 
 
 def test_matching_tier_is_injected_before_other_stack_tiers(
