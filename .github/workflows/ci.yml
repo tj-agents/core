@@ -294,15 +294,29 @@ jobs:
     if: always()
     needs: [select, guard, guidance-examples, verify-windows, verify-linux]
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - id: default-branch
+        name: read the default branch's latest completed CI run
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch "$DEFAULT_BRANCH" \
+            --event push --status completed --limit 1 --json conclusion,url --jq '.[0]')
+          echo "run=${run:-null}" >> "$GITHUB_OUTPUT"
       - name: require every selected validation job
         env:
           CI_SELECTION: ${{ needs.select.outputs.plan }}
           CI_NEEDS: ${{ toJSON(needs) }}
           CI_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          CI_DEFAULT_BRANCH_RUN: ${{ steps.default-branch.outputs.run }}
         run: python3 -B scripts/ci_selection.py required
 
   regenerate:
