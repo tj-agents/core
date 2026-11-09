@@ -1,9 +1,7 @@
 import hashlib
-import importlib.util
 import json
 import os
 import shutil
-import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -29,15 +27,11 @@ from workflow_runtime import (
     select_state_provider,
 )
 import workflow_runtime
-READER_SPEC = importlib.util.spec_from_file_location(
-    "agent_store_reader", ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "reader.py"
-)
-READER = importlib.util.module_from_spec(READER_SPEC)
-READER_SPEC.loader.exec_module(READER)
-ReadOnlyWorkItemStore = READER.ReadOnlyWorkItemStore
-StoreReadError = READER.StoreReadError
 from host_runtime import HostAdapterRegistry, WriterLeaseRegistry
 from fixtures.lane_expectations import authored_skill
+from fixtures import fake_cli
+
+TRACKED = "github:github.com/example/runtime:9"
 
 
 def powershell_hosts():
@@ -1936,7 +1930,7 @@ class RepositoryProviderTests(unittest.TestCase):
         self.contract = WorkflowContract(WORKFLOWS)
         self.provider = RepositoryStateProvider(self.root, self.contract)
 
-    def write_work_item(self, next_steps="Continue the local implementation."):
+    def write_work_item(self, next_steps="Continue the local implementation.", reference="#9"):
         feature = self.root / "plans" / "features" / "runtime-bridge"
         document = feature / "work-items" / "readme-reader" / "README.md"
         document.parent.mkdir(parents=True, exist_ok=True)
@@ -1944,11 +1938,13 @@ class RepositoryProviderTests(unittest.TestCase):
             "# Runtime bridge\n\n- [ ] `runtime-bridge/readme-reader`\n",
             encoding="utf-8",
         )
+        declaration = f"- Work item: `{reference}`\n" if reference else ""
         document.write_text(
             "# README reader\n\n"
             f"- Worktree: `{self.root}`\n"
-            "- Branch: `Feature/provider-fixture`\n\n"
-            "## Decisions\n\n- SQLite is authoritative for status and ownership.\n\n"
+            "- Branch: `Feature/provider-fixture`\n"
+            f"{declaration}\n"
+            "## Decisions\n\n- The tracker is authoritative for state.\n\n"
             "## Reviews\n\n- `reviews/runtime.md`\n\n"
             "## Next Steps\n\n"
             f"{next_steps}\n"
@@ -1960,55 +1956,30 @@ class RepositoryProviderTests(unittest.TestCase):
         )
         return document
 
-    def write_session_store(self, status, owner=None, pr=None, schema_version=4):
-        state = self.root / "state"
-        state.mkdir(exist_ok=True)
-        database = state / "sessions.db"
-        if database.exists():
-            database.unlink()
-        connection = sqlite3.connect(database)
-        connection.executescript(
-            "CREATE TABLE work_items (key TEXT PRIMARY KEY, repo TEXT NOT NULL, feature TEXT NOT NULL, "
-            "item TEXT NOT NULL, status TEXT NOT NULL, branch TEXT, pr TEXT, updated_at REAL);"
-            "CREATE TABLE sessions (handle TEXT PRIMARY KEY, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, "
-            "role TEXT, ended_at REAL);"
-            "CREATE TABLE work_item_references (provider TEXT, scope TEXT, native_id TEXT, work_item TEXT);"
-        )
-        connection.execute(f"PRAGMA user_version = {schema_version}")
-        key = "github.com/example/runtime:runtime-bridge/readme-reader"
-        connection.execute(
-            "INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (key, "github.com/example/runtime", "runtime-bridge", "readme-reader", status,
-             "Feature/provider-fixture", pr, 0),
-        )
-        if owner:
-            connection.execute(
-                "INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (owner.get("handle", "codex:owner"), owner.get("repo"), owner.get("branch"),
-                 owner.get("cwd"), key, "owner", None),
-            )
-        connection.commit()
-        connection.close()
-        return state
+    def fake_clis(self, state="In Progress", prs=(), sessions=(), **overrides):
+        tools = Path(tempfile.mkdtemp(prefix="fake clis ", dir=self.temp.name))
+        item = {"ref": TRACKED, "title": "README reader", "url": "https://github.com/example/runtime/issues/9",
+                "state": state, "native_state": state or "Triage", "kind": "task", "assignees": []}
+        responses = {
+            "tj item resolve #9": {"stdout": item},
+            f"tj item prs {TRACKED}": {"stdout": {"ref": TRACKED, "prs": list(prs), "all_merged": False}},
+            f"agent-store sessions --item {TRACKED}": {"stdout": {
+                "ok": True, "schema_version": 1,
+                "data": {"item": {"ref": TRACKED}, "sessions": list(sessions)},
+            }},
+            **overrides,
+        }
+        installed = fake_cli.install(tools, responses)
+        self.enterContext(fake_cli.environment({**installed, "PATH": str(tools) + os.pathsep + os.environ["PATH"]}))
+        return installed
 
-    def write_session_store_with_writer(self, status):
-        path = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
-        spec = importlib.util.spec_from_file_location("workflow_contract_session_store", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        state = self.root / "writer-state"
-        with module.SessionStore(state / "sessions.db") as store:
-            repository = module.identify_repository(self.root)
-            key = module.work_item_key(repository, "runtime-bridge", "readme-reader")
-            store.upsert_work_item(
-                key,
-                repository,
-                "runtime-bridge",
-                "readme-reader",
-                status=status,
-                branch="Feature/provider-fixture",
-            )
-        return state
+    def resolve_work_item(self, document, run="readme"):
+        return self.provider.resolve(document.relative_to(self.root).as_posix(), run, "implementation")
+
+    def owner(self, worktree, state="active", role="owner", ref=TRACKED, handle="codex:owner"):
+        return {"session": handle, "host": "codex", "native_id": "owner", "cwd": str(worktree),
+                "worktree": str(worktree), "state": state,
+                "links": [{"item": {"ref": ref}, "role": role, "linked_at": "2026-11-08T00:00:00Z"}]}
 
     def test_repository_provider_resolves_portable_state_and_git_identity(self):
         self.assertEqual("available", self.provider.probe()["status"])
@@ -2027,217 +1998,81 @@ class RepositoryProviderTests(unittest.TestCase):
         )
         self.assertIs(state, self.provider.validate_checkpoint(state))
 
-    def test_work_item_readme_uses_read_only_store_status_and_artifacts(self):
+    def test_work_item_readme_reads_tracker_state_owner_and_pull_request(self):
         document = self.write_work_item()
-        state_root = self.write_session_store("active", pr="https://github.com/example/runtime/pull/9")
-        before = (state_root / "sessions.db").read_bytes()
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
-            state = self.provider.resolve(
-                document.relative_to(self.root).as_posix(), "readme", "implementation"
-            )
-        after = (state_root / "sessions.db").read_bytes()
+        url = "https://github.com/example/runtime/pull/9"
+        installed = self.fake_clis(
+            prs=[{"url": url, "state": "open", "head": "Feature/provider-fixture", "title": "runtime"},
+                 {"url": "https://github.com/example/runtime/pull/3", "state": "merged", "head": "Feature/old"}],
+            sessions=[self.owner(self.root)],
+        )
+
+        state = self.resolve_work_item(document)
 
         self.assertEqual("runtime-bridge/readme-reader", state["workflow_id"])
         self.assertEqual(document.relative_to(self.root).as_posix(), state["artifacts"]["plan"])
         self.assertEqual(state["artifacts"]["plan"], state["artifacts"]["ledger"])
         self.assertEqual("plans/features/runtime-bridge/README.md", state["artifacts"]["roadmap"])
-        self.assertEqual("https://github.com/example/runtime/pull/9", state["artifacts"]["pull_request"])
-        self.assertEqual(["SQLite is authoritative for status and ownership."], state["decisions"])
+        self.assertEqual(url, state["artifacts"]["pull_request"])
+        self.assertEqual("codex:owner", state["owner"]["session_id"])
+        self.assertEqual(["The tracker is authoritative for state."], state["decisions"])
         self.assertEqual(["reviews/runtime.md#BUG1", "reviews/runtime.md#NAT1"], state["open_findings"])
-        self.assertEqual(before, after)
-
-    def test_read_only_work_item_store_accepts_v4_and_refuses_invalid_stores_without_writes(self):
-        state = self.root / "v4-store-reader-state"
-        state.mkdir()
-        database = state / "sessions.db"
-        source = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
-        spec = importlib.util.spec_from_file_location("workflow_contract_v4_session_store", source)
-        session_store = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(session_store)
-        key = "github.com/example/runtime:runtime-bridge/readme-reader"
-        connection = sqlite3.connect(database)
-        connection.executescript(session_store.WORK_ITEMS_SCHEMA)
-        connection.executescript(session_store.SESSIONS_SCHEMA)
-        connection.executescript(session_store.WORK_ITEM_REFERENCES_SCHEMA)
-        connection.execute("PRAGMA user_version = 4")
-        connection.execute(
-            "INSERT INTO work_items "
-            "(key, repo, feature, item, status, branch, pr, title, plan_path, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                key,
-                "github.com/example/runtime",
-                "runtime-bridge",
-                "readme-reader",
-                "active",
-                "Feature/provider-fixture",
-                None,
-                "Read the v4 work item",
-                "plans/features/runtime-bridge/work-items/readme-reader/README.md",
-                0,
-            ),
+        self.assertEqual(
+            ["tj item resolve #9", f"agent-store sessions --item {TRACKED}", f"tj item prs {TRACKED}"],
+            [call["command"] for call in fake_cli.calls(installed)],
         )
-        connection.commit()
-        connection.close()
+        self.assertEqual({self.root}, {Path(call["cwd"]).resolve() for call in fake_cli.calls(installed)})
 
-        before = database.read_bytes()
-        self.assertEqual("active", ReadOnlyWorkItemStore(database).work_item(key)["status"])
-        self.assertEqual(before, database.read_bytes())
-
-        missing = state / "missing.db"
-        with self.assertRaisesRegex(StoreReadError, "does not exist"):
-            ReadOnlyWorkItemStore(missing).work_item(key)
-        self.assertFalse(missing.exists())
-
-        malformed = state / "malformed.db"
-        connection = sqlite3.connect(malformed)
-        connection.executescript(
-            "CREATE TABLE work_items (key TEXT, status TEXT, title TEXT, plan_path TEXT);"
-            "CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, "
-            "role TEXT, ended_at REAL);"
-            "PRAGMA user_version = 4;"
-        )
-        connection.commit()
-        connection.close()
-        before = malformed.read_bytes()
-        with self.assertRaisesRegex(StoreReadError, "missing required columns"):
-            ReadOnlyWorkItemStore(malformed).work_item(key)
-        self.assertEqual(before, malformed.read_bytes())
-
-        connection = sqlite3.connect(database)
-        connection.execute("PRAGMA user_version = 5")
-        connection.commit()
-        connection.close()
-        before = database.read_bytes()
-        with self.assertRaisesRegex(StoreReadError, "unsupported schema version 5"):
-            ReadOnlyWorkItemStore(database).work_item(key)
-        self.assertEqual(before, database.read_bytes())
-
-    def test_read_only_work_item_store_accepts_v4_references_and_execution_keys_without_writes(self):
-        state = self.root / "v4-reader-state"
-        state.mkdir()
-        database = state / "sessions.db"
-        execution_key = "execution:1d7b92d5-23a4-4dd4-b5f4-7ba249d4d5be"
-        legacy_key = "github.com/example/runtime:runtime-bridge/readme-reader"
-        connection = sqlite3.connect(database)
-        connection.executescript(
-            "CREATE TABLE work_items ("
-            "key TEXT PRIMARY KEY, repo TEXT NOT NULL, feature TEXT, item TEXT, status TEXT NOT NULL, "
-            "branch TEXT, pr TEXT, title TEXT, plan_path TEXT, updated_at REAL);"
-            "CREATE TABLE work_item_references ("
-            "provider TEXT NOT NULL, scope TEXT NOT NULL, native_id TEXT NOT NULL, "
-            "work_item TEXT NOT NULL REFERENCES work_items(key), "
-            "PRIMARY KEY (provider, scope, native_id));"
-            "CREATE TABLE sessions ("
-            "handle TEXT PRIMARY KEY, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);"
-            "PRAGMA user_version = 4;"
-        )
-        connection.execute(
-            "INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                execution_key,
-                "github.com/example/runtime",
-                None,
-                None,
-                "active",
-                "Feature/provider-fixture",
-                None,
-                "Native execution",
-                None,
-                0,
-            ),
-        )
-        connection.execute(
-            "INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                legacy_key,
-                "github.com/example/runtime",
-                "runtime-bridge",
-                "readme-reader",
-                "active",
-                "Feature/provider-fixture",
-                None,
-                "Legacy local work item",
-                "plans/features/runtime-bridge/work-items/readme-reader/README.md",
-                0,
-            ),
-        )
-        connection.execute(
-            "INSERT INTO work_item_references VALUES (?, ?, ?, ?)",
-            ("github", "github.com/example/runtime", "42", execution_key),
-        )
-        connection.execute(
-            "INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (
-                "codex:owner",
-                "github.com/example/runtime",
-                "Feature/provider-fixture",
-                str(self.root),
-                execution_key,
-                "owner",
-                None,
-            ),
-        )
-        connection.commit()
-        connection.close()
-
-        before = database.read_bytes()
-        store = ReadOnlyWorkItemStore(database)
-        self.assertEqual("active", store.work_item(execution_key)["status"])
-        self.assertEqual("active", store.work_item(legacy_key)["status"])
-        self.assertEqual("codex:owner", store.owner(execution_key)["handle"])
-        self.assertEqual(before, database.read_bytes())
-
-    def test_read_only_work_item_store_rejects_incomplete_v4_reference_table_without_writes(self):
-        state = self.root / "invalid-v4-reader-state"
-        state.mkdir()
-        database = state / "sessions.db"
-        connection = sqlite3.connect(database)
-        connection.executescript(
-            "CREATE TABLE work_items (key TEXT, status TEXT, pr TEXT);"
-            "CREATE TABLE work_item_references (provider TEXT, scope TEXT, work_item TEXT);"
-            "CREATE TABLE sessions ("
-            "handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);"
-            "PRAGMA user_version = 4;"
-        )
-        connection.commit()
-        connection.close()
-
-        before = database.read_bytes()
-        with self.assertRaisesRegex(StoreReadError, "missing required columns.*native_id"):
-            ReadOnlyWorkItemStore(database).work_item("execution:missing-reference-column")
-        self.assertEqual(before, database.read_bytes())
-
-    def test_work_item_readme_preserves_a_registered_null_pull_request(self):
+    def test_work_item_without_an_open_linked_pull_request_is_a_new_slice(self):
         document = self.write_work_item()
-        state_root = self.write_session_store("active")
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
-            state = self.provider.resolve(
-                document.relative_to(self.root).as_posix(), "readme", "implementation"
-            )
+        self.fake_clis(prs=[{"url": "https://github.com/example/runtime/pull/3", "state": "closed", "head": "x"}])
+        state = self.resolve_work_item(document)
         self.assertIn("pull_request", state["artifacts"])
         self.assertIsNone(state["artifacts"]["pull_request"])
 
-    def test_work_item_identity_matches_writer_without_a_normalized_origin(self):
+    def test_several_open_linked_pull_requests_resolve_to_this_branch_or_refuse(self):
         document = self.write_work_item()
-        relative = document.relative_to(self.root).as_posix()
-        for origin in (None, "../local-origin"):
-            with self.subTest(origin=origin):
-                if origin is None:
-                    subprocess.run(["git", "-C", str(self.root), "remote", "remove", "origin"], check=True)
-                else:
-                    subprocess.run(
-                        ["git", "-C", str(self.root), "remote", "add", "origin", origin], check=True
-                    )
-                state_root = self.write_session_store_with_writer("active")
-                with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
-                    self.assertEqual("active", self.provider.work_item_status(relative))
-                    self.assertEqual(
-                        "runtime-bridge/readme-reader",
-                        self.provider.resolve(relative, "readme", "implementation")["workflow_id"],
-                    )
-                if origin is not None:
-                    subprocess.run(["git", "-C", str(self.root), "remote", "remove", "origin"], check=True)
+        prs = [{"url": "https://github.com/example/runtime/pull/9", "state": "open", "head": "Feature/provider-fixture"},
+               {"url": "https://github.com/example/runtime/pull/10", "state": "open", "head": "Feature/other"}]
+        self.fake_clis(prs=prs)
+        self.assertEqual("https://github.com/example/runtime/pull/9", self.resolve_work_item(document)["artifacts"]["pull_request"])
+        self.fake_clis(prs=[{**pull, "head": "Feature/other"} for pull in prs])
+        with self.assertRaisesRegex(ContractViolation, "several open pull requests"):
+            self.resolve_work_item(document, "ambiguous")
+
+    def test_work_item_readme_requires_a_tracker_reference(self):
+        document = self.write_work_item(reference=None)
+        installed = self.fake_clis()
+        with self.assertRaisesRegex(ContractViolation, "Work item"):
+            self.resolve_work_item(document)
+        self.assertEqual([], fake_cli.calls(installed))
+
+    def test_tracker_and_store_failures_are_contract_violations(self):
+        document = self.write_work_item()
+        cases = {
+            "issue 9 not found": {"tj item resolve #9": {"stderr": '{"error": "issue 9 not found"}', "code": 3}},
+            "printed invalid JSON": {"tj item resolve #9": {"stdout": "not json"}},
+            "no canonical work-item state": {"tj item resolve #9": {"stdout": {"ref": TRACKED, "state": None,
+                                                                             "native_state": "Triage"}}},
+            "storage": {f"agent-store sessions --item {TRACKED}": {"stdout": {
+                "ok": False, "schema_version": 1, "error": {"code": "storage", "message": "locked"}}, "code": 5}},
+            "returned no session list": {f"agent-store sessions --item {TRACKED}": {"stdout": {
+                "ok": True, "schema_version": 1, "data": {}}}},
+            "returned no pull request list": {f"tj item prs {TRACKED}": {"stdout": {"ref": TRACKED}}},
+        }
+        for reason, overrides in cases.items():
+            with self.subTest(reason=reason):
+                self.fake_clis(**overrides)
+                with self.assertRaisesRegex(ContractViolation, reason):
+                    self.resolve_work_item(document, "failure")
+
+    def test_missing_cli_is_a_contract_violation(self):
+        document = self.write_work_item()
+        which = shutil.which
+        with mock.patch.object(workflow_runtime.shutil, "which",
+                               side_effect=lambda name, *rest: None if name == "tj" else which(name, *rest)):
+            with self.assertRaisesRegex(ContractViolation, "requires tj on PATH"):
+                self.resolve_work_item(document)
 
     def test_read_only_git_uses_utf8_replacement_decoding(self):
         completed = subprocess.CompletedProcess([], 0, "github.com/example/runtime", "")
@@ -2249,166 +2084,44 @@ class RepositoryProviderTests(unittest.TestCase):
         self.assertEqual("utf-8", run.call_args.kwargs["encoding"])
         self.assertEqual("replace", run.call_args.kwargs["errors"])
 
-    def test_originless_non_ascii_linked_worktree_matches_writer_and_provider(self):
-        primary = self.root / "repository-\u00e9"
-        subprocess.run(["git", "clone", "-q", str(self.root), str(primary)], check=True)
-        subprocess.run(["git", "-C", str(primary), "remote", "remove", "origin"], check=True)
-        linked = self.root / "linked-\u00e9"
-        subprocess.run(
-            ["git", "-C", str(primary), "worktree", "add", "-q", "-b", "Feature/provider-linked", str(linked)],
-            check=True,
-        )
-        self.addCleanup(
-            subprocess.run,
-            ["git", "-C", str(primary), "worktree", "remove", "--force", str(linked)],
-            check=False,
-        )
-        feature = linked / "plans" / "features" / "runtime-bridge"
-        document = feature / "work-items" / "readme-reader" / "README.md"
-        document.parent.mkdir(parents=True)
-        (feature / "README.md").write_text(
-            "# Runtime bridge\n\n- [ ] `runtime-bridge/readme-reader`\n",
-            encoding="utf-8",
-        )
-        document.write_text(
-            "# README reader\n\n"
-            f"- Worktree: `{linked}`\n"
-            "- Branch: `Feature/provider-linked`\n\n"
-            "## Decisions\n\n- SQLite is authoritative.\n\n"
-            "## Next Steps\n\n"
-            "Continue the local implementation.\n"
-            "Scope: whole plan remains incomplete.\n"
-            "Current slice: resolve the runtime work item.\n"
-            "Remaining scope: review and delivery remain.\n"
-            "Done when: the runtime work item is verified.\n",
-            encoding="utf-8",
-        )
-        path = ROOT / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime" / "session_store.py"
-        spec = importlib.util.spec_from_file_location("linked_worktree_session_store", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        state = linked / "state"
-        with module.SessionStore(state / "sessions.db") as store:
-            repository = module.identify_repository(linked)
-            store.upsert_work_item(
-                module.work_item_key(repository, "runtime-bridge", "readme-reader"),
-                repository,
-                "runtime-bridge",
-                "readme-reader",
-                status="active",
-                branch="Feature/provider-linked",
-            )
-        provider = RepositoryStateProvider(linked, WorkflowContract(WORKFLOWS))
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
-            self.assertEqual(
-                "active",
-                provider.work_item_status(document.relative_to(linked).as_posix()),
-            )
-
-    def test_work_item_store_rejects_incomplete_or_conflicting_rows_and_query_errors(self):
-        document = self.write_work_item()
-        state = self.root / "malformed-state"
-        state.mkdir()
-        database = state / "sessions.db"
-        connection = sqlite3.connect(database)
-        connection.executescript(
-            "CREATE TABLE work_items (key TEXT, status TEXT);"
-            "CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);"
-            "CREATE TABLE work_item_references (provider TEXT, scope TEXT, native_id TEXT, work_item TEXT);"
-            "PRAGMA user_version = 4;"
-        )
-        connection.close()
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
-            with self.assertRaisesRegex(ContractViolation, "missing required columns"):
-                self.provider.resolve(document.relative_to(self.root).as_posix(), "schema", "implementation")
-
-        connection = sqlite3.connect(database)
-        connection.executescript(
-            "DROP TABLE work_items;"
-            "CREATE TABLE work_items (key TEXT, status TEXT, pr TEXT);"
-        )
-        key = "github.com/example/runtime:runtime-bridge/readme-reader"
-        connection.executemany(
-            "INSERT INTO work_items VALUES (?, 'active', NULL)", [(key,), (key,)]
-        )
-        connection.commit()
-        connection.close()
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
-            with self.assertRaisesRegex(ContractViolation, "conflicting registered rows"):
-                self.provider.resolve(document.relative_to(self.root).as_posix(), "duplicates", "implementation")
-
-        store = ReadOnlyWorkItemStore(database)
-        broken = mock.Mock()
-        broken.execute.side_effect = sqlite3.OperationalError("query failure")
-        with mock.patch.object(store, "_connection", return_value=broken):
-            with self.assertRaisesRegex(StoreReadError, "query failed"):
-                store.work_item(key)
-        broken.close.assert_called_once()
-
-    def test_work_item_statuses_require_matching_actions(self):
+    def test_work_item_states_require_matching_actions(self):
         cases = {
-            "proposed": "Continue the local implementation.",
-            "active": "Continue the local implementation.",
-            "delivery-gated": "Transfer: local work is complete\nTransfer to: delivery owner\nResume stage: delivery\nResume when: delivery authority is recorded",
-            "blocked": "Blocked: a dependency is unavailable\nBlocked by: dependency owner\nUnblock action: restore the dependency\nResume when: the dependency is available",
-            "paused": "Paused: waiting for a decision",
-            "done": "Complete",
+            "To Do": "Continue the local implementation.",
+            "In Progress": "Transfer: local work is complete\nTransfer to: delivery owner\nResume stage: delivery\nResume when: delivery authority is recorded",
+            "In Review": "Paused: waiting for a decision",
+            "Blocked": "Blocked: a dependency is unavailable\nBlocked by: dependency owner\nUnblock action: restore the dependency\nResume when: the dependency is available",
+            "Done": "Complete",
         }
-        for status, next_steps in cases.items():
-            with self.subTest(status=status):
+        expected = {"In Review": "paused", "Blocked": "blocked", "Done": "complete"}
+        for tracker_state, next_steps in cases.items():
+            with self.subTest(state=tracker_state):
                 document = self.write_work_item(next_steps)
-                state_root = self.write_session_store(status)
-                with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
-                    state = self.provider.resolve(document.relative_to(self.root).as_posix(), status, "implementation")
-                self.assertEqual({"blocked": "blocked", "paused": "paused", "done": "complete"}.get(status, "active"), state["status"])
+                self.fake_clis(tracker_state)
+                state = self.resolve_work_item(document, "states")
+                self.assertEqual(expected.get(tracker_state, "active"), state["status"])
         document = self.write_work_item("Paused: release owner — waiting for the release.")
-        state_root = self.write_session_store("paused")
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
-            state = self.provider.resolve(document.relative_to(self.root).as_posix(), "paused-owner", "implementation")
-        self.assertEqual("release owner", state["next_action"]["owner"])
-        document = self.write_work_item("Blocked: incorrect\nBlocked by: owner\nUnblock action: fix it\nResume when: fixed")
-        state_root = self.write_session_store("active")
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
-            with self.assertRaisesRegex(ContractViolation, "conflicts"):
-                self.provider.resolve(document.relative_to(self.root).as_posix(), "mismatch", "implementation")
+        self.fake_clis("In Progress")
+        self.assertEqual("release owner", self.resolve_work_item(document, "paused-owner")["next_action"]["owner"])
+        for tracker_state, next_steps in (("In Progress", "Blocked: incorrect\nBlocked by: owner\nUnblock action: fix it\nResume when: fixed"),
+                                          ("Done", "Continue the local implementation."),
+                                          ("In Progress", "Complete")):
+            with self.subTest(mismatch=tracker_state):
+                document = self.write_work_item(next_steps)
+                self.fake_clis(tracker_state)
+                with self.assertRaisesRegex(ContractViolation, "conflicts"):
+                    self.resolve_work_item(document, "mismatch")
 
-    def test_work_item_store_rejects_missing_corrupt_and_wrong_schema(self):
+    def test_work_item_owner_is_optional_and_a_live_owner_must_use_this_worktree(self):
         document = self.write_work_item()
-        missing = self.root / "missing-state"
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(missing)}):
-            with self.assertRaisesRegex(ContractViolation, "does not exist"):
-                self.provider.resolve(document.relative_to(self.root).as_posix(), "missing", "implementation")
-        corrupt = self.root / "corrupt-state"
-        corrupt.mkdir()
-        (corrupt / "sessions.db").write_text("not sqlite", encoding="utf-8")
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(corrupt)}):
-            with self.assertRaisesRegex(ContractViolation, "cannot be read"):
-                self.provider.resolve(document.relative_to(self.root).as_posix(), "corrupt", "implementation")
-        old = self.write_session_store("active", schema_version=1)
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(old)}):
-            with self.assertRaisesRegex(ContractViolation, "schema version"):
-                self.provider.resolve(document.relative_to(self.root).as_posix(), "schema", "implementation")
-
-    def test_work_item_owner_is_optional_and_present_identity_is_checked(self):
-        document = self.write_work_item()
-        state_root = self.write_session_store("active")
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
-            state = self.provider.resolve(document.relative_to(self.root).as_posix(), "optional", "implementation")
-        self.assertNotIn("session_id", state["owner"])
-        state_root = self.write_session_store(
-            "active",
-            {"handle": "codex:owner", "repo": "github.com/example/runtime", "branch": "Feature/provider-fixture", "cwd": str(self.root)},
-        )
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
-            state = self.provider.resolve(document.relative_to(self.root).as_posix(), "owner", "implementation")
-        self.assertEqual("codex:owner", state["owner"]["session_id"])
-        state_root = self.write_session_store(
-            "active",
-            {"repo": "github.com/example/runtime", "branch": "Feature/other", "cwd": str(self.root)},
-        )
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
-            with self.assertRaisesRegex(ContractViolation, "owner branch"):
-                self.provider.resolve(document.relative_to(self.root).as_posix(), "conflict", "implementation")
+        self.fake_clis(sessions=[self.owner(self.root, state="ended"), self.owner(self.root, role="observer"),
+                                 self.owner(self.root, ref="github:github.com/example/runtime:8")])
+        self.assertNotIn("session_id", self.resolve_work_item(document, "optional")["owner"])
+        self.fake_clis(sessions=[self.owner(self.root / "other")])
+        with self.assertRaisesRegex(ContractViolation, "owner worktree"):
+            self.resolve_work_item(document, "conflict")
+        self.fake_clis(sessions=[self.owner(self.root), self.owner(self.root, handle="claude:second")])
+        with self.assertRaisesRegex(ContractViolation, "several live sessions"):
+            self.resolve_work_item(document, "contested")
 
     def test_repository_provider_rejects_stale_worktree_identity(self):
         text = self.ledger.read_text(encoding="utf-8")

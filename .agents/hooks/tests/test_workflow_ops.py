@@ -3,7 +3,6 @@ import hashlib
 import json
 import os
 import shutil
-import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -25,6 +24,8 @@ def load_operations():
 
 
 ops = load_operations()
+sys.path.insert(0, str(Path(__file__).resolve().parent / "fixtures"))
+import fake_cli  # noqa: E402
 
 
 class WindowsSharingRetryTests(unittest.TestCase):
@@ -1067,16 +1068,7 @@ class DeliveryOwnershipTests(RepositoryFixture):
         self.assertEqual("view", self.forge_commands[0][2])
         self.assertEqual(1, len(self.forge_commands))
 
-    def test_delivery_gated_work_item_cannot_supply_delivery_authority(self):
-        provider = mock.Mock()
-        provider.resolve.return_value = {"artifacts": {"pull_request": None}}
-        provider.work_item_status.return_value = "delivery-gated"
-        with mock.patch.object(ops.workflow_runtime, "RepositoryStateProvider", return_value=provider):
-            with self.assertRaisesRegex(ops.WorkflowOperationError, "delivery-gated"):
-                ops.delivery_owner(self.root, "delivery-gated", "plans/features/runtime-bridge/work-items/readme-reader/README.md")
-        self.assertEqual([], self.forge_commands)
-
-    def test_real_work_item_with_null_pull_request_can_create_a_review(self):
+    def test_real_work_item_without_an_open_linked_pull_request_can_create_a_review(self):
         feature = self.root / "plans" / "features" / "runtime-bridge"
         document = feature / "work-items" / "readme-reader" / "README.md"
         document.parent.mkdir(parents=True)
@@ -1087,7 +1079,8 @@ class DeliveryOwnershipTests(RepositoryFixture):
         document.write_text(
             "# README reader\n\n"
             f"- Worktree: `{self.root}`\n"
-            "- Branch: `Feature/Workflow-ops`\n\n"
+            "- Branch: `Feature/Workflow-ops`\n"
+            "- Work item: `#12`\n\n"
             "## Decisions\n\n- State is authoritative.\n\n"
             "## Next Steps\n\n"
             "Continue the local implementation.\n"
@@ -1097,25 +1090,17 @@ class DeliveryOwnershipTests(RepositoryFixture):
             "Done when: the runtime work item is verified.\n",
             encoding="utf-8",
         )
-        state = self.root / "state"
-        state.mkdir()
-        database = state / "sessions.db"
-        connection = sqlite3.connect(database)
-        try:
-            connection.executescript(
-                "CREATE TABLE work_items (key TEXT PRIMARY KEY, status TEXT, pr TEXT);"
-                "CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);"
-                "CREATE TABLE work_item_references (provider TEXT, scope TEXT, native_id TEXT, work_item TEXT);"
-                "PRAGMA user_version = 4;"
-            )
-            connection.execute(
-                "INSERT INTO work_items VALUES (?, 'active', NULL)",
-                ("github.com/example/workflow-fixture:runtime-bridge/readme-reader",),
-            )
-            connection.commit()
-        finally:
-            connection.close()
-        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
+        tools = Path(tempfile.mkdtemp(prefix="fake clis "))
+        self.addCleanup(shutil.rmtree, tools, True)
+        tracked = "github:github.com/example/workflow-fixture:12"
+        installed = fake_cli.install(tools, {
+            "tj item resolve #12": {"stdout": {"ref": tracked, "state": "In Progress",
+                                               "native_state": "In Progress", "kind": "task"}},
+            f"tj item prs {tracked}": {"stdout": {"ref": tracked, "prs": [], "all_merged": False}},
+            f"agent-store sessions --item {tracked}": {"stdout": {
+                "ok": True, "schema_version": 1, "data": {"sessions": []}}},
+        })
+        with fake_cli.environment({**installed, "PATH": str(tools) + os.pathsep + os.environ["PATH"]}):
             result = ops.delivery_preflight(
                 self.root,
                 "real-null-pr",

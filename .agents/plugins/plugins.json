@@ -89,7 +89,6 @@
       "dependencies": {
         "required": [
           "tj-agents/base",
-          "tj-agents/agent-store",
           "tj-agents/agent",
           "tj-agents/cli"
         ],
@@ -98,6 +97,8 @@
       "external_prerequisites": {
         "required": [
           "exe:tj_hook",
+          "exe:tj",
+          "exe:agent-store",
           "exe:git",
           "python>=3.12"
         ],
@@ -113,7 +114,6 @@
         ],
         "plugins": [
           "tj-agents/agent",
-          "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/cli",
           "tj-agents/workflow"
@@ -150,7 +150,7 @@
                   "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
                 ]
               ],
-              "justification": "Read selected work-item state and supporting plans without creating or changing agent-store records.",
+              "justification": "Read work-item tracker state and supporting plans without changing them.",
               "match": [
                 [
                   "python",
@@ -213,11 +213,6 @@
       },
       "external_dependencies": {
         "required": [
-          {
-            "id": "tj-agents/agent-store",
-            "marketplace": "tj-agents",
-            "repository": "tj-agents/agent"
-          },
           {
             "id": "tj-agents/agent",
             "marketplace": "tj-agents",
@@ -291,7 +286,6 @@
         "required": [
           "tj-agents/base",
           "tj-agents/workflow",
-          "tj-agents/agent-store",
           "tj-agents/agent",
           "tj-agents/cli"
         ],
@@ -300,6 +294,8 @@
       "external_prerequisites": {
         "required": [
           "exe:tj_hook",
+          "exe:tj",
+          "exe:agent-store",
           "exe:git",
           "python>=3.12"
         ],
@@ -319,7 +315,6 @@
         ],
         "plugins": [
           "tj-agents/agent",
-          "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/cli",
           "tj-agents/engineering",
@@ -492,11 +487,6 @@
       },
       "external_dependencies": {
         "required": [
-          {
-            "id": "tj-agents/agent-store",
-            "marketplace": "tj-agents",
-            "repository": "tj-agents/agent"
-          },
           {
             "id": "tj-agents/agent",
             "marketplace": "tj-agents",

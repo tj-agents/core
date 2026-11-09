@@ -1,9 +1,11 @@
-"""Real temporary Git repositories; GitHub, the merge proof and process liveness are replaced by doubles."""
+"""Real temporary Git repositories; GitHub, the merge proof and agent-store are replaced by doubles."""
 
+import contextlib
 import importlib.util
+import io
+import json
 import os
 from pathlib import Path
-import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -16,6 +18,8 @@ sys.path.insert(0, str(SCRIPTS))
 SPEC = importlib.util.spec_from_file_location('worktree_sweep', SCRIPTS / 'worktree_sweep.py')
 SWEEP = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SWEEP)
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'fixtures'))
+import fake_cli
 
 
 def git(cwd, *arguments):
@@ -90,19 +94,32 @@ class SweepTests(unittest.TestCase):
 
         self.assertNotIn('Feature/Merged', self.removed)
 
-    def test_only_unended_sessions_with_a_live_process_count_as_working(self):
-        database = Path(self.temp.name) / 'sessions.db'
-        connection = sqlite3.connect(database)
-        connection.execute('CREATE TABLE sessions (cwd TEXT, pid INTEGER, ended_at REAL)')
-        connection.executemany('INSERT INTO sessions VALUES (?, ?, ?)', [
-            ('C:/a', 10, None), ('C:/b', 11, 5.0), ('C:/c', 12, None), (None, 13, None)])
-        connection.commit()
-        connection.close()
+    def fake_agent_store(self, response):
+        environment = fake_cli.install(Path(self.temp.name) / 'tools', {'agent-store launches': response},
+                                       names=('agent-store',))
+        self.enterContext(fake_cli.environment({**environment, 'PATH': str(Path(self.temp.name) / 'tools')}))
+        return environment
 
-        rows = SWEEP.session_rows(database)
-        live = SWEEP.live_session_directories(rows, alive=lambda pid: pid != 12)
+    def test_only_active_launches_with_a_worktree_count_as_working(self):
+        launches = [
+            {'launch_id': 'a', 'cwd': 'C:/a', 'worktree': 'C:/a', 'state': 'active'},
+            {'launch_id': 'b', 'cwd': 'C:/b', 'worktree': 'C:/b', 'state': 'ended'},
+            {'launch_id': 'c', 'cwd': 'C:/c', 'worktree': 'C:/c', 'state': 'closing'},
+            {'launch_id': 'd', 'cwd': 'C:/d', 'worktree': None, 'state': 'active'},
+        ]
+        environment = self.fake_agent_store(
+            {'stdout': {'ok': True, 'schema_version': 1, 'data': {'launches': launches}}})
 
-        self.assertEqual(['C:/a'], live)
+        rows = SWEEP.launch_rows()
+
+        self.assertEqual(['C:/a'], SWEEP.live_worktrees(rows))
+        self.assertEqual(['agent-store launches'], [call['command'] for call in fake_cli.calls(environment)])
+
+    def test_repositories_are_discovered_from_every_launch_directory(self):
+        launches = [{'cwd': str(self.worktrees['Feature/Merged']), 'state': 'ended'},
+                    {'cwd': str(self.primary), 'state': 'active'}, {'cwd': None, 'state': 'active'}]
+
+        self.assertEqual([self.primary.resolve()], SWEEP.discover_repositories(launches))
 
     def test_links_inside_a_worktree_are_unlinked_without_touching_their_target(self):
         target = Path(self.temp.name) / 'real skills'
@@ -179,12 +196,26 @@ class SweepTests(unittest.TestCase):
 
         self.assertNotIn('removed', outcomes.values())
 
-    def test_an_unreadable_session_registry_stops_the_run(self):
-        database = Path(self.temp.name) / 'sessions.db'
-        database.write_bytes(b'not a sqlite database at all' * 100)
+    def test_a_failed_launch_listing_stops_the_run(self):
+        for response in ({'stdout': {'ok': False, 'schema_version': 1,
+                                     'error': {'code': 'storage', 'message': 'locked'}}, 'code': 5},
+                         {'stdout': 'not json'},
+                         {'stdout': {'ok': True, 'schema_version': 1, 'data': {}}}):
+            with self.subTest(response=response):
+                self.fake_agent_store(response)
+                with self.assertRaises(SWEEP.UnreadableLaunches):
+                    SWEEP.launch_rows()
 
-        with self.assertRaises(SWEEP.UnreadableSessions):
-            SWEEP.session_rows(database)
+    def test_a_missing_agent_store_removes_nothing(self):
+        empty = Path(self.temp.name) / 'empty tools'
+        empty.mkdir()
+        output = io.StringIO()
+        with fake_cli.environment({'PATH': str(empty)}), contextlib.redirect_stdout(output):
+            code = SWEEP.main(['--repo', str(self.primary)])
+
+        self.assertEqual(1, code)
+        self.assertIn('agent-store is not on PATH', json.loads(output.getvalue())['error'])
+        self.assertTrue(all(path.is_dir() for path in self.worktrees.values()))
 
     def test_recent_edits_keep_a_worktree_and_old_ones_do_not(self):
         worktree = self.worktrees['Feature/Merged']
