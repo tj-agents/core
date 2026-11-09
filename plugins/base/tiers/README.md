@@ -145,8 +145,9 @@ the write.
 When a write targets a file matching a selected, applicable stack tier's `file`, `glob` or content-glob
 marker, the hook also injects the canonical text of that repository's selected stack standards after
 employer replacement: the matching tiers' skills first, `core` profile first within a tier, then the other
-applicable stack tiers. One injection is bounded at 40,000 characters; skills that do not fit are named
-and injected by later writes. Each skill is injected once per session and agent, recorded under
+applicable stack tiers. The whole hook context, tier lines included, stays within 10,000 characters, the most
+Claude Code inlines; Codex's handler raises its `additionalContextLimit` to carry the same text. Skills that
+do not fit are named and injected by later writes, and one larger than the bound is only ever named. Each skill is injected once per session and agent, recorded under
 `<AGENT_STATE_DIRECTORY|~/.agents-state>/standards-injection/`; the PostCompact hook clears that agent's
 record so its next write injects again. A repository without a plugin selection receives no injection.
 
