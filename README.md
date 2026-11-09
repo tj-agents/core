@@ -146,7 +146,9 @@ executable guidance, binary changes, unresolved ranges and broad changes run the
 removing the label reevaluates selection.
 
 `ci-required` runs after selection, the generated-path guard and both platform jobs. It fails if
-classification or any selected job fails, disappears or is cancelled, or skips on a `ci:full` PR. Configure branch protection
+classification or any selected job fails, disappears or is cancelled, or skips on a `ci:full` PR. While
+main's latest completed run is not green, `regenerate` publishes nothing, so a PR without `ci:full` fails
+`ci-required` with that run's link. Configure branch protection
 to require this check when enabling server-side enforcement. Existing all-checks merge validation also
 consumes its result. Selection never cancels a prior run or transfers a previous head's test success.
 
