@@ -20,7 +20,8 @@
             "type": "command",
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --tool-context",
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --tool-context",
-            "timeout": 30
+            "timeout": 30,
+            "additionalContextLimit": 5000
           }
         ]
       }
