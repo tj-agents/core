@@ -1,54 +1,56 @@
 """Shared launch primitives for the native agent CLIs, on Windows and POSIX.
 
-Imported by Agent's private handoff launchers and session recovery so the environment scrub, executable
-discovery, lane lookup and terminal argument escaping have one owner. Not runnable on its own.
+Every agent tab runs under `tj run`, opened in Windows Terminal or tmux; a launch is confirmed when
+`tj run` records it in agent-store.
 """
 
-import glob
+from __future__ import annotations
+
 import importlib.util
-import json
 import os
 from pathlib import Path
 import re
-import shlex
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
+import uuid
+from typing import TYPE_CHECKING, cast
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+from tj_agent.host import Host
+from launch_contract import Launch
+from launch_errors import LaunchError, LaunchTimeout
+from package_root import find_package_root
+import agent_store
+
+if TYPE_CHECKING:
+    from claude import launch as claude_launch
+    from codex import launch as codex_launch
+
+    _claude_implementation: Launch = claude_launch
+    _codex_implementation: Launch = codex_launch
+
+_HOST_LAUNCHES: dict[Host, Launch] = {}
 IS_WINDOWS = os.name == 'nt'
 
-# Session state a Claude Code parent exports into anything it spawns. NO_COLOR=1 alone makes the child
-# black and white; the CLAUDE_CODE_* set binds it to the parent's messaging pipe and makes it behave as a
-# managed nested child rather than the independent session the caller asked for. CLAUDE_CODE_GIT_BASH_PATH
-# is machine configuration rather than session state and is deliberately absent from this list.
-SESSION_ENVIRONMENT = (
-    'NO_COLOR',
-    'CLAUDECODE',
-    'CLAUDE_CODE_CHILD_SESSION',
-    'CLAUDE_CODE_ENTRYPOINT',
-    'CLAUDE_CODE_SESSION_ID',
-    'CLAUDE_CODE_MESSAGING_SOCKET',
-    'CLAUDE_CODE_MESSAGING_TOKEN',
-    'CLAUDE_PID',
-    'WORKBOARD_LAUNCH_TOKEN',
-    'WORKBOARD_WORKFLOW_TOKEN',
-)
 
-# The launch title is the session's one name: peer lookup and recovery resolve the stored copy, so a host
-# retitling its tab would leave that name pointing at nothing on screen.
-CODEX_KEEP_TAB_TITLE = ('--config', 'tui.terminal_title=[]')
-CLAUDE_KEEP_TAB_TITLE = {'CLAUDE_CODE_DISABLE_TERMINAL_TITLE': '1'}
-
-
-class LaunchError(Exception):
-    """A launch precondition failed; the message is the whole report."""
-
-
-class LaunchTimeout(LaunchError):
-    """A terminal control command did not answer in time, so whether it took effect is unknown."""
+def host_launch(host: Host) -> Launch:
+    if host not in _HOST_LAUNCHES:
+        root = find_package_root(HERE)
+        native = root / f'.{host.value}' / 'runtime' / 'launch.py'
+        path = native if (root / '.git').exists() else HERE / host.value / 'launch.py'
+        if not path.is_file():
+            raise LaunchError(f'The packaged {host.value} launch adapter was not found under {root}.')
+        spec = importlib.util.spec_from_file_location(f'agent_{host.value}_launch', path)
+        if spec is None or spec.loader is None:
+            raise LaunchError(f'The {host.value} launch adapter cannot be loaded from {path}.')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _HOST_LAUNCHES[host] = cast(Launch, module)
+    return _HOST_LAUNCHES[host]
 
 
 def make_stdio_encoding_lossy():
@@ -70,180 +72,10 @@ def launch_environment(clear=(), force=None):
     Returned rather than applied, because on POSIX they travel inside the launched command line: a tab
     handler starts the command from an already-running terminal process that never sees ours.
     """
-    cleared = list(dict.fromkeys((*SESSION_ENVIRONMENT, *clear)))
+    session_state = (name for host in Host for name in host_launch(host).SESSION_ENVIRONMENT)
+    cleared = list(dict.fromkeys((*session_state, 'WORKBOARD_LAUNCH_TOKEN', 'WORKBOARD_WORKFLOW_TOKEN', *clear)))
     forced = dict(force or {})
     return [name for name in cleared if name not in forced], forced
-
-
-def _is_script(path):
-    try:
-        with open(path, 'rb') as f:
-            return f.read(2) == b'#!'
-    except OSError:
-        return True
-
-
-# The native executable, never the npm shim: a shim launches the TUI through an extra node process and
-# degrades it to monochrome and non-interactive, the failure handoff-codex first recorded. On Windows
-# `claude` on PATH resolves to that shim (claude.ps1/claude.cmd), so PATH is consulted only for a real
-# claude.exe; on POSIX the shim is a `#!` script, and npm with its prefix at ~/.local puts one at the native
-# install's own path, so any candidate that is one is refused.
-def resolve_claude_executable(home=None, which=shutil.which):
-    home = Path(home) if home else Path.home()
-    name = 'claude.exe' if IS_WINDOWS else 'claude'
-    local = home / '.local' / 'bin' / name
-    found = which(name)
-    for candidate in (str(local), found):
-        if candidate and os.path.isfile(candidate) and (IS_WINDOWS or not _is_script(os.path.realpath(candidate))):
-            return candidate
-
-    raise LaunchError(f'The native Claude Code executable was not found. Looked for {local} and a native {name} on PATH.')
-
-
-_CODEX_VERSION = re.compile(r'(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?')
-
-
-def parse_codex_version(text):
-    match = _CODEX_VERSION.search(text or '')
-    if not match:
-        return None
-    return {
-        'core': tuple(int(match.group(i)) for i in (1, 2, 3)),
-        'prerelease': match.group(4) or '',
-        'text': match.group(0),
-    }
-
-
-def compare_codex_version(left, right):
-    if left['core'] != right['core']:
-        return -1 if left['core'] < right['core'] else 1
-    # A prerelease ranks BELOW the release it precedes, so 0.151.0-alpha.7.1 loses to 0.151.0. Ranking by
-    # file date instead is what silently selected a three-versions-stale alpha over the current CLI.
-    if bool(left['prerelease']) != bool(right['prerelease']):
-        return -1 if left['prerelease'] else 1
-    if not left['prerelease']:
-        return 0
-
-    left_parts, right_parts = left['prerelease'].split('.'), right['prerelease'].split('.')
-    for i in range(max(len(left_parts), len(right_parts))):
-        if i >= len(left_parts):
-            return -1
-        if i >= len(right_parts):
-            return 1
-        a, b = left_parts[i], right_parts[i]
-        if a.isdigit() and b.isdigit():
-            a, b = int(a), int(b)
-        if a != b:
-            return -1 if a < b else 1
-    return 0
-
-
-def npm_global_prefix():
-    """The npm global install prefix, or None when npm is unavailable or reports nothing."""
-    try:
-        result = subprocess.run(['npm', 'config', 'get', 'prefix'], capture_output=True, text=True,
-                                 encoding='utf-8', errors='replace', timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if result.returncode != 0:
-        return None
-    prefix = result.stdout.strip()
-    return prefix or None
-
-
-def codex_candidate_paths(which=shutil.which, local_app_data=None, npm_prefix=npm_global_prefix):
-    name = 'codex.exe' if IS_WINDOWS else 'codex'
-    candidates = []
-
-    # The npm package is a JavaScript entry point over a vendored native binary per platform, and the entry
-    # point is what lands on PATH. Launching that shim is the path that degrades the TUI to monochrome and
-    # non-interactive, so the vendored executable underneath it is launched instead - identical bits,
-    # without the node process in front. Windows npm puts the shim beside node_modules; POSIX npm symlinks
-    # bin/codex to the package's own bin/codex.js, two levels below the package root.
-    shim = which('codex')
-
-    # A session launched from a desktop entry (not a login shell) often has PATH built from the display
-    # manager rather than the shell rc files that add a user npm prefix's bin directory, so `which` finds
-    # nothing even though the global install is on disk. `npm config get prefix` resolves it directly,
-    # the same way the native install under home is checked for Claude, below any PATH lookup.
-    if not shim and not IS_WINDOWS:
-        prefix = npm_prefix()
-        if prefix:
-            direct = Path(prefix) / 'bin' / name
-            if direct.is_file():
-                shim = str(direct)
-
-    # `codex` on PATH is not always that shim: a standalone install, or a PATH that puts the vendored
-    # binary ahead of the npm one, lands the native executable on PATH directly. On POSIX that is whatever
-    # is not a `#!` script; on Windows the npm entry point is a `.cmd`/`.ps1`, never a `.exe`, so any `.exe`
-    # found here is native. Its realpath is included too, in case the PATH entry is itself a symlink.
-    if shim and ((IS_WINDOWS and Path(shim).suffix.casefold() == '.exe')
-                 or (not IS_WINDOWS and not _is_script(os.path.realpath(shim)))):
-        candidates.append(shim)
-        candidates.append(os.path.realpath(shim))
-
-    if shim:
-        roots = [
-            Path(shim).parent / 'node_modules' / '@openai' / 'codex',
-            Path(os.path.realpath(shim)).parent.parent,
-        ]
-        for root in dict.fromkeys(roots):
-            pattern = str(root / 'node_modules' / '@openai' / 'codex-*' / 'vendor' / '*' / 'bin' / name)
-            candidates.extend(sorted(glob.glob(pattern)))
-
-    # The Windows desktop app caches each downloaded runtime in its own hash-named directory and adds rather
-    # than replaces, so this folder accumulates stale payloads instead of holding only the current build.
-    # There is no desktop app cache anywhere else.
-    if IS_WINDOWS:
-        local_app_data = local_app_data or os.environ.get('LOCALAPPDATA')
-        if local_app_data:
-            desktop = Path(local_app_data) / 'OpenAI' / 'Codex' / 'bin'
-            candidates.extend(sorted(str(p) for p in desktop.rglob('codex.exe') if p.is_file()))
-
-    return list(dict.fromkeys(candidates))
-
-
-def resolve_codex_executable(minimum='0.154.0', candidates=None):
-    """The newest native Codex executable that answers --version, as (path, version)."""
-    paths = codex_candidate_paths() if candidates is None else candidates
-    found = []
-    for path in paths:
-        try:
-            result = subprocess.run([path, '--version'], capture_output=True, text=True, timeout=30)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        version = parse_codex_version(result.stdout + result.stderr)
-        if version:
-            found.append((path, version))
-
-    if not found:
-        raise LaunchError(
-            'No native Codex executable answered --version. Looked beside the `codex` shim on PATH for the npm '
-            "package's vendored binary" + (', and under the desktop app cache.' if IS_WINDOWS else '.')
-        )
-
-    best = found[0]
-    for candidate in found[1:]:
-        if compare_codex_version(candidate[1], best[1]) > 0:
-            best = candidate
-
-    floor = parse_codex_version(minimum)
-    if floor is None:
-        raise LaunchError(f'The minimum Codex version is not a version: {minimum}')
-    if compare_codex_version(best[1], floor) < 0:
-        inventory = '\n'.join(f'  {version["text"]}\t{path}' for path, version in found)
-        raise LaunchError(
-            f'The newest native Codex executable found is {best[1]["text"]}, below the required {minimum}.\n'
-            'The model roster is gated on the CLI version, so launching this build would silently drop newer models.\n'
-            'Update with: npm install -g @openai/codex@latest\n'
-            f'Found:\n{inventory}'
-        )
-    return best
-
-
-def claude_config_dir():
-    configured = os.environ.get('CLAUDE_CONFIG_DIR')
-    return Path(configured) if configured else Path.home() / '.claude'
 
 
 def prompt_file_argument(path):
@@ -261,10 +93,10 @@ def prompt_file_argument(path):
 def resolve_tab_directory(path):
     """The absolute-but-not-resolved working directory for a tab, validated to exist.
 
-    Not .resolve(): on Windows that rewrites a mapped or subst drive to its target, and Claude Code keys a
+    Not .resolve(): on Windows that rewrites a mapped or subst drive to its target, and native history keys a
     session's history by the directory string it was started in. Called by both Python launchers first,
     before any filesystem or lane-table work, so a bad directory is reported before anything else they
-    check; launch_tab calls it again for callers that reach it directly. The error always names the
+    check. The error always names the
     absolute path.
     """
     directory = Path(os.path.abspath(path))
@@ -316,22 +148,22 @@ def _lanes_module():
 # configured default, because guessing a lane from a prompt is how an expensive model ends up serving a
 # rename. frontier resolves the tier above the ladder, which no lane resolves to: its selection is the
 # user's explicit request, never task shape.
-def resolve_lane(harness, lane=None, frontier=False):
+def resolve_lane(host, lane=None, frontier=False):
     if not lane and not frontier:
         raise LaunchError('resolve_lane needs a lane or frontier.')
     if lane and frontier:
         raise LaunchError('A lane and the frontier tier are mutually exclusive.')
     lanes = _lanes_module()
     try:
-        entry = lanes.frontier(harness) if frontier else lanes.resolve(harness, lane)
+        entry = lanes.frontier(host) if frontier else lanes.resolve(host, lane)
     except SystemExit as exc:
         raise LaunchError(str(exc)) from None
     return entry
 
 
-def resolve_lane_model(harness, lane=None, frontier=False):
+def resolve_lane_model(host, lane=None, frontier=False):
     """(model, effort) for a lane or the frontier tier; effort is None when the table prices none."""
-    entry = resolve_lane(harness, lane=lane, frontier=frontier)
+    entry = resolve_lane(host, lane=lane, frontier=frontier)
     return entry['model'], entry.get('effort')
 
 
@@ -408,296 +240,102 @@ def _environment_for(environ, cleared, forced):
     return env
 
 
-def _launch_tmux(directory, executable, title, arguments, cleared, forced, environ, run, popen):
-    inner = posix_inner_command(directory, cleared, forced, executable, arguments)
-    # Passing several argv elements after `--` is what makes tmux 3.0+ exec them directly without an
-    # intermediate shell; a single joined string would be re-split by tmux's own command parser. No `-d`:
-    # the new window comes to the front, as a new tab does in every other terminal.
-    pane = _client(run, ['tmux', 'new-window', '-n', title, '-P', '-F', '#{pane_id}', '--', *inner], 'tmux new-window')
-    # The session is already running in that window, so a failure past this point must not read as a
-    # failed launch: a caller would retry and start a second writer.
-    try:
-        if not pane:
-            raise LaunchError('tmux new-window did not report the new pane id')
-        _client(run, ['tmux', 'select-pane', '-t', pane, '-T', title], 'tmux select-pane')
-    except LaunchError as exc:
-        print(f'warning: the session started, but its tmux pane title was not set to {title!r}: {exc}', file=sys.stderr)
+TJ_RUN_TIMEOUT_SECONDS = 30
+SESSION_TIMEOUT_SECONDS = 180
 
 
-def _launch_kitty(directory, executable, title, arguments, cleared, forced, environ, run, popen):
-    listen_on = environ.get('KITTY_LISTEN_ON')
-    if not listen_on:
-        raise LaunchError(
-            'kitty remote control is not reachable: KITTY_LISTEN_ON is not set. Add '
-            "'allow_remote_control socket-only' and 'listen_on unix:/tmp/kitty-{kitty_pid}' to kitty.conf "
-            'and restart kitty.'
-        )
-    window_id = environ.get('KITTY_WINDOW_ID', '')
-    inner = posix_inner_command(directory, cleared, forced, executable, arguments)
-    # For `launch`, --match selects a tab, and `id:` is a tab id; `window_id:` selects the tab holding the
-    # caller's own window. The two id counters are independent, so `id:` lands in the wrong place.
-    _client(run, ['kitty', '@', '--to', listen_on, 'launch', '--type=tab', '--match', f'window_id:{window_id}',
-                  '--tab-title', title, '--title', title, *inner], 'kitty @ launch')
+def _launch_tmux(directory, title, command, cleared, forced, environ, run):
+    inner = posix_inner_command(directory, cleared, forced, command[0], command[1:])
+    window = _client(run, ['tmux', 'new-window', '-n', title, '-P', '-F', '#{window_id}', '--', *inner],
+                     'tmux new-window')
+    if window:
+        _client(run, ['tmux', 'set-option', '-w', '-t', window, 'automatic-rename', 'off'], 'tmux set-option')
+        _client(run, ['tmux', 'set-option', '-w', '-t', window, 'allow-rename', 'off'], 'tmux set-option')
 
 
-def _konsole_qdbus():
-    return shutil.which('qdbus6') or shutil.which('qdbus')
-
-
-def _launch_konsole(directory, executable, title, arguments, cleared, forced, environ, run, popen):
-    qdbus = _konsole_qdbus()
-    if not qdbus:
-        raise LaunchError('Neither qdbus6 nor qdbus was found on PATH to drive Konsole over D-Bus.')
-    service = environ.get('KONSOLE_DBUS_SERVICE')
-    window = environ.get('KONSOLE_DBUS_WINDOW')
-    if not service or not window:
-        raise LaunchError('KONSOLE_DBUS_SERVICE or KONSOLE_DBUS_WINDOW is not set.')
-    # The title becomes Konsole's tab-title format, where `%` sequences expand to the directory, program
-    # and so on, with no escape for a literal `%`. The visible title must equal AGENT_CLI_TAB_TITLE, which
-    # peer-cli resolves sessions by, so a `%` is refused rather than shown differently.
-    if '%' in title:
-        raise LaunchError(f'Konsole would expand the % in the tab title {title!r}; choose a title without %.')
-
-    def call(*args):
-        return _client(run, [qdbus, service, *args], f'{qdbus} {args[-1] if len(args) < 3 else args[1]}')
-
-    try:
-        session = call(window, 'newSession')
-    except LaunchTimeout as exc:
-        # No session id came back, so there is nothing here to close by typing into it; the D-Bus call may
-        # still have created an empty, untitled tab despite the timeout, and this is the only way to say
-        # so. A plain LaunchError, not a LaunchTimeout: there is no inner command running yet to disturb.
-        raise LaunchError(f'{exc} An empty Konsole tab may have been left open; check for one before retrying.') from None
-
-    session_path = f'/Sessions/{session}'
-    script_path = None
-
-    def abandon():
-        """Try to end the empty tab by closing its shell; report whether that itself succeeded."""
-        if script_path is not None:
-            shutil.rmtree(script_path.parent, ignore_errors=True)
-        # Konsole exposes no D-Bus call to close a session; ending its shell closes the tab this created.
-        try:
-            result = run([qdbus, service, session_path, 'sendText', 'exit\n'],
-                          stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10)
-            return result.returncode == 0
-        except (OSError, subprocess.SubprocessError):
-            return False
-
-    try:
-        # setTitle alone is replaced by the tab-title format as soon as the foreground process changes, so
-        # the format itself is set for both the local (0) and remote (1) contexts.
-        for context in ('0', '1'):
-            call(session_path, 'setTabTitleFormat', context, title)
-
-        # runCommand TYPES this text into the user's own interactive shell, which may not be sh (it may be
-        # fish), so the inner command never travels as that text: it is written to a private sh script whose
-        # first line deletes it and its directory, and the only thing typed is `exec sh '<path>'`.
-        script_path = _write_posix_script(posix_inner_command(directory, cleared, forced, executable, arguments))
-    except LaunchTimeout:
-        # The session definitely exists (newSession already returned one) and no inner command was ever
-        # typed into it, so this is a definite failure, not an open question -- unlike the generic
-        # LaunchTimeout wording, never "may still have taken effect": closing the empty tab is attempted
-        # right here, and the only thing actually left uncertain is whether that closing itself worked.
-        closed = abandon()
-        message = 'Konsole did not confirm the tab title within 30 seconds, so the launch failed.'
-        if not closed:
-            message += ' Closing the empty tab also failed; an empty Konsole tab may have been left open.'
-        raise LaunchError(message) from None
-    except BaseException:
-        abandon()
-        raise
-
-    try:
-        call(session_path, 'runCommand', f'exec sh {shlex.quote(str(script_path))}')
-    except LaunchTimeout:
-        # The command may already have been typed and be running; removing its script or typing `exit`
-        # into the session now would break a launch that is actually under way.
-        raise
-    except BaseException:
-        abandon()
-        raise
-
-
-def _write_posix_script(inner):
-    temp_dir = tempfile.mkdtemp(prefix='agent-cli-tab-')
-    script_path = Path(temp_dir) / 'launch.sh'
-    script_path.write_text('rm -rf "$(dirname "$0")"\n' + shlex.join(inner) + '\n')
-    script_path.chmod(0o700)
-    return script_path
-
-
-def _launch_windows_terminal(directory, executable, title, arguments, cleared, forced, environ, run, popen):
+def _launch_windows_terminal(directory, title, command, cleared, forced, environ, run):
     terminal = shutil.which('wt.exe')
     if not terminal:
         raise LaunchError('wt.exe was not found on PATH.')
-
-    # --window 0 is WT's documented sentinel for "the window that most recently had focus". This is not
-    # the same as omitting the flag: windowingBehavior is unset by default, so no flag at all means
-    # useNew -- always a separate OS window. Do not simplify this away, and do not swap it for
-    # --window new, which forces the opposite of what it looks like it asks for.
-    terminal_arguments = ['--window', '0', 'new-tab', '--startingDirectory', str(directory), '--title', title,
-                           '--useApplicationTitle', executable, *arguments]
-    escaped = [terminal_argument(value) for value in terminal_arguments]
-
-    # The tab process inherits the environment of this wt.exe invocation, so the changes travel through
-    # its own `env=` rather than by mutating this process's environment, which would leak them back into
-    # the calling session.
-    _client(run, [terminal, *escaped], 'Windows Terminal', env=_environment_for(environ, cleared, forced))
+    # --window 0 is the most recently focused window; omitting it opens a separate OS window.
+    arguments = ['--window', '0', 'new-tab', '--startingDirectory', str(directory), '--title', title,
+                 '--suppressApplicationTitle', *command]
+    _client(run, [terminal, *(terminal_argument(value) for value in arguments)], 'Windows Terminal',
+            env=_environment_for(environ, cleared, forced))
 
 
-# Checked in this order because it is the order a launcher process could be nested in another: tmux
-# inside kitty inside Konsole inside Windows Terminal sees TMUX first, so the innermost multiplexer the
-# caller is actually attached to wins over an outer terminal emulator it happens to also be running in.
-# Each handler runs only on the platform it can start a tab from: WT_SESSION also reaches WSL through
-# WSLENV, and TMUX reaches Windows Python started from an MSYS or Cygwin tmux pane, and neither terminal
-# can start the other platform's executable.
-_TAB_HANDLERS = (
-    ('TMUX', 'posix', _launch_tmux),
-    ('KITTY_WINDOW_ID', 'posix', _launch_kitty),
-    ('KONSOLE_DBUS_WINDOW', 'posix', _launch_konsole),
-    ('WT_SESSION', 'windows', _launch_windows_terminal),
-)
-
-
-def _launch_new_window(directory, executable, title, arguments, cleared, forced, environ, run, popen):
+def open_tab(directory, title, command, cleared=(), forced=None, environ=os.environ, run=subprocess.run):
+    """Open `command` as a new tab titled `title`, in Windows Terminal or the current tmux server."""
+    if run is subprocess.run and 'PYTEST_CURRENT_TEST' in os.environ:
+        raise LaunchError('Refusing to open a real terminal tab under pytest; inject a fake run.')
+    forced = dict(forced or {})
     if IS_WINDOWS:
-        if shutil.which('wt.exe'):
-            # Still a tab: --window 0 opens it in the Windows Terminal window used most recently.
-            return _launch_windows_terminal(directory, executable, title, arguments, cleared, forced, environ, run, popen)
-        print('warning: no terminal was detected; opening a new window instead of a tab', file=sys.stderr)
-        try:
-            popen([executable, *arguments], cwd=str(directory), env=_environment_for(environ, cleared, forced),
-                  creationflags=subprocess.CREATE_NEW_CONSOLE)
-        except OSError as exc:
-            raise LaunchError(f'Could not open a new console window: {exc}') from exc
-        return
-
-    # Without a display an X11 or Wayland terminal emulator starts and exits at once, which would read as
-    # a launch. macOS sessions set neither variable and need no such check.
-    if sys.platform != 'darwin' and not (environ.get('DISPLAY') or environ.get('WAYLAND_DISPLAY')):
-        raise LaunchError('No terminal was detected and there is no graphical display to open a new window on.')
-    print('warning: no terminal was detected; opening a new window instead of a tab', file=sys.stderr)
-
-    inner = posix_inner_command(directory, cleared, forced, executable, arguments)
-    candidates = []
-    terminal_env = environ.get('TERMINAL')
-    if terminal_env:
-        candidates.append([terminal_env, '-e', *inner])
-    candidates.append(['kitty', '--title', title, *inner])
-    candidates.append(['konsole', '--workdir', str(directory), '-e', *inner])
-    candidates.append(['xterm', '-e', *inner])
-
-    for candidate in candidates:
-        if not shutil.which(candidate[0]):
-            continue
-        try:
-            popen(candidate, start_new_session=True,
-                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return
-        except OSError:
-            continue
-
-    raise LaunchError('No terminal was detected and no terminal emulator was found on PATH to open a new window.')
+        return _launch_windows_terminal(directory, title, command, cleared, forced, environ, run)
+    if environ.get('TMUX'):
+        return _launch_tmux(directory, title, command, cleared, forced, environ, run)
+    raise LaunchError('Agent tabs open in Windows Terminal or tmux; start tmux first.')
 
 
-def launch_tab(working_directory, executable, title, arguments=(), clear=(), force=None,
-               environ=os.environ, run=subprocess.run, popen=subprocess.Popen):
-    """Open <executable> <arguments> as a new tab in the terminal this process is already running inside.
-
-    Detects the terminal from its own environment variables and uses its native new-tab command. Only
-    with no terminal detected does this open a new window, with a warning -- a tab is the contract every
-    caller relies on. A detected handler that fails raises rather than falling back to a window: a silent
-    new window is a worse surprise than a loud failure.
-    """
-    # Made absolute here, because a relative path would be re-resolved against the terminal's own cwd in
-    # the tab.
-    directory = resolve_tab_directory(working_directory)
-
-    clear = list(clear)
-    force = dict(force or {})
-    if not IS_WINDOWS:
-        # The terminal that starts the tab sets TERM for that session itself; forcing or clearing it here
-        # would fight that.
-        clear = [name for name in clear if name != 'TERM']
-        force.pop('TERM', None)
-
-    cleared, forced = launch_environment(clear=clear, force=force)
-    # The tab title is the only name for this session the user can see on screen, so the session records
-    # it at SessionStart and peer-cli resolves by it.
-    forced = dict(forced)
-    forced['AGENT_CLI_TAB_TITLE'] = title
-    arguments = list(arguments)
-
-    platform = 'windows' if IS_WINDOWS else 'posix'
-    for name, handler_platform, handler in _TAB_HANDLERS:
-        if handler_platform == platform and environ.get(name):
-            return handler(directory, executable, title, arguments, cleared, forced, environ, run, popen)
-
-    return _launch_new_window(directory, executable, title, arguments, cleared, forced, environ, run, popen)
-
-
-def startup_binding_script():
-    path = HERE / "startup_binding.py"
-    if not path.is_file():
-        raise LaunchError(f"startup binding script was not found beside {HERE}")
-    return path
-
-
-def handoff_status_path():
-    return Path(tempfile.mkdtemp(prefix="tj-agents-handoff-")) / "status.json"
-
-
-def await_handoff_startup(status_path, timeout=480, wrapper_timeout=45,
-                          clock=time.monotonic, wait=time.sleep):
-    spec = importlib.util.spec_from_file_location("handoff_launch_status", HERE / "launch_status.py")
-    status_file = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(status_file)
+def await_launch(launch_id, want_session=False, timeout=TJ_RUN_TIMEOUT_SECONDS,
+                 session_timeout=SESSION_TIMEOUT_SECONDS, clock=time.monotonic, wait=time.sleep):
+    """The `show --launch-id` data once tj run records the launch, and its session when asked for."""
     start = clock()
     while True:
-        status = status_file.read(status_path) or {}
-        state = status.get("state")
-        if state == "abandoned":
-            raise LaunchError("the launch was abandoned before startup")
-        if state == "failed":
-            raise LaunchError(str(status.get("error") or "native startup failed"))
-        if state == "unconfirmed":
-            raise LaunchTimeout(f"native CLI is still running, but SessionStart was not acknowledged; "
-                                f"leave the tab open and do not relaunch; receipt: {status_path}")
-        if state == "running" or (state == "exited" and status.get("running_at") and status.get("returncode") == 0):
-            return
-        if state == "exited":
-            raise LaunchError(f"native CLI exited with {status.get('returncode')} before handoff confirmation")
-        elapsed = clock() - start
-        if not status and elapsed >= wrapper_timeout:
-            try:
-                abandoned = status_file.create(status_path, {"state": "abandoned", "at": time.time()})
-            except OSError as error:
-                raise LaunchTimeout(f"launch status could not be recorded: {error}; receipt: {status_path}") from error
-            if abandoned:
-                raise LaunchError("the terminal never started the startup wrapper; the late launch is blocked")
-        if elapsed >= timeout:
-            raise LaunchTimeout(f"native SessionStart was not confirmed; receipt: {status_path}")
-        wait(0.1)
+        try:
+            shown = agent_store.run('show', '--launch-id', launch_id)
+        except agent_store.AgentStoreError as error:
+            if error.code != 'not-found':
+                raise LaunchError(f'agent-store could not read launch {launch_id}: {error}') from error
+            if clock() - start >= timeout:
+                raise LaunchTimeout(f'tj run did not record launch {launch_id} within {timeout} seconds; '
+                                    'check the new tab before launching again.') from None
+        else:
+            if not want_session or shown.get('session'):
+                return shown
+            if shown['launch']['state'] == 'ended':
+                raise LaunchError(f'the agent in launch {launch_id} exited before its session started')
+            if clock() - start >= session_timeout:
+                raise LaunchTimeout(f'the agent in launch {launch_id} did not start a session within '
+                                    f'{session_timeout} seconds; check its tab.')
+        wait(0.5)
 
 
-def bound_terminal_arguments(host, working_directory, target, arguments, status_file=None, require_session_start=False):
-    status = ["--status-file", str(status_file)] if status_file else []
-    return ["-I", "-B", str(startup_binding_script()), "--host", host, "--project",
-            str(working_directory), "--target", str(target), *status,
-            *(["--require-session-start"] if require_session_start else []), "--", *arguments]
+def launch(host, directory, title, arguments, item=None, parent=None, want_session=False,
+           environ=os.environ, run=subprocess.run):
+    """Open a `tj run` tab for one agent and return its confirmed launch."""
+    adapter = host_launch(host)
+    tj = shutil.which('tj')
+    if not tj:
+        raise LaunchError('tj is not on PATH; run the Agent install.')
+    launch_id = uuid.uuid4().hex
+    clear = [name for name in adapter.TAB_CLEARED if IS_WINDOWS or name != 'TERM']
+    force = {name: value for name, value in adapter.TAB_FORCED.items() if IS_WINDOWS or name != 'TERM'}
+    cleared, forced = launch_environment(clear=clear, force=force)
+    command = [tj, 'run', '--host', str(host), '--title', title, '--cwd', str(directory),
+               *(['--item', item] if item else []), '--launch-id', launch_id,
+               *(['--parent', parent] if parent else []), '--', adapter.executable(), *arguments]
+    open_tab(directory, title, command, cleared, forced, environ, run)
+    return await_launch(launch_id, want_session=want_session)
 
 
-def open_claude_tab(working_directory, title, arguments, out=print, status_file=None, require_session_start=False,
-                    clear=(), force=None):
-    claude = resolve_claude_executable()
+def parent_session(value):
+    """The parent's `host:id`: as given, the calling session for `current`, or None without a parent."""
+    if value != 'current':
+        return value
+    for host in Host:
+        if session_id := os.environ.get(host.session_variable):
+            return f'{host}:{session_id}'
+    raise LaunchError('bare --parent names the calling session, but this is not a Claude or Codex session.')
 
-    # Forced, not merely un-cleared: an automation-spawned terminal tab is not the interactive shell a
-    # human would have launched it from, so colour/terminal-capability auto-detection cannot be trusted to
-    # land on a good value on its own. FORCE_COLOR is the de-facto Node CLI convention (chalk/supports-color)
-    # to force colour outright. TERM=xterm-256color is forced the same way, but only ever reaches the
-    # session on Windows: launch_tab drops any forced TERM on POSIX, because the terminal that actually
-    # starts the tab sets TERM for that session itself, and forcing or clearing it here would fight that.
-    launch_tab(working_directory, sys.executable, title,
-               arguments=bound_terminal_arguments("claude", working_directory, claude, list(arguments), status_file, require_session_start),
-               clear=clear, force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color', **CLAUDE_KEEP_TAB_TITLE, **(force or {})})
+
+def parent_rule(parent):
+    """The standing instruction a child gets to report back to the session that started it."""
+    if not parent:
+        return ''
+    try:
+        title = agent_store.run('show', parent)['session'].get('title')
+    except agent_store.AgentStoreError:
+        title = None
+    name = f'"{title}" ({parent})' if title else parent
+    return (f' Standing rule: the session {name} started you. Message it with agent:message when you finish, '
+            "when you are blocked, and whenever Tommy's approval is needed, without waiting to be asked.")
