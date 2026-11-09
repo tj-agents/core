@@ -29,8 +29,8 @@ python3 -B "<skill-directory>/scripts/status.py" "payments"
 ```
 
 Report the rows as printed, newest first. Keep out-of-scope and text-only matches as counts unless the
-caller selected `all`. Blank state means the plan has no explicit checkbox or completion state. A selected
-repository's plans show `supporting`: they are design and recovery context, never its live queue. Report
-`skipped` repositories whose selection could not be read; an invalid selection in the current repository
-stops the script. Recorded execution state does not establish native process liveness; request Agent
-observation separately when that is needed.
+caller selected `all`. Blank state means the plan has no explicit checkbox or completion state. A work-item
+README's state and kind come from `tj item resolve` on its `- Work item:` reference; `Done` items are hidden
+and an unresolved reference shows `unknown` with its reason. A selected repository's plans show
+`supporting`: they are design and recovery context, never its live queue. Report `skipped` repositories
+whose selection could not be read; an invalid selection in the current repository stops the script.
