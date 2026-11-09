@@ -145,6 +145,10 @@ checks. Changed test modules include their import consumers. Unknown paths, shar
 executable guidance, binary changes, unresolved ranges and broad changes run the full matrix. Adding or
 removing the label reevaluates selection.
 
+`scripts/runtime_sources.py` stages `tj-agents/agent` and `tj-agents/cli` from the exact commit pinned
+in `.agents/plugins/runtime-sources.json`, never their moving `main`, and Renovate bumps that pin
+through a `ci:full`-labelled PR.
+
 `ci-required` runs after selection, the generated-path guard and both platform jobs. It fails if
 classification or any selected job fails, disappears or is cancelled, or skips on a `ci:full` PR. While
 main's latest completed run is not green, `regenerate` publishes nothing, so a PR without `ci:full` fails
