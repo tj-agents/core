@@ -1,5 +1,12 @@
 # core
 
+Core is the judgement half of [TJ Agents](https://github.com/tj-agents): Tommy's agentic engineering standards
+for Claude Code and Codex, with harness parity between the two. Where `tj-agents/agent` and `tj-agents/cli`
+are the deterministic layer (CLI scripts and thin trigger skills), Core's plugins hold the conventions a model
+applies judgement against — they call the lifecycle verbs rather than reimplementing them. Every repository
+that selects Core is a personal project (GitHub Issues/Projects, the bot identity); a repository outside the
+org gets its context from an injected profile instead.
+
 Core authors and publishes the `base`, `workflow`, `engineering` and `docs` plugins for Codex and Claude, from
 [`tj-agents/core`](https://github.com/tj-agents/core) through
 [`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
@@ -24,9 +31,9 @@ retirements. `skill:check` owns skill content and executable assets; the
 [`template:check` validator](https://github.com/tj-agents/template) owns repository layout and metadata
 validation. `engineering:docs` owns the generic guidance-writing convention.
 
-Global architecture and cross-repository designs live in [`tj-agents/docs`](https://github.com/tj-agents/docs)
-(private; organization access required). Core-specific implementation plans and operational documentation
-stay here; shared plans link to their source owners.
+Global architecture and cross-repository designs live in [`tj-agents/docs`](https://github.com/tj-agents/docs).
+Core-specific implementation plans and operational documentation stay here; shared plans link to their
+source owners.
 
 `workflow:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
 `base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
