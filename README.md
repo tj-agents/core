@@ -31,9 +31,9 @@ retirements. `skill:check` owns skill content and executable assets; the
 [`template:check` validator](https://github.com/tj-agents/template) owns repository layout and metadata
 validation. `engineering:docs` owns the generic guidance-writing convention.
 
-Global architecture and cross-repository designs live in [`tj-agents/docs`](https://github.com/tj-agents/docs)
-(private; organization access required). Core-specific implementation plans and operational documentation
-stay here; shared plans link to their source owners.
+Global architecture and cross-repository designs live in [`tj-agents/docs`](https://github.com/tj-agents/docs).
+Core-specific implementation plans and operational documentation stay here; shared plans link to their
+source owners.
 
 `workflow:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
 `base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
