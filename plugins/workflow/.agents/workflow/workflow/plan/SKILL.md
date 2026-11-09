@@ -35,7 +35,7 @@ ownership, usable context, and remaining work; a lane or cost change alone does 
    integrates, verifies, and accepts its result and remains the goal owner.
 2. **Transfer owner:** hand the agreed implementation-ready plan and explicitly authorized implementation
    to one successor at the selected lane through `workflow:handoff`'s verified execution pickup procedure.
-   That skill owns pickup, first-action evidence, and the conditions for release and invoking `agent:close`.
+   That skill owns pickup, first-action evidence, and the conditions for release and terminal closure.
    A recipient begins the agreed next action rather than recursively handing off to change lane.
 
 For an implementation transfer, the canonical goal or existing progress owner must contain
