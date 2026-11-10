@@ -2,6 +2,12 @@
   {
     "path": ".github/workflows/ci.yml",
     "rule": "naming",
+    "message": "job 'python-standards' name 'python-standards' must start with an uppercase letter",
+    "reason": "Preserves the existing GitHub check context consumed by branch protection and release qualification."
+  },
+  {
+    "path": ".github/workflows/ci.yml",
+    "rule": "naming",
     "message": "job 'select' name 'select' must start with an uppercase letter",
     "reason": "Preserves the existing GitHub check context consumed by branch protection and release qualification."
   },
