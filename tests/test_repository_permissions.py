@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 BLOCK_START = re.compile(r"run:\s*[|>](?:[-+]?\d?|\d[-+])\s*(?:\s#.*)?")
 POWERSHELL_CONTROL = re.compile(r"(\$|if\s*\()")
 CI_BOOTSTRAP_STEPS = {
-    "build the pinned tj_hook candidate",
-    "install the locked Python environment",
+    "Build the pinned tj_hook candidate",
+    "Install the locked Python environment",
 }
 
 
@@ -104,7 +104,7 @@ class RepositoryPermissionTests(unittest.TestCase):
                 self.assertIn("$pythonDirectory >> $env:GITHUB_PATH", block)
                 self.assertLess(
                     block.index("$pythonDirectory >> $env:GITHUB_PATH"),
-                    block.index("- name: regenerate the workspace from authored sources"),
+                    block.index("- name: Regenerate the workspace from authored sources"),
                 )
 
     def test_regeneration_validates_with_locked_hook_dependencies(self):
