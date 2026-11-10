@@ -197,7 +197,7 @@ def test_rejects_missing_or_malformed_revision(
 ) -> None:
     runtime_source.write_declaration(revision)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Invalid runtime source"):
         SOURCES.stage(runtime_source.root, {"agent": runtime_source.source})
 
 
