@@ -1,6 +1,6 @@
 ---
 name: failing-tests
-description: Diagnose and repair failing tests and browser acceptance stalls through observed evidence and focused reruns. Use when a unit, integration, API or UI test fails, a browser acceptance flow misses its startup or progress deadline, or a proposed workaround would disable a test or inflate its timeout. A compiler, restore or build error is not a red run.
+description: Diagnose and repair failing tests and browser acceptance stalls through observed evidence and focused reruns. Use when a unit, integration, API or UI test fails, a browser acceptance flow misses its startup or progress deadline, or a proposed workaround would disable a test or inflate its timeout. A compiler, restore, or build error is not a red run and does not select this skill.
 
 kind: workflow
 domain: process
