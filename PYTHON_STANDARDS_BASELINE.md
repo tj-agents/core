@@ -1132,3 +1132,13 @@ The previous source allowlist skipped authored implementations and tests. Broad 
 
 | File | Ruff rule | Existing count | Required repair |
 | --- | --- | ---: | --- |
+
+## Linux typing baseline
+
+Three additional diagnostics occur when mypy targets Linux. Each source is unchanged from the recorded base; the configuration suppresses only its exact module/error code.
+
+| File | Mypy module | Rule | Required repair |
+| --- | --- | --- | --- |
+| `.agents/hooks/host_cli.py` | `host_cli` | `unreachable` | Statement is unreachable |
+| `.agents/hooks/tests/test_continuation_runtime.py` | `test_continuation_runtime` | `attr-defined` | "PermissionError" has no attribute "winerror" |
+| `tests/test_create_worktree.py` | `tests.test_create_worktree` | `unreachable` | Statement is unreachable |
