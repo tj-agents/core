@@ -50,7 +50,9 @@ delivered PR alone does not close the item.
 3. Implement directly. A `mechanical-worker` may receive only a disjoint transformation under an exclusive
    writer lease; all writes remain serialized and the parent reconciles the reported paths against Git.
 4. Run the focused checks through the shared `run` operation so detailed output remains an artifact and the
-   model receives only bounded results. Then apply
+   model receives only bounded results. For browser-visible acceptance, establish
+   [observable browser acceptance](../failing-tests/SKILL.md#observable-browser-acceptance) before launching
+   the flow or handing a browser step to the user. Then apply
    `engineering:committing` so branch-diff review has an immutable candidate.
 5. Run the repository's focused independent `engineering:review`. Because this lifecycle includes
    implementation, resolve actionable findings through `engineering:address-review`, commit
