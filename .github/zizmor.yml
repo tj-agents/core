@@ -5,4 +5,4 @@ rules:
         tj-agents/template/.github/workflows/plugin-ci.yml: ref-pin
   undocumented-permissions:
     ignore:
-    - ci.yml:315:7
+    - ci.yml:319:7
