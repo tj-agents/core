@@ -19,7 +19,7 @@ env:
 jobs:
   python-standards:
     name: python-standards
-    uses: tj-agents/template/.github/workflows/python-standards.yml@9db905b2a10a6a6d34e4b972192f0d59852f53e5
+    uses: tj-agents/template/.github/workflows/python-standards.yml@7a06ba176a7245248fee3270842e0c4ed3030653
 
   select:
     name: select
