@@ -16,27 +16,986 @@ tj-base = { workspace = true }
 tj-cli = { git = "https://github.com/tj-agents/cli", rev = "92e29a7589a5dcf462af36d960684e49146d9d3b", subdirectory = "packages/tj-cli" }
 
 [dependency-groups]
-dev = [
-    "mypy>=2.4.0",
-    "pytest>=9.1.1",
-    "ruff>=0.17.1",
-]
+dev = ["mypy>=2.4.1", "pytest>=9.1.1", "ruff>=0.17.4", "pytest-socket>=0.7.0"]
 
 [tool.ruff]
 extend-exclude = ["plugins"]
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "N", "UP", "B", "A", "BLE", "C4", "SIM", "PTH", "PIE", "RET", "RUF"]
+explicit-preview-rules = true
+preview = true
+select = ["E", "W", "F", "I", "N", "UP", "B", "A", "BLE", "C4", "SIM", "PTH", "PIE", "RET", "RUF", "PGH004", "ANN401", "G004", "PLW1514", "LOG002", "LOG015", "PLC2701", "ICN001", "TID251", "TRY300", "PT009", "PT011", "PT006", "PLR6301"]
 
 [tool.mypy]
+enable_error_code = ["ignore-without-code", "exhaustive-match"]
 strict = true
 warn_unreachable = true
-files = [".agents", ".codex/adapters", "scripts", "tests"]
+files = [".agents", "scripts", "tests", ".codex/runtime", "packages"]
+explicit_package_bases = true
+mypy_path = [".agents/hooks/tests"]
 exclude = ["^plugins/"]
 
 [tool.pytest]
 strict = true
 pythonpath = ["."]
 testpaths = ["tests", ".agents/hooks/tests"]
-addopts = ["--import-mode=importlib", "-ra"]
+addopts = ["--import-mode=importlib", "-ra", "--disable-socket"]
 filterwarnings = ["error"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"unittest.TestCase" = { "msg" = "Use plain pytest functions and bare assertions." }
+"importlib.util.spec_from_file_location" = { "msg" = "Import the installed public API; do not load another checkout by path." }
+"sys.path" = { "msg" = "Install the declared dependency; do not modify the import search path." }
+
+[tool.ruff.lint.flake8-pytest-style]
+raises-require-match-for = ["*"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/test_workspace_tiers.py" = ["TID251"]
+"tests/test_workflow_status.py" = ["E501", "PLR6301", "PT009", "TID251", "UP031"]
+"tests/test_workflow_session_hooks.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
+"tests/test_tier_tool_context.py" = ["E501", "TID251"]
+"tests/test_tier_predicates.py" = ["E501", "I001", "PT009", "RUF059", "TID251"]
+"tests/test_task_routing.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/test_standards_context.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
+"tests/test_stack_tiers.py" = ["C420", "E501", "I001", "PT009", "TID251"]
+"tests/test_source_layout.py" = ["E501", "F401", "I001", "PLR6301", "PT009", "RUF059", "SIM117", "TID251"]
+"tests/test_selected_standards.py" = ["PLW1514", "TID251"]
+"tests/test_runtime_sources.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
+"tests/test_review_rules.py" = ["E501", "PT009", "SIM117", "TID251"]
+"tests/test_review_native_layer.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
+"tests/test_repository_permissions.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/test_remote_host_tiers.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/test_publisher_dependencies.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
+"tests/test_project_facts.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
+"tests/test_plugin_update.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/test_plan_artifacts.py" = ["I001", "PT009", "TID251"]
+"tests/test_native_host_acceptance.py" = ["TID251"]
+"tests/test_host_coverage.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/test_hook_launch_budget.py" = ["E501", "PT009", "TID251", "UP017"]
+"tests/test_hook_contract.py" = ["E501", "PT009", "TID251"]
+"tests/test_harness_manifests.py" = ["E501", "I001", "PLR6301", "PT009", "RUF059", "TID251"]
+"tests/test_guide_build.py" = ["E501", "PT009", "RET504", "TID251"]
+"tests/test_employer_tiers.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/test_delivery_continuation.py" = ["E501", "I001", "PLR6301", "PT009", "PTH115", "SIM117", "TID251"]
+"tests/test_company_skill_replacement.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/test_codex_windows_hook_commands.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/test_codex_startup_dispatch.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
+"tests/test_codex_hook_snapshot.py" = ["E501", "F811", "PT009", "TID251", "UP012"]
+"tests/test_ci_selection.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/test_ci_native_acceptance.py" = ["E501", "I001", "PLR6301", "PT009", "SIM117", "TID251"]
+"tests/test_check_tier_payload.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/test_check_generated_paths.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/test_catch_up.py" = ["PLR6301", "PT009", "TID251"]
+"tests/test_background_processes.py" = ["I001"]
+"tests/test_agent_files.py" = ["E501", "I001", "PT009", "TID251"]
+"tests/native_plugin_inventory.py" = ["E501", "I001"]
+"tests/fixtures/setup_probe.py" = ["E501", "I001"]
+"tests/fixtures/plugin_cli.py" = ["E501", "I001"]
+"tests/fixtures/plugin_autoupdate_208cc302.py" = ["E501", "I001", "PTH105"]
+"tests/fixtures/fake_claude.py" = ["E501", "I001", "PTH109", "PTH116", "PTH123"]
+"scripts/update_plugin_digests.py" = ["E501", "I001", "TID251"]
+"scripts/sync_plugin_packages.py" = ["B904", "E501", "SIM102", "SIM105", "TID251"]
+"scripts/sync_harness_manifests.py" = ["E501", "I001", "RUF021", "TID251"]
+"scripts/runtime_sources.py" = ["E501", "I001", "TRY300"]
+"scripts/native_host_acceptance.py" = ["B905", "E501", "N815", "SIM105", "TID251", "TRY300"]
+"scripts/ci_selection.py" = ["C420", "E501", "I001", "UP036"]
+"scripts/ci_native_acceptance.py" = ["E501", "I001", "UP036"]
+"scripts/check_generated_paths.py" = ["E501", "I001"]
+"packages/tj-base/tests/test_startup.py" = ["PT011"]
+".codex/runtime/continuation/delivery_continuation.py" = ["B904", "E402", "E501", "I001", "SIM102", "SIM105", "TID251", "TRY300"]
+".codex/runtime/continuation/continuation_scheduler.py" = ["B007", "E501", "I001", "PLR6301", "PTH105", "PTH115", "SIM102", "SIM105", "SIM112"]
+".codex/runtime/continuation/continuation_runtime.py" = ["E402", "E501", "I001", "N818", "PLW1514", "SIM105", "TID251", "TRY300"]
+".codex/hooks/snapshot.py" = ["TID251"]
+".codex/hooks/bootstrap.py" = ["E401", "E501", "F821", "I001"]
+".agents/workflows/workflow_runtime.py" = ["E501", "I001", "N818", "PIE810", "SIM102", "TID251", "TRY300"]
+".agents/workflows/workflow_ops.py" = ["B904", "BLE001", "E402", "E501", "I001", "PTH105", "PTH111", "PTH115", "PTH121", "RUF021", "SIM102", "SIM105", "TID251", "UP017"]
+".agents/workflows/verify.py" = ["E402"]
+".agents/workflows/review_evidence.py" = ["E501", "PTH105"]
+".agents/workflows/process_runtime.py" = ["TID251"]
+".agents/workflows/pr_body.py" = ["E501", "I001"]
+".agents/workflows/hosts/smoke.py" = ["E402", "TID251"]
+".agents/workflows/host_runtime.py" = ["E501", "I001", "PLC2701", "PLR6301", "PTH115", "RUF012"]
+".agents/workflows/delivery_runtime.py" = ["E501", "I001", "N818", "PLR6301"]
+".agents/workflows/delivery_policy.py" = ["E501", "I001", "N818", "TID251"]
+".agents/workflows/completion.py" = ["B904", "E501", "I001", "RUF059"]
+".agents/workflows/auto_merge.py" = ["E402", "E501", "RUF021", "TID251"]
+".agents/workflow/workflow/handoff/scripts/transfer.py" = ["B904", "E501", "PTH105", "PTH108", "PTH110", "PTH123", "TRY300"]
+".agents/workflow/utility/status/scripts/status.py" = ["B904", "E501", "I001", "TID251", "UP031"]
+".agents/workflow/utility/catch-up/scripts/catch_up.py" = ["TID251"]
+".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py" = ["E501", "I001", "RUF005", "UP031"]
+".agents/hooks/tier_gate.py" = ["B904", "BLE001", "C401", "E501", "E731", "RUF005", "TID251", "TRY300", "UP036"]
+".agents/hooks/tests/test_worktree_sweep.py" = ["E402", "E501", "I001", "PLR6301", "PT009", "PTH104", "TID251"]
+".agents/hooks/tests/test_workflow_ops.py" = ["B023", "E501", "F811", "I001", "PLR6301", "PT009", "SIM117", "TID251"]
+".agents/hooks/tests/test_workflow_contracts.py" = ["B905", "C416", "E402", "E501", "E731", "I001", "PLR6301", "PT009", "SIM117", "TID251"]
+".agents/hooks/tests/test_workflow_adoption.py" = ["C401", "E402", "E501", "I001", "PT009", "TID251"]
+".agents/hooks/tests/test_task_workflows.py" = ["E402", "E501", "I001", "PLR6301", "PT009", "TID251"]
+".agents/hooks/tests/test_shell_profile_oracle.py" = ["E501", "I001", "PT009", "TID251"]
+".agents/hooks/tests/test_review_workflows.py" = ["E402", "E501", "I001", "PLR6301", "PT009", "TID251", "UP012"]
+".agents/hooks/tests/test_review_evidence.py" = ["B023", "E402", "E501", "I001", "PT009", "SIM117", "TID251"]
+".agents/hooks/tests/test_repository_configuration.py" = ["E402", "E501", "I001", "PT009", "PTH211", "SIM117", "TID251"]
+".agents/hooks/tests/test_process_standards.py" = ["E501", "F841", "PT009", "TID251"]
+".agents/hooks/tests/test_problem_records.py" = ["E501", "PT009", "PTH109", "TID251"]
+".agents/hooks/tests/test_pr_body.py" = ["E501", "F401", "I001", "PT009", "PTH201", "SIM117", "TID251"]
+".agents/hooks/tests/test_plan_workflows.py" = ["E402", "E501", "I001", "PT009", "TID251"]
+".agents/hooks/tests/test_plan_graph.py" = ["E501", "I001", "PT009", "TID251"]
+".agents/hooks/tests/test_merge_review_gate.py" = ["E501", "PT009", "SIM117", "TID251"]
+".agents/hooks/tests/test_merge_cleanup_proof.py" = ["E501", "I001", "PT009", "RUF059", "SIM117", "TID251"]
+".agents/hooks/tests/test_lane_tables.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
+".agents/hooks/tests/test_host_cli.py" = ["E402", "E501", "PT009", "TID251"]
+".agents/hooks/tests/test_hook_runtime.py" = ["E402", "E501", "PLR6301", "PT009", "TID251"]
+".agents/hooks/tests/test_handoff_transfer.py" = ["E501", "I001", "PT009", "TID251"]
+".agents/hooks/tests/test_goal_preflight.py" = ["E501", "I001", "PT009", "TID251"]
+".agents/hooks/tests/test_docs_reachability.py" = ["E501", "PT009", "TID251"]
+".agents/hooks/tests/test_delivery_runtime.py" = ["E402", "E501", "I001", "PLR6301", "PT009", "RUF012", "SIM117", "TID251"]
+".agents/hooks/tests/test_continuation_runtime.py" = ["BLE001", "E501", "I001", "PT009", "SIM117", "TID251"]
+".agents/hooks/tests/test_completion.py" = ["B023", "E501", "I001", "PLR6301", "PT009", "TID251"]
+".agents/hooks/tests/test_auto_merge.py" = ["E501", "I001", "PLR6301", "PT009", "SIM117", "TID251"]
+".agents/hooks/tests/fixtures/workflow_writer_lease_worker.py" = ["E402", "I001", "TID251"]
+".agents/hooks/tests/fixtures/task_workflow_harness.py" = ["E501", "F401", "PLR6301", "RUF012"]
+".agents/hooks/tests/fixtures/shell_profile_oracle.py" = ["B905", "C420", "E501", "I001"]
+".agents/hooks/tests/fixtures/review_workflow_harness.py" = ["B023", "E501", "PLR6301", "RUF005"]
+".agents/hooks/tests/fixtures/plan_workflow_harness.py" = ["E501", "PLR6301", "RUF012"]
+".agents/hooks/tests/fixtures/plan_authoring_harness.py" = ["E501"]
+".agents/hooks/tests/fixtures/lane_expectations.py" = ["E501", "I001"]
+".agents/hooks/tests/fixtures/fake_cli.py" = ["E501"]
+".agents/hooks/tests/fixtures/continuation_runtime_fixture.py" = ["E402", "E501", "I001", "TID251"]
+".agents/hooks/tests/fixtures/continuation_fixture.py" = ["E501", "I001", "PLW1514"]
+".agents/hooks/standards_context.py" = ["E501", "I001"]
+".agents/hooks/project_facts.py" = ["E501", "I001", "RUF005"]
+".agents/hooks/problem_records.py" = ["E501", "UP036"]
+".agents/hooks/plan_graph.py" = ["B905", "E501", "F841", "I001", "PIE810"]
+".agents/hooks/merge_review_gate.py" = ["E501", "N818", "SIM102"]
+".agents/hooks/installed_skills.py" = ["E501", "TID251"]
+".agents/hooks/hook_runtime.py" = ["E501", "SIM105"]
+".agents/hooks/docs_reachability.py" = ["E501", "I001"]
+".agents/hooks/check_tier_payload.py" = ["E501", "I001", "SIM102"]
+".agents/engineering/workflow/merge/scripts/worktree_sweep.py" = ["C420", "E501", "I001", "N818", "RUF005", "TID251"]
+".agents/engineering/workflow/merge/scripts/cleanup_proof.py" = ["E501", "I001", "N818", "PTH105", "PTH108", "PTH110"]
+".agents/engineering/utility/review/scripts/review_rules.py" = ["E501", "I001", "TID251", "UP036"]
+".agents/engineering/utility/guide-build/template/build.py" = ["B023", "B904", "E501", "E741", "RUF001"]
+".agents/engineering/utility/guide-build/scripts/scaffold.py" = ["E501"]
+
+[tool.ruff.format]
+exclude = [".agents/engineering/utility/guide-build/scripts/scaffold.py", ".agents/engineering/utility/guide-build/template/build.py", ".agents/engineering/utility/review/scripts/review_rules.py", ".agents/engineering/workflow/merge/scripts/cleanup_proof.py", ".agents/engineering/workflow/merge/scripts/worktree_sweep.py", ".agents/hooks/check_tier_payload.py", ".agents/hooks/docs_reachability.py", ".agents/hooks/hook_runtime.py", ".agents/hooks/installed_skills.py", ".agents/hooks/merge_review_gate.py", ".agents/hooks/plan_graph.py", ".agents/hooks/problem_records.py", ".agents/hooks/project_facts.py", ".agents/hooks/standards_context.py", ".agents/hooks/tests/fixtures/continuation_fixture.py", ".agents/hooks/tests/fixtures/continuation_runtime_fixture.py", ".agents/hooks/tests/fixtures/fake_cli.py", ".agents/hooks/tests/fixtures/lane_expectations.py", ".agents/hooks/tests/fixtures/plan_authoring_harness.py", ".agents/hooks/tests/fixtures/plan_workflow_harness.py", ".agents/hooks/tests/fixtures/review_workflow_harness.py", ".agents/hooks/tests/fixtures/shell_profile_oracle.py", ".agents/hooks/tests/fixtures/task_workflow_harness.py", ".agents/hooks/tests/test_auto_merge.py", ".agents/hooks/tests/test_completion.py", ".agents/hooks/tests/test_continuation_runtime.py", ".agents/hooks/tests/test_delivery_runtime.py", ".agents/hooks/tests/test_docs_reachability.py", ".agents/hooks/tests/test_goal_preflight.py", ".agents/hooks/tests/test_handoff_transfer.py", ".agents/hooks/tests/test_hook_runtime.py", ".agents/hooks/tests/test_host_cli.py", ".agents/hooks/tests/test_lane_tables.py", ".agents/hooks/tests/test_merge_cleanup_proof.py", ".agents/hooks/tests/test_merge_review_gate.py", ".agents/hooks/tests/test_plan_graph.py", ".agents/hooks/tests/test_plan_workflows.py", ".agents/hooks/tests/test_pr_body.py", ".agents/hooks/tests/test_problem_records.py", ".agents/hooks/tests/test_process_standards.py", ".agents/hooks/tests/test_repository_configuration.py", ".agents/hooks/tests/test_review_evidence.py", ".agents/hooks/tests/test_review_workflows.py", ".agents/hooks/tests/test_shell_profile_oracle.py", ".agents/hooks/tests/test_task_workflows.py", ".agents/hooks/tests/test_workflow_adoption.py", ".agents/hooks/tests/test_workflow_contracts.py", ".agents/hooks/tests/test_workflow_ops.py", ".agents/hooks/tests/test_worktree_sweep.py", ".agents/hooks/tier_gate.py", ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py", ".agents/workflow/utility/status/scripts/status.py", ".agents/workflow/workflow/handoff/scripts/transfer.py", ".agents/workflows/auto_merge.py", ".agents/workflows/completion.py", ".agents/workflows/delivery_policy.py", ".agents/workflows/delivery_runtime.py", ".agents/workflows/host_runtime.py", ".agents/workflows/pr_body.py", ".agents/workflows/review_evidence.py", ".agents/workflows/workflow_ops.py", ".agents/workflows/workflow_runtime.py", ".codex/hooks/bootstrap.py", ".codex/runtime/continuation/continuation_runtime.py", ".codex/runtime/continuation/continuation_scheduler.py", ".codex/runtime/continuation/delivery_continuation.py", "packages/tj-base/src/tj_base/startup.py", "plans/delivery-binding-budget/GOAL.md", "scripts/check_generated_paths.py", "scripts/ci_native_acceptance.py", "scripts/ci_selection.py", "scripts/native_host_acceptance.py", "scripts/runtime_sources.py", "scripts/sync_harness_manifests.py", "scripts/sync_plugin_packages.py", "scripts/update_plugin_digests.py", "tests/fixtures/fake_claude.py", "tests/fixtures/plugin_autoupdate_208cc302.py", "tests/fixtures/plugin_cli.py", "tests/fixtures/setup_probe.py", "tests/native_plugin_inventory.py", "tests/test_agent_files.py", "tests/test_check_generated_paths.py", "tests/test_check_tier_payload.py", "tests/test_ci_native_acceptance.py", "tests/test_ci_selection.py", "tests/test_codex_hook_snapshot.py", "tests/test_codex_startup_dispatch.py", "tests/test_codex_windows_hook_commands.py", "tests/test_company_skill_replacement.py", "tests/test_delivery_continuation.py", "tests/test_employer_tiers.py", "tests/test_guide_build.py", "tests/test_harness_manifests.py", "tests/test_hook_contract.py", "tests/test_hook_launch_budget.py", "tests/test_host_coverage.py", "tests/test_plugin_update.py", "tests/test_project_facts.py", "tests/test_publisher_dependencies.py", "tests/test_remote_host_tiers.py", "tests/test_repository_permissions.py", "tests/test_review_native_layer.py", "tests/test_review_rules.py", "tests/test_runtime_sources.py", "tests/test_source_layout.py", "tests/test_stack_tiers.py", "tests/test_standards_context.py", "tests/test_task_routing.py", "tests/test_tier_predicates.py", "tests/test_tier_tool_context.py", "tests/test_workflow_session_hooks.py", "tests/test_workflow_status.py"]
+
+[[tool.mypy.overrides]]
+module = "auto_merge"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "build"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "union-attr", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "check_tier_payload"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "cleanup_proof"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "completion"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "continuation_runtime"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "continuation_scheduler"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "delivery_continuation"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "delivery_policy"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "delivery_runtime"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "docs_reachability"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "fixtures.continuation_fixture"
+disable_error_code = ["arg-type", "assignment", "index"]
+
+[[tool.mypy.overrides]]
+module = "fixtures.continuation_runtime_fixture"
+disable_error_code = ["no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "fixtures.fake_cli"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "fixtures.lane_expectations"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "fixtures.plan_authoring_harness"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "fixtures.plan_workflow_harness"
+disable_error_code = ["assignment", "index", "method-assign", "no-untyped-call", "no-untyped-def", "union-attr", "unreachable"]
+
+[[tool.mypy.overrides]]
+module = "fixtures.review_workflow_harness"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "fixtures.shell_profile_oracle"
+disable_error_code = ["call-overload", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "fixtures.task_workflow_harness"
+disable_error_code = ["dict-item", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "fixtures.workflow_writer_lease_worker"
+disable_error_code = ["no-untyped-call"]
+
+[[tool.mypy.overrides]]
+module = "hook_runtime"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "host_cli"
+disable_error_code = ["no-untyped-def", "unreachable"]
+
+[[tool.mypy.overrides]]
+module = "host_coverage"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "host_runtime"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "installed_skills"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "operator"]
+
+[[tool.mypy.overrides]]
+module = "merge_review_gate"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "plan_graph"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "pr_body"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "union-attr", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "problem_records"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "project_facts"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "review_evidence"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "review_rules"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "scaffold"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "scripts.ci_native_acceptance"
+disable_error_code = ["arg-type", "import-not-found", "misc", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "scripts.ci_selection"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "scripts.native_host_acceptance"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "type-arg", "union-attr", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "scripts.runtime_sources"
+disable_error_code = ["type-arg"]
+
+[[tool.mypy.overrides]]
+module = "scripts.sync_harness_manifests"
+disable_error_code = ["arg-type", "no-untyped-def", "type-arg", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "scripts.sync_plugin_packages"
+disable_error_code = ["arg-type", "assignment", "attr-defined", "no-any-return", "no-untyped-def", "type-arg", "union-attr", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "scripts.update_plugin_digests"
+disable_error_code = ["arg-type", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "smoke"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "standards_context"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "status"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "test_auto_merge"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "test_completion"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_continuation_runtime"
+disable_error_code = ["arg-type", "attr-defined", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "test_delivery_runtime"
+disable_error_code = ["dict-item", "index", "no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "test_docs_reachability"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_goal_preflight"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_handoff_transfer"
+disable_error_code = ["assignment", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_hook_runtime"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_host_cli"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_lane_tables"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_merge_cleanup_proof"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "test_merge_review_gate"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "test_plan_graph"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_plan_workflows"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_pr_body"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_problem_records"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_process_standards"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_repository_configuration"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "test_review_evidence"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "test_review_workflows"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_shell_profile_oracle"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "test_task_workflows"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_workflow_adoption"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "test_workflow_contracts"
+disable_error_code = ["arg-type", "attr-defined", "no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "test_workflow_ops"
+disable_error_code = ["arg-type", "attr-defined", "import-not-found", "no-redef", "no-untyped-call", "no-untyped-def", "union-attr", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "test_worktree_sweep"
+disable_error_code = ["arg-type", "import-not-found", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.fixtures.fake_claude"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.fixtures.plugin_autoupdate_208cc302"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "type-arg"]
+
+[[tool.mypy.overrides]]
+module = "tests.native_plugin_inventory"
+disable_error_code = ["no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_agent_files"
+disable_error_code = ["no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_background_processes"
+disable_error_code = ["var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_check_generated_paths"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_check_tier_payload"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_ci_native_acceptance"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_ci_selection"
+disable_error_code = ["arg-type", "index", "list-item", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_codex_hook_snapshot"
+disable_error_code = ["arg-type", "no-redef", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_codex_startup_dispatch"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_codex_windows_hook_commands"
+disable_error_code = ["no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_company_skill_replacement"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_delivery_continuation"
+disable_error_code = ["arg-type", "func-returns-value", "misc", "name-defined", "no-untyped-call", "no-untyped-def", "operator", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_employer_tiers"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_guide_build"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_harness_manifests"
+disable_error_code = ["arg-type", "import-not-found", "no-untyped-call", "no-untyped-def", "union-attr", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_hook_contract"
+disable_error_code = ["arg-type", "attr-defined", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_hook_launch_budget"
+disable_error_code = ["attr-defined", "misc", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_host_coverage"
+disable_error_code = ["arg-type", "attr-defined", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_native_host_acceptance"
+disable_error_code = ["arg-type", "type-arg"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_plan_artifacts"
+disable_error_code = ["arg-type", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_plugin_update"
+disable_error_code = ["arg-type", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_project_facts"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_publisher_dependencies"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_remote_host_tiers"
+disable_error_code = ["arg-type", "assignment", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_repository_permissions"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_review_native_layer"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_review_rules"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_runtime_sources"
+disable_error_code = ["arg-type", "index", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_source_layout"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_stack_tiers"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_standards_context"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_task_routing"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_tier_predicates"
+disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_workflow_session_hooks"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tests.test_workflow_status"
+disable_error_code = ["arg-type", "import-not-found", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "tier_gate"
+disable_error_code = ["arg-type", "assignment", "attr-defined", "misc", "no-any-return", "no-untyped-call", "no-untyped-def", "type-arg", "unreachable", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "transfer"
+disable_error_code = ["attr-defined", "no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "verify"
+disable_error_code = ["no-untyped-call", "no-untyped-def"]
+
+[[tool.mypy.overrides]]
+module = "workflow_ops"
+disable_error_code = ["dict-item", "index", "no-untyped-call", "no-untyped-def", "union-attr", "unreachable"]
+
+[[tool.mypy.overrides]]
+module = "workflow_runtime"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "worktree_sweep"
+disable_error_code = ["no-untyped-call", "no-untyped-def", "type-arg", "var-annotated"]
+
+[[tool.python-standards.exceptions]]
+path = ".agents/engineering/utility/guide-build/template/build.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/engineering/utility/review/scripts/review_rules.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/engineering/workflow/merge/scripts/worktree_sweep.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/hook_runtime.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/host_cli.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/installed_skills.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/project_facts.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/fixtures/continuation_fixture.py"
+rule = "PY009"
+reason = "Legacy import-time execution or explicit subprocess fixture; move runtime I/O into the entry point and isolate fixture setup."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/fixtures/continuation_fixture.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/fixtures/continuation_runtime_fixture.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/fixtures/fake_cli.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/fixtures/lane_expectations.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/fixtures/workflow_writer_lease_worker.py"
+rule = "PY009"
+reason = "Legacy import-time execution or explicit subprocess fixture; move runtime I/O into the entry point and isolate fixture setup."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/fixtures/workflow_writer_lease_worker.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/fixtures/workflow_writer_lease_worker.py"
+rule = "PY017"
+reason = "Legacy direct test clock read; inject a fixed clock."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_completion.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_continuation_runtime.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_continuation_runtime.py"
+rule = "PY017"
+reason = "Legacy direct test clock read; inject a fixed clock."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_goal_preflight.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_hook_runtime.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_hook_runtime.py"
+rule = "PY017"
+reason = "Legacy direct test clock read; inject a fixed clock."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_lane_tables.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_merge_cleanup_proof.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_process_standards.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_workflow_adoption.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_workflow_contracts.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_workflow_contracts.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_workflow_contracts.py"
+rule = "PY017"
+reason = "Legacy direct test clock read; inject a fixed clock."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tests/test_workflow_ops.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tier_gate.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/hooks/tier_gate.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/workflow/utility/status/scripts/status.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/workflow/utility/status/scripts/status.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/workflows/completion.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/workflows/host_runtime.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/workflows/host_runtime.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/workflows/workflow_ops.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/workflows/workflow_ops.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".agents/workflows/workflow_runtime.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = ".codex/runtime/continuation/continuation_runtime.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".codex/runtime/continuation/continuation_scheduler.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = ".codex/runtime/continuation/delivery_continuation.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "packages/tj-base/src/tj_base/startup.py"
+rule = "PY011"
+reason = "Legacy exception hierarchy; consolidate under the owning package error root."
+
+[[tool.python-standards.exceptions]]
+path = "scripts/check_generated_paths.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = "scripts/native_host_acceptance.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = "scripts/native_host_acceptance.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "scripts/sync_plugin_packages.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = "tests/fixtures/fake_claude.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/fixtures/fake_claude.py"
+rule = "PY017"
+reason = "Legacy direct test clock read; inject a fixed clock."
+
+[[tool.python-standards.exceptions]]
+path = "tests/fixtures/plugin_autoupdate_208cc302.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = "tests/fixtures/plugin_cli.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = "tests/fixtures/plugin_cli.py"
+rule = "PY009"
+reason = "Legacy import-time execution or explicit subprocess fixture; move runtime I/O into the entry point and isolate fixture setup."
+
+[[tool.python-standards.exceptions]]
+path = "tests/fixtures/plugin_cli.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/fixtures/setup_probe.py"
+rule = "PY009"
+reason = "Legacy import-time execution or explicit subprocess fixture; move runtime I/O into the entry point and isolate fixture setup."
+
+[[tool.python-standards.exceptions]]
+path = "tests/fixtures/setup_probe.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_agent_files.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_background_processes.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_ci_selection.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_codex_hook_snapshot.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_company_skill_replacement.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_delivery_continuation.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_delivery_continuation.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_harness_manifests.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_hook_launch_budget.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_hook_launch_budget.py"
+rule = "PY017"
+reason = "Legacy direct test clock read; inject a fixed clock."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_native_host_acceptance.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_review_native_layer.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_review_rules.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_selected_standards.py"
+rule = "PY001"
+reason = "Legacy comprehension traversal; split the nested generators into named loops."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_stack_tiers.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_task_routing.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.python-standards.exceptions]]
+path = "tests/test_workflow_status.py"
+rule = "PY016"
+reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
+
+[[tool.mypy.overrides]]
+module = "tests.test_create_worktree"
+disable_error_code = ["unreachable"]

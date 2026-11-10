@@ -1,6 +1,6 @@
 ---
 name: failing-tests
-description: What to do when a test run comes back red — enter the run/diagnose/fix/re-run loop and drive it to green rather than reporting the failure and waiting, fix the real bug wherever it lives (service, handler, page object, step definition, fixture, config) instead of disabling, skipping, marking flaky, or inflating a timeout to get past it, and for browser or service E2E do proper flaky-versus-real triage by re-running the failed scenario alone on a fresh stack — passing clean proves a host-load blip, failing again proves a real bug. Use the moment any unit, integration, API, or UI test run fails, or when tempted to skip a test or raise a timeout to make a suite pass. A compiler, restore, or build error is not a red run and does not select this skill.
+description: Diagnose and repair failing tests and browser acceptance stalls through observed evidence and focused reruns. Use when a unit, integration, API or UI test fails, a browser acceptance flow misses its startup or progress deadline, or a proposed workaround would disable a test or inflate its timeout. A compiler, restore, or build error is not a red run and does not select this skill.
 
 kind: workflow
 domain: process
@@ -42,6 +42,48 @@ the selected IDE's test-discovery repair procedure, when installed and applicabl
 **Neither is a compiler, restore, or generator error.** A build that never produced a test result has nothing
 to triage: fix it in the ordinary diagnose/fix/rebuild loop and enter here only once a run happens and a test
 fails. That holds when the thing that stopped compiling is the test project itself.
+
+## Observable browser acceptance
+
+Establish an observer before launching a browser acceptance flow or handing a browser step to the user.
+Use the actual user entry point and an observable real browser in the intended desktop session. Declare the
+expected first rendered state, the next meaningful progress state and a bounded deadline for each step
+using the selected project's acceptance contract. Tool choice and deadline values belong to that project.
+A running server, HTTP 200 or passing headless fixture alone does not establish visible launch or completion.
+
+Arm automatic timeout evidence before launch. When startup or progress misses its deadline, capture a
+safely scoped screenshot, redacted DOM or rendered-state snapshot, and available console errors and
+request-failure metadata. Preserve timestamps and the expected versus observed step so the artifacts explain
+the stalled transition. Inspect those artifacts, enter the applicable browser E2E diagnostic procedure above,
+repair the cause and rerun the failing scenario through the same user entry point. Do not ask the user to
+diagnose the UI or supply the first screenshot when the agent can obtain that evidence.
+
+If the primary browser bridge is unavailable, establish and verify a supported observable fallback in the
+correct desktop environment before relying on a user handoff. Confirm it can observe the actual browser
+window and capture the required safe evidence. Do not weaken browser security, change account boundaries
+or copy credential stores to make observation work. If no suitable surface is available, report the exact
+missing capability and the unverified acceptance step; never claim a screenshot or observed state exists.
+
+Expected human authentication or security approval is a distinct waiting state. Keep the observer attached
+and record that state while the user enters secrets or approves access directly in the supported UI. Resume
+the progress deadline when that handoff completes; a legitimate wait is not evidence of a malfunction.
+Capture only the safe application region and redact sensitive fields before saving or exposing evidence.
+Screenshots, DOM, traces, URLs and network metadata must not disclose passwords, tokens, authorization
+codes, cookies or PEM material; omit request bodies. During a sensitive step, monitor only non-secret state
+signals and withhold unsafe artifacts with an explicit reason rather than capturing the user's secrets.
+
+For a project whose selected acceptance runner provides these options, a bounded first-run check is:
+
+```text
+browser-acceptance --scenario first-run --observe --capture-on-timeout --artifacts artifacts/first-run
+Expected startup: the application renders its account-choice page before the project's startup deadline.
+Timeout evidence: a safe screenshot, redacted state and available console/request-failure metadata.
+Next action: inspect the evidence, fix the failed transition and rerun first-run to its declared final state.
+```
+
+Use the project's real runner and options. A browser acceptance run that never reaches its first rendered
+state has failed even when no test assertion was reached. Keep source checks, headless checks, observed
+desktop execution and any pending human approval separate in the acceptance report.
 
 ## Never bypass instead of fixing
 
