@@ -308,14 +308,14 @@ class WorkflowWiringTests(unittest.TestCase):
             self.assertIn("mode != 'docs'", job)
             self.assertIn("contains(github.event.pull_request.labels.*.name, 'ci:full')", job)
             for group in ("source", "runtime"):
-                step = re.search(r"      - name: selected[^\n]*\n(.*?)(?=\n      -|\Z)",
-                                 job[job.index(f"      - name: selected {'source' if group == 'source' else 'shared'}"):],
+                step = re.search(r"      - name: Selected[^\n]*\n(.*?)(?=\n      -|\Z)",
+                                 job[job.index(f"      - name: Selected {'source' if group == 'source' else 'shared'}"):],
                                  re.DOTALL)[1]
                 self.assertIn("mode == 'focused'", step)
                 self.assertIn(f"scripts/ci_selection.py run --group {group}", step)
                 if platform == "linux":
                     self.assertIn("< /dev/null", step)
-            for name in ("source layout and package tests", "shared runtime tests"):
+            for name in ("Source layout and package tests", "Shared runtime tests"):
                 step = job.split(f"      - name: {name}\n", 1)[1].split("\n      -", 1)[0]
                 self.assertIn("mode == 'full'", step)
             self.assertIn("sync-generated.ps1 -Check", job)
@@ -331,14 +331,15 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertIn("repository: tj-agents/template", job)
         self.assertIn("path: .template", job)
         self.assertIn("github.event.pull_request.base.sha", job)
-        self.assertIn("github.event.pull_request.head.sha }}\"", job)
+        self.assertIn("HEAD_SHA: ${{ github.event.pull_request.head.sha }}", job)
         self.assertIn("github.event.before", job)
-        self.assertIn("github.sha }}\"", job)
+        self.assertIn("HEAD_SHA: ${{ github.sha }}", job)
         self.assertIn("github.ref == 'refs/heads/main'", job)
         self.assertEqual(2, job.count(".template/.agents/template/utility/check/scripts/check_examples.py --root . --base"))
-        pull_request_run = next(line for line in job.splitlines()
-                                if "github.event.pull_request.base.sha" in line)
-        push_run = next(line for line in job.splitlines() if "github.event.before" in line)
+        pull_request_run, push_run = [line for line in job.splitlines()
+                                      if "run: python3 -B .template/" in line]
+        for command in (pull_request_run, push_run):
+            self.assertIn('--base "$BASE_SHA" --head "$HEAD_SHA"', command)
         self.assertIn("--merge-base", pull_request_run)
         self.assertNotIn("--merge-base", push_run)
 
