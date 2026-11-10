@@ -14,7 +14,7 @@ env:
 
 jobs:
   python-standards:
-    uses: tj-agents/template/.github/workflows/python-standards.yml@83ff855873610c02b445ba436fd40836bf01252b
+    uses: tj-agents/template/.github/workflows/python-standards.yml@9db905b2a10a6a6d34e4b972192f0d59852f53e5
 
   select:
     runs-on: ubuntu-latest
