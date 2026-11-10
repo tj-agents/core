@@ -292,7 +292,7 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertIn("    if: always()\n", jobs["ci-required"])
         required = re.search(r"^    needs: \[(.*?)\]$", jobs["ci-required"], re.MULTILINE)
         self.assertEqual(set(required[1].split(", ")),
-                         {"select", "guard", "guidance-examples", "verify-windows", "verify-linux"})
+                         {"select", "guard", "guidance-examples", "verify-windows", "verify-linux", "python-standards"})
         self.assertIn("CI_NEEDS: ${{ toJSON(needs) }}", jobs["ci-required"])
         self.assertIn("CI_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}", jobs["ci-required"])
         self.assertIn("      actions: read\n", jobs["ci-required"])
