@@ -1,3 +1,4 @@
+import contextlib
 import importlib.util
 import io
 import json
@@ -337,6 +338,11 @@ def test_previous_failure_marker_cannot_satisfy_current_probe(
             if evidence.parent.name != "failure-" + host:
                 evidence.write_text(NATIVE.FAILURE_PROBE, encoding="utf-8")
 
+    monkeypatch.setattr(
+        NATIVE,
+        "authentication_failure_endpoint",
+        lambda: contextlib.nullcontext("http://unused.invalid"),
+    )
     monkeypatch.setattr(NATIVE, "write_fixture", fixture)
     monkeypatch.setattr(NATIVE, "isolated_environment", lambda *args: {})
     monkeypatch.setattr(NATIVE, "context_marketplace", lambda *args: marketplace)
