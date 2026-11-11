@@ -61,8 +61,10 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
    breaks fetch for everyone. Match an existing branch's casing rather than creating a variant.
 
    ```text
-   python -B <skill-directory>/scripts/create_worktree.py <Type>/<Name>    # Windows
-   python3 -B <skill-directory>/scripts/create_worktree.py <Type>/<Name>   # Linux/macOS
+   python -B <skill-directory>/scripts/create_worktree.py Feature/BrowserCredentials    # Windows
+   python3 -B <skill-directory>/scripts/create_worktree.py Feature/BrowserCredentials   # Linux/macOS
+   Result: <repository-root>/.worktrees/Feature-BrowserCredentials is created and
+           associated with the current agent session through tj session claim-worktree.
    ```
 
    The script resolves the repository from any existing checkout, fetches with pruning, flattens `/` to
@@ -70,6 +72,10 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
    — **the only supported location.** It independently chooses the right start point (an existing local
    branch, an existing remote-only branch's tracking ref, or the fetched remote default) and prints the
    resulting branch, path, HEAD, base and base SHA as JSON; read that JSON rather than re-deriving the path yourself.
+   Creation requires the installed `tj` command. After Git creates the checkout, the script asks
+   `tj session claim-worktree` to associate its exact path with the current session. Outside an agent
+   session, that command succeeds without an owner. A refused claim fails creation and reports the
+   created path; the checkout remains available for the owning task to resolve the failure.
    For a dependent stack layer, pass `--from <parent-ref>` with the verified parent ref and record its SHA.
    Do not merge main separately into each layer as a substitute for reconciling the stack.
 
