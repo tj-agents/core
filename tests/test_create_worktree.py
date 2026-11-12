@@ -191,13 +191,81 @@ def test_explicit_parent_uses_recorded_tip(repo: Path) -> None:
     assert result["base_head"] == parent_tip
 
 
-def test_existing_destination_is_preserved(repo: Path, ownership: Ownership) -> None:
+def test_existing_checkout_is_reused_with_dirty_work_preserved(
+    repo: Path, ownership: Ownership
+) -> None:
     first = create(repo, "Feature/Repeated")
+    worktree = Path(first["path"])
+    (worktree / "unfinished.txt").write_text("keep this work", encoding="utf-8")
     result = invoke(repo, "Feature/Repeated")
+    assert result.returncode == 0, result.stdout
+    repeated = json.loads(result.stdout)
+    assert repeated["path"] == first["path"]
+    assert repeated["head"] == first["head"]
+    assert git(worktree, "status", "--porcelain") == "?? unfinished.txt"
+    assert (worktree / "unfinished.txt").read_text(encoding="utf-8") == "keep this work"
+    assert ownership.calls == [worktree, worktree]
+
+
+def test_existing_checkout_owned_by_another_session_is_not_reused(
+    repo: Path, ownership: Ownership
+) -> None:
+    first = create(repo, "Feature/Owned")
+    ownership.refusal = "checkout belongs to another live session"
+    result = invoke(repo, "Feature/Owned")
+    assert result.returncode == 1
+    assert ownership.refusal in result.stdout
+    assert git(Path(first["path"]), "rev-parse", "HEAD") == first["head"]
+
+
+def test_unregistered_destination_is_preserved(repo: Path) -> None:
+    path = repo / ".worktrees" / "Feature-Unregistered"
+    path.mkdir(parents=True)
+    (path / "keep.txt").write_text("keep", encoding="utf-8")
+    result = invoke(repo, "Feature/Unregistered")
     assert result.returncode == 1
     assert "already exists" in result.stdout
-    assert git(Path(first["path"]), "rev-parse", "HEAD") == first["head"]
-    assert ownership.calls == [Path(first["path"])]
+    assert (path / "keep.txt").read_text(encoding="utf-8") == "keep"
+
+
+def test_flattened_branch_collision_preserves_original_checkout(repo: Path) -> None:
+    first = create(repo, "Feature/Two-Parts")
+    result = invoke(repo, "Feature/Two/Parts")
+    assert result.returncode == 1
+    assert "already exists" in result.stdout
+    assert git(Path(first["path"]), "branch", "--show-current") == "Feature/Two-Parts"
+
+
+def test_legacy_checkout_is_reported_without_moving_or_claiming(
+    repo: Path, ownership: Ownership
+) -> None:
+    path = repo.parent / f"{repo.name}.worktrees" / "Feature-Legacy"
+    git(repo, "worktree", "add", "-b", "Feature/Legacy", str(path))
+    result = invoke(repo, "Feature/Legacy")
+    assert result.returncode == 1
+    assert "migrate it" in result.stdout
+    assert path.is_dir()
+    assert ownership.calls == []
+
+
+def test_explicit_repository_is_resolved_outside_a_checkout(
+    repo: Path, tmp_path: Path
+) -> None:
+    result = create(tmp_path, "Feature/Explicit", "--repo", str(repo))
+    assert Path(result["repository"]) == repo
+    assert Path(result["path"]) == repo / ".worktrees" / "Feature-Explicit"
+
+
+def test_separate_git_directory_does_not_become_the_primary_root(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "separate primary"
+    metadata = tmp_path / "metadata"
+    repo.mkdir()
+    git(repo, "init", "-b", "main", "--separate-git-dir", str(metadata))
+    commit(repo, "initial")
+    result = create(repo, "Feature/SeparateGitDir")
+    assert Path(result["path"]) == repo / ".worktrees" / "Feature-SeparateGitDir"
 
 
 def test_linked_checkout_resolves_primary_repository(
@@ -332,6 +400,14 @@ def test_case_variant_of_existing_branch_is_not_created(
     assert "existing branch casing: Feature/Existing" in result.stdout
     assert not (repo / ".worktrees").exists()
     assert ownership.calls == []
+
+
+@pytest.mark.parametrize("branch", ["feature/New", "new-feature"])
+def test_new_branch_requires_capitalized_type(repo: Path, branch: str) -> None:
+    result = invoke(repo, branch)
+    assert result.returncode == 1
+    assert "capitalized <Type>/<Name>" in result.stdout
+    assert not (repo / ".worktrees").exists()
 
 
 def test_redirected_worktree_directory_does_not_create_outside_repo(

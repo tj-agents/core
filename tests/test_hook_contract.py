@@ -37,7 +37,10 @@ class HookContractTests(unittest.TestCase):
         self.assertEqual({"plugins/base/hooks/claude.json", "plugins/base/hooks/codex.json"}, set(hook_manifests))
         for path, manifest in hook_manifests.items():
             with self.subTest(path=path):
-                self.assertEqual({"SessionStart", "PreToolUse", "PostCompact"}, set(manifest["hooks"]))
+                expected = {"SessionStart", "PreToolUse", "PostCompact"}
+                if path.endswith("claude.json"):
+                    expected.add("WorktreeCreate")
+                self.assertEqual(expected, set(manifest["hooks"]))
 
     def test_generated_hooks_use_the_hidden_boundary(self) -> None:
         claude = json.loads(self.output["plugins/base/hooks/claude.json"])
