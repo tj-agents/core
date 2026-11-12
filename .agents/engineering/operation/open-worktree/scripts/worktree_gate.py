@@ -124,6 +124,12 @@ def check_git(arguments: Sequence[str], cwd: Path, deadline: float) -> None:
     create_worktree.validate_destination(repo, cwd / target)
 
 
+def mentions_worktree(words: Sequence[str]) -> bool:
+    return "worktree" in words or any(
+        word.startswith("--worktree") or word == "-w" for word in words
+    )
+
+
 def check_command(command: str, cwd: Path, deadline: float) -> None:
     if not re.search(r"\b(?:git(?:\.exe)?|worktree)\b", command, re.IGNORECASE):
         return
@@ -135,11 +141,7 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
                 "cannot verify this worktree shell expression"
             ) from error
         return
-    if not any(
-        "worktree" in words
-        or any(word.startswith("--worktree") or word == "-w" for word in words)
-        for words in commands
-    ):
+    if not any(mentions_worktree(words) for words in commands):
         return
     for words in commands:
         program = executable(words[0])
@@ -176,6 +178,7 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
             or any(executable(word) == "git" for word in words[1:])
             or (
                 "worktree" in words
+                and any(word in {"add", "move"} for word in words[1:])
                 and program not in {"echo", "printf", "write-output"}
             )
         ):

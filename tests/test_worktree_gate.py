@@ -118,6 +118,8 @@ def test_noncanonical_or_unresolved_mutation_is_denied(
         "git worktree list --porcelain",
         "git worktree prune --dry-run",
         "git status --short",
+        "rg worktree",
+        "g worktree list",
         "cd $project; git status --short",
         "echo 'git worktree add ../outside'",
         "python - <<'PY'\nprint(\"isn't balanced in the shell lexer\")\nPY",
