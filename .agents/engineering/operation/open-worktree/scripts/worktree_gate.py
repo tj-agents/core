@@ -130,6 +130,13 @@ def mentions_worktree(words: Sequence[str]) -> bool:
     )
 
 
+def mutates_worktree(words: Sequence[str]) -> bool:
+    if "worktree" not in words:
+        return False
+    action = words[words.index("worktree") + 1 :]
+    return bool(action) and literal(action[0]) in {"add", "move"}
+
+
 def check_command(command: str, cwd: Path, deadline: float) -> None:
     if not re.search(r"\b(?:git(?:\.exe)?|worktree)\b", command, re.IGNORECASE):
         return
@@ -145,6 +152,17 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
         return
     for words in commands:
         program = executable(words[0])
+        if program in {
+            "rg",
+            "grep",
+            "findstr",
+            "select-string",
+            "echo",
+            "printf",
+            "write-output",
+            "write-host",
+        }:
+            continue
         if program in {"cd", "chdir", "set-location", "push-location", "pushd"}:
             arguments = [
                 word for word in words[1:] if word not in {"-LiteralPath", "-Path"}
@@ -176,11 +194,7 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
             program in {"popd", "pop-location"}
             or "=" in words[0]
             or any(executable(word) == "git" for word in words[1:])
-            or (
-                "worktree" in words
-                and any(word in {"add", "move"} for word in words[1:])
-                and program not in {"echo", "printf", "write-output"}
-            )
+            or mutates_worktree(words)
         ):
             raise create_worktree.CreateWorktreeError(
                 "cannot verify this worktree shell expression"
