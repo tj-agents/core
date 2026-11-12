@@ -62,10 +62,8 @@ writer. A bounded result needed to continue the originating task follows the nat
 Do not create duplicate writers or hand off work that overlaps the original checkout's owned paths.
 
 Prompt-only requests remain prompt-only. They return a self-contained pointer or prompt without launching or
-reserving an executor. Preserve a user-selected model, effort, frontier, or harness choice. Otherwise select
-the appropriate lane through `agent:lanes`; L7 is in-session only and cannot launch either handoff tool.
-Claude launch requires an explicit L1-L6 lane, frontier tier, or non-Haiku model. Record the chosen lane and
-one-line reason beside the next action when a lane is selected.
+reserving an executor. Preserve an explicit harness or lane choice; otherwise use `agent:lanes` to match
+the reasoning needed by the transferred work. `agent:handoff` requires `--lane L1`–`L6`; L7 stays in-session.
 
 ## Admit work before dispatch
 
@@ -248,9 +246,8 @@ transfer, reconcile the completed attempt and current owner before recording a n
    workstream through completion; it does not adopt, close, or rewrite the originating goal.
 3. For an implementation-owner transfer, use verified execution pickup above. For other transfers, write
    the self-contained side-workstream prompt to UTF-8 and invoke the selected launcher once. An explicit
-   prompt-only request returns that prompt without launching. Preserve an explicit model, effort,
-   frontier, or harness request; otherwise select a lane under `agent:lanes` when remaining work warrants
-   it.
+   prompt-only request returns that prompt without launching. Preserve an explicit harness or lane choice;
+   otherwise select the lane through `agent:lanes`.
 4. Verify submission and apply the applicable pickup and release requirements above. Success proves launch,
    not that the successor has read its goal. Release only the side-workstream writer lease, retain the
    original task's writer lease, and continue the original task.
