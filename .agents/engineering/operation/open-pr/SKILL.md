@@ -28,15 +28,23 @@ Read the authoritative saved body and run Step 6's `pr-body-check` after the wri
 marking ready or reporting the PR. Preserve attribution and existing scope. A connector's successful
 write response alone is not body validation. Reuse the same validator for both hosts and both write paths.
 
-Resolve the work and its owning review under `engineering:branching`. **During implementation, open a draft PR at the first stable
-candidate that needs remote validation**; later stable candidates within that slice push to the same
-PR. A new substantive slice gets its own PR under `engineering:branching`, stacked when dependent.
-An existing draft is not permission to keep expanding its scope. This procedure does
+Resolve the work and its owning review under
+[Engineering's delivery boundary](../../policy/branching/SKILL.md#delivery-boundary).
+**During implementation, open a draft PR at the first stable candidate that needs remote validation**;
+later stable candidates completing the agreed scope push to that same PR. An independently authorized
+goal or approved stage may have its own PR under that contract. An existing draft is not permission
+to expand beyond the agreed goal. This procedure does
 **not** enqueue, choose the end-to-end tier, or wait for a merge — that is
 `engineering:merge`.
 
 **A draft is the remote validation environment, not a claim that delivery is ready.** Mark it ready only
 once review and exact-head CI are green — and marking it ready is still not merge authorization.
+
+```text
+Input: an Auth checkpoint needs remote validation for a goal that also includes infrastructure.
+Action: open the owning draft, then add the remaining agreed implementation to that same PR.
+Completion: apply workflow:run's whole-outcome acceptance; the Auth checkpoint alone is not delivery.
+```
 
 ## What is and is not this procedure's call
 

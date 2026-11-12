@@ -8,9 +8,11 @@ domain: process
 
 # Deliver a feature
 
-Own an unplanned feature from the user's request to a completed repository outcome. If an explicit or
-uniquely resolved active plan already owns the work, use that plan's execution workflow instead. A direct
-question or report request is not implementation authority.
+Own an unplanned feature from the user's request to a completed repository outcome. Read `workflow:run`'s
+Authority and acceptance section and apply it from discovery through final acceptance. If an explicit
+or uniquely resolved active plan already owns
+the work, use that plan's execution workflow under the same contract. A direct question or report request
+is not implementation authority.
 
 ## Resolve the path
 
@@ -90,7 +92,9 @@ transcripts, model choices, routine continuation prompts, or a phase boundary as
 ## Example
 
 ```text
-Work Items feature WI-605 requires CSV export to include the account owner column. An analogous JSON export
-already defines that column, so add the matching CSV mapping and a focused export test. After the test and
-review pass, update WI-605 with the verified acceptance evidence; an open PR alone does not resolve it.
+Request: add the account owner column to CSV export and make it available from the export screen.
+Existing JSON export proves the owner mapping; the parent owns CSV and a bounded worker owns the screen.
+Acceptance: compare both requested behaviors with the implemented mapping, screen call and focused tests.
+An export-only patch is incomplete even if its PR and review pass. Promoting to an active plan retains
+the screen requirement under Workflow's same authority and acceptance contract.
 ```

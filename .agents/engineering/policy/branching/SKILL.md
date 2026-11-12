@@ -66,22 +66,36 @@ both `feature/x` and `Feature/x` breaks `git fetch` and `git pull` **for everyon
 `cannot lock ref … File exists`. Before creating a branch, match the casing of any existing branch of the
 same name exactly.
 
-## Deliver one slice at a time
+## Delivery boundary
 
-The default is sequential delivery: implement the current focused slice, validate and review it, merge
-it as soon as it is ready and authorized, sync the remote default, then start the next slice from that
-updated base. Plan the full sequence while keeping one delivery slice active by default. A future
-dependency in a plan does not by itself require concurrent branches or open PRs.
+The default is one PR per repository for the complete agreed goal. Implementation steps, phases and
+local commits organize work inside that PR. Staged delivery or a stack requires an explicit user
+instruction or a recorded staged plan the user approved. A selected employer profile may prescribe its
+own staged-review policy; do not import that policy into personal projects. The user judges what they
+will review in stages. Size or multiple concerns justify an assessment and proposed boundary, not an
+agent's unilateral split or omission of requested implementation.
 
-A preparatory slice exists to unblock the named substantive work. Once it has landed and its required
-checks are satisfied, begin that next authorized slice. Reuse the recorded split assessment while its
-scope and measured inputs remain valid; repeat it only for a changed concern, dependency, base or
-candidate. Required review and delivery checks still apply to their own candidate. Do not turn the
-completed preparation into another round of preparation without identifying the new fact that requires
-it.
+Resolve this boundary from the complete request and handoff before opening another PR. A genuine
+dependency or publication constraint that cannot fit it requires a precise decision from the user;
+read `workflow:run`'s Authority and acceptance section to retain the whole goal and continue independent
+authorized implementation.
 
-When the next slice must proceed before its required parent can land, record the concrete constraint
-preventing the parent from merging and why proceeding now is necessary. Use a stack for that overlap.
+```text
+Input: complete a personal-project setup in one repository, with Auth, infrastructure and persistence.
+Decision: one owning PR contains the agreed implementation; three steps do not create three PRs.
+Input: the user approves a staged plan with a preparatory PR followed by a dependent feature PR.
+Decision: deliver those approved boundaries; use the stack procedure if they must overlap.
+```
+
+## Deliver approved stages
+
+When staging is authorized under the delivery boundary above, deliver its slices sequentially by
+default: implement, validate, review and land the current PR, then start the next from the updated
+remote default. Keep the full goal active until all approved stages meet acceptance. Reuse the recorded
+assessment while its scope, dependencies and measured inputs remain valid.
+
+When an approved next slice must proceed before its required parent can land, record the concrete
+constraint preventing the parent from merging and why proceeding now is necessary. Use a stack for that overlap.
 **Every PR that builds on another unmerged PR must be stacked**: branch from the parent's verified tip,
 target the immediate parent, review the child-only delta and validate the cumulative tree. Once that
 dependency exists, stack handling is required. The `stack` skill owns the procedure.
@@ -90,7 +104,7 @@ dependency exists, stack handling is required. The `stack` skill owns the proced
 |---|---|
 | Current slice is ready and authorized to land | Merge it, sync the default branch, then begin the next slice |
 | Current slice still needs implementation, checks or review | Finish that slice and resolve its delivery blockers |
-| A concrete constraint requires dependent work before the parent can land | Record the reason and maintain a proper parent/child stack |
+| An approved stage requires dependent work before its parent can land | Record the reason and maintain a proper parent/child stack |
 | An independently authorized task needs concurrent work | Branch from the remote default and isolate its active writer |
 
 Keep necessary stacks as small as the active work requires. Land ready parents promptly through the
@@ -99,9 +113,9 @@ a hold is a constraint to resolve, not a reason to accumulate speculative descen
 
 ## Reviewable PR boundaries
 
-A goal, feature, refactor or plan phase is not automatically one PR. Before implementing a large or
-multi-concern change, divide it into focused delivery slices. Deliver those slices sequentially by default;
-use the unmerged-dependency rule above when overlap is necessary. Keep one goal and owner across them.
+Before implementing or expanding a large or multi-concern change, assess its reviewability within the
+agreed delivery boundary. A proposed split needs the staging authority above before it becomes the
+delivery map. Keep one goal and owner across any approved stages.
 
 Record each slice's purpose, included code and tests, base/parent, dependencies, expected size and
 verification gate in the existing plan or PR description. When branches exist, record their exact base
@@ -114,18 +128,19 @@ Measure the proposed PR against its actual base with `git diff --numstat <base>.
 lockfiles, documentation and mechanical moves separately from substantive code and tests; do not hide
 their total. Line counts are a review warning, not a target or proof of safety. Unless the repository
 sets a stricter budget, around 1,000 substantive added/deleted lines or 40 substantive changed files
-requires an explicit split assessment before adding more scope, requesting final review or publishing
-another candidate. Smaller changes spanning unrelated concerns need that assessment too.
+requires an explicit boundary assessment before adding more scope, requesting final review or publishing
+another candidate. Smaller changes spanning unrelated concerns need that assessment too. Record whether
+the whole goal remains reviewable together, or the concrete staged alternative that needs approval.
 
 Choose coherent boundaries, not equal-sized batches of files. Each landed slice must build, retain
 working exposed behavior, preserve security invariants and include its relevant tests. Keep an atomic
 schema/API/caller cutover together when splitting it would break those guarantees. Do not create dead
 APIs, compatibility adapters forbidden by the project, or failing intermediate branches just to shrink
-the displayed diff. Where possible, extract tested preparatory refactors or independent infrastructure
-first. A large exception needs a recorded concrete reason, rejected split boundaries, measured size and
+the displayed diff. Within approved staging, extract tested preparatory refactors or independent infrastructure
+where suitable. A large exception needs a recorded concrete reason, rejected split boundaries, measured size and
 validation plan; "same feature", "same phase", or "already on this branch" is not sufficient.
 
-Complete and land the current slice before beginning a substantial next slice by default. A separately
+For approved staging, complete and land the current slice before beginning a substantial next slice by default. A separately
 scoped change that depends on unmerged code follows the stack relationship above. Corrections within
 the existing slice follow its owning review as resolved above. If a PR is already oversized, preserve its exact head and working
 changes and assess recovery before rewriting history. Map possible boundaries and compare the benefit
@@ -138,8 +153,8 @@ the final stack tree preserves the intended result before superseding or rewriti
 
 Each child targets its immediate parent's branch; only the bottom PR targets the stack trunk, normally
 `main`. Review each layer against that parent and validate its cumulative tree. Keep the stack map,
-base/head SHAs and remaining scope in the one owning ledger. New slices continue the authorized goal;
-they do not require routine permission or a new session.
+base/head SHAs and remaining scope in the one owning ledger. Once the staged plan is approved, its
+slices continue the authorized goal without repeated staging permission or a new session.
 
 Use verified native forge stack support or already-installed tooling where available. Do not assume
 that a website feature is enabled locally, install tooling without authorization, or cap a necessary
