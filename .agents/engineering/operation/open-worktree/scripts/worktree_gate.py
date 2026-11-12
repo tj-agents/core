@@ -2,6 +2,7 @@ import json
 import re
 import shlex
 import sys
+import time
 from collections.abc import Mapping, Sequence
 from enum import Enum
 from pathlib import Path
@@ -93,7 +94,7 @@ def destination(arguments: Sequence[str], mutation: Mutation) -> str:
     return operands[mutation.destination]
 
 
-def check_git(arguments: Sequence[str], cwd: Path) -> None:
+def check_git(arguments: Sequence[str], cwd: Path, deadline: float) -> None:
     index = 0
     while index < len(arguments):
         value = literal(arguments[index])
@@ -119,11 +120,11 @@ def check_git(arguments: Sequence[str], cwd: Path) -> None:
     if mutation is None:
         raise create_worktree.CreateWorktreeError("unsupported worktree operation")
     target = destination(arguments[index + 2 :], mutation)
-    repo = create_worktree.repository_root(cwd)
+    repo = create_worktree.repository_root(cwd, deadline=deadline)
     create_worktree.validate_destination(repo, cwd / target)
 
 
-def check_command(command: str, cwd: Path) -> None:
+def check_command(command: str, cwd: Path, deadline: float) -> None:
     if not re.search(r"\b(?:git(?:\.exe)?|worktree)\b", command, re.IGNORECASE):
         return
     try:
@@ -153,15 +154,15 @@ def check_command(command: str, cwd: Path) -> None:
             cwd = (cwd / literal(arguments[0])).resolve()
         elif program in {"command", "env"} and len(words) > 1:
             if executable(words[1]) == "git":
-                check_git(words[2:], cwd)
+                check_git(words[2:], cwd, deadline)
             elif "worktree" in words:
                 raise create_worktree.CreateWorktreeError("unsupported Git environment")
         elif program == "git":
-            check_git(words[1:], cwd)
+            check_git(words[1:], cwd, deadline)
         elif program in {"bash", "sh", "zsh", "pwsh", "powershell", "cmd"}:
             for index, word in enumerate(words[1:], start=1):
                 if word.lower() in {"-c", "-lc", "-command", "/c"}:
-                    check_command(" ".join(words[index + 1 :]), cwd)
+                    check_command(" ".join(words[index + 1 :]), cwd, deadline)
                     break
         elif program in {"claude", "codex"} and any(
             word.split("=", 1)[0] in {"--worktree", "-w"} for word in words[1:]
@@ -173,6 +174,10 @@ def check_command(command: str, cwd: Path) -> None:
             program in {"popd", "pop-location"}
             or "=" in words[0]
             or any(executable(word) == "git" for word in words[1:])
+            or (
+                "worktree" in words
+                and program not in {"echo", "printf", "write-output"}
+            )
         ):
             raise create_worktree.CreateWorktreeError(
                 "cannot verify this worktree shell expression"
@@ -204,7 +209,7 @@ def check_tool(payload: Mapping[str, object]) -> None:
         raise create_worktree.CreateWorktreeError(
             "worktree hook working directory is missing"
         )
-    check_command(command, Path(cwd))
+    check_command(command, Path(cwd), time.monotonic() + 10)
 
 
 def main() -> int:
