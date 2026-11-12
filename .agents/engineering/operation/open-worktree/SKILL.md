@@ -61,17 +61,22 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
    breaks fetch for everyone. Match an existing branch's casing rather than creating a variant.
 
    ```text
-   python -B <skill-directory>/scripts/create_worktree.py Feature/BrowserCredentials    # Windows
-   python3 -B <skill-directory>/scripts/create_worktree.py Feature/BrowserCredentials   # Linux/macOS
+   python -B <skill-directory>/scripts/create_worktree.py --repo <repository> Feature/BrowserCredentials    # Windows
+   python3 -B <skill-directory>/scripts/create_worktree.py --repo <repository> Feature/BrowserCredentials   # Linux/macOS
    Result: <repository-root>/.worktrees/Feature-BrowserCredentials is created and
            associated with the current agent session through tj session claim-worktree.
    ```
 
-   The script resolves the repository from any existing checkout, fetches with pruning, flattens `/` to
-   `-` in the folder name, and always lands the result at `<repository-root>/.worktrees/<flattened-branch>`
-   — **the only supported location.** It independently chooses the right start point (an existing local
+   The script resolves the primary repository from `--repo` (default: current directory), fetches with pruning,
+   and derives `<primary-repository>/.worktrees/<flattened-branch>`. It chooses the start point (an existing local
    branch, an existing remote-only branch's tracking ref, or the fetched remote default) and prints the
-   resulting branch, path, HEAD, base and base SHA as JSON; read that JSON rather than re-deriving the path yourself.
+   resulting branch, path, HEAD, base and base SHA as JSON; use that returned path.
+   Repeated invocation reuses the registered canonical checkout and preserves its dirty work, after a fresh
+   ownership claim. An existing checkout elsewhere, a redirected destination or a flattened-name collision
+   fails with its path; resolve ownership before migrating it. It never moves another checkout implicitly.
+   It keeps the primary checkout clean by adding `/.worktrees/` to Git's local excludes, preserving existing
+   entries. Base's hooks reject unsupported native creation and direct shell destinations outside this layout;
+   unresolved shell expressions and Git lookup failures return a denial with the shared command.
    Creation requires the installed `tj` command. After Git creates the checkout, the script asks
    `tj session claim-worktree` to associate its exact path with the current session. Outside an agent
    session, that command succeeds without an owner. A refused claim fails creation and reports the
@@ -79,11 +84,8 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
    For a dependent stack layer, pass `--from <parent-ref>` with the verified parent ref and record its SHA.
    Do not merge main separately into each layer as a substitute for reconciling the stack.
 
-4. **Always use `<primary-repository>/.worktrees/<flattened-branch>`.** Do not create sibling
-   `<repo-name>.worktrees` directories or use a directory reserved for the agent harness's ephemeral trees.
-   Physical nesting does not establish plugin discovery: verify the checkout's selected declarations and
-   actual host loading separately. Inventory still reports old sibling worktrees so their existing owner
-   can relocate them with `git worktree move`; new creation always uses the shared script's nested path.
+4. Verify the checkout's selected declarations and actual host loading; filesystem nesting does not establish
+   plugin discovery. Inventory includes legacy sibling paths for their owners to migrate with Git.
 5. **Verify** the resulting path, branch, HEAD, base or existing remote head, and clean status. Use absolute
    paths for every subsequent tool call in the session.
 

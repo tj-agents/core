@@ -54,6 +54,11 @@
   "resources": [
     {
       "plugin": "base",
+      "source": ".agents/engineering/operation/open-worktree/scripts",
+      "destination": "hooks/worktrees"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/dependencies/agent/.agents/agent/runtime",
       "destination": "dependencies/agent/.agents/agent/runtime"
     },
