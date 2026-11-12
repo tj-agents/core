@@ -14,6 +14,17 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "Bash|PowerShell|shell|shell_command|exec_command|.*create_worktree",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py\"",
+            "timeout": 30
+          }
+        ]
+      },
+      {
         "matcher": "apply_patch",
         "hooks": [
           {
