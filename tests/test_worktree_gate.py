@@ -103,6 +103,8 @@ def test_literal_canonical_destination_is_allowed(
         "$GIT worktree add ../outside",
         "& $env:GIT worktree add ../outside",
         "g worktree add ../outside",
+        "g worktree a${e}dd ../outside",
+        "& $env:GIT worktree $action ../outside",
     ],
 )
 def test_noncanonical_or_unresolved_mutation_is_denied(
@@ -119,6 +121,8 @@ def test_noncanonical_or_unresolved_mutation_is_denied(
         "git worktree prune --dry-run",
         "git status --short",
         "rg worktree",
+        "rg worktree $path",
+        "rg git worktree",
         "g worktree list",
         "cd $project; git status --short",
         "echo 'git worktree add ../outside'",
