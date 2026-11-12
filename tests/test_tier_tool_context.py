@@ -23,6 +23,26 @@ def _load_gate() -> ModuleType:
 gate = _load_gate()
 
 
+def test_base_configuration_context_loads_without_stack_detection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    data = json.loads((ROOT / ".agents/tiers/base.json").read_text(encoding="utf-8"))
+    declaration = gate.Declaration("base", "tj-agents", data)
+    assert not gate.v3_declaration_diagnostics(data)
+    monkeypatch.setattr(gate, "declarations", lambda *args, **kwargs: [declaration])
+    monkeypatch.setattr(
+        gate.sys,
+        "argv",
+        ["tier_gate.py", "--session-context", "--project", str(tmp_path)],
+    )
+
+    assert gate.main() == 0
+
+    context = json.loads(capsys.readouterr().out)["hookSpecificOutput"]
+    assert context["hookEventName"] == "SessionStart"
+    assert context["additionalContext"].count(data["session_context"]) == 1
+
+
 def test_native_utf8_payload_is_independent_of_windows_console_encoding(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -316,7 +336,8 @@ def test_personal_work_personal_operations_use_current_target_scope(
     ]
     assert "employer-a:*" not in selections[2]["context"]
     search = gate.tool_context(
-        {"tool_name": "Grep", "cwd": str(tmp_path), "tool_input": {}}, tmp_path / "state"
+        {"tool_name": "Grep", "cwd": str(tmp_path), "tool_input": {}},
+        tmp_path / "state",
     )
     assert "Organizational scope: mixed" in search
     assert "Applies here:" not in search
@@ -325,7 +346,8 @@ def test_personal_work_personal_operations_use_current_target_scope(
         f"*** Add File: {work}/two.py\n+y\n*** End Patch"
     )
     contexts = gate.tool_context(
-        {"tool_name": "apply_patch", "tool_input": {"command": patch}}, tmp_path / "state"
+        {"tool_name": "apply_patch", "tool_input": {"command": patch}},
+        tmp_path / "state",
     )
     assert str(personal) in contexts and str(work) in contexts
     assert (

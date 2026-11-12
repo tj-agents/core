@@ -211,7 +211,7 @@ class EmployerScope(unittest.TestCase):
     def test_owner_identity_and_overrides_do_not_establish_employer(self):
         self.install('employer-a', EMPLOYER)
         self.remote('publisher/employer-a')
-        with patch.dict(gate.os.environ, {gate.OVERRIDE_VARIABLE: 'employer-a,work'}):
+        with patch.object(gate.os, 'environ', dict(gate.os.environ, **{gate.OVERRIDE_VARIABLE: 'employer-a,work'})):
             result = gate.assess(self.project, self.found())
         self.assertEqual(result.applicable, [])
         self.assertEqual(result.employers, ())

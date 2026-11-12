@@ -97,6 +97,11 @@ are all reported; consuming workflows must resolve that ambiguity before choosin
 contacts. No employer names are built into Core. Employer scope comes from installed declarations;
 Personal additionally requires explicit repository adoption.
 
+Base's version 3 `session_context` is the canonical common configuration rule. It loads at
+SessionStart without requiring a stack match or skill invocation. Repository preparation projects
+the same selected `always` contexts into the managed standards block in `AGENTS.md`; conditional
+contexts remain runtime decisions. Updating the declaration therefore updates both loading routes.
+
 ## Folders containing repositories
 
 A repository or a directory inside it uses that repository's evidence. Nested repositories have their

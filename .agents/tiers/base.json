@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "tier": "base",
   "stack": "any project",
-  "applies": "always"
+  "applies": "always",
 }
