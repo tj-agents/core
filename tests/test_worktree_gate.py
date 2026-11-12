@@ -1,7 +1,11 @@
+import io
 import json
+import runpy
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -96,6 +100,9 @@ def test_literal_canonical_destination_is_allowed(
         "cd elsewhere || git worktree add .worktrees/Feature-Bad",
         "pushd elsewhere; popd; git worktree add .worktrees/Feature-Bad",
         "claude --worktree=example",
+        "$GIT worktree add ../outside",
+        "& $env:GIT worktree add ../outside",
+        "g worktree add ../outside",
     ],
 )
 def test_noncanonical_or_unresolved_mutation_is_denied(
@@ -198,3 +205,34 @@ def test_claude_worktree_create_event_refuses_default_placement(repo: Path) -> N
     assert result.returncode == 2
     assert "create_worktree.py" in result.stderr
     assert not result.stdout
+
+
+def test_git_timeout_returns_denial_before_the_host_deadline(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def stalled_git(
+        command: list[str], *, timeout: float, **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        assert 0 < timeout <= 10
+        raise subprocess.TimeoutExpired(command, timeout)
+
+    monkeypatch.syspath_prepend(str(SCRIPT.parent))
+    monkeypatch.setattr(subprocess, "run", stalled_git)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(
+            json.dumps(
+                {
+                    "tool_name": "exec_command",
+                    "tool_input": {"cmd": "git worktree add ../outside"},
+                    "cwd": str(repo),
+                }
+            )
+        ),
+    )
+    main = cast(Callable[[], int], runpy.run_path(str(SCRIPT))["main"])
+    assert main() == 0
+    decision = json.loads(capsys.readouterr().out)["hookSpecificOutput"]
+    assert decision["permissionDecision"] == "deny"
+    assert "timed out" in decision["permissionDecisionReason"]
