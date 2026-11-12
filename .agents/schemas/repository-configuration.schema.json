@@ -21,6 +21,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "personal": {
+          "type": "object",
+          "properties": {
+            "bot_identity": {"type": "boolean"}
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": {"type": "object"}

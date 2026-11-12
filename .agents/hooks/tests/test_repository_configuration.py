@@ -63,6 +63,32 @@ class RepositoryConfigurationTests(unittest.TestCase):
         self.assertTrue(CONFIGURATION.auto_approve_design(self.root))
         self.assertFalse(delivery_policy.auto_merge_preference(self.root))
 
+    def test_personal_bot_identity_defaults_to_false_and_accepts_explicit_booleans(self):
+        self.assertFalse(CONFIGURATION.personal_bot_identity(self.root))
+        for value in (False, True):
+            with self.subTest(value=value):
+                self.write({"configuration": {"personal": {"bot_identity": value}}})
+                self.assertEqual(value, CONFIGURATION.personal_bot_identity(self.root))
+
+    def test_personal_bot_identity_rejects_nonboolean_values(self):
+        for value in ("true", 1, None):
+            with self.subTest(value=value):
+                self.write({"configuration": {"personal": {"bot_identity": value}}})
+                with self.assertRaises(CONFIGURATION.ConfigurationViolation):
+                    CONFIGURATION.personal_bot_identity(self.root)
+
+    def test_personal_bot_identity_preserves_unrelated_project_configuration(self):
+        path = self.write({
+            "marketplaces": {"future": True},
+            "configuration": {
+                "future": {"feature": {"enabled": True}},
+                "personal": {},
+            },
+        })
+        before = path.read_text(encoding="utf-8")
+        self.assertFalse(CONFIGURATION.personal_bot_identity(self.root))
+        self.assertEqual(before, path.read_text(encoding="utf-8"))
+
     def test_present_settings_are_authoritative_and_preserve_other_namespaces(self):
         path = self.write({
             "marketplaces": {"future": True},
@@ -226,6 +252,9 @@ class RepositoryConfigurationTests(unittest.TestCase):
             {"all": {"type": "boolean"}, "design": {"type": "boolean"}},
             auto_approve["properties"],
         )
+        personal = configuration["properties"]["personal"]
+        self.assertFalse(personal["additionalProperties"])
+        self.assertEqual({"type": "boolean"}, personal["properties"]["bot_identity"])
 
 
 if __name__ == "__main__":
