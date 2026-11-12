@@ -71,12 +71,17 @@ no merge, publication, installation, permission, or other external authority.
 ## Keep large changes reviewable
 
 Before implementing or expanding a large refactor or multi-concern change, apply
-`engineering:branching` to define and measure PR-sized delivery slices. Deliver one slice at a time
-by default: validate, review and merge when ready and authorized, then start the next from the updated
-base. When work must build on an unmerged PR, maintain a proper stack. Allocate worktrees for active
-execution needs independently of the number of branches. One goal may span many PRs. A phase label or
-an existing open PR never justifies accumulating the whole goal in one diff. Reassess an oversized
-candidate before adding more scope; preserve atomic behavior and security when choosing boundaries.
+[Engineering's delivery boundary](../branching/SKILL.md#delivery-boundary) and measured review assessment.
+That owner governs whether staging is authorized; a phase or local commit does not choose a PR boundary.
+Allocate worktrees for active execution needs independently of the number of branches. Preserve atomic
+behavior, security and required validation when assessing an oversized candidate.
+
+```text
+Input: a personal-project goal has three implementation steps and no approved staging.
+Route: engineering:branching resolves its delivery boundary; keep the steps in the owning PR.
+Input: the measured candidate exceeds the review warning threshold.
+Route: assess it under the same contract before final review; a size warning is not staging approval.
+```
 
 ## Delivery checkpoints
 

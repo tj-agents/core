@@ -8,6 +8,8 @@ domain: process
 
 # Committing and pushing
 
+Owns local commit and push cadence; PR boundaries belong to `engineering:branching`.
+
 **The default is to commit, not to "leave it for review."** The moment a discrete chunk of work is complete
 and its targeted local checks pass, **commit it, without asking.**
 
@@ -66,8 +68,12 @@ considered. That is what keeps it out of the code as running commentary.
 
 ## Keep commits within a reviewable delivery slice
 
-Use `engineering:branching` to choose PR boundaries and deliver focused PRs sequentially by default.
-When a PR must build on an unmerged parent, maintain the required stack. Keep related repairs and tests with their behavior, and split a substantial next concern
-before it grows the current candidate. Publication and deployment dependencies are additional boundaries;
-they are not the only reasons to separate PRs. Commit cadence and one verified push per slice do not
-require combining the entire goal into one PR.
+Use [Engineering's delivery boundary](../../policy/branching/SKILL.md#delivery-boundary) to choose PRs.
+Keep related repairs and tests with their behavior. Local commit or push cadence does not select a
+separate PR or change the agreed outcome.
+
+```text
+Input: a setup goal has verified Auth and persistence changes at separate local checkpoints.
+Action: commit each completed chunk, then publish a stable candidate to the owning review.
+PR boundary: resolve it through engineering:branching; two commits do not imply two PRs.
+```

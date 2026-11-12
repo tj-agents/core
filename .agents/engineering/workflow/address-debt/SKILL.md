@@ -71,9 +71,10 @@ repository's record operation; retain unsent facts under the shared guidance.
 3. **Investigate.** Read the surrounding code and understand the real root cause before touching anything,
    for each item in the bundle.
 4. **Fix it properly.** Always the long-term, scalable solution, never the hacky shortcut — the shortcut
-   decision remains subject to the repository's current-solution policy. It can span multiple PRs; if it genuinely
-   needs splitting, say so in one line, drop it from any bundle, and start with the first PR on its own
-   branch.
+   decision remains subject to the repository's current-solution policy. Apply
+   [Engineering's delivery boundary](../../policy/branching/SKILL.md#delivery-boundary) if the repair needs
+   a split assessment. Surface a genuine staging conflict with the precise decision needed; retain the
+   full repair scope and continue independent authorized work rather than opening a first partial PR.
 5. **Verify.** Build the affected projects to zero errors and run the affected unit/integration tests. Do
    not run local E2E for PR-bound work; the merge queue owns that gate per the repository's plan floor.
 6. **Close the loop.** Give each item its own commit — never squash a bundle into one — so the PR reads as
@@ -90,13 +91,13 @@ the item(s) you picked before starting, and flag anything irreversible.
 The Step 2 survey and Step 3 investigation may use independent read-only Workflow v2 roles —
 `evidence-explorer` over the selected debt items and surrounding code, `test-impact-analyst` for the
 affected projects and their commands — through the semantic envelopes in `.agents/workflows/contract/v2`, or
-the packaged `../../workflows/contract/v2` bundle. Picking, bundling, the split call, and the fix stay with
+the packaged `../../workflows/contract/v2` bundle. Picking, bundling, the boundary assessment, and the fix stay with
 the parent. A bundled item whose transformation is disjoint from every other may go to a `mechanical-worker`
 under one exclusive writer lease; writes stay serialized and the parent reconciles the reported paths against
 Git.
 
-Each delivery slice keeps its branch, selected checkout, commits and PR through these stages. When the
-work needs multiple PRs, resolve and validate Workflow v2 repository state, promote it through
+Each delivery slice keeps its branch, selected checkout, commits and PR through these stages. When
+staged delivery is authorized, resolve and validate Workflow v2 repository state, promote it through
 `engineering:plans`, and checkpoint under `engineering:plans`. Deliver the remaining slices
 under `engineering:branching`, resuming from the entry and ledger rather than this session.
 
@@ -107,4 +108,7 @@ The selected provider lists debt WI-320, "remove the duplicate parser branch", a
 high-value item in api/. It has no branch or worktree owner. Select its api checkout, repair the duplicate
 branch, run the parser unit tests, commit the focused change, and update WI-320 with the test evidence
 before closing it through the provider.
+
+If the repair grows beyond a small bundle, assess its full delivery boundary through engineering:branching.
+An unapproved split remains a decision to resolve; it does not authorize a first PR that omits half the repair.
 ```

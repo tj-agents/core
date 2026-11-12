@@ -18,9 +18,23 @@ before changing this goal's next action.
 ## Authority and acceptance
 
 The user's authorization defines the whole goal. An instruction to implement, execute, or deliver it
-covers its necessary reviewable slices and the PRs those slices create. An agent-selected phase, PR, or
-procedural limit does not narrow that authority. A goal file records authority; its existence does not
-invent it.
+covers the review and delivery needed for that outcome. An agent-selected phase, PR, or procedural limit
+does not narrow that authority. A goal file records authority; its existence does not invent it.
+
+Read the complete request, handoff and active goal before choosing the implementation scope. Carry every
+requested deliverable through design, delegation and plan promotion. Before dispatch, each deliverable
+has an implementation owner, including the parent where appropriate, or cited evidence that existing
+implementation already satisfies it. A bounded worker's brief defines its assignment, not the goal's
+remaining scope. Keep this reconciliation in the existing task or plan; a small coherent goal needs no
+additional ledger.
+
+Before reporting delivery, compare the whole agreed outcome with actual implementation and verification,
+including the consuming entry points and dependencies it needs. Documentation of missing code, future-work
+lists, unpublished experiments and fixes the consumer has not adopted do not satisfy requested implementation.
+A runtime, dependency, ownership or publication gate preserves the unmet requirement: complete independent
+authorized work, retain its resolver and observable acceptance, and surface the precise decision needed
+when the full outcome conflicts with the agreed repository or PR boundary. For software, read
+`engineering:branching`'s Delivery boundary section to resolve that boundary.
 
 When the user names a replacement or cutover, carry that scope through acceptance; an agent cannot retain
 the former public capability by reclassifying it as policy, transport, or another discovery name.
@@ -40,10 +54,21 @@ not completion.
 
 ```text
 User: "Implement and ship the parser migration."
-Agent: chooses two PR-sized slices and records their review and CI evidence.
-First PR: its required GitHub approval is pending, so workflow:continue retains the same goal and binding.
+Agent: implements the agreed migration and records its review and CI evidence in the owning PR.
+PR: its required GitHub approval is pending, so workflow:continue retains the same goal and binding.
 Approval observed: workflow:run resumes engineering:merge without a new user prompt.
 Completion: report only after the requested migration and its authorized package update are observed.
+```
+
+```text
+Request: complete a local search setup with Auth, Azure/Infra, persistence and an adopted platform fix.
+Proposed dispatch: worker A changes only Auth parameters and tests; the other deliverables have no owner.
+Decision: the dispatch does not cover the goal. The parent must own or assign the remaining implementation,
+          or verify that it already exists, before dispatching the bounded work.
+Candidate: one PR contains Auth and a future-work document; Infra is an unpublished experiment and the
+           platform fix is unconsumed.
+Acceptance: incomplete. Implement the remaining authorized setup and verify its consuming entry points;
+            retain any genuine publication or runtime gate rather than reporting the full setup delivered.
 ```
 
 Read `agent:lanes` for bounded phase capability. The parent retains design, acceptance, diagnosis, and

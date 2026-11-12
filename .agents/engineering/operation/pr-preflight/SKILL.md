@@ -116,11 +116,17 @@ commit ancestry, nor intercept arbitrary forge commands. The slice assessment be
    CI owns those, per `engineering:remote-validation`.
 
 9. **A reviewable delivery slice.** Apply `engineering:branching` to the measured diff against the
-   actual PR base. An oversized or multi-concern candidate without a recorded split assessment and
-   justified exception permitted by that contract (atomicity or frozen-scope recovery) is a blocker:
-   decompose and validate it before adding scope or requesting
-   final review. For a stack, verify parent/base/head identities, the layer's scope, and CI/protection
+   actual PR base. An oversized or multi-concern candidate without the recorded boundary assessment
+   required by that contract is a blocker. Resolve its reviewability within the
+   [agreed delivery boundary](../../policy/branching/SKILL.md#delivery-boundary), including a justified
+   large exception or the precise user decision needed for proposed staging; do not decompose it
+   automatically. For an authorized stack, verify parent/base/head identities, the layer's scope, and CI/protection
    coverage. A green top-of-stack build does not establish that lower layers can land independently.
+
+   ```text
+   Input: a one-PR goal exceeds the review warning threshold without a boundary assessment.
+   Verdict: blocked pending engineering:branching's assessment; the threshold does not authorize a stack.
+   ```
 
 ## Verdict
 

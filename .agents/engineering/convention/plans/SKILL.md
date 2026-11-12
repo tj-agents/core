@@ -8,6 +8,10 @@ domain: process
 
 # Plans
 
+Owns durable Engineering plan structure and recovery state. For execution, read `workflow:run`'s Authority
+and acceptance section and apply it to the complete agreed outcome, including work routed here from a
+feature or pre-existing programme.
+
 ## Applicability
 
 Read `workflow:plan-artifacts` for the common maintained-plan contract.
@@ -84,10 +88,10 @@ user-authorized goal through merged default-branch state.
 
 ## Shape of a plan
 
-A plan describes a chunk of work too big for one commit, broken into **phases that are each independently
-shippable and each end green**. A phase states what it changes, why, its verification gate, and — whenever it
-ships a capability something else consumes — its **consumption contract**. Phases sequence so that every
-intermediate state builds and passes.
+A plan describes a chunk of work too big for one commit, broken into phases with explicit verification
+gates. A phase states what it changes, why, its verification gate, and — whenever it provides a capability
+something else consumes — its **consumption contract**. Phases organize implementation; they do not select
+PR boundaries. Sequence them so that each verified intermediate state builds and passes.
 
 For a project selecting the Concertable pre-launch profile, its always-on instructions outrank every plan. That profile's router pre-launch guard applies to every write in every
 task lifecycle, enforced through Concertable's own adapter CLI. Run the shared structural ledger check as
@@ -101,23 +105,28 @@ This is a product-specific profile. Other repositories apply their own declared 
 **The consumption contract is a required part of any phase that ships a consumable capability, on the same
 footing as the verification gate** — not an aside to fill in later. It pins who calls the capability and the
 exact shape it hands back: payload, sync vs async, inline vs file/download. Design it from what the *consumer*
-needs, not from what is convenient to emit. You may defer the *consumer itself* — the UI, the calling
-service — to a named later phase or plan; you may **never** defer the *output contract*. A producer with an
+needs, not from what is convenient to emit. A consumer required by the agreed outcome remains subject
+to Workflow's acceptance contract even when implemented in a later phase. You may **never** defer the
+*output contract*. A producer with an
 undecided output is not a shippable phase: it cannot be named, typed, or tested against a consumer, and the
 gap resurfaces downstream as naming churn over a thing whose job was never fixed.
 
-## Delivery slices within a phase
+## Phases and delivery boundaries
 
-A phase can require several PRs. Apply `engineering:branching` before implementing or expanding a
-large change; its split assessment and atomicity exceptions govern the delivery map. Record each PR
-slice's purpose, included code/tests, base or parent, dependency, size estimate and validation gate.
-Deliver slices sequentially by default, landing the current ready and authorized PR before starting the
-next from the updated remote default. If dependent work must proceed before its parent lands, record
-why and maintain the required stack under `engineering:branching`. Keep a single goal and one current
-ledger, with branch/PR links and exact base/head SHAs for the active slices. Checkout allocation follows
-active execution needs, separately from planned PR boundaries.
+Apply [Engineering's delivery boundary](../../policy/branching/SKILL.md#delivery-boundary) before
+implementing or expanding a large change. Its assessment and staging authority govern the delivery map;
+an inherited phase or slice label does not select a separate PR. Record the agreed PR scope, included
+code/tests, base or parent, dependencies, size estimate and validation gate in the existing plan or
+ledger. Keep branch/PR links and exact base/head SHAs current. Checkout allocation follows active
+execution needs, separately from approved PR boundaries.
 
-Review a child against its actual parent while validating the cumulative tree. Reconcile descendants
+```text
+Input: an active programme receives a complete local setup request; its plan has Auth, Infra and persistence phases.
+Route: workflow:run owns whole-outcome acceptance; engineering:branching resolves the agreed PR boundary.
+Result: completing Auth does not complete the setup or authorize separate PRs for the remaining phases.
+```
+
+For an authorized stack, review a child against its actual parent while validating the cumulative tree. Reconcile descendants
 after parent changes. After a lower PR lands, continue from the reconciled next layer rather than
 starting a duplicate slice from main. Every landed state must work; never separate tests or security
 repairs from the behavior they are required to qualify merely to meet a line budget.
@@ -257,21 +266,22 @@ Every phase, no exceptions:
 
 ## Never leave the codebase out of sync — the plan isn't done until the whole thing is
 
-A refactor isn't finished when the convenient half lands. If a package boundary forces it into multiple PRs,
-do them back-to-back — but the plan stays open until **all** of them land and the codebase is in sync again.
+A refactor isn't finished when the convenient half lands. Resolve a package boundary against Engineering's
+agreed delivery boundary; when multiple PRs are authorized, the plan stays open until **all** of them land
+and the codebase is in sync again.
 Merging the consumer and calling the plan done while the producer still speaks the old shape is the thing to
 never do.
 
 ## Breaking published-contract changes — capture them, don't force them in
 
 Where services compile against *published* packages rather than the source sitting beside them, use the
-`concertable:package-cutover` standard to classify a contract change. A breaking change cannot land in one PR:
-consumers only see the new shape once the package republishes.
+`concertable:package-cutover` standard to classify a contract change. Consumers only see the new shape once
+the package republishes; preserve that publication and revalidation gate.
 
-When you hit one mid-feature, **don't force it into the current PR and don't derail the feature to do it.**
-Capture it in a dedicated plan (design, expand/contract steps, why it is multi-merge), record both dependency
-graphs, and do every consumer preparation step an exact local producer artifact supports. Keep those
-consumers delivery-gated until the published-package revalidation.
+When that gate conflicts with the agreed PR boundary, apply Workflow's authority and acceptance contract
+and surface the precise staging or publication decision. Retain the dependency and consumption requirements
+in the existing plan, record both dependency graphs, and do every authorized consumer preparation step an
+exact local producer artifact supports. Keep consumers delivery-gated until published-package revalidation.
 
 ## The delivery state vocabulary
 
@@ -296,8 +306,8 @@ implementation only when the required source, API, design, or exact test artifac
 prepare the consumer in its own worktree, test it against the exact producer artifact, and leave it
 delivery-gated until it passes again against the published baseline.
 
-Actively hand off every independent implementation path. Parallel means independently owned work made ready
-for its eventual merge order — not branches that are already mergeable today.
+Use Workflow's outcome ownership reconciliation for independent implementation paths; they may stay with
+the parent or receive bounded delegation. Their implementation readiness is distinct from merge eligibility.
 
 ## Write a fact into the plan that owns it
 
@@ -364,7 +374,7 @@ alone does not require that transfer; the context-transfer decision is owned by
    creating them, check plans, branches, worktrees, and PRs for the same work, then assign each logical
    workstream exactly one ledger.
 2. **Branch, then work a delivery slice** from the current remote default or the recorded stack parent's
-   tip. That branch and its selected checkout own the plan's current state for one PR-sized slice.
+   tip. Resolve the PR boundary through `engineering:branching`; phases may share the same owning PR.
 3. **At a material milestone, update the plan and compact ledger before the substantive commit.** Check off
    or strike shipped phases, retain only current recovery state, and stage those edits with the work.
 4. **Keep both artifacts after the last local phase while delivery is live.** Make the ledger's exact next
@@ -382,8 +392,8 @@ alone does not require that transfer; the context-transfer decision is owned by
 
 ### Plans outlive delivery branches
 
-A branch owns one PR-sized delivery slice, while the plan survives through the commits merged to the
-default branch. After merge, retire the completed branch and any isolated checkout through
+A branch owns its agreed PR scope, while the plan survives through any approved delivery stages merged
+to the default branch. After merge, retire the completed branch and any isolated checkout through
 `engineering:merge`, then continue the reconciled successor layer.
 When remaining work has no existing slice, start its branch from the current remote default and select
 its checkout under `engineering:branching`; create isolation only when active execution needs it.
