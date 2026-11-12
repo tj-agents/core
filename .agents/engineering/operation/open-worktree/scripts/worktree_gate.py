@@ -140,6 +140,10 @@ def mutates_worktree(words: Sequence[str]) -> bool:
 def check_command(command: str, cwd: Path, deadline: float) -> None:
     if not re.search(r"\b(?:git(?:\.exe)?|worktree)\b", command, re.IGNORECASE):
         return
+    if "worktree" in command.lower() and ("`" in command or "$(" in command):
+        raise create_worktree.CreateWorktreeError(
+            "worktree shell substitutions cannot be verified; use literal arguments"
+        )
     try:
         commands = segments(command)
     except ValueError as error:
