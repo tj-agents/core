@@ -105,6 +105,10 @@ def test_literal_canonical_destination_is_allowed(
         "g worktree add ../outside",
         "g worktree a${e}dd ../outside",
         "& $env:GIT worktree $action ../outside",
+        "rg `git worktree add ../outside`",
+        'echo "`git worktree add ../outside`"',
+        'printf "%s" "$(git worktree add ../outside)"',
+        'rg "$(git worktree move old ../outside)"',
     ],
 )
 def test_noncanonical_or_unresolved_mutation_is_denied(
