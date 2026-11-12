@@ -1,5 +1,6 @@
 import io
 import json
+import re
 import runpy
 import subprocess
 import sys
@@ -109,6 +110,7 @@ def test_literal_canonical_destination_is_allowed(
         'echo "`git worktree add ../outside`"',
         'printf "%s" "$(git worktree add ../outside)"',
         'rg "$(git worktree move old ../outside)"',
+        'git worktree list; echo "$(git worktree add ../outside)"',
     ],
 )
 def test_noncanonical_or_unresolved_mutation_is_denied(
@@ -128,6 +130,8 @@ def test_noncanonical_or_unresolved_mutation_is_denied(
         "rg worktree $path",
         "rg git worktree",
         "g worktree list",
+        "main=$(git symbolic-ref --short refs/remotes/origin/HEAD); git worktree prune",
+        'echo "$(git worktree list --porcelain)"',
         "cd $project; git status --short",
         "echo 'git worktree add ../outside'",
         "python - <<'PY'\nprint(\"isn't balanced in the shell lexer\")\nPY",
@@ -137,6 +141,20 @@ def test_nonmutating_commands_and_literal_text_are_allowed(
     repo: Path, command: str
 ) -> None:
     assert invoke(repo, "Bash", {"command": command}) is None
+
+
+@pytest.mark.parametrize(
+    ("skill", "block"),
+    [("prune-worktrees", 0), ("prune-worktrees", 1), ("unmerged", 3)],
+)
+def test_shipped_inventory_and_pruning_commands_are_allowed(
+    repo: Path, skill: str, block: int
+) -> None:
+    source = ROOT / ".agents/engineering/utility" / skill / "SKILL.md"
+    commands = re.findall(
+        r"```bash\n(.*?)\n```", source.read_text(encoding="utf-8"), re.DOTALL
+    )
+    assert invoke(repo, "Bash", {"command": commands[block]}) is None
 
 
 def test_git_directory_switch_resolves_the_target_repository(
