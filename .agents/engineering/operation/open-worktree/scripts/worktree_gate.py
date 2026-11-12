@@ -31,13 +31,37 @@ def executable(value: str) -> str:
     return value.replace("\\", "/").rsplit("/", 1)[-1].removesuffix(".exe").lower()
 
 
-def segments(command: str) -> list[list[str]]:
+def shell_words(command: str) -> list[str]:
     lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|()\n")
     lexer.whitespace = " \t\r"
     lexer.whitespace_split = True
     lexer.escape = ""
+    return list(lexer)
+
+
+def nonplacement_operation(action: str) -> bool:
+    return action in {"list", "prune", "remove", "repair", "lock", "unlock", "-h"}
+
+
+def needs_placement_check(command: str) -> bool:
+    words = shell_words(command)
+    for index, word in enumerate(words):
+        if word.startswith("--worktree") or word == "-w":
+            return True
+        if (
+            word == "worktree"
+            and index + 1 < len(words)
+            and not nonplacement_operation(words[index + 1])
+        ):
+            return True
+        if "worktree" in word and len(word.split()) > 1 and needs_placement_check(word):
+            return True
+    return False
+
+
+def segments(command: str) -> list[list[str]]:
     groups: list[list[str]] = [[]]
-    for token in lexer:
+    for token in shell_words(command):
         if token and all(character in ";&|()\n" for character in token):
             if "(" in token or ")" in token or "||" in token:
                 raise ValueError("unsupported shell control flow")
@@ -114,7 +138,7 @@ def check_git(arguments: Sequence[str], cwd: Path, deadline: float) -> None:
     if index + 1 == len(arguments):
         return
     action = literal(arguments[index + 1])
-    if action in {"list", "prune", "remove", "repair", "lock", "unlock", "-h"}:
+    if nonplacement_operation(action):
         return
     mutation = next((item for item in Mutation if item.command == action), None)
     if mutation is None:
@@ -140,11 +164,13 @@ def mutates_worktree(words: Sequence[str]) -> bool:
 def check_command(command: str, cwd: Path, deadline: float) -> None:
     if not re.search(r"\b(?:git(?:\.exe)?|worktree)\b", command, re.IGNORECASE):
         return
-    if "worktree" in command.lower() and ("`" in command or "$(" in command):
-        raise create_worktree.CreateWorktreeError(
-            "worktree shell substitutions cannot be verified; use literal arguments"
-        )
     try:
+        if not needs_placement_check(command):
+            return
+        if "`" in command or "$(" in command:
+            raise create_worktree.CreateWorktreeError(
+                "worktree shell substitutions cannot be verified; use literal arguments"
+            )
         commands = segments(command)
     except ValueError as error:
         if "worktree" in command.lower():
