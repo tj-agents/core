@@ -872,10 +872,10 @@ def build(root: Path, validate_plugin_digests: bool = True, roster=None):
 
     output: dict[str, bytes] = {}
 
-    def emit(relative: str, data: str | bytes):
+    def emit(relative: str, data: str | bytes, *, exact: bool = False):
         if relative in output:
             raise ValueError(f"Duplicate generated output: {relative}")
-        output[relative] = canonical_output_bytes(data)
+        output[relative] = data if exact and isinstance(data, bytes) else canonical_output_bytes(data)
 
     # Ship the canonical definition once. Resource siblings are also copied into each
     # generated discovery entry so <skill-directory> remains valid after installation;
@@ -920,13 +920,23 @@ def build(root: Path, validate_plugin_digests: bool = True, roster=None):
         destination = PurePosixPath(resource["destination"])
         if destination.is_absolute() or ".." in destination.parts:
             raise ValueError(f"Invalid resource destination: {destination}")
+        installer = resource["source"] == "install.ps1"
+        if installer and (
+            destination.as_posix() != f".agents/{plugin}/resources/installer/install.ps1"
+            or source != root / "install.ps1"
+            or source.is_symlink()
+            or source.is_junction()
+            or not source.is_file()
+            or source.stat().st_nlink != 1
+        ):
+            raise ValueError("Root installer requires a direct file and its owning installer resource path")
         paths = sorted(source.rglob("*")) if source.is_dir() else [source]
         for path in paths:
             if not path.is_file() or path.suffix == ".pyc" or "__pycache__" in path.parts:
                 continue
             suffix = path.relative_to(source).as_posix() if source.is_dir() else ""
             target = f"plugins/{plugin}/{destination}" + (f"/{suffix}" if suffix else "")
-            emit(target, path.read_bytes())
+            emit(target, path.read_bytes(), exact=installer)
 
     emit_workflow_agents(root, config, emit)
 

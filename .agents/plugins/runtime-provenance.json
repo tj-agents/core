@@ -298,11 +298,11 @@
       "adaptation": "Extract structural ledger validation; product convention policy and --plan entry remain at Concertable source unchanged."
     },
     {
-      "path": ".codex/install-workflow-agents.ps1",
+      "path": "install.ps1",
       "source_path": ".agents/workflows/hosts/install-codex-agents.ps1",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "907aa7179990caac9670215bc0331f346053b2c7ee06fc9d378d3d1b96310893",
-      "adaptation": "Codex-only installer is authored under .codex and packaged with the engineering plugin."
+      "adaptation": "Global Codex role writes are authored in the owning root install.ps1 and packaged byte-identically with Engineering."
     },
     {
       "path": ".codex/agent-delivery.json",

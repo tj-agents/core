@@ -61,6 +61,7 @@ class HarnessManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             shutil.copytree(ROOT / ".agents", root / ".agents")
+            shutil.copy2(ROOT / "install.ps1", root / "install.ps1")
             shutil.copytree(ROOT / ".codex/runtime/continuation", root / ".codex/runtime/continuation")
             path = root / ".agents/plugins/harness/workflow.json"
             original = json.loads(path.read_text(encoding="utf-8"))

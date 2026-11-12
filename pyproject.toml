@@ -37,7 +37,7 @@ exclude = ["^plugins/"]
 
 [tool.pytest]
 strict = true
-pythonpath = ["."]
+pythonpath = [".", ".agents/hooks/tests"]
 testpaths = ["tests", ".agents/hooks/tests"]
 addopts = ["--import-mode=importlib", "-ra", "--disable-socket"]
 filterwarnings = ["error"]

@@ -24,6 +24,11 @@ maintained source.
 (`skills/<plugin>/<name>/SKILL.md`), agent TOML and installation details. `.claude/` contains the
 corresponding Claude-only material.
 
+Protected global configuration writes belong in the owning root `install.ps1`. Core's Codex role
+installer is authored there and ships byte-identically at
+`plugins/engineering/.agents/engineering/resources/installer/install.ps1`; its role definitions and
+delivery configuration remain under `.codex/`.
+
 Authored host manifests and hook wiring live under `.agents/plugins/manifests/`, with their Codex or
 Claude identity explicit in the path. `.agents/plugins/sources.json` is the one source map used to
 assemble those manifests with the host adapter and canonical capability definitions.

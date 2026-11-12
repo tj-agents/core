@@ -129,8 +129,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".codex/install-workflow-agents.ps1",
-      "destination": "scripts/install-codex-agents.ps1"
+      "source": "install.ps1",
+      "destination": ".agents/engineering/resources/installer/install.ps1"
     },
     {
       "plugin": "engineering",

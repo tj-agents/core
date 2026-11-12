@@ -23,6 +23,7 @@ class PluginUpdateTests(unittest.TestCase):
                 shutil.copytree(
                     ROOT / name, root / name, ignore=shutil.ignore_patterns(*patterns)
                 )
+            shutil.copy2(ROOT / "install.ps1", root / "install.ps1")
             path = root / ".agents/plugins/harness/engineering.json"
             manifest = json.loads(path.read_text(encoding="utf-8"))
             manifest["requires"]["permissions"]["claude_allow"].append("Bash(python -B fixture.py)")

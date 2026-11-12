@@ -49,6 +49,8 @@ class SourceLayoutTests(unittest.TestCase):
                 ignore=shutil.ignore_patterns(*patterns),
             )
 
+        shutil.copy2(ROOT / "install.ps1", self.root / "install.ps1")
+
     def config(self, edit):
         path = self.root / ".agents/plugins/sources.json"
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -86,6 +88,8 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
+        installer = "plugins/engineering/.agents/engineering/resources/installer/install.ps1"
+        self.assertEqual((self.root / "install.ps1").read_bytes(), output[installer])
         self.assertIn("workflow:continue", skills)
         self.assertEqual("workflow", skills["workflow:session"]["plugin"])
         self.assertNotIn("agent:background-listener", skills)

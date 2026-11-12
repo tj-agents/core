@@ -41,6 +41,8 @@ def test_base_configuration_context_loads_without_stack_detection(
     context = json.loads(capsys.readouterr().out)["hookSpecificOutput"]
     assert context["hookEventName"] == "SessionStart"
     assert context["additionalContext"].count(data["session_context"]) == 1
+    assert "<primary-repository>/.worktrees/<flattened-branch>" in context["additionalContext"]
+    assert "engineering:open-worktree's shared creator" in context["additionalContext"]
 
 
 def test_native_utf8_payload_is_independent_of_windows_console_encoding(

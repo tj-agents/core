@@ -94,7 +94,7 @@ A generic work tier can depend on this fact:
 only when that tier applies, including valid `always` tiers. It lists each genuinely matched
 employer's qualified context skill and exact installed `SKILL.md` path. Multiple matching employers
 are all reported; consuming workflows must resolve that ambiguity before choosing employer-specific
-contacts. No employer names are built into Core. Employer scope comes from installed declarations;
+contacts. No employer names are built into Core's detection logic. Employer scope comes from installed declarations;
 Personal additionally requires explicit repository adoption.
 
 Base's version 3 `session_context` is the canonical common configuration rule. It loads at

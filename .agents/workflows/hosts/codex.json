@@ -10,7 +10,7 @@
     "project_directory": ".codex/agents",
     "plugin_directory": "codex-agents",
     "extension": ".toml",
-    "plugin_installer": "scripts/install-codex-agents.ps1",
+    "plugin_installer": ".agents/engineering/resources/installer/install.ps1",
     "plugin_loading": "unsupported-use-profile-installer",
     "project_scope": "supported-for-project-owned-distinct-roles"
   },

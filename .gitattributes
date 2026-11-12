@@ -1,4 +1,6 @@
 *.sh text eol=lf
+/install.ps1 text eol=lf
+/plugins/engineering/.agents/engineering/resources/installer/install.ps1 text eol=lf
 .agents/engineering/utility/guide-build/template/** text eol=lf
 /.codex/config.toml -merge
 /.claude/settings.json -merge

@@ -655,7 +655,7 @@ class WorkflowGenerationTests(unittest.TestCase):
         self.assertNotEqual([], hosts)
         for name, arguments in hosts:
             with self.subTest(host=name):
-                script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+                script = ROOT / "plugins" / "engineering" / ".agents/engineering/resources/installer/install.ps1"
                 with tempfile.TemporaryDirectory() as temp:
                     root = Path(temp)
                     codex_home = root / "codex-home"
@@ -792,7 +792,7 @@ class WorkflowGenerationTests(unittest.TestCase):
         self.assertNotEqual([], hosts)
         for name, arguments in hosts:
             with self.subTest(host=name):
-                script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+                script = ROOT / "plugins" / "engineering" / ".agents/engineering/resources/installer/install.ps1"
                 generated = sorted((ROOT / "plugins" / "engineering" / "codex-agents").glob("*.toml"))
                 with tempfile.TemporaryDirectory() as temp:
                     codex_home = Path(temp) / "codex-home"
@@ -842,12 +842,12 @@ class WorkflowGenerationTests(unittest.TestCase):
             with self.subTest(host=name):
                 with tempfile.TemporaryDirectory() as temp:
                     root = Path(temp)
-                    bundle = root / "bundle" / ".codex"
-                    source = bundle / "agents"
+                    bundle = root / "bundle"
+                    source = bundle / ".codex/agents"
                     shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
-                    script = bundle / "install-workflow-agents.ps1"
-                    shutil.copy2(ROOT / ".codex" / script.name, script)
-                    shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
+                    script = bundle / "install.ps1"
+                    shutil.copy2(ROOT / script.name, script)
+                    shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / ".codex/agent-delivery.json")
                     generated = sorted(source.glob("*.toml"))
                     codex_home = root / "codex-home"
                     target = codex_home / "agents"
@@ -924,8 +924,8 @@ class WorkflowGenerationTests(unittest.TestCase):
                     root = Path(temp)
                     bundle = root / "bundle" / "scripts"
                     bundle.mkdir(parents=True)
-                    script = bundle / "install-codex-agents.ps1"
-                    shutil.copy2(ROOT / ".codex" / "install-workflow-agents.ps1", script)
+                    script = bundle / "install.ps1"
+                    shutil.copy2(ROOT / "install.ps1", script)
                     project = root / "project"
                     project.mkdir()
                     (project / ".git").mkdir()
@@ -944,7 +944,7 @@ class WorkflowGenerationTests(unittest.TestCase):
         self.assertNotEqual([], hosts)
         for name, arguments in hosts:
             with self.subTest(host=name):
-                script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+                script = ROOT / "plugins" / "engineering" / ".agents/engineering/resources/installer/install.ps1"
                 with tempfile.TemporaryDirectory() as temp:
                     root = Path(temp)
                     codex_home = root / "codex-home"
@@ -998,7 +998,7 @@ class WorkflowGenerationTests(unittest.TestCase):
     def test_codex_installer_rejects_a_reparse_point_in_a_profile_ancestor(self):
         hosts = powershell_hosts()
         self.assertNotEqual([], hosts)
-        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+        script = ROOT / "plugins" / "engineering" / ".agents/engineering/resources/installer/install.ps1"
         for name, arguments in hosts:
             with self.subTest(host=name):
                 with tempfile.TemporaryDirectory() as temp:
@@ -1019,7 +1019,7 @@ class WorkflowGenerationTests(unittest.TestCase):
     def test_codex_installer_rejects_a_dangling_reparse_point_in_a_profile_ancestor(self):
         hosts = powershell_hosts()
         self.assertNotEqual([], hosts)
-        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+        script = ROOT / "plugins" / "engineering" / ".agents/engineering/resources/installer/install.ps1"
         for name, arguments in hosts:
             with self.subTest(host=name):
                 with tempfile.TemporaryDirectory() as temp:
@@ -1044,7 +1044,7 @@ class WorkflowGenerationTests(unittest.TestCase):
             self.skipTest("root bypasses directory permissions")
         hosts = powershell_hosts()
         self.assertNotEqual([], hosts)
-        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+        script = ROOT / "plugins" / "engineering" / ".agents/engineering/resources/installer/install.ps1"
         for name, arguments in hosts:
             with self.subTest(host=name):
                 with tempfile.TemporaryDirectory() as temp:
@@ -1072,7 +1072,7 @@ class WorkflowGenerationTests(unittest.TestCase):
             self.skipTest("root bypasses directory permissions")
         hosts = powershell_hosts()
         self.assertNotEqual([], hosts)
-        installer = ROOT / ".codex" / "install-workflow-agents.ps1"
+        installer = ROOT / "install.ps1"
         probe_body = """param([string] $Installer, [string] $Locked, [string] $Missing)
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($Installer, [ref]$null, [ref]$null)
 $definition = $ast.Find({
@@ -1128,12 +1128,12 @@ $results | ConvertTo-Json -Compress
             with self.subTest(host=name):
                 with tempfile.TemporaryDirectory() as temp:
                     root = Path(temp)
-                    bundle = root / "bundle" / ".codex"
-                    source = bundle / "agents"
+                    bundle = root / "bundle"
+                    source = bundle / ".codex/agents"
                     shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
-                    script = bundle / "install-workflow-agents.ps1"
-                    shutil.copy2(ROOT / ".codex" / script.name, script)
-                    shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
+                    script = bundle / "install.ps1"
+                    shutil.copy2(ROOT / script.name, script)
+                    shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / ".codex/agent-delivery.json")
                     generated = len(list(source.glob("*.toml")))
                     (source / "unrelated.toml").write_text('name = "unrelated"\n', encoding="utf-8")
                     codex_home = root / "codex-home"

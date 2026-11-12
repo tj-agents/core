@@ -51,7 +51,7 @@ incomplete.
   a skip reason, and the behaviour it covers also has a test on the other platform. Tests whose
   behaviour differs by platform pin the platform explicitly.
 
-Repository tooling (`.agents/sync-generated.ps1`, `.codex/install-workflow-agents.ps1`) may use PowerShell 7
+Repository tooling (`.agents/sync-generated.ps1`, `install.ps1`) may use PowerShell 7
 (`pwsh`), but it must run under `pwsh` on Linux as well as on Windows.
 
 ## Python and portability

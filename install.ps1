@@ -188,21 +188,21 @@ function Remove-DirectoryIfEmpty([string] $Path) {
     }
 }
 
-$source =
-    if ((Split-Path -Leaf $PSScriptRoot) -eq '.codex') { Join-Path $PSScriptRoot 'agents' }
-    else { Join-Path (Split-Path -Parent $PSScriptRoot) 'codex-agents' }
-if (-not (Test-Path -LiteralPath $source)) {
+$repositorySource = Join-Path $PSScriptRoot '.codex/agents'
+$packageRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../../..'))
+if (Test-Path -LiteralPath $repositorySource -PathType Container) {
+    $source = $repositorySource
+    $deliveryConfig = Join-Path $PSScriptRoot '.codex/agent-delivery.json'
+}
+else {
+    $source = Join-Path $packageRoot 'codex-agents'
+    $deliveryConfig = Join-Path $packageRoot 'workflows/hosts/agent-delivery.json'
+}
+if (-not (Test-Path -LiteralPath $source -PathType Container)) {
     throw "No generated role files beside this installer: $source"
 }
 $source = (Resolve-Path -LiteralPath $source).ProviderPath
 
-$deliveryConfig =
-    if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'agent-delivery.json')) {
-        Join-Path $PSScriptRoot 'agent-delivery.json'
-    }
-    else {
-        Join-Path (Split-Path -Parent $PSScriptRoot) 'workflows/hosts/agent-delivery.json'
-    }
 if (-not (Test-Path -LiteralPath $deliveryConfig)) {
     throw "No Codex agent delivery config beside this installer: $deliveryConfig"
 }
