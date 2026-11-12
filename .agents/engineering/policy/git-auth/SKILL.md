@@ -1,53 +1,58 @@
 ---
 name: git-auth
-description: Select GitHub credentials for the owning work, diagnose denied access, and honor an explicitly authorized fine-grained or classic token choice. Use when access is refused or before requesting, creating or widening credentials.
+description: Use existing native Git and gh authentication for the selected repository, diagnose refused GitHub access, and preserve the user's credential configuration. Use when GitHub access is refused or before an authorized Git or gh operation needs verified access.
 
 kind: policy
 domain: process
 ---
 
-# Select credentials for the owning work
+# Select native GitHub access
 
-Keep access decisions tied to the owning organization, requested operations and the user's authority.
-A refused call requires diagnosis; never switch token types, widen scopes or change organization policy
-automatically. Use the selected profile's existing GitHub App when it already supplies the needed access.
+Owns repository-scoped use of existing native Git and gh authentication, including evidence-based diagnosis
+of refused GitHub access. It never creates an enrollment, binds a checkout to an employer credential, or
+routes access through a separate token store or gateway.
 
 ```text
-Fine-grained token awaits employer admin approval, which the user cannot obtain.
-User explicitly chooses classic repository access with employer SSO.
-Select github:access classic onboarding; keep employer routing and secure storage in force.
-Do not generate another fine-grained token or request organization administration scopes.
+Repository: github.com/acme/project; the user authorizes a read-only access check.
+Run: git ls-remote origin
+     gh auth status
+     gh repo view acme/project --json viewerPermission
+Result: the remote reachability, active gh identity and repository permission are known; no credential,
+        host setting or repository binding changed.
 ```
 
-## Offer the supported token choices
+## Keep scope and identity explicit
 
-A fine-grained personal access token has one resource owner and selected repository permissions. Prefer
-it when the organization permits it and required approval is available. State the actual resource owner,
-repository access and permissions; its creation URL does not preselect repositories.
+Use the checkout's configured remote and the user's existing Git credential helpers and `gh` authentication.
+Keep global native helpers and any already-configured GitHub MCP helper intact. A configured MCP helper is
+optional evidence for the operation; Git and `gh` do not require it and it must not become a credential
+gateway.
 
-A classic personal access token is a supported choice when the user explicitly authorizes its broader
-scope. It can reach repositories beyond the owning organization, so never describe the credential itself
-as organization-scoped. For ordinary private repository work use `repo`; include `workflow` when workflow
-writes are needed. Employer SSO authorization and organization restrictions still apply. Classic-token
-SSO authorization and fine-grained administrator approval are different steps.
+Personal policy applies only after the repository explicitly adopts Personal. A bot identity also requires
+its own explicit opt-in and configuration. Repository ownership, a GitHub account, an employer remote, or
+access to a credential does not establish either scope.
 
-`github:access` owns both onboarding forms, token validation, secure storage, rotation, tool routing and
-readiness checks. An employer-owned profile declares its default method and repository access, including
-all repositories in that organization when authorized. Preserve the selected checkout and organization
-boundaries even when the underlying credential is broader. Personal GitHub App setup keeps its owner.
+Do not create tokens, change `gh` login state, alter global Git credential helpers, replace `HOME` or
+`GH_CONFIG_DIR`, add a repository-specific credential binding, or create a separate token vault. A global
+native helper remains the user's configuration; do not replace it to route one employer or checkout.
 
-## Diagnose and complete the selected flow
+## Diagnose the refused operation
 
-Distinguish invalid authentication, wrong identity, missing SSO authorization, pending organization
-approval, insufficient repository permissions and unavailable network checks from observed evidence.
-Do not call a token ready merely because the local submission page received it. Verify actual access
-through the selected Git, gh and MCP routes before claiming readiness.
+Start with the least invasive authorized native check for the selected remote. Use Git to establish remote
+reachability and `gh` to identify its active account and the repository permission needed for the requested
+operation. When an actual authorized operation is refused, distinguish evidence for invalid or missing
+authentication, the wrong active identity, missing repository permission, required organization SSO, and a
+network or service failure.
 
-The human creates and submits a token through the secure local flow and completes required GitHub/SSO
-actions. Never request the value in chat, command arguments, environment dumps, clipboard automation or
-files. Do not configure an account-wide gh login as an employer-routing shortcut.
+Treat organization SSO as GitHub's own authorization step. Report the concrete GitHub response and its
+organization or authorization link when available; do not infer an SSO state from the repository owner or
+try to change organization policy. A denied operation that lacks enough evidence remains unavailable rather
+than a guessed permission finding.
 
-Existing repository access does not grant authority for an unrelated administration operation. Request
-additional permissions only for an explicitly authorized operation that needs them. If no authorized
-credential can perform a check, record it unavailable and explain the missing evidence; never turn a
-refused check into a guessed finding.
+Only the user may authorize a native authentication change. If they do, use the normal Git or `gh` flow they
+selected and re-run the relevant repository check. Never request, print, paste, pass through command
+arguments, add to environment dumps, automate through the clipboard, or write a token, password, private key
+or session credential to a file.
+
+Existing repository access does not authorize a different administration operation. Request only the
+operation the user has authorized, and report the missing access or evidence when it cannot be verified.
