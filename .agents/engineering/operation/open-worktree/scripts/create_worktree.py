@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -32,8 +33,13 @@ class Checkout:
     base_head: str
 
 
-def git(cwd: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+def git(
+    cwd: Path, *arguments: str, deadline: float | None = None
+) -> subprocess.CompletedProcess[str]:
     command = ["git", "-C", str(cwd), *arguments]
+    timeout = GIT_TIMEOUT_SECONDS if deadline is None else deadline - time.monotonic()
+    if timeout <= 0:
+        raise CreateWorktreeError("Git worktree verification deadline exceeded")
     try:
         return subprocess.run(
             command,
@@ -41,24 +47,26 @@ def git(cwd: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=GIT_TIMEOUT_SECONDS,
+            timeout=timeout,
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise CreateWorktreeError(f"{' '.join(command)}: {error}") from error
 
 
-def run(cwd: Path, *arguments: str) -> str:
-    result = git(cwd, *arguments)
+def run(cwd: Path, *arguments: str, deadline: float | None = None) -> str:
+    result = git(cwd, *arguments, deadline=deadline)
     if result.returncode:
         detail = (result.stderr or result.stdout).strip()
         raise CreateWorktreeError(f"git {' '.join(arguments)} failed: {detail}")
     return result.stdout.rstrip("\r\n")
 
 
-def worktrees(start: Path) -> list[Worktree]:
+def worktrees(start: Path, *, deadline: float | None = None) -> list[Worktree]:
     entries = []
-    for record in run(start, "worktree", "list", "--porcelain", "-z").split("\0\0"):
+    for record in run(
+        start, "worktree", "list", "--porcelain", "-z", deadline=deadline
+    ).split("\0\0"):
         if not record:
             continue
         fields = dict(field.partition(" ")[::2] for field in record.split("\0"))
@@ -73,17 +81,28 @@ def worktrees(start: Path) -> list[Worktree]:
     return entries
 
 
-def repository_root(start: Path) -> Path:
-    root = Path(run(start, "rev-parse", "--show-toplevel")).resolve()
-    directory = run(root, "rev-parse", "--path-format=absolute", "--git-dir")
-    common = run(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+def repository_root(start: Path, *, deadline: float | None = None) -> Path:
+    root = Path(run(start, "rev-parse", "--show-toplevel", deadline=deadline)).resolve()
+    directory = run(
+        root, "rev-parse", "--path-format=absolute", "--git-dir", deadline=deadline
+    )
+    common = run(
+        root,
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-common-dir",
+        deadline=deadline,
+    )
     if Path(directory).resolve() == Path(common).resolve():
         return root
-    entries = worktrees(start)
+    entries = worktrees(start, deadline=deadline)
     if not entries or entries[0].bare:
         raise CreateWorktreeError("a non-bare primary repository is required")
     primary = entries[0].path
-    if Path(run(primary, "rev-parse", "--show-toplevel")).resolve() != primary:
+    if (
+        Path(run(primary, "rev-parse", "--show-toplevel", deadline=deadline)).resolve()
+        != primary
+    ):
         raise CreateWorktreeError("cannot resolve the primary repository")
     return primary
 
@@ -146,6 +165,25 @@ def ensure_available(path: Path) -> None:
                 raise CreateWorktreeError(f"{existing} already exists")
 
 
+def exclude_worktree_directory(repo: Path) -> None:
+    common = Path(run(repo, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+    path = common.resolve() / "info" / "exclude"
+    if path.resolve() != path:
+        raise CreateWorktreeError(f"Git exclude file is redirected: {path}")
+    try:
+        content = path.read_bytes() if path.exists() else b""
+        pattern = b"/.worktrees/"
+        if pattern in content.splitlines():
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("ab") as stream:
+            if content and not content.endswith(b"\n"):
+                stream.write(b"\n")
+            stream.write(pattern + b"\n")
+    except OSError as error:
+        raise CreateWorktreeError(f"cannot ignore local worktrees: {error}") from error
+
+
 def claim_worktree(path: Path) -> None:
     executable = shutil.which("tj.exe" if sys.platform == "win32" else "tj")
     if executable is None:
@@ -196,6 +234,7 @@ def create(branch: str, start_point: str | None = None, *, cwd: Path) -> Checkou
         ):
             raise CreateWorktreeError(f"registered checkout needs repair: {path}")
         claim_worktree(path)
+        exclude_worktree_directory(repo)
         head = run(path, "rev-parse", "HEAD")
         return Checkout(str(repo), branch, str(path), head, "(existing worktree)", head)
     ensure_available(path)
@@ -216,6 +255,7 @@ def create(branch: str, start_point: str | None = None, *, cwd: Path) -> Checkou
         base = start_point or default_base(repo, has_origin)
         base_head = run(repo, "rev-parse", "--verify", f"{base}^{{commit}}")
         arguments = ["worktree", "add", str(path), "-b", branch, base_head]
+    exclude_worktree_directory(repo)
     run(repo, *arguments)
     claim_worktree(path)
     return Checkout(

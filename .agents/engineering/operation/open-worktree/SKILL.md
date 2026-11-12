@@ -74,6 +74,9 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
    Repeated invocation reuses the registered canonical checkout and preserves its dirty work, after a fresh
    ownership claim. An existing checkout elsewhere, a redirected destination or a flattened-name collision
    fails with its path; resolve ownership before migrating it. It never moves another checkout implicitly.
+   It keeps the primary checkout clean by adding `/.worktrees/` to Git's local excludes, preserving existing
+   entries. Base's hooks reject unsupported native creation and direct shell destinations outside this layout;
+   unresolved shell expressions and Git lookup failures return a denial with the shared command.
    Creation requires the installed `tj` command. After Git creates the checkout, the script asks
    `tj session claim-worktree` to associate its exact path with the current session. Outside an agent
    session, that command succeeds without an owner. A refused claim fails creation and reports the

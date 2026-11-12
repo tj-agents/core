@@ -167,6 +167,7 @@ def test_new_branch_uses_nested_flattened_path(
     assert Path(result["path"]) == expected
     assert git(expected, "branch", "--show-current") == branch
     assert git(expected, "status", "--porcelain") == ""
+    assert git(repo, "status", "--porcelain") == ""
     assert result["head"] == git(repo, "rev-parse", "HEAD")
     assert not (repo.parent / f"{repo.name}.worktrees").exists()
     assert ownership.claimed == [expected]
@@ -180,6 +181,17 @@ def test_existing_local_branch_keeps_its_tip(repo: Path) -> None:
     assert result["head"] == existing_tip
     assert result["base"] == "(existing branch)"
     assert result["base_head"] == existing_tip
+
+
+def test_local_excludes_are_preserved_across_creation_and_reuse(repo: Path) -> None:
+    exclude = repo / ".git" / "info" / "exclude"
+    original = b"local-only.txt"
+    exclude.write_bytes(original)
+    (repo / "local-only.txt").write_text("keep ignored", encoding="utf-8")
+    create(repo, "Feature/Excluded")
+    create(repo, "Feature/Excluded")
+    assert exclude.read_bytes() == original + b"\n/.worktrees/\n"
+    assert git(repo, "status", "--porcelain") == ""
 
 
 def test_explicit_parent_uses_recorded_tip(repo: Path) -> None:
@@ -266,6 +278,7 @@ def test_separate_git_directory_does_not_become_the_primary_root(
     commit(repo, "initial")
     result = create(repo, "Feature/SeparateGitDir")
     assert Path(result["path"]) == repo / ".worktrees" / "Feature-SeparateGitDir"
+    assert git(repo, "status", "--porcelain") == ""
 
 
 def test_linked_checkout_resolves_primary_repository(
