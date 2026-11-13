@@ -1,6 +1,8 @@
 import importlib.util
+import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -17,6 +19,7 @@ NOT_PLANS = {"agents.md", "claude.md", "readme.md", "tech_debt.md", "technical_d
 WORK_ITEM_README = re.compile(
     r"^plans/features/([a-z0-9]+(?:-[a-z0-9]+)*)/work-items/"
     r"([a-z0-9]+(?:-[a-z0-9]+)*)/README\.md$")
+WORK_ITEM_REFERENCE = re.compile(r"^- Work item:\s*(.+?)\s*$", re.M)
 
 WORD = re.compile(r"[a-z0-9]+")
 
@@ -75,28 +78,29 @@ def owned_module(name, path):
     return module
 
 
-def git(directory, *arguments):
+def tracker_item(directory, text):
+    declared = WORK_ITEM_REFERENCE.search(text)
+    if declared is None:
+        raise RuntimeError("work-item README declares no `- Work item: <ref>`")
+    reference = declared.group(1).strip("`")
+    executable = shutil.which("tj")
+    if executable is None:
+        raise RuntimeError("tj is not on PATH")
     try:
-        result = subprocess.run(["git", "-C", str(directory), *arguments],
-                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
+        result = subprocess.run([executable, "item", "resolve", reference], cwd=str(directory),
+                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     except (OSError, subprocess.TimeoutExpired) as error:
-        raise RuntimeError(f"status repository identity unavailable: {error}") from error
-    return result.stdout.strip() if result.returncode == 0 else None
-
-
-def work_item_reader():
-    package = package_root()
-    source_runtime = package / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime"
-    runtime = source_runtime if source_runtime.is_dir() else package / ".agents" / "agent-store" / "runtime"
-    store = owned_module("reader", runtime / "reader.py")
-    identity = owned_module("repository_identity", runtime / "repository_identity.py")
-    reader_type = getattr(store, "ReadOnlyWorkItemStore", None)
-    if not all((callable(reader_type),
-                callable(getattr(store, "StoreReadError", None)),
-                callable(getattr(identity, "repository_identity", None)),
-                callable(getattr(reader_type, "work_item", None)))):
-        raise RuntimeError("status capability failure: own Agent Store reader lacks work-item support")
-    return store, identity
+        raise RuntimeError(f"tj item resolve failed: {error}") from error
+    if result.returncode:
+        raise RuntimeError(f"tj item resolve {reference} exited {result.returncode}: "
+                           f"{(result.stderr or result.stdout).strip()}")
+    try:
+        item = json.loads(result.stdout)
+    except ValueError as error:
+        raise RuntimeError(f"tj item resolve {reference} printed invalid JSON") from error
+    if not isinstance(item, dict) or not (item.get("state") or item.get("native_state")):
+        raise RuntimeError(f"tj item resolve {reference} returned no state")
+    return item
 
 
 def record_selection_reader():
@@ -117,7 +121,6 @@ def record_selection(directory):
 
 
 try:
-    store, identity = work_item_reader()
     records = record_selection_reader()
     asked = record_selection(here)
 except RuntimeError as error:
@@ -213,7 +216,6 @@ DONE_BOX = re.compile(r"^\s*[-*]\s*\[[xX]\]", re.M)
 
 named, mentioned, hidden, elsewhere = [], [], 0, {}
 named_seen = False
-repositories = {}
 for entry in plan_entries():
     path, folder, label, group = entry[:4]
     member, item, selection = entry[4:] if len(entry) > 4 else (None, None, None)
@@ -240,23 +242,19 @@ for entry in plan_entries():
     if selection and item is not None:
         state = "supporting"
     elif item is not None:
-        relative_path = path.relative_to(member).as_posix()
-        work_item = work_item_key
         try:
-            repository = repositories.get(member)
-            if repository is None:
-                repository = identity.repository_identity(member, git)
-                if repository is None:
-                    raise RuntimeError("work-item repository identity is unavailable")
-                repositories[member] = repository
-            state = store.ReadOnlyWorkItemStore().work_item(f"{repository}:{work_item_key}")["status"]
-            if state == "done":
+            tracked = tracker_item(member, text)
+        except RuntimeError as error:
+            state = "unknown"
+            status_reason = str(error)
+        else:
+            if tracked.get("state") == "Done":
                 if is_named:
                     hidden += 1
                 continue
-        except (store.StoreReadError, RuntimeError) as error:
-            state = "unknown"
-            status_reason = str(error)
+            state = tracked.get("state") or tracked["native_state"]
+            if tracked.get("kind"):
+                work_item = "%s (%s)" % (work_item_key, tracked["kind"])
     else:
         opens, dones = len(OPEN_BOX.findall(text)), len(DONE_BOX.findall(text))
         if not opens and (DONE.search(text) or dones):

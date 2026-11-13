@@ -2,6 +2,7 @@
 
 Generated from canonical `.agents/` definitions.
 
+- `catch-up` — utility — `.agents/workflow/utility/catch-up/SKILL.md`
 - `continue` — workflow — `.agents/workflow/workflow/continue/SKILL.md`
 - `handoff` — workflow — `.agents/workflow/workflow/handoff/SKILL.md`
 - `plan` — workflow — `.agents/workflow/workflow/plan/SKILL.md`
