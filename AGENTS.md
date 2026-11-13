@@ -9,8 +9,9 @@ pinned in `.agents/plugins/runtime-sources.json` and bumped only by a Renovate P
 
 Read `README.md` before changing repository structure.
 Personal applies only to explicitly adopted personal projects. GitHub ownership and permission to commit
-agent configuration do not establish personal scope. Infonetica is work scope, including the
-`tj-agents/infonetica` plugin source repository and every worktree: never select or inject Personal there.
+agent configuration do not establish personal scope. A specific profile's source repository and every
+worktree of it are work scope: never select or inject Personal there. See
+[Generic and specific profiles](https://github.com/tj-agents/docs/blob/main/PLUGINS.md#generic-and-specific-profiles).
 Read the target repository's README.md and AGENTS.md before selecting its policy profiles.
 Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts or hooks.
 Shipped code must run on Windows and Linux; follow
