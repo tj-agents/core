@@ -59,7 +59,7 @@ def test_tier_context_requires_the_probe_in_actual_host_evidence() -> None:
     )
     with pytest.raises(NATIVE.AcceptanceError, match="did not include"):
         NATIVE.require_context(
-            "base:task-routing old-policy-hash", NATIVE.CONTEXT_PROBE, "host"
+            "base:project-setup old-policy-hash", NATIVE.CONTEXT_PROBE, "host"
         )
 
 

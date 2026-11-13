@@ -1,6 +1,6 @@
 ---
 name: plan-artifacts
-description: Maintain one canonical Markdown plan or goal artifact for substantive work, with current recovery evidence and host-coverage records where applicable. Use when creating, revising, recovering, or reporting a substantive plan.
+description: Keep one canonical Markdown plan or goal for substantive work, with current progress and recovery evidence. Use when creating, revising, recovering or reporting a substantive plan.
 kind: contract
 domain: process
 ---
