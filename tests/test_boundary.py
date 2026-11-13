@@ -349,6 +349,9 @@ def test_remote_matches_never_assumes_an_unknown_host(
     assert boundary.remote_matches(predicate, boundary.Remote(*remote)) is matched
 
 
+@pytest.mark.skipif(
+    sys.platform != "win32", reason="backslash paths are Windows paths only"
+)
 def test_boundary_reason_reads_windows_style_body_paths(
     machine: Machine, tmp_path: Path
 ) -> None:
