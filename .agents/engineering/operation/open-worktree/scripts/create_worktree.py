@@ -1,6 +1,8 @@
 import argparse
 import json
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 GIT_TIMEOUT_SECONDS = 60
@@ -81,6 +83,34 @@ def worktree_path(repo: Path, branch: str) -> Path:
     return path
 
 
+def claim_worktree(path: Path) -> None:
+    executable = shutil.which("tj.exe" if sys.platform == "win32" else "tj")
+    if executable is None:
+        raise CreateWorktreeError(
+            f"worktree created at {path}; ownership claim failed: tj is not installed"
+        )
+    try:
+        result = subprocess.run(
+            [executable, "session", "claim-worktree", "--path", str(path)],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=GIT_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise CreateWorktreeError(
+            f"worktree created at {path}; ownership claim failed: {error}"
+        ) from error
+    if result.returncode:
+        detail = (result.stderr or result.stdout).strip()
+        raise CreateWorktreeError(
+            f"worktree created at {path}; ownership claim failed: {detail}"
+        )
+
+
 def create(
     branch: str, start_point: str | None = None, *, cwd: Path | None = None
 ) -> dict[str, str]:
@@ -104,6 +134,7 @@ def create(
         base_head = run(repo, "rev-parse", "--verify", f"{base}^{{commit}}")
         arguments = ["worktree", "add", str(path), "-b", branch, base_head]
     run(repo, *arguments)
+    claim_worktree(path)
     return {
         "repository": str(repo),
         "branch": branch,
