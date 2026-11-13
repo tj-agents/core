@@ -1,4 +1,4 @@
-name: ci
+name: CI
 
 on:
   push:
@@ -9,14 +9,20 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: caller-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   PYTHONUTF8: '1'
 
 jobs:
   python-standards:
-    uses: tj-agents/template/.github/workflows/python-standards.yml@9db905b2a10a6a6d34e4b972192f0d59852f53e5
+    name: python-standards
+    uses: tj-agents/template/.github/workflows/python-standards.yml@7a06ba176a7245248fee3270842e0c4ed3030653
 
   select:
+    name: select
     runs-on: ubuntu-latest
     outputs:
       plan: ${{ steps.selection.outputs.plan }}
@@ -26,23 +32,26 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - id: selection
-        name: select affected validation
+        name: Select affected validation
         run: python3 -B scripts/ci_selection.py select
 
   guard:
+    name: guard
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: generated output stays out of pull requests
+      - name: Generated output stays out of pull requests
         env:
           BASE_REF: ${{ github.base_ref }}
         run: python3 -B scripts/check_generated_paths.py --base "origin/${BASE_REF}"
 
   guidance-examples:
+    name: guidance-examples
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -58,15 +67,22 @@ jobs:
           path: .template
           persist-credentials: false
 
-      - name: changed authored guidance has concrete examples (pull request)
+      - name: Changed authored guidance has concrete examples (pull request)
         if: github.event_name == 'pull_request'
-        run: python3 -B .template/.agents/template/utility/check/scripts/check_examples.py --root . --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}" --merge-base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 -B .template/.agents/template/utility/check/scripts/check_examples.py --root . --base "$BASE_SHA" --head "$HEAD_SHA" --merge-base
 
-      - name: changed authored guidance has concrete examples (default push)
+      - name: Changed authored guidance has concrete examples (default push)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: python3 -B .template/.agents/template/utility/check/scripts/check_examples.py --root . --base "${{ github.event.before }}" --head "${{ github.sha }}"
+        env:
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: python3 -B .template/.agents/template/utility/check/scripts/check_examples.py --root . --base "$BASE_SHA" --head "$HEAD_SHA"
 
   verify-windows:
+    name: verify-windows
     needs: select
     if: >-
       needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
@@ -87,7 +103,7 @@ jobs:
           ref: 92e29a7589a5dcf462af36d960684e49146d9d3b
           path: .tj-cli
           persist-credentials: false
-      - name: build the pinned tj_hook candidate
+      - name: Build the pinned tj_hook candidate
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -102,7 +118,7 @@ jobs:
             throw "Missing built $binaryName"
           }
           $binaryDirectory >> $env:GITHUB_PATH
-      - name: install the locked Python environment
+      - name: Install the locked Python environment
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -118,7 +134,7 @@ jobs:
           path: .template
           persist-credentials: false
 
-      - name: regenerate the workspace from authored sources
+      - name: Regenerate the workspace from authored sources
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -128,36 +144,36 @@ jobs:
           ./.agents/sync-generated.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: generated files are current
+      - name: Generated files are current
         shell: pwsh
         run: ./.agents/sync-generated.ps1 -Check
 
-      - name: tier payloads conform to the shipped shape
+      - name: Tier payloads conform to the shipped shape
         shell: pwsh
         run: python -B .agents/hooks/check_tier_payload.py --root .
 
-      - name: local capability plugin digests are current
+      - name: Local capability plugin digests are current
         shell: pwsh
         run: python -B scripts/update_plugin_digests.py --check
 
-      - name: harness declarations cover authored sources
+      - name: Harness declarations cover authored sources
         shell: pwsh
         run: python -B scripts/sync_harness_manifests.py --check
 
-      - name: native host startup and discovery acceptance
+      - name: Native host startup and discovery acceptance
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
         run: python -B scripts/ci_native_acceptance.py
 
-      - name: upload native host diagnostics
+      - name: Upload native host diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: native-host-acceptance-windows
           path: ${{ runner.temp }}/tj-agents-native-acceptance/artifacts
           if-no-files-found: warn
 
-      - name: authored skill references resolve in the public corpus
+      - name: Authored skill references resolve in the public corpus
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
         run: python -B .template/.agents/template/utility/check/scripts/check_skill_references.py --root . --source-root . --marketplace tj-agents/marketplace
@@ -169,32 +185,33 @@ jobs:
           ./tests/powershell-host-compat.tests.ps1
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell-host-compat.tests.ps1
 
-      - name: continuation scheduler tests
+      - name: Continuation scheduler tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
         run: |
           ./tests/delivery-continuation.tests.ps1
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/delivery-continuation.tests.ps1
 
-      - name: source layout and package tests
+      - name: Source layout and package tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
         run: uv run --locked pytest tests -v
 
-      - name: shared runtime tests
+      - name: Shared runtime tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
         run: python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py' -v
 
-      - name: selected source and package regressions
+      - name: Selected source and package regressions
         if: fromJSON(needs.select.outputs.plan).mode == 'focused'
         run: uv run --locked python -B scripts/ci_selection.py run --group source
 
-      - name: selected shared runtime regressions
+      - name: Selected shared runtime regressions
         if: fromJSON(needs.select.outputs.plan).mode == 'focused'
         run: python -B scripts/ci_selection.py run --group runtime
 
   verify-linux:
+    name: verify-linux
     needs: select
     if: >-
       needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
@@ -215,7 +232,7 @@ jobs:
           ref: 92e29a7589a5dcf462af36d960684e49146d9d3b
           path: .tj-cli
           persist-credentials: false
-      - name: build the pinned tj_hook candidate
+      - name: Build the pinned tj_hook candidate
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -230,7 +247,7 @@ jobs:
             throw "Missing built $binaryName"
           }
           $binaryDirectory >> $env:GITHUB_PATH
-      - name: install the locked Python environment
+      - name: Install the locked Python environment
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -239,7 +256,7 @@ jobs:
           $pythonDirectory = Split-Path -Parent (uv run --locked python -c "import sys; print(sys.executable)")
           $pythonDirectory >> $env:GITHUB_PATH
 
-      - name: regenerate the workspace from authored sources
+      - name: Regenerate the workspace from authored sources
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -249,27 +266,27 @@ jobs:
           ./.agents/sync-generated.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: generated files are current
+      - name: Generated files are current
         shell: pwsh
         run: ./.agents/sync-generated.ps1 -Check
 
-      - name: tier payloads conform to the shipped shape
+      - name: Tier payloads conform to the shipped shape
         run: python -B .agents/hooks/check_tier_payload.py --root .
 
-      - name: local capability plugin digests are current
+      - name: Local capability plugin digests are current
         run: python -B scripts/update_plugin_digests.py --check
 
-      - name: harness declarations cover authored sources
+      - name: Harness declarations cover authored sources
         run: python -B scripts/sync_harness_manifests.py --check
 
-      - name: native host startup and discovery acceptance
+      - name: Native host startup and discovery acceptance
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: bash
         run: python3 -B scripts/ci_native_acceptance.py
 
-      - name: upload native host diagnostics
+      - name: Upload native host diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: native-host-acceptance-linux
           path: ${{ runner.temp }}/tj-agents-native-acceptance/artifacts
@@ -277,23 +294,24 @@ jobs:
 
       # Hook subprocesses in some tests read stdin as their payload; a closed stdin stands in for the host,
       # which always closes it, so an inherited runner stdin can never leave a hook waiting.
-      - name: source layout and package tests
+      - name: Source layout and package tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         run: uv run --locked pytest tests -v < /dev/null
 
-      - name: shared runtime tests
+      - name: Shared runtime tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         run: python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py' -v < /dev/null
 
-      - name: selected source and package regressions
+      - name: Selected source and package regressions
         if: fromJSON(needs.select.outputs.plan).mode == 'focused'
         run: uv run --locked python -B scripts/ci_selection.py run --group source < /dev/null
 
-      - name: selected shared runtime regressions
+      - name: Selected shared runtime regressions
         if: fromJSON(needs.select.outputs.plan).mode == 'focused'
         run: python3 -B scripts/ci_selection.py run --group runtime < /dev/null
 
   ci-required:
+    name: ci-required
     if: always()
     needs: [select, guard, guidance-examples, verify-windows, verify-linux, python-standards]
     runs-on: ubuntu-latest
@@ -301,23 +319,24 @@ jobs:
       actions: read
       contents: read
     steps:
-      - name: require Python standards
+      - name: Require Python standards
         if: needs.python-standards.result != 'success'
         run: exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - id: default-branch
-        name: read the default branch's latest completed CI run
+        name: Read the default branch's latest completed CI run
         if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
+          set -euo pipefail
           run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch "$DEFAULT_BRANCH" \
             --event push --status completed --limit 1 --json conclusion,url --jq '.[0]')
           echo "run=${run:-null}" >> "$GITHUB_OUTPUT"
-      - name: require every selected validation job
+      - name: Require every selected validation job
         env:
           CI_SELECTION: ${{ needs.select.outputs.plan }}
           CI_NEEDS: ${{ toJSON(needs) }}
@@ -326,6 +345,7 @@ jobs:
         run: python3 -B scripts/ci_selection.py required
 
   regenerate:
+    name: regenerate
     if: >-
       !cancelled()
       && needs.ci-required.result == 'success'
@@ -346,7 +366,7 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
           python-version: '3.12'
-      - name: regenerate committed packages from authored sources
+      - name: Regenerate committed packages from authored sources
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -354,7 +374,7 @@ jobs:
           python -B scripts/runtime_sources.py
           python -B scripts/update_plugin_digests.py
           ./.agents/sync-generated.ps1
-      - name: verify the regenerated tree
+      - name: Verify the regenerated tree
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -363,14 +383,14 @@ jobs:
           uv run --locked python -B .agents/hooks/check_tier_payload.py --root .
           python -B scripts/update_plugin_digests.py --check
           python -B scripts/sync_harness_manifests.py --check
-      - name: mint the updater token
+      - name: Mint the updater token
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
           client-id: ${{ vars.UPDATE_APP_CLIENT_ID }}
           private-key: ${{ secrets.UPDATE_APP_PRIVATE_KEY }}
           permission-contents: write
-      - name: publish generated files
+      - name: Publish generated files
         uses: tj-agents/github-actions/.github/actions/publish-generated@1a8099ab95aaf609704f892087081c35d15b331a
         with:
           token: ${{ steps.app-token.outputs.token }}
