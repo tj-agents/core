@@ -1,12 +1,12 @@
 ---
 name: failing-tests
-description: Diagnose and repair failing tests and browser acceptance stalls through observed evidence and focused reruns. Use when a unit, integration, API or UI test fails, a browser acceptance flow misses its startup or progress deadline, or a proposed workaround would disable a test or inflate its timeout. A compiler, restore, or build error is not a red run and does not select this skill.
+description: Diagnose and fix a failing unit, integration, API or UI test, or a stalled browser acceptance flow, from observed evidence and focused reruns. Not for compiler, restore or build errors.
 
 kind: workflow
 domain: process
 ---
 
-# A failing test is never just reported
+# Fix a failing test
 
 Read and follow the [canonical shared definition](../../.agents/engineering/workflow/failing-tests/SKILL.md) in full.
 This entry point supplies only Claude discovery metadata; the shared procedure is authored once under `.agents/`.

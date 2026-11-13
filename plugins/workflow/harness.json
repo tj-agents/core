@@ -5,11 +5,9 @@
     ".agents/dependencies/agent/.agents/agent/resources/lanes",
     ".agents/dependencies/cli/.agents/cli/runtime",
     ".agents/hooks/installed_skills.py",
-    ".agents/hooks/merge_review_gate.py",
     ".agents/hooks/problem_records.py",
     ".agents/tiers/workflow.json",
     ".agents/workflow",
-    ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
     ".agents/workflow/resources/problem-records.md",
     ".agents/workflows",
     ".codex/runtime/continuation"

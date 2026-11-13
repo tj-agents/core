@@ -1,6 +1,6 @@
 ---
 name: address-bug
-description: Reconcile one actionable recorded bug with its existing repair owner, run the appropriate defect lifecycle, and update the canonical record only after causal verification. Use when the user asks to fix a named bug or to work an actionable bug record.
+description: Reconcile one recorded bug with its existing repair owner, run the defect workflow and resolve the record only after causal verification. Use to fix a named bug or work a bug record.
 
 kind: workflow
 domain: process

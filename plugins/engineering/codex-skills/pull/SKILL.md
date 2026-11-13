@@ -1,6 +1,6 @@
 ---
 name: pull
-description: Pull the latest changes for the current branch, and when the pull fails diagnose the cause, fix it, and explain briefly what was wrong — uncommitted changes blocking the merge, conflicts, a diverged branch, a missing upstream, or a detached HEAD. Nothing destructive without asking. Use whenever the user wants to pull, pull latest, get the latest changes, or recover from a failed pull.
+description: Pull the current branch and, when the pull fails, diagnose and fix the cause - blocking changes, conflicts, divergence, no upstream or detached HEAD. Use to pull or recover a failed pull.
 
 kind: operation
 domain: process

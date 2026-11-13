@@ -1,6 +1,6 @@
 ---
 name: branching
-description: Choose branches, worktrees and stacks for reviewable engineering work. Use when starting or reusing a delivery branch, sizing a PR, or arranging dependent work.
+description: Find existing work, then branch from the fetched remote default with a `<Type>/<Name>` branch and an isolated checkout only for concurrent writers. Use when starting or reusing a branch or worktree.
 
 kind: policy
 domain: process

@@ -1,11 +1,11 @@
 ---
 name: address-debt
-description: Take one debt item all the way to a focused PR in its selected checkout — survey the selected provider, pick one high-value item, fix it, verify resolution under its retention rules, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
+description: Pick one high-value tech-debt item from the selected provider, fix it properly, verify it and deliver it under the selected profile. Use when working through tech debt or one debt item end to end.
 kind: workflow
 domain: process
 ---
 
-# Working one tech-debt item — or a small bundle — to a PR
+# Address tech debt
 
 Read and follow the [canonical shared definition](../../.agents/engineering/workflow/address-debt/SKILL.md) in full.
 This entry point supplies only Claude discovery metadata; the shared procedure is authored once under `.agents/`.

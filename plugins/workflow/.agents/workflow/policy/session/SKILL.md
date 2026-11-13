@@ -1,97 +1,57 @@
 ---
 name: session
-description: Own a working session in any domain from start through completion: one owner, mistake callouts, stage-by-stage skill loading, recording noticed problems, and closing when owned work is finished. Use when starting, continuing or finishing a task, when the user calls out a mistake, or when asked to note or record a bug, mistake or debt.
+description: Own a working session in any domain from start to finish. Use when starting, continuing or finishing a task, when the user calls out a mistake, or when a side bug, mistake or debt is noticed.
 kind: policy
 domain: process
 ---
 
 # Session
 
-These conventions apply to any selected work, software or not. They grant no implementation, publication
-or installation authority. The common maintained-plan contract is `workflow:plan-artifacts`; the common
-continuation owner is `workflow:run`. When engineering is selected, `engineering:session` adds its software
-rules on top of this lifecycle.
+Owns the lifecycle of any selected work, software or not. It grants no implementation, publication or
+installation authority. `engineering:session` adds software rules when Engineering is selected.
 
-## When the user calls out a mistake
+## Enter the owning lifecycle before the first edit
 
-Answer the direct question first and correct the active task within its existing authorization.
-Questions ask for reasoning: explain and defend recommendations with evidence, change them only for new
-evidence or a stated user decision, and say what changed.
-For a reported side problem, load [Incidental problems](../../resources/problem-records.md#incidental-problems).
-
-## A task has an owning lifecycle — load it before the first edit
-
-Authorized sustained or multi-phase work selects `workflow:run`; read the existing canonical goal before
-edits and keep it current. Planning selects `workflow:plan`, without implementation authority. Questions
-and reviews alone grant none. Answer status questions before continuing authorized execution.
-
-Use `agent:lanes` to match substantive work to suitable capability. Reuse its loaded contract;
-routine commands and phase labels do not require another read or lane rationale. Keep cheap leaf lanes
-for clerical work and delegate useful batches under that contract. Reconsider the
-selection when the work's judgment or capability requirements change. The lane contract owns execution
-and capability fallback.
+Authorized sustained or multiphase work enters `workflow:run`; planning enters `workflow:plan` without
+implementation authority. Questions and reviews grant none; answer a status question before continuing.
+Match substantive work to capability through `agent:lanes`; routine commands need no lane rationale.
 
 ## A link to another skill is a stage pointer, not a read
 
 Load a referenced skill when its stage is actually entered, never because a document you are reading names
-it. A procedure step, table row or route line says which skill owns that stage. Do not load the corpus
-transitively. Use the host's native skill invocation when available or read its advertised source file.
-Reuse an already-loaded body while its source identity is unchanged, including after compaction when the
-continuation preserves its relevant instructions. Read again only for changed instructions or missing context.
+it, through native invocation or its advertised source. Reuse a loaded body while its source is unchanged,
+including after compaction.
+
+## When the user calls out a mistake
+
+Answer the direct question first, then correct the active task within its authorization. A question asks
+for reasoning: defend a recommendation with evidence and change it only for new evidence or a user
+decision, saying what changed. Audit the session for other mistakes only when reporting a terminal result.
 
 ## Incidental problems
 
-When a side problem is noticed or reported, keep the active goal and load
-[Incidental problems](../../resources/problem-records.md#incidental-problems) before routing it.
+Keep the active goal, tell the user and record only through the selected profile, as
+[Incidental problems](../../resources/problem-records.md#incidental-problems) describes.
+
+## One owner
+
+One session owns a goal. Message another session only for a blocker it must act on or a final result it
+is waiting for, after verifying from its goal, work-item binding or explicit assignment that it is
+responsible. A shared checkout, parent conversation or similar title does not establish that. Correct a
+misrouted message by sending a retraction to the original recipient. `agent:message` (`tj message`)
+delivers natively to a Claude session's inbox and to a Codex session's feed, which it reads on demand.
+
+Phases, commits, open PRs, handoffs and briefs never narrow the original scope. Use `workflow:handoff`
+only for an actual transfer of ownership.
+
+## Finish
+
+Finish only when delivery, validation and any authorized handoff are done. A merged PR, a Stop event or a
+question about a missed close-out is not completion. A new mistake callout is answered and corrected first.
 
 ```text
-A: add report export. B: an unrelated terminal-close bug.
-Keep report export active and read Incidental problems before routing B.
-```
-
-## Preserve one owner through completion
-
-Coordinate with another agent when its verified responsibility needs the information. Before sending,
-establish the exact recipient, its current responsibility from an owned goal, work-item binding or explicit
-assignment, and the concrete decision or action the message changes for it. Do not send progress or status
-that changes nothing for the recipient; every message costs it context. Shared checkout, parent conversation,
-similar title and convenience do not establish that relationship. Unknown or irrelevant ownership keeps the
-information with the current task while ownership is reconciled. Existing task authority covers necessary
-coordination with a verified responsible recipient; do not add a confirmation step to every message.
-
-Correct a mistaken route by posting a retraction of the earlier assignment to the original recipient. That
-correction does not assign it the repair. Resolve the actual owner before routing work again.
-`agent:message` posts to the recipient's feed, which the recipient reads on demand; never inject a message
-into another session's conversation.
-
-```text
-The repair goal names session A as owner; session B shares its repository but owns a naming migration.
-Send repair evidence to A because it changes A's next diagnostic step. Keep B out of the repair.
-If an earlier message assigned B the repair, post B a retraction that names that message.
-```
-
-When preparation or approved design has resolved the next action, enter that action through the owning
-lifecycle.
-
-At normal start, read `agent:recover`'s linked command contract and inspect `status`. For a new
-planning task, `item <feature>/<item> --status proposed --title '<useful title>'`; for new authorized
-execution, `claim <feature>/<item> --host <actual host> --role owner --status active --title '<useful title>'`.
-Use `--plan-path` only for an existing repo-relative plan. Questions need no registration; chores need no
-plan. Retain metadata and status unless deliberately transitioning; another owner follows recovery or handoff.
-
-Act on authorized reversible work and keep the canonical plan aligned with observed results. A phase,
-commit, open PR or context boundary does not narrow the original scope. Honor user limits and real
-external-action gates. Use `workflow:handoff` for an actual authorized context transfer; it checkpoints
-first, invokes one selected machine launcher, and releases the previous writer. Prompt-only requests
-remain prompt-only. Missing runtime capabilities must be reported accurately, not assumed installed.
-
-## Finish the session
-
-Choose completion only when delivery, validation and any authorized handoff are finished. A merged PR,
-a Stop event or a question about a missed close-out does not by itself establish completion. A new
-mistake callout is answered and corrected first; completion is then reassessed.
-
-```text
-Delivery and validation complete, no owned wait: finish normally.
-User calls out a mistake: answer and correct the active task, then reassess completion.
+A: add report export. B: an unrelated terminal-close bug is reported.
+Keep A's next action; tell the user about B and record it through the selected profile.
+User calls out a mistake: answer, correct the active task, then reassess completion.
+Delivery and validation complete, no owned wait: finish.
 ```

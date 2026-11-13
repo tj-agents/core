@@ -1,12 +1,13 @@
 ---
 name: status
-description: Read selected work items and supporting plans with recorded execution state and next actions. Use when asking what work is open, which plans remain, what is active, or for the status of a named subject.
-
+description: Read selected work items and supporting plans with execution state and next actions. Use when asking what work is open, which plans remain, what is active, or a named subject's status.
 kind: utility
 domain: process
 ---
 
 # Status
+
+Owns reporting open work items and supporting plans; it changes nothing.
 
 Read [repository selection](../../resources/problem-records.md#repository-selection) first. When a
 provider is selected, load its qualified skill and use its list/read commands scoped by the requested

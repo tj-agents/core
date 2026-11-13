@@ -1,6 +1,6 @@
 ---
 name: prune-worktrees
-description: Sweep ALL git worktrees at once and delete the dead ones — the bulk counterpart to the per-branch `worktree remove`. Classifies every worktree by content (merged / squash-ghost / genuinely unmerged), refuses anything dirty, detached-unsafe, or still carrying work, then tears down the provably-dead ones properly — unlinking .Codex junctions first so deletion can't recurse into the main checkout's real skill files, handling Windows MAX_PATH, pruning admin state, sweeping orphaned leftover folders a removed worktree left behind, and dropping the orphaned branch. Use when Tommy says "prune worktrees", "/prune-worktrees", "delete unused worktrees", "clean up my worktrees", "why do I have so many worktrees", "get rid of these worktrees", or "remove all the dead worktrees". Works in any repo; personal git/gh only. For ONE named worktree use `worktree remove`; for branch-ref clutter use `unmerged`.
+description: Sweep every git worktree and remove only the provably dead ones - clean, content already in main, no open PR - plus orphaned leftover folders and their branches. Use to prune or clean up worktrees.
 
 kind: utility
 domain: process
@@ -8,11 +8,8 @@ domain: process
 
 # prune-worktrees
 
-Answer "which of these worktrees are dead, and can I bin them?" — then bin exactly those.
-
-Sibling skills, so you pick the right one: **`worktree`** is per-worktree lifecycle (create/list/remove
-one by name). **`unmerged`** classifies and deletes *branch refs*. **This** is the bulk *worktree*
-sweep — many trees, one pass, disk actually reclaimed.
+Owns the bulk worktree sweep: classify every worktree, then remove exactly the provably dead ones.
+`engineering:open-worktree` owns one named worktree and `engineering:unmerged` owns branch refs.
 
 The trap this exists to avoid: a worktree looks disposable because its branch looks merged, but the
 tree holds **uncommitted work nothing else on earth has a copy of**, or its branch was squash-merged so
