@@ -18,10 +18,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --tool-context",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --tool-context",
-            "timeout": 30,
-            "additionalContextLimit": 5000
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --write-gate",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --write-gate",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --record-command",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --record-command",
+            "timeout": 30
           }
         ]
       }
