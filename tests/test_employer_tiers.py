@@ -73,7 +73,7 @@ class EmployerScope(unittest.TestCase):
         work = next(item for item in result.selections if item['plugin_id'] == 'work@test-market')
         self.assertEqual(work['prerequisites'], ('employer',))
         self.assertEqual(work['evidence'], ('employer-a@test-market: origin host example.test', 'employer-a@test-market: origin employer-a/service'))
-        context = gate.statement(self.project, self.found())
+        context = gate.assessment_statement(self.project, self.found())
         self.assertIn(str((employer / 'skills/communication-context/SKILL.md').resolve()), context)
         self.assertIn('employer-a:communication-context', context)
         self.assertEqual(context.count(WORK['session_context']), 1)
@@ -96,7 +96,7 @@ class EmployerScope(unittest.TestCase):
                 result = gate.assess(self.project, self.found())
                 self.assertEqual(any(item.plugin == 'work' for item, _ in result.applicable), applies)
                 self.assertEqual(bool(result.employers), applies)
-                self.assertEqual(WORK['session_context'] in gate.statement(self.project, self.found()), applies)
+                self.assertEqual(WORK['session_context'] in gate.assessment_statement(self.project, self.found()), applies)
         subprocess.run(['git', '-C', str(self.project), 'config', '--unset', 'remote.origin.url'],
                        check=True, capture_output=True)
         self.assertEqual(gate.assess(self.project, self.found()).applicable, [])
@@ -120,7 +120,7 @@ class EmployerScope(unittest.TestCase):
     def test_personal_remote_blocks_both_hosts_and_omits_conditional_context(self):
         employer = self.install('employer-a', EMPLOYER)
         self.remote('personal/project')
-        context = gate.statement(self.project, self.found())
+        context = gate.assessment_statement(self.project, self.found())
         self.assertNotIn(WORK['session_context'], context)
         self.assertNotIn('Employer context:', context)
         self.assertNotIn(str(employer / 'skills/communication-context/SKILL.md'), context)
@@ -140,7 +140,7 @@ class EmployerScope(unittest.TestCase):
                 result = gate.assess(self.project, self.found())
                 self.assertFalse(any(item.plugin == 'work' for item, _ in result.applicable))
                 self.assertEqual(result.employers, ())
-                self.assertNotIn(WORK['session_context'], gate.statement(self.project, self.found()))
+                self.assertNotIn(WORK['session_context'], gate.assessment_statement(self.project, self.found()))
         employer = self.install('employer-a', EMPLOYER)
         (employer / gate.ORPHAN_MARKER).touch()
         result = gate.assess(self.project, self.found())
@@ -239,7 +239,7 @@ class EmployerScope(unittest.TestCase):
                     for name in ('employer-a', 'employer-b')]
         result = gate.assess(self.project, self.found())
         self.assertEqual([item.plugin for item, _ in result.employers], ['employer-a', 'employer-b'])
-        context = gate.statement(self.project, self.found())
+        context = gate.assessment_statement(self.project, self.found())
         self.assertEqual(context.count('Employer context:'), 2)
         for payload in payloads:
             self.assertIn(str((payload / 'skills/communication-context/SKILL.md').resolve()), context)
@@ -260,14 +260,14 @@ class EmployerScope(unittest.TestCase):
     def test_only_valid_applicable_tiers_emit_one_line_session_context(self):
         declaration = gate.Declaration('base', 'test-market', {'schema_version': 3, 'tier': 'base',
                                       'applies': 'always', 'session_context': 'Always load this context.'})
-        self.assertIn('Always load this context.', gate.statement(self.project, [declaration]))
+        self.assertIn('Always load this context.', gate.assessment_statement(self.project, [declaration]))
         for text in ('', '  ', 'first\nsecond', 'first\rsecond', 'first\u2028second'):
             invalid = gate.Declaration('base', 'test-market', dict(declaration.data, session_context=text))
             result = gate.assess(self.project, [invalid])
             self.assertEqual(result.ubiquitous, [])
             self.assertTrue(result.diagnostics)
         legacy = gate.Declaration('base', 'test-market', dict(declaration.data, schema_version=2))
-        self.assertEqual(gate.statement(self.project, [legacy]), '')
+        self.assertEqual(gate.assessment_statement(self.project, [legacy]), '')
 
     def test_employer_context_shipping_is_required_for_in_memory_declarations_too(self):
         (self.project / 'marker').touch()
