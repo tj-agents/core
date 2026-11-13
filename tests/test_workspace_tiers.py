@@ -127,7 +127,7 @@ def test_complete_all_work_folder_applies_only_common_employer_context(
     assert result.inventory.complete
     assert result.scope_state == "work"
     assert set(result.inventory) == {first, project / "services" / "second"}
-    context = gate.statement(project, _found(cache, project))
+    context = gate.assessment_statement(project, _found(cache, project))
     assert WORK["session_context"] in context
     assert (
         str((employer / "skills/communication-context/SKILL.md").resolve()) in context
@@ -185,7 +185,7 @@ def test_mixed_folder_does_not_apply_work_or_personal_to_every_repository(
     _adopt_personal(personal)
 
     result = gate.assess(project, _found(cache, project))
-    context = gate.statement(project, _found(cache, project))
+    context = gate.assessment_statement(project, _found(cache, project))
 
     assert {item.plugin for item, _ in result.applicable}.isdisjoint(
         {"work", "employer-a", "personal"}

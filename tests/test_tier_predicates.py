@@ -113,7 +113,7 @@ class Predicates(unittest.TestCase):
     def test_session_reports_unknown_configuration(self):
         declaration = gate.Declaration("example", "test", {
             "schema_version": 3, "tier": "example", "applies": "stack-present", "detect": {"fact": "unknown"}})
-        output = gate.statement(self.root, [declaration])
+        output = gate.assessment_statement(self.root, [declaration])
         self.assertIn("Configuration diagnostic", output)
         self.assertIn("Provide scoped evidence for fact: unknown", output)
 
@@ -168,7 +168,7 @@ class Predicates(unittest.TestCase):
             result = gate.assess(self.root)
             self.assertEqual([item.plugin for item, _ in result.applicable], ["valid1", "valid2", "valid3"])
             self.assertNotIn("ordinary", [item.plugin for item in result.blocked])
-            listing = gate.statement(self.root)
+            listing = gate.assessment_statement(self.root)
             self.assertIn("Configuration diagnostic", listing)
             self.assertIn("Provide scoped evidence for fact: missing", listing)
             for version in (1, 2, 3):

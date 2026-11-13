@@ -16,6 +16,7 @@ PLUGINS = ("base",)
 PER_CALL_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop")
 TOOLS = ("Bash", "PowerShell", "Read", "Edit", "Write", "MultiEdit", "Skill", "Agent", "Grep")
 BUDGET_SECONDS = 10
+WRITE_GATE_SECONDS = 1
 AUDIT = r"""
 import atexit, json, os, runpy, sys
 events = []
@@ -107,16 +108,18 @@ class HookBudgetUnderLoad(unittest.TestCase):
     def tearDownClass(cls):
         cls.temp.cleanup()
 
-    def run_registered(self, plugin, event, payload):
+    def run_registered(self, plugin, event, payload, home=None, cwd=None):
+        home = home or self.home
+        cwd = cwd or self.cwd
         package = ROOT / "plugins" / plugin
         environment = dict(
-            os.environ, HOME=str(self.home), USERPROFILE=str(self.home),
+            os.environ, HOME=str(home), USERPROFILE=str(home),
             CLAUDE_PLUGIN_ROOT=str(package), TEMP=str(self.scratch), TMP=str(self.scratch),
             TMPDIR=str(self.scratch), PYTHONIOENCODING="utf-8",
         )
         environment.pop("CLAUDE_CONFIG_DIR", None)
         environment.pop("CODEX_HOME", None)
-        data = {"hook_event_name": event, "cwd": str(self.cwd), "session_id": self.session,
+        data = {"hook_event_name": event, "cwd": str(cwd), "session_id": self.session,
                 "transcript_path": str(self.transcript), "tool_use_id": str(uuid.uuid4()),
                 **payload}
         tool = payload.get("tool_name", "")
@@ -133,7 +136,7 @@ class HookBudgetUnderLoad(unittest.TestCase):
                 result = subprocess.run(
                     [hook["command"], *arguments[:2], "-B", "-c", AUDIT, *arguments[3:]],
                     input=json.dumps(data), capture_output=True, text=True, encoding="utf-8",
-                    cwd=self.cwd, env=environment, timeout=hook["timeout"],
+                    cwd=cwd, env=environment, timeout=hook["timeout"],
                 )
                 elapsed = time.perf_counter() - started
                 events = json.loads(audit.read_text(encoding="utf-8")) if audit.exists() else []
@@ -164,6 +167,52 @@ class HookBudgetUnderLoad(unittest.TestCase):
             ):
                 runs = self.run_registered(plugin, event, payload)
                 self.assert_bounded(runs)
+
+    def test_write_gate_decides_within_a_second_without_git_or_repository_scans(self):
+        root = Path(self.temp.name) / "write gate"
+        home = root / "home"
+        cache = home / ".claude" / "plugins" / "cache"
+        payload = cache / "tj-agents" / "python" / "1.0.0"
+        header = "---\nname: style\ndescription: Style.\nkind: convention\nprofile: core\n---\n"
+        (payload / "skills/style").mkdir(parents=True)
+        (payload / "skills/style/SKILL.md").write_text(header + "Read the canonical file.\n", encoding="utf-8")
+        canonical = payload / ".agents/python/convention/style/SKILL.md"
+        canonical.parent.mkdir(parents=True)
+        canonical.write_text(header + "Rule body.\n", encoding="utf-8")
+        (payload / "tier.json").write_text(json.dumps({
+            "schema_version": 1, "tier": "python", "applies": "stack-present",
+            "detect": {"files": ["pyproject.toml"], "globs": ["*.py"]}}), encoding="utf-8")
+        (cache.parent / "installed_plugins.json").write_text(json.dumps({"plugins": {
+            "python@tj-agents": [{"scope": "user", "installPath": str(payload)}]}}), encoding="utf-8")
+        repository = root / "repository"
+        (repository / ".git").mkdir(parents=True)
+        (repository / ".agents").mkdir()
+        (repository / ".agents/plugins.json").write_text(json.dumps({
+            "schema_version": 1, "plugins": ["python@tj-agents"],
+            "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}}), encoding="utf-8")
+        for index in range(200):
+            folder = repository / "src" / f"package_{index}"
+            folder.mkdir(parents=True)
+            (folder / "module.py").write_text("value = 1\n", encoding="utf-8")
+        write = {"tool_name": "Write", "tool_input": {"file_path": str(repository / "src/app.py"), "content": ""}}
+        read = {"tool_name": "Read", "tool_input": {"file_path": str(canonical)}}
+
+        denied = self.run_registered("base", "PreToolUse", write, home, repository)
+        recorded = self.run_registered("base", "PreToolUse", read, home, repository)
+        allowed = self.run_registered("base", "PreToolUse", write, home, repository)
+
+        decision = json.loads(denied[0][1].stdout)["hookSpecificOutput"]
+        self.assertEqual("deny", decision["permissionDecision"])
+        self.assertIn(str(canonical.resolve()), decision["permissionDecisionReason"])
+        self.assertEqual("", allowed[0][1].stdout)
+        for hook, result, elapsed, events in (*denied, *recorded, *allowed):
+            with self.subTest(hook=hook["args"][4]):
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertLess(elapsed, WRITE_GATE_SECONDS)
+                self.assertEqual([], [path for event, path in events if event == "subprocess.Popen"])
+                scanned = [path for event, path in events if event != "subprocess.Popen"
+                           and Path(path).resolve().is_relative_to(repository.resolve())]
+                self.assertEqual([], scanned)
 
 
 if __name__ == "__main__":
