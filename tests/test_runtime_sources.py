@@ -1,14 +1,69 @@
 import importlib.util
 import json
-from pathlib import Path
 import tempfile
 import unittest
-from unittest import mock
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
 
+import pytest
 
-SPEC = importlib.util.spec_from_file_location("runtime_sources", Path(__file__).resolve().parents[1] / "scripts/runtime_sources.py")
+SPEC = importlib.util.spec_from_file_location(
+    "runtime_sources",
+    Path(__file__).resolve().parents[1] / "scripts/runtime_sources.py",
+)
 SOURCES = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SOURCES)
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeSourceFixture:
+    root: Path
+    source: Path
+
+    def write_declaration(self, revision: object) -> None:
+        agent: dict[str, object] = {
+            "repository": "tj-agents/agent",
+            "package": "plugins/agent",
+            "exports": [".agents/agent/runtime"],
+        }
+        if revision is not None:
+            agent["revision"] = revision
+        document: dict[str, object] = {
+            "schema_version": 1,
+            "sources": {"agent": agent},
+        }
+        (self.root / ".agents/plugins/runtime-sources.json").write_text(
+            json.dumps(document), encoding="utf-8"
+        )
+
+
+@pytest.fixture
+def runtime_source(tmp_path: Path) -> RuntimeSourceFixture:
+    root = tmp_path / "consumer"
+    source = tmp_path / "publisher"
+    package = source / "plugins/agent"
+    (root / ".agents/plugins").mkdir(parents=True)
+    (package / ".agents/agent/runtime").mkdir(parents=True)
+    (package / ".agents/agent/runtime/helper.py").write_text(
+        "VALUE = 42\n", encoding="utf-8"
+    )
+    return RuntimeSourceFixture(root, source)
+
+
+def fake_remote_git(revision: str) -> Callable[..., str]:
+    def fake_git(*arguments: str) -> str:
+        if arguments[0] == "init":
+            checkout = Path(arguments[-1])
+            target = checkout / "plugins/agent/.agents/agent/runtime"
+            target.mkdir(parents=True)
+            (target / "helper.py").write_text("VALUE = 42\n", encoding="utf-8")
+            return ""
+        if arguments[0] == "-C" and arguments[2] == "rev-parse":
+            return revision
+        return ""
+
+    return fake_git
 
 
 class RuntimeSourcesTests(unittest.TestCase):
@@ -20,7 +75,9 @@ class RuntimeSourcesTests(unittest.TestCase):
         self.package = self.source / "plugins/agent"
         (self.root / ".agents/plugins").mkdir(parents=True)
         (self.package / ".agents/agent/runtime").mkdir(parents=True)
-        (self.package / ".agents/agent/runtime/helper.py").write_text("VALUE = 42\n", encoding="utf-8")
+        (self.package / ".agents/agent/runtime/helper.py").write_text(
+            "VALUE = 42\n", encoding="utf-8"
+        )
         self.declaration = {
             "schema_version": 1,
             "sources": {
@@ -35,7 +92,9 @@ class RuntimeSourcesTests(unittest.TestCase):
         self.save()
 
     def save(self):
-        (self.root / ".agents/plugins/runtime-sources.json").write_text(json.dumps(self.declaration), encoding="utf-8")
+        (self.root / ".agents/plugins/runtime-sources.json").write_text(
+            json.dumps(self.declaration), encoding="utf-8"
+        )
 
     def stage(self):
         return SOURCES.stage(self.root, {"agent": self.source})
@@ -43,13 +102,19 @@ class RuntimeSourcesTests(unittest.TestCase):
     def test_local_export_is_self_contained_and_verified_without_publisher(self):
         self.stage()
         self.source.rename(self.source.with_name("publisher removed"))
-        self.assertEqual("verified", SOURCES.stage(self.root, {}, check=True)[0]["status"])
-        target = self.root / ".agents/dependencies/agent/.agents/agent/runtime/helper.py"
+        self.assertEqual(
+            "verified", SOURCES.stage(self.root, {}, check=True)[0]["status"]
+        )
+        target = (
+            self.root / ".agents/dependencies/agent/.agents/agent/runtime/helper.py"
+        )
         self.assertEqual("VALUE = 42\n", target.read_text(encoding="utf-8"))
 
     def test_changed_or_missing_staged_file_fails_verification(self):
         self.stage()
-        target = self.root / ".agents/dependencies/agent/.agents/agent/runtime/helper.py"
+        target = (
+            self.root / ".agents/dependencies/agent/.agents/agent/runtime/helper.py"
+        )
         target.write_text("wrong", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "modified"):
             SOURCES.stage(self.root, {}, check=True)
@@ -84,13 +149,17 @@ class RuntimeSourcesTests(unittest.TestCase):
         nested.write_text("nested file", encoding="utf-8")
         self.stage()
         staged = self.root / ".agents/dependencies/agent/.agents/agent/runtime/module"
-        self.assertEqual("nested file", (staged / "helper.py").read_text(encoding="utf-8"))
+        self.assertEqual(
+            "nested file", (staged / "helper.py").read_text(encoding="utf-8")
+        )
         nested.unlink()
         module.rmdir()
         module.write_text("new file", encoding="utf-8")
         self.stage()
         self.assertEqual("new file", staged.read_text(encoding="utf-8"))
-        self.assertEqual("verified", SOURCES.stage(self.root, {}, check=True)[0]["status"])
+        self.assertEqual(
+            "verified", SOURCES.stage(self.root, {}, check=True)[0]["status"]
+        )
 
     def test_rejects_undeclared_local_override(self):
         with self.assertRaisesRegex(ValueError, "Undeclared"):
@@ -119,63 +188,52 @@ class RuntimeSourcesTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "link"):
             self.stage()
 
-    def test_rejects_missing_or_malformed_revision(self):
-        for revision in (None, "", "g" * 40, "A" * 40, "deadbeef", 1234567890):
-            with self.subTest(revision=revision):
-                if revision is None:
-                    del self.declaration["sources"]["agent"]["revision"]
-                else:
-                    self.declaration["sources"]["agent"]["revision"] = revision
-                self.save()
-                with self.assertRaises(ValueError):
-                    self.stage()
 
-    def fake_remote_git(self, revision):
-        def fake_git(*arguments):
-            if arguments[0] == "init":
-                checkout = Path(arguments[-1])
-                target = checkout / "plugins/agent/.agents/agent/runtime"
-                target.mkdir(parents=True)
-                (target / "helper.py").write_text("VALUE = 42\n", encoding="utf-8")
-                return ""
-            if arguments[0] == "-C" and arguments[2] == "rev-parse":
-                return revision
-            return ""
+@pytest.mark.parametrize(
+    "revision", [None, "", "g" * 40, "A" * 40, "deadbeef", 1234567890]
+)
+def test_rejects_missing_or_malformed_revision(
+    runtime_source: RuntimeSourceFixture, revision: object
+) -> None:
+    runtime_source.write_declaration(revision)
 
-        return fake_git
+    with pytest.raises(ValueError, match="Invalid runtime source"):
+        SOURCES.stage(runtime_source.root, {"agent": runtime_source.source})
 
-    def test_staging_fetches_exactly_the_declared_revision(self):
-        revision = "b" * 40
-        self.declaration["sources"]["agent"]["revision"] = revision
-        self.save()
-        calls = []
-        fake_git = self.fake_remote_git(revision)
 
-        def recording_git(*arguments):
-            calls.append(arguments)
-            return fake_git(*arguments)
+def test_staging_fetches_exactly_the_declared_revision(
+    runtime_source: RuntimeSourceFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    revision = "b" * 40
+    runtime_source.write_declaration(revision)
+    calls: list[tuple[str, ...]] = []
+    remote_git = fake_remote_git(revision)
 
-        with mock.patch.object(SOURCES, "git", side_effect=recording_git):
-            result = SOURCES.stage(self.root, {})
-        self.assertEqual("staged", result[0]["status"])
-        self.assertEqual(revision, result[0]["revision"])
-        fetch_call = next(
-            call for call in calls if call[0] == "-C" and call[2] == "fetch"
-        )
-        self.assertIn("https://github.com/tj-agents/agent.git", fetch_call)
-        self.assertIn(revision, fetch_call)
+    def recording_git(*arguments: str) -> str:
+        calls.append(arguments)
+        return remote_git(*arguments)
 
-    def test_check_fails_when_declared_revision_is_bumped(self):
-        revision = "c" * 40
-        self.declaration["sources"]["agent"]["revision"] = revision
-        self.save()
-        fake_git = self.fake_remote_git(revision)
-        with mock.patch.object(SOURCES, "git", side_effect=fake_git):
-            SOURCES.stage(self.root, {})
-        self.declaration["sources"]["agent"]["revision"] = "d" * 40
-        self.save()
-        with self.assertRaisesRegex(ValueError, "Stale or modified"):
-            SOURCES.stage(self.root, {}, check=True)
+    monkeypatch.setattr(SOURCES, "git", recording_git)
+    result = SOURCES.stage(runtime_source.root, {})
+
+    assert result[0]["status"] == "staged"
+    assert result[0]["revision"] == revision
+    fetch_call = next(call for call in calls if call[0] == "-C" and call[2] == "fetch")
+    assert "https://github.com/tj-agents/agent.git" in fetch_call
+    assert revision in fetch_call
+
+
+def test_check_fails_when_declared_revision_is_bumped(
+    runtime_source: RuntimeSourceFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    revision = "c" * 40
+    runtime_source.write_declaration(revision)
+    monkeypatch.setattr(SOURCES, "git", fake_remote_git(revision))
+    SOURCES.stage(runtime_source.root, {})
+    runtime_source.write_declaration("d" * 40)
+
+    with pytest.raises(ValueError, match="Stale or modified"):
+        SOURCES.stage(runtime_source.root, {}, check=True)
 
 
 if __name__ == "__main__":
