@@ -43,11 +43,6 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `.agents/hooks/installed_skills.py` | `TID251` | 1 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/hooks/problem_records.py` | `E501` | 15 | Line too long (93 > 88) |
 | `.agents/hooks/problem_records.py` | `UP036` | 1 | Version block is outdated for minimum Python version |
-| `.agents/hooks/project_facts.py` | `E501` | 47 | Line too long (121 > 88) |
-| `.agents/hooks/project_facts.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/project_facts.py` | `RUF005` | 2 | Consider `[*sorted(set(members)), workspace.id]` instead of concatenation |
-| `.agents/hooks/standards_context.py` | `E501` | 20 | Line too long (109 > 88) |
-| `.agents/hooks/standards_context.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `.agents/hooks/tests/fixtures/continuation_fixture.py` | `E501` | 9 | Line too long (99 > 88) |
 | `.agents/hooks/tests/fixtures/continuation_fixture.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `.agents/hooks/tests/fixtures/continuation_fixture.py` | `PLW1514` | 1 | `pathlib.Path(...).write_text` without explicit `encoding` argument |
@@ -334,11 +329,6 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `tests/test_plugin_update.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `tests/test_plugin_update.py` | `PT009` | 2 | Use a regular `assert` instead of unittest-style `assertEqual` |
 | `tests/test_plugin_update.py` | `TID251` | 2 | `importlib.util.spec_from_file_location` is banned: Import the installed public API; do not load another checkout by path. |
-| `tests/test_project_facts.py` | `E501` | 135 | Line too long (94 > 88) |
-| `tests/test_project_facts.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `tests/test_project_facts.py` | `PLR6301` | 1 | Method `dependency` could be a function, class method, or static method |
-| `tests/test_project_facts.py` | `PT009` | 90 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `tests/test_project_facts.py` | `TID251` | 1 | `unittest.TestCase` is banned: Use plain pytest functions and bare assertions. |
 | `tests/test_publisher_dependencies.py` | `E501` | 7 | Line too long (109 > 88) |
 | `tests/test_publisher_dependencies.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `tests/test_publisher_dependencies.py` | `PLR6301` | 1 | Method `roster` could be a function, class method, or static method |
@@ -381,11 +371,6 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `tests/test_stack_tiers.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `tests/test_stack_tiers.py` | `PT009` | 62 | Use a regular `assert` instead of unittest-style `assertNotIn` |
 | `tests/test_stack_tiers.py` | `TID251` | 5 | `importlib.util.spec_from_file_location` is banned: Import the installed public API; do not load another checkout by path. |
-| `tests/test_standards_context.py` | `E501` | 35 | Line too long (150 > 88) |
-| `tests/test_standards_context.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `tests/test_standards_context.py` | `PLR6301` | 1 | Method `assertion` could be a function, class method, or static method |
-| `tests/test_standards_context.py` | `PT009` | 29 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `tests/test_standards_context.py` | `TID251` | 1 | `unittest.TestCase` is banned: Use plain pytest functions and bare assertions. |
 | `tests/test_task_routing.py` | `E501` | 9 | Line too long (108 > 88) |
 | `tests/test_task_routing.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `tests/test_task_routing.py` | `PT009` | 12 | Use a regular `assert` instead of unittest-style `assertEqual` |
@@ -421,8 +406,6 @@ Exact existing files requiring formatting are excluded from the formatter during
 - `.agents/hooks/hook_runtime.py`
 - `.agents/hooks/installed_skills.py`
 - `.agents/hooks/problem_records.py`
-- `.agents/hooks/project_facts.py`
-- `.agents/hooks/standards_context.py`
 - `.agents/hooks/tests/fixtures/continuation_fixture.py`
 - `.agents/hooks/tests/fixtures/continuation_runtime_fixture.py`
 - `.agents/hooks/tests/fixtures/fake_cli.py`
@@ -483,7 +466,6 @@ Exact existing files requiring formatting are excluded from the formatter during
 - `tests/test_hook_contract.py`
 - `tests/test_hook_launch_budget.py`
 - `tests/test_plugin_update.py`
-- `tests/test_project_facts.py`
 - `tests/test_publisher_dependencies.py`
 - `tests/test_remote_host_tiers.py`
 - `tests/test_repository_permissions.py`
@@ -492,7 +474,6 @@ Exact existing files requiring formatting are excluded from the formatter during
 - `tests/test_runtime_sources.py`
 - `tests/test_source_layout.py`
 - `tests/test_stack_tiers.py`
-- `tests/test_standards_context.py`
 - `tests/test_task_routing.py`
 - `tests/test_tier_predicates.py`
 - `tests/test_tier_tool_context.py`
@@ -531,13 +512,6 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 | `.agents/hooks/installed_skills.py` | `installed_skills` | `operator` | 1 | Unsupported operand types for / ("Path" and "None") |
 | `.agents/hooks/problem_records.py` | `problem_records` | `no-untyped-call` | 8 | Call to untyped function "selects_personal" in typed context |
 | `.agents/hooks/problem_records.py` | `problem_records` | `no-untyped-def` | 7 | Function is missing a type annotation |
-| `.agents/hooks/project_facts.py` | `project_facts` | `arg-type` | 1 | Argument 1 to "append" of "list" has incompatible type "tuple[Any, tuple[Any]]"; expected "tuple[Any, tuple[()]]" |
-| `.agents/hooks/project_facts.py` | `project_facts` | `no-untyped-call` | 38 | Call to untyped function "problem" in typed context |
-| `.agents/hooks/project_facts.py` | `project_facts` | `no-untyped-def` | 17 | Function is missing a type annotation |
-| `.agents/hooks/project_facts.py` | `project_facts` | `var-annotated` | 2 | Need type annotation for "members" (hint: "members: list[<type>] = ...") |
-| `.agents/hooks/standards_context.py` | `standards_context` | `no-untyped-call` | 8 | Call to untyped function "report" in typed context |
-| `.agents/hooks/standards_context.py` | `standards_context` | `no-untyped-def` | 6 | Function is missing a type annotation |
-| `.agents/hooks/standards_context.py` | `standards_context` | `var-annotated` | 2 | Need type annotation for "values" (hint: "values: dict[<type>, <type>] = ...") |
 | `.agents/hooks/tests/fixtures/continuation_fixture.py` | `fixtures.continuation_fixture` | `arg-type` | 1 | Argument 1 to "dict" has incompatible type "str"; expected "Iterable[tuple[str, Any]]" |
 | `.agents/hooks/tests/fixtures/continuation_fixture.py` | `fixtures.continuation_fixture` | `assignment` | 1 | Incompatible types in assignment (expression has type "dict[str, dict[str, Any]]", target has type "str") |
 | `.agents/hooks/tests/fixtures/continuation_fixture.py` | `fixtures.continuation_fixture` | `index` | 1 | Invalid index type "str" for "str"; expected type "SupportsIndex \| slice[SupportsIndex \| None, SupportsIndex \| None, SupportsIndex \| None]" |
@@ -738,9 +712,6 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 | `tests/test_plugin_update.py` | `tests.test_plugin_update` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
 | `tests/test_plugin_update.py` | `tests.test_plugin_update` | `no-untyped-def` | 1 | Function is missing a return type annotation |
 | `tests/test_plugin_update.py` | `tests.test_plugin_update` | `union-attr` | 2 | Item "None" of "ModuleSpec \| None" has no attribute "loader" |
-| `tests/test_project_facts.py` | `tests.test_project_facts` | `no-untyped-call` | 136 | Call to untyped function "write" in typed context |
-| `tests/test_project_facts.py` | `tests.test_project_facts` | `no-untyped-def` | 30 | Function is missing a return type annotation |
-| `tests/test_project_facts.py` | `tests.test_project_facts` | `var-annotated` | 2 | Need type annotation for "invalid" |
 | `tests/test_publisher_dependencies.py` | `tests.test_publisher_dependencies` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
 | `tests/test_publisher_dependencies.py` | `tests.test_publisher_dependencies` | `no-untyped-call` | 2 | Call to untyped function "roster" in typed context |
 | `tests/test_publisher_dependencies.py` | `tests.test_publisher_dependencies` | `no-untyped-def` | 3 | Function is missing a return type annotation |
@@ -772,8 +743,6 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 | `tests/test_stack_tiers.py` | `tests.test_stack_tiers` | `no-untyped-call` | 18 | Call to untyped function "load_module" in typed context |
 | `tests/test_stack_tiers.py` | `tests.test_stack_tiers` | `no-untyped-def` | 38 | Function is missing a return type annotation |
 | `tests/test_stack_tiers.py` | `tests.test_stack_tiers` | `union-attr` | 2 | Item "None" of "ModuleSpec \| None" has no attribute "loader" |
-| `tests/test_standards_context.py` | `tests.test_standards_context` | `no-untyped-call` | 24 | Call to untyped function "write" in typed context |
-| `tests/test_standards_context.py` | `tests.test_standards_context` | `no-untyped-def` | 14 | Function is missing a return type annotation |
 | `tests/test_task_routing.py` | `tests.test_task_routing` | `no-untyped-call` | 5 | Call to untyped function "manifest" in typed context |
 | `tests/test_task_routing.py` | `tests.test_task_routing` | `no-untyped-def` | 8 | Function is missing a type annotation |
 | `tests/test_tier_predicates.py` | `tests.test_tier_predicates` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
@@ -800,7 +769,6 @@ Exact legacy file/rule exceptions preserve existing runtime behavior during roll
 | `.agents/hooks/hook_runtime.py` | `PY016` | 1 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/hooks/host_cli.py` | `PY016` | 2 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/hooks/installed_skills.py` | `PY016` | 2 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
-| `.agents/hooks/project_facts.py` | `PY001` | 1 | Legacy comprehension traversal; split the nested generators into named loops. |
 | `.agents/hooks/tests/fixtures/continuation_fixture.py` | `PY009` | 9 | Legacy import-time execution or explicit subprocess fixture; move runtime I/O into the entry point and isolate fixture setup. |
 | `.agents/hooks/tests/fixtures/continuation_fixture.py` | `PY016` | 4 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/hooks/tests/fixtures/continuation_runtime_fixture.py` | `PY016` | 2 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |

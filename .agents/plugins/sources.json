@@ -183,36 +183,6 @@
       "destination": "tier.json"
     },
     {
-      "plugin": "base",
-      "source": ".agents/hooks/project_facts.py",
-      "destination": "hooks/project_facts.py"
-    },
-    {
-      "plugin": "base",
-      "source": ".agents/hooks/standards_context.py",
-      "destination": "hooks/standards_context.py"
-    },
-    {
-      "plugin": "base",
-      "source": ".agents/schemas/standards-context.schema.json",
-      "destination": "schemas/standards-context.schema.json"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/project_facts.py",
-      "destination": "hooks/project_facts.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/standards_context.py",
-      "destination": "hooks/standards_context.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/schemas/standards-context.schema.json",
-      "destination": "schemas/standards-context.schema.json"
-    },
-    {
       "plugin": "workflow",
       "source": ".agents/dependencies/agent/.agents/agent/runtime/repository_configuration.py",
       "destination": "resources/agent/runtime/repository_configuration.py"
