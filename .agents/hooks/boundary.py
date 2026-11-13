@@ -19,6 +19,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 TEXT_BYTES = 256 * 1024
+PATH_TOKENS = 256
+PATH_LIKE = re.compile(r"[/\\.~]")
 MANIFESTS = (".claude-plugin/plugin.json", ".codex-plugin/plugin.json")
 TOKEN = re.compile(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'|[^\s;|&<>()]+')
 LEADING_CD = re.compile(
@@ -201,15 +203,27 @@ def origin(repository: Path) -> Remote | None:
 
 
 def remote_matches(node: object, remote: Remote) -> bool:
-    """Whether an employer origin predicate matches; only origin facts can match."""
+    """Whether an employer origin predicate matches; only origin facts can match.
+
+    A reference without a host, such as `owner/name` text, matches only through a
+    repository-name pattern: its host is unknown, never assumed.
+    """
+    return _origin_fact(node, remote) is True
+
+
+def _origin_fact(node: object, remote: Remote) -> bool | None:
     if not isinstance(node, Mapping) or len(node) != 1:
         return False
     operator, value = next(iter(node.items()))
     if operator in ("all", "any") and isinstance(value, list) and value:
-        results = (remote_matches(child, remote) for child in value)
-        return all(results) if operator == "all" else any(results)
+        results = [_origin_fact(child, remote) for child in value]
+        if operator == "any":
+            return True in results
+        if False in results:
+            return False
+        return True if True in results else None
     if operator == "remote_host" and isinstance(value, str):
-        return remote.host is None or remote.host == value.rstrip(".").lower()
+        return None if remote.host is None else remote.host == value.rstrip(".").lower()
     if operator == "remote":
         patterns = value if isinstance(value, list) else [value]
         return any(
@@ -306,14 +320,15 @@ def _command(command: str, cwd: Path, plugin_roots: Sequence[Path]) -> Outgoing:
     kept: list[str] = []
     targets = [directory]
     contents: list[str] = []
-    for raw in TOKEN.findall(command):
+    for index, raw in enumerate(TOKEN.findall(command)):
         token = raw.strip("\"'")
         candidates = [token, *token.split("=", 1)[1:], token.removeprefix("@")]
+        probed = index < PATH_TOKENS and PATH_LIKE.search(token) is not None
         local = next(
             (
                 _resolved(candidate, directory)
                 for candidate in candidates
-                if _exists(candidate, directory)
+                if probed and _exists(candidate, directory)
             ),
             None,
         )

@@ -326,6 +326,39 @@ def test_remote_matches_evaluates_origin_predicates(
     )
 
 
+@pytest.mark.parametrize(
+    ("predicate", "remote", "matched"),
+    [
+        ({"remote_host": "github.com"}, (None, "someone/notes"), False),
+        ({"remote_host": "github.com"}, ("github.com", "someone/notes"), True),
+        (
+            {"any": [{"remote_host": "github.com"}, {"remote": "^x/"}]},
+            (None, "y/z"),
+            False,
+        ),
+        (
+            {"any": [{"remote_host": "github.com"}, {"remote": "^x/"}]},
+            (None, "x/z"),
+            True,
+        ),
+    ],
+)
+def test_remote_matches_never_assumes_an_unknown_host(
+    predicate: object, remote: tuple[str | None, str], matched: bool
+) -> None:
+    assert boundary.remote_matches(predicate, boundary.Remote(*remote)) is matched
+
+
+def test_boundary_reason_reads_windows_style_body_paths(
+    machine: Machine, tmp_path: Path
+) -> None:
+    body = tmp_path / "body.md"
+    body.write_text("Drafted with personal-tools.\n", encoding="utf-8")
+    command = "gh pr create --body-file " + str(body).replace("/", "\\")
+    reason = _reason(machine, "PowerShell", {"command": command}, machine.work)
+    assert "`personal-tools`" in reason
+
+
 def test_tool_gate_prints_a_deny_decision(
     machine: Machine, monkeypatch: pytest.MonkeyPatch
 ) -> None:

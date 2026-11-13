@@ -1649,9 +1649,10 @@ def boundary_reason(payload: Mapping[str, object], state_directory: Path) -> str
 
 
 def boundary_gate(payload: Mapping[str, object], state_directory: Path) -> str:
+    """The boundary reason, or nothing: a check that cannot decide never denies."""
     try:
         return boundary_reason(payload, state_directory)
-    except (OSError, ValueError, UnicodeError, RuntimeError):
+    except Exception:
         return ""
 
 
