@@ -1,12 +1,14 @@
 ---
 name: recents
-description: Reconstruct what Tommy was recently working on from git activity — clusters recent commits into workstreams, flags what's still unmerged/open (the stuff to pick back up), and points at where to resume. Use whenever Tommy says "/recents", "what was I working on", "what did I do yesterday / this week", "what's still open", or "where did I leave off". Works in any repo.
+description: Reconstruct recent work from git activity - cluster commits into workstreams, surface unfinished ones first and show where to resume. Use for recents, what was I working on, or where did I leave off.
 
 kind: utility
 domain: process
 ---
 
-Answer "what was I working on recently?" by mining git — not chat history (that's `/last-conversation`).
+# recents
+
+Owns answering "what was I working on recently?" from git, not chat history (that's `/last-conversation`).
 The goal is a short, ranked rundown of **workstreams**, with the **unfinished** ones surfaced first,
 because those are what Tommy actually wants to resume.
 
@@ -118,8 +120,7 @@ line in a fenced block, plus `git switch <branch>` (or the plan file if design-s
 **✅ Landed recently** — merged workstreams, one line each. Resume ids here go in a single fenced
 block at the end of the section (same one-per-line shape), not inline on the bullets.
 
-**⚠️ Needs attention** — only if found: red platform-sync PR, an open draft that's gone stale, a
-branch far ahead with no PR. Skip the heading entirely if nothing qualifies.
+**⚠️ Needs attention** — only if found: an open draft that's gone stale, a branch far ahead with no PR. Skip the heading entirely if nothing qualifies.
 
 ## Rules
 

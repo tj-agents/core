@@ -2,9 +2,6 @@
   "external_skills": {
     "personal:work-item": "Optional repository-selected personal operation; Core never selects or installs this profile.",
     "personal:create-work-item": "Optional repository-selected personal operation; Core never selects or installs this profile.",
-    "personal:address-work-item": "Optional repository-selected personal operation; Core never selects or installs this profile.",
-    "infonetica:work-item": "Optional repository-selected infonetica operation; Core never selects or installs this profile.",
-    "infonetica:create-work-item": "Optional repository-selected infonetica operation; Core never selects or installs this profile.",
-    "infonetica:address-work-item": "Optional repository-selected infonetica operation; Core never selects or installs this profile."
+    "personal:address-work-item": "Optional repository-selected personal operation; Core never selects or installs this profile."
   }
 }

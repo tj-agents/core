@@ -1,6 +1,6 @@
 ---
 name: merging
-description: Landing a PR safely through a GitHub merge queue — synchronize once immediately before final review, preserve that exact reviewed head when unrelated base commits land, then confirm the queue outcome with the reconnect-safe shared monitor. It resolves to exactly one of four terminal states (merged, a failed check, conflicted-so-auto-merge-was-silently-disabled, or green-but-never-admitted), never retries or toggles a genuine failure, never swallows query errors, and distinguishes a failed merge-group run from a PR-state glitch; it also owns only the generated downstream version-bump PR causally produced by that merge. Use after enabling auto-merge, when a PR seems stuck, when a merge-queue run fails, or before starting new work on a possibly-broken base.
+description: Land a reviewed PR on its exact head with `gh pr merge --auto --match-head-commit`, one background monitor and a worktree sweep; never retry a genuine failure. Use when landing or watching a PR.
 
 kind: policy
 domain: process
@@ -8,154 +8,31 @@ domain: process
 
 # Merging
 
-## Goal authority and technical gates
+Owns the rules for landing a PR. `engineering:merge` runs the steps, `workflow:run` owns the user's authority
+to merge, and the repository's GitHub rulesets are the merge gate.
 
-`workflow:run` owns the user's goal-wide authority, its acceptance condition, and the decision to continue
-after a waiting approval. This policy owns the technical gates: current-head review, green checks, queue
-state, repository stop paths, labels, and recorded delivery rules. Read `workflow:run` for authorization;
-a CI event alone does not grant it.
-
-## Persistent continuation
-
-When a queue, check, publication, or generated sync will resolve after this turn, enter the current harness's
-`workflow:continue` skill. Its software delivery reference binds this exact PR/head/worktree; the continuation selects the native
-continuation mechanism. That owner classifies a real failure by test tier, dispatches its corresponding debug
-skill in a fresh context, rebinds after a push, obtains the required review, and reaches merge under the
-goal-scoped authorization above. The shared monitor is the only foreground or persistent forge-wait mechanism.
-
-Do not arm `gh pr merge … --auto` on a PR whose checks or merge queue have not settled unless a continuation
-owns the wait; otherwise wait for the checks to finish and merge without `--auto`.
-## Synchronize once before final review
-
-Immediately before final review, resolve the actual PR base to its fetched remote-tracking ref:
-`origin/<parent-branch>` for a stack child, otherwise `origin/<default-branch>`. Check currency in the
-branch's own checkout:
+1. Review the exact head once through `engineering:review`.
+2. The PR body states Why and What; validate it once before the forge write.
+3. Arm auto-merge bound to that head, so required CI must pass on exactly the reviewed commit.
+4. Start one background monitor (`engineering:remote-validation`) and read GitHub once when it wakes.
+5. After the merge, retire the checkout through `engineering:merge`'s worktree sweep and cleanup proof.
 
 ```bash
-git fetch origin --quiet
-git rev-list --count HEAD..<actual-base>
+gh pr merge 42 --auto --squash --match-head-commit "$(git rev-parse HEAD)"
 ```
 
-Reconcile missing base commits before freezing the candidate. A standalone branch may merge the remote
-default; a child follows the verified restacking procedure against its parent. Rebuild the affected scope,
-push the stable candidate, and record the actual base and resulting head in the review descriptor. This
-is the single implementation synchronization point; do not substitute a direct main merge into every child.
+Replace `--squash` with the repository's merge method. Each wake resolves to one state:
 
-After final review, preserve the exact reviewed head. If base moves, run `workflow_ops.py review-reconcile`.
-Disjoint base-only movement does not restart source review or require a candidate merge; the merge-group run
-is the combined-tree authority. Relevant base movement requires synchronization, affected validation, and an
-incremental review of the changed candidate head. A stale pinned dependency or changed routed rule is
-relevant evidence.
+- **Merged**: report the landing SHA and stop.
+- **A check failed**: report the job and its run log and stop. Never retry or toggle a genuine failure.
+- **Conflicted**: GitHub silently disables auto-merge on a `DIRTY` PR. Update the branch, review the delta and
+  re-arm.
+- **Query error**: surface the failed command and its stderr; never swallow it as "still waiting".
 
-## Confirm the outcome with a token-efficient, transition-only monitor
-
-Use `engineering:remote-validation`'s reconnect-safe `workflow_ops.py monitor`. Start it
-through the harness notification or scheduled-continuation primitive with the exact PR, head, run, workflow,
-and attempt identity. Reconnect to its persisted state after process loss, session resume, or machine
-suspension. It queries no more than once a minute and emits only a changed tuple, terminal result, query
-error, or bounded timeout. When it wakes, perform one direct GitHub read before acting. The monitor never
-retries or toggles a failed check.
-
-Read forge status once, then again only after a real wake or observed transition; avoid repeated unchanged
-reads and ad hoc sleeping loops.
-
-1. **Merged** — report the landing sha and stop.
-2. **A check failed** — report the failing job, point at the run log, and **stop. Do not retry**; re-running a
-   genuinely failing suite just fails again. When persistent delivery owns the wait, bind the exact run head
-   and bound PR source head, classify the tier, and immediately dispatch one fresh debugging context with the
-   corresponding debug skill and complete failure evidence. In the foreground fallback with no persistent
-   host capability only, hand off to a dedicated debugging session with a ready-to-paste
-   dispatch prompt: worktree path, branch, PR, failing scenarios, and the failure signature. Emit it as soon as
-   the failure is obviously genuine (deterministic, in the changed area); only an environment-signature failure
-   — the whole suite dead at startup — waits for a fresh-stack re-run before dispatch.
-3. **Conflicted mid-wait** — base moved while you waited, the PR went `DIRTY`, and **GitHub silently disabled
-   auto-merge when it did.** Nothing is wrong with the work and nothing is retrying; the PR simply stopped
-   being enqueued. This is the state that looks most like "still waiting" and is the easiest hour to lose.
-   Reconcile the changed base against the frozen review descriptor. If the movement is relevant, update the
-   branch, rebuild, push, review the delta, and re-arm auto-merge. A real conflict is relevant by definition.
-4. **Green but never admitted** — the PR is `CLEAN`, every check passes, auto-merge is on, and GitHub never
-   adds it to the queue. That is an auto-merge **re-evaluation glitch** (enabled while checks were pending,
-   then never looked at again), **not** a test failure. The remedy is a **one-time** action: re-assert
-   auto-merge once (disable then re-enable) or break-glass admin-merge. Never an automated loop.
-
-**Telling state 2 from state 4 requires inspecting the actual run results, not just PR state — this is the
-trap.** After a `merge_group` run fails, GitHub ejects the PR back to `OPEN`/`CLEAN`/not-queued, which looks
-**identical** to the never-admitted glitch. The failure lives on the merge-queue's own
-`gh-readonly-queue/...pr-<N>-...` run, not on the PR head's checks, so a PR-checks query alone will not show
-it. The loop must also scan `merge_group` run conclusions for this PR: a failed one means state 2 (debug it);
-none ever dispatched means state 4 (nudge it once). Conflating them is how a real failure gets mistaken for a
-stall, and vice versa.
-
-**Never swallow poll errors.** A `2>/dev/null || continue` makes a broken CLI look identical to "still
-waiting". Capture stderr and surface the failed query as a terminal polling error. Keep the last complete
-state tuple, emit the next one only when it differs, and **cap** the loop so a persistent failure surfaces
-instead of hanging forever. User-facing updates follow the same rule: transitions, failures and the terminal
-outcome only — never a transcript of unchanged polls.
-
-Read **five** signals every poll, never fewer, for the **same PR recorded at entry**: the PR's bare `state`;
-its merge-state status (a `DIRTY` value is state 3); whether an auto-merge request is still attached; whether
-the merge queue actually holds an entry for it (no entry is what makes state 4 recognisable); and the
-conclusions of the merge queue's own runs (what makes state 2 recognisable). Read the state and the merge-state
-status into **separate** variables — a joined string never matches `MERGED`, so the loop times out instead of
-reporting the merge.
-An adjacent queue entry, a similarly named branch or a newer PR never silently becomes the target.
-
-The executable monitor is `.agents/workflows/workflow_ops.py`; `engineering:merge` supplies its exact
-PR and head identity.
+Load `workflow:continue` and its delivery reference only when the user asks for unattended progress.
 
 ## Transferred checkout cleanup
 
-Use `engineering:merge` Step 5's `finish` when the current owner can release its checkout itself. When
-that capability is unavailable and an authorized `workflow:handoff` transfers cleanup, the successor owns
-the exact removal, rename or move and final filesystem verification recorded in `## Next Steps`.
-The predecessor ends repository-scoped activity and emits a recorded release marker; it never performs
-the operation after launch. The successor waits for that marker and never stops the predecessor's
-session: the host that runs a session ends it.
-
-Run the filesystem operation from a verified surviving checkout after the predecessor no longer holds
-the old directory. Treat a command error or residual path as incomplete cleanup. Launcher submission or
-partial Git cleanup does not establish release of the host or removal of the directory.
-
-```text
-Next Steps: wait for the predecessor's recorded release, then remove the named old checkout from the
-surviving checkout and verify the old path is absent.
-```
-
-## Whoever merges owns only the generated downstream PR that merge caused
-
-Where a merge triggers a package republish and an automated version-bump PR across consumers, that causally
-linked PR is part of the merge, not an afterthought. **Ownership is causal, not topical:** prove the publish
-run was triggered by the landing commit, then identify the sync from that run's recorded version, branch or PR
-metadata. A name such as `platform-sync`, being open at the same time, or touching the same consumers proves
-nothing.
-
-- **Non-breaking → it auto-merges green in minutes. Breaking** — a published type moved and a consumer no
-  longer compiles against the new pin — **→ it goes red, and until it is fixed every consumer is stranded on a
-  broken pin.**
-- **A pre-existing generated PR is out of scope.** Healthy, pending or already automation-owned, it is not a
-  prerequisite for the selected PR and must not be reviewed, labelled, enqueued, waited on or otherwise
-  mutated. The only repository-wide exception is the explicit branch-time check for an **open red** sync
-  below.
-- **Follow only the causally linked PR to green or merged.** If it is red, migrate the failing consumers **in
-  that PR** (legal now: the new version is on the feed), build to zero errors, and push. **Never leave a red
-  sync PR behind.**
-- **Leave healthy automation alone.** When the generated PR's own workflow promises to validate and
-  auto-merge it, do not add a manual review, re-arm it speculatively or merge it by hand. Intervene only after
-  the causally linked publication, checks or auto-merge actually fail.
-- **Supersession transfers ownership.** If a later publish from an unrelated landing closes or replaces the
-  sync being followed, verify that provenance and stop. The later producer owns its replacement; do not adopt
-  the new PR and turn one delivery into an unbounded chase through the queue.
-- **Before branching for new work, confirm no open red sync PR** — don't build on a mid-break platform. That is
-  a branch-time check, not a per-prompt one.
-- Back it with automation that opens a tracking issue and labels the PR the moment a sync goes red, so a broken
-  sync cannot rot unnoticed when a merge bypassed the normal path.
-
-## No workflow arms merge automation on an ordinary PR
-
-Marking a PR ready for review changes its review state, not its merge authorization. **No CI workflow may
-enable auto-merge or merge an ordinary PR in response to a PR lifecycle event** — `opened`, `reopened`,
-`synchronize`, or `ready_for_review`. A user-authorized `workflow:run` goal enters delivery after its
-source and technical gates are ready; the CI event itself never starts it. The one
-exception is a repository-owned **generated** PR — the `platform-sync`/version-bump kind above: its own
-workflow may arm auto-merge for itself as part of the already-authorized producer chain, and that scoped
-automation must never generalise to ordinary PRs.
+When an authorized `workflow:handoff` transfers cleanup, the successor removes the old checkout from a
+verified surviving checkout only after the predecessor has stopped using it, then verifies the path is gone.
+A command error or residual path is incomplete cleanup.

@@ -1,6 +1,6 @@
 ---
 name: pull
-description: Pull the latest changes for the current branch, and when the pull fails diagnose the cause, fix it, and explain briefly what was wrong — uncommitted changes blocking the merge, conflicts, a diverged branch, a missing upstream, or a detached HEAD. Nothing destructive without asking. Use whenever the user wants to pull, pull latest, get the latest changes, or recover from a failed pull.
+description: Pull the current branch and, when the pull fails, diagnose and fix the cause - blocking changes, conflicts, divergence, no upstream or detached HEAD. Use to pull or recover a failed pull.
 
 kind: operation
 domain: process
@@ -9,12 +9,8 @@ lane: L7
 
 # Pulling, and recovering a failed pull
 
-Pull the latest changes for the current branch. When it fails, find the cause, fix it, and explain what was
-wrong in a sentence or two.
-
-This is the narrow operation: it updates the branch you are on and nothing else. When the question is also
-*"is this branch still live, and is my view of the default branch stale?"*, `engineering:sync-checkout` is the
-procedure.
+Owns updating the current branch and nothing else. When the question is also whether the branch is still
+live or the default-branch view is stale, use `engineering:sync-checkout`.
 
 ## Steps
 
@@ -34,3 +30,9 @@ procedure.
 
 - Keep it lightweight: pull, fix only if needed, explain briefly.
 - **Nothing destructive without asking** — no hard reset, no force-anything, no discarding local work.
+
+```text
+git pull -> error: Your local changes to src/map.py would be overwritten by merge.
+git stash && git pull && git stash pop    # after offering it
+Report: "Local edits to src/map.py blocked the merge; stashed, pulled 3 commits and restored them."
+```

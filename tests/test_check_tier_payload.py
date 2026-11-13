@@ -111,11 +111,11 @@ class PayloadTree(unittest.TestCase):
 
     def test_a_remote_matcher_requires_schema_version_two(self):
         self.declare(["dotnet"])
-        self.payload("dotnet", tier=dict(TIER, detect={"remote": ["^infonetica/"]}))
+        self.payload("dotnet", tier=dict(TIER, detect={"remote": ["^example-employer/"]}))
         problems = checker.check(self.root)
         self.assertTrue(any("schema_version 1" in problem for problem in problems), problems)
 
-        self.payload("dotnet", tier=dict(TIER, schema_version=2, detect={"remote": ["^infonetica/"]}))
+        self.payload("dotnet", tier=dict(TIER, schema_version=2, detect={"remote": ["^example-employer/"]}))
         self.assertEqual(checker.check(self.root), [])
 
     def test_front_matter_must_carry_the_kind_marker(self):

@@ -108,7 +108,7 @@ would create another instruction owner without providing the automated runtime.
 
 The [handoff contract](../../.agents/workflow/workflow/handoff/SKILL.md) distinguishes ordinary launches,
 full transfers, critical verified pickup and side workstreams. Critical transfers use
-[transfer.py](../../.agents/workflow/workflow/handoff/scripts/transfer.py): atomic receipts bind the
+[transfer.py](https://github.com/tj-agents/core/blob/9fd451823672de94f006ad0803756b24603af538/.agents/workflow/workflow/handoff/scripts/transfer.py): atomic receipts bind the
 goal digest, checkout, Git identity, harness and attempt. Matching acknowledgement and first-action
 evidence are separate states. An interrupted launch becomes uncertain and cannot be retried blindly.
 The helper explicitly does not implement a general writer lease or prove host acceptance.

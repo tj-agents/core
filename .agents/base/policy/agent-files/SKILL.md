@@ -7,21 +7,17 @@ domain: behavior
 
 # Pair agent instruction files
 
-Whenever you create, move, rename, or delete an `AGENTS.md` or `CLAUDE.md`, handle both files in that
-directory together. `AGENTS.md` owns the instructions. Its sibling `CLAUDE.md` contains only:
+Owns the pairing of `AGENTS.md` and `CLAUDE.md` in repositories whose GitHub owner is listed in
+`repo-owners.json`. Any other repository keeps its own layout; edit its agent files only when the work
+requires it, and never add personal conventions or settings to them.
+
+Create, move, rename or delete both files of a directory together. `AGENTS.md` owns the instructions; its
+sibling `CLAUDE.md` contains only:
 
 ```text
 @AGENTS.md
 ```
 
-Claude then loads the same instructions. If either file exists without the other, repair the pair as part of
-the current change. Move any distinct instructions from an existing `CLAUDE.md` into `AGENTS.md` before
-replacing it with the pointer.
-
-Before delivery, check both directions across the changed repository: every `AGENTS.md` has its sibling
-`CLAUDE.md`, and every `CLAUDE.md` has its sibling `AGENTS.md` with the exact pointer content. Do not rely
-on a machine-local profile file to supply this repository rule.
-
-This applies only to repositories whose GitHub owner is listed in `repo-owners.json`. Any other
-repository keeps its own agent-file layout. Edit its agent files only when the work itself requires it, and
-never add personal conventions or settings to them.
+If either file exists without the other, repair the pair in the current change, moving any distinct
+instructions from an existing `CLAUDE.md` into `AGENTS.md` first. Before delivery, check both directions
+across the changed repository. A machine-local profile file never supplies this rule.
