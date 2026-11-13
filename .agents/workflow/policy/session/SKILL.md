@@ -38,8 +38,8 @@ Keep the active goal, tell the user and record only through the selected profile
 One session owns a goal. Message another session only for a blocker it must act on or a final result it
 is waiting for, after verifying from its goal, work-item binding or explicit assignment that it is
 responsible. A shared checkout, parent conversation or similar title does not establish that. Correct a
-misrouted message by posting a retraction to the original recipient. `agent:message` posts to the
-recipient's feed, which it reads on demand; never inject a message into another session's conversation.
+misrouted message by sending a retraction to the original recipient. `agent:message` (`tj message`)
+delivers natively to a Claude session's inbox and to a Codex session's feed, which it reads on demand.
 
 Phases, commits, open PRs, handoffs and briefs never narrow the original scope. Use `workflow:handoff`
 only for an actual transfer of ownership.
