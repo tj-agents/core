@@ -1,7 +1,6 @@
 import importlib
 import importlib.util
 import json
-import os
 import subprocess
 import sys
 from collections.abc import Mapping
@@ -327,20 +326,21 @@ def test_remote_matches_evaluates_origin_predicates(
     )
 
 
-def test_tool_gate_prints_a_deny_decision(machine: Machine) -> None:
+def test_tool_gate_prints_a_deny_decision(
+    machine: Machine, monkeypatch: pytest.MonkeyPatch
+) -> None:
     payload = {
         "tool_name": "Bash",
         "tool_input": {"command": 'git commit -m "personal-tools"'},
         "cwd": str(machine.work),
     }
-    environment = {"AGENT_STATE_DIRECTORY": str(machine.state)}
+    monkeypatch.setenv("AGENT_STATE_DIRECTORY", str(machine.state))
     result = subprocess.run(
         [sys.executable, "-B", str(GATE), "--tool-gate"],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
         encoding="utf-8",
-        env={**os.environ, **environment},
         check=False,
     )
     decision = json.loads(result.stdout)["hookSpecificOutput"]
