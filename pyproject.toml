@@ -952,11 +952,6 @@ rule = "PY016"
 reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
 
 [[tool.python-standards.exceptions]]
-path = "tests/test_selected_standards.py"
-rule = "PY001"
-reason = "Legacy comprehension traversal; split the nested generators into named loops."
-
-[[tool.python-standards.exceptions]]
 path = "tests/test_stack_tiers.py"
 rule = "PY016"
 reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
