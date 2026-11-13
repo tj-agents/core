@@ -1,6 +1,6 @@
 ---
 name: plans
-description: Supporting contract for plan, roadmap, and progress-ledger structure, ownership, dependency states, phase gates, closeout, and context-transfer criteria. Load while a task workflow authors, executes, reconciles, checkpoints, or closes durable plan state; it does not own natural-language planning or implementation requests, which select workflow:plan, workflow:run, or update-roadmap.
+description: Shape of an implementation plan: phases that each end green, a verification gate per phase and a consumption contract for every consumable capability. Use when writing or executing a plan.
 
 kind: convention
 domain: process

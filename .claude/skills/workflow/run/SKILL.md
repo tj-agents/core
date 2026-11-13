@@ -1,6 +1,6 @@
 ---
 name: run
-description: Own authorized sustained or multiphase work through its actual acceptance condition. Use when work continues across phases, commits, reviews, or context changes.
+description: Own authorized sustained or multiphase work through its whole requested outcome. Use when work continues across phases, commits, PRs, reviews or context changes.
 kind: workflow
 domain: process
 ---

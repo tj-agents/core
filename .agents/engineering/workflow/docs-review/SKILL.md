@@ -1,115 +1,35 @@
 ---
 name: docs-review
-description: Apply the canonical isolated review workflow to documentation or agent-metadata-only work, using ordinary review by default and one explicitly assessed routine-docs pass only for low-risk prose/navigation changes. Use to review docs, plans, skills, or a meta-only PR; route mixed runtime/product/package/CI-selection diffs to review.
+description: Review documentation or agent-metadata-only changes in one pass for accuracy, contradictions, ownership, concision and followability. Use for docs, plans, skills or meta-only PRs.
 
 kind: workflow
 domain: process
 ---
 
-# Documentation review mode
+# Documentation review
 
-This is the documentation mode of the canonical `review` pipeline. It uses the same frozen candidate,
-host native layer, fresh read-only dispatches, result validation, parent synthesis, canonical work order,
-status, watermark, and explicit review-and-fix authorization. Only the scope guard, loaded rules, and lenses
-differ.
-
-In scope: Markdown, agent metadata under `.agents/`, `.claude/`, and `.codex/`, plans, documentation,
-`AGENTS.md`, `CLAUDE.md`, and `README*`. In an agents source repository this also includes its
-process hooks, deterministic workflow helpers/tests, and generated plugin mirrors when they cannot affect a
-product build or runtime.
-
-## Scope guard and routine mode
-
-Resolve and freeze the candidate exactly as `review` Stage 1. If any frozen path affects runtime, product
-code, a published package manifest/lockfile, migrations, or CI test selection, stop and route the entire
-mixed candidate to `review`.
-
-Ordinary review remains the default. A routine documentation candidate is an explicit semantic assessment,
-not an extension inference. Invoke the frozen preparation operation with both of these arguments:
-
-```bash
---docs-risk routine --docs-rationale "<specific low-risk prose or navigation rationale>"
-```
-
-The descriptor binds that rationale, the `routine` mode and its one focused lens to the exact candidate and
-bundle identity. It rejects an empty rationale, executable and agent-instruction surfaces, `AGENTS.md`,
-`CLAUDE.md`, `SKILL.md`, security-sensitive paths, and every non-Markdown/non-README path. A qualifying
-path set does not prove its content harmless: escalate to ordinary review for executable contracts,
-configuration, security-sensitive or destructive instructions, materially consequential technical claims,
-or any uncertainty about the semantic risk.
-
-A pure closeout whose net diff contains deletions only is exempt because no surviving content remains for
-these lenses:
+Owns one review pass over documentation and agent metadata: Markdown, `.agents/`, `.claude/`, `.codex/`,
+plans, `docs/`, `AGENTS.md`, `CLAUDE.md` and `README*`. Resolve the candidate as `engineering:review`
+Stage 1 does. If any changed path affects runtime, product code, a package manifest or lockfile, migrations
+or CI test selection, route the whole candidate to `engineering:review`. A candidate whose surviving diff is
+empty is exempt:
 
 ```bash
 git diff --diff-filter=ACMRT --name-only "<base>..<head>"
+# No output: deletions only, nothing to review. Any path: review it below.
 ```
 
-Any surviving path requires review in its explicitly assessed mode.
+Run the `review` Stage 3 native layer, then one pass covering:
 
-## Work order and review layer
+- accuracy: paths, headings, names, commands, flags and behavior match the repository;
+- contradiction: changed rules agree with sibling and local guidance;
+- one rule, one home: a durable rule lives with its narrow owner and hubs only point to it;
+- concision: `AGENTS.md`, `CLAUDE.md` and `SKILL.md` additions add a real constraint, not narration;
+- dangling references: durable guidance never depends on a plan, ticket or scratch file; and
+- followability: each instruction has one owner, action and pass condition.
 
-Use the same runtime-resolved private or durable work-order contract from `review-lifecycle`. The parent records status
-`in-progress` and the frozen candidate before review.
-
-An ordinary candidate runs the `review` Stage 3 native layer, with the same `native-general` fallback.
-A valid routine candidate is exempt from the repeated native-plus-fresh full-code-review sequence and runs
-its one focused docs pass instead.
-
-## Rules
-
-Load the root and changed-path `AGENTS.md` files, the plan floor and `plans` for plan artifacts and
-implementation-ready design references, `review-lifecycle` for work-order changes, `handoff` for transfer
-instructions, and sibling skills a changed skill names. Apply the `plans` implementation-design review gate,
-including its implementation-path standards resolution. Use the route table when it covers the paths.
-Convention findings require an owning rule; accuracy and contradiction findings stand on repository evidence.
-
-## Documentation lenses
-
-Dispatch only relevant fresh lenses, using the same immutable descriptor and concurrency rules as
-`review`:
-
-- accuracy: paths, headings, names, commands, flags, behavior, and configuration must match the repository;
-- contradiction: changed rules must agree with sibling and local guidance;
-- one-rule-one-home: durable rules belong to their narrow owner, with hubs remaining pointers;
-- recurring-context concision: `AGENTS.md`, `CLAUDE.md`, agent playbooks, and `SKILL.md` additions must
-  add a real constraint rather than narration or duplication;
-- dangling references: durable guidance must not depend on disposable plans, phases, tickets, or scratch
-  files; and
-- followability: each instruction has an unambiguous owner, action, and pass condition.
-
-For every changed authored skill, standard, or always-loaded instruction, verify the relevant concrete
-fenced example demonstrates the changed rule. A nonempty fence alone is insufficient: verify the example's
-types, ownership, construction, and call site where the rule defines them. Apply `engineering:docs`' required
-code, procedure, or input/output format. Resolve the checker from the installed `template:check` skill
-directory and run it over the source checkout:
-
-```bash
-python -B "<template:check skill-directory>/scripts/check_examples.py" --root <source-checkout> --base <base-sha> --head <head-sha>
-```
-
-The checker reads committed files from `<head-sha>`, so it does not rely on mutable source-checkout content.
-It establishes only that an eligible changed guidance file has a usable demonstration; semantic coverage
-remains a reviewer judgment.
-
-A routine candidate dispatches one focused docs lens over the frozen tree. It verifies links and anchors,
-fences and formatting, privacy/source separation, targeted facts and prerequisites. It does not dispatch a
-native review or a second fresh code lens.
-
-When agent guidance changes, run the frozen tree's own `.agents/hooks/docs_reachability.py` when it ships
-one, otherwise `<engineering>/hooks/docs_reachability.py` as defined by `review`, always with
-`--root <candidate-bundle>/tree` and never against the live checkout. Treat each error as accuracy evidence.
-
-Fresh lenses do not see sibling conclusions or write the artifact. The parent verifies repository evidence,
-deduplicates, assigns severity and stable IDs, and drops preference-only rewrites, unchanged pre-existing
-issues, and findings below the effort-adjusted confidence bar. Retained findings name one concrete edit.
-
-## Complete and report
-
-The parent finalizes the canonical work order exactly as `review` Stage 7: one judgment, status
-`complete`, and a watermark at the frozen head. Use IDs such as `ACC#`, `CON#`, `HOME#`, `CONC#`,
-`DANG#`, and `INST#`.
-
-If a plan owns the branch, the completed pass is one material review transition. Report range, finding
-counts, canonical work order, and watermark. Remediation begins only under explicit combined authorization
-and returns through `incremental-review` with a risk reassessment for new consequential content.
+Load the root and changed-path `AGENTS.md` files and the sibling skills a changed skill names. A convention
+finding names its owning rule; accuracy and contradiction findings stand on repository evidence. The
+repository's CI runs the example and reachability checkers; read their results rather than rerunning them.
+The parent verifies, deduplicates and assigns severity, dropping preference-only rewrites and unchanged
+pre-existing issues. Report findings, the reviewed range and the rules applied.

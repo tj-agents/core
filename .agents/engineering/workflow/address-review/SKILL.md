@@ -1,79 +1,33 @@
 ---
 name: address-review
-description: Serially resolve open findings in the canonical review work order without changing its frozen candidate, original finding text, severity, or completed pass judgment; verify and commit coherent fixes, then require a fresh incremental watermark. Use when the user explicitly asks to address findings or an implementation workflow already authorized review-and-fix.
+description: Fix a completed review's findings one at a time on the reviewed branch, commit each fix with its test, then review only the fix delta. Use when asked to address review findings.
 
 kind: workflow
 domain: process
 ---
 
-# Address a review serially
+# Address a review
 
-This is the separate write side of the review family. It may begin only when the user explicitly requests
-fixes, passes `--fix` to `review`, or the original implementation workflow already authorizes repairing
-its reviewed candidate. Review-only requests end after the judgment.
+Owns fixing a completed review's findings. It starts only when the user asks for fixes, passes `--fix` to
+`engineering:review`, or the implementing workflow already covers repairing its candidate; a review-only
+request ends at the findings. `engineering:review-lifecycle` owns where a finding may be fixed.
 
-Read `review-lifecycle`, then resolve the current branch's canonical work order with `<engineering>/workflows/workflow_ops.py review-path`. If the user
-names a file, normalize it to a repository-relative path and reject it unless it equals the derived path
-exactly.
+Take one finding, or one tightly coupled group, at a time under a single writer: fix it, add the test that
+fails before and passes after where the defect is testable, run the smallest relevant check and commit with
+explicit pathspecs. Never run two writers at once, even on disjoint files. Keep each finding's original text
+and severity; record only its disposition and evidence. A finding that cannot be fixed now is recorded
+through the selected profile with an objective resolution condition. Fix the fixable part of a split
+finding now; a genuine product or architecture decision stops with its owner and resume condition.
 
-Before setting any finding to `[~]` or starting a writer, require the single top-level `Review status` to be
-`complete`, the current `Judgment` and active `Pass judgment` to be non-pending final values, and staged
-coverage to contain no `[ ]` or `[~]`. The single `Reviewed up to commit:` marker must exist and equal the
-active pass's candidate head or staged anchor. When the active path set requires security review, its
-`Security-reviewed up to commit:` marker must equal that same head. Otherwise resume review production or
-parent finalization first. On a staged work order, the single `Cross-area notes status` and
-`Parent summary status` fields must both be `complete`.
-
-## Serial finding loop
-
-Take one open finding or one tightly coupled group, set it to `[~]`, fix it under one exclusive writer, run
-the smallest relevant validation, and return control to the parent before selecting the next. Never overlap
-writers, even for disjoint files: one parent must observe and accept each resulting tree before another write.
-
-The original candidate base/head/path digest, finding ID, text, severity, lens attribution, and completed
-pass judgment are immutable. Remediation may only:
-
-- move a finding from `[ ]` to `[~]` to `[x]`;
-- append a concise disposition and fix evidence; or
-- mark `[wontfix]` with a final reason and, when work is postponed, record debt through the selected
-  profile under [the recording contract](../../../workflow/resources/problem-records.md) in the same stroke and link
-  its canonical record with an objective resolution condition.
-
-Do not reassess a high-confidence review finding as subjective and silently defer it. When part is fixable,
-split the blocked remainder and land the fixable part now. A genuinely irreversible or product/architecture
-decision stops with its owner and observable resume condition.
-
-Commit each coherent finding or tightly related group locally with explicit pathspec staging. Batch completed
-related commits into one stable push only when remote validation or handoff is due. No review result or
-subordinate owns staging, commits, severity, or follow-on scope.
-
-## Fresh review after writes
-
-Keep the work order throughout remediation. After any code or durable guidance commit, run
-`incremental-review` from its prior completed watermark to the new head. New findings re-enter this serial
-loop. Completion requires:
-
-- every original and incremental finding has a terminal disposition;
-- the incremental pass is clean;
-- `Review status` is `complete`; and
-- the top-level watermark covers the fixing head.
-
-Leave the clean artifact as the merge gate. Retire it only after merge according to `review-lifecycle`.
-
-## Continue or report
-
-If a plan uniquely owns the branch, checkpoint only when the whole addressing pass completes, a blocking
-finding changes the next action, or ownership transfers. Otherwise run the repository's read-only PR
-preflight and report its exact next action.
-
-Report fixed findings, any final dispositions and their durable owner, fixing commits, validation, canonical
-work order, and current watermark. Do not re-litigate a completed pass judgment.
-
-## Example
+After the last fix, run `engineering:incremental-review` over the fix delta; new findings re-enter this
+loop. Finish when every finding has a disposition and the delta review is clean.
 
 ```text
-Finding F-07 asks for paging beyond 1,000 records, but the provider endpoint has no continuation support
-yet. Mark F-07 `[wontfix]` with that reason and, in the same stroke, record the deferred paging as debt
-under the shared recording contract. Append the debt's identity and exit condition, every record fetched
-and verified in a queue above 1,000, to F-07; do not introduce a separate deferred status.
+Review 3f1c2a9..8e04d17: HIGH F-1 export breaks on commas; MEDIUM F-2 missing null guard.
+F-1: quote through csv.writer + test_export_quotes_commas -> commit c91b5e2.
+F-2: guard + test_export_skips_null_title -> commit d40a7f3.
+incremental-review 8e04d17..d40a7f3: clean. Report F-1, F-2 fixed at d40a7f3.
 ```
+
+Report fixed findings with their commits, any recorded deferral and its owner, the checks run and the new
+reviewed head.

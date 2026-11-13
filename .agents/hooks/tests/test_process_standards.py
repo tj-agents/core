@@ -33,51 +33,32 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertNotIn(phrase, corpus)
 
-    def test_checkpoint_standard_owns_material_transitions_and_single_push(self):
-        checkpoint = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
+    def test_plan_standard_owns_phase_gates_and_consumption_contracts(self):
+        plans = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
 
         for phrase in (
-            "material implementation milestone",
-            "genuine blocker or ownership handoff",
-            "completed full review or important finding",
-            "terminal delivery transition",
-            "unsafe context ending",
-            "pushes once",
-            "Do not create observation-only",
-            "200 lines",
-            "16,000 UTF-8 bytes",
+            "every intermediate state builds and passes",
+            "verification gate",
+            "pins its consumption contract",
+            "A plan holds unfinished work only",
         ):
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, checkpoint)
-
-    def test_staged_review_uses_its_own_resume_contract(self):
-        staged = authored_skill("staged-review").read_text(
-            encoding="utf-8"
-        )
-
-        self.assertIn("## rules manifest", staged.lower())
-        self.assertIn("the canonical work order is the resume contract", staged.lower())
-        self.assertNotRegex(staged.lower(), r"plan checkpoint[^\n]{0,120}(?:each|every) stage")
+                self.assertIn(phrase, plans)
+        for retired in ("verified pickup", "ownership release", "merge-docs", "roadmap"):
+            with self.subTest(retired=retired):
+                self.assertNotIn(retired, plans)
 
     def test_address_review_does_not_force_one_agent_context_per_finding(self):
-        address = authored_skill("address-review").read_text(
-            encoding="utf-8"
-        )
+        address = " ".join(authored_skill("address-review").read_text(encoding="utf-8").split())
 
-        self.assertIn("Take one open finding or one tightly coupled group", address)
+        self.assertIn("Take one finding, or one tightly coupled group, at a time under a single writer", address)
         self.assertNotIn("own fresh agent context", address)
-        self.assertNotIn("Spawn exactly one fresh agent context", address)
         self.assertNotIn("one finding per agent context", address)
 
     def test_address_review_serializes_every_fix(self):
-        address = authored_skill("address-review").read_text(
-            encoding="utf-8"
-        )
+        address = " ".join(authored_skill("address-review").read_text(encoding="utf-8").split())
 
-        self.assertIn("Never overlap\nwriters", address)
-        self.assertIn("one exclusive writer", address)
-        self.assertIn("even for disjoint files", address)
-        self.assertNotIn("Serial by default", address)
+        self.assertIn("Never run two writers at once, even on disjoint files", address)
         self.assertNotIn("concurrent fixes", address)
 
     def test_always_on_instructions_own_the_stage_pointer_rule(self):
@@ -93,16 +74,12 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertEqual(1, self.corpus().count("stage is actually entered"))
 
     def test_always_on_instructions_reconcile_known_problems_before_terminal_results(self):
-        instructions = authored_skill("engineering:session").read_text(
-            encoding="utf-8"
-        )
-        flat = " ".join(instructions.split())
+        flat = " ".join(authored_skill("engineering:session").read_text(encoding="utf-8").split())
 
         self.assertIn(
-            "Before committing or returning a terminal result, check the work against the "
-            "standards that governed it and reconcile every problem encountered: it is fixed, "
-            "routed to an existing owner, recorded when authorized, or retained in the active task "
-            "pending the profile's recording decision.",
+            "Before returning a terminal result, check the work against the standards that governed it and "
+            "reconcile every problem encountered: fixed, routed to an existing owner, or recorded through the "
+            "selected profile",
             flat,
         )
 
@@ -113,184 +90,134 @@ class ProcessStandardsTests(unittest.TestCase):
                 instructions.split("## When the user calls out a mistake", 1)[1].split("## ", 1)[0].split()
             )
 
-        self.assertTrue(callout("workflow:session").startswith("Answer the direct question first"))
+        text = callout("workflow:session")
+        self.assertTrue(text.startswith("Answer the direct question first"))
+        self.assertIn("Audit the session for other mistakes only when reporting a terminal result", text)
 
-    def test_harness_specific_persistent_continuation_is_routed(self):
-        remote = authored_skill("remote-validation").read_text(
-            encoding="utf-8"
+    def test_sessions_message_each_other_only_for_blockers_or_awaited_results(self):
+        session = " ".join(authored_skill("workflow:session").read_text(encoding="utf-8").split())
+
+        self.assertIn(
+            "Message another session only for a blocker it must act on or a final result it is waiting for",
+            session,
         )
+
+    def test_the_whole_requested_outcome_is_delivered_and_the_profile_decides_pr_count(self):
+        run = " ".join(authored_skill("workflow:run").read_text(encoding="utf-8").split())
+        session = " ".join(authored_skill("engineering:session").read_text(encoding="utf-8").split())
+
+        self.assertIn("Deliver the whole requested outcome", run)
+        self.assertIn("The selected profile, or the user, decides how many PRs the outcome uses", run)
+        self.assertIn("Never split a cutover into broken intermediate states", run)
+        self.assertIn("Phases, handoffs and briefs never narrow it, and a merged PR is not completion", session)
+
+    def test_unattended_continuation_is_opt_in_and_routed_once(self):
+        remote = authored_skill("remote-validation").read_text(encoding="utf-8")
         shared = (self.root / ".agents/workflow/workflow/continue/references/delivery.md").read_text(encoding="utf-8")
         workflow = authored_skill("workflow:continue").read_text(encoding="utf-8")
-        claude = (
-            self.root / ".claude/skills/workflow/continue/SKILL.md"
-        ).read_text(encoding="utf-8")
-        codex = (
-            self.root / ".codex/skills/workflow/continue/SKILL.md"
-        ).read_text(encoding="utf-8")
-
+        claude = (self.root / ".claude/skills/workflow/continue/SKILL.md").read_text(encoding="utf-8")
+        codex = (self.root / ".codex/skills/workflow/continue/SKILL.md").read_text(encoding="utf-8")
         delivery = (self.root / ".codex/runtime/continuation/README.md").read_text(encoding="utf-8")
 
-        self.assertIn("`workflow:continue`", remote)
-        self.assertIn("`workflow:continue`", remote)
-        self.assertIn("one persistent owner for a PR/head pair", shared)
+        self.assertIn("`workflow:continue` owns the wait only when the user asks for unattended progress", " ".join(remote.split()))
+        self.assertIn("It is the only route to the Codex CLI continuation runtime", " ".join(workflow.split()))
+        self.assertIn("Keep one background monitor per binding", shared)
+        self.assertIn("A merged PR returns to `workflow:run`", " ".join(shared.split()))
         self.assertIn("init --root ROOT --goal GOALPATH", delivery)
         self.assertIn("CONTINUATION_RESULT_PATH", delivery)
         self.assertIn("900-second child timeout", delivery)
-        self.assertIn("Missing merge authorization gates merge only", shared)
+        self.assertIn("fresh headless `codex exec` context", " ".join(delivery.split()))
+        self.assertIn("delivery_continuation.py", delivery)
         self.assertIn("`/goal`", claude)
         self.assertIn("`/loop`", claude)
         self.assertNotIn("continuation_runtime.py", claude)
         self.assertNotIn("delivery_continuation.py", claude)
-        self.assertIn(
-            "Scheduled interface",
-            codex,
-        )
-        self.assertIn("fresh headless `codex exec` context", " ".join(delivery.split()))
-        self.assertIn("delivery_continuation.py", delivery)
+        self.assertIn("Scheduled interface", codex)
         self.assertNotIn("Claude uses", remote)
         self.assertNotIn("Codex Desktop uses", remote)
-        for skill in ("e2e-debug", "e2e-api-debug", "e2e-ui-debug", "integration-debug"):
-            with self.subTest(skill=skill):
-                self.assertIn(skill, shared)
         self.assertNotEqual(claude, codex)
+        for identity in ("merge", "merging"):
+            with self.subTest(identity=identity):
+                body = " ".join(authored_skill(identity).read_text(encoding="utf-8").split())
+                self.assertIn(
+                    "Load `workflow:continue` and its delivery reference only when the user asks for unattended progress",
+                    body,
+                )
 
+    def test_merge_runs_on_the_reviewed_head_under_the_repository_rulesets(self):
         merge = authored_skill("merge").read_text(encoding="utf-8")
         merging = authored_skill("merging").read_text(encoding="utf-8")
+
+        self.assertLess(len(merging.encode("utf-8")), 3072)
         for body in (merge, merging):
-            with self.subTest(policy="merge-debug-dispatch"):
-                self.assertIn("immediately dispatch one fresh", body)
-                self.assertIn("foreground fallback", body)
-        self.assertIn("exact run head", merging)
-        self.assertIn("bound PR source head", merging)
-
-    def test_merge_authorization_is_goal_scoped_with_one_owner(self):
-        run = authored_skill("workflow:run").read_text(encoding="utf-8")
+            with self.subTest(body=body[:40]):
+                self.assertIn("--auto --squash --match-head-commit", body)
+                self.assertIn("GitHub rulesets are the merge gate", " ".join(body.split()))
+        self.assertIn("never retry or toggle a genuine failure", " ".join(merge.split()))
+        self.assertIn("Never retry or toggle a genuine failure", merging)
+        self.assertIn("`workflow:run` owns the user's authority", " ".join(merging.split()))
         corpus = " ".join(self.corpus().split())
-        self.assertIn("## Authority and acceptance", run)
         self.assertEqual(1, corpus.count("## Authority and acceptance"))
-        self.assertNotIn("## What authorizes a merge", corpus)
-        for identity in ("merging", "merge", "plans", "feature", "bugfix", "open-pr", "remote-validation"):
-            with self.subTest(identity=identity):
-                body = authored_skill(identity).read_text(encoding="utf-8")
-                self.assertIn("`workflow:run`", body)
-        delivery = (self.root / ".agents/workflow/workflow/continue/references/delivery.md").read_text(encoding="utf-8")
-        self.assertIn("`workflow:run`", delivery)
+        for retired in ("delivery-authorization", "authorized_stop_classes", "auto_merge.py", "merge queue"):
+            with self.subTest(retired=retired):
+                self.assertNotIn(retired, corpus)
 
-        for per_pr_reading in (
-            "implementation approval never invents merge authority",
-            "reaches merge only under explicit authorization",
-            "never silently authorizes the successor",
-            "merge authorization into the successor",
-            "adds no authority for installation, publication, merging",
-        ):
-            with self.subTest(per_pr_reading=per_pr_reading):
-                self.assertNotIn(per_pr_reading, corpus)
+    def test_address_debt_picks_fast_in_the_current_or_child_repository(self):
+        flat = " ".join(authored_skill("address-debt").read_text(encoding="utf-8").split())
 
-    def test_address_debt_uses_mode_specific_isolation_and_picks_fast(self):
-        body = authored_skill("address-debt").read_text(encoding="utf-8")
-        flat = " ".join(body.split())
+        self.assertIn("Work in the current repository", flat)
+        self.assertIn("survey their debt as one list; the picked item's repository then owns the run", flat)
+        self.assertIn("List titles and severity in one pass", flat)
+        self.assertIn("Take the first genuinely high-value, self-contained item", flat)
+        self.assertIn("the selected profile decides how many PRs", flat)
 
-        self.assertIn("Single-repo mode:** survey the repository", flat)
-        self.assertIn("Select or reuse an available checkout under `engineering:branching`", flat)
-        self.assertIn("Polyrepo-root mode:** run Step 2's survey across every child repo", flat)
-        self.assertIn("Once the primary item is selected, its child repo owns this run", flat)
-        self.assertIn("Pick the item(s) fast", flat)
-        self.assertIn("do not read each entry in full", flat)
-        self.assertIn("the bundling test below is applied after that pick", flat)
-        self.assertNotIn("Survey every `TECH_DEBT.md` in the repo, then choose", flat)
+    def test_handoff_is_one_self_contained_prompt_launched_once(self):
+        handoff = " ".join(authored_skill("handoff").read_text(encoding="utf-8").split())
 
-    def test_engineering_defers_execution_routing_to_workflow(self):
-        plans = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
-        handoff = " ".join(
-            authored_skill("handoff").read_text(encoding="utf-8").split()
-        )
+        self.assertIn("One self-contained prompt", handoff)
+        self.assertIn("It never narrows the requested outcome", handoff)
+        self.assertIn("Checkpoint the canonical goal, then stop writing owned paths", handoff)
+        self.assertIn("invoke the launcher once", handoff)
+        self.assertIn("Never keep two writers on one checkout", handoff)
+        self.assertIn("A prepared prompt alone is not a handoff", handoff)
+        for retired in ("transfer.py", "acknowledge", "receipt"):
+            with self.subTest(retired=retired):
+                self.assertNotIn(retired, handoff)
 
-        self.assertIn("`workflow:plan` owns", plans)
-        self.assertIn("`workflow:handoff` owns", plans)
-        self.assertIn("Stop owned-path writes before invoking the launcher", handoff)
-        self.assertIn("Preparing a pointer alone does not complete a handoff", handoff)
+    def test_review_uses_the_selected_standards_and_counts_identical_trees(self):
+        flat = " ".join(authored_skill("review").read_text(encoding="utf-8").split())
 
-    def test_plan_artifacts_always_reach_merged_default_branch(self):
-        plans = authored_skill("plans").read_text(encoding="utf-8")
-        flat = " ".join(plans.split())
-
-        self.assertIn("## Planning artifacts always land", plans)
-        self.assertIn("## Roadmap → plan → progress", plans)
-        self.assertIn("## Implementation examples and their standards", plans)
-        self.assertIn("planning-only or meta-only slice lands through `merge-docs`", flat)
-        self.assertIn("Location alone never makes a restriction stale", plans)
-        for live_gate in (
-            "explicit current user limitation",
-            "recorded repository authorization",
-            "named PR/head security or validation hold",
-            "merge hold",
-            "repository stop class",
-        ):
-            with self.subTest(live_gate=live_gate):
-                self.assertIn(live_gate, flat)
-        self.assertIn("Planning-only work is terminal only when its", flat)
-        self.assertIn("implementation are terminal only when that delivery PR merges", flat)
-
-    def test_review_keeps_injected_scope_and_rechecks_rule_identities(self):
-        body = authored_skill("review").read_text(encoding="utf-8")
-        flat = " ".join(body.split())
-
-        self.assertIn("reads `.agents/plugins.json`", flat)
-        self.assertIn("only when its recorded hash is unchanged", flat)
-        self.assertIn("changed or missing hash requires a new body read", flat)
-
-    def test_merge_docs_keeps_an_existing_isolated_branch(self):
-        body = authored_skill("merge-docs").read_text(
-            encoding="utf-8"
-        )
-        flat = " ".join(body.split())
-
-        self.assertIn(
-            "do not create a second branch solely to change the type prefix to `Docs`", flat
-        )
+        self.assertIn("`.agents/plugins.json` selection define the standards", flat)
+        self.assertIn("A head whose tree equals an already-reviewed head's tree counts as reviewed", flat)
+        lifecycle = " ".join(authored_skill("review-lifecycle").read_text(encoding="utf-8").split())
+        self.assertIn("A review is one native review of the full base and head SHAs and the diff between them", lifecycle)
+        for retired in ("bundle", "descriptor", "watermark", "work order"):
+            with self.subTest(retired=retired):
+                self.assertNotIn(retired, lifecycle)
 
     def test_merge_cleanup_runs_the_proving_worktree_sweep(self):
-        body = authored_skill("merge").read_text(encoding="utf-8")
-        cleanup = body.split(
-            "### 5. Return to a clean base and retire any isolated checkout",
-            maxsplit=1,
-        )[1].split("### 6. Follow the publish", maxsplit=1)[0]
-        flat = " ".join(cleanup.split())
+        flat = " ".join(authored_skill("merge").read_text(encoding="utf-8").split())
 
         for required in (
-            "never remove that path",
             "scripts/worktree_sweep.py --repo <primary-checkout>",
-            "`cleanup_proof.py` proves its PR merged at exactly its head",
-            "archiving any leftovers under `<state>/merge-cleanup/set-aside/` first",
-            "while an active `agent-store` launch still works inside it",
-            "while an open PR is based on its branch",
-            "removed by the sweep that runs once the session closes",
-            "never force a removal",
+            "once cleanup_proof.py proves its PR merged at exactly its head",
+            "a worktree with an active launch, a dependent open PR or a refused proof is kept and named",
+            "Never force a removal the sweep refused",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
-
         for retired in ("finish.py", "close.py", "machine:close", "worktrees.ps1", "worktree remove --force"):
             with self.subTest(retired=retired):
-                self.assertNotIn(retired, cleanup)
+                self.assertNotIn(retired, flat)
 
     def test_handoff_transfers_active_directory_removal_after_predecessor_release(self):
         handoff = " ".join(authored_skill("handoff").read_text(encoding="utf-8").split())
         cleanup = " ".join(authored_skill("merging").read_text(encoding="utf-8").split())
 
-        self.assertIn("follow `engineering:merging` under Transferred checkout cleanup", handoff)
-        self.assertIn(
-            "Put the exact operation and final filesystem verification in the successor's `## Next Steps`",
-            handoff,
-        )
-        self.assertIn("The predecessor must not perform it after launch", handoff)
-        self.assertIn("The successor waits for that marker and never stops the predecessor's session", cleanup)
-        self.assertIn(
-            "Run the filesystem operation from a verified surviving checkout after the predecessor "
-            "no longer holds the old directory",
-            cleanup,
-        )
-        self.assertIn("a command error or residual path as incomplete", cleanup)
+        self.assertIn("put `engineering:merging`'s transferred checkout cleanup in the successor's next action", handoff)
+        self.assertIn("the predecessor does not perform it after launch", handoff)
+        self.assertIn("only after the predecessor has stopped using it, then verifies the path is gone", cleanup)
+        self.assertIn("A command error or residual path is incomplete cleanup", cleanup)
 
 
 

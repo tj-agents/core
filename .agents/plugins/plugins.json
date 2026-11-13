@@ -18,8 +18,7 @@
       "skills": [
         "agent-files",
         "project-setup",
-        "solution-assessment",
-        "task-routing"
+        "solution-assessment"
       ],
       "dependencies": {
         "required": [],
@@ -256,17 +255,13 @@
         "failure-provenance",
         "feature",
         "git-auth",
-        "guide",
-        "guide-build",
         "incremental-review",
         "merge",
-        "merge-docs",
         "merging",
         "open-pr",
         "open-worktree",
         "plans",
         "pr-preflight",
-        "pr-screenshots",
         "prune-worktrees",
         "pull",
         "push",
@@ -275,12 +270,8 @@
         "review",
         "review-lifecycle",
         "session",
-        "stack",
-        "staged-review",
-        "staged-review-all",
         "sync-checkout",
-        "unmerged",
-        "update-roadmap"
+        "unmerged"
       ],
       "dependencies": {
         "required": [
@@ -442,47 +433,7 @@
                 ]
               ]
             }
-          ],
-          "auto_merge": {
-            "claude_allow": [
-              "Bash(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")",
-              "PowerShell(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")"
-            ],
-            "codex_prefix_rules": [
-              {
-                "pattern": [
-                  [
-                    "python",
-                    "python.exe",
-                    "python3",
-                    "py"
-                  ],
-                  "-B",
-                  "${PLUGIN_ROOT}/workflows/auto_merge.py",
-                  "--root",
-                  "${PROJECT_ROOT}"
-                ],
-                "justification": "Rechecks required authorization, checkout identity, readiness, review, and security evidence before arming auto-merge for this declared checkout.",
-                "match": [
-                  [
-                    "python",
-                    "-B",
-                    "${PLUGIN_ROOT}/workflows/auto_merge.py",
-                    "--root",
-                    "${PROJECT_ROOT}"
-                  ]
-                ],
-                "not_match": [
-                  [
-                    "python",
-                    "-B",
-                    "${PLUGIN_ROOT}/workflows/auto_merge.py",
-                    "--root"
-                  ]
-                ]
-              }
-            ]
-          }
+          ]
         }
       },
       "external_dependencies": {
@@ -508,14 +459,13 @@
       "id": "tj-agents/docs",
       "name": "docs",
       "package_path": "plugins/docs",
-      "description": "Layout, diagram and design-page conventions for pages people read.",
+      "description": "Layout and diagram conventions for pages people read.",
       "platforms": [
         "windows",
         "linux",
         "macos"
       ],
       "skills": [
-        "design",
         "diagram",
         "layout"
       ],

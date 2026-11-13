@@ -119,7 +119,6 @@ class SourceLayoutTests(unittest.TestCase):
             output,
         )
         self.assertIn("plugins/base/.agents/base/policy/agent-files/SKILL.md", output)
-        self.assertIn("plugins/base/.agents/base/policy/task-routing/SKILL.md", output)
         self.assertIn("plugins/base/.agents/base/policy/project-setup/SKILL.md", output)
         self.assertIn("plugins/base/.agents/base/policy/solution-assessment/SKILL.md", output)
 
