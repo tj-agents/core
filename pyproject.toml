@@ -57,7 +57,6 @@ raises-require-match-for = ["*"]
 "tests/test_tier_tool_context.py" = ["E501", "TID251"]
 "tests/test_tier_predicates.py" = ["E501", "I001", "PT009", "RUF059", "TID251"]
 "tests/test_task_routing.py" = ["E501", "I001", "PT009", "TID251"]
-"tests/test_standards_context.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
 "tests/test_stack_tiers.py" = ["C420", "E501", "I001", "PT009", "TID251"]
 "tests/test_source_layout.py" = ["E501", "F401", "I001", "PLR6301", "PT009", "RUF059", "SIM117", "TID251"]
 "tests/test_selected_standards.py" = ["PLW1514", "TID251"]
@@ -67,7 +66,6 @@ raises-require-match-for = ["*"]
 "tests/test_repository_permissions.py" = ["E501", "I001", "PT009", "TID251"]
 "tests/test_remote_host_tiers.py" = ["E501", "I001", "PT009", "TID251"]
 "tests/test_publisher_dependencies.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
-"tests/test_project_facts.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
 "tests/test_plugin_update.py" = ["E501", "I001", "PT009", "TID251"]
 "tests/test_native_host_acceptance.py" = ["TID251"]
 "tests/test_hook_launch_budget.py" = ["E501", "PT009", "TID251", "UP017"]
@@ -133,8 +131,6 @@ raises-require-match-for = ["*"]
 ".agents/hooks/tests/fixtures/fake_cli.py" = ["E501"]
 ".agents/hooks/tests/fixtures/continuation_runtime_fixture.py" = ["E402", "E501", "I001", "TID251"]
 ".agents/hooks/tests/fixtures/continuation_fixture.py" = ["E501", "I001", "PLW1514"]
-".agents/hooks/standards_context.py" = ["E501", "I001"]
-".agents/hooks/project_facts.py" = ["E501", "I001", "RUF005"]
 ".agents/hooks/problem_records.py" = ["E501", "UP036"]
 ".agents/hooks/installed_skills.py" = ["E501", "TID251"]
 ".agents/hooks/hook_runtime.py" = ["E501", "SIM105"]
@@ -145,7 +141,7 @@ raises-require-match-for = ["*"]
 ".agents/engineering/utility/review/scripts/review_rules.py" = ["E501", "I001", "TID251", "UP036"]
 
 [tool.ruff.format]
-exclude = [".agents/engineering/utility/review/scripts/review_rules.py", ".agents/engineering/workflow/merge/scripts/cleanup_proof.py", ".agents/engineering/workflow/merge/scripts/worktree_sweep.py", ".agents/hooks/check_tier_payload.py", ".agents/hooks/docs_reachability.py", ".agents/hooks/hook_runtime.py", ".agents/hooks/installed_skills.py", ".agents/hooks/problem_records.py", ".agents/hooks/project_facts.py", ".agents/hooks/standards_context.py", ".agents/hooks/tests/fixtures/continuation_fixture.py", ".agents/hooks/tests/fixtures/continuation_runtime_fixture.py", ".agents/hooks/tests/fixtures/fake_cli.py", ".agents/hooks/tests/fixtures/lane_expectations.py", ".agents/hooks/tests/fixtures/shell_profile_oracle.py", ".agents/hooks/tests/test_completion.py", ".agents/hooks/tests/test_continuation_runtime.py", ".agents/hooks/tests/test_delivery_runtime.py", ".agents/hooks/tests/test_docs_reachability.py", ".agents/hooks/tests/test_hook_runtime.py", ".agents/hooks/tests/test_host_cli.py", ".agents/hooks/tests/test_lane_tables.py", ".agents/hooks/tests/test_merge_cleanup_proof.py", ".agents/hooks/tests/test_pr_body.py", ".agents/hooks/tests/test_problem_records.py", ".agents/hooks/tests/test_process_standards.py", ".agents/hooks/tests/test_repository_configuration.py", ".agents/hooks/tests/test_shell_profile_oracle.py", ".agents/hooks/tests/test_workflow_ops.py", ".agents/hooks/tests/test_worktree_sweep.py", ".agents/hooks/tier_gate.py", ".agents/workflow/utility/status/scripts/status.py", ".agents/workflows/completion.py", ".agents/workflows/delivery_runtime.py", ".agents/workflows/pr_body.py", ".agents/workflows/workflow_ops.py", ".codex/hooks/bootstrap.py", ".codex/runtime/continuation/continuation_runtime.py", ".codex/runtime/continuation/continuation_scheduler.py", ".codex/runtime/continuation/delivery_continuation.py", "packages/tj-base/src/tj_base/startup.py", "plans/delivery-binding-budget/GOAL.md", "scripts/check_generated_paths.py", "scripts/ci_native_acceptance.py", "scripts/ci_selection.py", "scripts/native_host_acceptance.py", "scripts/runtime_sources.py", "scripts/sync_harness_manifests.py", "scripts/sync_plugin_packages.py", "scripts/update_plugin_digests.py", "tests/fixtures/fake_claude.py", "tests/fixtures/plugin_autoupdate_208cc302.py", "tests/fixtures/plugin_cli.py", "tests/fixtures/setup_probe.py", "tests/native_plugin_inventory.py", "tests/test_agent_files.py", "tests/test_check_generated_paths.py", "tests/test_check_tier_payload.py", "tests/test_ci_native_acceptance.py", "tests/test_ci_selection.py", "tests/test_codex_hook_snapshot.py", "tests/test_codex_startup_dispatch.py", "tests/test_codex_windows_hook_commands.py", "tests/test_company_skill_replacement.py", "tests/test_delivery_continuation.py", "tests/test_employer_tiers.py", "tests/test_harness_manifests.py", "tests/test_hook_contract.py", "tests/test_hook_launch_budget.py", "tests/test_plugin_update.py", "tests/test_project_facts.py", "tests/test_publisher_dependencies.py", "tests/test_remote_host_tiers.py", "tests/test_repository_permissions.py", "tests/test_review_native_layer.py", "tests/test_review_rules.py", "tests/test_runtime_sources.py", "tests/test_source_layout.py", "tests/test_stack_tiers.py", "tests/test_standards_context.py", "tests/test_task_routing.py", "tests/test_tier_predicates.py", "tests/test_tier_tool_context.py", "tests/test_workflow_session_hooks.py", "tests/test_workflow_status.py"]
+exclude = [".agents/engineering/utility/review/scripts/review_rules.py", ".agents/engineering/workflow/merge/scripts/cleanup_proof.py", ".agents/engineering/workflow/merge/scripts/worktree_sweep.py", ".agents/hooks/check_tier_payload.py", ".agents/hooks/docs_reachability.py", ".agents/hooks/hook_runtime.py", ".agents/hooks/installed_skills.py", ".agents/hooks/problem_records.py", ".agents/hooks/tests/fixtures/continuation_fixture.py", ".agents/hooks/tests/fixtures/continuation_runtime_fixture.py", ".agents/hooks/tests/fixtures/fake_cli.py", ".agents/hooks/tests/fixtures/lane_expectations.py", ".agents/hooks/tests/fixtures/shell_profile_oracle.py", ".agents/hooks/tests/test_completion.py", ".agents/hooks/tests/test_continuation_runtime.py", ".agents/hooks/tests/test_delivery_runtime.py", ".agents/hooks/tests/test_docs_reachability.py", ".agents/hooks/tests/test_hook_runtime.py", ".agents/hooks/tests/test_host_cli.py", ".agents/hooks/tests/test_lane_tables.py", ".agents/hooks/tests/test_merge_cleanup_proof.py", ".agents/hooks/tests/test_pr_body.py", ".agents/hooks/tests/test_problem_records.py", ".agents/hooks/tests/test_process_standards.py", ".agents/hooks/tests/test_repository_configuration.py", ".agents/hooks/tests/test_shell_profile_oracle.py", ".agents/hooks/tests/test_workflow_ops.py", ".agents/hooks/tests/test_worktree_sweep.py", ".agents/hooks/tier_gate.py", ".agents/workflow/utility/status/scripts/status.py", ".agents/workflows/completion.py", ".agents/workflows/delivery_runtime.py", ".agents/workflows/pr_body.py", ".agents/workflows/workflow_ops.py", ".codex/hooks/bootstrap.py", ".codex/runtime/continuation/continuation_runtime.py", ".codex/runtime/continuation/continuation_scheduler.py", ".codex/runtime/continuation/delivery_continuation.py", "packages/tj-base/src/tj_base/startup.py", "plans/delivery-binding-budget/GOAL.md", "scripts/check_generated_paths.py", "scripts/ci_native_acceptance.py", "scripts/ci_selection.py", "scripts/native_host_acceptance.py", "scripts/runtime_sources.py", "scripts/sync_harness_manifests.py", "scripts/sync_plugin_packages.py", "scripts/update_plugin_digests.py", "tests/fixtures/fake_claude.py", "tests/fixtures/plugin_autoupdate_208cc302.py", "tests/fixtures/plugin_cli.py", "tests/fixtures/setup_probe.py", "tests/native_plugin_inventory.py", "tests/test_agent_files.py", "tests/test_check_generated_paths.py", "tests/test_check_tier_payload.py", "tests/test_ci_native_acceptance.py", "tests/test_ci_selection.py", "tests/test_codex_hook_snapshot.py", "tests/test_codex_startup_dispatch.py", "tests/test_codex_windows_hook_commands.py", "tests/test_company_skill_replacement.py", "tests/test_delivery_continuation.py", "tests/test_employer_tiers.py", "tests/test_harness_manifests.py", "tests/test_hook_contract.py", "tests/test_hook_launch_budget.py", "tests/test_plugin_update.py", "tests/test_publisher_dependencies.py", "tests/test_remote_host_tiers.py", "tests/test_repository_permissions.py", "tests/test_review_native_layer.py", "tests/test_review_rules.py", "tests/test_runtime_sources.py", "tests/test_source_layout.py", "tests/test_stack_tiers.py", "tests/test_task_routing.py", "tests/test_tier_predicates.py", "tests/test_tier_tool_context.py", "tests/test_workflow_session_hooks.py", "tests/test_workflow_status.py"]
 
 [[tool.mypy.overrides]]
 module = "check_tier_payload"
@@ -221,10 +217,6 @@ module = "problem_records"
 disable_error_code = ["no-untyped-call", "no-untyped-def"]
 
 [[tool.mypy.overrides]]
-module = "project_facts"
-disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "var-annotated"]
-
-[[tool.mypy.overrides]]
 module = "review_rules"
 disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr", "var-annotated"]
 
@@ -255,10 +247,6 @@ disable_error_code = ["arg-type", "assignment", "attr-defined", "no-any-return",
 [[tool.mypy.overrides]]
 module = "scripts.update_plugin_digests"
 disable_error_code = ["arg-type", "union-attr"]
-
-[[tool.mypy.overrides]]
-module = "standards_context"
-disable_error_code = ["no-untyped-call", "no-untyped-def", "var-annotated"]
 
 [[tool.mypy.overrides]]
 module = "status"
@@ -406,10 +394,6 @@ module = "tests.test_plugin_update"
 disable_error_code = ["arg-type", "no-untyped-def", "union-attr"]
 
 [[tool.mypy.overrides]]
-module = "tests.test_project_facts"
-disable_error_code = ["no-untyped-call", "no-untyped-def", "var-annotated"]
-
-[[tool.mypy.overrides]]
 module = "tests.test_publisher_dependencies"
 disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
 
@@ -440,10 +424,6 @@ disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-at
 [[tool.mypy.overrides]]
 module = "tests.test_stack_tiers"
 disable_error_code = ["arg-type", "no-untyped-call", "no-untyped-def", "union-attr"]
-
-[[tool.mypy.overrides]]
-module = "tests.test_standards_context"
-disable_error_code = ["no-untyped-call", "no-untyped-def"]
 
 [[tool.mypy.overrides]]
 module = "tests.test_task_routing"
@@ -502,11 +482,6 @@ reason = "Legacy environment or argv access in hooks, orchestration and determin
 path = ".agents/hooks/installed_skills.py"
 rule = "PY016"
 reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
-
-[[tool.python-standards.exceptions]]
-path = ".agents/hooks/project_facts.py"
-rule = "PY001"
-reason = "Legacy comprehension traversal; split the nested generators into named loops."
 
 [[tool.python-standards.exceptions]]
 path = ".agents/hooks/tests/fixtures/continuation_fixture.py"
@@ -742,11 +717,6 @@ reason = "Legacy environment or argv access in hooks, orchestration and determin
 path = "tests/test_review_rules.py"
 rule = "PY016"
 reason = "Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point."
-
-[[tool.python-standards.exceptions]]
-path = "tests/test_selected_standards.py"
-rule = "PY001"
-reason = "Legacy comprehension traversal; split the nested generators into named loops."
 
 [[tool.python-standards.exceptions]]
 path = "tests/test_stack_tiers.py"
