@@ -4,7 +4,6 @@ import json
 import os
 import re
 import shutil
-import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -14,6 +13,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / '.agents/workflow/utility/status/scripts/status.py'
 ROW = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2} .*$', re.M)
+sys.path.insert(0, str(ROOT / '.agents/hooks/tests/fixtures'))
+import fake_cli  # noqa: E402
+
+TRACKED = 'github:github.com/example/demo:7'
 
 
 def rows(output):
@@ -35,6 +38,16 @@ class WorkflowStatusHarness(unittest.TestCase):
         self.plans.mkdir(parents=True)
         self.repos.mkdir(parents=True)
         self.script = SCRIPT
+        self.tools = self.home / 'tools'
+        self.tools.mkdir()
+        self.hook_bin = self.home / 'hook bin'
+        self.hook_bin.mkdir()
+        hook = Path(shutil.which('tj_hook'))
+        try:
+            os.link(hook, self.hook_bin / hook.name)
+        except OSError:
+            shutil.copy2(hook, self.hook_bin / hook.name)
+        self.tracker = {}
         self.here = self.repo('demo')
 
     def repo(self, *parts):
@@ -63,20 +76,30 @@ class WorkflowStatusHarness(unittest.TestCase):
         path.write_text(text, encoding='utf-8')
         return path
 
-    def work_item(self, feature='reader-bridge', item='status-reader', repo=None):
+    def work_item(self, feature='reader-bridge', item='status-reader', repo=None, reference='#7'):
+        declaration = '- Work item: `%s`\n' % reference if reference else ''
         return self.repo_plan(
             'plans/features/%s/work-items/%s/README.md' % (feature, item),
-            '# %s\n' % item,
+            '# %s\n\n%s' % (item, declaration),
             repo=repo,
         )
 
+    def track(self, state='In Progress', native_state=None, kind='task', reference='#7', **response):
+        item = {'ref': TRACKED, 'title': 'status reader', 'url': 'https://github.com/example/demo/issues/7',
+                'state': state, 'native_state': native_state or state or 'Triage', 'kind': kind, 'assignees': []}
+        self.tracker = fake_cli.install(
+            self.tools, {'tj item resolve %s' % reference: response or {'stdout': item}}, names=('tj',))
+
+    def tracker_calls(self):
+        return fake_cli.calls(self.tracker) if self.tracker else []
+
     def disposable_environment(self):
-        environment = dict(os.environ, HOME=str(self.home), USERPROFILE=str(self.home))
+        environment = dict(os.environ, HOME=str(self.home), USERPROFILE=str(self.home), **self.tracker)
+        environment['PATH'] = os.pathsep.join(
+            (str(self.tools), str(self.hook_bin), str(Path(shutil.which('git')).parent)))
         for name in tuple(environment):
             if name == 'GIT_CONFIG_COUNT' or re.fullmatch(r'GIT_CONFIG_(?:KEY|VALUE)_\d+', name):
                 environment.pop(name)
-        if hasattr(self, 'state_directory'):
-            environment['AGENT_STATE_DIRECTORY'] = str(self.state_directory)
         return environment
 
     def board(self, needle='', limit='20', scope='auto', cwd=None, script=None):
@@ -90,52 +113,6 @@ class WorkflowStatusHarness(unittest.TestCase):
 
     def listed(self, *arguments, **keywords):
         return rows(self.board(*arguments, **keywords))
-
-    def write_work_item_status(self, feature, item, status, schema=True):
-        self.state_directory = self.home / 'state'
-        self.state_directory.mkdir(exist_ok=True)
-        database = self.state_directory / 'sessions.db'
-        if database.exists():
-            database.unlink()
-        connection = sqlite3.connect(database)
-        if schema:
-            connection.executescript(
-                'CREATE TABLE work_items (key TEXT PRIMARY KEY, repo TEXT NOT NULL, '
-                'feature TEXT NOT NULL, item TEXT NOT NULL, status TEXT NOT NULL, '
-                'branch TEXT, pr TEXT, title TEXT, plan_path TEXT, updated_at REAL);'
-                'CREATE TABLE sessions (handle TEXT PRIMARY KEY, host TEXT NOT NULL, session_id TEXT NOT NULL, '
-                'repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);'
-                'CREATE TABLE work_item_references (provider TEXT NOT NULL, scope TEXT NOT NULL, '
-                'native_id TEXT NOT NULL, work_item TEXT NOT NULL, PRIMARY KEY (provider, scope, native_id));'
-                'PRAGMA user_version = 4;'
-            )
-            key = 'github.com/example/demo:%s/%s' % (feature, item)
-            connection.execute(
-                'INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                (key, 'github.com/example/demo', feature, item, status, None, None, None, None, 0),
-            )
-        connection.commit()
-        connection.close()
-        return database
-
-    def status_skill_directory(self, reader_text=None):
-        root = self.home / 'runtime-fixture'
-        skill = root / '.agents' / 'workflow' / 'utility' / 'status'
-        script = skill / 'scripts' / 'status.py'
-        script.parent.mkdir(parents=True)
-        shutil.copy2(SCRIPT, script)
-        runtime = root / '.agents' / 'agent-store' / 'runtime'
-        runtime.mkdir(parents=True)
-        (runtime / 'reader.py').write_text(reader_text or (
-            'class StoreReadError(ValueError):\n    pass\n\n'
-            'class ReadOnlyWorkItemStore:\n    def work_item(self, key):\n        return {"status": "active"}\n'
-        ), encoding='utf-8')
-        (runtime / 'repository_identity.py').write_text(
-            'def repository_identity(directory, git):\n    return "github.com/example/demo"\n', encoding='utf-8')
-        hooks = root / '.agents' / 'hooks'
-        hooks.mkdir(parents=True)
-        shutil.copy2(ROOT / '.agents/hooks/problem_records.py', hooks / 'problem_records.py')
-        return script
 
     def capability_result(self, script):
         return subprocess.run(
@@ -375,56 +352,51 @@ class RepoResidentPlanTests(WorkflowStatusHarness):
 
 
 class WorkItemStatusTests(WorkflowStatusHarness):
-    def test_all_sqlite_statuses_are_reported_and_done_is_hidden(self):
-        for status in ('proposed', 'active', 'delivery-gated', 'blocked', 'paused', 'done'):
-            with self.subTest(status=status):
-                self.work_item()
-                self.write_work_item_status('reader-bridge', 'status-reader', status)
+    def test_tracker_states_and_kind_are_reported_and_done_is_hidden(self):
+        self.work_item()
+        for state in ('To Do', 'In Progress', 'Blocked', 'In Review', 'Done'):
+            with self.subTest(state=state):
+                self.track(state, kind='bug')
                 output = self.board()
-                if status == 'done':
+                if state == 'Done':
                     self.assertNotIn('README.md', rows(output))
                     self.assertIn('1 named and marked done, hidden', output)
                 else:
-                    self.assertIn(status, output)
-                    self.assertIn('reader-bridge/status-reader', output)
+                    line = next(line for line in ROW.findall(output) if line.endswith('README.md'))
+                    self.assertIn(state, line)
+                    self.assertIn('reader-bridge/status-reader (bug)', line)
+        calls = self.tracker_calls()
+        self.assertEqual({'tj item resolve #7'}, {call['command'] for call in calls})
+        self.assertEqual({self.here.resolve()}, {Path(call['cwd']).resolve() for call in calls})
 
-    def test_missing_malformed_and_unregistered_store_state_is_visible_unknown(self):
+    def test_a_state_outside_the_canonical_set_shows_its_native_state(self):
         self.work_item()
-        self.state_directory = self.home / 'missing-state'
-        output = self.board()
-        self.assertIn('unknown', output)
-        self.assertIn('session store does not exist', output)
+        self.track(None, native_state='Triage')
+        self.assertIn('Triage', self.board())
 
-        database = self.write_work_item_status('reader-bridge', 'status-reader', 'active', schema=False)
-        connection = sqlite3.connect(database)
-        connection.executescript(
-            'CREATE TABLE work_items (key TEXT, status TEXT);'
-            'CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, '
-            'role TEXT, ended_at REAL);'
-            'PRAGMA user_version = 4;'
+    def test_an_unresolvable_work_item_is_visible_unknown(self):
+        cases = (
+            ('#7', None, 'tj is not on PATH'),
+            ('#7', {'stdout': '', 'stderr': json.dumps({'error': 'issue 7 not found'}), 'code': 3},
+             'issue 7 not found'),
+            ('#7', {'stdout': 'not json'}, 'printed invalid JSON'),
+            ('', None, 'declares no `- Work item: <ref>`'),
         )
-        connection.close()
-        output = self.board()
-        self.assertIn('unknown', output)
-        self.assertIn('missing required columns', output)
-
-        database = self.write_work_item_status('other-feature', 'other-item', 'active')
-        output = self.board()
-        self.assertIn('unknown', output)
-        self.assertIn('is not registered', output)
-        self.assertTrue(database.is_file())
-
-    def test_status_lookup_is_read_only(self):
-        self.work_item()
-        database = self.write_work_item_status('reader-bridge', 'status-reader', 'active')
-        before = database.read_bytes()
-        output = self.board()
-        self.assertIn('active', output)
-        self.assertEqual(before, database.read_bytes())
+        for reference, response, reason in cases:
+            with self.subTest(reason=reason):
+                self.work_item(reference=reference)
+                self.tracker = {}
+                for path in self.tools.iterdir():
+                    path.unlink()
+                if response:
+                    self.track(reference=reference, **response)
+                output = self.board()
+                self.assertIn('unknown', output)
+                self.assertIn(reason, output)
 
     def test_work_item_key_matches_feature_full_key_and_item(self):
         self.work_item()
-        self.write_work_item_status('reader-bridge', 'status-reader', 'active')
+        self.track()
         for needle in ('reader-bridge', 'reader-bridge/status-reader', 'status-reader'):
             with self.subTest(needle=needle):
                 self.assertEqual({'README.md'}, self.listed(needle))
@@ -439,27 +411,30 @@ class WorkItemStatusTests(WorkflowStatusHarness):
         self.repo_plan('Plans/LEGACY_STATUS_PLAN.md')
         self.assertIn('LEGACY_STATUS_PLAN.md', self.listed('legacy'))
 
-    def test_only_strict_lowercase_work_item_readmes_use_sqlite_status(self):
+    def test_only_strict_lowercase_work_item_readmes_use_tracker_state(self):
         self.work_item()
         self.repo_plan('plans/features/reader-bridge/README.md', '# feature\n')
         self.repo_plan('plans/features/reader-bridge/support/README.md', '# support\n')
-        self.repo_plan('plans/features/reader-bridge/work-items/status-reader/Readme.md', '# mixed\n')
-        self.write_work_item_status('reader-bridge', 'status-reader', 'active')
+        self.repo_plan('plans/features/reader-bridge/work-items/status-reader/Readme.md',
+                       '# mixed\n\n- Work item: `#7`\n')
+        self.track()
         output = self.board()
-        self.assertIn('active', output)
+        self.assertIn('In Progress', output)
         self.assertEqual({'README.md'}, rows(output))
+        self.assertEqual(1, len(self.tracker_calls()))
 
-    def test_out_of_scope_work_item_never_reads_the_store(self):
+    def test_out_of_scope_work_item_never_reads_the_tracker(self):
         other = self.repo('other-group', 'other-repo')
         self.work_item(repo=other)
-        self.state_directory = self.home / 'missing-state'
+        self.track()
         output = self.board()
         self.assertNotIn('unknown', output)
         self.assertNotIn('README.md', rows(output))
+        self.assertEqual([], self.tracker_calls())
 
     def test_source_and_packaged_skill_layouts_load_their_own_runtime(self):
         self.work_item()
-        self.write_work_item_status('reader-bridge', 'status-reader', 'active')
+        self.track()
         copies = [SCRIPT]
         layouts = (
             '.agents/workflow/utility/status',
@@ -473,14 +448,10 @@ class WorkItemStatusTests(WorkflowStatusHarness):
             shutil.copy2(SCRIPT, script)
             (package / 'hooks').mkdir()
             shutil.copy2(ROOT / '.agents/hooks/problem_records.py', package / 'hooks/problem_records.py')
-            shutil.copytree(
-                ROOT / '.agents/dependencies/agent/.agents/agent-store/runtime',
-                package / '.agents/agent-store/runtime',
-            )
             copies.append(script)
         for script in copies:
             with self.subTest(script=script):
-                self.assertIn('active', self.board(script=script))
+                self.assertIn('In Progress', self.board(script=script))
 
     def test_packaged_status_loads_the_adjacent_hidden_runtime_in_isolated_python(self):
         package = self.home / 'packaged status'
@@ -491,8 +462,6 @@ class WorkItemStatusTests(WorkflowStatusHarness):
         hooks.mkdir()
         shutil.copy2(ROOT / '.agents/hooks/problem_records.py', hooks / 'problem_records.py')
         shutil.copytree(ROOT / '.agents/dependencies/cli/.agents/cli/runtime/tj_cli', hooks / 'tj_cli')
-        runtime = package / '.agents/agent-store/runtime'
-        shutil.copytree(ROOT / '.agents/dependencies/agent/.agents/agent-store/runtime', runtime)
         result = self.isolated_capability_result(script)
         self.assertEqual(0, result.returncode, result.stderr)
 
@@ -520,20 +489,16 @@ class WorkItemStatusTests(WorkflowStatusHarness):
         self.assertIn('selected provider: fixture:manage', output)
         self.assertIn('list/read', output)
 
-    def test_selected_canonical_plan_never_uses_local_execution_status(self):
+    def test_selected_canonical_plan_never_resolves_the_tracker(self):
         self.work_item()
         self.select(self.here)
-        for status in ('active', 'done'):
-            with self.subTest(status=status):
-                self.write_work_item_status('reader-bridge', 'status-reader', status)
-                output = self.board()
-                self.assertIn('README.md', rows(output))
-                line = next(line for line in ROW.findall(output) if line.endswith('README.md'))
-                self.assertIn('supporting', line)
-                self.assertIn('reader-bridge/status-reader', line)
-                self.assertNotIn('unknown', output)
-        self.state_directory = self.home / 'absent-state'
-        self.assertIn('supporting', self.board())
+        self.track('Done')
+        output = self.board()
+        line = next(line for line in ROW.findall(output) if line.endswith('README.md'))
+        self.assertIn('supporting', line)
+        self.assertIn('reader-bridge/status-reader', line)
+        self.assertNotIn('unknown', output)
+        self.assertEqual([], self.tracker_calls())
 
     def test_sibling_selection_failures_are_skipped_without_aborting(self):
         application = self.repo('group', 'app')
@@ -574,40 +539,6 @@ class WorkItemStatusTests(WorkflowStatusHarness):
         result = self.capability_result(script)
         self.assertEqual(2, result.returncode)
         self.assertIn('no supported runtime anchor', result.stderr)
-
-    def test_reader_without_read_only_store_is_a_capability_failure(self):
-        skill = self.status_skill_directory(
-            'class StoreReadError(ValueError):\n    pass\n'
-        )
-        result = self.capability_result(skill)
-        self.assertEqual(2, result.returncode)
-        self.assertIn('own Agent Store reader lacks work-item support', result.stderr)
-
-    def test_reader_without_work_item_is_a_capability_failure(self):
-        skill = self.status_skill_directory(
-            'class StoreReadError(ValueError):\n    pass\n\n'
-            'class ReadOnlyWorkItemStore:\n    pass\n'
-        )
-        result = self.capability_result(skill)
-        self.assertEqual(2, result.returncode)
-        self.assertIn('own Agent Store reader lacks work-item support', result.stderr)
-
-    def test_repository_identity_decodes_non_ascii_git_output_as_utf8(self):
-        self.work_item()
-        subprocess.run(['git', '-C', str(self.here), 'remote', 'set-url', 'origin',
-                        'https://github.com/example/résumé.git'], check=True, capture_output=True,
-                       text=True, encoding='utf-8')
-        self.write_work_item_status('reader-bridge', 'status-reader', 'active')
-        database = self.state_directory / 'sessions.db'
-        connection = sqlite3.connect(database)
-        connection.execute('DELETE FROM work_items')
-        connection.execute('INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                           ('github.com/example/résumé:reader-bridge/status-reader',
-                            'github.com/example/résumé', 'reader-bridge', 'status-reader',
-                            'active', None, None, None, None, 0))
-        connection.commit()
-        connection.close()
-        self.assertIn('active', self.board())
 
 
 if __name__ == '__main__':

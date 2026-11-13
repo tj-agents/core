@@ -25,7 +25,7 @@ class NeitherWorkflowNorEngineeringRegistersItsOwnHook(unittest.TestCase):
             manifest_root = ROOT / '.agents/plugins/manifests' / host
             self.assertTrue((manifest_root / 'base-hooks.json').is_file())
             hooks = json.loads((manifest_root / 'base-hooks.json').read_text(encoding='utf-8'))['hooks']
-            self.assertEqual({'SessionStart', 'PreToolUse'}, set(hooks))
+            self.assertEqual({'SessionStart', 'PreToolUse', 'PostCompact'}, set(hooks))
 
 
 if __name__ == '__main__':

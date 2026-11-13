@@ -124,7 +124,8 @@ def test_unsupported_patch_forms_and_opaque_tools_require_explicit_resolution() 
         == []
     )
     assert "Resolve target paths" in gate.tool_context(
-        {"tool_name": "exec_command", "tool_input": {"cmd": "type secret.txt"}}
+        {"tool_name": "exec_command", "tool_input": {"cmd": "type secret.txt"}},
+        Path("unused-state"),
     )
 
 
@@ -315,7 +316,7 @@ def test_personal_work_personal_operations_use_current_target_scope(
     ]
     assert "employer-a:*" not in selections[2]["context"]
     search = gate.tool_context(
-        {"tool_name": "Grep", "cwd": str(tmp_path), "tool_input": {}}
+        {"tool_name": "Grep", "cwd": str(tmp_path), "tool_input": {}}, tmp_path / "state"
     )
     assert "Organizational scope: mixed" in search
     assert "Applies here:" not in search
@@ -324,7 +325,7 @@ def test_personal_work_personal_operations_use_current_target_scope(
         f"*** Add File: {work}/two.py\n+y\n*** End Patch"
     )
     contexts = gate.tool_context(
-        {"tool_name": "apply_patch", "tool_input": {"command": patch}}
+        {"tool_name": "apply_patch", "tool_input": {"command": patch}}, tmp_path / "state"
     )
     assert str(personal) in contexts and str(work) in contexts
     assert (

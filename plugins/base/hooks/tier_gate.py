@@ -35,13 +35,22 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from contextvars import ContextVar
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from host_cli import plugin_inventory_command
+from selected_standards import (
+    HOOK_CONTEXT_CHARACTERS,
+    AgentIdentity,
+    InjectionLedger,
+    PluginSelection,
+    Standard,
+    compose_injection,
+    payload_standards,
+)
 from tj_cli import process
 
 SCHEMA_VERSIONS = (1, 2, 3)
@@ -50,6 +59,8 @@ ORPHAN_MARKER = ".orphaned_at"
 FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
 PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
 OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
+STATE_DIRECTORY_VARIABLE = "AGENT_STATE_DIRECTORY"
+WRITE_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit", "apply_patch"})
 WALK_DEPTH = 4
 WALK_SKIP = frozenset({
     ".git", ".hg", ".svn", ".worktrees", "node_modules", "bin", "obj", "dist", "build",
@@ -58,6 +69,7 @@ WALK_SKIP = frozenset({
 CONTENT_CANDIDATES = 20
 CONTENT_BYTES = 256 * 1024
 GIT_TIMEOUT = 10
+TOOL_CONTEXT_SECONDS = 20
 WORKSPACE_REPOSITORIES = 64
 WORKSPACE_ENTRIES = 1024
 REMOTE_HOST_PATTERN = r"(?=.{1,253}\.?(?![\s\S]))[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.?"
@@ -987,7 +999,11 @@ def _legacy_result(root, declaration, inventory) -> PredicateResult:
 
 def assess(root, found=None, facts=None, contexts=None):
     token = GIT_RESULTS.set({})
-    deadline_token = GIT_DEADLINE.set(time.monotonic() + GIT_TIMEOUT)
+    deadline = time.monotonic() + GIT_TIMEOUT
+    outer = GIT_DEADLINE.get()
+    deadline_token = GIT_DEADLINE.set(
+        deadline if outer is None else min(deadline, outer)
+    )
     try:
         return _assess(root, found, facts, contexts)
     finally:
@@ -1247,6 +1263,111 @@ def replacement_skill(selection, name, available):
     return candidate if available(candidate) else name
 
 
+def selected_assessment(
+    project: Path, selection: PluginSelection, found: Iterable[Declaration]
+) -> SelectionResult:
+    selected = [item for item in found if item.id in selection.identities]
+    missing = sorted(set(selection.identities) - {item.id for item in selected})
+    if missing:
+        raise ValueError(
+            "Selected standards are not available in this host: " + ", ".join(missing)
+        )
+    if len({item.plugin for item in selected}) != len(selected):
+        raise ValueError("Selected marketplaces provide conflicting plugin namespaces")
+    assessment = assess(project, selected)
+    if assessment.diagnostics:
+        raise ValueError(
+            "Selected standards have unresolved applicability: "
+            + json.dumps(assessment.diagnostics)
+        )
+    if len(assessment.employers) > 1:
+        raise ValueError(
+            "Multiple selected employer profiles apply; resolve the employer scope"
+        )
+    return assessment
+
+
+def applicable_standards(
+    assessment: SelectionResult, scope: Iterable[Declaration]
+) -> list[Standard]:
+    applicable = {
+        declaration.plugin: declaration
+        for declaration in [
+            *assessment.ubiquitous,
+            *(item for item, _ in assessment.applicable),
+        ]
+    }
+    catalogues: dict[str, dict[str, Standard]] = {}
+
+    def catalogue(plugin: str) -> dict[str, Standard]:
+        if plugin not in catalogues:
+            declaration = applicable.get(plugin)
+            if declaration is not None and declaration.orphaned:
+                raise ValueError(
+                    "Selected standards payload is orphaned: " + declaration.id
+                )
+            catalogues[plugin] = (
+                {}
+                if declaration is None
+                else payload_standards(
+                    Path(declaration.payload_dir), declaration.plugin, declaration.id
+                )
+            )
+        return catalogues[plugin]
+
+    def available(name: str) -> bool:
+        return name in catalogue(name.partition(":")[0])
+
+    effective: dict[str, Standard] = {}
+    for declaration in scope:
+        for name in catalogue(declaration.plugin):
+            chosen = replacement_skill(assessment, name, available)
+            effective[chosen] = catalogue(chosen.partition(":")[0])[chosen]
+    return [effective[name] for name in sorted(effective)]
+
+
+def _predicate_markers(node: object) -> list[str]:
+    if not isinstance(node, dict) or len(node) != 1:
+        return []
+    operator, value = next(iter(node.items()))
+    if operator in ("all", "any") and isinstance(value, list):
+        return [marker for child in value for marker in _predicate_markers(child)]
+    if operator in ("file", "glob") and isinstance(value, str):
+        return [value]
+    if operator == "content" and isinstance(value, dict):
+        return [value["glob"]] if isinstance(value.get("glob"), str) else []
+    return []
+
+
+def _listed(detect: dict[str, object], key: str) -> list[object]:
+    value = detect.get(key)
+    return value if isinstance(value, list) else []
+
+
+def path_markers(declaration: Declaration) -> list[str]:
+    detect = declaration.detect
+    if declaration.schema_version == 3:
+        return _predicate_markers(detect)
+    markers = [
+        *_listed(detect, "files"),
+        *_listed(detect, "globs"),
+        *(
+            rule.get("glob")
+            for rule in _listed(detect, "content")
+            if isinstance(rule, dict)
+        ),
+    ]
+    return [marker for marker in markers if isinstance(marker, str) and marker]
+
+
+def declares_path(declaration: Declaration, relative: PurePosixPath) -> bool:
+    return any(
+        fnmatch.fnmatch(relative.as_posix(), marker)
+        or ("/" not in marker and fnmatch.fnmatch(relative.name, marker))
+        for marker in path_markers(declaration)
+    )
+
+
 def active_host():
     parts = Path(__file__).resolve().parts
     if ".codex" in parts or os.environ.get("PLUGIN_ROOT") or os.environ.get("CODEX_PLUGIN_ROOT"):
@@ -1443,8 +1564,11 @@ def tool_paths(payload: object) -> list[str]:
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return []
-    if name in {"Read", "Edit", "Write"}:
+    if name in {"Read", "Edit", "Write", "MultiEdit"}:
         value = _text(tool_input.get("file_path"))
+        return [value] if value else []
+    if name == "NotebookEdit":
+        value = _text(tool_input.get("notebook_path"))
         return [value] if value else []
     if name in {"Glob", "Grep"}:
         value = _text(tool_input.get("path")) or _payload_cwd(payload)
@@ -1461,7 +1585,92 @@ def _payload_cwd(payload: dict[str, object]) -> str:
     return next((value for value in values if isinstance(value, str) and value), "")
 
 
-def tool_context(payload: object) -> str:
+def path_standards(path: str, cwd: str) -> list[Standard]:
+    raw = Path(path)
+    target = (Path(cwd) / raw if cwd and not raw.is_absolute() else raw).expanduser()
+    target = target.resolve(strict=False)
+    repository, error = _repository_boundary(_existing_path(target))
+    if error is not None:
+        raise ValueError(error)
+    if repository is None:
+        return []
+    selection = PluginSelection.read(repository)
+    if selection is None:
+        return []
+    relative = PurePosixPath(target.relative_to(repository).as_posix())
+    found = declarations(project=repository)
+    if not any(
+        declaration.gated and declares_path(declaration, relative)
+        for declaration in found
+        if declaration.id in selection.identities
+    ):
+        return []
+    assessment = selected_assessment(repository, selection, found)
+    stacks = [item for item, _ in assessment.applicable if item.gated]
+    specific = [item for item in stacks if declares_path(item, relative)]
+    if not specific:
+        return []
+    standards: dict[str, Standard] = {}
+    for declaration in [*specific, *(item for item in stacks if item not in specific)]:
+        ranked = sorted(
+            applicable_standards(assessment, [declaration]),
+            key=lambda standard: (standard.profile != "core", standard.name),
+        )
+        for standard in ranked:
+            standards.setdefault(standard.name, standard)
+    return list(standards.values())
+
+
+def write_standards(payload: dict[str, object], state_directory: Path, limit: int) -> str:
+    standards: dict[str, Standard] = {}
+    notes: list[str] = []
+    for path in tool_paths(payload):
+        try:
+            selected = path_standards(path, _payload_cwd(payload))
+        except (OSError, ValueError) as error:
+            notes.append(f"Stack standards were not injected for {path}: {error}")
+        else:
+            for standard in selected:
+                standards.setdefault(standard.name, standard)
+    agent = AgentIdentity.from_payload(payload)
+    ledger = (
+        None if agent is None else InjectionLedger.for_agent(state_directory, agent)
+    )
+    delivered = frozenset() if ledger is None else ledger.injected()
+    pending = [item for name, item in standards.items() if name not in delivered]
+    if not pending:
+        return "\n\n".join(notes)
+    try:
+        injection = compose_injection(pending, limit - len("\n\n".join(["", *notes])))
+    except OSError as error:
+        return "\n\n".join([*notes, f"Stack standards could not be read: {error}"])
+    sections = [injection.text, *notes]
+    if ledger is not None:
+        try:
+            ledger.record(injection.delivered, time.time())
+        except OSError as error:
+            sections.append(
+                f"The injected standards could not be recorded ({error}); "
+                "later writes may inject them again."
+            )
+    return "\n\n".join(sections)
+
+
+def forget_injected_standards(payload: object, state_directory: Path) -> None:
+    agent = AgentIdentity.from_payload(payload) if isinstance(payload, dict) else None
+    if agent is not None:
+        InjectionLedger.for_agent(state_directory, agent).forget()
+
+
+def tool_context(payload: object, state_directory: Path) -> str:
+    deadline = GIT_DEADLINE.set(time.monotonic() + TOOL_CONTEXT_SECONDS)
+    try:
+        return _typed_tool_context(payload, state_directory)
+    finally:
+        GIT_DEADLINE.reset(deadline)
+
+
+def _typed_tool_context(payload: object, state_directory: Path) -> str:
     if not isinstance(payload, dict):
         return "Resolve target paths with tier_gate.py --path before applying standards."
     contexts = []
@@ -1469,6 +1678,11 @@ def tool_context(payload: object) -> str:
         context = path_selection(path, _payload_cwd(payload))["context"]
         if isinstance(context, str) and context and context not in contexts:
             contexts.append(context)
+    if _text(payload.get("tool_name")) in WRITE_TOOLS:
+        remaining = HOOK_CONTEXT_CHARACTERS - len("\n\n".join([*contexts, ""]))
+        standards = write_standards(payload, state_directory, remaining)
+        if standards:
+            contexts.append(standards)
     return "\n\n".join(contexts) or "Resolve target paths with tier_gate.py --path before applying standards."
 
 
@@ -1484,6 +1698,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--session-context", action="store_true")
     parser.add_argument("--tool-context", action="store_true")
+    parser.add_argument("--compacted", action="store_true")
     parser.add_argument("--path", action="append", default=[])
     parser.add_argument("--project", default=None)
     arguments = parser.parse_args()
@@ -1496,12 +1711,20 @@ def main():
         print(json.dumps({"paths": [path_selection(path) for path in arguments.path]}, ensure_ascii=True))
         return 0
 
+    state_directory = Path(
+        os.environ.get(STATE_DIRECTORY_VARIABLE) or Path.home() / ".agents-state"
+    )
+
     if arguments.tool_context:
-        context = tool_context(_stdin_payload())
+        context = tool_context(_stdin_payload(), state_directory)
         if context:
             print(json.dumps({"hookSpecificOutput": {
                 "hookEventName": "PreToolUse", "additionalContext": context
             }}, ensure_ascii=True))
+        return 0
+
+    if arguments.compacted:
+        forget_injected_standards(_stdin_payload(), state_directory)
         return 0
 
     if not arguments.session_context:

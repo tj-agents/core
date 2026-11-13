@@ -21,7 +21,8 @@ bad declaration in its owning stack repository. Host skill listings can still sh
 skills. Context tells the agent which standards govern a repository; it does not restrict filesystem access
 or remove instructions already present in the conversation.
 
-Reviews load only the skills selected by the reviewed repository's route table for changed paths.
+Reviews and write-time injection load only the convention and contract skills of applicable plugins that
+the repository's `.agents/plugins.json` selects.
 When one valid version 3 employer declaration applies, a selected `<stack>:<name>` resolves to
 `<employer>-<stack>:<name>` if that plugin and skill are installed. Otherwise it stays
 `<stack>:<name>`. The employer name is the declaring plugin name. The same resolution governs
@@ -135,10 +136,20 @@ file uses its nearest existing parent to find its owning repository. A search sp
 retains the separate results; its anchor does not select one profile for every search result. Repeated
 queries re-read ownership, origin, adoption and declarations. There is no remembered active repository.
 
-Base's PreToolUse hook adds repository-scoped context for Claude `Read`, `Edit`, `Write`, `Glob` and `Grep`,
-and for paths in Codex `apply_patch` operations, including move destinations. Each context names the
-repository it governs and excludes nested repositories. A context addition cannot reconsider edit text
-already generated; resolve an unfamiliar repository before preparing the write.
+Base's PreToolUse hook adds repository-scoped context for Claude `Read`, `Edit`, `Write`, `MultiEdit`,
+`NotebookEdit`, `Glob` and `Grep`, and for paths in Codex `apply_patch` operations, including move
+destinations. Each context names the repository it governs and excludes nested repositories. A context
+addition cannot reconsider edit text already generated; resolve an unfamiliar repository before preparing
+the write.
+
+When a write targets a file matching a selected, applicable stack tier's `file`, `glob` or content-glob
+marker, the hook also injects the canonical text of that repository's selected stack standards after
+employer replacement: the matching tiers' skills first, `core` profile first within a tier, then the other
+applicable stack tiers. The whole hook context, tier lines included, stays within 10,000 characters, the most
+Claude Code inlines; Codex's handler raises its `additionalContextLimit` to carry the same text. Skills that
+do not fit are named and injected by later writes, and one larger than the bound is only ever named. Each skill is injected once per session and agent, recorded under
+`<AGENT_STATE_DIRECTORY|~/.agents-state>/standards-injection/`; the PostCompact hook clears that agent's
+record so its next write injects again. A repository without a plugin selection receives no injection.
 
 Shell commands and other opaque tools require the explicit path query before the operation. Command
 text, cwd and a previous query are not proof of the paths an operation accesses. Claude file mentions

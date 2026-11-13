@@ -249,7 +249,7 @@ class ContinuationTests(unittest.TestCase):
         self.binding()
         parent = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
         self.processes.append(parent)
-        claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(parent.pid))
+        self.cli("claim", "--owner", str(self.owner), "--pid", str(parent.pid))
         self.assertEqual(self.wake()["launches"], 0)
         parent.kill()
         parent.wait()
@@ -340,41 +340,59 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(first.returncode, 0, stderr)
         self.assertEqual(json.loads(stdout)["launches"], 1)
 
-    def test_supervisor_pid_and_python_environment_match_the_owned_process(self) -> None:
+    def test_supervisor_wrapper_admits_child_and_preserves_host_identity(self) -> None:
         probe = self.root / "supervisor_probe.py"
         report = self.root / "supervisor-identity.json"
         probe.write_text(
             "import json, os, runpy, sys, tj_cli\n"
             "from pathlib import Path\n"
             "Path(sys.argv[1]).write_text(json.dumps({"
-            "'pid': os.getpid(), 'prefix': sys.prefix, "
+            "'pid': os.getpid(), 'parent': os.getppid(), 'prefix': sys.prefix, "
             "'dependency': tj_cli.__file__}), encoding='utf-8')\n"
             "sys.argv = sys.argv[2:]\n"
             "runpy.run_path(sys.argv[0], run_name='__main__')\n",
             encoding="utf-8",
         )
-        popen = subprocess.Popen
+        start_process = runtime.process.start
         supervisors = []
 
         def start(command, *args, **kwargs):
             supervisor = command[2:4] == [str(RUNTIME), "_child"]
             if supervisor:
                 command = [*command[:2], str(probe), str(report), *command[2:]]
-            process = popen(command, *args, **kwargs)
+            process = start_process(command, *args, **kwargs)
             if supervisor:
                 supervisors.append(process)
                 self.processes.append(process)
             return process
 
         state = self.state()
-        with mock.patch.object(runtime.subprocess, "Popen", side_effect=start):
+        with mock.patch.object(runtime.process, "start", side_effect=start):
             runtime.launch(self.owner, state, None, {}, [sys.executable, str(FIXTURE), "host"])
         observed = json.loads(report.read_text(encoding="utf-8"))
         self.assertEqual(1, len(supervisors))
-        self.assertEqual(supervisors[0].pid, observed["pid"])
+        if os.name == "nt":
+            self.assertEqual(supervisors[0].pid, observed["parent"])
+            self.assertNotEqual(supervisors[0].pid, observed["pid"])
+        else:
+            self.assertEqual(supervisors[0].pid, observed["pid"])
         self.assertEqual(Path(sys.prefix), Path(observed["prefix"]))
         self.assertEqual(Path(tj_cli.__file__), Path(observed["dependency"]))
         self.assertEqual("complete", state["state"])
+
+    @unittest.skipUnless(os.name == "nt", "Windows tj_hook wrapper parent admission")
+    def test_wrapper_parent_admission_requires_the_exact_recorded_identity(self):
+        record = {"pid": 100, "identity": "wrapper-start"}
+        with mock.patch.object(runtime.os, "getpid", return_value=200), \
+                mock.patch.object(runtime.os, "getppid", return_value=100), \
+                mock.patch.object(runtime, "process_identity", return_value="wrapper-start"):
+            self.assertTrue(runtime.child_admitted(record))
+        for pid, identity in ((101, "wrapper-start"), (100, "different-start"), (100, None)):
+            with self.subTest(pid=pid, identity=identity), \
+                    mock.patch.object(runtime.os, "getpid", return_value=200), \
+                    mock.patch.object(runtime.os, "getppid", return_value=pid), \
+                    mock.patch.object(runtime, "process_identity", return_value=identity):
+                self.assertFalse(runtime.child_admitted(record))
 
     @unittest.skipUnless(os.name == "nt", "Windows sharing violations are Windows-only")
     def test_owner_read_recovers_from_a_crt_sharing_violation(self):
@@ -762,6 +780,25 @@ class ContinuationTests(unittest.TestCase):
         kernel.TerminateJobObject.assert_not_called()
         kernel.CloseHandle.assert_called_once_with(456)
         write.assert_not_called()
+
+    def test_child_records_the_raw_supervised_host_identity(self):
+        state = self.state()
+        state["child"] = {"pid": os.getpid()}
+        runtime.atomic_json(self.owner, state)
+        payload = self.root / "host-payload.json"
+        host_path = self.root / "host.json"
+        payload.write_text(json.dumps({"command": ["fixture"], "environment": {},
+                                       "child_path": str(host_path)}))
+        host_process = mock.Mock(pid=12345, _handle=123)
+        host_process.wait.return_value = 0
+        args = SimpleNamespace(owner=str(self.owner), payload=str(payload))
+        with mock.patch.object(runtime, "windows_job", return_value=None), \
+                mock.patch.object(runtime.subprocess, "Popen", return_value=host_process), \
+                mock.patch.object(runtime, "process_identity", return_value="host-start") as identity, \
+                mock.patch.object(runtime, "atomic_json") as write:
+            self.assertEqual(0, runtime.child(args))
+        identity.assert_called_once_with(12345)
+        write.assert_called_once_with(host_path, {"pid": 12345, "identity": "host-start"})
 
     def released_child(self, status):
         self.binding("COMPLETED", "SUCCESS")
