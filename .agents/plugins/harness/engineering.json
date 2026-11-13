@@ -9,9 +9,7 @@
     ".agents/hooks/installed_skills.py",
     ".agents/hooks/problem_records.py",
     ".agents/workflow/resources/problem-records.md",
-    ".agents/workflows",
-    ".agents/workflows/review_evidence.py",
-    ".agents/workflows/workflow_runtime.py"
+    ".agents/workflows"
   ],
   "requires": {
     "marketplaces": [
@@ -149,47 +147,7 @@
             ]
           ]
         }
-      ],
-      "auto_merge": {
-        "claude_allow": [
-          "Bash(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")",
-          "PowerShell(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")"
-        ],
-        "codex_prefix_rules": [
-          {
-            "pattern": [
-              [
-                "python",
-                "python.exe",
-                "python3",
-                "py"
-              ],
-              "-B",
-              "${PLUGIN_ROOT}/workflows/auto_merge.py",
-              "--root",
-              "${PROJECT_ROOT}"
-            ],
-            "justification": "Rechecks required authorization, checkout identity, readiness, review, and security evidence before arming auto-merge for this declared checkout.",
-            "match": [
-              [
-                "python",
-                "-B",
-                "${PLUGIN_ROOT}/workflows/auto_merge.py",
-                "--root",
-                "${PROJECT_ROOT}"
-              ]
-            ],
-            "not_match": [
-              [
-                "python",
-                "-B",
-                "${PLUGIN_ROOT}/workflows/auto_merge.py",
-                "--root"
-              ]
-            ]
-          }
-        ]
-      }
+      ]
     }
   }
 }

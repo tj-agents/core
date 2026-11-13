@@ -1,6 +1,6 @@
 {
   "name": "docs",
-  "description": "Layout, diagram and design-page conventions for pages people read.",
+  "description": "Layout and diagram conventions for pages people read.",
   "author": {
     "name": "Tommy Seery"
   },
@@ -12,8 +12,8 @@
   "skills": "./codex-skills/",
   "interface": {
     "displayName": "Documentation",
-    "shortDescription": "Layout, diagram and design-page conventions for pages people read.",
-    "longDescription": "Layout, diagram and design-page conventions for pages people read.",
+    "shortDescription": "Layout and diagram conventions for pages people read.",
+    "longDescription": "Layout and diagram conventions for pages people read.",
     "developerName": "Tommy Seery",
     "category": "Productivity",
     "capabilities": [],

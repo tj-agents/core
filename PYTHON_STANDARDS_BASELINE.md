@@ -2,18 +2,20 @@
 
 Existing violations at `03f99b363e11943cf8918a99b6a7654f5b770edb` are baselined by exact authored file and rule. New files receive all enabled checks. Remove an exception when repairing its source. The tool configuration owns enforcement; this document records the rollout evidence and rationale.
 
+Deleting a baselined file removes its rows here and its `pyproject.toml` entries in the same change:
+
+```text
+Delete .agents/workflows/auto_merge.py
+-> remove its Ruff, mypy and python-standards rows below
+-> remove its per-file-ignores entry, ruff format exclusion and mypy override
+```
+
 ## Ruff
 
 Reason: preserve existing implementations during the standards rollout. Each row records the existing count and a representative required repair. No wildcard path or whole-rule ignores were added.
 
 | File | Rule | Existing count | Required repair |
 | --- | --- | ---: | --- |
-| `.agents/engineering/utility/guide-build/scripts/scaffold.py` | `E501` | 1 | Line too long (104 > 88) |
-| `.agents/engineering/utility/guide-build/template/build.py` | `B023` | 1 | Function definition does not bind loop variable `path` |
-| `.agents/engineering/utility/guide-build/template/build.py` | `B904` | 2 | Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling |
-| `.agents/engineering/utility/guide-build/template/build.py` | `E501` | 37 | Line too long (92 > 88) |
-| `.agents/engineering/utility/guide-build/template/build.py` | `E741` | 3 | Ambiguous variable name: `l` |
-| `.agents/engineering/utility/guide-build/template/build.py` | `RUF001` | 2 | String contains ambiguous `ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“` (EN DASH). Did you mean `-` (HYPHEN-MINUS)? |
 | `.agents/engineering/utility/review/scripts/review_rules.py` | `E501` | 14 | Line too long (89 > 88) |
 | `.agents/engineering/utility/review/scripts/review_rules.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `.agents/engineering/utility/review/scripts/review_rules.py` | `TID251` | 3 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
@@ -39,14 +41,6 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `.agents/hooks/hook_runtime.py` | `SIM105` | 2 | Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass` |
 | `.agents/hooks/installed_skills.py` | `E501` | 7 | Line too long (107 > 88) |
 | `.agents/hooks/installed_skills.py` | `TID251` | 1 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/merge_review_gate.py` | `E501` | 25 | Line too long (90 > 88) |
-| `.agents/hooks/merge_review_gate.py` | `N818` | 1 | Exception name `ConfigUnusable` should be named with an Error suffix |
-| `.agents/hooks/merge_review_gate.py` | `SIM102` | 1 | Use a single `if` statement instead of nested `if` statements |
-| `.agents/hooks/plan_graph.py` | `B905` | 1 | `zip()` without an explicit `strict=` parameter |
-| `.agents/hooks/plan_graph.py` | `E501` | 25 | Line too long (89 > 88) |
-| `.agents/hooks/plan_graph.py` | `F841` | 1 | Local variable `error` is assigned to but never used |
-| `.agents/hooks/plan_graph.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/plan_graph.py` | `PIE810` | 1 | Call `startswith` once with a `tuple` |
 | `.agents/hooks/problem_records.py` | `E501` | 15 | Line too long (93 > 88) |
 | `.agents/hooks/problem_records.py` | `UP036` | 1 | Version block is outdated for minimum Python version |
 | `.agents/hooks/tests/fixtures/continuation_fixture.py` | `E501` | 9 | Line too long (99 > 88) |
@@ -59,31 +53,10 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `.agents/hooks/tests/fixtures/fake_cli.py` | `E501` | 4 | Line too long (104 > 88) |
 | `.agents/hooks/tests/fixtures/lane_expectations.py` | `E501` | 7 | Line too long (102 > 88) |
 | `.agents/hooks/tests/fixtures/lane_expectations.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/fixtures/plan_authoring_harness.py` | `E501` | 8 | Line too long (103 > 88) |
-| `.agents/hooks/tests/fixtures/plan_workflow_harness.py` | `E501` | 7 | Line too long (93 > 88) |
-| `.agents/hooks/tests/fixtures/plan_workflow_harness.py` | `PLR6301` | 1 | Method `trust_continuation` could be a function, class method, or static method |
-| `.agents/hooks/tests/fixtures/plan_workflow_harness.py` | `RUF012` | 1 | Mutable default value for class attribute |
-| `.agents/hooks/tests/fixtures/review_workflow_harness.py` | `B023` | 9 | Function definition does not bind loop variable `ready` |
-| `.agents/hooks/tests/fixtures/review_workflow_harness.py` | `E501` | 11 | Line too long (100 > 88) |
-| `.agents/hooks/tests/fixtures/review_workflow_harness.py` | `PLR6301` | 7 | Method `capture` could be a function, class method, or static method |
-| `.agents/hooks/tests/fixtures/review_workflow_harness.py` | `RUF005` | 1 | Consider iterable unpacking instead of concatenation |
 | `.agents/hooks/tests/fixtures/shell_profile_oracle.py` | `B905` | 1 | `zip()` without an explicit `strict=` parameter |
 | `.agents/hooks/tests/fixtures/shell_profile_oracle.py` | `C420` | 1 | Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead |
 | `.agents/hooks/tests/fixtures/shell_profile_oracle.py` | `E501` | 25 | Line too long (99 > 88) |
 | `.agents/hooks/tests/fixtures/shell_profile_oracle.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/fixtures/task_workflow_harness.py` | `E501` | 13 | Line too long (89 > 88) |
-| `.agents/hooks/tests/fixtures/task_workflow_harness.py` | `F401` | 1 | `json` imported but unused |
-| `.agents/hooks/tests/fixtures/task_workflow_harness.py` | `PLR6301` | 3 | Method `capture` could be a function, class method, or static method |
-| `.agents/hooks/tests/fixtures/task_workflow_harness.py` | `RUF012` | 1 | Mutable default value for class attribute |
-| `.agents/hooks/tests/fixtures/workflow_writer_lease_worker.py` | `E402` | 2 | Module level import not at top of file |
-| `.agents/hooks/tests/fixtures/workflow_writer_lease_worker.py` | `I001` | 2 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/fixtures/workflow_writer_lease_worker.py` | `TID251` | 1 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/tests/test_auto_merge.py` | `E501` | 67 | Line too long (101 > 88) |
-| `.agents/hooks/tests/test_auto_merge.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/test_auto_merge.py` | `PLR6301` | 1 | Method `binding` could be a function, class method, or static method |
-| `.agents/hooks/tests/test_auto_merge.py` | `PT009` | 10 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `.agents/hooks/tests/test_auto_merge.py` | `SIM117` | 6 | Use a single `with` statement with multiple contexts instead of nested `with` statements |
-| `.agents/hooks/tests/test_auto_merge.py` | `TID251` | 3 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/hooks/tests/test_completion.py` | `B023` | 1 | Function definition does not bind loop variable `body` |
 | `.agents/hooks/tests/test_completion.py` | `E501` | 40 | Line too long (95 > 88) |
 | `.agents/hooks/tests/test_completion.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
@@ -107,14 +80,6 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `.agents/hooks/tests/test_docs_reachability.py` | `E501` | 9 | Line too long (95 > 88) |
 | `.agents/hooks/tests/test_docs_reachability.py` | `PT009` | 23 | Use a regular `assert` instead of unittest-style `assertEqual` |
 | `.agents/hooks/tests/test_docs_reachability.py` | `TID251` | 2 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/tests/test_goal_preflight.py` | `E501` | 10 | Line too long (101 > 88) |
-| `.agents/hooks/tests/test_goal_preflight.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/test_goal_preflight.py` | `PT009` | 21 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `.agents/hooks/tests/test_goal_preflight.py` | `TID251` | 3 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/tests/test_handoff_transfer.py` | `E501` | 32 | Line too long (94 > 88) |
-| `.agents/hooks/tests/test_handoff_transfer.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/test_handoff_transfer.py` | `PT009` | 20 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `.agents/hooks/tests/test_handoff_transfer.py` | `TID251` | 1 | `unittest.TestCase` is banned: Use plain pytest functions and bare assertions. |
 | `.agents/hooks/tests/test_hook_runtime.py` | `E402` | 1 | Module level import not at top of file |
 | `.agents/hooks/tests/test_hook_runtime.py` | `E501` | 10 | Line too long (89 > 88) |
 | `.agents/hooks/tests/test_hook_runtime.py` | `PLR6301` | 1 | Method `payload` could be a function, class method, or static method |
@@ -135,19 +100,6 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `.agents/hooks/tests/test_merge_cleanup_proof.py` | `RUF059` | 19 | Unpacked variable `bare` is never used |
 | `.agents/hooks/tests/test_merge_cleanup_proof.py` | `SIM117` | 2 | Use a single `with` statement with multiple contexts instead of nested `with` statements |
 | `.agents/hooks/tests/test_merge_cleanup_proof.py` | `TID251` | 2 | `importlib.util.spec_from_file_location` is banned: Import the installed public API; do not load another checkout by path. |
-| `.agents/hooks/tests/test_merge_review_gate.py` | `E501` | 27 | Line too long (108 > 88) |
-| `.agents/hooks/tests/test_merge_review_gate.py` | `PT009` | 42 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `.agents/hooks/tests/test_merge_review_gate.py` | `SIM117` | 1 | Use a single `with` statement with multiple contexts instead of nested `with` statements |
-| `.agents/hooks/tests/test_merge_review_gate.py` | `TID251` | 6 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/tests/test_plan_graph.py` | `E501` | 17 | Line too long (95 > 88) |
-| `.agents/hooks/tests/test_plan_graph.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/test_plan_graph.py` | `PT009` | 50 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `.agents/hooks/tests/test_plan_graph.py` | `TID251` | 2 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/tests/test_plan_workflows.py` | `E402` | 4 | Module level import not at top of file |
-| `.agents/hooks/tests/test_plan_workflows.py` | `E501` | 19 | Line too long (94 > 88) |
-| `.agents/hooks/tests/test_plan_workflows.py` | `I001` | 2 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/test_plan_workflows.py` | `PT009` | 101 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `.agents/hooks/tests/test_plan_workflows.py` | `TID251` | 2 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/hooks/tests/test_pr_body.py` | `E501` | 9 | Line too long (111 > 88) |
 | `.agents/hooks/tests/test_pr_body.py` | `F401` | 2 | `io` imported but unused |
 | `.agents/hooks/tests/test_pr_body.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
@@ -170,46 +122,10 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `.agents/hooks/tests/test_repository_configuration.py` | `PTH211` | 2 | `os.symlink` should be replaced by `Path.symlink_to` |
 | `.agents/hooks/tests/test_repository_configuration.py` | `SIM117` | 1 | Use a single `with` statement with multiple contexts instead of nested `with` statements |
 | `.agents/hooks/tests/test_repository_configuration.py` | `TID251` | 3 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/tests/test_review_evidence.py` | `B023` | 3 | Function definition does not bind loop variable `branch` |
-| `.agents/hooks/tests/test_review_evidence.py` | `E402` | 4 | Module level import not at top of file |
-| `.agents/hooks/tests/test_review_evidence.py` | `E501` | 41 | Line too long (106 > 88) |
-| `.agents/hooks/tests/test_review_evidence.py` | `I001` | 2 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/test_review_evidence.py` | `PT009` | 28 | Use a regular `assert` instead of unittest-style `assertIn` |
-| `.agents/hooks/tests/test_review_evidence.py` | `SIM117` | 2 | Use a single `with` statement with multiple contexts instead of nested `with` statements |
-| `.agents/hooks/tests/test_review_evidence.py` | `TID251` | 4 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/tests/test_review_workflows.py` | `E402` | 3 | Module level import not at top of file |
-| `.agents/hooks/tests/test_review_workflows.py` | `E501` | 20 | Line too long (99 > 88) |
-| `.agents/hooks/tests/test_review_workflows.py` | `I001` | 2 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/test_review_workflows.py` | `PLR6301` | 1 | Method `harness_artifacts` could be a function, class method, or static method |
-| `.agents/hooks/tests/test_review_workflows.py` | `PT009` | 130 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `.agents/hooks/tests/test_review_workflows.py` | `TID251` | 2 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/tests/test_review_workflows.py` | `UP012` | 1 | Unnecessary UTF-8 `encoding` argument to `encode` |
 | `.agents/hooks/tests/test_shell_profile_oracle.py` | `E501` | 33 | Line too long (104 > 88) |
 | `.agents/hooks/tests/test_shell_profile_oracle.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `.agents/hooks/tests/test_shell_profile_oracle.py` | `PT009` | 31 | Use a regular `assert` instead of unittest-style `assertEqual` |
 | `.agents/hooks/tests/test_shell_profile_oracle.py` | `TID251` | 3 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/tests/test_task_workflows.py` | `E402` | 4 | Module level import not at top of file |
-| `.agents/hooks/tests/test_task_workflows.py` | `E501` | 12 | Line too long (89 > 88) |
-| `.agents/hooks/tests/test_task_workflows.py` | `I001` | 2 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/test_task_workflows.py` | `PLR6301` | 1 | Method `harness` could be a function, class method, or static method |
-| `.agents/hooks/tests/test_task_workflows.py` | `PT009` | 41 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `.agents/hooks/tests/test_task_workflows.py` | `TID251` | 2 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/tests/test_workflow_adoption.py` | `C401` | 1 | Unnecessary generator (rewrite as a set comprehension) |
-| `.agents/hooks/tests/test_workflow_adoption.py` | `E402` | 1 | Module level import not at top of file |
-| `.agents/hooks/tests/test_workflow_adoption.py` | `E501` | 1 | Line too long (90 > 88) |
-| `.agents/hooks/tests/test_workflow_adoption.py` | `I001` | 2 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/test_workflow_adoption.py` | `PT009` | 13 | Use a regular `assert` instead of unittest-style `assertIn` |
-| `.agents/hooks/tests/test_workflow_adoption.py` | `TID251` | 2 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `B905` | 3 | `zip()` without an explicit `strict=` parameter |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `C416` | 1 | Unnecessary dict comprehension (rewrite using `dict()`) |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `E402` | 5 | Module level import not at top of file |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `E501` | 165 | Line too long (93 > 88) |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `E731` | 1 | Do not assign a `lambda` expression, use a `def` |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `I001` | 2 | Import block is un-sorted or un-formatted |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `PLR6301` | 3 | Method `normalized` could be a function, class method, or static method |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `PT009` | 283 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `SIM117` | 10 | Use a single `with` statement with multiple contexts instead of nested `with` statements |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `TID251` | 5 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/hooks/tests/test_workflow_ops.py` | `B023` | 1 | Function definition does not bind loop variable `redirected` |
 | `.agents/hooks/tests/test_workflow_ops.py` | `E501` | 167 | Line too long (95 > 88) |
 | `.agents/hooks/tests/test_workflow_ops.py` | `F811` | 1 | Redefinition of unused `test_cleanup_validates_redirected_cache_ancestor_before_absent_bundle_probe` from line 778: `test_cleanup_validates_redirected_cache_ancestor_before_absent_bundle_probe` redefined here |
@@ -234,53 +150,23 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `.agents/hooks/tier_gate.py` | `TID251` | 1 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/hooks/tier_gate.py` | `TRY300` | 2 | Consider moving this statement to an `else` block |
 | `.agents/hooks/tier_gate.py` | `UP036` | 1 | Version block is outdated for minimum Python version |
-| `.agents/workflow/contract/plan-artifacts/scripts/host_coverage.py` | `E501` | 15 | Line too long (89 > 88) |
-| `.agents/workflow/contract/plan-artifacts/scripts/host_coverage.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/workflow/contract/plan-artifacts/scripts/host_coverage.py` | `RUF005` | 1 | Consider iterable unpacking instead of concatenation |
-| `.agents/workflow/contract/plan-artifacts/scripts/host_coverage.py` | `UP031` | 14 | Use format specifiers instead of percent format |
 | `.agents/workflow/utility/catch-up/scripts/catch_up.py` | `TID251` | 1 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/workflow/utility/status/scripts/status.py` | `B904` | 1 | Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling |
 | `.agents/workflow/utility/status/scripts/status.py` | `E501` | 25 | Line too long (95 > 88) |
 | `.agents/workflow/utility/status/scripts/status.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `.agents/workflow/utility/status/scripts/status.py` | `TID251` | 3 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/workflow/utility/status/scripts/status.py` | `UP031` | 16 | Use format specifiers instead of percent format |
-| `.agents/workflow/workflow/handoff/scripts/transfer.py` | `B904` | 4 | Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling |
-| `.agents/workflow/workflow/handoff/scripts/transfer.py` | `E501` | 13 | Line too long (99 > 88) |
-| `.agents/workflow/workflow/handoff/scripts/transfer.py` | `PTH105` | 1 | `os.replace()` should be replaced by `Path.replace()` |
-| `.agents/workflow/workflow/handoff/scripts/transfer.py` | `PTH108` | 1 | `os.unlink()` should be replaced by `Path.unlink()` |
-| `.agents/workflow/workflow/handoff/scripts/transfer.py` | `PTH110` | 1 | `os.path.exists()` should be replaced by `Path.exists()` |
-| `.agents/workflow/workflow/handoff/scripts/transfer.py` | `PTH123` | 1 | `open()` should be replaced by `Path.open()` |
-| `.agents/workflow/workflow/handoff/scripts/transfer.py` | `TRY300` | 1 | Consider moving this statement to an `else` block |
-| `.agents/workflows/auto_merge.py` | `E402` | 3 | Module level import not at top of file |
-| `.agents/workflows/auto_merge.py` | `E501` | 12 | Line too long (97 > 88) |
-| `.agents/workflows/auto_merge.py` | `RUF021` | 2 | Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear |
-| `.agents/workflows/auto_merge.py` | `TID251` | 1 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/workflows/completion.py` | `B904` | 1 | Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling |
 | `.agents/workflows/completion.py` | `E501` | 30 | Line too long (94 > 88) |
 | `.agents/workflows/completion.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `.agents/workflows/completion.py` | `RUF059` | 1 | Unpacked variable `acceptance` is never used |
-| `.agents/workflows/delivery_policy.py` | `E501` | 11 | Line too long (94 > 88) |
-| `.agents/workflows/delivery_policy.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/workflows/delivery_policy.py` | `N818` | 1 | Exception name `PolicyViolation` should be named with an Error suffix |
-| `.agents/workflows/delivery_policy.py` | `TID251` | 1 | `importlib.util.spec_from_file_location` is banned: Import the installed public API; do not load another checkout by path. |
 | `.agents/workflows/delivery_runtime.py` | `E501` | 65 | Line too long (101 > 88) |
 | `.agents/workflows/delivery_runtime.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `.agents/workflows/delivery_runtime.py` | `N818` | 1 | Exception name `DeliveryContractViolation` should be named with an Error suffix |
 | `.agents/workflows/delivery_runtime.py` | `PLR6301` | 8 | Method `validate_policy` could be a function, class method, or static method |
-| `.agents/workflows/host_runtime.py` | `E501` | 29 | Line too long (98 > 88) |
-| `.agents/workflows/host_runtime.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/workflows/host_runtime.py` | `PLC2701` | 2 | Private name import `_load_json` from external module `workflow_runtime` |
-| `.agents/workflows/host_runtime.py` | `PLR6301` | 1 | Method `_model_route_key` could be a function, class method, or static method |
-| `.agents/workflows/host_runtime.py` | `PTH115` | 1 | `os.readlink()` should be replaced by `Path.readlink()` |
-| `.agents/workflows/host_runtime.py` | `RUF012` | 1 | Mutable default value for class attribute |
-| `.agents/workflows/hosts/smoke.py` | `E402` | 1 | Module level import not at top of file |
-| `.agents/workflows/hosts/smoke.py` | `TID251` | 1 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/workflows/pr_body.py` | `E501` | 6 | Line too long (92 > 88) |
 | `.agents/workflows/pr_body.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `.agents/workflows/process_runtime.py` | `TID251` | 1 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
-| `.agents/workflows/review_evidence.py` | `E501` | 14 | Line too long (97 > 88) |
-| `.agents/workflows/review_evidence.py` | `PTH105` | 1 | `os.replace()` should be replaced by `Path.replace()` |
-| `.agents/workflows/verify.py` | `E402` | 1 | Module level import not at top of file |
 | `.agents/workflows/workflow_ops.py` | `B904` | 1 | Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling |
 | `.agents/workflows/workflow_ops.py` | `BLE001` | 1 | Do not catch blind exception: `Exception` |
 | `.agents/workflows/workflow_ops.py` | `E402` | 6 | Module level import not at top of file |
@@ -295,13 +181,6 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `.agents/workflows/workflow_ops.py` | `SIM105` | 2 | Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass` |
 | `.agents/workflows/workflow_ops.py` | `TID251` | 6 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/workflows/workflow_ops.py` | `UP017` | 3 | Use `datetime.UTC` alias |
-| `.agents/workflows/workflow_runtime.py` | `E501` | 109 | Line too long (99 > 88) |
-| `.agents/workflows/workflow_runtime.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `.agents/workflows/workflow_runtime.py` | `N818` | 1 | Exception name `ContractViolation` should be named with an Error suffix |
-| `.agents/workflows/workflow_runtime.py` | `PIE810` | 2 | Call `startswith` once with a `tuple` |
-| `.agents/workflows/workflow_runtime.py` | `SIM102` | 1 | Use a single `if` statement instead of nested `if` statements |
-| `.agents/workflows/workflow_runtime.py` | `TID251` | 1 | `importlib.util.spec_from_file_location` is banned: Import the installed public API; do not load another checkout by path. |
-| `.agents/workflows/workflow_runtime.py` | `TRY300` | 1 | Consider moving this statement to an `else` block |
 | `.codex/hooks/bootstrap.py` | `E401` | 1 | Multiple imports on one line |
 | `.codex/hooks/bootstrap.py` | `E501` | 6 | Line too long (98 > 88) |
 | `.codex/hooks/bootstrap.py` | `F821` | 1 | Undefined name `LOADER_DIGEST` |
@@ -432,10 +311,6 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `tests/test_employer_tiers.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `tests/test_employer_tiers.py` | `PT009` | 70 | Use a regular `assert` instead of unittest-style `assertEqual` |
 | `tests/test_employer_tiers.py` | `TID251` | 2 | `importlib.util.spec_from_file_location` is banned: Import the installed public API; do not load another checkout by path. |
-| `tests/test_guide_build.py` | `E501` | 14 | Line too long (92 > 88) |
-| `tests/test_guide_build.py` | `PT009` | 77 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `tests/test_guide_build.py` | `RET504` | 1 | Unnecessary assignment to `result` before `return` statement |
-| `tests/test_guide_build.py` | `TID251` | 2 | `unittest.TestCase` is banned: Use plain pytest functions and bare assertions. |
 | `tests/test_harness_manifests.py` | `E501` | 28 | Line too long (90 > 88) |
 | `tests/test_harness_manifests.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `tests/test_harness_manifests.py` | `PLR6301` | 2 | Method `requires` could be a function, class method, or static method |
@@ -449,14 +324,7 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `tests/test_hook_launch_budget.py` | `PT009` | 7 | Use a regular `assert` instead of unittest-style `assertEqual` |
 | `tests/test_hook_launch_budget.py` | `TID251` | 2 | `unittest.TestCase` is banned: Use plain pytest functions and bare assertions. |
 | `tests/test_hook_launch_budget.py` | `UP017` | 1 | Use `datetime.UTC` alias |
-| `tests/test_host_coverage.py` | `E501` | 13 | Line too long (117 > 88) |
-| `tests/test_host_coverage.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `tests/test_host_coverage.py` | `PT009` | 13 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `tests/test_host_coverage.py` | `TID251` | 2 | `importlib.util.spec_from_file_location` is banned: Import the installed public API; do not load another checkout by path. |
 | `tests/test_native_host_acceptance.py` | `TID251` | 1 | `importlib.util.spec_from_file_location` is banned: Import the installed public API; do not load another checkout by path. |
-| `tests/test_plan_artifacts.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `tests/test_plan_artifacts.py` | `PT009` | 5 | Use a regular `assert` instead of unittest-style `assertTrue` |
-| `tests/test_plan_artifacts.py` | `TID251` | 2 | `unittest.TestCase` is banned: Use plain pytest functions and bare assertions. |
 | `tests/test_plugin_update.py` | `E501` | 3 | Line too long (105 > 88) |
 | `tests/test_plugin_update.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `tests/test_plugin_update.py` | `PT009` | 2 | Use a regular `assert` instead of unittest-style `assertEqual` |
@@ -530,8 +398,6 @@ Reason: preserve existing implementations during the standards rollout. Each row
 
 Exact existing files requiring formatting are excluded from the formatter during this rollout. Regenerate payloads after formatting authored source and then remove its exception. New files are checked.
 
-- `.agents/engineering/utility/guide-build/scripts/scaffold.py`
-- `.agents/engineering/utility/guide-build/template/build.py`
 - `.agents/engineering/utility/review/scripts/review_rules.py`
 - `.agents/engineering/workflow/merge/scripts/cleanup_proof.py`
 - `.agents/engineering/workflow/merge/scripts/worktree_sweep.py`
@@ -539,57 +405,33 @@ Exact existing files requiring formatting are excluded from the formatter during
 - `.agents/hooks/docs_reachability.py`
 - `.agents/hooks/hook_runtime.py`
 - `.agents/hooks/installed_skills.py`
-- `.agents/hooks/merge_review_gate.py`
-- `.agents/hooks/plan_graph.py`
 - `.agents/hooks/problem_records.py`
 - `.agents/hooks/tests/fixtures/continuation_fixture.py`
 - `.agents/hooks/tests/fixtures/continuation_runtime_fixture.py`
 - `.agents/hooks/tests/fixtures/fake_cli.py`
 - `.agents/hooks/tests/fixtures/lane_expectations.py`
-- `.agents/hooks/tests/fixtures/plan_authoring_harness.py`
-- `.agents/hooks/tests/fixtures/plan_workflow_harness.py`
-- `.agents/hooks/tests/fixtures/review_workflow_harness.py`
 - `.agents/hooks/tests/fixtures/shell_profile_oracle.py`
-- `.agents/hooks/tests/fixtures/task_workflow_harness.py`
-- `.agents/hooks/tests/test_auto_merge.py`
 - `.agents/hooks/tests/test_completion.py`
 - `.agents/hooks/tests/test_continuation_runtime.py`
 - `.agents/hooks/tests/test_delivery_runtime.py`
 - `.agents/hooks/tests/test_docs_reachability.py`
-- `.agents/hooks/tests/test_goal_preflight.py`
-- `.agents/hooks/tests/test_handoff_transfer.py`
 - `.agents/hooks/tests/test_hook_runtime.py`
 - `.agents/hooks/tests/test_host_cli.py`
 - `.agents/hooks/tests/test_lane_tables.py`
 - `.agents/hooks/tests/test_merge_cleanup_proof.py`
-- `.agents/hooks/tests/test_merge_review_gate.py`
-- `.agents/hooks/tests/test_plan_graph.py`
-- `.agents/hooks/tests/test_plan_workflows.py`
 - `.agents/hooks/tests/test_pr_body.py`
 - `.agents/hooks/tests/test_problem_records.py`
 - `.agents/hooks/tests/test_process_standards.py`
 - `.agents/hooks/tests/test_repository_configuration.py`
-- `.agents/hooks/tests/test_review_evidence.py`
-- `.agents/hooks/tests/test_review_workflows.py`
 - `.agents/hooks/tests/test_shell_profile_oracle.py`
-- `.agents/hooks/tests/test_task_workflows.py`
-- `.agents/hooks/tests/test_workflow_adoption.py`
-- `.agents/hooks/tests/test_workflow_contracts.py`
 - `.agents/hooks/tests/test_workflow_ops.py`
 - `.agents/hooks/tests/test_worktree_sweep.py`
 - `.agents/hooks/tier_gate.py`
-- `.agents/workflow/contract/plan-artifacts/scripts/host_coverage.py`
 - `.agents/workflow/utility/status/scripts/status.py`
-- `.agents/workflow/workflow/handoff/scripts/transfer.py`
-- `.agents/workflows/auto_merge.py`
 - `.agents/workflows/completion.py`
-- `.agents/workflows/delivery_policy.py`
 - `.agents/workflows/delivery_runtime.py`
-- `.agents/workflows/host_runtime.py`
 - `.agents/workflows/pr_body.py`
-- `.agents/workflows/review_evidence.py`
 - `.agents/workflows/workflow_ops.py`
-- `.agents/workflows/workflow_runtime.py`
 - `.codex/hooks/bootstrap.py`
 - `.codex/runtime/continuation/continuation_runtime.py`
 - `.codex/runtime/continuation/continuation_scheduler.py`
@@ -620,11 +462,9 @@ Exact existing files requiring formatting are excluded from the formatter during
 - `tests/test_company_skill_replacement.py`
 - `tests/test_delivery_continuation.py`
 - `tests/test_employer_tiers.py`
-- `tests/test_guide_build.py`
 - `tests/test_harness_manifests.py`
 - `tests/test_hook_contract.py`
 - `tests/test_hook_launch_budget.py`
-- `tests/test_host_coverage.py`
 - `tests/test_plugin_update.py`
 - `tests/test_publisher_dependencies.py`
 - `tests/test_remote_host_tiers.py`
@@ -646,12 +486,6 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 
 | File | Module | Rule | Existing count | Required repair |
 | --- | --- | --- | ---: | --- |
-| `.agents/engineering/utility/guide-build/scripts/scaffold.py` | `scaffold` | `no-untyped-call` | 9 | Call to untyped function "template_bytes_for" in typed context |
-| `.agents/engineering/utility/guide-build/scripts/scaffold.py` | `scaffold` | `no-untyped-def` | 7 | Function is missing a type annotation |
-| `.agents/engineering/utility/guide-build/template/build.py` | `build` | `no-untyped-call` | 17 | Call to untyped function "find" in typed context |
-| `.agents/engineering/utility/guide-build/template/build.py` | `build` | `no-untyped-def` | 15 | Function is missing a type annotation |
-| `.agents/engineering/utility/guide-build/template/build.py` | `build` | `union-attr` | 1 | Item "None" of "Match[str] \| None" has no attribute "groups" |
-| `.agents/engineering/utility/guide-build/template/build.py` | `build` | `var-annotated` | 4 | Need type annotation for "by_line" (hint: "by_line: dict[<type>, <type>] = ...") |
 | `.agents/engineering/utility/review/scripts/review_rules.py` | `review_rules` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
 | `.agents/engineering/utility/review/scripts/review_rules.py` | `review_rules` | `no-untyped-call` | 5 | Call to untyped function "effective_claude_entries" in typed context |
 | `.agents/engineering/utility/review/scripts/review_rules.py` | `review_rules` | `no-untyped-def` | 5 | Function is missing a return type annotation |
@@ -676,11 +510,6 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 | `.agents/hooks/installed_skills.py` | `installed_skills` | `no-untyped-call` | 11 | Call to untyped function "NativePluginDiscoveryError" in typed context |
 | `.agents/hooks/installed_skills.py` | `installed_skills` | `no-untyped-def` | 7 | Function is missing a type annotation |
 | `.agents/hooks/installed_skills.py` | `installed_skills` | `operator` | 1 | Unsupported operand types for / ("Path" and "None") |
-| `.agents/hooks/merge_review_gate.py` | `merge_review_gate` | `no-untyped-call` | 13 | Call to untyped function "git" in typed context |
-| `.agents/hooks/merge_review_gate.py` | `merge_review_gate` | `no-untyped-def` | 17 | Function is missing a type annotation |
-| `.agents/hooks/plan_graph.py` | `plan_graph` | `no-untyped-call` | 54 | Call to untyped function "section" in typed context |
-| `.agents/hooks/plan_graph.py` | `plan_graph` | `no-untyped-def` | 26 | Function is missing a type annotation |
-| `.agents/hooks/plan_graph.py` | `plan_graph` | `var-annotated` | 1 | Need type annotation for "claims" (hint: "claims: dict[<type>, <type>] = ...") |
 | `.agents/hooks/problem_records.py` | `problem_records` | `no-untyped-call` | 8 | Call to untyped function "selects_personal" in typed context |
 | `.agents/hooks/problem_records.py` | `problem_records` | `no-untyped-def` | 7 | Function is missing a type annotation |
 | `.agents/hooks/tests/fixtures/continuation_fixture.py` | `fixtures.continuation_fixture` | `arg-type` | 1 | Argument 1 to "dict" has incompatible type "str"; expected "Iterable[tuple[str, Any]]" |
@@ -691,30 +520,9 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 | `.agents/hooks/tests/fixtures/fake_cli.py` | `fixtures.fake_cli` | `no-untyped-def` | 4 | Function is missing a type annotation |
 | `.agents/hooks/tests/fixtures/lane_expectations.py` | `fixtures.lane_expectations` | `no-untyped-call` | 1 | Call to untyped function "_table" in typed context |
 | `.agents/hooks/tests/fixtures/lane_expectations.py` | `fixtures.lane_expectations` | `no-untyped-def` | 4 | Function is missing a type annotation |
-| `.agents/hooks/tests/fixtures/plan_authoring_harness.py` | `fixtures.plan_authoring_harness` | `no-untyped-call` | 16 | Call to untyped function "initialize_repository" in typed context |
-| `.agents/hooks/tests/fixtures/plan_authoring_harness.py` | `fixtures.plan_authoring_harness` | `no-untyped-def` | 10 | Function is missing a type annotation |
-| `.agents/hooks/tests/fixtures/plan_workflow_harness.py` | `fixtures.plan_workflow_harness` | `assignment` | 1 | Incompatible types in assignment (expression has type "def tracked(instance: Any, *arguments: Any, **keywords: Any) -> Any", variable has type "Callable[[Path, str \| None, str \| None], str]") |
-| `.agents/hooks/tests/fixtures/plan_workflow_harness.py` | `fixtures.plan_workflow_harness` | `index` | 4 | Value of type "Any \| None" is not indexable |
-| `.agents/hooks/tests/fixtures/plan_workflow_harness.py` | `fixtures.plan_workflow_harness` | `method-assign` | 2 | Cannot assign to a method |
-| `.agents/hooks/tests/fixtures/plan_workflow_harness.py` | `fixtures.plan_workflow_harness` | `no-untyped-call` | 53 | Call to untyped function "initialize_repository" in typed context |
-| `.agents/hooks/tests/fixtures/plan_workflow_harness.py` | `fixtures.plan_workflow_harness` | `no-untyped-def` | 26 | Function is missing a type annotation |
-| `.agents/hooks/tests/fixtures/plan_workflow_harness.py` | `fixtures.plan_workflow_harness` | `union-attr` | 4 | Item "None" of "Any \| None" has no attribute "resolve" |
-| `.agents/hooks/tests/fixtures/plan_workflow_harness.py` | `fixtures.plan_workflow_harness` | `unreachable` | 1 | Statement is unreachable |
-| `.agents/hooks/tests/fixtures/review_workflow_harness.py` | `fixtures.review_workflow_harness` | `attr-defined` | 2 | "Collection[Any]" has no attribute "append" |
-| `.agents/hooks/tests/fixtures/review_workflow_harness.py` | `fixtures.review_workflow_harness` | `no-untyped-call` | 63 | Call to untyped function "prepare_repository" in typed context |
-| `.agents/hooks/tests/fixtures/review_workflow_harness.py` | `fixtures.review_workflow_harness` | `no-untyped-def` | 32 | Function is missing a return type annotation |
-| `.agents/hooks/tests/fixtures/review_workflow_harness.py` | `fixtures.review_workflow_harness` | `var-annotated` | 2 | Need type annotation for "waves" (hint: "waves: list[<type>] = ...") |
 | `.agents/hooks/tests/fixtures/shell_profile_oracle.py` | `fixtures.shell_profile_oracle` | `call-overload` | 1 | No overload variant of "update" of "MutableMapping" matches argument type "object" |
 | `.agents/hooks/tests/fixtures/shell_profile_oracle.py` | `fixtures.shell_profile_oracle` | `no-untyped-call` | 8 | Call to untyped function "load_json" in typed context |
 | `.agents/hooks/tests/fixtures/shell_profile_oracle.py` | `fixtures.shell_profile_oracle` | `no-untyped-def` | 11 | Function is missing a type annotation |
-| `.agents/hooks/tests/fixtures/task_workflow_harness.py` | `fixtures.task_workflow_harness` | `dict-item` | 1 | Dict entry 0 has incompatible type "str": "str"; expected "str": "int" |
-| `.agents/hooks/tests/fixtures/task_workflow_harness.py` | `fixtures.task_workflow_harness` | `no-untyped-call` | 9 | Call to untyped function "dispatch" in typed context |
-| `.agents/hooks/tests/fixtures/task_workflow_harness.py` | `fixtures.task_workflow_harness` | `no-untyped-def` | 9 | Function is missing a return type annotation |
-| `.agents/hooks/tests/fixtures/workflow_writer_lease_worker.py` | `fixtures.workflow_writer_lease_worker` | `no-untyped-call` | 1 | Call to untyped function "for_repository" of "WriterLeaseRegistry" in typed context |
-| `.agents/hooks/tests/test_auto_merge.py` | `test_auto_merge` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
-| `.agents/hooks/tests/test_auto_merge.py` | `test_auto_merge` | `no-untyped-call` | 8 | Call to untyped function "binding" in typed context |
-| `.agents/hooks/tests/test_auto_merge.py` | `test_auto_merge` | `no-untyped-def` | 13 | Function is missing a type annotation |
-| `.agents/hooks/tests/test_auto_merge.py` | `test_auto_merge` | `union-attr` | 2 | Item "None" of "ModuleSpec \| None" has no attribute "loader" |
 | `.agents/hooks/tests/test_completion.py` | `test_completion` | `no-untyped-call` | 65 | Call to untyped function "publisher_follow_up" in typed context |
 | `.agents/hooks/tests/test_completion.py` | `test_completion` | `no-untyped-def` | 28 | Function is missing a type annotation |
 | `.agents/hooks/tests/test_continuation_runtime.py` | `test_continuation_runtime` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
@@ -728,11 +536,6 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 | `.agents/hooks/tests/test_delivery_runtime.py` | `test_delivery_runtime` | `var-annotated` | 1 | Need type annotation for "configured" |
 | `.agents/hooks/tests/test_docs_reachability.py` | `test_docs_reachability` | `no-untyped-call` | 91 | Call to untyped function "write" in typed context |
 | `.agents/hooks/tests/test_docs_reachability.py` | `test_docs_reachability` | `no-untyped-def` | 24 | Function is missing a return type annotation |
-| `.agents/hooks/tests/test_goal_preflight.py` | `test_goal_preflight` | `no-untyped-call` | 13 | Call to untyped function "goal_evaluator_scopes" in typed context |
-| `.agents/hooks/tests/test_goal_preflight.py` | `test_goal_preflight` | `no-untyped-def` | 15 | Function is missing a return type annotation |
-| `.agents/hooks/tests/test_handoff_transfer.py` | `test_handoff_transfer` | `assignment` | 1 | Incompatible types in assignment (expression has type "tuple[str, str, ... <12 more items>]", variable has type "tuple[str, str, ... <10 more items>]") |
-| `.agents/hooks/tests/test_handoff_transfer.py` | `test_handoff_transfer` | `no-untyped-call` | 76 | Call to untyped function "write_goal" in typed context |
-| `.agents/hooks/tests/test_handoff_transfer.py` | `test_handoff_transfer` | `no-untyped-def` | 24 | Function is missing a return type annotation |
 | `.agents/hooks/tests/test_hook_runtime.py` | `test_hook_runtime` | `attr-defined` | 1 | Module "hook_runtime" does not explicitly export attribute "tempfile" |
 | `.agents/hooks/tests/test_hook_runtime.py` | `test_hook_runtime` | `no-untyped-call` | 25 | Call to untyped function "declared_plugin_root" in typed context |
 | `.agents/hooks/tests/test_hook_runtime.py` | `test_hook_runtime` | `no-untyped-def` | 13 | Function is missing a return type annotation |
@@ -745,15 +548,6 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 | `.agents/hooks/tests/test_merge_cleanup_proof.py` | `test_merge_cleanup_proof` | `no-untyped-call` | 181 | Call to untyped function "git" in typed context |
 | `.agents/hooks/tests/test_merge_cleanup_proof.py` | `test_merge_cleanup_proof` | `no-untyped-def` | 34 | Function is missing a type annotation |
 | `.agents/hooks/tests/test_merge_cleanup_proof.py` | `test_merge_cleanup_proof` | `union-attr` | 2 | Item "None" of "ModuleSpec \| None" has no attribute "loader" |
-| `.agents/hooks/tests/test_merge_review_gate.py` | `test_merge_review_gate` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
-| `.agents/hooks/tests/test_merge_review_gate.py` | `test_merge_review_gate` | `no-untyped-call` | 28 | Call to untyped function "load_gate" in typed context |
-| `.agents/hooks/tests/test_merge_review_gate.py` | `test_merge_review_gate` | `no-untyped-def` | 37 | Function is missing a return type annotation |
-| `.agents/hooks/tests/test_merge_review_gate.py` | `test_merge_review_gate` | `union-attr` | 2 | Item "None" of "ModuleSpec \| None" has no attribute "loader" |
-| `.agents/hooks/tests/test_plan_graph.py` | `test_plan_graph` | `no-untyped-call` | 60 | Call to untyped function "write_ledger" in typed context |
-| `.agents/hooks/tests/test_plan_graph.py` | `test_plan_graph` | `no-untyped-def` | 31 | Function is missing a return type annotation |
-| `.agents/hooks/tests/test_plan_workflows.py` | `test_plan_workflows` | `attr-defined` | 14 | "type[PlanWorkflowAcceptanceTests]" has no attribute "fixture" |
-| `.agents/hooks/tests/test_plan_workflows.py` | `test_plan_workflows` | `no-untyped-call` | 24 | Call to untyped function "PlanWorkflowHarness" in typed context |
-| `.agents/hooks/tests/test_plan_workflows.py` | `test_plan_workflows` | `no-untyped-def` | 21 | Function is missing a return type annotation |
 | `.agents/hooks/tests/test_pr_body.py` | `test_pr_body` | `attr-defined` | 1 | Module "workflow_ops" does not explicitly export attribute "delivery_runtime" |
 | `.agents/hooks/tests/test_pr_body.py` | `test_pr_body` | `no-untyped-call` | 13 | Call to untyped function "unchecked_tasks" in typed context |
 | `.agents/hooks/tests/test_pr_body.py` | `test_pr_body` | `no-untyped-def` | 8 | Function is missing a return type annotation |
@@ -767,28 +561,10 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 | `.agents/hooks/tests/test_repository_configuration.py` | `test_repository_configuration` | `no-untyped-def` | 18 | Function is missing a return type annotation |
 | `.agents/hooks/tests/test_repository_configuration.py` | `test_repository_configuration` | `union-attr` | 2 | Item "None" of "ModuleSpec \| None" has no attribute "loader" |
 | `.agents/hooks/tests/test_repository_configuration.py` | `test_repository_configuration` | `var-annotated` | 2 | Need type annotation for "cases" |
-| `.agents/hooks/tests/test_review_evidence.py` | `test_review_evidence` | `attr-defined` | 2 | Module "workflow_ops" does not explicitly export attribute "workflow_runtime" |
-| `.agents/hooks/tests/test_review_evidence.py` | `test_review_evidence` | `no-untyped-call` | 63 | Call to untyped function "prepare_path" in typed context |
-| `.agents/hooks/tests/test_review_evidence.py` | `test_review_evidence` | `no-untyped-def` | 21 | Function is missing a return type annotation |
-| `.agents/hooks/tests/test_review_evidence.py` | `test_review_evidence` | `var-annotated` | 1 | Need type annotation for "value" |
-| `.agents/hooks/tests/test_review_workflows.py` | `test_review_workflows` | `attr-defined` | 5 | "type[ReviewWorkflowAcceptanceTests]" has no attribute "fixture" |
-| `.agents/hooks/tests/test_review_workflows.py` | `test_review_workflows` | `no-untyped-call` | 25 | Call to untyped function "ReviewWorkflowHarness" in typed context |
-| `.agents/hooks/tests/test_review_workflows.py` | `test_review_workflows` | `no-untyped-def` | 17 | Function is missing a return type annotation |
 | `.agents/hooks/tests/test_shell_profile_oracle.py` | `test_shell_profile_oracle` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
 | `.agents/hooks/tests/test_shell_profile_oracle.py` | `test_shell_profile_oracle` | `no-untyped-call` | 2 | Call to untyped function "load_oracle" in typed context |
 | `.agents/hooks/tests/test_shell_profile_oracle.py` | `test_shell_profile_oracle` | `no-untyped-def` | 8 | Function is missing a return type annotation |
 | `.agents/hooks/tests/test_shell_profile_oracle.py` | `test_shell_profile_oracle` | `union-attr` | 2 | Item "None" of "ModuleSpec \| None" has no attribute "loader" |
-| `.agents/hooks/tests/test_task_workflows.py` | `test_task_workflows` | `attr-defined` | 9 | "type[TaskWorkflowAcceptanceTests]" has no attribute "fixture" |
-| `.agents/hooks/tests/test_task_workflows.py` | `test_task_workflows` | `no-untyped-call` | 20 | Call to untyped function "WorkflowContract" in typed context |
-| `.agents/hooks/tests/test_task_workflows.py` | `test_task_workflows` | `no-untyped-def` | 14 | Function is missing a return type annotation |
-| `.agents/hooks/tests/test_workflow_adoption.py` | `test_workflow_adoption` | `attr-defined` | 15 | "type[WorkflowAdoptionTests]" has no attribute "contract" |
-| `.agents/hooks/tests/test_workflow_adoption.py` | `test_workflow_adoption` | `no-untyped-call` | 2 | Call to untyped function "WorkflowContract" in typed context |
-| `.agents/hooks/tests/test_workflow_adoption.py` | `test_workflow_adoption` | `no-untyped-def` | 7 | Function is missing a return type annotation |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `test_workflow_contracts` | `arg-type` | 1 | Argument after ** must be a mapping, not "object" |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `test_workflow_contracts` | `attr-defined` | 39 | "type[WorkflowContractTests]" has no attribute "contract" |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `test_workflow_contracts` | `no-untyped-call` | 177 | Call to untyped function "WorkflowContract" in typed context |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `test_workflow_contracts` | `no-untyped-def` | 92 | Function is missing a return type annotation |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `test_workflow_contracts` | `var-annotated` | 1 | Need type annotation for "observed_changes" (hint: "observed_changes: set[<type>] = ...") |
 | `.agents/hooks/tests/test_workflow_ops.py` | `test_workflow_ops` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
 | `.agents/hooks/tests/test_workflow_ops.py` | `test_workflow_ops` | `attr-defined` | 7 | "type[RepositoryFixture]" has no attribute "_baseline_temp" |
 | `.agents/hooks/tests/test_workflow_ops.py` | `test_workflow_ops` | `import-not-found` | 1 | Cannot find implementation or library stub for module named "fake_cli" |
@@ -812,47 +588,23 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 | `.agents/hooks/tier_gate.py` | `tier_gate` | `type-arg` | 1 | Missing type arguments for generic type "list" |
 | `.agents/hooks/tier_gate.py` | `tier_gate` | `unreachable` | 9 | Right operand of "and" is never evaluated |
 | `.agents/hooks/tier_gate.py` | `tier_gate` | `var-annotated` | 9 | Need type annotation for "definitions" (hint: "definitions: dict[<type>, <type>] = ...") |
-| `.agents/workflow/contract/plan-artifacts/scripts/host_coverage.py` | `host_coverage` | `no-untyped-call` | 8 | Call to untyped function "is_text" in typed context |
-| `.agents/workflow/contract/plan-artifacts/scripts/host_coverage.py` | `host_coverage` | `no-untyped-def` | 7 | Function is missing a type annotation |
-| `.agents/workflow/contract/plan-artifacts/scripts/host_coverage.py` | `host_coverage` | `var-annotated` | 1 | Need type annotation for "records" (hint: "records: list[<type>] = ...") |
 | `.agents/workflow/utility/status/scripts/status.py` | `status` | `no-untyped-call` | 19 | Call to untyped function "words" in typed context |
 | `.agents/workflow/utility/status/scripts/status.py` | `status` | `no-untyped-def` | 13 | Function is missing a type annotation |
 | `.agents/workflow/utility/status/scripts/status.py` | `status` | `var-annotated` | 4 | Need type annotation for "skipped" (hint: "skipped: list[<type>] = ...") |
-| `.agents/workflow/workflow/handoff/scripts/transfer.py` | `transfer` | `attr-defined` | 5 | Module has no attribute "flock" |
-| `.agents/workflow/workflow/handoff/scripts/transfer.py` | `transfer` | `no-untyped-call` | 35 | Call to untyped function "absolute" in typed context |
-| `.agents/workflow/workflow/handoff/scripts/transfer.py` | `transfer` | `no-untyped-def` | 17 | Function is missing a type annotation |
-| `.agents/workflows/auto_merge.py` | `auto_merge` | `attr-defined` | 2 | Module "workflow_ops" does not explicitly export attribute "review_evidence" |
-| `.agents/workflows/auto_merge.py` | `auto_merge` | `no-untyped-call` | 30 | Call to untyped function "binding_from_artifact" in typed context |
-| `.agents/workflows/auto_merge.py` | `auto_merge` | `no-untyped-def` | 8 | Function is missing a type annotation |
 | `.agents/workflows/completion.py` | `completion` | `no-untyped-call` | 25 | Call to untyped function "resolve_path" in typed context |
 | `.agents/workflows/completion.py` | `completion` | `no-untyped-def` | 15 | Function is missing a type annotation |
-| `.agents/workflows/delivery_policy.py` | `delivery_policy` | `no-untyped-call` | 2 | Call to untyped function "validate" in typed context |
-| `.agents/workflows/delivery_policy.py` | `delivery_policy` | `no-untyped-def` | 4 | Function is missing a return type annotation |
 | `.agents/workflows/delivery_runtime.py` | `delivery_runtime` | `no-untyped-call` | 36 | Call to untyped function "validate" in typed context |
 | `.agents/workflows/delivery_runtime.py` | `delivery_runtime` | `no-untyped-def` | 20 | Function is missing a type annotation |
-| `.agents/workflows/host_runtime.py` | `host_runtime` | `attr-defined` | 5 | Module has no attribute "flock" |
-| `.agents/workflows/host_runtime.py` | `host_runtime` | `no-untyped-call` | 76 | Call to untyped function "RepositoryWriterLock" in typed context |
-| `.agents/workflows/host_runtime.py` | `host_runtime` | `no-untyped-def` | 31 | Function is missing a type annotation |
-| `.agents/workflows/host_runtime.py` | `host_runtime` | `var-annotated` | 1 | Need type annotation for "repositories" |
-| `.agents/workflows/hosts/smoke.py` | `smoke` | `no-untyped-call` | 3 | Call to untyped function "HostAdapterRegistry" in typed context |
-| `.agents/workflows/hosts/smoke.py` | `smoke` | `no-untyped-def` | 1 | Function is missing a return type annotation |
 | `.agents/workflows/pr_body.py` | `pr_body` | `no-untyped-call` | 2 | Call to untyped function "validate_pr_body" in typed context |
 | `.agents/workflows/pr_body.py` | `pr_body` | `no-untyped-def` | 3 | Function is missing a type annotation |
 | `.agents/workflows/pr_body.py` | `pr_body` | `union-attr` | 1 | Item "None" of "Match[str] \| None" has no attribute "group" |
 | `.agents/workflows/pr_body.py` | `pr_body` | `var-annotated` | 2 | Need type annotation for "list_indents" (hint: "list_indents: list[<type>] = ...") |
-| `.agents/workflows/review_evidence.py` | `review_evidence` | `no-untyped-call` | 16 | Call to untyped function "reject_redirects" in typed context |
-| `.agents/workflows/review_evidence.py` | `review_evidence` | `no-untyped-def` | 10 | Function is missing a type annotation |
-| `.agents/workflows/verify.py` | `verify` | `no-untyped-call` | 4 | Call to untyped function "WorkflowContract" in typed context |
-| `.agents/workflows/verify.py` | `verify` | `no-untyped-def` | 1 | Function is missing a return type annotation |
 | `.agents/workflows/workflow_ops.py` | `workflow_ops` | `dict-item` | 2 | Dict entry 0 has incompatible type "str": "int \| None"; expected "str": "None" |
 | `.agents/workflows/workflow_ops.py` | `workflow_ops` | `index` | 1 | Value of type "dict[str, Any] \| None" is not indexable |
 | `.agents/workflows/workflow_ops.py` | `workflow_ops` | `no-untyped-call` | 300 | Call to untyped function "utc_now" in typed context |
 | `.agents/workflows/workflow_ops.py` | `workflow_ops` | `no-untyped-def` | 100 | Function is missing a return type annotation |
 | `.agents/workflows/workflow_ops.py` | `workflow_ops` | `union-attr` | 1 | Item "None" of "str \| Any \| None" has no attribute "lower" |
 | `.agents/workflows/workflow_ops.py` | `workflow_ops` | `unreachable` | 1 | Statement is unreachable |
-| `.agents/workflows/workflow_runtime.py` | `workflow_runtime` | `no-untyped-call` | 73 | Call to untyped function "_validate" in typed context |
-| `.agents/workflows/workflow_runtime.py` | `workflow_runtime` | `no-untyped-def` | 37 | Function is missing a return type annotation |
-| `.agents/workflows/workflow_runtime.py` | `workflow_runtime` | `var-annotated` | 1 | Need type annotation for "loaded" (hint: "loaded: dict[<type>, <type>] = ...") |
 | `.codex/runtime/continuation/continuation_runtime.py` | `continuation_runtime` | `attr-defined` | 11 | Module has no attribute "flock" |
 | `.codex/runtime/continuation/continuation_runtime.py` | `continuation_runtime` | `no-untyped-call` | 85 | Call to untyped function "runtime_paths" in typed context |
 | `.codex/runtime/continuation/continuation_runtime.py` | `continuation_runtime` | `no-untyped-def` | 28 | Function is missing a return type annotation |
@@ -942,8 +694,6 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 | `tests/test_employer_tiers.py` | `tests.test_employer_tiers` | `no-untyped-def` | 24 | Function is missing a type annotation |
 | `tests/test_employer_tiers.py` | `tests.test_employer_tiers` | `union-attr` | 2 | Item "None" of "ModuleSpec \| None" has no attribute "loader" |
 | `tests/test_employer_tiers.py` | `tests.test_employer_tiers` | `var-annotated` | 4 | Need type annotation for "cases" |
-| `tests/test_guide_build.py` | `tests.test_guide_build` | `no-untyped-call` | 32 | Call to untyped function "git" in typed context |
-| `tests/test_guide_build.py` | `tests.test_guide_build` | `no-untyped-def` | 42 | Function is missing a type annotation |
 | `tests/test_harness_manifests.py` | `tests.test_harness_manifests` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
 | `tests/test_harness_manifests.py` | `tests.test_harness_manifests` | `import-not-found` | 2 | Cannot find implementation or library stub for module named "harness_permissions" |
 | `tests/test_harness_manifests.py` | `tests.test_harness_manifests` | `no-untyped-call` | 13 | Call to untyped function "requires" in typed context |
@@ -957,16 +707,8 @@ The previous target named a removed `.codex/adapters` directory. Targets cover a
 | `tests/test_hook_launch_budget.py` | `tests.test_hook_launch_budget` | `misc` | 1 | Generator has incompatible item type "int"; expected "bool" |
 | `tests/test_hook_launch_budget.py` | `tests.test_hook_launch_budget` | `no-untyped-call` | 7 | Call to untyped function "manifest" in typed context |
 | `tests/test_hook_launch_budget.py` | `tests.test_hook_launch_budget` | `no-untyped-def` | 10 | Function is missing a type annotation |
-| `tests/test_host_coverage.py` | `tests.test_host_coverage` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
-| `tests/test_host_coverage.py` | `tests.test_host_coverage` | `attr-defined` | 1 | "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable) |
-| `tests/test_host_coverage.py` | `tests.test_host_coverage` | `no-untyped-call` | 6 | Call to untyped function "record" in typed context |
-| `tests/test_host_coverage.py` | `tests.test_host_coverage` | `no-untyped-def` | 11 | Function is missing a type annotation |
-| `tests/test_host_coverage.py` | `tests.test_host_coverage` | `union-attr` | 2 | Item "None" of "ModuleSpec \| None" has no attribute "loader" |
 | `tests/test_native_host_acceptance.py` | `tests.test_native_host_acceptance` | `arg-type` | 1 | Argument 1 to "Path" has incompatible type "object"; expected "str \| PathLike[str]" |
 | `tests/test_native_host_acceptance.py` | `tests.test_native_host_acceptance` | `type-arg` | 1 | Missing type arguments for generic type "dict" |
-| `tests/test_plan_artifacts.py` | `tests.test_plan_artifacts` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
-| `tests/test_plan_artifacts.py` | `tests.test_plan_artifacts` | `no-untyped-def` | 2 | Function is missing a return type annotation |
-| `tests/test_plan_artifacts.py` | `tests.test_plan_artifacts` | `union-attr` | 2 | Item "None" of "ModuleSpec \| None" has no attribute "loader" |
 | `tests/test_plugin_update.py` | `tests.test_plugin_update` | `arg-type` | 1 | Argument 1 to "module_from_spec" has incompatible type "ModuleSpec \| None"; expected "ModuleSpec" |
 | `tests/test_plugin_update.py` | `tests.test_plugin_update` | `no-untyped-def` | 1 | Function is missing a return type annotation |
 | `tests/test_plugin_update.py` | `tests.test_plugin_update` | `union-attr` | 2 | Item "None" of "ModuleSpec \| None" has no attribute "loader" |
@@ -1021,7 +763,6 @@ Exact legacy file/rule exceptions preserve existing runtime behavior during roll
 
 | File | Rule | Existing count | Required repair |
 | --- | --- | ---: | --- |
-| `.agents/engineering/utility/guide-build/template/build.py` | `PY001` | 3 | Legacy comprehension traversal; split the nested generators into named loops. |
 | `.agents/engineering/utility/review/scripts/review_rules.py` | `PY016` | 1 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/engineering/workflow/merge/scripts/cleanup_proof.py` | `PY016` | 2 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/engineering/workflow/merge/scripts/worktree_sweep.py` | `PY001` | 1 | Legacy comprehension traversal; split the nested generators into named loops. |
@@ -1033,33 +774,19 @@ Exact legacy file/rule exceptions preserve existing runtime behavior during roll
 | `.agents/hooks/tests/fixtures/continuation_runtime_fixture.py` | `PY016` | 2 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/hooks/tests/fixtures/fake_cli.py` | `PY016` | 4 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/hooks/tests/fixtures/lane_expectations.py` | `PY001` | 1 | Legacy comprehension traversal; split the nested generators into named loops. |
-| `.agents/hooks/tests/fixtures/workflow_writer_lease_worker.py` | `PY009` | 1 | Legacy import-time execution or explicit subprocess fixture; move runtime I/O into the entry point and isolate fixture setup. |
-| `.agents/hooks/tests/fixtures/workflow_writer_lease_worker.py` | `PY016` | 4 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
-| `.agents/hooks/tests/fixtures/workflow_writer_lease_worker.py` | `PY017` | 3 | Legacy direct test clock read; inject a fixed clock. |
 | `.agents/hooks/tests/test_completion.py` | `PY016` | 1 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/hooks/tests/test_continuation_runtime.py` | `PY016` | 2 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/hooks/tests/test_continuation_runtime.py` | `PY017` | 7 | Legacy direct test clock read; inject a fixed clock. |
-| `.agents/hooks/tests/test_goal_preflight.py` | `PY016` | 1 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/hooks/tests/test_hook_runtime.py` | `PY016` | 5 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/hooks/tests/test_hook_runtime.py` | `PY017` | 4 | Legacy direct test clock read; inject a fixed clock. |
 | `.agents/hooks/tests/test_lane_tables.py` | `PY001` | 2 | Legacy comprehension traversal; split the nested generators into named loops. |
 | `.agents/hooks/tests/test_merge_cleanup_proof.py` | `PY016` | 4 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/hooks/tests/test_process_standards.py` | `PY001` | 1 | Legacy comprehension traversal; split the nested generators into named loops. |
-| `.agents/hooks/tests/test_workflow_adoption.py` | `PY001` | 2 | Legacy comprehension traversal; split the nested generators into named loops. |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `PY001` | 1 | Legacy comprehension traversal; split the nested generators into named loops. |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `PY016` | 3 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
-| `.agents/hooks/tests/test_workflow_contracts.py` | `PY017` | 2 | Legacy direct test clock read; inject a fixed clock. |
-| `.agents/hooks/tests/test_workflow_ops.py` | `PY016` | 1 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/hooks/tier_gate.py` | `PY001` | 23 | Legacy comprehension traversal; split the nested generators into named loops. |
 | `.agents/hooks/tier_gate.py` | `PY016` | 8 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/workflow/utility/status/scripts/status.py` | `PY001` | 1 | Legacy comprehension traversal; split the nested generators into named loops. |
 | `.agents/workflow/utility/status/scripts/status.py` | `PY016` | 3 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.agents/workflows/completion.py` | `PY016` | 1 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
-| `.agents/workflows/host_runtime.py` | `PY001` | 1 | Legacy comprehension traversal; split the nested generators into named loops. |
-| `.agents/workflows/host_runtime.py` | `PY016` | 1 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
-| `.agents/workflows/workflow_ops.py` | `PY001` | 2 | Legacy comprehension traversal; split the nested generators into named loops. |
-| `.agents/workflows/workflow_ops.py` | `PY016` | 2 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
-| `.agents/workflows/workflow_runtime.py` | `PY001` | 3 | Legacy comprehension traversal; split the nested generators into named loops. |
 | `.codex/runtime/continuation/continuation_runtime.py` | `PY016` | 2 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.codex/runtime/continuation/continuation_scheduler.py` | `PY016` | 4 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |
 | `.codex/runtime/continuation/delivery_continuation.py` | `PY016` | 3 | Legacy environment or argv access in hooks, orchestration and deterministic fixtures; pass process state from the entry point. |

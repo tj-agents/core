@@ -44,8 +44,12 @@ REACT = {
     "detect": {"content": [{"glob": "package.json", "pattern": r"\"react\"\s*:"}]},
 }
 BASE = {"schema_version": 1, "tier": "base", "stack": "any project", "applies": "always"}
+EXAMPLE_EMPLOYER = {
     "schema_version": 2,
+    "tier": "example-employer",
+    "stack": "example employer work",
     "applies": "stack-present",
+    "detect": {"remote": [r"^example-employer/"]},
 }
 
 
@@ -100,10 +104,13 @@ class DeclarationDiscovery(unittest.TestCase):
 
     def test_schema_version_two_is_accepted(self):
         with tempfile.TemporaryDirectory() as cache:
+            payload = Path(cache) / "example-employer" / "example-employer" / "1.0.0"
             payload.mkdir(parents=True)
+            (payload / "tier.json").write_text(json.dumps(EXAMPLE_EMPLOYER), encoding="utf-8")
 
             found = gate.declarations([cache])
 
+        self.assertEqual([item.tier for item in found], ["example-employer"])
 
     def test_an_orphaned_version_never_shadows_a_live_one(self):
         with tempfile.TemporaryDirectory() as cache:
@@ -285,10 +292,13 @@ class Detection(TemporaryProject):
         project = self.populated("", ["README.md"])
         subprocess.run(["git", "init", "-q"], cwd=project, check=True)
         subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/example-employer/example-service.git"],
             cwd=project,
             check=True,
         )
+        present, evidence = gate.stack_present(project, EXAMPLE_EMPLOYER["detect"])
         self.assertTrue(present)
+        self.assertEqual(evidence, "origin example-employer/example-service")
 
         unrelated = self.populated("", ["README.md"])
         subprocess.run(["git", "init", "-q"], cwd=unrelated, check=True)
@@ -297,6 +307,7 @@ class Detection(TemporaryProject):
             cwd=unrelated,
             check=True,
         )
+        present, _ = gate.stack_present(unrelated, EXAMPLE_EMPLOYER["detect"])
         self.assertFalse(present)
 
 
