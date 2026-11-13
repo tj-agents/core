@@ -20,7 +20,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
@@ -31,7 +31,25 @@
               "python",
               "-B",
               "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
-              "--tool-context"
+              "--write-gate"
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Read(//**/SKILL.md)",
+            "timeout": 30,
+            "command": "tj_hook",
+            "args": [
+              "--",
+              "python",
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
+              "--record-read"
             ]
           }
         ]
