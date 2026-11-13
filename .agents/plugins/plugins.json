@@ -104,7 +104,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:a8c4c7b54dd1c5ad0bd562c1c63f93b90dfbe6fd89856caed0b8f7fcd98818df",
+      "digest": "sha256:811fc0716ef0f7f150c364d64421c8d59841212b9cf4e974cd9c37cd8821d0de",
       "harness": {
         "marketplaces": [
           {
