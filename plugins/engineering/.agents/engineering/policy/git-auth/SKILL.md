@@ -1,6 +1,6 @@
 ---
 name: git-auth
-description: Select GitHub credentials for the owning work, diagnose denied access, and honor an explicitly authorized fine-grained or classic token choice. Use when access is refused or before requesting, creating or widening credentials.
+description: Select GitHub credentials for the owning work, diagnose denied access, and honor an authorized fine-grained or classic token choice. Use when access is refused or before changing credentials.
 
 kind: policy
 domain: process
@@ -8,6 +8,7 @@ domain: process
 
 # Select credentials for the owning work
 
+Owns credential choice and access diagnosis for GitHub work.
 Keep access decisions tied to the owning organization, requested operations and the user's authority.
 A refused call requires diagnosis; never switch token types, widen scopes or change organization policy
 automatically. Use the selected profile's existing GitHub App when it already supplies the needed access.

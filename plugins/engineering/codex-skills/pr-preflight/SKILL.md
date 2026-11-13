@@ -1,6 +1,6 @@
 ---
 name: pr-preflight
-description: Resolve the owning review and check publication readiness across the execution branch, actual base, upstream, committed code, review evidence and slice scope. Read-only apart from refreshing Git refs and runtime telemetry.
+description: Read-only go/no-go before opening or landing a PR - feature branch, upstream sync, committed code, the owning PR and the base currency GitHub requires. Use before open-pr or merge.
 
 kind: operation
 domain: process
