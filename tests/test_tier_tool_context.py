@@ -2,6 +2,7 @@ import importlib.util
 import io
 import json
 import subprocess
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -54,6 +55,27 @@ def isolated_plugins(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(gate.OVERRIDE_VARIABLE, raising=False)
 
 
+STACK = {
+    "schema_version": 1,
+    "applies": "stack-present",
+    "detect": {"globs": ["*.src"]},
+}
+
+
+def _select(repository: Path, plugins: list[str]) -> None:
+    (repository / ".agents").mkdir()
+    (repository / ".agents/plugins.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "plugins": plugins,
+                "marketplaces": {"market": {"repository": "example/marketplace"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def _repository(path: Path, name: str) -> Path:
     path.mkdir(parents=True)
     subprocess.run(["git", "-C", str(path), "init", "--quiet"], check=True, timeout=10)
@@ -72,25 +94,19 @@ def _repository(path: Path, name: str) -> Path:
     return path
 
 
-def test_claude_typed_paths_are_extracted_without_shell_or_mentions() -> None:
-    assert gate.tool_paths(
-        {"tool_name": "Read", "tool_input": {"file_path": "src/a.py"}}
+def test_write_paths_are_only_the_targets_of_write_tools() -> None:
+    assert gate.write_paths(
+        {"tool_name": "Write", "tool_input": {"file_path": "src/a.py"}}
     ) == ["src/a.py"]
-    assert gate.tool_paths({"tool_name": "Glob", "tool_input": {"path": "src"}}) == [
-        "src"
-    ]
-    assert (
-        gate.tool_paths(
-            {"tool_name": "Bash", "tool_input": {"command": "cat src/a.py"}}
-        )
-        == []
-    )
-    assert gate.tool_paths(
-        {
-            "tool_name": "Read",
-            "tool_input": {"file_path": "src/a.py", "mentions": ["other.py"]},
-        }
-    ) == ["src/a.py"]
+    assert gate.write_paths(
+        {"tool_name": "NotebookEdit", "tool_input": {"notebook_path": "a.ipynb"}}
+    ) == ["a.ipynb"]
+    for name, tool_input in (
+        ("Read", {"file_path": "src/a.py"}),
+        ("Glob", {"path": "src"}),
+        ("Bash", {"command": "cat src/a.py"}),
+    ):
+        assert gate.write_paths({"tool_name": name, "tool_input": tool_input}) == []
 
 
 def test_codex_apply_patch_extracts_each_supported_source_and_move_destination() -> (
@@ -108,7 +124,7 @@ def test_codex_apply_patch_extracts_each_supported_source_and_move_destination()
         },
     }
 
-    assert gate.tool_paths(payload) == [
+    assert gate.write_paths(payload) == [
         "src/old.py",
         "src/new.py",
         "docs/new.md",
@@ -116,25 +132,96 @@ def test_codex_apply_patch_extracts_each_supported_source_and_move_destination()
     ]
 
 
-def test_unsupported_patch_forms_and_opaque_tools_require_explicit_resolution() -> None:
+def test_unsupported_patch_forms_resolve_no_paths() -> None:
     assert (
-        gate.tool_paths(
+        gate.write_paths(
             {"tool_name": "apply_patch", "tool_input": {"patch": "diff --git a/a b/a"}}
         )
         == []
     )
-    assert "Resolve target paths" in gate.tool_context(
-        {"tool_name": "exec_command", "tool_input": {"cmd": "type secret.txt"}},
-        Path("unused-state"),
+
+
+@pytest.mark.parametrize(
+    ("path", "windows", "expected"),
+    [
+        ("C:\\Users\\Me\\Style\\SKILL.md", True, "c:/users/me/style/skill.md"),
+        ("c:/users/me/style/skill.md", True, "c:/users/me/style/skill.md"),
+        ("/home/Me/Style/SKILL.md", False, "/home/Me/Style/SKILL.md"),
+    ],
+)
+def test_path_key_ignores_case_and_separators_only_on_windows(
+    path: str, windows: bool, expected: str
+) -> None:
+    assert gate.path_key(path, windows) == expected
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows path spelling only")
+def test_read_recorded_under_another_windows_spelling_counts(tmp_path: Path) -> None:
+    standard = tmp_path / "Plugin" / "SKILL.md"
+    payload = {
+        "session_id": "session-1",
+        "tool_name": "Read",
+        "tool_input": {"file_path": str(standard).upper().replace("\\", "/")},
+    }
+
+    gate.record_read(payload, tmp_path / "state", 0.0)
+
+    ledger = gate.LoadLedger.for_agent(
+        tmp_path / "state", gate.AgentIdentity("session-1", "")
     )
+    assert ledger.loaded(gate.standard_key(standard.resolve()))
 
 
-def test_claude_search_without_path_uses_the_event_cwd(tmp_path: Path) -> None:
-    repository = _repository(tmp_path / "repository", "personal")
+def test_session_statement_is_empty_outside_a_repository(tmp_path: Path) -> None:
+    (tmp_path / "nested").mkdir()
+    _repository(tmp_path / "nested" / "child", "personal")
 
-    assert gate.tool_paths(
-        {"tool_name": "Grep", "cwd": str(repository), "tool_input": {}}
-    ) == [str(repository)]
+    assert gate.statement(tmp_path) == ""
+
+
+def test_session_statement_names_selected_stacks_without_assessing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    (repository / ".git").mkdir(parents=True)
+    _select(repository, ["python@market", "rust@market", "template@market"])
+    declarations = [
+        gate.Declaration("python", "market", STACK | {"tier": "python"}),
+        gate.Declaration("rust", "market", STACK | {"tier": "rust"}),
+        gate.Declaration("react", "market", STACK | {"tier": "react"}),
+        gate.Declaration(
+            "template",
+            "market",
+            {
+                "schema_version": 3,
+                "tier": "template",
+                "applies": "always",
+                "session_context": "Load template:self-repair first.",
+            },
+        ),
+    ]
+
+    def unexpected(*_: object) -> None:
+        raise AssertionError("SessionStart assessed a selecting repository")
+
+    monkeypatch.setattr(gate, "assess", unexpected)
+    monkeypatch.setattr(gate, "declarations", lambda project: declarations)
+
+    lines = gate.statement(repository / "src").splitlines()
+
+    assert len(lines) == 2
+    assert lines[0].startswith("Writes to python, rust files in this repository are blocked")
+    assert lines[1] == "Load template:self-repair first."
+
+
+def test_session_statement_assesses_a_repository_without_a_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    (repository / ".git").mkdir(parents=True)
+    monkeypatch.setattr(gate, "assessment_statement", lambda root, found: "assessed")
+
+    assert gate.statement(repository) == "assessed"
 
 
 def test_typed_relative_path_uses_the_event_cwd(tmp_path: Path) -> None:
@@ -241,7 +328,7 @@ def test_cli_path_output_is_json_and_repeatable(
 )
 def test_partial_or_unknown_patch_is_not_claimed_as_resolved(patch: str) -> None:
     assert (
-        gate.tool_paths({"tool_name": "apply_patch", "tool_input": {"command": patch}})
+        gate.write_paths({"tool_name": "apply_patch", "tool_input": {"command": patch}})
         == []
     )
 
@@ -315,23 +402,6 @@ def test_personal_work_personal_operations_use_current_target_scope(
         {"personal@tj-agents"},
     ]
     assert "employer-a:*" not in selections[2]["context"]
-    search = gate.tool_context(
-        {"tool_name": "Grep", "cwd": str(tmp_path), "tool_input": {}}, tmp_path / "state"
-    )
-    assert "Organizational scope: mixed" in search
-    assert "Applies here:" not in search
-    patch = (
-        f"*** Begin Patch\n*** Add File: {personal}/one.py\n+x\n"
-        f"*** Add File: {work}/two.py\n+y\n*** End Patch"
-    )
-    contexts = gate.tool_context(
-        {"tool_name": "apply_patch", "tool_input": {"command": patch}}, tmp_path / "state"
-    )
-    assert str(personal) in contexts and str(work) in contexts
-    assert (
-        "Organizational scope: personal" in contexts
-        and "Organizational scope: work" in contexts
-    )
     adoption.unlink()
     assert gate.path_selection(str(personal))["scope_state"] == "unclassified"
     subprocess.run(
