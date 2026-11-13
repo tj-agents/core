@@ -52,7 +52,7 @@ Core publishes generic work status as Workflow and reusable engineering lifecycl
 Installing Engineering does not select or install a recording
 profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
 registers remain evidence only.
-Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.12+
+Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. The same hooks refuse any write to host memory and any call that names installed personal tooling on a work surface (`.agents/hooks/boundary.py`). Their Python 3.12+
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
 current manifest uses `python` on all platforms. Core packages also require the CLI-provided `tj_hook`
 executable on PATH; Agent must install CLI before it activates Core packages. Codex skips new or
