@@ -385,7 +385,7 @@ class Applicability(TemporaryProject):
 class SessionStatement(TemporaryProject):
     def test_nothing_is_said_when_no_stack_tier_is_installed(self):
         found = [declaration("base", "tj-agents", BASE)]
-        self.assertEqual(gate.statement(self.project, found), "")
+        self.assertEqual(gate.assessment_statement(self.project, found), "")
 
     def test_the_statement_names_what_applies_and_what_does_not(self):
         found = [
@@ -394,7 +394,7 @@ class SessionStatement(TemporaryProject):
             declaration("react", "react-agents", REACT),
         ]
         (self.project / "Api.csproj").write_text("", encoding="utf-8")
-        text = gate.statement(self.project, found)
+        text = gate.assessment_statement(self.project, found)
 
         self.assertIn("Ubiquitous, always applies: base", text)
         self.assertIn("Applies here: `dotnet:*`", text)
@@ -403,7 +403,7 @@ class SessionStatement(TemporaryProject):
 
     def test_an_audit_can_inspect_source_without_adopting_inapplicable_rules(self):
         found = [declaration("dotnet", "dotagents", DOTNET)]
-        text = gate.statement(self.project, found)
+        text = gate.assessment_statement(self.project, found)
         self.assertIn("standards-source audit", text)
         self.assertIn("canonical source files", text)
         self.assertIn("does not load them as governing instructions", text)

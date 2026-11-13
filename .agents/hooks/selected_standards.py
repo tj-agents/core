@@ -1,12 +1,13 @@
-"""The standards a repository's plugin selection supplies, delivered once per agent."""
+"""The standards a repository's plugin selection requires, and those an agent read."""
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
-import uuid
-from collections.abc import Iterable, Mapping, Sequence
+import shutil
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,20 +16,9 @@ SKILL_FIELDS = re.compile(
     r"^(name|kind|profile):[ \t]*([a-z][a-z0-9-]*)[ \t]*$", re.MULTILINE
 )
 STANDARD_KINDS = frozenset({"convention", "contract"})
-FRONT_MATTER = re.compile(
-    r"\A---[ \t]*\r?\n.*?^---[ \t]*\r?(?:\n|\Z)", re.DOTALL | re.MULTILINE
-)
-LEDGER_DIRECTORY = "standards-injection"
+REQUIRED_PROFILES = frozenset({"core", ""})
+LEDGER_DIRECTORY = "standards-loaded"
 LEDGER_RETENTION_SECONDS = 7 * 24 * 60 * 60
-# Claude Code inlines at most 10,000 characters of one hook's additionalContext and
-# saves anything longer to a file the model only sees a preview of; Codex's limit is
-# raised in the hook manifest to carry the same text.
-HOOK_CONTEXT_CHARACTERS = 10_000
-INJECTION_HEADER = (
-    "Stack standards selected by this repository's `.agents/plugins.json` for the "
-    "file being written. They govern this write and every later change to that "
-    "code; each is injected once per agent."
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,9 +67,9 @@ class Standard:
     path: Path
     profile: str
 
-    def body(self) -> str:
-        text = self.path.read_text(encoding="utf-8-sig")
-        return FRONT_MATTER.sub("", text, count=1).strip()
+    @property
+    def required(self) -> bool:
+        return self.profile in REQUIRED_PROFILES
 
 
 def skill_metadata(path: Path) -> dict[str, str]:
@@ -122,6 +112,15 @@ def payload_standards(payload: Path, plugin: str, identity: str) -> dict[str, St
     return standards
 
 
+def path_key(path: str, windows: bool) -> str:
+    """A comparable spelling of a path; on Windows, case and slashes do not matter."""
+    return path.replace("\\", "/").casefold() if windows else path
+
+
+def standard_key(path: Path) -> str:
+    return path_key(str(path), os.name == "nt")
+
+
 @dataclass(frozen=True, slots=True)
 class AgentIdentity:
     session_id: str
@@ -137,89 +136,46 @@ class AgentIdentity:
 
 
 @dataclass(frozen=True, slots=True)
-class InjectionLedger:
+class LoadLedger:
+    """The canonical standard files one agent has read, one marker file per path.
+
+    A marker per path keeps concurrent recorders, such as parallel reads, from
+    overwriting each other's records.
+    """
+
     agent: AgentIdentity
-    path: Path
+    directory: Path
 
     @classmethod
-    def for_agent(cls, state_directory: Path, agent: AgentIdentity) -> InjectionLedger:
+    def for_agent(cls, state_directory: Path, agent: AgentIdentity) -> LoadLedger:
         identity = f"{agent.session_id}\0{agent.agent_id}".encode()
-        name = hashlib.sha256(identity).hexdigest() + ".json"
+        name = hashlib.sha256(identity).hexdigest()
         return cls(agent, state_directory / LEDGER_DIRECTORY / name)
 
-    def injected(self) -> frozenset[str]:
-        try:
-            document = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return frozenset()
-        names = document.get("injected") if isinstance(document, dict) else None
-        if not isinstance(names, list):
-            return frozenset()
-        return frozenset(name for name in names if isinstance(name, str))
+    def loaded(self, key: str) -> bool:
+        return self._marker(key).is_file()
 
-    def record(self, names: Iterable[str], now: float) -> None:
-        created = not self.path.exists()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        if created:
+    def record(self, keys: Iterable[str], now: float) -> None:
+        keys = list(keys)
+        if not keys:
+            return
+        if not self.directory.is_dir():
+            self.directory.parent.mkdir(parents=True, exist_ok=True)
             self._prune(now - LEDGER_RETENTION_SECONDS)
-        document = {
-            "session_id": self.agent.session_id,
-            "agent_id": self.agent.agent_id,
-            "injected": sorted(self.injected() | set(names)),
-        }
-        temporary = self.path.with_name(f"{self.path.stem}.{uuid.uuid4().hex}.tmp")
-        temporary.write_text(json.dumps(document), encoding="utf-8")
-        temporary.replace(self.path)
+            self.directory.mkdir(exist_ok=True)
+        for key in keys:
+            self._marker(key).touch()
 
     def forget(self) -> None:
-        self.path.unlink(missing_ok=True)
+        shutil.rmtree(self.directory, ignore_errors=True)
+
+    def _marker(self, key: str) -> Path:
+        return self.directory / hashlib.sha256(key.encode("utf-8")).hexdigest()
 
     def _prune(self, cutoff: float) -> None:
-        for entry in self.path.parent.iterdir():
+        for entry in self.directory.parent.iterdir():
             try:
                 if entry.stat().st_mtime < cutoff:
-                    entry.unlink()
-            except (FileNotFoundError, PermissionError):
+                    shutil.rmtree(entry)
+            except (FileNotFoundError, NotADirectoryError, PermissionError):
                 continue
-
-
-@dataclass(frozen=True, slots=True)
-class Injection:
-    delivered: tuple[str, ...]
-    text: str
-
-
-def compose_injection(standards: Sequence[Standard], limit: int) -> Injection:
-    separator = "\n\n"
-    budget = (
-        limit
-        - len(INJECTION_HEADER)
-        - len(separator)
-        - len(_deferral_note(standards, limit))
-    )
-    blocks: list[str] = []
-    delivered: list[str] = []
-    deferred: list[Standard] = []
-    for standard in standards:
-        block = (
-            f'<standard name="{standard.name}" source="{standard.path}">\n'
-            f"{standard.body()}\n</standard>"
-        )
-        if len(separator) + len(block) > budget:
-            deferred.append(standard)
-            continue
-        blocks.append(block)
-        delivered.append(standard.name)
-        budget -= len(separator) + len(block)
-    sections = [INJECTION_HEADER, *blocks]
-    if deferred:
-        sections.append(_deferral_note(deferred, limit))
-    return Injection(tuple(delivered), separator.join(sections))
-
-
-def _deferral_note(standards: Sequence[Standard], limit: int) -> str:
-    names = ", ".join(f"`{item.name}`" for item in standards)
-    return (
-        f"Deferred by the {limit}-character hook context bound and injected on later "
-        f"writes; load one now as a skill when this change depends on it: {names}."
-    )

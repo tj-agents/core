@@ -3,8 +3,8 @@ import importlib.util
 import io
 import json
 import os
-import shutil
 import subprocess
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,13 +13,11 @@ from types import ModuleType
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-LARGE = 6_000
+GATE = ROOT / ".agents/hooks/tier_gate.py"
 
 
 def _load_gate() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(
-        "selected_standards_gate", ROOT / ".agents/hooks/tier_gate.py"
-    )
+    spec = importlib.util.spec_from_file_location("selected_standards_gate", GATE)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -28,35 +26,31 @@ def _load_gate() -> ModuleType:
 
 gate = _load_gate()
 selected = importlib.import_module("selected_standards")
+RUST = {
+    "schema_version": 1,
+    "tier": "rust",
+    "applies": "stack-present",
+    "detect": {"files": ["Cargo.toml"], "globs": ["*.rs"]},
+}
 PYTHON = {
     "schema_version": 1,
     "tier": "python",
-    "stack": "Python",
     "applies": "stack-present",
     "detect": {"files": ["pyproject.toml"], "globs": ["*.py"]},
 }
 ACTIONS = {
     "schema_version": 1,
-    "tier": "actions",
-    "stack": "Actions",
+    "tier": "github-actions",
     "applies": "stack-present",
-    "detect": {"globs": ["*.yml"]},
+    "detect": {"globs": [".github/workflows/*.yml"]},
 }
 BASE = {"schema_version": 1, "tier": "base", "applies": "always"}
-ACME = {
-    "schema_version": 3,
-    "tier": "acme",
-    "applies": "stack-present",
-    "detect": {"all": [{"remote_host": "example.test"}, {"remote": "^acme/"}]},
-    "employer": {"context_skill": "context"},
-}
-ACME_PYTHON = {"schema_version": 1, "tier": "acme-python", "applies": "always"}
+SELECTED = ("rust@market", "python@market", "github-actions@market", "base@market")
 
 
 @dataclass(frozen=True, slots=True)
 class Skill:
     name: str
-    body: str
     kind: str = "convention"
     profile: str = "core"
 
@@ -69,8 +63,6 @@ class PluginCache:
         self, plugin: str, tier: dict[str, object], skills: Sequence[Skill]
     ) -> None:
         payload = self.root / "market" / plugin / "1.0.0"
-        if payload.exists():
-            shutil.rmtree(payload)
         for skill in skills:
             header = (
                 f"---\nname: {skill.name}\ndescription: {skill.name} rule.\n"
@@ -79,11 +71,13 @@ class PluginCache:
             discovery = payload / "skills" / skill.name / "SKILL.md"
             discovery.parent.mkdir(parents=True)
             discovery.write_text(
-                header + "Read the canonical definition.\n", encoding="utf-8"
+                header + "Read the canonical file.\n", encoding="utf-8"
             )
             canonical = payload / ".agents" / plugin / skill.kind / skill.name
             canonical.mkdir(parents=True)
-            (canonical / "SKILL.md").write_text(header + skill.body, encoding="utf-8")
+            (canonical / "SKILL.md").write_text(
+                header + "Rule body.\n", encoding="utf-8"
+            )
         (payload / "tier.json").write_text(json.dumps(tier), encoding="utf-8")
         registry = self.root.parent / "installed_plugins.json"
         data = (
@@ -96,23 +90,29 @@ class PluginCache:
         ]
         registry.write_text(json.dumps(data), encoding="utf-8")
 
+    def canonical(self, plugin: str, name: str, kind: str = "convention") -> Path:
+        path = self.root / "market" / plugin / "1.0.0" / ".agents" / plugin
+        return (path / kind / name / "SKILL.md").resolve()
+
 
 @pytest.fixture(autouse=True)
 def cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> PluginCache:
     plugins = PluginCache(tmp_path / "profile" / "plugins" / "cache")
     plugins.root.mkdir(parents=True)
     monkeypatch.setattr(gate, "cache_roots", lambda: [plugins.root])
-    monkeypatch.delenv(gate.OVERRIDE_VARIABLE, raising=False)
     plugins.install(
-        "python",
-        PYTHON,
+        "rust",
+        RUST,
         [
-            Skill("style", "Canonical Python style body."),
-            Skill("testing", "Canonical Python testing body."),
-            Skill("scaffold", "Scaffold utility body.", kind="utility"),
+            Skill("style"),
+            Skill("testing"),
+            Skill("persistence", profile="persistence"),
+            Skill("scaffold", kind="utility"),
         ],
     )
-    plugins.install("base", BASE, [Skill("process", "Base process body.")])
+    plugins.install("python", PYTHON, [Skill("style")])
+    plugins.install("github-actions", ACTIONS, [Skill("workflows")])
+    plugins.install("base", BASE, [Skill("process")])
     return plugins
 
 
@@ -121,21 +121,8 @@ def state(tmp_path: Path) -> Path:
     return tmp_path / "state"
 
 
-def _repository(path: Path, owner: str, plugins: Sequence[str]) -> Path:
-    path.mkdir(parents=True)
-    subprocess.run(["git", "-C", str(path), "init", "--quiet"], check=True, timeout=10)
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(path),
-            "config",
-            "remote.origin.url",
-            f"git@example.test:{owner}/project.git",
-        ],
-        check=True,
-        timeout=10,
-    )
+def _repository(path: Path, plugins: Sequence[str] = SELECTED) -> Path:
+    (path / ".git").mkdir(parents=True)
     (path / ".agents").mkdir()
     selection = {
         "schema_version": 1,
@@ -145,295 +132,302 @@ def _repository(path: Path, owner: str, plugins: Sequence[str]) -> Path:
     (path / ".agents" / "plugins.json").write_text(
         json.dumps(selection), encoding="utf-8"
     )
-    (path / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
-    (path / "src").mkdir()
     return path
 
 
 @pytest.fixture
 def repository(tmp_path: Path) -> Path:
-    return _repository(
-        tmp_path / "repository", "tommy", ["python@market", "base@market"]
-    )
+    return _repository(tmp_path / "repository")
 
 
 def _write(
-    path: Path, session: str = "session-1", agent: str | None = None
+    path: Path | str, cwd: Path, session: str = "session-1", agent: str | None = None
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "hook_event_name": "PreToolUse",
         "session_id": session,
         "tool_name": "Write",
-        "tool_input": {"file_path": str(path), "content": "value = 1\n"},
-        "cwd": str(path.parent),
+        "tool_input": {"file_path": str(path), "content": "fn main() {}\n"},
+        "cwd": str(cwd),
     }
     if agent is not None:
         payload["agent_id"] = agent
     return payload
 
 
-def _injected(context: str) -> list[str]:
+def _read(path: Path, agent: str | None = None) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-1",
+        "tool_name": "Read",
+        "tool_input": {"file_path": str(path)},
+    }
+    if agent is not None:
+        payload["agent_id"] = agent
+    return payload
+
+
+def _listed(reason: str) -> list[str]:
     return [
-        line.split('"')[1]
-        for line in context.splitlines()
-        if line.startswith("<standard name=")
+        line[2:].split(": ", 1)[0] for line in reason.splitlines() if line[:2] == "- "
     ]
 
 
-def test_python_write_injects_the_canonical_standard_text(
+def _run_main(
+    monkeypatch: pytest.MonkeyPatch, state: Path, flag: str, payload: object
+) -> int:
+    stream = io.TextIOWrapper(
+        io.BytesIO(json.dumps(payload).encode("utf-8")), encoding="utf-8"
+    )
+    monkeypatch.setattr(gate.sys, "stdin", stream)
+    monkeypatch.setattr(gate.sys, "argv", ["tier_gate.py", flag])
+    monkeypatch.setenv(gate.STATE_DIRECTORY_VARIABLE, str(state))
+    result: int = gate.main()
+    return result
+
+
+def test_write_gate_requires_only_the_matching_stack_core_standards(
     repository: Path, state: Path
 ) -> None:
-    context = gate.tool_context(_write(repository / "src" / "app.py"), state)
+    reason = gate.write_gate(_write(repository / "src" / "main.rs", repository), state)
 
-    assert _injected(context) == ["python:style", "python:testing"]
-    assert "Canonical Python style body." in context
-    assert "Read the canonical definition." not in context
-    assert "Scaffold utility body." not in context
-    assert "Base process body." not in context
+    assert _listed(reason) == ["rust:style", "rust:testing"]
 
 
-def test_second_write_by_the_same_agent_injects_nothing_new(
-    repository: Path, state: Path
+def test_write_gate_lists_each_missing_standard_with_its_canonical_path(
+    repository: Path, state: Path, cache: PluginCache
 ) -> None:
-    gate.tool_context(_write(repository / "src" / "app.py"), state)
+    target = repository / "src" / "main.rs"
 
-    context = gate.tool_context(_write(repository / "src" / "other.py"), state)
+    reason = gate.write_gate(_write(target, repository), state)
 
-    assert _injected(context) == []
-    assert "Applies here: `python:*`" in context
+    assert str(target) in reason
+    assert f"- rust:style: {cache.canonical('rust', 'style')}" in reason
+    assert f"- rust:testing: {cache.canonical('rust', 'testing')}" in reason
+    assert len(reason) < 1_000
 
 
-def test_each_agent_receives_the_standards_on_its_first_write(
-    repository: Path, state: Path
+def test_write_gate_allows_the_write_silently_once_every_standard_is_read(
+    repository: Path,
+    state: Path,
+    cache: PluginCache,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    target = repository / "src" / "app.py"
-    gate.tool_context(_write(target), state)
+    target = repository / "src" / "main.rs"
+    for name in ("style", "testing"):
+        gate.record_read(_read(cache.canonical("rust", name)), state, 0.0)
 
-    subagent = gate.tool_context(_write(target, agent="agent-a"), state)
-    repeated = gate.tool_context(_write(target, agent="agent-a"), state)
-    other_session = gate.tool_context(_write(target, session="session-2"), state)
-
-    assert _injected(subagent) == ["python:style", "python:testing"]
-    assert _injected(repeated) == []
-    assert _injected(other_session) == ["python:style", "python:testing"]
+    assert (
+        _run_main(monkeypatch, state, "--write-gate", _write(target, repository)) == 0
+    )
+    assert capsys.readouterr().out == ""
 
 
-@pytest.mark.parametrize("name", ["README.md", "notes/plan.txt"])
-def test_non_stack_path_injects_nothing_and_records_nothing(
+def test_write_gate_names_only_the_standards_still_unread(
+    repository: Path, state: Path, cache: PluginCache
+) -> None:
+    gate.record_read(_read(cache.canonical("rust", "style")), state, 0.0)
+
+    reason = gate.write_gate(_write(repository / "lib.rs", repository), state)
+
+    assert _listed(reason) == ["rust:testing"]
+
+
+def test_write_gate_denies_with_the_host_permission_decision_shape(
+    repository: Path,
+    state: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    payload = _write(repository / "main.rs", repository)
+
+    assert _run_main(monkeypatch, state, "--write-gate", payload) == 0
+    output = json.loads(capsys.readouterr().out)
+
+    assert set(output) == {"hookSpecificOutput"}
+    decision = output["hookSpecificOutput"]
+    assert decision["hookEventName"] == "PreToolUse"
+    assert decision["permissionDecision"] == "deny"
+    assert _listed(decision["permissionDecisionReason"]) == [
+        "rust:style",
+        "rust:testing",
+    ]
+
+
+def test_each_agent_must_read_the_standards_itself(
+    repository: Path, state: Path, cache: PluginCache
+) -> None:
+    target = repository / "main.rs"
+    for name in ("style", "testing"):
+        gate.record_read(_read(cache.canonical("rust", name)), state, 0.0)
+
+    assert gate.write_gate(_write(target, repository), state) == ""
+    assert gate.write_gate(_write(target, repository, agent="agent-a"), state)
+    assert gate.write_gate(_write(target, repository, session="session-2"), state)
+
+
+def test_compaction_forgets_only_the_compacted_agent(
+    repository: Path,
+    state: Path,
+    cache: PluginCache,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = repository / "main.rs"
+    for agent in (None, "agent-a"):
+        for name in ("style", "testing"):
+            gate.record_read(_read(cache.canonical("rust", name), agent), state, 0.0)
+    compacted = {"hook_event_name": "PostCompact", "session_id": "session-1"}
+
+    assert _run_main(monkeypatch, state, "--compacted", compacted) == 0
+
+    assert gate.write_gate(_write(target, repository), state)
+    assert gate.write_gate(_write(target, repository, agent="agent-a"), state) == ""
+
+
+@pytest.mark.parametrize("name", ["README.md", "notes/plan.txt", "Cargo.lock"])
+def test_write_gate_allows_files_no_selected_stack_declares(
     repository: Path, state: Path, name: str
 ) -> None:
-    context = gate.tool_context(_write(repository / name), state)
-
-    assert _injected(context) == []
-    assert not (state / "standards-injection").exists()
+    assert gate.write_gate(_write(repository / name, repository), state) == ""
 
 
-def test_read_of_a_stack_file_injects_nothing(repository: Path, state: Path) -> None:
-    payload = {
-        "session_id": "session-1",
-        "tool_name": "Read",
-        "tool_input": {"file_path": str(repository / "pyproject.toml")},
-    }
-
-    assert _injected(gate.tool_context(payload, state)) == []
-
-
-def test_repository_without_a_plugin_selection_injects_nothing(
+def test_write_gate_allows_a_repository_without_a_selection(
     repository: Path, state: Path
 ) -> None:
     (repository / ".agents" / "plugins.json").unlink()
 
-    context = gate.tool_context(_write(repository / "src" / "app.py"), state)
-
-    assert _injected(context) == []
+    assert gate.write_gate(_write(repository / "main.rs", repository), state) == ""
 
 
-def test_unavailable_selection_is_reported_instead_of_injected(
+def test_write_gate_allows_a_file_outside_any_repository(
     tmp_path: Path, state: Path
 ) -> None:
-    repository = _repository(
-        tmp_path / "broken", "tommy", ["python@market", "missing@market"]
-    )
+    outside = tmp_path / "loose"
 
-    context = gate.tool_context(_write(repository / "src" / "app.py"), state)
-
-    assert _injected(context) == []
-    assert "not available in this host: missing@market" in context
+    assert gate.write_gate(_write(outside / "main.rs", outside), state) == ""
 
 
-def test_codex_apply_patch_injects_the_standards(repository: Path, state: Path) -> None:
+def test_write_gate_ignores_an_unselected_stack(tmp_path: Path, state: Path) -> None:
+    repository = _repository(tmp_path / "python-only", ["python@market"])
+
+    assert gate.write_gate(_write(repository / "main.rs", repository), state) == ""
+    reason = gate.write_gate(_write(repository / "app.py", repository), state)
+    assert _listed(reason) == ["python:style"]
+
+
+def test_write_gate_without_a_session_cannot_track_and_allows(
+    repository: Path, state: Path
+) -> None:
+    payload = _write(repository / "main.rs", repository)
+    del payload["session_id"]
+
+    assert gate.write_gate(payload, state) == ""
+
+
+def test_write_gate_covers_codex_apply_patch_targets(
+    repository: Path, state: Path
+) -> None:
     payload = {
         "hook_event_name": "PreToolUse",
         "session_id": "codex-session",
-        "turn_id": "turn-1",
         "tool_name": "apply_patch",
         "tool_input": {
             "command": (
-                "*** Begin Patch\n*** Add File: src/new.py\n+value = 1\n*** End Patch"
+                "*** Begin Patch\n*** Add File: docs/notes.md\n+x\n"
+                "*** Add File: src/new.rs\n+fn x() {}\n*** End Patch"
             )
         },
         "cwd": str(repository),
     }
 
-    context = gate.tool_context(payload, state)
+    reason = gate.write_gate(payload, state)
 
-    assert _injected(context) == ["python:style", "python:testing"]
+    assert "src/new.rs" in reason
+    assert _listed(reason) == ["rust:style", "rust:testing"]
 
 
-def test_employer_replacement_injects_the_company_skill(
-    tmp_path: Path, state: Path, cache: PluginCache
+def test_record_read_ignores_files_other_than_skill_definitions(
+    repository: Path, state: Path
 ) -> None:
-    cache.install("acme", ACME, [Skill("context", "Acme contacts.", kind="knowledge")])
-    cache.install("acme-python", ACME_PYTHON, [Skill("style", "Acme Python style.")])
-    repository = _repository(
-        tmp_path / "work",
-        "acme",
-        ["python@market", "base@market", "acme@market", "acme-python@market"],
-    )
+    gate.record_read(_read(repository / "README.md"), state, 0.0)
 
-    context = gate.tool_context(_write(repository / "src" / "app.py"), state)
-
-    assert _injected(context) == ["acme-python:style", "python:testing"]
-    assert "Acme Python style." in context
-    assert "Canonical Python style body." not in context
+    assert not (state / selected.LEDGER_DIRECTORY).exists()
 
 
-def test_size_bound_injects_the_most_specific_first_and_names_the_rest(
-    tmp_path: Path, state: Path, cache: PluginCache
+def test_codex_shell_command_naming_a_canonical_path_records_it(
+    repository: Path, state: Path, cache: PluginCache
 ) -> None:
-    cache.install(
-        "python",
-        PYTHON,
-        [
-            Skill("style", "S" * LARGE),
-            Skill("extras", "E" * LARGE, profile="advanced"),
-        ],
-    )
-    cache.install("actions", ACTIONS, [Skill("workflows", "W" * LARGE)])
-    repository = _repository(
-        tmp_path / "bounded", "tommy", ["python@market", "actions@market"]
-    )
-    (repository / "deploy.yml").write_text("on: push\n", encoding="utf-8")
-    target = repository / "src" / "app.py"
+    style = cache.canonical("rust", "style")
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-1",
+        "tool_name": "Bash",
+        "tool_input": {"command": f'cat "{style}" README.md'},
+        "cwd": str(repository),
+    }
 
-    writes = [gate.tool_context(_write(target), state) for _ in range(4)]
+    gate.record_command(payload, state, 0.0)
 
-    assert [_injected(context) for context in writes] == [
-        ["python:style"],
-        ["python:extras"],
-        ["actions:workflows"],
-        [],
-    ]
-    deferred = writes[0].split("character hook context bound")[1]
-    assert deferred.index("`python:extras`") < deferred.index("`actions:workflows`")
-    assert max(len(context) for context in writes) <= selected.HOOK_CONTEXT_CHARACTERS
+    reason = gate.write_gate(_write(repository / "main.rs", repository), state)
+    assert _listed(reason) == ["rust:testing"]
 
 
-def test_an_oversized_standard_is_named_without_blocking_smaller_ones(
-    tmp_path: Path, state: Path, cache: PluginCache
+def test_codex_shell_command_without_a_canonical_path_records_nothing(
+    repository: Path, state: Path, cache: PluginCache
 ) -> None:
-    oversized = selected.HOOK_CONTEXT_CHARACTERS + 1
-    cache.install(
-        "python",
-        PYTHON,
-        [Skill("errors", "E" * oversized), Skill("style", "Small style body.")],
-    )
-    repository = _repository(tmp_path / "oversized", "tommy", ["python@market"])
-    target = repository / "src" / "app.py"
+    discovery = cache.root / "market" / "rust" / "1.0.0" / "skills" / "style"
+    for command in ("git status", f"cat {discovery / 'SKILL.md'}"):
+        payload = {
+            "session_id": "session-1",
+            "tool_name": "Bash",
+            "tool_input": {"command": command},
+            "cwd": str(repository),
+        }
+        gate.record_command(payload, state, 0.0)
 
-    writes = [gate.tool_context(_write(target), state) for _ in range(2)]
-
-    assert [_injected(context) for context in writes] == [["python:style"], []]
-    assert all("`python:errors`" in context for context in writes)
-    assert max(len(context) for context in writes) <= selected.HOOK_CONTEXT_CHARACTERS
+    assert not (state / selected.LEDGER_DIRECTORY).exists()
 
 
-@pytest.mark.parametrize(
-    "sizes", [(1,), (9_000,), (4_000, 4_000, 4_000), (12_000, 10, 3_000)]
-)
-def test_an_injection_never_exceeds_its_limit(
-    tmp_path: Path, sizes: tuple[int, ...]
+def test_hook_errors_fail_open(
+    repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    standards = []
-    for index, size in enumerate(sizes):
-        path = tmp_path / f"standard-{index}.md"
-        path.write_text("x" * size, encoding="utf-8")
-        standards.append(
-            selected.Standard(f"stack:standard-{index}", "stack", path, "core")
-        )
+    (repository / ".agents" / "plugins.json").write_text("{", encoding="utf-8")
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.setenv(gate.STATE_DIRECTORY_VARIABLE, str(tmp_path / "state"))
+    monkeypatch.delenv("CLAUDE_PLUGIN_ROOT", raising=False)
 
-    injection = selected.compose_injection(standards, selected.HOOK_CONTEXT_CHARACTERS)
-
-    assert len(injection.text) <= selected.HOOK_CONTEXT_CHARACTERS
-
-
-def test_codex_inlines_at_least_the_hook_context_bound() -> None:
-    manifest = json.loads(
-        (ROOT / ".agents/plugins/manifests/codex/base-hooks.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    handlers = [
-        handler
-        for entry in manifest["hooks"]["PreToolUse"]
-        for handler in entry["hooks"]
-        if "--tool-context" in handler["command"]
-    ]
-    worst_case_characters_per_token = 2
-
-    assert handlers
-    assert all(
-        handler["additionalContextLimit"] * worst_case_characters_per_token
-        >= selected.HOOK_CONTEXT_CHARACTERS
-        for handler in handlers
+    result = subprocess.run(
+        [sys.executable, "-B", str(GATE), "--write-gate"],
+        input=json.dumps(_write(repository / "main.rs", repository)),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=False,
     )
 
-
-def test_matching_tier_is_injected_before_other_stack_tiers(
-    tmp_path: Path, state: Path, cache: PluginCache
-) -> None:
-    cache.install("actions", ACTIONS, [Skill("workflows", "Actions body.")])
-    repository = _repository(
-        tmp_path / "ordered", "tommy", ["python@market", "actions@market"]
-    )
-    (repository / "deploy.yml").write_text("on: push\n", encoding="utf-8")
-
-    context = gate.tool_context(_write(repository / "release.yml"), state)
-
-    assert _injected(context) == ["actions:workflows", "python:style", "python:testing"]
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "Invalid repository plugin selection" in result.stderr
 
 
-def test_compaction_clears_only_the_compacted_agent_record(
-    repository: Path, state: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    target = repository / "src" / "app.py"
-    gate.tool_context(_write(target), state)
-    gate.tool_context(_write(target, agent="agent-a"), state)
-    compacted = {"hook_event_name": "PostCompact", "session_id": "session-1"}
-    stream = io.TextIOWrapper(io.BytesIO(json.dumps(compacted).encode("utf-8")))
-    monkeypatch.setattr(gate.sys, "stdin", stream)
-    monkeypatch.setattr(gate.sys, "argv", ["tier_gate.py", "--compacted"])
-    monkeypatch.setenv(gate.STATE_DIRECTORY_VARIABLE, str(state))
-
-    assert gate.main() == 0
-    main_agent = gate.tool_context(_write(target), state)
-    subagent = gate.tool_context(_write(target, agent="agent-a"), state)
-
-    assert _injected(main_agent) == ["python:style", "python:testing"]
-    assert _injected(subagent) == []
-
-
-def test_stale_records_are_pruned_when_a_new_agent_record_starts(state: Path) -> None:
-    old = selected.InjectionLedger.for_agent(
+def test_stale_ledgers_are_pruned_when_a_new_agent_ledger_starts(state: Path) -> None:
+    old = selected.LoadLedger.for_agent(
         state, selected.AgentIdentity("old-session", "")
     )
-    old.record(["python:style"], 0.0)
-    os.utime(old.path, (1_000.0, 1_000.0))
-    current = selected.InjectionLedger.for_agent(
+    old.record(["/standards/style/SKILL.md"], 0.0)
+    os.utime(old.directory, (1_000.0, 1_000.0))
+    current = selected.LoadLedger.for_agent(
         state, selected.AgentIdentity("new-session", "")
     )
 
-    current.record(["python:style"], 1_000.0 + selected.LEDGER_RETENTION_SECONDS + 1)
+    current.record(
+        ["/standards/style/SKILL.md"], 1_000.0 + selected.LEDGER_RETENTION_SECONDS + 1
+    )
 
-    assert not old.path.exists()
-    assert current.injected() == frozenset({"python:style"})
+    assert not old.directory.exists()
+    assert current.loaded("/standards/style/SKILL.md")
