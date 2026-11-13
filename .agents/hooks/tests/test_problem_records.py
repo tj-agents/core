@@ -14,7 +14,6 @@ from problem_records import (
     main,
     operation_skill,
     primary_checkout,
-    read_record,
 )
 
 
@@ -30,19 +29,12 @@ class ProblemRecordTests(unittest.TestCase):
         self.skill = self.root / "installed provider" / "SKILL.md"
         self.skill.parent.mkdir()
         self.skill.write_text("provider", encoding="utf-8")
-        self.reader = self.skill.parent / "scripts/read_problem_record.py"
-        self.reader.parent.mkdir()
-        self.reader.write_text("provider", encoding="utf-8")
-        self.reference = "https://example.invalid/repository/issues/1"
-        self.value = {"record": self.reference, "kind": "bug", "state": "open", "body": "current evidence"}
 
     def select(self, value=None):
         self.selection.write_text(json.dumps(value or {"schema_version": 1, "provider": "optional:manage"}), encoding="utf-8")
 
     def test_absence_preserves_files_and_malformed_selection_fails(self):
         self.assertIsNone(declaration(self.root))
-        with self.assertRaises(RecordError):
-            read_record(self.root, self.reference, "codex")
         for value in ({"schema_version": True, "provider": "optional:manage"},
                       {"schema_version": 1, "provider": "manage"},
                       {"schema_version": 1, "provider": "optional:manage", "script": "elsewhere"}):
@@ -52,48 +44,6 @@ class ProblemRecordTests(unittest.TestCase):
         self.selection.write_text("{", encoding="utf-8")
         with self.assertRaises(RecordError):
             declaration(self.root)
-
-    def test_both_hosts_resolve_the_declared_skill_and_run_its_reader_without_shell(self):
-        self.select()
-        for host in ("codex", "claude"):
-            with self.subTest(host=host), patch("installed_skills.resolved_skill", return_value=(self.skill, "provider")) as resolve, patch("problem_records.process.run", return_value=subprocess.CompletedProcess([], 0, json.dumps(self.value), "")) as run:
-                self.assertEqual(self.value, read_record(self.root, self.reference, host))
-                resolve.assert_called_once_with("optional:manage", host)
-                self.assertEqual([sys.executable, "-B", str(self.reader), "--root", str(self.root), "--record", self.reference], run.call_args.args[0])
-                self.assertNotIn("shell", run.call_args.kwargs)
-                self.assertEqual("utf-8", run.call_args.kwargs["encoding"])
-
-    def test_missing_provider_reader_and_host_fail_without_fallback(self):
-        self.select()
-        with patch("installed_skills.resolved_skill", return_value=None), self.assertRaises(RecordError):
-            read_record(self.root, self.reference, "codex")
-        self.reader.unlink()
-        with patch("installed_skills.resolved_skill", return_value=(self.skill, "provider")), self.assertRaises(RecordError):
-            read_record(self.root, self.reference, "claude")
-        with self.assertRaises(RecordError):
-            read_record(self.root, self.reference, "unknown")
-        with self.assertRaises(RecordError):
-            read_record(self.root, "relative/file.md", "codex")
-
-    def test_native_discovery_failure_becomes_an_actionable_provider_error(self):
-        from installed_skills import NativePluginDiscoveryError
-        self.select()
-        with patch("installed_skills.resolved_skill", side_effect=NativePluginDiscoveryError("codex", "unavailable")), self.assertRaisesRegex(RecordError, "could not be resolved"):
-            read_record(self.root, self.reference, "codex")
-
-    def test_invalid_closed_and_unrelated_provider_results_fail(self):
-        self.select()
-        values = ["invalid", "[]", json.dumps({**self.value, "state": "closed"}),
-                  json.dumps({**self.value, "record": "another"}), json.dumps({**self.value, "kind": []}),
-                  json.dumps({**self.value, "body": " "}), json.dumps({**self.value, "extra": True})]
-        with patch("installed_skills.resolved_skill", return_value=(self.skill, "provider")):
-            for value in values:
-                with self.subTest(value=value), patch("problem_records.process.run", return_value=subprocess.CompletedProcess([], 0, value, "")), self.assertRaises(RecordError):
-                    read_record(self.root, self.reference, "codex")
-            with patch("problem_records.process.run", side_effect=subprocess.TimeoutExpired("reader", 15)), self.assertRaises(RecordError):
-                read_record(self.root, self.reference, "codex")
-            with patch("problem_records.process.run", return_value=subprocess.CompletedProcess([], 1, "", "private details")), self.assertRaisesRegex(RecordError, "could not read"):
-                read_record(self.root, self.reference, "codex")
 
     def test_personal_selection_implies_the_personal_provider_and_a_declaration_wins(self):
         agents = self.root / ".agents"
@@ -172,26 +122,6 @@ class PrimaryCheckoutTests(unittest.TestCase):
                 with self.subTest(directory=directory):
                     self.assertEqual(root, primary_checkout(directory))
                     self.assertEqual(selected, declaration(primary_checkout(directory)))
-
-    def test_reader_uses_only_the_primary_selection_from_a_linked_worktree(self):
-        with tempfile.TemporaryDirectory(prefix="selected reader ") as raw:
-            root = Path(raw).resolve() / "source"
-            feature = Path(raw).resolve() / "feature"
-            subprocess.run(["git", "init", "-q", str(root)], check=True)
-            subprocess.run(["git", "-C", str(root), "-c", "user.name=Fixture", "-c",
-                            "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"], check=True)
-            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "feature", str(feature)], check=True)
-            for directory, provider in ((root, "primary:work-item"), (feature, "foreign:work-item")):
-                (directory / ".problem-records.json").write_text(json.dumps({"schema_version": 1, "provider": provider}), encoding="utf-8")
-            skill = Path(raw) / "installed" / "SKILL.md"
-            reader = skill.parent / "scripts" / "read_problem_record.py"
-            reader.parent.mkdir(parents=True)
-            skill.write_text("provider", encoding="utf-8")
-            value = {"record": "https://example.invalid/issues/1", "kind": "bug", "state": "open", "body": "evidence"}
-            reader.write_text("import json, sys\nassert sys.argv[sys.argv.index('--root') + 1] == " + repr(str(root)) + "\nprint(" + repr(json.dumps(value)) + ")\n", encoding="utf-8")
-            with patch("installed_skills.resolved_skill", return_value=(skill, "provider")) as resolve:
-                self.assertEqual(value, read_record(feature, value["record"], "codex"))
-                resolve.assert_called_once_with("primary:work-item", "codex")
 
     def test_bare_repository_entry_is_never_the_primary_checkout(self):
         with tempfile.TemporaryDirectory(prefix="bare tracker ") as raw:

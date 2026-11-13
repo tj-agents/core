@@ -56,6 +56,8 @@ Claim the same execution only after verifying exact native identity and a permit
 age-based takeover. Standalone work keeps its existing task goal and does not invent Git, provider, or SQLite
 identity.
 
+Before implementing a goal that introduces a reusable tool, capability or technical mechanism, apply
+`base:solution-assessment` unless that idea already has a completed one.
 For software, load `engineering:plans` for technical delivery slicing and select `engineering:feature`,
 `engineering:bugfix`, or the supplied selected technical operation for a bounded slice. A profile may supply an
 `address-*` operation; Workflow uses that selection without depending on a profile or tracker. Those operations

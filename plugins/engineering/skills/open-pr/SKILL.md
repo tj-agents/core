@@ -1,6 +1,6 @@
 ---
 name: open-pr
-description: Create or edit a pull request with explicit nonempty Why and What sections, validating the proposed body before the forge write and the saved body afterward. Use before any PR creation or description edit through a CLI or connector, publishing a correction, or showing the corrected review.
+description: Create or edit a pull request with explicit nonempty Why and What sections, validating the proposed body before the forge write and the saved body afterward. Use before any PR creation or description edit through a CLI or connector, publishing a correction, showing the corrected review, or handing existing PRs over for approval.
 
 kind: operation
 domain: process

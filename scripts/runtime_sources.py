@@ -67,11 +67,15 @@ def declarations(root: Path) -> dict[str, dict]:
     for name, source in sources.items():
         if not name.isascii() or not name.replace("-", "").isalnum() or name.lower() != name:
             raise ValueError(f"Invalid runtime source name: {name!r}")
-        if not isinstance(source, dict) or set(source) != {"repository", "package", "exports"}:
+        required_keys = {"repository", "revision", "package", "exports"}
+        if not isinstance(source, dict) or set(source) != required_keys:
             raise ValueError(f"Invalid runtime source: {name}")
         repository = source["repository"]
         if not isinstance(repository, str) or not re.fullmatch(r"tj-agents/[a-z][a-z0-9-]*", repository):
             raise ValueError(f"Unapproved runtime publisher: {repository!r}")
+        revision = source["revision"]
+        if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+            raise ValueError(f"Invalid runtime source revision: {revision!r}")
         if not isinstance(source["package"], str) or not relative(source["package"]).startswith("plugins/"):
             raise ValueError(f"Runtime package must belong to plugins: {source['package']!r}")
         exports = source["exports"]
@@ -117,10 +121,19 @@ def stage(root: Path, overrides: dict[str, Path], check: bool = False) -> list[d
         if check:
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             contents = export_contents(destination, source["exports"])
-            if (receipt.get("repository") != source["repository"]
-                    or receipt.get("package") != source["package"]
-                    or receipt.get("exports") != source["exports"]
-                    or receipt.get("sha256") != digest(contents)):
+            staged_revision = receipt.get("revision")
+            stale_revision = (
+                isinstance(staged_revision, str)
+                and not staged_revision.startswith("local:")
+                and staged_revision != source["revision"]
+            )
+            if (
+                receipt.get("repository") != source["repository"]
+                or receipt.get("package") != source["package"]
+                or receipt.get("exports") != source["exports"]
+                or receipt.get("sha256") != digest(contents)
+                or stale_revision
+            ):
                 raise ValueError(f"Stale or modified staged runtime: {name}; run scripts/runtime_sources.py")
             results.append({"name": name, "status": "verified", "revision": receipt["revision"]})
             continue
@@ -130,9 +143,24 @@ def stage(root: Path, overrides: dict[str, Path], check: bool = False) -> list[d
                 revision = "local:" + digest(export_contents(safe_path(checkout, source["package"]), source["exports"]))
             else:
                 checkout = Path(temporary) / "source"
-                git("clone", "--quiet", "--depth", "1", "--branch", "main",
-                    f"https://github.com/{source['repository']}.git", str(checkout))
+                url = f"https://github.com/{source['repository']}.git"
+                git("init", "--quiet", str(checkout))
+                git(
+                    "-C",
+                    str(checkout),
+                    "fetch",
+                    "--quiet",
+                    "--depth",
+                    "1",
+                    url,
+                    source["revision"],
+                )
+                git("-C", str(checkout), "checkout", "--quiet", "FETCH_HEAD")
                 revision = git("-C", str(checkout), "rev-parse", "HEAD")
+                if revision != source["revision"]:
+                    raise ValueError(
+                        f"Fetched revision does not match declared pin: {name}"
+                    )
             contents = export_contents(safe_path(checkout, source["package"]), source["exports"])
             receipt = {"repository": source["repository"], "package": source["package"], "revision": revision,
                        "exports": source["exports"], "sha256": digest(contents),

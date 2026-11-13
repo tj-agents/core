@@ -9,6 +9,8 @@ lane: L7
 
 # Checkout isolation for active work
 
+Owns checkout selection, deterministic worktree creation and safe closure.
+
 `engineering:branching` owns sequential delivery, required stack relationships and checkout allocation.
 Reuse an available checkout for sequential work after preserving its previous work and verifying that no
 writer, build, monitor or active session still owns it. Create a separate worktree when concurrent execution,
@@ -53,39 +55,36 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
 2. **Confirm no open red generated-sync PR before starting new work** — `engineering:merging` owns
    that gate and the reason it is a branch-time check rather than a per-prompt one. A red one means the
    platform is mid-break; clear it first.
-3. Resolve the common repository root with Git, so the operation works from any existing checkout:
+3. **Create through the shared script, never by typing `git worktree add` yourself.** Naming is
+   `engineering:branching`'s: the repository's capitalized `<Type>/<Name>` form, and **never a second
+   casing of an existing name** — a case-insensitive filesystem cannot hold both, and the remote then
+   breaks fetch for everyone. Match an existing branch's casing rather than creating a variant.
 
-   ```powershell
-   $commonDirectory = git rev-parse --path-format=absolute --git-common-dir
-   $repository = [IO.Path]::GetDirectoryName($commonDirectory.Trim())
+   ```text
+   python -B <skill-directory>/scripts/create_worktree.py Feature/BrowserCredentials    # Windows
+   python3 -B <skill-directory>/scripts/create_worktree.py Feature/BrowserCredentials   # Linux/macOS
+   Result: <repository-root>/.worktrees/Feature-BrowserCredentials is created and
+           associated with the current agent session through tj session claim-worktree.
    ```
 
-4. **Fetch with pruning. Independent branches start at the fetched remote default; dependent stack
-   layers start at their recorded parent's current tip. Never start from a stale local default**,
-   which is routinely stale. Naming is `engineering:branching`'s: the repository's capitalized
-   `<Type>/<Name>` form, and **never a second casing of an existing name** — a case-insensitive filesystem
-   cannot hold both, and the remote then breaks fetch for everyone. Match an existing branch's casing rather
-   than creating a variant.
+   The script resolves the repository from any existing checkout, fetches with pruning, flattens `/` to
+   `-` in the folder name, and always lands the result at `<repository-root>/.worktrees/<flattened-branch>`
+   — **the only supported location.** It independently chooses the right start point (an existing local
+   branch, an existing remote-only branch's tracking ref, or the fetched remote default) and prints the
+   resulting branch, path, HEAD, base and base SHA as JSON; read that JSON rather than re-deriving the path yourself.
+   Creation requires the installed `tj` command. After Git creates the checkout, the script asks
+   `tj session claim-worktree` to associate its exact path with the current session. Outside an agent
+   session, that command succeeds without an owner. A refused claim fails creation and reports the
+   created path; the checkout remains available for the owning task to resolve the failure.
+   For a dependent stack layer, pass `--from <parent-ref>` with the verified parent ref and record its SHA.
+   Do not merge main separately into each layer as a substitute for reconciling the stack.
 
-   ```powershell
-   $branch = '<Type>/<Name>'
-   $path = Join-Path $repository ".worktrees/$($branch.Replace('/', '-'))"
-   git -C $repository fetch origin --prune
-   git -C $repository worktree add $path -b $branch origin/<default>
-   ```
-
-   For a dependent stack layer, replace `origin/<default>` with the verified parent ref and record its
-   SHA. Do not merge main separately into each layer as a substitute for reconciling the stack.
-
-   For an existing local branch, omit `-b` and the start point. For a remote-only branch, create its matching
-   local tracking ref with `-b $branch --track "origin/$branch"`.
-
-5. **Flatten `/` to `-` in the folder name.** A branch hierarchy left unflattened creates nested worktree
-   roots, which are ambiguous to every tool that walks the tree. Inventory covers both a `.worktrees` directory
-   inside the repository and a `<repo>.worktrees` sibling, so either placement is found — but **never** place one under a directory the agent harness reserves for its own ephemeral
-   worktrees, where manual trees collide with it and land as stray gitlinks that break submodule-aware
-   checkouts.
-6. **Verify** the resulting path, branch, HEAD, base or existing remote head, and clean status. Use absolute
+4. **Always use `<primary-repository>/.worktrees/<flattened-branch>`.** Do not create sibling
+   `<repo-name>.worktrees` directories or use a directory reserved for the agent harness's ephemeral trees.
+   Physical nesting does not establish plugin discovery: verify the checkout's selected declarations and
+   actual host loading separately. Inventory still reports old sibling worktrees so their existing owner
+   can relocate them with `git worktree move`; new creation always uses the shared script's nested path.
+5. **Verify** the resulting path, branch, HEAD, base or existing remote head, and clean status. Use absolute
    paths for every subsequent tool call in the session.
 
 ## Do not copy or junction guidance directories into a new checkout

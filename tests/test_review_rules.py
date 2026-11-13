@@ -178,7 +178,7 @@ class ReviewRulesTests(unittest.TestCase):
         shutil.copy2(SCRIPT, script)
         hooks = package / "hooks"
         hooks.mkdir()
-        for name in ("tier_gate.py", "host_cli.py"):
+        for name in ("tier_gate.py", "host_cli.py", "selected_standards.py"):
             shutil.copy2(ROOT / ".agents/hooks" / name, hooks / name)
         shutil.copytree(ROOT / ".agents/dependencies/cli/.agents/cli/runtime/tj_cli", hooks / "tj_cli")
         probe = package / "probe.py"

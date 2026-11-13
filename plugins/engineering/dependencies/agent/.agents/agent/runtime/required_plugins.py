@@ -14,12 +14,30 @@ import subprocess
 import sys
 import time
 
-from host import Host
+from tj_cli import process
+from tj_agent.host import Host
 import host_plugins
 
 
 IDENTITY = re.compile(r"[a-z][a-z0-9-]*@[a-z][a-z0-9-]*\Z")
 INVENTORY_TIMEOUT_SECONDS = 20
+MARKETPLACE_NAME = "tj-agents"
+MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
+
+
+def producer_repository(repository: object) -> bool:
+    return (isinstance(repository, str) and repository.casefold().startswith("tj-agents/")
+            and repository.casefold() != MARKETPLACE_REPOSITORY)
+
+
+def marketplace_error(name: str, repository: object) -> str | None:
+    canonical_repository = isinstance(repository, str) and repository.casefold() == MARKETPLACE_REPOSITORY
+    if ((name == MARKETPLACE_NAME and repository != MARKETPLACE_REPOSITORY)
+            or (name != MARKETPLACE_NAME and canonical_repository)):
+        return f"The {MARKETPLACE_NAME} marketplace must be {MARKETPLACE_REPOSITORY} and nothing else may use that name"
+    if producer_repository(repository):
+        return f"{repository} is published through the {MARKETPLACE_NAME} marketplace; select {MARKETPLACE_REPOSITORY}"
+    return None
 
 
 class RequiredPluginsError(RuntimeError):
@@ -204,11 +222,10 @@ def inventory(binary: str, plugins: host_plugins.Plugins, launch_directory: Path
     try:
         if os.name == "nt" and Path(binary).suffix.casefold() == ".ps1":
             command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-File", *command]
-        result = subprocess.run(
+        result = process.run(
             command, cwd=launch_directory, capture_output=True,
             text=True, encoding="utf-8", errors="replace",
             timeout=INVENTORY_TIMEOUT_SECONDS if timeout is None else timeout,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
     except (OSError, subprocess.SubprocessError) as error:
         scope = f" for marketplace {marketplace}" if marketplace is not None else ""
@@ -330,13 +347,8 @@ def declaration(root: Path, identity: str, document: dict | None = None) -> Targ
     return Target(identity, script, setup["script"], runtime_bytes(script.parent))
 
 
-def targets(project: Path, host: Host, executable: str | None, *, repair=False) -> list[Target]:
-    if repair:
-        import reload_plugins
-
-        roots = reload_plugins.prepare_required(project, host, executable)
-    else:
-        roots = check(project, host, executable)
+def targets(project: Path, host: Host, executable: str | None) -> list[Target]:
+    roots = check(project, host, executable)
     if roots is None:
         return []
     identities = selected(project_root(project))
@@ -354,11 +366,11 @@ def targets(project: Path, host: Host, executable: str | None, *, repair=False) 
     return found
 
 
-def collect(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None], *, repair=False) -> tuple[list[Target], list[str]]:
+def collect(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None]) -> tuple[list[Target], list[str]]:
     discovered, errors = {}, []
     for host in hosts:
         try:
-            discovered[host] = {target.identity: target for target in targets(project, host, executables.get(host), repair=repair)}
+            discovered[host] = {target.identity: target for target in targets(project, host, executables.get(host))}
         except (RequiredPluginsError, PluginSetupError, RuntimeError, OSError) as error:
             errors.append(f"{host}: {error}")
     if not errors and discovered:
@@ -375,23 +387,30 @@ def collect(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str
     return ([] if errors else [reference[key] for key in sorted(reference)]), errors
 
 
-def invoke(target: Target, arguments: list[str], timeout: int, inherit: bool = False) -> subprocess.CompletedProcess:
+def invoke(target: Target, arguments: list[str], timeout: int, project: Path,
+           inherit: bool = False) -> subprocess.CompletedProcess:
     command = [sys.executable, "-B", str(target.script), "setup", *arguments]
     if inherit:
-        return subprocess.run(command, timeout=timeout, check=False)
-    return subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                          timeout=timeout, check=False)
+        return process.run(command, cwd=project, timeout=timeout, check=False)
+    return process.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       cwd=project, timeout=timeout, check=False)
 
 
 def reconcile_selection(project: Path, *, check_only: bool = False) -> list[str]:
-    project = project_root(project)
-    if not (project / ".agents/plugins.json").is_file():
+    return reconcile_selections([project], check_only=check_only)
+
+
+def reconcile_selections(projects: Sequence[Path], *, check_only: bool = False) -> list[str]:
+    projects = sorted({project_root(project) for project in projects
+                       if (project_root(project) / ".agents/plugins.json").is_file()})
+    if not projects:
         return []
     script = Path(__file__).resolve().parents[1] / "utility/plugins/scripts/adopt_plugins.py"
+    additional = [argument for project in projects[1:] for argument in ("--also-root", str(project))]
     try:
-        result = subprocess.run(
-            [sys.executable, "-B", str(script), "--root", str(project), "--converge-existing",
-             "--mode", "check" if check_only else "write"],
+        result = process.run(
+            [sys.executable, "-B", str(script), "--root", str(projects[0]), "--converge-existing",
+             "--mode", "check" if check_only else "write", *additional],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, check=False,
         )
     except (OSError, subprocess.SubprocessError) as error:
@@ -407,6 +426,7 @@ def reconcile_selection(project: Path, *, check_only: bool = False) -> list[str]
 
 
 def check_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None]) -> list[str]:
+    project = project_root(project)
     try:
         drift = reconcile_selection(project, check_only=True)
     except RequiredPluginsError as error:
@@ -416,7 +436,7 @@ def check_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host,
     targets_found, errors = collect(project, hosts, executables)
     for target in targets_found:
         try:
-            result = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS)
+            result = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS, project)
             if result.returncode:
                 errors.append(f"{target.identity}: setup --check failed: {bounded(result)}")
         except (OSError, subprocess.SubprocessError) as error:
@@ -425,17 +445,22 @@ def check_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host,
 
 
 def converge_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None], onboard: bool = False) -> list[str]:
-    targets_found, errors = collect(project, hosts, executables, repair=True)
+    project = project_root(project)
+    try:
+        reconcile_selection(project)
+    except RequiredPluginsError as error:
+        return [str(error)]
+    targets_found, errors = collect(project, hosts, executables)
     for target in targets_found:
         try:
-            checked = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS)
+            checked = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS, project)
             if checked.returncode:
                 applied = invoke(target, ["--onboard"] if onboard else [],
-                                 ONBOARD_TIMEOUT_SECONDS if onboard else CHECK_TIMEOUT_SECONDS, inherit=onboard)
+                                 ONBOARD_TIMEOUT_SECONDS if onboard else CHECK_TIMEOUT_SECONDS, project, inherit=onboard)
                 if applied.returncode:
                     errors.append(f"{target.identity}: setup failed: {bounded(applied)}")
                     continue
-                checked = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS)
+                checked = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS, project)
             if checked.returncode:
                 errors.append(f"{target.identity}: setup did not converge: {bounded(checked)}")
         except (OSError, subprocess.SubprocessError) as error:

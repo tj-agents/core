@@ -109,15 +109,37 @@ class AggregateTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     CI.required_results(value, broken, "pull_request", ("ci:full",))
 
-    def test_suites_run_only_on_request(self):
+    def test_default_push_requires_suites_and_pr_suites_remain_explicit(self):
         results = ClassificationTests.results()
         results["guard"]["result"] = "skipped"
         results["verify-windows"]["result"] = results["verify-linux"]["result"] = "skipped"
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("full", "main"), results, "push")
+        results["verify-windows"]["result"] = results["verify-linux"]["result"] = "success"
         CI.required_results(CI.plan("full", "main"), results, "push")
+        results["verify-windows"]["result"] = results["verify-linux"]["result"] = "skipped"
         results["guard"]["result"] = "success"
         CI.required_results(CI.plan("full", "unlabelled"), results, "pull_request")
         with self.assertRaises(ValueError):
             CI.required_results(CI.plan("full", "requested"), results, "pull_request", ("ci:full",))
+
+    def test_red_default_branch_admits_only_a_pull_request_passing_the_full_verify(self):
+        results = ClassificationTests.results()
+        results["verify-windows"]["result"] = results["verify-linux"]["result"] = "skipped"
+        url = "https://github.com/tj-agents/core/actions/runs/1"
+        for conclusion in ("failure", "cancelled", "timed_out", None):
+            with self.subTest(conclusion=conclusion), self.assertRaisesRegex(ValueError, f"{url}.*ci:full"):
+                CI.required_results(CI.plan("docs", "prose"), results, "pull_request", (),
+                                    {"conclusion": conclusion, "url": url})
+        CI.required_results(CI.plan("docs", "prose"), results, "pull_request", (), {"conclusion": "success"})
+        CI.required_results(CI.plan("docs", "prose"), results, "pull_request", (), None)
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("docs", "prose"), results, "pull_request", (), ["failure"])
+        red = {"conclusion": "failure", "url": url}
+        with self.assertRaises(ValueError):
+            CI.required_results(CI.plan("full", "requested"), results, "pull_request", ("ci:full",), red)
+        results["verify-windows"]["result"] = results["verify-linux"]["result"] = "success"
+        CI.required_results(CI.plan("full", "requested"), results, "pull_request", ("ci:full",), red)
 
     def test_non_pr_event_cannot_accept_a_narrowed_plan(self):
         results = ClassificationTests.results()
@@ -270,9 +292,13 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertIn("    if: always()\n", jobs["ci-required"])
         required = re.search(r"^    needs: \[(.*?)\]$", jobs["ci-required"], re.MULTILINE)
         self.assertEqual(set(required[1].split(", ")),
-                         {"select", "guard", "guidance-examples", "verify-windows", "verify-linux"})
+                         {"select", "guard", "guidance-examples", "verify-windows", "verify-linux", "python-standards"})
         self.assertIn("CI_NEEDS: ${{ toJSON(needs) }}", jobs["ci-required"])
         self.assertIn("CI_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}", jobs["ci-required"])
+        self.assertIn("      actions: read\n", jobs["ci-required"])
+        self.assertIn("--workflow ci.yml --branch \"$DEFAULT_BRANCH\"", jobs["ci-required"])
+        self.assertIn("--event push --status completed --limit 1", jobs["ci-required"])
+        self.assertIn("CI_DEFAULT_BRANCH_RUN: ${{ steps.default-branch.outputs.run }}", jobs["ci-required"])
         self.assertIn("scripts/ci_selection.py required", jobs["ci-required"])
         self.assertNotRegex(workflow.split("jobs:\n", 1)[0], r"paths(?:-ignore)?:")
         self.assertNotIn("cancel-in-progress: true", workflow)
@@ -282,14 +308,14 @@ class WorkflowWiringTests(unittest.TestCase):
             self.assertIn("mode != 'docs'", job)
             self.assertIn("contains(github.event.pull_request.labels.*.name, 'ci:full')", job)
             for group in ("source", "runtime"):
-                step = re.search(r"      - name: selected[^\n]*\n(.*?)(?=\n      -|\Z)",
-                                 job[job.index(f"      - name: selected {'source' if group == 'source' else 'shared'}"):],
+                step = re.search(r"      - name: Selected[^\n]*\n(.*?)(?=\n      -|\Z)",
+                                 job[job.index(f"      - name: Selected {'source' if group == 'source' else 'shared'}"):],
                                  re.DOTALL)[1]
                 self.assertIn("mode == 'focused'", step)
                 self.assertIn(f"scripts/ci_selection.py run --group {group}", step)
                 if platform == "linux":
                     self.assertIn("< /dev/null", step)
-            for name in ("source layout and package tests", "shared runtime tests"):
+            for name in ("Source layout and package tests", "Shared runtime tests"):
                 step = job.split(f"      - name: {name}\n", 1)[1].split("\n      -", 1)[0]
                 self.assertIn("mode == 'full'", step)
             self.assertIn("sync-generated.ps1 -Check", job)
@@ -305,14 +331,15 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertIn("repository: tj-agents/template", job)
         self.assertIn("path: .template", job)
         self.assertIn("github.event.pull_request.base.sha", job)
-        self.assertIn("github.event.pull_request.head.sha }}\"", job)
+        self.assertIn("HEAD_SHA: ${{ github.event.pull_request.head.sha }}", job)
         self.assertIn("github.event.before", job)
-        self.assertIn("github.sha }}\"", job)
+        self.assertIn("HEAD_SHA: ${{ github.sha }}", job)
         self.assertIn("github.ref == 'refs/heads/main'", job)
         self.assertEqual(2, job.count(".template/.agents/template/utility/check/scripts/check_examples.py --root . --base"))
-        pull_request_run = next(line for line in job.splitlines()
-                                if "github.event.pull_request.base.sha" in line)
-        push_run = next(line for line in job.splitlines() if "github.event.before" in line)
+        pull_request_run, push_run = [line for line in job.splitlines()
+                                      if "run: python3 -B .template/" in line]
+        for command in (pull_request_run, push_run):
+            self.assertIn('--base "$BASE_SHA" --head "$HEAD_SHA"', command)
         self.assertIn("--merge-base", pull_request_run)
         self.assertNotIn("--merge-base", push_run)
 

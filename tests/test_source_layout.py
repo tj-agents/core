@@ -151,17 +151,16 @@ class SourceLayoutTests(unittest.TestCase):
         roster = json.loads((self.root / ".agents/plugins/plugins.json").read_text(encoding="utf-8"))
         engineering = next(package for package in roster["packages"] if package["id"] == "tj-agents/engineering")
         self.assertEqual(
-            ["tj-agents/base", "tj-agents/workflow",
-             "tj-agents/agent-store", "tj-agents/agent", "tj-agents/cli"],
+            ["tj-agents/base", "tj-agents/workflow", "tj-agents/agent", "tj-agents/cli"],
             engineering["dependencies"]["required"],
         )
         self.assertEqual(
-            ["tj-agents/agent-store", "tj-agents/agent", "tj-agents/cli"],
+            ["tj-agents/agent", "tj-agents/cli"],
             [entry["id"] for entry in engineering["external_dependencies"]["required"]],
         )
         harness = json.loads(output["plugins/engineering/harness.json"].decode("utf-8"))
         self.assertEqual([{"id": "tj-agents", "repository": "tj-agents/marketplace"}], harness["requires"]["marketplaces"])
-        self.assertEqual(["tj-agents/agent", "tj-agents/agent-store", "tj-agents/base", "tj-agents/cli", "tj-agents/engineering", "tj-agents/workflow"], harness["requires"]["plugins"])
+        self.assertEqual(["tj-agents/agent", "tj-agents/base", "tj-agents/cli", "tj-agents/engineering", "tj-agents/workflow"], harness["requires"]["plugins"])
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertEqual(engineering["external_dependencies"]["required"], selection["external_prerequisites"])
 
@@ -240,42 +239,15 @@ class SourceLayoutTests(unittest.TestCase):
         ):
             self.assertIn(relative, output)
 
-    def test_agent_store_runtime_is_embedded_in_each_core_consumer(self):
+    def test_store_consumers_ship_no_store_runtime_and_require_its_clis(self):
         _, output, _, _ = SYNC.build(self.root)
-        runtime = ".agents/agent-store/runtime"
-        staged = self.root / ".agents/dependencies/agent/.agents/agent-store/runtime"
+        roster = json.loads((self.root / ".agents/plugins/plugins.json").read_text(encoding="utf-8"))
+        packages = {package["name"]: package for package in roster["packages"]}
         for plugin in ("workflow", "engineering"):
-            for name in ("session_store.py", "repository_identity.py", "reader.py"):
-                self.assertEqual(
-                    SYNC.canonical_output_bytes((staged / name).read_bytes()),
-                    output[f"plugins/{plugin}/{runtime}/{name}"],
-                )
-        isolated = self.root / "isolated package \u00e9"
-        for relative, body in output.items():
-            if relative.startswith("plugins/workflow/"):
-                destination = isolated / relative.removeprefix("plugins/workflow/")
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                destination.write_bytes(body)
-        spec = importlib.util.spec_from_file_location(
-            "isolated_agent_store", isolated / runtime / "session_store.py"
-        )
-        store = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(store)
-        database = self.root / "fixture state \u00e9" / "sessions.db"
-        with store.SessionStore(database) as session_store:
-            session_store.upsert_work_item(
-                "github.com/example/repo:fixture/task", "github.com/example/repo",
-                "fixture", "task", status="active", title="Fixture execution",
-            )
-        before = database.read_bytes()
-        reader_spec = importlib.util.spec_from_file_location(
-            "isolated_reader", isolated / runtime / "reader.py"
-        )
-        reader = importlib.util.module_from_spec(reader_spec)
-        reader_spec.loader.exec_module(reader)
-        payload = reader.ReadOnlyWorkItemStore(database).inspect("github.com/example/repo:fixture/task")
-        self.assertEqual("Fixture execution", payload["work_items"][0]["title"])
-        self.assertEqual(before, database.read_bytes())
+            with self.subTest(plugin=plugin):
+                self.assertFalse(any(path.startswith(f"plugins/{plugin}/.agents/agent-store/") for path in output))
+                self.assertLessEqual({"exe:tj", "exe:agent-store"},
+                                     set(packages[plugin]["external_prerequisites"]["required"]))
 
     def test_generated_text_bytes_are_stable_across_checkout_line_endings(self):
         source = self.root / ".agents/workflow/contract/plan-artifacts/templates/PLAN.md"

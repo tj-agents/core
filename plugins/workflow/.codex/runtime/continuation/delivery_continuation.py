@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Register deterministic, receipt-owned delivery continuation wakes (Python 3.9+)."""
+"""Register deterministic, receipt-owned delivery continuation wakes (Python 3.12+)."""
 
 import sys
 
-if sys.version_info < (3, 9):
-    raise RuntimeError("delivery_continuation requires Python 3.9 or later")
+if sys.version_info < (3, 12):  # noqa: UP036
+    raise RuntimeError("delivery_continuation requires Python 3.12 or later")
 
 import argparse
 import contextlib
@@ -13,6 +13,8 @@ import json
 import os
 from pathlib import Path
 import subprocess
+
+sys.dont_write_bytecode = True
 
 
 def package_root():
@@ -36,6 +38,13 @@ def resource(name):
 
 
 SCHEDULER_PATH = resource("continuation_scheduler.py")
+PACKAGE = package_root()
+WORKFLOWS = PACKAGE / ("workflows" if (PACKAGE / ".codex-plugin/plugin.json").is_file() else ".agents/workflows")
+if not (WORKFLOWS / "process_runtime.py").is_file():
+    raise RuntimeError("continuation shared runtime unavailable")
+sys.path.insert(0, str(WORKFLOWS))
+from process_runtime import process
+
 spec = importlib.util.spec_from_file_location("continuation_scheduler", SCHEDULER_PATH)
 scheduler = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = scheduler
@@ -57,8 +66,8 @@ def owner_path(args):
         if not path.is_absolute():
             raise scheduler.SchedulerError("worktree must be absolute")
         return path.resolve() / ".agents/continuation/owner.json"
-    result = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-                            encoding="utf-8", timeout=10, check=False)
+    result = process.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
+                         encoding="utf-8", timeout=10, check=False)
     if result.returncode:
         raise scheduler.SchedulerError("specify --worktree or --owner outside a git checkout")
     return Path(result.stdout.strip()).resolve() / ".agents/continuation/owner.json"
@@ -296,8 +305,8 @@ def wake(owner, root, path, args, transport):
             raise scheduler.SchedulerError("registered package prerequisite is missing: " + receipt[item])
     if args.dry_run:
         return {"action": "wake", "dry_run": True}
-    result = subprocess.run(receipt["runtime_command"], cwd=str(root), capture_output=True, text=True,
-                            encoding="utf-8", errors="replace", timeout=930, env=wake_environment(receipt), check=False)
+    result = process.run(receipt["runtime_command"], cwd=str(root), capture_output=True, text=True,
+                         encoding="utf-8", errors="replace", timeout=930, env=wake_environment(receipt), check=False)
     if result.returncode:
         raise scheduler.SchedulerError("continuation runtime wake failed with exit code " + str(result.returncode))
     state = read_json(path)

@@ -155,18 +155,27 @@ def validate_plan(value):
     return value
 
 
-def required_results(value, needs, event, labels=()):
+def required_results(value, needs, event, labels=(), default_branch_run=None):
     validate_plan(value)
     if not isinstance(needs, dict):
         raise ValueError("invalid CI job results")
     if event != "pull_request" and value["mode"] != "full":
         raise ValueError("non-PR validation requires full coverage")
+    if default_branch_run is not None and not isinstance(default_branch_run, dict):
+        raise ValueError("invalid default branch CI run")
+    if (event == "pull_request" and FULL_LABEL not in labels and default_branch_run is not None
+            and default_branch_run.get("conclusion") != "success"):
+        raise ValueError(
+            f"the default branch's latest CI run did not succeed ({default_branch_run.get('url')}), so its "
+            f"generated plugins are not being published; until it is green only a change that passes the "
+            f"full verify merges: add the {FULL_LABEL} label"
+        )
     expected = {
         "select": "success",
         "guard": "success" if event == "pull_request" else "skipped",
         "guidance-examples": "success",
     }
-    suites = event == "pull_request" and FULL_LABEL in labels and value["mode"] != "docs"
+    suites = (event != "pull_request" or FULL_LABEL in labels) and value["mode"] != "docs"
     expected.update({name: "success" if suites else "skipped" for name in ("verify-windows", "verify-linux")})
     for name, result in expected.items():
         if not isinstance(needs.get(name), dict) or needs[name].get("result") != result:
@@ -237,6 +246,7 @@ def main(argv=None):
             required_results(
                 value, json.loads(os.environ["CI_NEEDS"]), os.environ.get("GITHUB_EVENT_NAME", ""),
                 json.loads(os.environ.get("CI_LABELS") or "null") or (),
+                json.loads(os.environ.get("CI_DEFAULT_BRANCH_RUN") or "null"),
             )
             print("Every selected CI job succeeded")
             return 0

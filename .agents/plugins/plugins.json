@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:cdbc6ab518853a74651c6ed761f57de0e29de27c47bb04422a829133f5ec85aa",
+      "digest": "sha256:6ff6691458ecf53e91562b2a618625e04f36254156fec12932566455a2b1c129",
       "harness": {
         "marketplaces": [
           {
@@ -76,6 +76,7 @@
         "macos"
       ],
       "skills": [
+        "catch-up",
         "continue",
         "handoff",
         "plan",
@@ -88,7 +89,6 @@
       "dependencies": {
         "required": [
           "tj-agents/base",
-          "tj-agents/agent-store",
           "tj-agents/agent",
           "tj-agents/cli"
         ],
@@ -97,12 +97,14 @@
       "external_prerequisites": {
         "required": [
           "exe:tj_hook",
+          "exe:tj",
+          "exe:agent-store",
           "exe:git",
           "python>=3.12"
         ],
         "optional": []
       },
-      "digest": "sha256:db54557cfbfbe6ba36c7519726e85e8f26140dfcbf73e0fad2783b30faf8a0b7",
+      "digest": "sha256:a8c4c7b54dd1c5ad0bd562c1c63f93b90dfbe6fd89856caed0b8f7fcd98818df",
       "harness": {
         "marketplaces": [
           {
@@ -112,7 +114,6 @@
         ],
         "plugins": [
           "tj-agents/agent",
-          "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/cli",
           "tj-agents/workflow"
@@ -149,7 +150,7 @@
                   "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
                 ]
               ],
-              "justification": "Read selected work-item state and supporting plans without creating or changing agent-store records.",
+              "justification": "Read work-item tracker state and supporting plans without changing them.",
               "match": [
                 [
                   "python",
@@ -212,11 +213,6 @@
       },
       "external_dependencies": {
         "required": [
-          {
-            "id": "tj-agents/agent-store",
-            "marketplace": "tj-agents",
-            "repository": "tj-agents/agent"
-          },
           {
             "id": "tj-agents/agent",
             "marketplace": "tj-agents",
@@ -290,7 +286,6 @@
         "required": [
           "tj-agents/base",
           "tj-agents/workflow",
-          "tj-agents/agent-store",
           "tj-agents/agent",
           "tj-agents/cli"
         ],
@@ -299,6 +294,8 @@
       "external_prerequisites": {
         "required": [
           "exe:tj_hook",
+          "exe:tj",
+          "exe:agent-store",
           "exe:git",
           "python>=3.12"
         ],
@@ -308,7 +305,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:dd7bed79a3882e3b614dc8db42af59fdd57af48cf596691ac60cb18b4f75e28d",
+      "digest": "sha256:171fba22d41d5ca1b6e7fdb19ffcff2e592bd734b36c1009a1302f372b3e1ac5",
       "harness": {
         "marketplaces": [
           {
@@ -318,7 +315,6 @@
         ],
         "plugins": [
           "tj-agents/agent",
-          "tj-agents/agent-store",
           "tj-agents/base",
           "tj-agents/cli",
           "tj-agents/engineering",
@@ -491,11 +487,6 @@
       },
       "external_dependencies": {
         "required": [
-          {
-            "id": "tj-agents/agent-store",
-            "marketplace": "tj-agents",
-            "repository": "tj-agents/agent"
-          },
           {
             "id": "tj-agents/agent",
             "marketplace": "tj-agents",
