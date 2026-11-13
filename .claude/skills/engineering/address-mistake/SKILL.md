@@ -1,6 +1,6 @@
 ---
 name: address-mistake
-description: Reconcile one actionable recorded mistake with its existing correction owner, preserve its learning history, and resolve it only after causal verification. Use when the user asks to address a named mistake or to work an actionable mistake record.
+description: Reconcile one recorded mistake with its existing correction owner, keep its learning history and resolve it only after causal verification. Use to address a named mistake or a mistake record.
 
 kind: workflow
 domain: process
