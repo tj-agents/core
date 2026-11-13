@@ -1,6 +1,6 @@
 ---
 name: feature
-description: Implement an explicitly requested new or changed behavior from discovery through review, validation, and commit when no active plan owns the work. Use for feature requests and behavior changes; do not use for defect repair, planning-only requests, execution of an existing plan, or review-only requests.
+description: Implement a requested new or changed behavior from discovery through tests, review and commit when no active plan owns it. Not for defect repair, planning-only requests or review-only requests.
 
 kind: workflow
 domain: process

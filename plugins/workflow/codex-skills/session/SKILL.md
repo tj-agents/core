@@ -1,6 +1,6 @@
 ---
 name: session
-description: Own a working session in any domain from start through completion: one owner, mistake callouts, stage-by-stage skill loading, recording noticed problems, and closing when owned work is finished. Use when starting, continuing or finishing a task, when the user calls out a mistake, or when asked to note or record a bug, mistake or debt.
+description: Own a working session in any domain from start to finish. Use when starting, continuing or finishing a task, when the user calls out a mistake, or when a side bug, mistake or debt is noticed.
 kind: policy
 domain: process
 ---
