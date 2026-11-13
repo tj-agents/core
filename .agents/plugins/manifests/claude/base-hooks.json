@@ -33,6 +33,21 @@
         ]
       },
       {
+        "matcher": "Bash|PowerShell|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
+              "--tool-gate"
+            ]
+          }
+        ]
+      },
+      {
         "matcher": "Read",
         "hooks": [
           {
