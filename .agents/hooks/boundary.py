@@ -11,6 +11,7 @@ predicate matches.
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
@@ -352,7 +353,9 @@ def _exists(candidate: str, directory: Path) -> bool:
 
 
 def _resolved(path: str, cwd: Path) -> Path:
-    raw = Path(path).expanduser()
+    # PowerShell accepts `\` as a separator on every platform; on POSIX it would
+    # otherwise be read as part of a file name.
+    raw = Path(path if os.sep == "\\" else path.replace("\\", "/")).expanduser()
     return (raw if raw.is_absolute() else cwd / raw).resolve(strict=False)
 
 
