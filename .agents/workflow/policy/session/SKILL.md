@@ -53,8 +53,8 @@ Keep report export active and read Incidental problems before routing B.
 
 Coordinate with another agent when its verified responsibility needs the information. Before sending,
 establish the exact recipient, its current responsibility from an owned goal, work-item binding or explicit
-assignment, and the concrete decision or action the message supports: a final result, a blocker the sender
-cannot resolve or a required user approval, never progress. Shared checkout, parent conversation,
+assignment, and the concrete decision or action the message changes for it. Do not send progress or status
+that changes nothing for the recipient; every message costs it context. Shared checkout, parent conversation,
 similar title and convenience do not establish that relationship. Unknown or irrelevant ownership keeps the
 information with the current task while ownership is reconciled. Existing task authority covers necessary
 coordination with a verified responsible recipient; do not add a confirmation step to every message.
