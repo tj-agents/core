@@ -88,7 +88,7 @@ class Predicates(unittest.TestCase):
     def test_content_and_remote_primitives(self):
         result = gate.evaluate_predicate(self.root, {"content": {"glob": "*.csproj", "pattern": "Project"}})
         self.assertTrue(result.matched)
-        self.assertFalse(gate.evaluate_predicate(self.root, {"remote": "^infonetica/"}).matched)
+        self.assertFalse(gate.evaluate_predicate(self.root, {"remote": "^example-employer/"}).matched)
 
     def test_v3_selection_exposes_shared_results(self):
         data = {"schema_version": 3, "tier": "example", "applies": "stack-present",

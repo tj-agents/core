@@ -105,7 +105,7 @@ class ReviewRunsWithoutRepositoryHelpers(unittest.TestCase):
 
 
 class ConsumerRepositoryAcceptance(unittest.TestCase):
-    """Stages 1 and 4 from a relocated package, in a repository shaped like cris-authz."""
+    """Stages 1 and 4 from a relocated package, in a repository shaped like example-service."""
 
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="consumer review ")
@@ -113,10 +113,10 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
         self.root = Path(temporary.name).resolve()
         self.package = self.root / "installed engineering"
         shutil.copytree(PACKAGE, self.package)
-        self.repository = self.root / "cris-authz"
+        self.repository = self.root / "example-service"
         self.repository.mkdir()
         self.git("init", "-q", "-b", "main")
-        self.git("remote", "add", "origin", "https://github.com/Infonetica/cris-authz.git")
+        self.git("remote", "add", "origin", "https://github.com/example-employer/example-service.git")
         (self.repository / "global.json").write_text("{}\n", encoding="utf-8")
         self.git("add", ".")
         self.git("commit", "-q", "-m", "base")

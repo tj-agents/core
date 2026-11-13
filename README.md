@@ -45,8 +45,9 @@ owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known bugs, mistakes and debt follow the selected problem-record profile.
 The [recording contract](.agents/workflow/resources/problem-records.md) routes remote work-item
-operations to the repository's explicitly selected profile. Personal owns GitHub records; Infonetica owns
-Azure Boards records and native type policy. Agent publishes the shared SQLite registry as Agent Store;
+operations to the repository's explicitly selected profile. Personal owns GitHub records; a selected
+specific profile owns its own tracker records and native type policy. Agent publishes the shared SQLite
+registry as Agent Store;
 Core publishes generic work status as Workflow and reusable engineering lifecycles as Engineering.
 Installing Engineering does not select or install a recording
 profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
