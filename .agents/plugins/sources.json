@@ -124,11 +124,6 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
-      "destination": "workflows/host_coverage.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".codex/install-workflow-agents.ps1",
       "destination": "scripts/install-codex-agents.ps1"
     },
@@ -161,16 +156,6 @@
       "plugin": "engineering",
       "source": ".agents/dependencies/cli/.agents/cli/runtime",
       "destination": "hooks"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/merge_review_gate.py",
-      "destination": "hooks/merge_review_gate.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/plan_graph.py",
-      "destination": "hooks/plan_graph.py"
     },
     {
       "plugin": "engineering",
@@ -269,11 +254,6 @@
     },
     {
       "plugin": "workflow",
-      "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
-      "destination": "resources/plan-artifacts/host_coverage.py"
-    },
-    {
-      "plugin": "workflow",
       "source": ".agents/tiers/workflow.json",
       "destination": "tier.json"
     },
@@ -296,16 +276,6 @@
       "plugin": "workflow",
       "source": ".agents/workflows",
       "destination": "workflows"
-    },
-    {
-      "plugin": "workflow",
-      "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
-      "destination": "workflows/host_coverage.py"
-    },
-    {
-      "plugin": "workflow",
-      "source": ".agents/hooks/merge_review_gate.py",
-      "destination": "hooks/merge_review_gate.py"
     },
     {
       "plugin": "workflow",

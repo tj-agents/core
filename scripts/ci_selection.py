@@ -23,10 +23,6 @@ FAMILIES = {
             ".agents/hooks/tests/test_problem_records.py",
         },
     },
-    "handoff-transfer": {
-        "sources": {".agents/workflow/workflow/handoff/scripts/transfer.py"},
-        "tests": {".agents/hooks/tests/test_handoff_transfer.py"},
-    },
 }
 
 

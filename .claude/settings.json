@@ -91,8 +91,7 @@
       "source": {
         "source": "github",
         "repo": "tj-agents/marketplace"
-      },
-      "autoUpdate": true
+      }
     }
   },
   "enabledPlugins": {

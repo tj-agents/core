@@ -14,8 +14,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".agents" / "engineering" / "workflow"
 PACKAGE = ROOT / "plugins" / "engineering"
-REVIEW_FAMILY = ("review", "incremental-review", "staged-review", "staged-review-all", "docs-review", "address-review")
-DELEGATES_NATIVE_LAYER = ("incremental-review", "staged-review", "docs-review")
+REVIEW_FAMILY = ("review", "incremental-review", "docs-review", "address-review")
+DELEGATES_NATIVE_LAYER = ("incremental-review", "docs-review")
 
 
 def body(skill):
@@ -51,16 +51,16 @@ class NativeLayerNamesTheHostReviewer(unittest.TestCase):
             with self.subTest(packaged=packaged):
                 entry = self.host_entry("claude", packaged)
                 self.assertIn("built-in `code-review` skill, invoked through the Skill tool", entry)
-                self.assertIn("`<effort> <frozen-base>..<frozen-head>`", entry)
+                self.assertIn("`<effort> <base>..<head>`", entry)
                 self.assertIn("built-in `security-review` skill", entry)
-                self.assertIn("the checkout is clean at the frozen head, scope is `all`", entry)
+                self.assertIn("the checkout is clean at the candidate head, scope is `all`", entry)
                 self.assertNotIn("codex review", entry)
 
     def test_the_codex_entry_point_names_codex_review(self):
         for packaged in (False, True):
             with self.subTest(packaged=packaged):
                 entry = self.host_entry("codex", packaged)
-                self.assertIn("`codex review --base <frozen-base>`", entry)
+                self.assertIn("`codex review --base <base>`", entry)
                 self.assertIn("`security` lens", entry)
                 self.assertNotIn("`code-review`", entry)
 
@@ -99,7 +99,6 @@ class ReviewRunsWithoutRepositoryHelpers(unittest.TestCase):
             path = next((ROOT / ".agents" / "engineering").rglob(f"{skill}/SKILL.md"))
             named.update(re.findall(r"<engineering>/([\w./-]+\.py)", path.read_text(encoding="utf-8")))
 
-        self.assertIn("workflows/workflow_ops.py", named)
         for relative in named:
             with self.subTest(helper=relative):
                 self.assertTrue((PACKAGE / relative).is_file())
@@ -152,22 +151,6 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
             env=self.environment, timeout=60,
         )
 
-    def test_stage_one_prepares_the_candidate_with_no_repository_runtime(self):
-        self.assertFalse((self.repository / ".agents").exists())
-
-        completed = self.run_packaged(
-            "workflows/workflow_ops.py", "--root", str(self.repository),
-            "--workflow-run-id", "consumer-review", "review-prepare", "--base", "main", "--head", "HEAD",
-        )
-
-        self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
-        descriptor = json.loads(completed.stdout)
-        self.assertEqual("Infonetica/cris-authz", descriptor["repository"])
-        self.assertEqual(["src/Authorization/Startup.cs"], descriptor["paths"])
-        self.assertEqual("src/Authorization/Startup.cs", descriptor["security"]["first_path"])
-        self.assertEqual("src/Authorization/Startup.cs", descriptor["security"]["trunk_first_path"])
-        self.assertTrue(Path(descriptor["bundle"]["tree"]).is_dir())
-
     def test_standards_resolver_runs_from_either_relocated_host_entry(self):
         for tree in ("skills", "codex-skills"):
             with self.subTest(tree=tree):
@@ -181,25 +164,6 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
                 self.assertEqual([], result["rules"])
                 self.assertTrue(result["diagnostics"])
 
-    def test_stack_child_inherits_its_parent_layers_security_paths(self):
-        self.git("checkout", "-q", "-b", "stack-child")
-        (self.repository / "README.md").write_text("docs\n", encoding="utf-8")
-        self.git("add", ".")
-        self.git("commit", "-q", "-m", "child")
-
-        completed = self.run_packaged(
-            "workflows/workflow_ops.py", "--root", str(self.repository),
-            "--workflow-run-id", "stack-child", "review-prepare", "--base", "fix-prod-boot", "--head", "HEAD",
-        )
-
-        self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
-        descriptor = json.loads(completed.stdout)
-        self.assertNotIn("src/Authorization/Startup.cs", descriptor["paths"])
-        main = subprocess.run(["git", "rev-parse", "main"], cwd=self.repository, capture_output=True, text=True)
-        self.assertEqual(
-            {"first_path": None, "trunk_base": main.stdout.strip(), "trunk_first_path": "src/Authorization/Startup.cs"},
-            descriptor["security"],
-        )
 
 if __name__ == "__main__":
     unittest.main()

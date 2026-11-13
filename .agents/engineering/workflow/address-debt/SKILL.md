@@ -1,110 +1,38 @@
 ---
 name: address-debt
-description: Take one debt item all the way to a focused PR in its selected checkout — survey the selected provider, pick one high-value item, fix it, verify resolution under its retention rules, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
+description: Pick one high-value tech-debt item from the selected provider, fix it properly, verify it and deliver it under the selected profile. Use when working through tech debt or one debt item end to end.
 
 kind: workflow
 domain: process
 ---
 
-# Working one tech-debt item — or a small bundle — to a PR
+# Address tech debt
 
-Take a debt item all the way to a focused PR in its selected checkout, so nothing touches
-in-flight branches. This is the *resolution* workflow; the selected profile owns the record's facts,
-retention, and verified closure. A single item is the default shape; bundling more than one into the same
-PR is the exception below, not a second workflow.
+Owns taking a debt item from the selected provider to a verified fix. Read
+[the shared recording contract](../../../workflow/resources/problem-records.md) first; the selected profile's
+provider lists, reads, updates and closes debt, and a provider failure blocks only that repository's record
+operation. A parent Workflow run's goal, branch and checkout are reused, never duplicated.
 
-Read [the shared problem-record contract](../../../workflow/resources/problem-records.md) first. In each repository,
-use the selected profile provider to list, read, update and close debt. Provider failure blocks that
-repository's record operation; retain unsent facts under the shared guidance.
+1. **Scope.** Work in the current repository. From a directory that is not a repository but holds several
+   child repositories, survey their debt as one list; the picked item's repository then owns the run.
+2. **Pick fast.** List titles and severity in one pass. Rule an item out only for a fact one command
+   settles: already in flight (`git branch -a`, `git worktree list`, open PRs), or needing a decision only
+   the owner can make. Take the first genuinely high-value, self-contained item and say why in two lines;
+   say so when an item is stale or wrong. A small related fix in a file the item already touches rides along
+   as its own commit; anything bigger becomes its own debt record.
+3. **Branch.** Start from the fetched default under `engineering:branching`; use
+   `engineering:open-worktree` only when a concurrent writer needs isolation.
+4. **Fix and verify.** Find the root cause and make the long-term fix. Build the affected projects and run
+   their focused tests; local E2E is not a routine gate.
+5. **Close the loop.** Commit each item separately, update it with the verification evidence and close it
+   through the provider only once its resolution condition holds. Deliver through `engineering:open-pr`;
+   the selected profile decides how many PRs.
 
-## Steps
-
-1. **Determine scope, then isolate.** When a parent Workflow run supplies the current goal, delivery slice,
-   and checkout, retain them and do not create another goal, branch, or checkout. Otherwise first tell
-   single-repo mode (the working directory, or an ancestor, is itself a git repository) from polyrepo-root
-   mode (the working directory is *not* a git repository, but
-   multiple of its immediate children are each their own git repository — e.g. a `Concertable/` folder
-   holding `auth/`, `b2b/`, `customer/`, `payment/`, `search/`, `docs/`, `agents/` as separate
-   checkouts, alongside whatever non-repo files or folders — a README, a shared script, IDE metadata — also
-   happen to sit there; those are simply out of scope, not disqualifying). A directory with no ancestor repo
-   and no such child repos beside it is neither mode — not a valid invocation; say so and stop.
-
-   - **Single-repo mode:** survey the repository, then start the selected focused slice from the current
-     remote default. Select or reuse an available checkout under `engineering:branching`; use
-     `open-worktree` when concurrent work or necessary isolation requires another checkout. Each active
-     writer has one owning branch and checkout.
-   - **Polyrepo-root mode:** run Step 2's survey across every child repository's selected debt items as one
-     combined list. Once the primary item is selected, its child repo owns this run. Select the branch
-     and checkout there under the same `branching` and `open-worktree` rules as single-repo mode. A second item may join the bundle only if it also lives in that same child
-     repo, on top of passing the Step 2 bundling test below — a PR belongs to one repo, so cross-repo
-     bundling doesn't exist. Every other child repo stays untouched; picking from more than one of them is a
-     future run, not this one.
-2. **Pick the item(s) fast.** List titles and severity across the selected debt items in one pass (in
-   polyrepo-root mode, across every child repository's set, combined); do not read each entry in full or
-   deep-dive candidates before choosing. Rule an item out only for a fact one command settles: already in
-   flight (`git branch -a` or `git worktree list` naming that area, run within whichever repo the candidate
-   belongs to), or needing a decision only the repository owner can make. Take the first remaining item
-   that is genuinely high-value
-   and self-contained as the primary, rather than continuing to rank candidates against each other; the
-   bundling test below is applied after that pick, not as part of it. Say which you picked and why in a
-   couple of lines before diving in. If the item as written is stale or wrong, say so.
-
-   **Bundling.** Add a second (or third) item to the same PR only when *every* condition holds for it:
-   - it is independently small — a narrow, mechanical, single-PR fix, not one already flagged as needing
-     a split or a publish-first cut-over;
-   - it touches files disjoint from every other item already picked for this PR, so there is no realistic
-     merge conflict between them and each diff can be read on its own;
-   - it does not depend on, and is not depended on by, another bundled item's change.
-
-   A single non-trivial or multi-file item is still a PR of its own — bundling exists to stop trivial
-   fixes each paying for a full isolate/PR/queue cycle, not to grow one PR's blast radius. State the
-   whole bundle up front, the same couple of lines per item, before starting on any of them.
-
-   **Opportunistic drive-bys.** A small, clearly-related improvement noticed in a file already open for
-   the primary item — not a pre-tracked entry, just something spotted while you're there — may be fixed
-   in the same PR, as its own commit, when it is genuinely small and safe: no new file beyond what the
-   primary item already touches, no design decision a reviewer would want isolated, nothing that could
-   plausibly need its own revert. State it in one line when you make the call, the same as a bundled
-   item. Anything bigger than that, or outside the files the primary item already touches, is not a
-   drive-by — it is either a new bundle candidate (apply the bundling test above) or its own tech-debt
-   entry; never silently skip it.
-3. **Investigate.** Read the surrounding code and understand the real root cause before touching anything,
-   for each item in the bundle.
-4. **Fix it properly.** Always the long-term, scalable solution, never the hacky shortcut — the shortcut
-   decision remains subject to the repository's current-solution policy. It can span multiple PRs; if it genuinely
-   needs splitting, say so in one line, drop it from any bundle, and start with the first PR on its own
-   branch.
-5. **Verify.** Build the affected projects to zero errors and run the affected unit/integration tests. Do
-   not run local E2E for PR-bound work; the merge queue owns that gate per the repository's plan floor.
-6. **Close the loop.** Give each item its own commit — never squash a bundle into one — so the PR reads as
-   N independent, individually-revertable changes. Update each canonical item with progress and close it
-   only through its provider after its resolution condition is verified. Then push and open one PR covering
-   the whole bundle following the `open-pr` standard, with a body section per item. Do not set an E2E label while opening the PR; the merge procedure's tier selection normalizes it
-   mechanically at merge time.
-
-Don't ask to confirm reversible steps — investigate, fix, build, commit, and push on the branch. Surface
-the item(s) you picked before starting, and flag anything irreversible.
-
-## Bounded dispatch, and the state that outlives a stage
-
-The Step 2 survey and Step 3 investigation may use independent read-only Workflow v2 roles —
-`evidence-explorer` over the selected debt items and surrounding code, `test-impact-analyst` for the
-affected projects and their commands — through the semantic envelopes in `.agents/workflows/contract/v2`, or
-the packaged `../../workflows/contract/v2` bundle. Picking, bundling, the split call, and the fix stay with
-the parent. A bundled item whose transformation is disjoint from every other may go to a `mechanical-worker`
-under one exclusive writer lease; writes stay serialized and the parent reconciles the reported paths against
-Git.
-
-Each delivery slice keeps its branch, selected checkout, commits and PR through these stages. When the
-work needs multiple PRs, resolve and validate Workflow v2 repository state, promote it through
-`engineering:plans`, and checkpoint under `engineering:plans`. Deliver the remaining slices
-under `engineering:branching`, resuming from the entry and ledger rather than this session.
-
-## Example
+Independent read-only surveys may go to host-native subagents (`evidence-explorer`,
+`test-impact-analyst`); picking, the fix and every write stay with the parent.
 
 ```text
-The selected provider lists debt WI-320, "remove the duplicate parser branch", as the first unblocked
-high-value item in api/. It has no branch or worktree owner. Select its api checkout, repair the duplicate
-branch, run the parser unit tests, commit the focused change, and update WI-320 with the test evidence
-before closing it through the provider.
+The provider lists debt WI-320, "remove the duplicate parser branch", as the first unblocked high-value
+item in api/ with no branch or worktree in flight. Branch from origin/main, remove the duplicate branch,
+run the parser unit tests, commit, record the passing tests on WI-320 and close it through the provider.
 ```

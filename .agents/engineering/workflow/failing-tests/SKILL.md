@@ -1,114 +1,59 @@
 ---
 name: failing-tests
-description: Diagnose and repair failing tests and browser acceptance stalls through observed evidence and focused reruns. Use when a unit, integration, API or UI test fails, a browser acceptance flow misses its startup or progress deadline, or a proposed workaround would disable a test or inflate its timeout. A compiler, restore, or build error is not a red run and does not select this skill.
+description: Diagnose and fix a failing unit, integration, API or UI test, or a stalled browser acceptance flow, from observed evidence and focused reruns. Not for compiler, restore or build errors.
 
 kind: workflow
 domain: process
 ---
 
-# A failing test is never just reported
+# Fix a failing test
 
-Whenever **any** test run comes back red — unit, integration, API, or UI — the next action is the
-diagnose-and-fix loop, **not** a status report back to the human. **A failure *is* the trigger**; don't make
-someone ask for it.
-
-The loop is yours end to end: **run → diagnose → fix → re-run until green.** Find the root cause and fix it in
-code, wherever the real bug lives — service, handler, page object, step definition, fixture, configuration.
+Owns the loop after any red test run: run, diagnose, fix, rerun until green. A failure is the trigger; fix
+the root cause wherever it lives, whether service, handler, page object, step, fixture or configuration,
+instead of reporting the red run back.
 
 ```text
 python -m pytest tests/test_repository_permissions.py -q
 FAILED test_every_ci_verify_command_is_allowed_for_both_shells: 18 != 17
-Cause: a CI verify step was removed. Fix: update the expected count to 17, then re-run until green.
+Cause: a CI verify step was removed. Fix: update the expected count to 17, then rerun until green.
 ```
-
-**Route by tier.** Each tier has its own procedure, and entering it *is* the next action; picking through the
-failure by hand is how a tier's known traps get rediscovered one at a time.
 
 | Red run | Procedure |
 |---|---|
-| Unit | Use the repository's unit-test guidance when present; otherwise the parent diagnoses the smallest failure, fixes its cause, and reruns it |
-| In-process .NET integration using `WebApplicationFactory` | the selected stack or IDE's `integration-debug` procedure, when installed and applicable |
-| Service E2E (no browser) | the selected stack or IDE's `e2e-api-debug` procedure, when installed and applicable |
-| Browser E2E | the selected stack or IDE's `e2e-ui-debug` procedure, when installed and applicable |
-| Both E2E tiers at once | the selected stack or IDE's `e2e-debug` procedure, when installed and applicable |
+| Unit | The repository's unit-test guidance, otherwise diagnose and fix in the parent |
+| In-process .NET integration (`WebApplicationFactory`) | The selected stack's `integration-debug`, when installed and applicable |
+| Service E2E (no browser) | The selected stack's `e2e-api-debug`, when installed and applicable |
+| Browser E2E | The selected stack's `e2e-ui-debug`, when installed and applicable |
+| Both E2E tiers | The selected stack's `e2e-debug`, when installed and applicable |
 
-A repository-specific tier procedure applies only when its described runner and harness match the red run.
-Otherwise keep diagnosis in the parent and follow the repository's own test guidance; never force a generic
-unit runner into an unrelated ecosystem's integration workflow.
+A tier procedure applies only when its runner matches the red run; otherwise follow the repository's own
+test guidance. A test the IDE never discovered, or a build that produced no test result, is not a red run.
 
-A test the IDE never discovered is not a red run at all — that is
-the selected IDE's test-discovery repair procedure, when installed and applicable.
-
-**Neither is a compiler, restore, or generator error.** A build that never produced a test result has nothing
-to triage: fix it in the ordinary diagnose/fix/rebuild loop and enter here only once a run happens and a test
-fails. That holds when the thing that stopped compiling is the test project itself.
+Never disable, skip, quarantine, mark flaky or inflate a timeout to get past a failure. A timeout change is a
+diagnosis you can state and defend. For a suspected flake or timing failure, apply
+`engineering:failure-provenance`. A CI failure is reproduced locally only for its failing scope, then fixed,
+pushed once and left to CI.
 
 ## Observable browser acceptance
 
-Establish an observer before launching a browser acceptance flow or handing a browser step to the user.
-Use the actual user entry point and an observable real browser in the intended desktop session. Declare the
-expected first rendered state, the next meaningful progress state and a bounded deadline for each step
-using the selected project's acceptance contract. Tool choice and deadline values belong to that project.
-A running server, HTTP 200 or passing headless fixture alone does not establish visible launch or completion.
+Before launching a browser acceptance flow or handing a browser step to the user, observe the real entry
+point in a visible browser in the intended desktop session. Declare the first rendered state, the next
+progress state and a deadline for each from the project's acceptance contract. A running server, HTTP 200
+or a passing headless fixture does not prove visible launch.
 
-Arm automatic timeout evidence before launch. When startup or progress misses its deadline, capture a
-safely scoped screenshot, redacted DOM or rendered-state snapshot, and available console errors and
-request-failure metadata. Preserve timestamps and the expected versus observed step so the artifacts explain
-the stalled transition. Inspect those artifacts, enter the applicable browser E2E diagnostic procedure above,
-repair the cause and rerun the failing scenario through the same user entry point. Do not ask the user to
-diagnose the UI or supply the first screenshot when the agent can obtain that evidence.
+Arm timeout evidence before launch: on a missed deadline, capture a safely scoped screenshot, a redacted
+DOM or state snapshot and console and request-failure metadata with timestamps and the expected versus
+observed step. Inspect it, repair the cause and rerun through the same entry point. Never ask the user for
+evidence the agent can capture. If the browser bridge is unavailable, verify a supported fallback that sees
+the actual window, without weakening browser security or copying credentials; otherwise report the missing
+capability and the unverified step.
 
-If the primary browser bridge is unavailable, establish and verify a supported observable fallback in the
-correct desktop environment before relying on a user handoff. Confirm it can observe the actual browser
-window and capture the required safe evidence. Do not weaken browser security, change account boundaries
-or copy credential stores to make observation work. If no suitable surface is available, report the exact
-missing capability and the unverified acceptance step; never claim a screenshot or observed state exists.
-
-Expected human authentication or security approval is a distinct waiting state. Keep the observer attached
-and record that state while the user enters secrets or approves access directly in the supported UI. Resume
-the progress deadline when that handoff completes; a legitimate wait is not evidence of a malfunction.
-Capture only the safe application region and redact sensitive fields before saving or exposing evidence.
-Screenshots, DOM, traces, URLs and network metadata must not disclose passwords, tokens, authorization
-codes, cookies or PEM material; omit request bodies. During a sensitive step, monitor only non-secret state
-signals and withhold unsafe artifacts with an explicit reason rather than capturing the user's secrets.
-
-For a project whose selected acceptance runner provides these options, a bounded first-run check is:
+A human sign-in or approval is a waiting state, not a malfunction: keep observing non-secret signals and
+resume the deadline afterwards. Evidence never discloses passwords, tokens, authorization codes, cookies or
+key material, and omits request bodies.
 
 ```text
 browser-acceptance --scenario first-run --observe --capture-on-timeout --artifacts artifacts/first-run
-Expected startup: the application renders its account-choice page before the project's startup deadline.
-Timeout evidence: a safe screenshot, redacted state and available console/request-failure metadata.
-Next action: inspect the evidence, fix the failed transition and rerun first-run to its declared final state.
+Expected: the account-choice page renders before the startup deadline.
+On timeout: a safe screenshot, redacted state and console/request-failure metadata; fix, then rerun.
 ```
-
-Use the project's real runner and options. A browser acceptance run that never reaches its first rendered
-state has failed even when no test assertion was reached. Keep source checks, headless checks, observed
-desktop execution and any pending human approval separate in the acceptance report.
-
-## Never bypass instead of fixing
-
-Do not disable, skip, quarantine, mark-as-flaky, build-skip, or inflate a timeout to get past a failure. That
-is bypassing, not fixing, and it converts a caught bug into an uncaught one plus a lie in the suite. If a
-timeout genuinely needs raising, that is a diagnosis you can state and defend, not a knob to turn until the
-red goes away.
-
-## Flaky-versus-real triage, for E2E only
-
-Re-run the **failed scenario alone on a fresh stack**:
-
-- **Passes clean** → a host-load blip. That is now *proven*, not assumed.
-- **Fails again** → a real bug. Fix it.
-
-Where a runner already does this for you — an isolated retry of just the failures
-of just the failures — that *is* this triage, and its verdict stands. Re-running by hand afterwards proves
-nothing that has not already been proven.
-
-Before that re-run, rule out the environment: a suite that died at fixture startup with zero scenarios
-executed is an environment failure, and the container-runtime check in the `remote-validation` skill comes
-first.
-
-## Where the failure came from a merge queue
-
-Don't drive a heavy local suite inline. Reproduce **only** the failing scope, from a dispatch prompt carrying
-the worktree path, branch, PR, failing scenarios, and the failure signature — then fix and push, and let the
-queue re-run the required suites on the way back in.

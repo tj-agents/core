@@ -1,6 +1,6 @@
 ---
 name: session
-description: Own the software-specific rules of an engineering session: standards-defect repair, feature and bugfix lifecycle selection, routine-decision delegation, reviewable delivery slices and source ownership. Use when starting, continuing or finishing work under an explicitly selected engineering lifecycle.
+description: Engineering session rules: whole-outcome delivery, lifecycle selection, routine-decision delegation, standards-defect repair and source ownership. Use for any engineering work.
 kind: policy
 domain: process
 ---

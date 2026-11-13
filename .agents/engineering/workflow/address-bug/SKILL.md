@@ -1,6 +1,6 @@
 ---
 name: address-bug
-description: Reconcile one actionable recorded bug with its existing repair owner, run the appropriate defect lifecycle, and update the canonical record only after causal verification. Use when the user asks to fix a named bug or to work an actionable bug record.
+description: Reconcile one recorded bug with its existing repair owner, run the defect workflow and resolve the record only after causal verification. Use to fix a named bug or work a bug record.
 
 kind: workflow
 domain: process
@@ -8,36 +8,26 @@ domain: process
 
 # Address a recorded bug
 
-Read [the shared problem-record contract](../../../workflow/resources/problem-records.md). This workflow selects and
-tracks repair; it does not replace `engineering:bugfix`, `engineering:failing-tests`, or an existing plan
-owner.
+Owns selecting and tracking the repair of a recorded bug. Read
+[the shared problem-record contract](../../../workflow/resources/problem-records.md); `engineering:bugfix`,
+`engineering:failing-tests` or an existing plan owns the repair itself.
 
-1. Use the selected profile provider's read/list/update/close commands. Reconcile the named record, or
-   select one actionable high-value record quickly. Do not deep-rank every
-   record. Prefer an unblocked `P0` or `P1`, then the first useful `P2` or `P3`; priority alone does not pause
-   unrelated work. Suspend only the operations a defect makes unsafe.
-2. Reconcile an existing goal, session, branch, PR, or writer before writing or dispatching. If another
-   owner already has the causal repair, update the record with the link and evidence instead of starting a
-   second writer. Update blocked records with their real reason and resume condition.
-3. Re-enter an existing authorized goal through `workflow:run` only when this work is not already
-   executing under that goal owner. Inside a bounded Workflow assignment, retain its owner and scope, use
-   the narrower `engineering:failing-tests` loop when an active failing test already bounds the work, or
-   use `engineering:bugfix` for diagnosis and repair, then return verification and record evidence to the
-   Workflow owner. These lifecycles own implementation and verification.
-4. Link related mistake or debt incidents to the repair. Keep cause unknown until evidence confirms it;
-   do not merge records merely because symptoms resemble each other.
-5. Set `resolved` only when the record's objective causal resolution condition has been tested and attach
-   that evidence. Retain the resolved bug. If the repair cannot proceed, leave it `blocked` or `deferred`
-   with the shared contract's required fields and continue the original task where it remains authorized.
+1. Use the selected profile provider's read, list, update and close commands. Reconcile the named record,
+   or pick one actionable high-value record quickly: an unblocked `P0` or `P1`, then the first useful `P2`
+   or `P3`. Priority alone does not pause unrelated work.
+2. Reconcile any existing goal, session, branch, PR or writer first. When another owner already has the
+   causal repair, link it on the record instead of starting a second writer. A blocked record keeps its
+   real reason and resume condition.
+3. Otherwise repair through `engineering:failing-tests` when a failing test bounds the work, or
+   `engineering:bugfix`; inside a Workflow assignment, return the evidence to its owner.
+4. Link related mistake or debt records. Keep the cause unknown until evidence confirms it.
+5. Set `resolved` only after the record's causal resolution condition is tested, with that evidence.
 
-Answer a user's direct question before entering this workflow. Recording or selecting a record does not
-grant repair or publication authority beyond the active task.
-
-## Example
+Answer a direct question before entering this workflow. Selecting a record grants no authority beyond the
+active task.
 
 ```text
-Work Items bug WI-241 reports that an export without a title returns HTTP 500. PR #91 already contains
-the causal repair and its regression test. Link WI-241 to PR #91 and keep its existing owner; do not open
-a second branch. After the regression test passes against the repaired export, record that evidence and
-set WI-241 to resolved.
+Bug WI-241: an export without a title returns HTTP 500. PR #91 already holds the causal repair and its
+regression test, so link WI-241 to PR #91 rather than opening a second branch. Once the regression test
+passes against the repaired export, record that evidence and set WI-241 to resolved.
 ```

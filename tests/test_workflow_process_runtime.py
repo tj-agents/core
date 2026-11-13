@@ -14,23 +14,16 @@ CONTINUATION = ".codex/runtime/continuation/"
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows npm-style host shims")
 @pytest.mark.parametrize("suffix", [".cmd", ".bat"])
-def test_batch_host_probe_and_generic_command_use_the_native_runner(
+def test_batch_command_uses_the_native_runner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, suffix: str
 ) -> None:
     workflows = ROOT / ".agents/workflows"
     monkeypatch.syspath_prepend(str(workflows))
     operations = importlib.import_module("workflow_ops")
-    hosts = importlib.import_module("host_runtime")
     tools = tmp_path / "tools ü"
     tools.mkdir()
     executable = tools / ("codex" + suffix)
     shutil.copy2(ROOT / ".agents/hooks/tests/fixtures/windows_host.cmd", executable)
-    registry = hosts.HostAdapterRegistry(
-        workflows, ROOT, executable_resolver=lambda _: str(executable)
-    )
-    probe = registry.probe("codex")
-    assert probe["status"] == "available", probe
-    assert probe["version"] == "fixture-host 1.0"
     result = operations.run_process([str(executable)], tmp_path)
     assert result.returncode == 0
     assert result.stdout.strip() == "fixture-host 1.0"

@@ -1,6 +1,6 @@
 ---
 name: feature
-description: Implement an explicitly requested new or changed behavior from discovery through review, validation, and commit when no active plan owns the work. Use for feature requests and behavior changes; do not use for defect repair, planning-only requests, execution of an existing plan, or review-only requests.
+description: Implement a requested new or changed behavior from discovery through tests, review and commit when no active plan owns it. Not for defect repair, planning-only requests or review-only requests.
 
 kind: workflow
 domain: process
@@ -8,89 +8,36 @@ domain: process
 
 # Deliver a feature
 
-Own an unplanned feature from the user's request to a completed repository outcome. If an explicit or
-uniquely resolved active plan already owns the work, use that plan's execution workflow instead. A direct
-question or report request is not implementation authority.
+Owns an unplanned feature from the request to a completed repository outcome. An active plan that owns the
+work runs under its own execution workflow; a question or report request is not implementation authority.
+When a Workflow owner delegates a bounded slice, do that slice and return its evidence to the same owner.
 
-## Resolve the path
+1. Read the repository's guidance and the standards for the paths likely to change; interpret the
+   requirement and success conditions from repository evidence before editing. Before choosing how to
+   build a reusable tool or mechanism, apply `base:solution-assessment`.
+2. Keep requirement interpretation, architecture, public contracts, data, security and migration decisions
+   and the final judgment in the parent. Independent read-only questions may go to host-native subagents
+   (`evidence-explorer`, `test-impact-analyst`); a disjoint mechanical change may go to one
+   `mechanical-worker`. One writer at a time; reconcile its reported paths against Git and validate every
+   result before using it, falling back to the parent on an invalid one.
+3. Implement, then run focused checks through the shared `run` operation per
+   `engineering:remote-validation`. For browser-visible acceptance, establish
+   [observable browser acceptance](../failing-tests/SKILL.md#observable-browser-acceptance) first. Commit
+   per `engineering:committing`.
+4. Review the committed candidate once with `engineering:review` and fix its actionable findings; the
+   selected profile decides whether fixes need another pass. Enter `engineering:failing-tests` for any red
+   run.
+5. When the work outgrows one session, follow `engineering:plans`. When the user's authorization covers
+   delivery, continue through `engineering:open-pr` and `engineering:merge`.
 
-Read the repository's branch/worktree guidance and the standards owed by the paths likely to change. Interpret
-the requirement, success conditions, scope, and any material ambiguity from repository evidence before
-editing.
-
-When a Workflow owner delegates a bounded technical slice, perform that slice and return implementation, test, review and delivery evidence to the same owner. Do not claim the whole goal or redirect the operation back to `workflow:run`. Resolve technical rules through selected native discovery and use the shared `inspect` operation once for routine repository state.
-
-Use the short path when ownership is obvious, one coherent implementation follows existing patterns, and
-focused validation can prove it. The short path creates no plan, ledger, workflow sidecar, or automatic
-checkpoint. Do the discovery directly; dispatch at most one bounded independent read only when it adds real
-evidence.
-
-Promote before recovery becomes fragile when the work grows across phases, delivery worktrees, external
-gates, or context/restart boundaries. Resolve and validate Workflow v2 repository state, then follow
-`engineering:plans` to create the durable plan and ledger and
-checkpoint them under
-`engineering:plans`. A Kandev-managed task may own the outer worktree and host
-session, but its identifiers are not workflow state. Continue under the plan's owner while the original
-implementation authority still covers the work.
-Promotion changes persistence, not the requested outcome.
-
-## Execute the lifecycle
-
-Read [the shared recording contract](../../../workflow/resources/problem-records.md). Reconcile the canonical item
-through the selected profile, preserving its requirements and acceptance
-criteria. Update its progress and verified acceptance through that contract before reporting it resolved; a
-delivered PR alone does not close the item.
-
-1. Discover repository ownership, applicable standards, analogous implementations, dependencies, and test
-   impact. Parallelize only independent bounded reads. Before choosing how to build a reusable tool,
-   capability or technical mechanism, including one added to an existing repository, load
-   `base:solution-assessment` and apply it.
-2. Keep requirement interpretation, architecture, public contracts, data/security/migration implications,
-   validation sufficiency, and final judgment with the parent.
-3. Implement directly. A `mechanical-worker` may receive only a disjoint transformation under an exclusive
-   writer lease; all writes remain serialized and the parent reconciles the reported paths against Git.
-4. Run the focused checks through the shared `run` operation so detailed output remains an artifact and the
-   model receives only bounded results. For browser-visible acceptance, establish
-   [observable browser acceptance](../failing-tests/SKILL.md#observable-browser-acceptance) before launching
-   the flow or handing a browser step to the user. Then apply
-   `engineering:committing` so branch-diff review has an immutable candidate.
-5. Run the repository's focused independent `engineering:review`. Because this lifecycle includes
-   implementation, resolve actionable findings through `engineering:address-review`, commit
-   those fixes, and recheck only the resulting delta through
-   `engineering:incremental-review`.
-6. Run every remaining repository-required validation tier. Enter
-   `engineering:failing-tests` immediately for a red run and use
-   `engineering:remote-validation` when validation belongs remotely.
-7. Checkpoint only material recovery state and commit any remaining coherent change. Re-resolve the next safe,
-   reversible action after every implementation, review, validation, checkpoint, and commit; continue while
-   authorized work remains.
-8. When `workflow:run` records that the original authorization covers delivery, continue to
-   `engineering:merge`, reaching it through
-   `engineering:open-pr` when no PR exists. Waiting on a queue, CI run, publish, or the version-sync
-   PR a merge generates is a poll, not a gate; own each to terminal, that generated PR included.
-
-## Dispatch and fallback
-
-Use the Workflow v2 semantic dispatch/result and provider/state envelopes in `.agents/workflows/contract/v2`
-when present, or the packaged `../../workflows/contract/v2` bundle. Submit capabilities such as `evidence-explorer`,
-`test-impact-analyst`, `review-lens`, or a leased `mechanical-worker`; never select an agent or model by name.
-Subordinates return cited evidence and never choose architecture, scope, severity, or the next stage.
-
-Validate each result. Give one focused follow-up to a correctable incomplete result, then cancel and perform
-the same bounded objective in the parent on another invalid result, timeout, unavailable role/model, or
-unsupported host capability. A cancelled or failed writer is reconciled from Git before any lease is reused.
-
-## Terminal result
-
-Return one completed repository outcome naming the implemented behavior, validation, review state, and
-delivery state; a commit is not terminal while authorized delivery remains. Otherwise return one typed human
-gate with its owner, required action, evidence, and observable resume condition. Do not expose internal agent
-transcripts, model choices, routine continuation prompts, or a phase boundary as a stopping condition.
-
-## Example
+When the work delivers a tracked item, update it through the selected profile under
+[the recording contract](../../../workflow/resources/problem-records.md); a merged PR alone does not resolve it.
 
 ```text
-Work Items feature WI-605 requires CSV export to include the account owner column. An analogous JSON export
-already defines that column, so add the matching CSV mapping and a focused export test. After the test and
-review pass, update WI-605 with the verified acceptance evidence; an open PR alone does not resolve it.
+Work item WI-605: CSV export must include the account owner column. The JSON export already maps it, so
+add the matching CSV mapping and test_csv_export_includes_owner. The test passes, review finds nothing,
+commit; record the passing test on WI-605 before resolving it.
 ```
+
+Return one outcome naming the behavior, validation, review and delivery state, or one human gate with its
+owner, required action and resume condition. A commit is not terminal while authorized delivery remains.

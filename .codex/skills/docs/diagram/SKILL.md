@@ -1,6 +1,6 @@
 ---
 name: diagram
-description: Decide whether a page needs a diagram and draw it in Mermaid - only where it shows a mechanism prose or a table cannot, sequenceDiagram for order over time, flowchart for architecture, one idea per diagram, classDef colours readable in light and dark, never ASCII art, source kept beside the page. Use whenever a page explains how systems interact, where data lives or a before/after change, or when a diagram is unreadable in a theme.
+description: Decide whether a page needs a Mermaid diagram and draw it: one idea each, theme-safe classDef colours, no ASCII art, source beside the page. Use when a page shows interactions, data flow or a change.
 kind: convention
 domain: docs
 ---
