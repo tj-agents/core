@@ -79,6 +79,11 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/hooks/boundary.py",
+      "destination": "hooks/boundary.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/hooks/check_tier_payload.py",
       "destination": "hooks/check_tier_payload.py"
     },
@@ -186,6 +191,11 @@
       "plugin": "engineering",
       "source": ".agents/hooks/selected_standards.py",
       "destination": "hooks/selected_standards.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/boundary.py",
+      "destination": "hooks/boundary.py"
     },
     {
       "plugin": "base",
