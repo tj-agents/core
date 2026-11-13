@@ -1,6 +1,6 @@
 ---
 name: layout
-description: Lay out a page people read so it can be scanned and revisited - a summary a reader can stop at, numbered sections, tables for parallel items, collapsible detail, diagrams for flows, and state kept distinct. Use when writing or restructuring a human-facing page such as a design page, Confluence page, project record, explainer or revision page.
+description: Lay out a human-facing page to scan and revisit: stop-here summary, numbered sections, tables, collapsed detail, distinct state. Use when writing or restructuring a design, Confluence or revision page.
 kind: convention
 domain: docs
 ---

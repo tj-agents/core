@@ -77,24 +77,9 @@ The packages have no release line or compatibility promise: machines follow each
 through automatic updates. Selection stays an
 independent user and repository setting; adding a marketplace does not select its full roster.
 
-## Repository auto-merge
-
-An engineering-enabled repository opts into guarded agent auto-merge in `.agents/settings.json`:
-
-```json
-{"configuration":{"core":{"auto_merge":true}}}
-```
-
-Omit `configuration.core.auto_merge`, or set it to `false`, to disable the capability. The setting only
-permits the guarded workflow command to request GitHub auto-merge; it does not authorize a merge. Standing
-or scoped merge authority, every stop class and hold label, exact-head checks, current independent review,
-security review, and checkout identity must still pass. The guarded workflow rereads settings at execution
-time, so disabling it after a delivery binding prevents arming auto-merge. See
-[repository settings](docs/workflows/REPOSITORY_CONFIGURATION.md) for the complete contract.
-
 ## Repository routine design approval
 
-`configuration.core.auto_approve` is separately `false` for every supported routine category when
+`configuration.core.auto_approve` is `false` for every supported routine category when
 absent. Its only currently supported category is `design`, including routine convention choices. A
 design-only opt-in is:
 
@@ -112,7 +97,8 @@ An explicit `design` value overrides `all`, and omitted members default to `fals
 `auto_approve` object disables design approval. When enabled, an agent may make and record routine design
 or convention choices within work already authorized by the user. It does not override an explicit user
 reservation, task scope, stricter repository rule, or any merge, publication, installation, or permission
-gate. Source verification does not establish installed-host trust or acceptance.
+gate. Source verification does not establish installed-host trust or acceptance. See
+[repository settings](docs/workflows/REPOSITORY_CONFIGURATION.md) for the complete contract.
 
 ## Layout
 
@@ -140,7 +126,7 @@ pwsh .agents/sync-generated.ps1
 The Windows and Linux test suites run only on a PR labelled `ci:full`; every other PR and main run
 selection, the generated-path guard and guidance examples. With the label, `scripts/ci_selection.py`
 (Python 3.9+) classifies the PR's own change from its merge base. Inert prose runs the documentation
-reachability check. Changes to mapped problem-record and handoff-transfer code run their regression modules on Windows and Linux, with generation and packaging
+reachability check. Changes to mapped problem-record code run their regression modules on Windows and Linux, with generation and packaging
 checks. Changed test modules include their import consumers. Unknown paths, shared infrastructure,
 executable guidance, binary changes, unresolved ranges and broad changes run the full matrix. Adding or
 removing the label reevaluates selection.
