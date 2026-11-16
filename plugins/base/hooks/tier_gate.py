@@ -19,8 +19,8 @@ declaration cannot claim to be a plugin it is not.
 an `.agents/plugins.json` selection it names the selected stacks whose writes are gated, without
 assessing the repository; in any other repository it states which tiers apply.
 
-`--write-gate` (PreToolUse on writes) denies a write to a file matching a selected stack's path
-predicate until this agent has read that stack's core standards, and lists their canonical files.
+`--write-gate` (PreToolUse on writes) requires adoption of installed stacks that directly own
+the target file, then requires reading the selected stack's core standards.
 `--record-read` (Claude `Read` of a `SKILL.md`) and `--record-command` (Codex shell commands) record
 which canonical files the agent has read; `--compacted` forgets them. These paths use filesystem
 checks only, never Git, so they stay cheap enough to run on every write.
@@ -1298,10 +1298,27 @@ def path_markers(declaration: Declaration) -> list[str]:
 
 def declares_path(declaration: Declaration, relative: PurePosixPath) -> bool:
     return any(
-        fnmatch.fnmatch(relative.as_posix(), marker)
-        or ("/" not in marker and fnmatch.fnmatch(relative.name, marker))
+        glob_target_matches(relative.as_posix(), marker)
+        or ("/" not in marker and glob_target_matches(relative.name, marker))
         for marker in path_markers(declaration)
     )
+
+
+def glob_target_matches(target: str, pattern: str) -> bool:
+    """Match globstar directory segments even when they consume no directories."""
+    pending = [pattern]
+    seen = set()
+    while pending:
+        candidate = pending.pop()
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if fnmatch.fnmatch(target, candidate):
+            return True
+        before, separator, after = candidate.partition("**/")
+        if separator:
+            pending.extend((before + after, before + "*/" + after))
+    return False
 
 
 @functools.lru_cache(maxsize=2)
@@ -1476,6 +1493,53 @@ def selected_stacks(repository: Path) -> list[Declaration]:
             and declaration.payload_dir is not None and path_markers(declaration)]
 
 
+def direct_path_predicates(node: object) -> list[tuple[str, str]]:
+    """Paths that independently establish a schema-v3 stack, without context."""
+    if not isinstance(node, dict) or len(node) != 1:
+        return []
+    operator, value = next(iter(node.items()))
+    if operator in ("file", "glob") and isinstance(value, str):
+        return [(operator, value)]
+    if operator == "any" and isinstance(value, list):
+        return [predicate for child in value for predicate in direct_path_predicates(child)]
+    return []
+
+
+def unselected_stacks(target: Path) -> list[str]:
+    """Installed stacks that directly own this file but have not been adopted."""
+    repository = repository_root(target)
+    if repository is None:
+        return []
+    selection = PluginSelection.read(repository)
+    identities = selection.identities if selection is not None else ()
+    relative = PurePosixPath(target.relative_to(repository).as_posix())
+    missing = []
+    for declaration in declarations(project=repository):
+        if (
+            not declaration.gated
+            or declaration.id in identities
+            or declaration.diagnostics
+            or declaration.orphaned
+        ):
+            continue
+        predicates = (
+            direct_path_predicates(declaration.detect)
+            if declaration.schema_version == 3
+            else [(kind, marker) for key, kind in (("files", "file"), ("globs", "glob"))
+                  for marker in _listed(declaration.detect, key)
+                  if isinstance(marker, str) and marker]
+        )
+        if any(
+            os.path.normcase(relative.as_posix()) == os.path.normcase(marker)
+            if kind == "file" else (
+                glob_target_matches(relative.as_posix(), marker)
+                or ("/" not in marker and glob_target_matches(relative.name, marker)))
+            for kind, marker in predicates
+        ):
+            missing.append(declaration.id)
+    return sorted(set(missing))
+
+
 def required_standards(target: Path) -> list[Standard]:
     """The core standards of each selected stack whose path predicate matches the target."""
     repository = repository_root(target)
@@ -1503,7 +1567,15 @@ def write_gate(payload: Mapping[str, object], state_directory: Path) -> str:
     missing: dict[str, Standard] = {}
     trigger = ""
     for path in write_paths(payload):
-        for standard in required_standards(_target(path, cwd)):
+        target = _target(path, cwd)
+        unselected = unselected_stacks(target)
+        if unselected:
+            return (f"Blocked: {path} requires repository stack selection: "
+                    + ", ".join(unselected)
+                    + ". Follow base:project-setup and use agent:plugins to adopt these stacks "
+                    "in the target repository, complete its write and passing check, then retry. "
+                    "Reading standards alone does not adopt their plugins.")
+        for standard in required_standards(target):
             if standard.name not in missing and not ledger.loaded(standard_key(standard.path)):
                 missing[standard.name] = standard
                 trigger = trigger or path
