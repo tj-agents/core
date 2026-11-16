@@ -103,7 +103,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:1a5ad973c62dd91db688c8bccaaabb81717ae355ccad554c67293d2a1f42cb18",
+      "digest": "sha256:c731267dd2a392a0339af4e8ca45db1c2f8afae88b76da4e7321447315ab364f",
       "harness": {
         "marketplaces": [
           {
@@ -119,95 +119,8 @@
         ],
         "hooks": [],
         "permissions": {
-          "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)"
-          ],
-          "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
-                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
-                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
-                ]
-              ],
-              "justification": "Read work-item tracker state and supporting plans without changing them.",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py",
-                  "payments"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
-                  "payments",
-                  "20",
-                  "all"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/writer.py"
-                ],
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
-                  "payments"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ],
-              "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ]
-            }
-          ]
+          "claude_allow": [],
+          "codex_prefix_rules": []
         }
       },
       "external_dependencies": {
@@ -296,7 +209,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:392e46fb0821fa6b73d77fd72cc84288a7fb14056d9349ed0ef5f13ca3dafbd5",
+      "digest": "sha256:c91edfd21d35624a89fbb360e49a466a06b6df918031d1f2e743df80e7161143",
       "harness": {
         "marketplaces": [
           {
@@ -313,127 +226,8 @@
         ],
         "hooks": [],
         "permissions": {
-          "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)"
-          ],
-          "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
-                  "${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py",
-                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
-                ]
-              ],
-              "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; a delivered report and verified idle session remain separate prerequisites for retained-session closure",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py",
-                  "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
-                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/worktree_sweep.py"
-                ],
-                "--repo"
-              ],
-              "justification": "engineering:merge Step 5 removes proven-merged worktrees for one repository; it never forces, keeps worktrees in use, and archives leftovers first",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
-                  "--repo",
-                  "C:/repo"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/skills/merge/scripts/other.py",
-                  "--repo",
-                  "C:/repo"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                "${PLUGIN_ROOT}/workflows/pr_body.py",
-                "--body-file"
-              ],
-              "justification": "Reads a proposed PR description and rejects missing or empty What and Why sections before any forge write; no repository or remote state changes",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/workflows/pr_body.py",
-                  "--body-file",
-                  "body.md"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/workflows/pr_body.py"
-                ]
-              ]
-            }
-          ]
+          "claude_allow": [],
+          "codex_prefix_rules": []
         }
       },
       "external_dependencies": {
