@@ -46,9 +46,9 @@ import time
 from collections.abc import Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from pathlib import Path, PurePosixPath
-from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.append(str(Path(__file__).resolve().parent.parent / "dependencies" / "agent" / ".agents" / "agent" / "runtime"))
 from boundary import (
     HostMemory,
     memory_reason,
@@ -65,13 +65,21 @@ from selected_standards import (
     payload_standards,
     standard_key,
 )
+from tj_agent.declarations import (  # type: ignore[import-not-found]
+    DECLARATION_NAME,
+    cache_roots,
+    installed,
+    origin_evidence,
+    origin_predicate,
+    parse_origin,
+)
+from tj_agent.declarations import (
+    ORPHAN_MARKER as ORPHAN_MARKER,
+)
 from tj_cli import process
 
 SCHEMA_VERSIONS = (1, 2, 3)
-DECLARATION_NAME = "tier.json"
-ORPHAN_MARKER = ".orphaned_at"
 FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
-PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
 OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
 STATE_DIRECTORY_VARIABLE = "AGENT_STATE_DIRECTORY"
 WALK_DEPTH = 4
@@ -240,8 +248,8 @@ def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
             problems.append(diagnostic("missing-employer-context", path + ".employer.context_skill", "Employer context skill must be readable and shipped within this payload"))
         if data.get("applies") != "stack-present":
             problems.append(diagnostic("malformed-employer", path + ".applies", "Employer declarations require stack-present"))
-        if predicate_uses_fact(data.get("detect"), "employer"):
-            problems.append(diagnostic("employer-self-dependency", path + ".detect", "Employer declarations cannot depend on the employer fact"))
+        if not origin_predicate(data.get("detect")):
+            problems.append(diagnostic("malformed-employer", path + ".detect", "Employer declarations detect by origin only: remote_host, remote, all and any"))
     return problems
 
 
@@ -334,9 +342,8 @@ def _evaluate_predicate(root, node, facts=None, contexts=None, path="detect", em
             return PredicateResult(root, diagnostics=[diagnostic("invalid-context", path, "Context has incompatible value: " + key)])
         return PredicateResult(root, matched, ["context " + key] if matched else [], ["context:" + key])
     if operator == "remote_host":
-        host = repository_host(root)
-        matched = host is not None and host == value.rstrip(".").lower()
-        return PredicateResult(root, matched, ["origin host " + host] if matched else [])
+        evidence = origin_evidence(node, repository_origin(root))
+        return PredicateResult(root, evidence is not None, evidence or ())
     legacy = {"file": "files", "glob": "globs", "remote": "remote", "content": "content"}
     matched, evidence = stack_present(root, {legacy[operator]: [value]})
     return PredicateResult(root, matched, [evidence] if evidence else [])
@@ -366,43 +373,6 @@ class WorkspaceInventory(list):
         self.reason = reason
 
 
-def cache_roots():
-    roots = []
-
-    def add(path):
-        try:
-            resolved = Path(path).resolve()
-        except (OSError, ValueError):
-            return
-        if resolved.is_dir() and resolved not in roots:
-            roots.append(resolved)
-
-    for variable in PLUGIN_ROOT_VARIABLES:
-        value = os.environ.get(variable)
-        if not value:
-            continue
-        try:
-            plugin_root = Path(value).resolve()
-        except (OSError, ValueError):
-            continue
-        if len(plugin_root.parents) >= 3 and plugin_root.parents[2].name == 'cache':
-            add(plugin_root.parents[2])
-
-    here = Path(__file__).resolve()
-    if len(here.parents) > 4 and here.parents[4].name == "cache":
-        add(here.parents[4])
-
-    for variable in ("CLAUDE_CONFIG_DIR", "CODEX_HOME"):
-        value = os.environ.get(variable)
-        if value:
-            add(Path(value) / "plugins" / "cache")
-
-    home = Path.home()
-    add(home / ".claude" / "plugins" / "cache")
-    add(home / ".codex" / "plugins" / "cache")
-    return roots
-
-
 def _key(path):
     return os.path.normcase(os.path.normpath(str(path)))
 
@@ -418,103 +388,37 @@ def _within(key, ancestor):
     return key == ancestor or key.startswith(ancestor.rstrip("\\/") + os.sep)
 
 
-def installed_declarations(root, project=None):
-    """Each installed `tier.json` the registry beside this cache names, with its scope rank, or None.
-
-    A project-scoped install outranks the user-scope one, the most specific project first; one scoped
-    to another project does not count. Reading only installed paths keeps the per-call cost
-    proportional to installed plugins, not to the stale versions a cache accumulates.
-    """
-    registry = Path(root).parent / "installed_plugins.json"
-    try:
-        plugins = json.loads(registry.read_text(encoding="utf-8-sig")).get("plugins")
-    except (OSError, UnicodeError, ValueError, AttributeError):
-        return None
-    if not isinstance(plugins, dict):
-        return None
-    cache = _resolved_key(root)
-    here = _resolved_key(project) if project is not None else None
-    ranked = {}
-    for entries in plugins.values():
-        for entry in entries if isinstance(entries, list) else ():
-            location = entry.get("installPath") if isinstance(entry, dict) else None
-            if not _text(location):
-                continue
-            scoped = _text(entry.get("projectPath"))
-            rank = -1
-            if scoped:
-                scope = _resolved_key(scoped)
-                if here is None or not _within(here, scope):
-                    continue
-                rank = len(scope)
-            ancestor = Path(location).parent.parent.parent
-            if _key(ancestor) != cache and _resolved_key(ancestor) != cache:
-                continue
-            path = Path(location) / DECLARATION_NAME
-            ranked[path] = max(rank, ranked.get(path, rank))
-    return ranked
-
-
 def declarations(roots=None, project=None, diagnostics=None):
-    """One declaration per plugin: the first cache root that has it, at its installed version.
+    """Each installed plugin's `tier.json`, read and validated, ordered by tier.
 
-    Roots are in priority order, the running host's cache first. A cache with a host registry beside it
-    answers only for its installed versions; one without falls back to every cached version, newest first.
+    Agent's `installed` chooses one installed version per plugin; roots are in priority order, the
+    running host's cache first.
     """
-    found = {}
-    for root in cache_roots() if roots is None else roots:
-        ranked = installed_declarations(root, project)
-        if ranked is None:
-            try:
-                ranked = dict.fromkeys(sorted(Path(root).glob("*/*/*/" + DECLARATION_NAME)), -1)
-            except OSError:
-                continue
-        candidates = {}
-        for path, rank in sorted(ranked.items()):
-            version_directory = path.parent
-            plugin = version_directory.parent.name
-            marketplace = version_directory.parent.parent.name
-            problems = []
-            try:
-                data = json.loads(path.read_text(encoding="utf-8-sig"))
-            except FileNotFoundError:
-                continue
-            except (OSError, UnicodeError, ValueError):
-                data = {}
-                problems.append(diagnostic("unreadable-declaration", str(path), "Read a valid tier.json declaration"))
-            if not isinstance(data, dict):
-                data = {}
-                problems.append(diagnostic("malformed-declaration", str(path), "Declare tier.json as an object"))
-            if not problems:
-                if data.get("schema_version") not in SCHEMA_VERSIONS:
-                    problems.append(diagnostic("unsupported-version", str(path), "Supported tier schema versions: 1, 2, 3"))
-                elif data.get("schema_version") == 3:
-                    problems.extend(v3_declaration_diagnostics(data, str(path), version_directory))
-                elif not _text(data.get("tier")) or data.get("applies") not in ("always", "stack-present"):
-                    problems.append(diagnostic("malformed-declaration", str(path), "Declare tier and applies"))
-            orphaned = (version_directory / ORPHAN_MARKER).exists()
-            declaration = Declaration(plugin, marketplace, data, version_directory, orphaned, problems)
-            preference = _preference(declaration, rank)
-            current = candidates.get(declaration.id)
-            if current is None or preference > current[0]:
-                candidates[declaration.id] = (preference, declaration)
-        for identity, (_, declaration) in candidates.items():
-            current = found.get(identity)
-            if current is None or (current.orphaned and not declaration.orphaned):
-                found[identity] = declaration
-    selected = sorted(found.values(), key=lambda declaration: declaration.tier)
+    selected = []
+    for item in installed(cache_roots(os.environ) if roots is None else roots, project):
+        problems = []
+        try:
+            data = json.loads(item.path.read_text(encoding="utf-8-sig"))
+        except FileNotFoundError:
+            continue
+        except (OSError, UnicodeError, ValueError):
+            data = {}
+            problems.append(diagnostic("unreadable-declaration", str(item.path), "Read a valid tier.json declaration"))
+        if not isinstance(data, dict):
+            data = {}
+            problems.append(diagnostic("malformed-declaration", str(item.path), "Declare tier.json as an object"))
+        if not problems:
+            if data.get("schema_version") not in SCHEMA_VERSIONS:
+                problems.append(diagnostic("unsupported-version", str(item.path), "Supported tier schema versions: 1, 2, 3"))
+            elif data.get("schema_version") == 3:
+                problems.extend(v3_declaration_diagnostics(data, str(item.path), item.path.parent))
+            elif not _text(data.get("tier")) or data.get("applies") not in ("always", "stack-present"):
+                problems.append(diagnostic("malformed-declaration", str(item.path), "Declare tier and applies"))
+        selected.append(Declaration(item.plugin, item.marketplace, data, item.path.parent, item.orphaned, problems))
+    selected.sort(key=lambda declaration: declaration.tier)
     if diagnostics is not None:
         diagnostics.extend(problem for declaration in selected for problem in declaration.diagnostics)
     return selected
-
-
-def _preference(declaration, rank):
-    """The most specific install scope, then live over orphaned, then the newest directory."""
-    try:
-        modified = declaration.payload_dir.stat().st_mtime
-    except OSError:
-        modified = 0.0
-    return (rank, not declaration.orphaned, modified)
 
 
 def project_root(payload):
@@ -568,32 +472,9 @@ def _run_git(root, arguments):
     return completed.stdout
 
 
-def repository_host(root):
+def repository_origin(root):
     output = _git(root, ["config", "--get", "remote.origin.url"])
-    if output is None:
-        return None
-    origin = output.removesuffix("\n").removesuffix("\r")
-    if not origin or re.search(r"[\s\x00-\x1f\x7f\\]", origin):
-        return None
-    if "://" in origin:
-        try:
-            url = urlsplit(origin)
-            if url.scheme not in ("https", "http", "ssh", "git") or not url.hostname or "?" in origin or "#" in origin or url.netloc.endswith(":"):
-                return None
-            if url.port is not None and not 1 <= url.port <= 65535:
-                return None
-            host, path = url.hostname, url.path.lstrip("/")
-        except ValueError:
-            return None
-    else:
-        match = re.fullmatch(r"[^@/:]+@([^/:]+):(.+)", origin)
-        if match is None:
-            return None
-        host, path = match.groups()
-        path = path.lstrip("/")
-    if not re.fullmatch(REMOTE_HOST_PATTERN, host) or not path or any(part in ("", ".", "..") for part in path.rstrip("/").split("/")):
-        return None
-    return host.rstrip(".").lower()
+    return None if output is None else parse_origin(output.removesuffix("\n").removesuffix("\r"))
 
 
 def _repository_boundary(root: Path | str):
@@ -1028,8 +909,10 @@ def _assess_one(root, found=None, facts=None, contexts=None, inventory=None):
     employer_predicates = {}
     employer_declarations = [declaration for declaration in found
                              if declaration.employer is not None and not problems_by_id[declaration.id]]
+    origin = repository_origin(root) if inventory and employer_declarations else None
     for declaration in employer_declarations:
-        result = _evaluate_predicate(root, declaration.detect, facts, contexts) if inventory else PredicateResult(root)
+        evidence = origin_evidence(declaration.detect, origin)
+        result = PredicateResult(root, evidence is not None, evidence or ())
         employer_predicates[declaration.id] = result
         if result.matched:
             employers.append((declaration, result))

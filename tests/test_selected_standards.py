@@ -100,7 +100,7 @@ class PluginCache:
 def cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> PluginCache:
     plugins = PluginCache(tmp_path / "profile" / "plugins" / "cache")
     plugins.root.mkdir(parents=True)
-    monkeypatch.setattr(gate, "cache_roots", lambda: [plugins.root])
+    monkeypatch.setattr(gate, "cache_roots", lambda _environ: [plugins.root])
     plugins.install(
         "rust",
         RUST,
