@@ -10,6 +10,8 @@ import sys
 import tempfile
 import unittest
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("harness_sync", ROOT / "scripts/sync_harness_manifests.py")
@@ -300,6 +302,103 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
                         self.assertIn('"decision":"allow"', decision)
                     else:
                         self.assertNotIn('"decision":"allow"', decision)
+
+
+FORBID_GH_LOGIN = {
+    "pattern": ["gh", "auth", "login"],
+    "justification": "Account-wide scopes reach every organization.",
+    "match": [["gh", "auth", "login"]],
+    "not_match": [["gh", "auth", "status"]],
+}
+
+
+def base_requires(**permissions: object) -> dict[str, object]:
+    manifest = HARNESS.load(ROOT / ".agents/plugins/harness/base.json")
+    return {
+        **manifest["requires"],
+        "permissions": {"claude_allow": [], "codex_prefix_rules": [], **permissions},
+    }
+
+
+def test_validate_requires_accepts_deny_and_forbidden_rules() -> None:
+    config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
+    roster = HARNESS.load(ROOT / ".agents/plugins/plugins.json")
+    requires = base_requires(
+        claude_deny=["Bash(gh auth login *)"],
+        codex_forbidden_prefix_rules=[FORBID_GH_LOGIN],
+    )
+
+    HARNESS.validate_requires(ROOT, config, roster, "base", requires)
+
+
+@pytest.mark.parametrize(
+    ("permissions", "message"),
+    [
+        ({"claude_deny": ["Bash(x)", "Bash(x)"]}, "duplicate Claude permission in claude_deny"),
+        ({"claude_deny": [""]}, "claude_deny must list non-empty strings"),
+        ({"claude_deny": "Bash(x)"}, "claude_deny must list non-empty strings"),
+        (
+            {"codex_forbidden_prefix_rules": [FORBID_GH_LOGIN, FORBID_GH_LOGIN]},
+            "duplicate Codex prefix rule in codex_forbidden_prefix_rules",
+        ),
+        (
+            {"codex_forbidden_prefix_rules": [{**FORBID_GH_LOGIN, "match": []}]},
+            "require pattern, justification and examples",
+        ),
+        (
+            {"codex_forbidden_prefix_rules": [{**FORBID_GH_LOGIN, "justification": ""}]},
+            "require pattern, justification and examples",
+        ),
+        (
+            {"codex_forbidden_prefix_rules": [{"pattern": ["gh"]}]},
+            "invalid Codex prefix rule in codex_forbidden_prefix_rules",
+        ),
+        (
+            {"codex_prefix_rules": [FORBID_GH_LOGIN, FORBID_GH_LOGIN]},
+            "duplicate Codex prefix rule in codex_prefix_rules",
+        ),
+        (
+            {"claude_allow": ["Bash(x)"], "claude_deny": ["Bash(x)"]},
+            "both allowed and denied",
+        ),
+        (
+            {
+                "codex_prefix_rules": [{**FORBID_GH_LOGIN, "justification": "Allow."}],
+                "codex_forbidden_prefix_rules": [FORBID_GH_LOGIN],
+            },
+            "both allowed and forbidden",
+        ),
+        ({"claude_ask": []}, "invalid permissions declaration"),
+    ],
+)
+def test_validate_permissions_rejects_invalid_deny_and_forbidden_rules(
+    permissions: dict[str, object], message: str
+) -> None:
+    declared = base_requires(**permissions)["permissions"]
+
+    with pytest.raises(ValueError, match=message):
+        HARNESS.validate_permissions("base", declared)
+
+
+@pytest.mark.skipif(not shutil.which("pwsh"), reason="PowerShell 7 provides Test-Json")
+def test_schema_accepts_deny_and_forbidden_rules_and_rejects_invalid_ones() -> None:
+    manifest = HARNESS.load(ROOT / ".agents/plugins/harness/base.json")
+
+    def declaring(**permissions: object) -> dict[str, object]:
+        return {**manifest, "requires": base_requires(**permissions)}
+
+    documents = [
+        declaring(
+            claude_deny=["Bash(gh auth login *)"],
+            codex_forbidden_prefix_rules=[FORBID_GH_LOGIN],
+        ),
+        declaring(claude_deny=["Bash(x)", "Bash(x)"]),
+        declaring(claude_deny=[""]),
+        declaring(codex_forbidden_prefix_rules=[{**FORBID_GH_LOGIN, "match": []}]),
+        declaring(codex_forbidden_prefix_rules=[FORBID_GH_LOGIN, FORBID_GH_LOGIN]),
+    ]
+
+    assert validate_harness_schema(documents) == [True, False, False, False, False]
 
 
 if __name__ == "__main__":
