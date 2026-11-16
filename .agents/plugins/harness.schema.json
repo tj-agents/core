@@ -104,9 +104,20 @@
           "items": { "type": "string", "minLength": 1 },
           "uniqueItems": true
         },
+        "claude_deny": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
         "codex_prefix_rules": {
           "type": "array",
-          "items": { "$ref": "#/$defs/codexPrefixRule" }
+          "items": { "$ref": "#/$defs/codexPrefixRule" },
+          "uniqueItems": true
+        },
+        "codex_forbidden_prefix_rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/codexPrefixRule" },
+          "uniqueItems": true
         }
       }
     },
