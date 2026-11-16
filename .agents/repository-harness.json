@@ -87,6 +87,9 @@
         "PowerShell(uv run --locked pytest tests -v)",
         "PowerShell(uv run --locked python -B scripts/ci_selection.py run --group source)"
       ],
+      "claude_deny": [
+        "Edit(/.agents/plugins/marketplace.json)"
+      ],
       "codex_prefix_rules": []
     }
   }
