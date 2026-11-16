@@ -40,7 +40,7 @@ is waiting for, after verifying from its goal, work-item binding or explicit ass
 responsible. A shared checkout, parent conversation or similar title does not establish that. Correct a
 misrouted message by sending a retraction to the original recipient.
 [`agent:message`](https://github.com/tj-agents/agent/blob/main/.agents/agent/utility/message/SKILL.md) owns
-transport: both hosts read their own feed on demand; requested result waits use `agent:listen` as that skill specifies.
+delivery, receiving, waiting and delivery receipts for both hosts.
 
 Phases, commits, open PRs, handoffs and briefs never narrow the original scope. Use `workflow:handoff`
 only for an actual transfer of ownership.
