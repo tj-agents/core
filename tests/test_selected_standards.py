@@ -333,7 +333,11 @@ def test_reading_python_rules_does_not_adopt_python(
 
 @pytest.mark.parametrize("tool", ["Write", "apply_patch"])
 def test_packaged_gate_refuses_first_python_write_without_selection(
-    tmp_path: Path, state: Path, cache: PluginCache, tool: str
+    tmp_path: Path,
+    state: Path,
+    cache: PluginCache,
+    tool: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repository = _repository(tmp_path / "base-only", ["base@market"])
     package = cache.root / "market" / "base" / "1.0.0"
@@ -347,20 +351,20 @@ def test_packaged_gate_refuses_first_python_write_without_selection(
             )
         }
     profile = cache.root.parent.parent
-    environment = dict(
-        os.environ,
-        HOME=str(profile),
-        USERPROFILE=str(profile),
-        CLAUDE_CONFIG_DIR=str(profile),
-        CODEX_HOME=str(profile),
-        CLAUDE_PLUGIN_ROOT=str(package),
-        CODEX_PLUGIN_ROOT=str(package),
-        AGENT_STATE_DIRECTORY=str(state),
-    )
+    environment = {
+        "HOME": str(profile),
+        "USERPROFILE": str(profile),
+        "CLAUDE_CONFIG_DIR": str(profile),
+        "CODEX_HOME": str(profile),
+        "CLAUDE_PLUGIN_ROOT": str(package),
+        "CODEX_PLUGIN_ROOT": str(package),
+        "AGENT_STATE_DIRECTORY": str(state),
+    }
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
     result = subprocess.run(
         [sys.executable, "-B", str(package / "hooks/tier_gate.py"), "--write-gate"],
         cwd=repository,
-        env=environment,
         input=json.dumps(payload),
         capture_output=True,
         text=True,
@@ -372,6 +376,47 @@ def test_packaged_gate_refuses_first_python_write_without_selection(
     assert decision["permissionDecision"] == "deny"
     assert "python@market" in decision["permissionDecisionReason"]
     assert not (repository / "install.py").exists()
+
+
+@pytest.mark.parametrize(
+    "predicate",
+    [
+        {"file": "src/item.x"},
+        {"glob": "*.x"},
+        {"any": [{"glob": "*.x"}, {"remote": "^example/"}]},
+    ],
+)
+def test_v3_direct_paths_require_adoption(
+    repository: Path, state: Path, cache: PluginCache, predicate: dict[str, object]
+) -> None:
+    cache.install(
+        "modern",
+        {
+            "schema_version": 3,
+            "tier": "modern",
+            "applies": "stack-present",
+            "detect": predicate,
+        },
+        [Skill("style")],
+    )
+    reason = gate.write_gate(_write(repository / "src/item.x", repository), state)
+    assert "modern@market" in reason
+
+
+def test_v3_contextual_conjunction_does_not_claim_the_path_alone(
+    repository: Path, state: Path, cache: PluginCache
+) -> None:
+    cache.install(
+        "contextual",
+        {
+            "schema_version": 3,
+            "tier": "contextual",
+            "applies": "stack-present",
+            "detect": {"all": [{"glob": "*.x"}, {"remote": "^employer/"}]},
+        },
+        [Skill("style")],
+    )
+    assert gate.write_gate(_write(repository / "src/item.x", repository), state) == ""
 
 
 def test_adoption_then_reading_unblocks_the_first_python_file(

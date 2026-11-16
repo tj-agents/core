@@ -21,8 +21,9 @@ Before declaring setup tooling unavailable, inspect the installed Agent skill an
 source checkouts. Use `tj install --help` and `tj install --check --step <name>` to verify machine
 capabilities; an old checkout or a top-level command listing alone does not establish their absence.
 
-Base's typed-file write gate refuses a target owned directly by an installed stack's `files` or `globs`
-declaration until that plugin is selected, including the first source file in a new repository. Adoption
+Base's typed-file write gate refuses a target owned directly by an installed stack's file or glob
+declaration until that plugin is selected, including the first source file in a new repository. Direct
+schema-v3 file/glob predicates and their `any` alternatives are included. Adoption
 then enables the separate standards-read gate. It does not select profiles automatically or infer stacks
 from content-only or contextual predicates. Shell writes and stacks absent from installed declarations
 still require this setup procedure; the file gate does not establish enforcement for those entry points.

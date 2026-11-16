@@ -1476,6 +1476,18 @@ def selected_stacks(repository: Path) -> list[Declaration]:
             and declaration.payload_dir is not None and path_markers(declaration)]
 
 
+def direct_path_markers(node: object) -> list[str]:
+    """Paths that independently establish a schema-v3 stack, without context."""
+    if not isinstance(node, dict) or len(node) != 1:
+        return []
+    operator, value = next(iter(node.items()))
+    if operator in ("file", "glob") and isinstance(value, str):
+        return [value]
+    if operator == "any" and isinstance(value, list):
+        return [marker for child in value for marker in direct_path_markers(child)]
+    return []
+
+
 def unselected_stacks(target: Path) -> list[str]:
     """Installed stacks that directly own this file but have not been adopted."""
     repository = repository_root(target)
@@ -1493,12 +1505,12 @@ def unselected_stacks(target: Path) -> list[str]:
             or declaration.orphaned
         ):
             continue
-        if declaration.schema_version == 3:
-            continue
-        markers = [
-            *_listed(declaration.detect, "files"),
-            *_listed(declaration.detect, "globs"),
-        ]
+        markers = (
+            direct_path_markers(declaration.detect)
+            if declaration.schema_version == 3
+            else [*_listed(declaration.detect, "files"),
+                  *_listed(declaration.detect, "globs")]
+        )
         if any(
             isinstance(marker, str)
             and marker
