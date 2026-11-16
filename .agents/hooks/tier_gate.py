@@ -25,9 +25,7 @@ the target file, then requires reading the selected stack's core standards.
 which canonical files the agent has read; `--compacted` forgets them. These paths use filesystem
 checks only, never Git, so they stay cheap enough to run on every write.
 
-The write gate, `--tool-gate` (Claude commands and MCP calls) and `--record-command` also apply
-`boundary`: they deny a write into host memory, and a call that carries a personal identifier onto a
-work surface, which an installed employer declaration's origin predicate identifies.
+The write gate, `--tool-gate` and `--record-command` also guard host memory.
 
 A tier's own authoring repository is exempt, even when its source files do not contain the
 stack's normal project markers.
@@ -52,18 +50,10 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from boundary import (
-    COMMANDS,
-    FILE_WRITERS,
     HostMemory,
-    Identifiers,
-    Remote,
-    installed_identifiers,
     memory_reason,
     memory_target,
-    origin,
-    outgoing,
-    remote_matches,
-    work_reason,
+    outgoing_targets,
 )
 from host_cli import plugin_inventory_command
 from selected_standards import (
@@ -1626,26 +1616,6 @@ def forget_loaded_standards(payload: object, state_directory: Path) -> None:
         LoadLedger.for_agent(state_directory, agent).forget()
 
 
-def installing_marketplace() -> Path | None:
-    """The cache directory of the marketplace that installed this plugin, when it runs installed."""
-    here = Path(__file__).resolve()
-    if len(here.parents) > 4 and here.parents[4].name == "cache":
-        return here.parents[3]
-    for variable in PLUGIN_ROOT_VARIABLES:
-        value = os.environ.get(variable)
-        plugin_root = Path(value).resolve() if value else None
-        if plugin_root is not None and len(plugin_root.parents) > 2 and plugin_root.parents[2].name == "cache":
-            return plugin_root.parents[1]
-    return None
-
-
-def personal_identifiers(state_directory: Path) -> Identifiers:
-    marketplace = installing_marketplace()
-    if marketplace is None:
-        return Identifiers(())
-    return installed_identifiers(marketplace, state_directory / "github-app" / "identity.json")
-
-
 def host_memory_homes() -> dict[HostMemory, Path]:
     homes = {
         HostMemory.CLAUDE: os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude",
@@ -1654,70 +1624,18 @@ def host_memory_homes() -> dict[HostMemory, Path]:
     return {host: Path(home).expanduser().resolve(strict=False) for host, home in homes.items()}
 
 
-def employer_predicates() -> list[object]:
-    """The detect predicates of every installed employer declaration, in any install scope."""
-    paths: set[Path] = set()
-    for root in cache_roots():
-        try:
-            registry = json.loads((root.parent / "installed_plugins.json").read_text(encoding="utf-8-sig"))
-        except FileNotFoundError:
-            paths.update(root.glob("*/*/*/" + DECLARATION_NAME))
-            continue
-        except (OSError, UnicodeError, ValueError):
-            continue
-        plugins = registry.get("plugins") if isinstance(registry, dict) else None
-        for entries in plugins.values() if isinstance(plugins, dict) else ():
-            for entry in entries if isinstance(entries, list) else ():
-                location = entry.get("installPath") if isinstance(entry, dict) else None
-                if isinstance(location, str) and location:
-                    paths.add(Path(location) / DECLARATION_NAME)
-    predicates: list[object] = []
-    for path in paths:
-        try:
-            data = json.loads(path.read_text(encoding="utf-8-sig"))
-        except (OSError, UnicodeError, ValueError):
-            continue
-        if (isinstance(data, dict) and data.get("schema_version") == 3
-                and isinstance(data.get("employer"), dict) and isinstance(data.get("detect"), dict)):
-            predicates.append(data["detect"])
-    return predicates
-
-
-def work_surface(places: Iterable[Path], remotes: Iterable[Remote], predicates: Sequence[object]) -> str | None:
-    """The first work repository a call touches, by local path or by a remote repository it names."""
-    if not predicates:
-        return None
-    for place in places:
-        repository = repository_root(place)
-        remote = origin(repository) if repository is not None else None
-        if remote is not None and any(remote_matches(predicate, remote) for predicate in predicates):
-            return str(repository)
-    for remote in remotes:
-        if any(remote_matches(predicate, remote) for predicate in predicates):
-            return remote.identity
-    return None
-
-
 def boundary_reason(payload: Mapping[str, object], state_directory: Path) -> str:
-    """Why this call may not proceed: a host-memory write, or personal tooling sent to a work surface."""
+    """Why this call may not proceed: a host-memory write."""
     tool = _text(payload.get("tool_name"))
     tool_input = payload.get("tool_input")
     if not tool or not isinstance(tool_input, dict):
         return ""
     cwd = Path(_payload_cwd(payload) or Path.cwd())
-    plugin_directories = [root.parent for root in cache_roots()] if tool in COMMANDS else []
-    sent = outgoing(tool, tool_input, cwd, plugin_directories)
-    memory = memory_target(sent.targets, host_memory_homes())
+    targets = outgoing_targets(tool, tool_input, cwd)
+    memory = memory_target(targets, host_memory_homes())
     if memory is not None:
         return memory_reason(memory)
-    if not sent.text.strip():
-        return ""
-    places = sent.targets if tool in FILE_WRITERS else (cwd, *sent.targets)
-    surface = work_surface(places, sent.remotes, employer_predicates())
-    if surface is None:
-        return ""
-    identifier = personal_identifiers(state_directory).find(sent.text)
-    return work_reason(identifier, surface) if identifier else ""
+    return ""
 
 
 def boundary_gate(payload: Mapping[str, object], state_directory: Path) -> str:
