@@ -17,8 +17,23 @@ Complete the utility's project write and passing check before writing governed c
 finished, even when a solution assessment is already complete. If the injector or current publisher
 sources are unavailable, keep governed writes pending and report the missing capability.
 
+Before declaring setup tooling unavailable, inspect the installed Agent skill and runtime as well as
+source checkouts. Use `tj install --help` and `tj install --check --step <name>` to verify machine
+capabilities; an old checkout or a top-level command listing alone does not establish their absence.
+
+Base's typed-file write gate refuses a target owned directly by an installed stack's file or glob
+declaration until that plugin is selected, including the first source file in a new repository. Direct
+schema-v3 file/glob predicates and their `any` alternatives are included. Adoption
+then enables the separate standards-read gate. It does not select profiles automatically or infer stacks
+from content-only or contextual predicates. Shell writes and stacks absent from installed declarations
+still require this setup procedure; the file gate does not establish enforcement for those entry points.
+
 ```text
 New car-hunting repository; the request says nothing about personal or work scope.
 Ask which it is before choosing policy profiles. Apply the chosen scope with the project's stack.
 Write and check the resulting project selection before starting governed code.
+
+Existing repository selects Base but not Python; first write targets install.py.
+The write gate names python@tj-agents. Adopt Python through agent:plugins, pass its check,
+then read Python's required standards and retry the write.
 ```
