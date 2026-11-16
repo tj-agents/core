@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -292,12 +293,14 @@ def test_write_gate_allows_files_no_selected_stack_declares(
     assert gate.write_gate(_write(repository / name, repository), state) == ""
 
 
-def test_write_gate_allows_a_repository_without_a_selection(
+def test_write_gate_requires_stack_adoption_in_a_new_repository(
     repository: Path, state: Path
 ) -> None:
     (repository / ".agents" / "plugins.json").unlink()
 
-    assert gate.write_gate(_write(repository / "main.rs", repository), state) == ""
+    reason = gate.write_gate(_write(repository / "main.rs", repository), state)
+    assert "rust@market" in reason
+    assert "agent:plugins" in reason
 
 
 def test_write_gate_allows_a_file_outside_any_repository(
@@ -308,11 +311,206 @@ def test_write_gate_allows_a_file_outside_any_repository(
     assert gate.write_gate(_write(outside / "main.rs", outside), state) == ""
 
 
-def test_write_gate_ignores_an_unselected_stack(tmp_path: Path, state: Path) -> None:
+def test_write_gate_requires_an_unselected_stack(tmp_path: Path, state: Path) -> None:
     repository = _repository(tmp_path / "python-only", ["python@market"])
 
-    assert gate.write_gate(_write(repository / "main.rs", repository), state) == ""
+    missing = gate.write_gate(_write(repository / "main.rs", repository), state)
+    assert "rust@market" in missing
+    assert "repository stack selection" in missing
     reason = gate.write_gate(_write(repository / "app.py", repository), state)
+    assert _listed(reason) == ["python:style"]
+
+
+def test_reading_python_rules_does_not_adopt_python(
+    tmp_path: Path, state: Path, cache: PluginCache
+) -> None:
+    repository = _repository(tmp_path / "base-only", ["base@market"])
+    gate.record_read(_read(cache.canonical("python", "style")), state, 0.0)
+    reason = gate.write_gate(_write(repository / "install.py", repository), state)
+    assert "python@market" in reason
+    assert "Reading standards alone does not adopt" in reason
+
+
+@pytest.mark.parametrize("tool", ["Write", "apply_patch"])
+def test_packaged_gate_refuses_first_python_write_without_selection(
+    tmp_path: Path,
+    state: Path,
+    cache: PluginCache,
+    tool: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = _repository(tmp_path / "base-only", ["base@market"])
+    package = cache.root / "market" / "base" / "1.0.0"
+    shutil.copytree(ROOT / "plugins/base", package, dirs_exist_ok=True)
+    payload = _write(repository / "install.py", repository)
+    if tool == "apply_patch":
+        payload["tool_name"] = tool
+        payload["tool_input"] = {
+            "command": (
+                "*** Begin Patch\n*** Add File: install.py\n+x = 1\n*** End Patch"
+            )
+        }
+    profile = cache.root.parent.parent
+    environment = {
+        "HOME": str(profile),
+        "USERPROFILE": str(profile),
+        "CLAUDE_CONFIG_DIR": str(profile),
+        "CODEX_HOME": str(profile),
+        "CLAUDE_PLUGIN_ROOT": str(package),
+        "CODEX_PLUGIN_ROOT": str(package),
+        "AGENT_STATE_DIRECTORY": str(state),
+    }
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+    result = subprocess.run(
+        [sys.executable, "-B", str(package / "hooks/tier_gate.py"), "--write-gate"],
+        cwd=repository,
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=True,
+    )
+    decision = json.loads(result.stdout)["hookSpecificOutput"]
+    assert decision["permissionDecision"] == "deny"
+    assert "python@market" in decision["permissionDecisionReason"]
+    assert not (repository / "install.py").exists()
+
+
+@pytest.mark.parametrize(
+    "predicate",
+    [
+        {"file": "src/item.x"},
+        {"glob": "*.x"},
+        {"any": [{"glob": "*.x"}, {"remote": "^example/"}]},
+    ],
+)
+def test_v3_direct_paths_require_adoption(
+    repository: Path, state: Path, cache: PluginCache, predicate: dict[str, object]
+) -> None:
+    cache.install(
+        "modern",
+        {
+            "schema_version": 3,
+            "tier": "modern",
+            "applies": "stack-present",
+            "detect": predicate,
+        },
+        [Skill("style")],
+    )
+    reason = gate.write_gate(_write(repository / "src/item.x", repository), state)
+    assert "modern@market" in reason
+
+
+def test_v3_contextual_conjunction_does_not_claim_the_path_alone(
+    repository: Path, state: Path, cache: PluginCache
+) -> None:
+    cache.install(
+        "contextual",
+        {
+            "schema_version": 3,
+            "tier": "contextual",
+            "applies": "stack-present",
+            "detect": {"all": [{"glob": "*.x"}, {"remote": "^employer/"}]},
+        },
+        [Skill("style")],
+    )
+    assert gate.write_gate(_write(repository / "src/item.x", repository), state) == ""
+
+
+@pytest.mark.parametrize("schema", [1, 3])
+def test_literal_file_predicates_do_not_claim_nested_files(
+    repository: Path, state: Path, cache: PluginCache, schema: int
+) -> None:
+    detect = {"file": "config.x"} if schema == 3 else {"files": ["config.x"]}
+    cache.install(
+        "literal",
+        {
+            "schema_version": schema,
+            "tier": "literal",
+            "applies": "stack-present",
+            "detect": detect,
+        },
+        [Skill("style")],
+    )
+    assert gate.write_gate(_write(repository / "sub/config.x", repository), state) == ""
+    assert "literal@market" in gate.write_gate(
+        _write(repository / "config.x", repository), state
+    )
+
+
+@pytest.mark.parametrize(
+    ("pattern", "target"),
+    [
+        ("**/*.x", "item.x"),
+        ("src/**/item.x", "src/item.x"),
+        ("**/a/**/item.x", "a/item.x"),
+        ("**/*.x", "sub/item.x"),
+    ],
+)
+def test_recursive_globs_require_adoption_then_standards_reads(
+    repository: Path, state: Path, cache: PluginCache, pattern: str, target: str
+) -> None:
+    cache.install(
+        "recursive",
+        {
+            "schema_version": 3,
+            "tier": "recursive",
+            "applies": "stack-present",
+            "detect": {"glob": pattern},
+        },
+        [Skill("style")],
+    )
+    payload = _write(repository / target, repository)
+    assert "recursive@market" in gate.write_gate(payload, state)
+    selection = repository / ".agents/plugins.json"
+    data = json.loads(selection.read_text(encoding="utf-8"))
+    data["plugins"].append("recursive@market")
+    selection.write_text(json.dumps(data), encoding="utf-8")
+    assert _listed(gate.write_gate(payload, state)) == ["recursive:style"]
+
+
+def test_adoption_then_reading_unblocks_the_first_python_file(
+    tmp_path: Path, state: Path, cache: PluginCache
+) -> None:
+    repository = _repository(tmp_path / "base-only", ["base@market"])
+    payload = _write(repository / "install.py", repository)
+    assert "python@market" in gate.write_gate(payload, state)
+    selection = repository / ".agents/plugins.json"
+    data = json.loads(selection.read_text(encoding="utf-8"))
+    data["plugins"].append("python@market")
+    selection.write_text(json.dumps(data), encoding="utf-8")
+    assert _listed(gate.write_gate(payload, state)) == ["python:style"]
+    gate.record_read(_read(cache.canonical("python", "style")), state, 0.0)
+    assert gate.write_gate(payload, state) == ""
+
+
+def test_missing_selection_uses_the_target_repository(
+    repository: Path, tmp_path: Path, state: Path
+) -> None:
+    other = _repository(tmp_path / "other", ["base@market"])
+    assert "python@market" in gate.write_gate(
+        _write(other / "app.py", repository), state
+    )
+    assert gate.write_gate(_write(other / "README.md", repository), state) == ""
+
+
+def test_content_predicate_does_not_claim_every_matching_extension(
+    repository: Path, state: Path, cache: PluginCache
+) -> None:
+    cache.install(
+        "optional",
+        {
+            "schema_version": 1,
+            "tier": "optional",
+            "applies": "stack-present",
+            "detect": {"content": [{"glob": "*.py", "pattern": "special_dependency"}]},
+        },
+        [Skill("style")],
+    )
+    reason = gate.write_gate(_write(repository / "plain.py", repository), state)
+    assert "optional@market" not in reason
     assert _listed(reason) == ["python:style"]
 
 
