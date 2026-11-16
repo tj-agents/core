@@ -419,6 +419,58 @@ def test_v3_contextual_conjunction_does_not_claim_the_path_alone(
     assert gate.write_gate(_write(repository / "src/item.x", repository), state) == ""
 
 
+@pytest.mark.parametrize("schema", [1, 3])
+def test_literal_file_predicates_do_not_claim_nested_files(
+    repository: Path, state: Path, cache: PluginCache, schema: int
+) -> None:
+    detect = {"file": "config.x"} if schema == 3 else {"files": ["config.x"]}
+    cache.install(
+        "literal",
+        {
+            "schema_version": schema,
+            "tier": "literal",
+            "applies": "stack-present",
+            "detect": detect,
+        },
+        [Skill("style")],
+    )
+    assert gate.write_gate(_write(repository / "sub/config.x", repository), state) == ""
+    assert "literal@market" in gate.write_gate(
+        _write(repository / "config.x", repository), state
+    )
+
+
+@pytest.mark.parametrize(
+    ("pattern", "target"),
+    [
+        ("**/*.x", "item.x"),
+        ("src/**/item.x", "src/item.x"),
+        ("**/a/**/item.x", "a/item.x"),
+        ("**/*.x", "sub/item.x"),
+    ],
+)
+def test_recursive_globs_require_adoption_then_standards_reads(
+    repository: Path, state: Path, cache: PluginCache, pattern: str, target: str
+) -> None:
+    cache.install(
+        "recursive",
+        {
+            "schema_version": 3,
+            "tier": "recursive",
+            "applies": "stack-present",
+            "detect": {"glob": pattern},
+        },
+        [Skill("style")],
+    )
+    payload = _write(repository / target, repository)
+    assert "recursive@market" in gate.write_gate(payload, state)
+    selection = repository / ".agents/plugins.json"
+    data = json.loads(selection.read_text(encoding="utf-8"))
+    data["plugins"].append("recursive@market")
+    selection.write_text(json.dumps(data), encoding="utf-8")
+    assert _listed(gate.write_gate(payload, state)) == ["recursive:style"]
+
+
 def test_adoption_then_reading_unblocks_the_first_python_file(
     tmp_path: Path, state: Path, cache: PluginCache
 ) -> None:
