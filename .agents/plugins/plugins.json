@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:a723301b4d13d2e8a52eae9474e03c29a339a40129d2f296526fd6a9b3c34ab7",
+      "digest": "sha256:08216465dab950a8377afde1e3918f3d22fee9d78305aac3f63ee406d1d2bc57",
       "harness": {
         "marketplaces": [
           {
