@@ -311,6 +311,13 @@ FORBID_GH_LOGIN = {
     "not_match": [["gh", "auth", "status"]],
 }
 
+MACHINE_PATH_CODEX_RULE = {
+    "pattern": ["python", "${PLUGIN_ROOT}/script.py"],
+    "justification": "Rule fixture whose example embeds an absolute path for the rejection test.",
+    "match": [["python", "${PLUGIN_ROOT}/script.py"]],
+    "not_match": [["python", "C:/repo/script.py"]],
+}
+
 
 def base_requires(**permissions: object) -> dict[str, object]:
     manifest = HARNESS.load(ROOT / ".agents/plugins/harness/base.json")
@@ -369,6 +376,38 @@ def test_validate_requires_accepts_deny_and_forbidden_rules() -> None:
             "both allowed and forbidden",
         ),
         ({"claude_ask": []}, "invalid permissions declaration"),
+        (
+            {"claude_allow": ["Bash(python C:/repo/script.py)"]},
+            "claude_allow embeds a machine-specific path",
+        ),
+        (
+            {"claude_deny": [r"Bash(python \\build-box\share\script.py)"]},
+            "claude_deny embeds a machine-specific path",
+        ),
+        (
+            {"claude_allow": ["Bash(python /home/alice/script.py)"]},
+            "claude_allow embeds a machine-specific path",
+        ),
+        (
+            {"claude_allow": ["Bash(python /Users/alice/script.py)"]},
+            "claude_allow embeds a machine-specific path",
+        ),
+        (
+            {"claude_allow": ["Bash(python /mnt/c/script.py)"]},
+            "claude_allow embeds a machine-specific path",
+        ),
+        (
+            {"claude_allow": ["Bash(python ${HOME}/script.py)"]},
+            "claude_allow embeds a machine-specific path",
+        ),
+        (
+            {"codex_prefix_rules": [MACHINE_PATH_CODEX_RULE]},
+            "codex_prefix_rules not_match embeds a machine-specific path",
+        ),
+        (
+            {"codex_forbidden_prefix_rules": [MACHINE_PATH_CODEX_RULE]},
+            "codex_forbidden_prefix_rules not_match embeds a machine-specific path",
+        ),
     ],
 )
 def test_validate_permissions_rejects_invalid_deny_and_forbidden_rules(
@@ -378,6 +417,22 @@ def test_validate_permissions_rejects_invalid_deny_and_forbidden_rules(
 
     with pytest.raises(ValueError, match=message):
         HARNESS.validate_permissions("base", declared)
+
+
+def test_validate_permissions_accepts_the_renderable_placeholders() -> None:
+    declared = base_requires(
+        claude_allow=["Bash(python ${PLUGIN_ROOT}/script.py:*)"],
+        codex_prefix_rules=[
+            {
+                "pattern": ["python", ["${PLUGIN_ROOT}/script.py", "${PROJECT_ROOT}/script.py"]],
+                "justification": "Both renderable placeholders stay accepted.",
+                "match": [["python", "${PLUGIN_ROOT}/script.py"]],
+                "not_match": [["python", "${PROJECT_ROOT}/other.py"]],
+            }
+        ],
+    )["permissions"]
+
+    HARNESS.validate_permissions("base", declared)
 
 
 @pytest.mark.skipif(not shutil.which("pwsh"), reason="PowerShell 7 provides Test-Json")

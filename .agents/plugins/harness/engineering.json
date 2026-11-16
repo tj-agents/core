@@ -90,42 +90,6 @@
               "py"
             ],
             "-B",
-            [
-              "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py",
-              "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
-              "${PLUGIN_ROOT}/codex-skills/merge/scripts/worktree_sweep.py"
-            ],
-            "--repo"
-          ],
-          "justification": "engineering:merge Step 5 removes proven-merged worktrees for one repository; it never forces, keeps worktrees in use, and archives leftovers first",
-          "match": [
-            [
-              "python",
-              "-B",
-              "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
-              "--repo",
-              "C:/repo"
-            ]
-          ],
-          "not_match": [
-            [
-              "python",
-              "-B",
-              "${PLUGIN_ROOT}/skills/merge/scripts/other.py",
-              "--repo",
-              "C:/repo"
-            ]
-          ]
-        },
-        {
-          "pattern": [
-            [
-              "python",
-              "python.exe",
-              "python3",
-              "py"
-            ],
-            "-B",
             "${PLUGIN_ROOT}/workflows/pr_body.py",
             "--body-file"
           ],

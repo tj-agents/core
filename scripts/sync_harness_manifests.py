@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator
 import importlib.util
 import json
 from pathlib import Path, PurePosixPath
@@ -21,6 +22,36 @@ REQUIRED_KEYS = {"marketplaces", "plugins", "hooks", "permissions"}
 REQUIRED_PERMISSIONS = {"claude_allow", "codex_prefix_rules"}
 OPTIONAL_PERMISSIONS = {"claude_deny", "codex_forbidden_prefix_rules"}
 CODEX_RULE_FIELDS = {"pattern", "justification", "match", "not_match"}
+
+# `${PLUGIN_ROOT}` and `${PROJECT_ROOT}` are the only placeholders harness_permissions
+# resolves before a rule ships; any other `${...}` or a path tied to one machine or
+# user cannot ship in a repository-scoped permission rule (tj-agents/agent#226).
+ALLOWED_PLACEHOLDERS = {"${PLUGIN_ROOT}", "${PROJECT_ROOT}"}
+PLACEHOLDER_PATTERN = re.compile(r"\$\{[^}]*\}")
+MACHINE_PATH_PATTERNS = (
+    re.compile(r"\\\\[^\\]"),
+    re.compile(r"(?<![A-Za-z0-9_])[A-Za-z]:[\\/]"),
+    re.compile(r"/home/[^/\s\"']+"),
+    re.compile(r"/Users/[^/\s\"']+"),
+    re.compile(r"/mnt/[A-Za-z0-9_-]+/"),
+)
+
+
+def contains_machine_path(value: str) -> bool:
+    for match in PLACEHOLDER_PATTERN.finditer(value):
+        if match.group(0) not in ALLOWED_PLACEHOLDERS:
+            return True
+    return any(pattern.search(value) for pattern in MACHINE_PATH_PATTERNS)
+
+
+def iter_rule_tokens(value: object) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, list):
+        for item in value:
+            yield from iter_rule_tokens(item)
+
+
 PACKAGES_SPEC = importlib.util.spec_from_file_location(
     "harness_package_sync", Path(__file__).resolve().with_name("sync_plugin_packages.py")
 )
@@ -117,6 +148,9 @@ def validate_permissions(plugin: str, permissions: object) -> None:
             raise ValueError(f"{plugin}: {key} must list non-empty strings")
         if len(commands) != len(set(commands)):
             raise ValueError(f"{plugin}: duplicate Claude permission in {key}")
+        for command in commands:
+            if contains_machine_path(command):
+                raise ValueError(f"{plugin}: {key} embeds a machine-specific path: {command}")
     for command in claude["claude_allow"]:
         if re.match(r"^PowerShell\(&\s+\*\\", command, re.IGNORECASE):
             raise ValueError(
@@ -138,6 +172,12 @@ def validate_permissions(plugin: str, permissions: object) -> None:
                     f"{plugin}: Codex prefix rules require pattern, "
                     "justification and examples"
                 )
+            for field in ("pattern", "match", "not_match"):
+                for token in iter_rule_tokens(rule[field]):
+                    if contains_machine_path(token):
+                        raise ValueError(
+                            f"{plugin}: {key} {field} embeds a machine-specific path: {token}"
+                        )
             identity = json.dumps(rule, sort_keys=True)
             if identity in seen:
                 raise ValueError(f"{plugin}: duplicate Codex prefix rule in {key}")
