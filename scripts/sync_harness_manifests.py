@@ -18,6 +18,9 @@ HOST_ROOTS = {
     "claude": re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"'@]+)"),
 }
 REQUIRED_KEYS = {"marketplaces", "plugins", "hooks", "permissions"}
+REQUIRED_PERMISSIONS = {"claude_allow", "codex_prefix_rules"}
+OPTIONAL_PERMISSIONS = {"claude_deny", "codex_forbidden_prefix_rules"}
+CODEX_RULE_FIELDS = {"pattern", "justification", "match", "not_match"}
 PACKAGES_SPEC = importlib.util.spec_from_file_location(
     "harness_package_sync", Path(__file__).resolve().with_name("sync_plugin_packages.py")
 )
@@ -95,19 +98,53 @@ def validate_requires(root: Path, config: dict, roster: dict, plugin: str, requi
         raise ValueError(f"{plugin}: marketplace declarations disagree with required plugins")
     if requires["hooks"] != expected_hooks(root, config, plugin):
         raise ValueError(f"{plugin}: declared hooks disagree with both host manifests")
-    permissions = requires["permissions"]
-    if set(permissions) != {"claude_allow", "codex_prefix_rules"}:
+    validate_permissions(plugin, requires["permissions"])
+
+
+def validate_permissions(plugin: str, permissions: object) -> None:
+    """Validate Claude allow/deny entries and Codex allow/forbidden rules alike."""
+    if (
+        not isinstance(permissions, dict)
+        or not set(permissions) >= REQUIRED_PERMISSIONS
+        or set(permissions) - REQUIRED_PERMISSIONS - OPTIONAL_PERMISSIONS
+    ):
         raise ValueError(f"{plugin}: invalid permissions declaration")
-    if len(permissions["claude_allow"]) != len(set(permissions["claude_allow"])):
-        raise ValueError(f"{plugin}: duplicate Claude permission")
-    for command in permissions["claude_allow"]:
+    claude = {key: permissions.get(key, []) for key in ("claude_allow", "claude_deny")}
+    for key, commands in claude.items():
+        if not isinstance(commands, list) or not all(
+            isinstance(command, str) and command for command in commands
+        ):
+            raise ValueError(f"{plugin}: {key} must list non-empty strings")
+        if len(commands) != len(set(commands)):
+            raise ValueError(f"{plugin}: duplicate Claude permission in {key}")
+    for command in claude["claude_allow"]:
         if re.match(r"^PowerShell\(&\s+\*\\", command, re.IGNORECASE):
-            raise ValueError(f"{plugin}: wildcard script path in Claude permission: {command}")
-    for rule in permissions["codex_prefix_rules"]:
-        if set(rule) != {"pattern", "justification", "match", "not_match"}:
-            raise ValueError(f"{plugin}: invalid Codex prefix rule")
-        if not all(rule.get(field) for field in ("pattern", "justification", "match", "not_match")):
-            raise ValueError(f"{plugin}: Codex prefix rules require pattern, justification and examples")
+            raise ValueError(
+                f"{plugin}: wildcard script path in Claude permission: {command}"
+            )
+    if set(claude["claude_allow"]) & set(claude["claude_deny"]):
+        raise ValueError(f"{plugin}: Claude permission both allowed and denied")
+    patterns: dict[str, set[str]] = {}
+    for key in ("codex_prefix_rules", "codex_forbidden_prefix_rules"):
+        rules = permissions.get(key, [])
+        if not isinstance(rules, list):
+            raise ValueError(f"{plugin}: {key} must be a list")
+        seen: set[str] = set()
+        for rule in rules:
+            if not isinstance(rule, dict) or set(rule) != CODEX_RULE_FIELDS:
+                raise ValueError(f"{plugin}: invalid Codex prefix rule in {key}")
+            if not all(rule[field] for field in sorted(CODEX_RULE_FIELDS)):
+                raise ValueError(
+                    f"{plugin}: Codex prefix rules require pattern, "
+                    "justification and examples"
+                )
+            identity = json.dumps(rule, sort_keys=True)
+            if identity in seen:
+                raise ValueError(f"{plugin}: duplicate Codex prefix rule in {key}")
+            seen.add(identity)
+        patterns[key] = {json.dumps(rule["pattern"]) for rule in rules}
+    if patterns["codex_prefix_rules"] & patterns["codex_forbidden_prefix_rules"]:
+        raise ValueError(f"{plugin}: Codex pattern both allowed and forbidden")
 
 
 def synchronize(root: Path, check: bool) -> dict[str, dict]:
