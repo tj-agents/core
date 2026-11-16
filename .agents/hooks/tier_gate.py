@@ -25,7 +25,8 @@ the target file, then requires reading the selected stack's core standards.
 which canonical files the agent has read; `--compacted` forgets them. These paths use filesystem
 checks only, never Git, so they stay cheap enough to run on every write.
 
-The write gate, `--tool-gate` and `--record-command` also guard host memory.
+The write gate, `--tool-gate` and `--record-command` also guard host memory, user-level host settings
+and the agent state directory.
 
 A tier's own authoring repository is exempt, even when its source files do not contain the
 stack's normal project markers.
@@ -50,10 +51,12 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from boundary import (
-    HostMemory,
+    Host,
     memory_reason,
     memory_target,
     outgoing_targets,
+    settings_reason,
+    settings_target,
 )
 from host_cli import plugin_inventory_command
 from selected_standards import (
@@ -1616,25 +1619,30 @@ def forget_loaded_standards(payload: object, state_directory: Path) -> None:
         LoadLedger.for_agent(state_directory, agent).forget()
 
 
-def host_memory_homes() -> dict[HostMemory, Path]:
+def host_homes() -> dict[Host, Path]:
     homes = {
-        HostMemory.CLAUDE: os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude",
-        HostMemory.CODEX: os.environ.get("CODEX_HOME") or Path.home() / ".codex",
+        Host.CLAUDE: os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude",
+        Host.CODEX: os.environ.get("CODEX_HOME") or Path.home() / ".codex",
     }
     return {host: Path(home).expanduser().resolve(strict=False) for host, home in homes.items()}
 
 
 def boundary_reason(payload: Mapping[str, object], state_directory: Path) -> str:
-    """Why this call may not proceed: a host-memory write."""
+    """Why this call may not proceed: a write to host memory, user-level host settings or machine state."""
     tool = _text(payload.get("tool_name"))
     tool_input = payload.get("tool_input")
     if not tool or not isinstance(tool_input, dict):
         return ""
     cwd = Path(_payload_cwd(payload) or Path.cwd())
     targets = outgoing_targets(tool, tool_input, cwd)
-    memory = memory_target(targets, host_memory_homes())
+    homes = host_homes()
+    memory = memory_target(targets, homes)
     if memory is not None:
         return memory_reason(memory)
+    state = Path(state_directory).expanduser().resolve(strict=False)
+    settings = settings_target(targets, homes, state)
+    if settings is not None:
+        return settings_reason(settings)
     return ""
 
 
