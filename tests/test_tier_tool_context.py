@@ -51,7 +51,7 @@ def test_unicode_repository_boundary_survives_git_output(tmp_path: Path) -> None
 
 @pytest.fixture(autouse=True)
 def isolated_plugins(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(gate, "cache_roots", list)
+    monkeypatch.setattr(gate, "cache_roots", lambda _environ: [])
     monkeypatch.delenv(gate.OVERRIDE_VARIABLE, raising=False)
 
 
