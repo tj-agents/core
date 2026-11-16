@@ -1298,10 +1298,27 @@ def path_markers(declaration: Declaration) -> list[str]:
 
 def declares_path(declaration: Declaration, relative: PurePosixPath) -> bool:
     return any(
-        fnmatch.fnmatch(relative.as_posix(), marker)
-        or ("/" not in marker and fnmatch.fnmatch(relative.name, marker))
+        glob_target_matches(relative.as_posix(), marker)
+        or ("/" not in marker and glob_target_matches(relative.name, marker))
         for marker in path_markers(declaration)
     )
+
+
+def glob_target_matches(target: str, pattern: str) -> bool:
+    """Match globstar directory segments even when they consume no directories."""
+    pending = [pattern]
+    seen = set()
+    while pending:
+        candidate = pending.pop()
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if fnmatch.fnmatch(target, candidate):
+            return True
+        before, separator, after = candidate.partition("**/")
+        if separator:
+            pending.extend((before + after, before + "*/" + after))
+    return False
 
 
 @functools.lru_cache(maxsize=2)
@@ -1476,15 +1493,15 @@ def selected_stacks(repository: Path) -> list[Declaration]:
             and declaration.payload_dir is not None and path_markers(declaration)]
 
 
-def direct_path_markers(node: object) -> list[str]:
+def direct_path_predicates(node: object) -> list[tuple[str, str]]:
     """Paths that independently establish a schema-v3 stack, without context."""
     if not isinstance(node, dict) or len(node) != 1:
         return []
     operator, value = next(iter(node.items()))
     if operator in ("file", "glob") and isinstance(value, str):
-        return [value]
+        return [(operator, value)]
     if operator == "any" and isinstance(value, list):
-        return [marker for child in value for marker in direct_path_markers(child)]
+        return [predicate for child in value for predicate in direct_path_predicates(child)]
     return []
 
 
@@ -1505,20 +1522,19 @@ def unselected_stacks(target: Path) -> list[str]:
             or declaration.orphaned
         ):
             continue
-        markers = (
-            direct_path_markers(declaration.detect)
+        predicates = (
+            direct_path_predicates(declaration.detect)
             if declaration.schema_version == 3
-            else [*_listed(declaration.detect, "files"),
-                  *_listed(declaration.detect, "globs")]
+            else [(kind, marker) for key, kind in (("files", "file"), ("globs", "glob"))
+                  for marker in _listed(declaration.detect, key)
+                  if isinstance(marker, str) and marker]
         )
         if any(
-            isinstance(marker, str)
-            and marker
-            and (
-                fnmatch.fnmatch(relative.as_posix(), marker)
-                or ("/" not in marker and fnmatch.fnmatch(relative.name, marker))
-            )
-            for marker in markers
+            os.path.normcase(relative.as_posix()) == os.path.normcase(marker)
+            if kind == "file" else (
+                glob_target_matches(relative.as_posix(), marker)
+                or ("/" not in marker and glob_target_matches(relative.name, marker)))
+            for kind, marker in predicates
         ):
             missing.append(declaration.id)
     return sorted(set(missing))
