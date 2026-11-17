@@ -133,6 +133,27 @@ def test_direct_git_worktree_add_is_denied_at_a_canonical_destination(
         'printf "%s" "$(git worktree add ../outside)"',
         'rg "$(git worktree move old ../outside)"',
         'git worktree list; echo "$(git worktree add ../outside)"',
+        "cat <<'DOC'\nLiteral git worktree documentation\nDOC\n"
+        "git worktree add ../outside",
+        "bash <<'SH'\ngit worktree add ../outside\nSH",
+        "<<'SH' bash\ngit worktree add ../outside\nSH",
+        "FLAG=value bash <<'SH'\ngit worktree add ../outside\nSH",
+        "FLAG='value with spaces'post bash <<'SH'\ngit worktree add ../outside\nSH",
+        "exec bash <<'SH'\ngit worktree add ../outside\nSH",
+        "env nice bash <<'SH'\ngit worktree add ../outside\nSH",
+        "nice bash <<'SH'\ngit worktree add ../outside\nSH",
+        "env timeout 10 bash <<'SH'\ngit worktree add ../outside\nSH",
+        "python -c 'import sys;exec(sys.stdin.read())' <<'PY'\n"
+        "import os; os.system('git worktree add ../outside')\nPY",
+        "cat <<'SH' | bash\ngit worktree add ../outside\nSH",
+        "cat <<'SH' | \\\nbash\ngit worktree add ../outside\nSH",
+        "bash \\\n<<'SH'\ngit worktree add ../outside\nSH",
+        'cat <<<"SH"\ngit worktree add ../outside\nSH',
+        "# <<'DOC'\ngit worktree add ../outside\nDOC",
+        "note=@'\n'\ngit worktree add ../outside\n: '\n'@ # '",
+        "cat <<DOC\n'$(git worktree add ../outside)'\nDOC",
+        "$text = @'\nLiteral git worktree documentation\n'@\n"
+        "git worktree add ../outside",
     ],
 )
 def test_noncanonical_or_unresolved_mutation_is_denied(
@@ -160,12 +181,67 @@ def test_noncanonical_or_unresolved_mutation_is_denied(
         "cd $project; git status --short",
         "echo 'git worktree add ../outside'",
         "python - <<'PY'\nprint(\"isn't balanced in the shell lexer\")\nPY",
+        "bash <<'SH'\n# Use `git worktree add` in documentation.\nSH",
+        "bash <<'SH'\nprintf '%s' 'Use `git worktree add` literally.'\nSH",
+        "bash <<'SH'\necho git worktree add ../outside\nSH",
+        "bash <<'SH'\nwt list\nSH",
+        "env -i cat <<'DOC' > README.md\nUse git worktree add\nDOC",
+        "env cat -n <<'DOC' > README.md\nUse git worktree add\nDOC",
+        "cat <<'DOC' > bash\ngit worktree add is documented here\nDOC",
+        "cat <<'DOC' | grep bash\ngit worktree add is documented here\nDOC",
+        "cat <<'DOC' | grep -c bash\ngit worktree add is documented here\nDOC",
+        pytest.param(
+            "cat <<'DOC' > README.md\nUse `git worktree add`; it isn't executed.\nDOC",
+            id="quoted_doc_posix_here_document",
+        ),
+        pytest.param(
+            'cat <<"DOC" > README.md\n$(git worktree add ../outside) is literal.\nDOC',
+            id="quoted_doc_double_quoted_delimiter",
+        ),
+        pytest.param(
+            "printf '%s' 'Use `git worktree add` or $(git worktree add ../outside)' "
+            "> README.md",
+            id="quoted_doc_single_quoted_argument",
+        ),
+        pytest.param(
+            'Set-Content -LiteralPath README.md -Value "Use git worktree add"',
+            id="quoted_doc_double_quoted_argument",
+        ),
+        pytest.param(
+            'printf "%s" "$(cat <<\'DOC\'\n'
+            'Use `git worktree add` in the guide.\nDOC\n)"',
+            id="quoted_doc_inside_substitution",
+        ),
     ],
 )
 def test_nonmutating_commands_and_literal_text_are_allowed(
     repo: Path, command: str
 ) -> None:
     assert invoke(repo, "Bash", {"command": command}) is None
+
+
+@pytest.mark.parametrize(
+    ("command", "denied"),
+    [
+        (
+            "$text = @'\nUse `git worktree add` in the user's guide.\n'@\n"
+            "Set-Content -LiteralPath README.md -Value $text",
+            False,
+        ),
+        ('Write-Output "\\$(git worktree add ../outside)"', True),
+        ('Write-Output "Use `$(git worktree add ../outside)"', False),
+        ('$text = @"\n$(git worktree add ../outside)\n"@', True),
+        ('pwsh -NoProfile -Command @"\ngit worktree add ../outside\n"@', True),
+        ("pwsh -NoProfile -Command @'\ngit worktree add ../outside\n'@", True),
+        ("pwsh -Command @'\nWrite-Output \"Use git worktree add\"\n'@", False),
+    ],
+)
+def test_powershell_literals_and_expansions_use_powershell_syntax(
+    repo: Path,
+    command: str,
+    denied: bool,
+) -> None:
+    assert (invoke(repo, "PowerShell", {"command": command}) is not None) is denied
 
 
 @pytest.mark.parametrize(
@@ -226,6 +302,15 @@ def test_packaged_base_dispatcher_enforces_the_creator(repo: Path, tool: str) ->
     assert invoke(repo, tool, {"command": "git worktree add ../outside"}, script=script)
     assert (
         invoke(repo, tool, {"command": "git worktree list --porcelain"}, script=script)
+        is None
+    )
+    assert (
+        invoke(
+            repo,
+            tool,
+            {"command": "echo 'Use `git worktree add` literally.'"},
+            script=script,
+        )
         is None
     )
 
