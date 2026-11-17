@@ -231,9 +231,12 @@ def test_packaged_base_dispatcher_enforces_the_creator(repo: Path, tool: str) ->
 
 
 def test_packaged_base_dispatcher_preserves_machine_settings_boundary(
-    repo: Path,
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    target = Path.home() / ".codex/config.toml"
+    profile = tmp_path / "codex home"
+    profile.mkdir()
+    monkeypatch.setenv("CODEX_HOME", str(profile))
+    target = profile / "config.toml"
     result = subprocess.run(
         [
             sys.executable,
