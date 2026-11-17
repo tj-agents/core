@@ -7,7 +7,7 @@ allowlist. A checker may enforce a deliberate semantic requirement for a particu
 
 | Kind | Meaning and examples |
 |---|---|
-| `policy` | Agent-conduct rules active within an already selected scope: authorship mode, authority, continuation, credential scope or process selection. Examples: `goal-continuation`, `git-auth`, `learning`. |
+| `policy` | Agent-conduct rules active within an already selected scope: authorship mode, authority, continuation, process or checkout selection. Examples: `goal-continuation`, `branching`, `learning`. |
 | `convention` | Requirements used to create or assess an artifact: code design, naming, document format, route-table semantics or evidence-record structure. Examples: `style`, `handoff-format`, `review-lifecycle`. |
 | `utility` | A bounded capability with a concrete input and result, called directly or by another skill. Examples: `commit`, `pull`, `clip`, `scaffold`, `failure-provenance`, `review`. It may have several steps and validation. |
 | `workflow` | A capability that keeps ownership of a task across distinct stages and advances it to a declared terminal outcome. Examples: `feature`, `plan-execution`, `debug-integration`, `merge`. |
