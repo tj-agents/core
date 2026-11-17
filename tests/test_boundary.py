@@ -313,9 +313,8 @@ def test_boundary_reason_allows_repository_host_settings(
 @pytest.mark.parametrize(
     ("option", "tool", "tool_input"),
     [
-        ("--write-gate", "Write", {"file_path": "~/.claude/settings.json"}),
+        ("--tool-gate", "Write", {"file_path": "~/.claude/settings.json"}),
         ("--tool-gate", "Bash", {"command": "echo x > ~/.codex/config.toml"}),
-        ("--record-command", "Bash", {"command": "echo x > ~/.codex/config.toml"}),
     ],
 )
 def test_hook_entry_points_deny_host_settings_writes(

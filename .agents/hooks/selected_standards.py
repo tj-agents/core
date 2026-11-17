@@ -1,24 +1,20 @@
-"""The standards a repository's plugin selection requires, and those an agent read."""
+"""Resolve a repository's selected plugins and their published standards."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
-import shutil
-from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+
+from tj_cli.git import repository_file
 
 PLUGIN_IDENTITY = re.compile(r"[a-z][a-z0-9-]*@[a-z][a-z0-9-]*\Z")
 SKILL_FIELDS = re.compile(
     r"^(name|kind|profile):[ \t]*([a-z][a-z0-9-]*)[ \t]*$", re.MULTILINE
 )
 STANDARD_KINDS = frozenset({"convention", "contract"})
-REQUIRED_PROFILES = frozenset({"core", ""})
-LEDGER_DIRECTORY = "standards-loaded"
-LEDGER_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,7 +25,7 @@ class PluginSelection:
 
     @classmethod
     def read(cls, repository: Path) -> PluginSelection | None:
-        path = repository / ".agents" / "plugins.json"
+        path = repository_file(repository, ".agents/plugins.json")
         try:
             raw = path.read_bytes()
         except FileNotFoundError:
@@ -66,11 +62,6 @@ class Standard:
     plugin: str
     path: Path
     profile: str
-
-    @property
-    def required(self) -> bool:
-        return self.profile in REQUIRED_PROFILES
-
 
 def skill_metadata(path: Path) -> dict[str, str]:
     text = path.read_text(encoding="utf-8-sig")
@@ -110,72 +101,3 @@ def payload_standards(payload: Path, plugin: str, identity: str) -> dict[str, St
             name, identity, sources[0], fields.get("profile", "")
         )
     return standards
-
-
-def path_key(path: str, windows: bool) -> str:
-    """A comparable spelling of a path; on Windows, case and slashes do not matter."""
-    return path.replace("\\", "/").casefold() if windows else path
-
-
-def standard_key(path: Path) -> str:
-    return path_key(str(path), os.name == "nt")
-
-
-@dataclass(frozen=True, slots=True)
-class AgentIdentity:
-    session_id: str
-    agent_id: str
-
-    @classmethod
-    def from_payload(cls, payload: Mapping[str, object]) -> AgentIdentity | None:
-        session = payload.get("session_id")
-        if not isinstance(session, str) or not session:
-            return None
-        agent = payload.get("agent_id")
-        return cls(session, agent if isinstance(agent, str) else "")
-
-
-@dataclass(frozen=True, slots=True)
-class LoadLedger:
-    """The canonical standard files one agent has read, one marker file per path.
-
-    A marker per path keeps concurrent recorders, such as parallel reads, from
-    overwriting each other's records.
-    """
-
-    agent: AgentIdentity
-    directory: Path
-
-    @classmethod
-    def for_agent(cls, state_directory: Path, agent: AgentIdentity) -> LoadLedger:
-        identity = f"{agent.session_id}\0{agent.agent_id}".encode()
-        name = hashlib.sha256(identity).hexdigest()
-        return cls(agent, state_directory / LEDGER_DIRECTORY / name)
-
-    def loaded(self, key: str) -> bool:
-        return self._marker(key).is_file()
-
-    def record(self, keys: Iterable[str], now: float) -> None:
-        keys = list(keys)
-        if not keys:
-            return
-        if not self.directory.is_dir():
-            self.directory.parent.mkdir(parents=True, exist_ok=True)
-            self._prune(now - LEDGER_RETENTION_SECONDS)
-            self.directory.mkdir(exist_ok=True)
-        for key in keys:
-            self._marker(key).touch()
-
-    def forget(self) -> None:
-        shutil.rmtree(self.directory, ignore_errors=True)
-
-    def _marker(self, key: str) -> Path:
-        return self.directory / hashlib.sha256(key.encode("utf-8")).hexdigest()
-
-    def _prune(self, cutoff: float) -> None:
-        for entry in self.directory.parent.iterdir():
-            try:
-                if entry.stat().st_mtime < cutoff:
-                    shutil.rmtree(entry)
-            except (FileNotFoundError, NotADirectoryError, PermissionError):
-                continue
