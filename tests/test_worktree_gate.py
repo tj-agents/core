@@ -141,6 +141,7 @@ def test_direct_git_worktree_add_is_denied_at_a_canonical_destination(
         "FLAG='value with spaces'post bash <<'SH'\ngit worktree add ../outside\nSH",
         "exec bash <<'SH'\ngit worktree add ../outside\nSH",
         "env nice bash <<'SH'\ngit worktree add ../outside\nSH",
+        "nice bash <<'SH'\ngit worktree add ../outside\nSH",
         "cat <<'SH' | bash\ngit worktree add ../outside\nSH",
         "cat <<'SH' | \\\nbash\ngit worktree add ../outside\nSH",
         "bash \\\n<<'SH'\ngit worktree add ../outside\nSH",

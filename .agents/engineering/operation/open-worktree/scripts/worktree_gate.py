@@ -127,7 +127,7 @@ def shell_reader(header: str, syntax: ShellSyntax) -> ShellReader | None:
                 operand = True
             elif word.startswith("-") or re.search(r"[$`%]", word):
                 return ShellReader(None, in_process=True)
-            elif executable(word) in {"env", "command", "exec", "sudo", "doas"}:
+            elif executable(word) in {"env", "command", "exec", "sudo", "doas", "nice"}:
                 wrapper = executable(word)
             elif executable(word) in {"source", ".", "iex", "invoke-expression"}:
                 return ShellReader(syntax, in_process=True)
