@@ -89,6 +89,7 @@ def machine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Machine:
         "CODEX_HOME",
         "PLUGIN_ROOT",
         "CODEX_PLUGIN_ROOT",
+        "RIPGREP_CONFIG_PATH",
     ):
         monkeypatch.delenv(variable, raising=False)
     monkeypatch.setenv("HOME", str(home))
@@ -288,6 +289,7 @@ def test_boundary_reason_blocks_shell_commands_naming_machine_state(
         "cat '{target}' || head -n 15 '{target}'",
         "cat '{target}'\nhead -n 15 '{target}'",
         "cat '{target}';\nhead -n 15 '{target}'",
+        "Get-Content '{target}'\rGet-Content '{target}'",
     ],
 )
 def test_boundary_reason_allows_literal_inspection(
@@ -366,6 +368,7 @@ def test_boundary_reason_allows_inspection_from_machine_state(
         "cat local.txt;\nrm '{target}'",
         "cat local.txt\n\nrm '{target}'",
         "Get-Content local.txt;\r\nSet-Content '{target}' x",
+        "Get-Content local.txt\rSet-Content '{target}' x",
         "cat local.txt & rm '{target}'",
         "cat local.txt | tee '{target}'",
         "rg --pre=mutator pattern '{target}'",
@@ -448,6 +451,35 @@ def test_boundary_reason_retains_host_memory_protection(
         settings.personal,
     )
     assert "is host memory" in reason
+
+
+@pytest.mark.parametrize(
+    ("command", "allowed"),
+    [
+        ("rg pattern '{target}'", False),
+        ("rg --no-config pattern '{target}'", True),
+        ("rg -e --no-config '{target}'", False),
+        ("rg -- --no-config '{target}'", False),
+        ("rg --no-config pattern local.txt; rg pattern '{target}'", False),
+    ],
+)
+def test_boundary_reason_accounts_for_ripgrep_configuration(
+    settings: Machine, monkeypatch: pytest.MonkeyPatch, command: str, allowed: bool
+) -> None:
+    config = settings.personal / "ripgrep.conf"
+    config.write_text("--pre=mutator\n", encoding="utf-8")
+    monkeypatch.setenv("RIPGREP_CONFIG_PATH", str(config))
+    target = settings.home / ".codex/config.toml"
+    reason = _reason(
+        settings,
+        "shell",
+        {"command": command.format(target=target.as_posix())},
+        settings.personal,
+    )
+    if allowed:
+        assert reason == ""
+    else:
+        assert "is user-level host settings or machine state" in reason
 
 
 @pytest.mark.parametrize(

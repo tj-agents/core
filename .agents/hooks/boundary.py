@@ -134,7 +134,7 @@ def settings_target(
 
 
 def outgoing_targets(
-    tool: str, tool_input: Mapping[str, object], cwd: Path
+    tool: str, tool_input: Mapping[str, object], cwd: Path, *, rg_configured: bool
 ) -> tuple[Path, ...]:
     if tool in FILE_WRITERS:
         return tuple(_resolved(path, cwd) for path in _written(tool, tool_input))
@@ -143,7 +143,7 @@ def outgoing_targets(
         if isinstance(command, list):
             command = " ".join(part for part in command if isinstance(part, str))
         if isinstance(command, str):
-            return _command_targets(command, cwd)
+            return _command_targets(command, cwd, rg_configured=rg_configured)
     return ()
 
 
@@ -185,8 +185,10 @@ def _patch_additions(patch: str) -> dict[str, str]:
     return {path: "\n".join(lines) for path, lines in added.items()}
 
 
-def _command_targets(command: str, cwd: Path) -> tuple[Path, ...]:
-    if _read_only(command):
+def _command_targets(
+    command: str, cwd: Path, *, rg_configured: bool
+) -> tuple[Path, ...]:
+    if _read_only(command, rg_configured=rg_configured):
         return ()
     leading = LEADING_CD.match(command)
     directory = _resolved(leading.group(1).strip("\"'"), cwd) if leading else cwd
@@ -205,23 +207,25 @@ def _command_targets(command: str, cwd: Path) -> tuple[Path, ...]:
     return tuple(targets)
 
 
-def _read_only(command: str) -> bool:
+def _read_only(command: str, *, rg_configured: bool) -> bool:
     # This recognizes only literal inspection pipelines, not arbitrary shell code.
     # Uncertain syntax retains the existing conservative target scan.
     if any(value in command for value in ("`", '\\"', "\\'")):
         return False
-    lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>()\n")
-    lexer.whitespace = " \t\r"
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>()\r\n")
+    lexer.whitespace = " \t"
     lexer.whitespace_split = True
     lexer.escape = ""
     lexer.commenters = ""
     reader = ""
     seen = False
+    requires_no_config = False
     try:
         for token in lexer:
-            if token and all(character in ";&|\n" for character in token):
-                if token not in {"&&", "||", "|"} and not all(
-                    character in ";\n" for character in token
+            if token and all(character in ";&|\r\n" for character in token):
+                if requires_no_config or (
+                    token not in {"&&", "||", "|"}
+                    and not all(character in ";\r\n" for character in token)
                 ):
                     return False
                 reader = ""
@@ -234,6 +238,11 @@ def _read_only(command: str) -> bool:
                 if reader not in READERS:
                     return False
                 seen = True
+                requires_no_config = reader == "rg" and rg_configured
+            elif requires_no_config:
+                if token != "--no-config":
+                    return False
+                requires_no_config = False
             elif (
                 reader == "rg"
                 and token.startswith("-")
@@ -242,7 +251,7 @@ def _read_only(command: str) -> bool:
                 return False
     except ValueError:
         return False
-    return seen
+    return seen and not requires_no_config
 
 
 def _names_path(candidate: str, directory: Path) -> bool:
