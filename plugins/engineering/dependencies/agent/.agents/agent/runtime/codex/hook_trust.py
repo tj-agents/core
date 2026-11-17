@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import argparse
-from collections import Counter
+import hashlib
 import importlib.util
 import io
 import json
 import os
-from pathlib import Path, PurePosixPath
 import queue
 import re
 import shutil
@@ -16,10 +15,13 @@ import tarfile
 import tempfile
 import threading
 import time
+from collections import Counter
+from pathlib import Path, PurePosixPath
 
+import required_plugins
+from codex import projects
 from tj_agent.host import Host
 from tj_cli import process
-
 
 GITHUB_SOURCE = re.compile(
     r"(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)?"
@@ -27,7 +29,9 @@ GITHUB_SOURCE = re.compile(
     re.IGNORECASE,
 )
 TRUSTED_OWNER = "tj-agents"
+RECEIPT = "codex-hook-trust.json"
 TIMEOUT = 45
+HOOK_LIST_BATCHES = 4
 
 
 def github_repository(source):
@@ -117,11 +121,34 @@ class AppServer:
                 raise RuntimeError(f"Codex {method} timed out") from error
             if message is None or isinstance(message, Exception):
                 raise RuntimeError(f"Codex app server stopped during {method}")
-            if message.get("id") != request_id:
+            if "method" in message or message.get("id") != request_id:
                 continue
             if "error" in message:
                 raise RuntimeError(f"Codex {method} failed: {message['error']}")
             return message["result"]
+
+    def requests(self, method, parameters):
+        pending = {}
+        for index, params in enumerate(parameters):
+            self.sequence += 1
+            pending[self.sequence] = index
+            self.send({"id": self.sequence, "method": method, "params": params})
+        results = [None] * len(pending)
+        deadline = time.monotonic() + self.timeout
+        while pending:
+            try:
+                message = self.messages.get(timeout=max(0, deadline - time.monotonic()))
+            except queue.Empty as error:
+                raise RuntimeError(f"Codex {method} timed out") from error
+            if message is None or isinstance(message, Exception):
+                raise RuntimeError(f"Codex app server stopped during {method}")
+            request_id = message.get("id")
+            if "method" in message or request_id not in pending:
+                continue
+            if "error" in message:
+                raise RuntimeError(f"Codex {method} failed: {message['error']}")
+            results[pending.pop(request_id)] = message["result"]
+        return results
 
     def __enter__(self):
         try:
@@ -258,7 +285,7 @@ def installed_package(hook):
     raise RuntimeError(f"Cannot identify installed plugin package: {hook['pluginId']}")
 
 
-def trust_updates(inventory, entries, cwd, verified_roots=None):
+def trust_updates(inventory, entries, cwds, verified_roots=None):
     verified_roots = {root.identity: root for root in verified_roots or ()}
     candidates = {}
     for plugin in inventory.get("installed", []):
@@ -275,7 +302,8 @@ def trust_updates(inventory, entries, cwd, verified_roots=None):
     verified = set()
     published = {}
     for entry in entries:
-        if Path(entry["cwd"]).resolve() != cwd:
+        cwd = Path(entry["cwd"]).resolve()
+        if cwd not in cwds:
             continue
         if entry.get("errors"):
             raise RuntimeError("Codex could not load all hook definitions")
@@ -397,15 +425,17 @@ def apply_trust(executable, cwd, preview=False, verified_roots=None, launch_args
             require_ready(listing, cwd, required)
             return {}
         if not launch_args and not environment:
-            inventory = json.loads(run([*command(executable), "plugin", "list", "--json"], cwd, limit))
+            inventory = json.loads(run([*command(executable), "plugin", "list", "--marketplace",
+                                        required_plugins.MARKETPLACE_NAME, "--json"], cwd, limit))
         else:
             completed = process.run(
-                [*command(executable), *launch_args, "plugin", "list", "--json"], cwd=cwd,
+                [*command(executable), *launch_args, "plugin", "list", "--marketplace",
+                 required_plugins.MARKETPLACE_NAME, "--json"], cwd=cwd,
                 env=dict(os.environ, **(environment or {})), check=True, capture_output=True,
                 text=True, encoding="utf-8", timeout=limit,
             )
             inventory = json.loads(completed.stdout)
-        updates = trust_updates(inventory, listing["data"], cwd, verified_roots)
+        updates = trust_updates(inventory, listing["data"], {cwd}, verified_roots)
         if updates and not preview:
             server.request("config/batchWrite", {
                 "edits": [{"keyPath": "hooks.state", "value": updates, "mergeStrategy": "upsert"}],
@@ -415,6 +445,121 @@ def apply_trust(executable, cwd, preview=False, verified_roots=None, launch_args
         if not preview:
             require_ready(listing, cwd, required, expected=updates)
         return updates
+
+
+def package_stamp(root: Path) -> str:
+    files = {}
+    for path in root.rglob("*"):
+        if path.is_file() and not generated_cache(path):
+            status = path.stat()
+            files[path.relative_to(root).as_posix()] = (status.st_size, status.st_mtime_ns)
+    return hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
+
+
+def published_hooks():
+    marketplace = required_plugins.MARKETPLACE_NAME
+    cache = Host.CODEX.configuration_root / "plugins" / "cache" / marketplace
+    hooks = {}
+    for plugin in sorted(cache.iterdir()) if cache.is_dir() else ():
+        builds = [entry for entry in plugin.iterdir() if entry.is_dir()] if plugin.is_dir() else []
+        if len(builds) != 1:
+            continue
+        identity = f"{plugin.name}@{marketplace}"
+        manifest_path = builds[0] / ".codex-plugin/plugin.json"
+        if not manifest_path.is_file():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+            definitions = required_definitions(builds[0], identity) if manifest.get("name") == plugin.name else []
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, RuntimeError):
+            definitions = [("unreadable", str(builds[0]))]
+        if definitions:
+            hooks[identity] = hashlib.sha256(json.dumps((definitions, package_stamp(builds[0]))).encode()).hexdigest()
+    return hooks
+
+
+def recorded_hooks(state):
+    try:
+        recorded = json.loads((state / RECEIPT).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return recorded if isinstance(recorded, dict) else {}
+
+
+def pending(state):
+    recorded = recorded_hooks(state)
+    return [f"trust {identity} hooks" for identity, digest in published_hooks().items()
+            if recorded.get(identity) != digest]
+
+
+def untrusted(listing):
+    suffix = "@" + required_plugins.MARKETPLACE_NAME
+    found = []
+    for entry in listing.get("data", []):
+        for hook in entry.get("hooks", []):
+            if (
+                hook.get("source") == "plugin"
+                and hook.get("enabled")
+                and not hook.get("isManaged")
+                and hook.get("trustStatus") in {"untrusted", "modified"}
+                and str(hook.get("pluginId", "")).endswith(suffix)
+            ):
+                found.append((Path(entry["cwd"]).resolve(), hook))
+    return found
+
+
+def list_installed_hooks(server, cwds):
+    size = len(cwds) if len(cwds) <= HOOK_LIST_BATCHES else (
+        len(cwds) + HOOK_LIST_BATCHES - 1
+    ) // HOOK_LIST_BATCHES
+    requests = [{"cwds": [str(cwd) for cwd in cwds[index:index + size]]}
+                for index in range(0, len(cwds), size)]
+    listings = ([server.request("hooks/list", requests[0])] if len(requests) == 1
+                else server.requests("hooks/list", requests))
+    entries = []
+    for request, listing in zip(requests, listings, strict=True):
+        data = listing.get("data")
+        if not isinstance(data, list) or len(data) != len(request["cwds"]):
+            raise RuntimeError("Codex hook inventory is incomplete")
+        if any(not isinstance(entry, dict) or not isinstance(entry.get("cwd"), str)
+               or Path(entry["cwd"]).resolve() != Path(cwd).resolve()
+               for entry, cwd in zip(data, request["cwds"], strict=True)):
+            raise RuntimeError("Codex hook inventory does not match requested directories")
+        entries.extend(data)
+    if any(entry.get("errors") for entry in entries):
+        raise RuntimeError("Codex could not load all hook definitions")
+    return {"data": entries}
+
+
+def trust_installed(executable, state, launch_args=(), timeout=TIMEOUT):
+    """Trust the hooks of every installed tj-agents plugin, in every project Codex trusts."""
+    hooks = published_hooks()
+    cwds = [Path.home().resolve(), *projects.trusted(projects.user_config())]
+    updates = {}
+    with AppServer(executable, cwds[0], launch_args, timeout=timeout) as server:
+        listing = list_installed_hooks(server, cwds)
+        rows = {}
+        for cwd, hook in untrusted(listing):
+            if hook["pluginId"] not in rows:
+                found = json.loads(run([*command(executable), *launch_args, "plugin", "list", "--marketplace",
+                                        required_plugins.MARKETPLACE_NAME, "--json"],
+                                       cwd, timeout)).get("installed", [])
+                rows.update({row["pluginId"]: row for row in found
+                             if isinstance(row, dict) and row.get("pluginId") not in rows})
+        if rows:
+            updates = trust_updates({"installed": list(rows.values())}, listing["data"], set(cwds))
+        if updates:
+            server.request("config/batchWrite", {
+                "edits": [{"keyPath": "hooks.state", "value": updates, "mergeStrategy": "upsert"}],
+                "reloadUserConfig": True,
+            })
+            listing = list_installed_hooks(server, cwds)
+        remaining = sorted({hook["key"] for _, hook in untrusted(listing)})
+        if remaining:
+            raise RuntimeError("tj-agents hooks are still not trusted: " + ", ".join(remaining))
+    state.mkdir(parents=True, exist_ok=True)
+    (state / RECEIPT).write_text(json.dumps(hooks), encoding="utf-8")
+    return updates
 
 
 def reload_running(executable, cwd, required, session_id=None, timeout=TIMEOUT):
