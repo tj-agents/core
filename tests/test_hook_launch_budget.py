@@ -168,44 +168,31 @@ class HookBudgetUnderLoad(unittest.TestCase):
                 runs = self.run_registered(plugin, event, payload)
                 self.assert_bounded(runs)
 
-    def test_write_gate_decides_within_a_second_without_git_or_repository_scans(self):
-        root = Path(self.temp.name) / "write gate"
+    def test_write_boundaries_decide_without_git_or_repository_scans(self):
+        root = Path(self.temp.name) / "write boundaries"
         home = root / "home"
-        cache = home / ".claude" / "plugins" / "cache"
-        payload = cache / "tj-agents" / "python" / "1.0.0"
-        header = "---\nname: style\ndescription: Style.\nkind: convention\nprofile: core\n---\n"
-        (payload / "skills/style").mkdir(parents=True)
-        (payload / "skills/style/SKILL.md").write_text(header + "Read the canonical file.\n", encoding="utf-8")
-        canonical = payload / ".agents/python/convention/style/SKILL.md"
-        canonical.parent.mkdir(parents=True)
-        canonical.write_text(header + "Rule body.\n", encoding="utf-8")
-        (payload / "tier.json").write_text(json.dumps({
-            "schema_version": 1, "tier": "python", "applies": "stack-present",
-            "detect": {"files": ["pyproject.toml"], "globs": ["*.py"]}}), encoding="utf-8")
-        (cache.parent / "installed_plugins.json").write_text(json.dumps({"plugins": {
-            "python@tj-agents": [{"scope": "user", "installPath": str(payload)}]}}), encoding="utf-8")
         repository = root / "repository"
         (repository / ".git").mkdir(parents=True)
-        (repository / ".agents").mkdir()
-        (repository / ".agents/plugins.json").write_text(json.dumps({
-            "schema_version": 1, "plugins": ["python@tj-agents"],
-            "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}}), encoding="utf-8")
         for index in range(200):
             folder = repository / "src" / f"package_{index}"
             folder.mkdir(parents=True)
             (folder / "module.py").write_text("value = 1\n", encoding="utf-8")
-        write = {"tool_name": "Write", "tool_input": {"file_path": str(repository / "src/app.py"), "content": ""}}
-        read = {"tool_name": "Read", "tool_input": {"file_path": str(canonical)}}
+        write = {"tool_name": "Write", "tool_input": {
+            "file_path": str(repository / "src/app.py"), "content": ""}}
+        protected = {"tool_name": "Write", "tool_input": {
+            "file_path": str(home / ".claude/settings.json"), "content": "{}"}}
+        read = {"tool_name": "Read", "tool_input": {
+            "file_path": str(repository / "SKILL.md")}}
 
-        denied = self.run_registered("base", "PreToolUse", write, home, repository)
-        recorded = self.run_registered("base", "PreToolUse", read, home, repository)
         allowed = self.run_registered("base", "PreToolUse", write, home, repository)
+        denied = self.run_registered("base", "PreToolUse", protected, home, repository)
+        self.assertEqual([], self.run_registered("base", "PreToolUse", read, home, repository))
 
+        self.assertEqual("", allowed[0][1].stdout)
         decision = json.loads(denied[0][1].stdout)["hookSpecificOutput"]
         self.assertEqual("deny", decision["permissionDecision"])
-        self.assertIn(str(canonical.resolve()), decision["permissionDecisionReason"])
-        self.assertEqual("", allowed[0][1].stdout)
-        for hook, result, elapsed, events in (*denied, *recorded, *allowed):
+        self.assertIn("user-level host settings", decision["permissionDecisionReason"])
+        for hook, result, elapsed, events in (*denied, *allowed):
             with self.subTest(hook=hook["args"][4]):
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertLess(elapsed, WRITE_GATE_SECONDS)
