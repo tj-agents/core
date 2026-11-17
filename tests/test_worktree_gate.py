@@ -178,6 +178,9 @@ def test_noncanonical_or_unresolved_mutation_is_denied(
         "python - <<'PY'\nprint(\"isn't balanced in the shell lexer\")\nPY",
         "bash <<'SH'\n# Use `git worktree add` in documentation.\nSH",
         "bash <<'SH'\nprintf '%s' 'Use `git worktree add` literally.'\nSH",
+        "bash <<'SH'\necho git worktree add ../outside\nSH",
+        "bash <<'SH'\nwt list\nSH",
+        "env -i cat <<'DOC' > README.md\nUse git worktree add\nDOC",
         pytest.param(
             "cat <<'DOC' > README.md\nUse `git worktree add`; it isn't executed.\nDOC",
             id="quoted_doc_posix_here_document",
