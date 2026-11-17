@@ -434,9 +434,19 @@ def test_redirected_worktree_directory_does_not_create_outside_repo(
         if sys.platform != "win32":
             pytest.skip(f"directory symlink permission unavailable: {error}")
         subprocess.run(
-            ["cmd", "/c", "mklink", "/J", str(repo / ".worktrees"), str(outside)],
+            [
+                "cmd",
+                "/d",
+                "/u",
+                "/c",
+                "mklink",
+                "/J",
+                str(repo / ".worktrees"),
+                str(outside),
+            ],
             check=True,
             capture_output=True,
+            encoding="utf-16-le",
             timeout=30,
         )
     result = invoke(repo, "Feature/Outside")
