@@ -362,6 +362,8 @@ def test_claude_worktree_create_event_refuses_default_placement(repo: Path) -> N
 def test_git_timeout_returns_denial_before_the_host_deadline(
     repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    monkeypatch.setattr("time.monotonic", lambda: 100.0)
+
     def stalled_git(
         command: list[str], *, timeout: float, **kwargs: object
     ) -> subprocess.CompletedProcess[str]:
