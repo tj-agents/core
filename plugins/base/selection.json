@@ -7,8 +7,8 @@
   "external_prerequisites": [],
   "skills": [
     "agent-files",
+    "machine-agnostic",
     "project-setup",
-    "solution-assessment",
-    "task-routing"
+    "solution-assessment"
   ]
 }

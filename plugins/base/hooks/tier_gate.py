@@ -15,8 +15,18 @@ the moment it is installed, with no change here and no release of `base`.
 Plugin and marketplace identity come from the installed path, never from the declaration, so a
 declaration cannot claim to be a plugin it is not.
 
-`--session-context` (SessionStart) states which tiers apply in this project. It prints nothing at
-all when no stack tier is installed, because a statement about an empty set is pure noise.
+`--session-context` (SessionStart) prints nothing outside a Git repository. In a repository with
+an `.agents/plugins.json` selection it names the selected stacks whose writes are gated, without
+assessing the repository; in any other repository it states which tiers apply.
+
+`--write-gate` (PreToolUse on writes) requires adoption of installed stacks that directly own
+the target file, then requires reading the selected stack's core standards.
+`--record-read` (Claude `Read` of a `SKILL.md`) and `--record-command` (Codex shell commands) record
+which canonical files the agent has read; `--compacted` forgets them. These paths use filesystem
+checks only, never Git, so they stay cheap enough to run on every write.
+
+The write gate, `--tool-gate` and `--record-command` also guard host memory, user-level host settings
+and the agent state directory.
 
 A tier's own authoring repository is exempt, even when its source files do not contain the
 stack's normal project markers.
@@ -30,26 +40,33 @@ import functools
 import json
 import os
 import re
-import runpy
 import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from boundary import (
+    Host,
+    memory_reason,
+    memory_target,
+    outgoing_targets,
+    settings_reason,
+    settings_target,
+)
 from host_cli import plugin_inventory_command
 from selected_standards import (
-    HOOK_CONTEXT_CHARACTERS,
     AgentIdentity,
-    InjectionLedger,
+    LoadLedger,
     PluginSelection,
     Standard,
-    compose_injection,
+    path_key,
     payload_standards,
+    standard_key,
 )
 from tj_cli import process
 
@@ -60,7 +77,6 @@ FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
 PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
 OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
 STATE_DIRECTORY_VARIABLE = "AGENT_STATE_DIRECTORY"
-WRITE_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit", "apply_patch"})
 WALK_DEPTH = 4
 WALK_SKIP = frozenset({
     ".git", ".hg", ".svn", ".worktrees", "node_modules", "bin", "obj", "dist", "build",
@@ -69,7 +85,6 @@ WALK_SKIP = frozenset({
 CONTENT_CANDIDATES = 20
 CONTENT_BYTES = 256 * 1024
 GIT_TIMEOUT = 10
-TOOL_CONTEXT_SECONDS = 20
 WORKSPACE_REPOSITORIES = 64
 WORKSPACE_ENTRIES = 1024
 REMOTE_HOST_PATTERN = r"(?=.{1,253}\.?(?![\s\S]))[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.?"
@@ -263,92 +278,6 @@ def fact_definition_diagnostics(definitions, detect=None, path="tier.json"):
     for name in sorted(definitions):
         visit(name, ())
     return problems
-
-
-def compose_fact_definitions(declarations, facts=None):
-    declarations = list(declarations)
-    definitions, owners, problems = {}, {}, []
-    for declaration in declarations:
-        if declaration.diagnostics:
-            problems.extend(declaration.diagnostics)
-            continue
-        problems.extend(fact_definition_diagnostics(declaration.fact_definitions))
-        if not isinstance(declaration.fact_definitions, dict):
-            continue
-        for name, node in declaration.fact_definitions.items():
-            if name in definitions and definitions[name] != node:
-                problems.append(diagnostic("conflicting-fact-definition", declaration.id, name + ": conflicts with " + owners[name]))
-            else:
-                definitions[name], owners[name] = node, declaration.id
-    problems.extend(fact_definition_diagnostics(definitions))
-    references = set().union(*(fact_references(node) for node in definitions.values()),
-                             *(fact_references(item.detect) for item in declarations))
-    supplied = {name for name, result in (facts or {}).items() if isinstance(result, PredicateResult) and not result.diagnostics}
-    for name in sorted(references - set(definitions) - supplied):
-        problems.append(diagnostic("unknown-fact-definition", "composition", "Resolve referenced fact: " + name))
-    return definitions, problems
-
-
-_RUNTIME_MODULES = {}
-
-
-def runtime_module(name):
-    if name not in _RUNTIME_MODULES:
-        _RUNTIME_MODULES[name] = runpy.run_path(str(Path(__file__).with_name(name + ".py")))
-    return _RUNTIME_MODULES[name]
-
-
-def discover_projects(root):
-    return runtime_module("project_facts")["ProjectGraph"](root).discover()
-
-
-def load_standards_context(graph, data=None, additional_claims=()):
-    return runtime_module("standards_context")["StandardsContext"](graph).load(data, additional_claims)
-
-
-def evaluate_project(graph, identity, node, definitions=None, context=None, facts=None, active=()):
-    problems = predicate_diagnostics(node)
-    if problems or identity not in graph.projects:
-        return PredicateResult(identity, diagnostics=problems or [diagnostic("unknown-project", identity, "Select a discovered project manifest")])
-    operator, value = next(iter(node.items()))
-    definitions = definitions or {}
-    if operator in ("all", "any"):
-        children = [evaluate_project(graph, identity, child, definitions, context, facts, active) for child in value]
-        return PredicateResult(identity, all(child.matched for child in children) if operator == "all" else any(child.matched for child in children),
-                               [item for child in children if child.matched for item in child.evidence],
-                               [item for child in children for item in child.prerequisites],
-                               [item for child in children for item in child.diagnostics])
-    if operator == "dependency":
-        result = graph.dependency(identity, value, context.supplements if context else ())
-        return PredicateResult(identity, result["matched"], result["evidence"], diagnostics=result["diagnostics"])
-    if operator == "project_dependency":
-        targets, problems = graph.reachable(identity, value["transitive"])
-        children = [(evaluate_project(graph, target, value["where"], definitions, context, None, active), chain)
-                    for target, chain in targets]
-        return PredicateResult(identity, any(child.matched for child, _ in children),
-                               [item for child, chain in children if child.matched for item in (*chain, *child.evidence)],
-                               [item for child, _ in children for item in child.prerequisites],
-                               [*problems, *(item for child, _ in children for item in child.diagnostics)])
-    if operator == "fact" and value in definitions:
-        if value in active:
-            return PredicateResult(identity, diagnostics=[diagnostic("cyclic-fact-definition", value, "Remove the fact reference cycle")])
-        result = evaluate_project(graph, identity, definitions[value], definitions, context, facts, active + (value,))
-        return PredicateResult(identity, result.matched, result.evidence, [value, *result.prerequisites], result.diagnostics)
-    if operator == "context":
-        problems = context.diagnostics_for(identity) if context else []
-        if problems:
-            return PredicateResult(identity, diagnostics=problems)
-        values, evidence = context.for_project(identity) if context else ({"architecture": [], "adopted_suites": []}, [])
-        if value["key"].startswith("house.") and value["key"] not in values:
-            return PredicateResult(identity)
-        result = evaluate_predicate(graph.projects[identity].root, node, contexts=values)
-        return PredicateResult(identity, result.matched, evidence if result.matched else (), result.prerequisites, result.diagnostics)
-    if operator == "fact":
-        fact = (facts or {}).get(value)
-        if isinstance(fact, PredicateResult) and fact.scope == identity:
-            return PredicateResult(identity, fact.matched, fact.evidence, [value], fact.diagnostics)
-        return PredicateResult(identity, prerequisites=[value], diagnostics=[diagnostic("unknown-fact", value, "Provide a declared or scoped fact result")])
-    return PredicateResult(identity, diagnostics=[diagnostic("project-ownership-required", identity, "Source/file ownership predicates require the subsequent source-facts contract")])
 
 
 def evaluate_predicate(root, node, facts=None, contexts=None, path="detect"):
@@ -1186,7 +1115,7 @@ def _assess_one(root, found=None, facts=None, contexts=None, inventory=None):
                            inventory, scope_state)
 
 
-def statement(root, found=None):
+def assessment_statement(root, found=None):
     result = assess(root, found)
     ubiquitous, applicable, blocked = result
     if not applicable and not blocked and not result.diagnostics and not any(
@@ -1362,19 +1291,27 @@ def path_markers(declaration: Declaration) -> list[str]:
 
 def declares_path(declaration: Declaration, relative: PurePosixPath) -> bool:
     return any(
-        fnmatch.fnmatch(relative.as_posix(), marker)
-        or ("/" not in marker and fnmatch.fnmatch(relative.name, marker))
+        glob_target_matches(relative.as_posix(), marker)
+        or ("/" not in marker and glob_target_matches(relative.name, marker))
         for marker in path_markers(declaration)
     )
 
 
-def active_host():
-    parts = Path(__file__).resolve().parts
-    if ".codex" in parts or os.environ.get("PLUGIN_ROOT") or os.environ.get("CODEX_PLUGIN_ROOT"):
-        return "codex"
-    if ".claude" in parts or os.environ.get("CLAUDE_PLUGIN_ROOT"):
-        return "claude"
-    return None
+def glob_target_matches(target: str, pattern: str) -> bool:
+    """Match globstar directory segments even when they consume no directories."""
+    pending = [pattern]
+    seen = set()
+    while pending:
+        candidate = pending.pop()
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if fnmatch.fnmatch(target, candidate):
+            return True
+        before, separator, after = candidate.partition("**/")
+        if separator:
+            pending.extend((before + after, before + "*/" + after))
+    return False
 
 
 @functools.lru_cache(maxsize=2)
@@ -1398,58 +1335,6 @@ def native_plugins(harness, project=None):
     if not isinstance(entries, list):
         return ()
     return tuple(item for item in entries if isinstance(item, dict) and item.get("enabled"))
-
-
-def installed_replacement(root, name, harness=None):
-    plugin, _, skill = name.partition(":")
-    profile = None
-    if harness == "codex":
-        profile = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
-    elif harness == "claude":
-        profile = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
-    roots = [profile / "plugins" / "cache"] if profile else cache_roots()
-    for cache in roots:
-        registry = cache.parent / "installed_plugins.json"
-        try:
-            plugins = json.loads(registry.read_text(encoding="utf-8-sig"))["plugins"]
-        except (OSError, UnicodeError, ValueError, KeyError, TypeError):
-            plugins = None
-        if isinstance(plugins, dict):
-            payloads = []
-            for identity, entries in plugins.items():
-                if identity.partition("@")[0] != plugin:
-                    continue
-                for entry in entries if isinstance(entries, list) else ():
-                    if not isinstance(entry, dict) or not entry.get("installPath"):
-                        continue
-                    scope = entry.get("projectPath")
-                    if scope and not _within(_resolved_key(root), _resolved_key(scope)):
-                        continue
-                    payloads.append(Path(entry["installPath"]))
-        else:
-            payloads = []
-            for item in native_plugins(harness) if harness else ():
-                if harness == "codex":
-                    if item.get("name") != plugin:
-                        continue
-                    parts = (item.get("marketplaceName"), plugin, item.get("version"))
-                    if not all(isinstance(part, str) for part in parts):
-                        continue
-                    payloads.append(cache.joinpath(*parts))
-                elif item.get("installPath"):
-                    payloads.append(Path(item["installPath"]))
-        for payload in payloads:
-            if payload.parent.name != plugin or _resolved_key(payload.parent.parent.parent) != _resolved_key(cache):
-                continue
-            if (payload / ORPHAN_MARKER).exists():
-                continue
-            try:
-                body = (payload / "skills" / skill / "SKILL.md").read_text(encoding="utf-8-sig")
-            except (OSError, UnicodeError):
-                continue
-            if re.search(r"^description:[ \t]*\S", front_matter(body), re.MULTILINE):
-                return True
-    return False
 
 
 def front_matter(text):
@@ -1557,133 +1442,248 @@ def _patch_paths(value: object) -> list[str]:
     return paths
 
 
-def tool_paths(payload: object) -> list[str]:
-    if not isinstance(payload, dict):
-        return []
+def write_paths(payload: Mapping[str, object]) -> list[str]:
     name = _text(payload.get("tool_name"))
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return []
-    if name in {"Read", "Edit", "Write", "MultiEdit"}:
+    if name in {"Edit", "Write", "MultiEdit"}:
         value = _text(tool_input.get("file_path"))
         return [value] if value else []
     if name == "NotebookEdit":
         value = _text(tool_input.get("notebook_path"))
-        return [value] if value else []
-    if name in {"Glob", "Grep"}:
-        value = _text(tool_input.get("path")) or _payload_cwd(payload)
         return [value] if value else []
     if name == "apply_patch":
         return _patch_paths(tool_input.get("command"))
     return []
 
 
-def _payload_cwd(payload: dict[str, object]) -> str:
+def _payload_cwd(payload: Mapping[str, object]) -> str:
     tool_input = payload.get("tool_input")
     values = (payload.get("cwd"), payload.get("project_dir"),
               tool_input.get("cwd") if isinstance(tool_input, dict) else None)
     return next((value for value in values if isinstance(value, str) and value), "")
 
 
-def path_standards(path: str, cwd: str) -> list[Standard]:
+def _target(path: str, cwd: str) -> Path:
     raw = Path(path)
-    target = (Path(cwd) / raw if cwd and not raw.is_absolute() else raw).expanduser()
-    target = target.resolve(strict=False)
-    repository, error = _repository_boundary(_existing_path(target))
-    if error is not None:
-        raise ValueError(error)
-    if repository is None:
-        return []
+    target = Path(cwd) / raw if cwd and not raw.is_absolute() else raw
+    return target.expanduser().resolve(strict=False)
+
+
+def repository_root(path: Path) -> Path | None:
+    """The nearest enclosing Git root, found from the filesystem alone."""
+    boundary, error = _repository_boundary(_existing_path(path))
+    return None if error else boundary
+
+
+def selected_stacks(repository: Path) -> list[Declaration]:
     selection = PluginSelection.read(repository)
     if selection is None:
         return []
+    return [declaration for declaration in declarations(project=repository)
+            if declaration.id in selection.identities and declaration.gated
+            and declaration.payload_dir is not None and path_markers(declaration)]
+
+
+def direct_path_predicates(node: object) -> list[tuple[str, str]]:
+    """Paths that independently establish a schema-v3 stack, without context."""
+    if not isinstance(node, dict) or len(node) != 1:
+        return []
+    operator, value = next(iter(node.items()))
+    if operator in ("file", "glob") and isinstance(value, str):
+        return [(operator, value)]
+    if operator == "any" and isinstance(value, list):
+        return [predicate for child in value for predicate in direct_path_predicates(child)]
+    return []
+
+
+def unselected_stacks(target: Path) -> list[str]:
+    """Installed stacks that directly own this file but have not been adopted."""
+    repository = repository_root(target)
+    if repository is None:
+        return []
+    selection = PluginSelection.read(repository)
+    identities = selection.identities if selection is not None else ()
     relative = PurePosixPath(target.relative_to(repository).as_posix())
-    found = declarations(project=repository)
-    if not any(
-        declaration.gated and declares_path(declaration, relative)
-        for declaration in found
-        if declaration.id in selection.identities
-    ):
-        return []
-    assessment = selected_assessment(repository, selection, found)
-    stacks = [item for item, _ in assessment.applicable if item.gated]
-    specific = [item for item in stacks if declares_path(item, relative)]
-    if not specific:
-        return []
-    standards: dict[str, Standard] = {}
-    for declaration in [*specific, *(item for item in stacks if item not in specific)]:
-        ranked = sorted(
-            applicable_standards(assessment, [declaration]),
-            key=lambda standard: (standard.profile != "core", standard.name),
+    missing = []
+    for declaration in declarations(project=repository):
+        if (
+            not declaration.gated
+            or declaration.id in identities
+            or declaration.diagnostics
+            or declaration.orphaned
+        ):
+            continue
+        predicates = (
+            direct_path_predicates(declaration.detect)
+            if declaration.schema_version == 3
+            else [(kind, marker) for key, kind in (("files", "file"), ("globs", "glob"))
+                  for marker in _listed(declaration.detect, key)
+                  if isinstance(marker, str) and marker]
         )
-        for standard in ranked:
-            standards.setdefault(standard.name, standard)
-    return list(standards.values())
+        if any(
+            os.path.normcase(relative.as_posix()) == os.path.normcase(marker)
+            if kind == "file" else (
+                glob_target_matches(relative.as_posix(), marker)
+                or ("/" not in marker and glob_target_matches(relative.name, marker)))
+            for kind, marker in predicates
+        ):
+            missing.append(declaration.id)
+    return sorted(set(missing))
 
 
-def write_standards(payload: dict[str, object], state_directory: Path, limit: int) -> str:
+def required_standards(target: Path) -> list[Standard]:
+    """The core standards of each selected stack whose path predicate matches the target."""
+    repository = repository_root(target)
+    if repository is None:
+        return []
+    relative = PurePosixPath(target.relative_to(repository).as_posix())
     standards: dict[str, Standard] = {}
-    notes: list[str] = []
-    for path in tool_paths(payload):
-        try:
-            selected = path_standards(path, _payload_cwd(payload))
-        except (OSError, ValueError) as error:
-            notes.append(f"Stack standards were not injected for {path}: {error}")
-        else:
-            for standard in selected:
-                standards.setdefault(standard.name, standard)
+    for declaration in selected_stacks(repository):
+        if not declares_path(declaration, relative):
+            continue
+        catalogue = payload_standards(Path(declaration.payload_dir), declaration.plugin, declaration.id)
+        for name, standard in catalogue.items():
+            if standard.required:
+                standards.setdefault(name, standard)
+    return [standards[name] for name in sorted(standards)]
+
+
+def write_gate(payload: Mapping[str, object], state_directory: Path) -> str:
+    """The reason to deny this write, or an empty string when it may proceed."""
     agent = AgentIdentity.from_payload(payload)
-    ledger = (
-        None if agent is None else InjectionLedger.for_agent(state_directory, agent)
-    )
-    delivered = frozenset() if ledger is None else ledger.injected()
-    pending = [item for name, item in standards.items() if name not in delivered]
-    if not pending:
-        return "\n\n".join(notes)
-    try:
-        injection = compose_injection(pending, limit - len("\n\n".join(["", *notes])))
-    except OSError as error:
-        return "\n\n".join([*notes, f"Stack standards could not be read: {error}"])
-    sections = [injection.text, *notes]
-    if ledger is not None:
-        try:
-            ledger.record(injection.delivered, time.time())
-        except OSError as error:
-            sections.append(
-                f"The injected standards could not be recorded ({error}); "
-                "later writes may inject them again."
-            )
-    return "\n\n".join(sections)
+    if agent is None:
+        return ""
+    ledger = LoadLedger.for_agent(state_directory, agent)
+    cwd = _payload_cwd(payload)
+    missing: dict[str, Standard] = {}
+    trigger = ""
+    for path in write_paths(payload):
+        target = _target(path, cwd)
+        unselected = unselected_stacks(target)
+        if unselected:
+            return (f"Blocked: {path} requires repository stack selection: "
+                    + ", ".join(unselected)
+                    + ". Follow base:project-setup and use agent:plugins to adopt these stacks "
+                    "in the target repository, complete its write and passing check, then retry. "
+                    "Reading standards alone does not adopt their plugins.")
+        for standard in required_standards(target):
+            if standard.name not in missing and not ledger.loaded(standard_key(standard.path)):
+                missing[standard.name] = standard
+                trigger = trigger or path
+    if not missing:
+        return ""
+    listing = "\n".join(f"- {standard.name}: {standard.path}" for standard in missing.values())
+    return (f"Blocked: {trigger} is governed by repository standards this agent has not loaded. "
+            "Read each file below in full by its absolute path (in parallel), apply them, "
+            "then retry the write.\n" + listing)
 
 
-def forget_injected_standards(payload: object, state_directory: Path) -> None:
+def record_read(payload: Mapping[str, object], state_directory: Path, now: float) -> None:
+    agent = AgentIdentity.from_payload(payload)
+    tool_input = payload.get("tool_input")
+    path = _text(tool_input.get("file_path")) if isinstance(tool_input, dict) else ""
+    if agent is None or Path(path).name.casefold() != "skill.md":
+        return
+    key = standard_key(_target(path, _payload_cwd(payload)))
+    LoadLedger.for_agent(state_directory, agent).record([key], now)
+
+
+def record_command(payload: Mapping[str, object], state_directory: Path, now: float) -> None:
+    """Record each installed stack standard whose canonical path a shell command names."""
+    agent = AgentIdentity.from_payload(payload)
+    tool_input = payload.get("tool_input")
+    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    if isinstance(command, list):
+        command = " ".join(part for part in command if isinstance(part, str))
+    if agent is None or not isinstance(command, str) or "skill.md" not in command.casefold():
+        return
+    windows = os.name == "nt"
+    text = path_key(command, windows)
+    cwd = Path(_payload_cwd(payload) or Path.cwd())
+    keys = []
+    for declaration in declarations(project=repository_root(cwd) or cwd):
+        if (not declaration.gated or declaration.payload_dir is None
+                or path_key(str(Path(declaration.payload_dir).resolve()), windows) not in text):
+            continue
+        catalogue = payload_standards(Path(declaration.payload_dir), declaration.plugin, declaration.id)
+        keys.extend(standard_key(standard.path) for standard in catalogue.values()
+                    if standard_key(standard.path) in text)
+    LoadLedger.for_agent(state_directory, agent).record(keys, now)
+
+
+def forget_loaded_standards(payload: object, state_directory: Path) -> None:
     agent = AgentIdentity.from_payload(payload) if isinstance(payload, dict) else None
     if agent is not None:
-        InjectionLedger.for_agent(state_directory, agent).forget()
+        LoadLedger.for_agent(state_directory, agent).forget()
 
 
-def tool_context(payload: object, state_directory: Path) -> str:
-    deadline = GIT_DEADLINE.set(time.monotonic() + TOOL_CONTEXT_SECONDS)
+def host_homes() -> dict[Host, Path]:
+    homes = {
+        Host.CLAUDE: os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude",
+        Host.CODEX: os.environ.get("CODEX_HOME") or Path.home() / ".codex",
+    }
+    return {host: Path(home).expanduser().resolve(strict=False) for host, home in homes.items()}
+
+
+def boundary_reason(payload: Mapping[str, object], state_directory: Path) -> str:
+    """Why this call may not proceed: a write to host memory, user-level host settings or machine state."""
+    tool = _text(payload.get("tool_name"))
+    tool_input = payload.get("tool_input")
+    if not tool or not isinstance(tool_input, dict):
+        return ""
+    cwd = Path(_payload_cwd(payload) or Path.cwd())
+    targets = outgoing_targets(tool, tool_input, cwd)
+    homes = host_homes()
+    memory = memory_target(targets, homes)
+    if memory is not None:
+        return memory_reason(memory)
+    state = Path(state_directory).expanduser().resolve(strict=False)
+    settings = settings_target(targets, homes, state)
+    if settings is not None:
+        return settings_reason(settings)
+    return ""
+
+
+def boundary_gate(payload: Mapping[str, object], state_directory: Path) -> str:
+    """The boundary reason, or nothing: a check that cannot decide never denies."""
     try:
-        return _typed_tool_context(payload, state_directory)
-    finally:
-        GIT_DEADLINE.reset(deadline)
+        return boundary_reason(payload, state_directory)
+    except Exception:
+        return ""
 
 
-def _typed_tool_context(payload: object, state_directory: Path) -> str:
-    if not isinstance(payload, dict):
-        return "Resolve target paths with tier_gate.py --path before applying standards."
-    contexts = []
-    for path in tool_paths(payload):
-        context = path_selection(path, _payload_cwd(payload))["context"]
-        if isinstance(context, str) and context and context not in contexts:
-            contexts.append(context)
-    if _text(payload.get("tool_name")) in WRITE_TOOLS:
-        remaining = HOOK_CONTEXT_CHARACTERS - len("\n\n".join([*contexts, ""]))
-        standards = write_standards(payload, state_directory, remaining)
-        if standards:
-            contexts.append(standards)
-    return "\n\n".join(contexts) or "Resolve target paths with tier_gate.py --path before applying standards."
+def _deny(reason: str) -> None:
+    if reason:
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse", "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }}, ensure_ascii=True))
+
+
+def selected_statement(repository: Path, selection: PluginSelection, found=None) -> str:
+    selected = [declaration for declaration in (declarations(project=repository) if found is None else found)
+                if declaration.id in selection.identities]
+    stacks = sorted(declaration.plugin for declaration in selected if declaration.gated and path_markers(declaration))
+    lines = []
+    if stacks:
+        lines.append("Writes to " + ", ".join(stacks) + " files in this repository are blocked until this "
+                     "agent has read the matching stack's core standards; a blocked write lists the files to read.")
+    lines.extend(declaration.session_context for declaration in selected
+                 if not declaration.gated and declaration.session_context)
+    return "\n".join(lines)
+
+
+def statement(root, found=None) -> str:
+    """The SessionStart context: nothing outside a repository, and no assessment when one selects plugins."""
+    repository = repository_root(Path(root))
+    if repository is None:
+        return ""
+    selection = PluginSelection.read(repository)
+    if selection is None:
+        return assessment_statement(root, found)
+    return selected_statement(repository, selection, found)
 
 
 def _stdin_payload():
@@ -1697,7 +1697,10 @@ def _stdin_payload():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--session-context", action="store_true")
-    parser.add_argument("--tool-context", action="store_true")
+    parser.add_argument("--write-gate", action="store_true")
+    parser.add_argument("--tool-gate", action="store_true")
+    parser.add_argument("--record-read", action="store_true")
+    parser.add_argument("--record-command", action="store_true")
     parser.add_argument("--compacted", action="store_true")
     parser.add_argument("--path", action="append", default=[])
     parser.add_argument("--project", default=None)
@@ -1715,16 +1718,27 @@ def main():
         os.environ.get(STATE_DIRECTORY_VARIABLE) or Path.home() / ".agents-state"
     )
 
-    if arguments.tool_context:
-        context = tool_context(_stdin_payload(), state_directory)
-        if context:
-            print(json.dumps({"hookSpecificOutput": {
-                "hookEventName": "PreToolUse", "additionalContext": context
-            }}, ensure_ascii=True))
+    if arguments.write_gate:
+        payload = _stdin_payload()
+        _deny(boundary_gate(payload, state_directory) or write_gate(payload, state_directory))
+        return 0
+
+    if arguments.tool_gate:
+        _deny(boundary_gate(_stdin_payload(), state_directory))
+        return 0
+
+    if arguments.record_read:
+        record_read(_stdin_payload(), state_directory, time.time())
+        return 0
+
+    if arguments.record_command:
+        payload = _stdin_payload()
+        record_command(payload, state_directory, time.time())
+        _deny(boundary_gate(payload, state_directory))
         return 0
 
     if arguments.compacted:
-        forget_injected_standards(_stdin_payload(), state_directory)
+        forget_loaded_standards(_stdin_payload(), state_directory)
         return 0
 
     if not arguments.session_context:

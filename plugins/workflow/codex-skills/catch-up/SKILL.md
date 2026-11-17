@@ -1,6 +1,6 @@
 ---
 name: catch-up
-description: Reconcile what the current conversation left behind against live repository, pull request and issue state, and report each item as done, superseded or still open. Use when returning to an unfinished or unclosed conversation, or when asked whether it is all done, still relevant or what has changed since.
+description: Reconcile what this conversation left behind against live PR, issue and branch state; report each item done, superseded or open. Use when returning to an unfinished conversation or asked if all is done.
 
 kind: utility
 domain: process

@@ -1,6 +1,6 @@
 ---
 name: bugfix
-description: Diagnose and fix a defect, regression, crash, or incorrect existing behavior through causal repair, regression coverage, review, validation, and commit when no active plan or specialist test workflow owns it. Do not use for new behavior, planning-only requests, execution of an existing plan, review-only requests, or a named test tier already owned by its debug skill.
+description: Diagnose and fix a defect, regression or crash through causal repair, regression coverage, review and commit when no plan or test-debug workflow owns it. Not for new behavior or review-only requests.
 
 kind: workflow
 domain: process
