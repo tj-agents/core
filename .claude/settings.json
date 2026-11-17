@@ -83,7 +83,11 @@
       "PowerShell(uv sync --locked)"
     ],
     "deny": [
-      "Edit(/.agents/plugins/marketplace.json)"
+      "Bash(tj approve:*)",
+      "Bash(tj-approve:*)",
+      "Edit(/.agents/plugins/marketplace.json)",
+      "PowerShell(tj approve:*)",
+      "PowerShell(tj-approve:*)"
     ]
   },
   "extraKnownMarketplaces": {
@@ -101,6 +105,7 @@
     "cli@tj-agents": true,
     "docs@tj-agents": true,
     "engineering@tj-agents": true,
+    "github@tj-agents": true,
     "personal@tj-agents": true,
     "python@tj-agents": true,
     "skill@tj-agents": true,
