@@ -54,7 +54,9 @@ Core publishes generic work status as Workflow and reusable engineering lifecycl
 Installing Engineering does not select or install a recording
 profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
 registers remain evidence only.
-Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. The same hooks refuse agent writes to host memory,
+Packaged SessionStart hooks identify the checkout and its selected standards. Agents select skills by their
+descriptions and read the applicable bodies before editing. A skill listing alone is not a loaded standard;
+the hooks do not track reads or require every core standard. PreToolUse hooks refuse agent writes to host memory,
 user-level host settings and the agent state directory (`.agents/hooks/boundary.py`). Their Python 3.12+
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
 current manifest uses `python` on all platforms. Core packages also require the CLI-provided `tj_hook`
