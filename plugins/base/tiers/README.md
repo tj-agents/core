@@ -21,16 +21,14 @@ bad declaration in its owning stack repository. Host skill listings can still sh
 skills. Context tells the agent which standards govern a repository; it does not restrict filesystem access
 or remove instructions already present in the conversation.
 
-Reviews load only the convention and contract skills of applicable plugins that the repository's
-`.agents/plugins.json` selects; the write gate requires only the `core` ones of the stack whose markers
-match the file being written.
+Reviews resolve convention and contract skills from the applicable plugins the repository's
+`.agents/plugins.json` selects, then read those relevant to the candidate.
 When one valid version 3 employer declaration applies, a selected `<stack>:<name>` resolves to
 `<employer>-<stack>:<name>` if that plugin and skill are installed. Otherwise it stays
 `<stack>:<name>`. The employer name is the declaring plugin name. The same resolution governs
 route queries, review, and session context. A company plugin can mirror a stack
 skill under the same name to replace that whole skill; no section merge occurs.
 When several employer declarations match, no replacement is selected until the ambiguity is resolved.
-The write gate evaluates no employer evidence, so it requires the selected stack's own skills.
 
 `hooks/check_tier_payload.py` enforces the shipped payload shape a tier repository must generate:
 `tier.json` present and schema-valid in every payload declared by `.agents/plugins/payloads.json`
@@ -140,28 +138,19 @@ queries re-read ownership, origin, adoption and declarations. There is no rememb
 
 Shell commands and other opaque tools require the explicit path query before the operation. Command
 text, cwd and a previous query are not proof of the paths an operation accesses. Claude file mentions
-and host operations without a supported typed path event also require explicit resolution. The write gate
-covers typed write tools only; it does not observe or restrict shell writes.
+and host operations without a supported typed path event also require explicit resolution.
 
-## Write gate
+## Standards loading
 
-Base's PreToolUse hook gates Claude `Edit`, `Write`, `MultiEdit` and `NotebookEdit` and every path in a
-Codex `apply_patch` operation, including move destinations. It finds the target's repository by walking up
-to the nearest `.git` and reads that repository's `.agents/plugins.json`. For each selected `stack-present`
-tier whose `file`, `glob` or content-glob marker matches the target, it requires that plugin's `core` (or
-unprofiled) convention and contract skills. Other stacks and other profiles are not required. A repository
-without a selection, or a file no selected stack declares, is allowed silently.
+Native skill descriptions select the standards relevant to a task. Read those bodies and their needed
+references before editing; a discovery entry may point to the full canonical definition. Selection and a
+catalogue listing alone do not load a body. Base does not require a fixed list of core standards or track
+skill reads. Mechanical checks and review assess whether the work follows its applicable rules.
 
-The hook denies the write until the agent has read every required canonical `SKILL.md`. The denial names
-the target and lists each missing `<plugin>:<name>` with its absolute canonical path; the agent reads those
-files and retries. A Claude `Read` of a `SKILL.md` is recorded by a `Read` hook whose `if` condition keeps
-ordinary reads from launching it. A Codex shell command is recorded for each installed stack standard whose
-canonical path it names. The discovery entry under `skills/<name>/` does not count, because it only points
-at the canonical file. Records are kept per session and agent under
-`<AGENT_STATE_DIRECTORY|~/.agents-state>/standards-loaded/`; the PostCompact hook clears that agent's
-record, so its next gated write requires the standards again. The gate and recorders use filesystem checks
-only, never Git, and allow the write when they fail.
+At SessionStart, a selected repository gets its checkout identity, selection path, stack names and concise
+loading guidance, plus context from its selected always-applicable plugins. The hook uses the event's
+working directory before the launch-directory fallback and performs no repository assessment when a
+selection exists. A linked checkout without its own selection inherits the primary checkout's file
+through CLI's filesystem resolver. Outside a Git repository the hook prints nothing.
 
-At SessionStart, a repository with a selection gets one line naming its gated stacks plus the session
-context of its selected always-applicable plugins, without a repository assessment. Outside a Git
-repository the hook prints nothing.
+The separate PreToolUse boundary still guards host memory, user-level settings and machine state.
