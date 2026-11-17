@@ -222,7 +222,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:6296a613c4495cd8dd6fe3ad68ad871f5cbec9cf3b867e778a9de463d80a8bab",
+      "digest": "sha256:84e52f3b265d5d53924a4689f33e1bc5537e53d3a4409102ce941901935ad329",
       "harness": {
         "marketplaces": [
           {
