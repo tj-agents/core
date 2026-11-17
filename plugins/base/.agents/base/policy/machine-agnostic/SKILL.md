@@ -13,10 +13,12 @@ Committed repository content and those services are the only records of a choice
 
 Anything that must exist locally (installed tools and shims, generated configuration, caches, a secret's
 local copy) is created by a scripted command shipped by its owner: `tj install`, a declared setup step or
-an onboard command. Re-running that command on a new machine rebuilds it. Never hand-edit local state or
-ask the user to. Never treat `~/.agents-state`, host settings, agent memory or a checkout's untracked
-files as the record of a choice: record the choice in the repository or the remote service, and let the
-command derive local state from it.
+an onboard command. Re-running that command on a new machine rebuilds it. Never ask the user to hand-edit
+local state. Base's write guard denies agent edits and shell commands that target user-level host settings
+(Claude `settings.json` and `settings.local.json`, Codex `config.toml` and `rules/`), host memory or
+`~/.agents-state`, while a command that runs the owning script still works. Never treat a checkout's
+untracked files as the record of a choice: record the choice in the repository or the remote service, and
+let the command derive local state from it.
 
 A secret's issuer is its source of truth. The owning onboard command enrols its local copy into the OS
 credential store or the owner's protected state, and can enrol it again on another machine.
@@ -26,7 +28,7 @@ never substitutes for a committed choice: every clone and worktree reads the sam
 
 ```text
 Choice: this project's agents push as its GitHub App.
-Record: commit the repository's access declaration, never only a local identity file.
+Record: commit the repository's access declaration, not a local identity file.
 Local: `tj install` installs the shared gh shim and Git helper; one onboard command enrols the App key.
 New machine: clone, `tj install`, onboard. Same behaviour, nothing copied by hand.
 ```
