@@ -320,8 +320,7 @@ jobs:
     needs: [select, guard, guidance-examples, verify-windows, verify-linux, python-standards]
     runs-on: ubuntu-latest
     permissions:
-      # Read the default branch's completed CI run for the publication gate.
-      actions: read
+      actions: read # Read the default branch's completed CI run for the publication gate.
       contents: read
     steps:
       - name: Require Python standards
