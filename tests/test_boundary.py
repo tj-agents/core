@@ -273,6 +273,183 @@ def test_boundary_reason_blocks_shell_commands_naming_machine_state(
     assert "is user-level host settings or machine state" in reason
 
 
+@pytest.mark.parametrize("tool", ["PowerShell", "Bash", "shell", "exec_command"])
+@pytest.mark.parametrize(
+    "command",
+    [
+        "Get-Content '{target}' -TotalCount 75",
+        'Get-Content "{target}" | Select-Object -First 35',
+        "rg -n 'credential|account|token|scope|configuration' '{target}' "
+        "| Select-Object -First 35",
+        "cat '{target}' | head -n 75",
+        "grep -n 'credential' '{target}' | tail -n 35",
+        "Get-Content '{target}'; rg -n 'configuration' '{target}'",
+        "cat '{target}' && head -n 15 '{target}'",
+        "cat '{target}' || head -n 15 '{target}'",
+        "cat '{target}'\nhead -n 15 '{target}'",
+        "cat '{target}';\nhead -n 15 '{target}'",
+    ],
+)
+def test_boundary_reason_allows_literal_inspection(
+    settings: Machine, tool: str, command: str
+) -> None:
+    targets = [
+        settings.home / ".codex/config.toml",
+        settings.state / "runtime with spaces/github_gate.py",
+        settings.home / ".claude/projects/example/memory/lesson.md",
+    ]
+    for target in targets:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("configuration\n", encoding="utf-8")
+        for spelling in (target.as_posix(), str(target).replace("/", "\\")):
+            assert (
+                _reason(
+                    settings,
+                    tool,
+                    {"command": command.format(target=spelling)},
+                    settings.personal,
+                )
+                == ""
+            )
+
+
+def test_boundary_reason_allows_reported_inspection_pipeline(settings: Machine) -> None:
+    runtime = settings.state / "github-gate/runtime/github_gate.py"
+    runtime.parent.mkdir(parents=True)
+    runtime.write_text("configuration\n", encoding="utf-8")
+    bindings = settings.state / "bin/.agents"
+    bindings.mkdir(parents=True)
+    config = settings.home / ".codex/config.toml"
+    command = (
+        f"Get-Content '{runtime.as_posix()}' -TotalCount 75; "
+        "rg -n 'credential|account|token|scope|configuration' "
+        f"'{runtime.as_posix()}' | Select-Object -First 35; "
+        f"rg -n 'GIT_CONFIG_COUNT|bot_identity.py' '{config.as_posix()}' "
+        f"'{bindings.as_posix()}' | Select-Object -First 15"
+    )
+    assert (
+        _reason(settings, "PowerShell", {"command": command}, settings.personal) == ""
+    )
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'cat "$HOME/.codex/config.toml"',
+        "Get-Content $env:USERPROFILE\\.codex\\config.toml",
+        "Get-Content ~/.codex/config.toml",
+        "rg -n configuration .",
+    ],
+)
+def test_boundary_reason_allows_inspection_from_machine_state(
+    settings: Machine, command: str
+) -> None:
+    assert _reason(settings, "shell", {"command": command}, settings.state) == ""
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "Set-Content '{target}' x",
+        "Remove-Item '{target}'",
+        "rm '{target}'",
+        "sed -i 's/a/b/' '{target}'",
+        "cat local.txt > '{target}'",
+        "cat local.txt >> '{target}'",
+        "rg x local.txt 2> '{target}'",
+        "Get-Content local.txt *> '{target}'",
+        "Get-Content local.txt | Set-Content '{target}' x",
+        "Get-Content local.txt; Set-Content '{target}' x",
+        "cat local.txt && rm '{target}'",
+        "cat local.txt || rm '{target}'",
+        "cat local.txt\nrm '{target}'",
+        "cat local.txt;\nrm '{target}'",
+        "cat local.txt\n\nrm '{target}'",
+        "Get-Content local.txt;\r\nSet-Content '{target}' x",
+        "cat local.txt & rm '{target}'",
+        "cat local.txt | tee '{target}'",
+        "rg --pre=mutator pattern '{target}'",
+        "rg --pre mutator pattern '{target}'",
+        "rg --hostname-bin=mutator pattern '{target}'",
+        "cat $(rm '{target}')",
+        "Get-Content \"$(Set-Content '{target}' x)\"",
+        "Get-Content local.txt | ForEach-Object {{ Set-Content '{target}' x }}",
+        "cat `rm '{target}'`",
+        "unknown-command '{target}'",
+        "cat local.txt; unknown-command '{target}'",
+        "cat local.txt; 'unterminated '{target}'",
+    ],
+)
+def test_boundary_reason_retains_protection_for_mutating_or_uncertain_commands(
+    settings: Machine, command: str
+) -> None:
+    for target in (
+        settings.home / ".codex/config.toml",
+        settings.state / "identity.json",
+    ):
+        reason = _reason(
+            settings,
+            "shell",
+            {"command": command.format(target=target.as_posix())},
+            settings.personal,
+        )
+        assert "is user-level host settings or machine state" in reason
+
+
+@pytest.mark.parametrize("mutating", [False, True])
+def test_hook_entry_point_distinguishes_inspection_from_later_write(
+    settings: Machine, monkeypatch: pytest.MonkeyPatch, mutating: bool
+) -> None:
+    monkeypatch.setenv("AGENT_STATE_DIRECTORY", str(settings.state))
+    target = (settings.home / ".codex/config.toml").as_posix()
+    command = f"Get-Content '{target}' | Select-Object -First 15"
+    if mutating:
+        command += f"; Set-Content '{target}' x"
+    result = subprocess.run(
+        [sys.executable, "-B", str(GATE), "--tool-gate"],
+        input=json.dumps(
+            {
+                "tool_name": "PowerShell",
+                "tool_input": {"command": command},
+                "cwd": str(settings.personal),
+            }
+        ),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=15,
+    )
+    assert result.returncode == 0
+    if mutating:
+        decision = json.loads(result.stdout)["hookSpecificOutput"]
+        assert decision["permissionDecision"] == "deny"
+    else:
+        assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "cat local.txt; rm '{target}'",
+        "Get-Content local.txt | Set-Content '{target}' x",
+        "cat local.txt >> '{target}'",
+    ],
+)
+def test_boundary_reason_retains_host_memory_protection(
+    settings: Machine, command: str
+) -> None:
+    target = settings.home / ".codex/memories/lesson.md"
+    target.parent.mkdir(parents=True)
+    reason = _reason(
+        settings,
+        "shell",
+        {"command": command.format(target=target.as_posix())},
+        settings.personal,
+    )
+    assert "is host memory" in reason
+
+
 @pytest.mark.parametrize(
     "command",
     [

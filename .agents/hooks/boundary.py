@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 from collections.abc import Iterable, Mapping
 from enum import Enum
+from itertools import islice
 from pathlib import Path
 
 PATH_TOKENS = 256
@@ -20,6 +22,62 @@ HOME_VARIABLE = re.compile(
 )
 FILE_WRITERS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit", "apply_patch"})
 COMMANDS = frozenset({"Bash", "PowerShell", "shell", "exec_command"})
+READERS = frozenset(
+    {
+        "cat",
+        "gc",
+        "get-content",
+        "get-childitem",
+        "get-item",
+        "grep",
+        "head",
+        "ls",
+        "pwd",
+        "rg",
+        "select-object",
+        "select-string",
+        "tail",
+        "test-path",
+    }
+)
+RG_READ_OPTIONS = frozenset(
+    {
+        "-n",
+        "--line-number",
+        "-i",
+        "--ignore-case",
+        "-s",
+        "--case-sensitive",
+        "-S",
+        "--smart-case",
+        "-F",
+        "--fixed-strings",
+        "-e",
+        "--regexp",
+        "-g",
+        "--glob",
+        "--hidden",
+        "--no-ignore",
+        "--files",
+        "-l",
+        "--files-with-matches",
+        "-v",
+        "--invert-match",
+        "-m",
+        "--max-count",
+        "-A",
+        "--after-context",
+        "-B",
+        "--before-context",
+        "-C",
+        "--context",
+        "--no-config",
+        "--no-heading",
+        "--heading",
+        "--color",
+        "--",
+    }
+)
 MEMORY_LESSON = (
     "Host memory lives on one machine, so a lesson kept there repeats everywhere else. "
     "Fix the cause in its source instead: a defect in the installed agent tooling "
@@ -128,11 +186,16 @@ def _patch_additions(patch: str) -> dict[str, str]:
 
 
 def _command_targets(command: str, cwd: Path) -> tuple[Path, ...]:
+    if _read_only(command):
+        return ()
     leading = LEADING_CD.match(command)
     directory = _resolved(leading.group(1).strip("\"'"), cwd) if leading else cwd
     targets = [directory]
-    for raw in TOKEN.findall(command)[:PATH_TOKENS]:
+    tokens = TOKEN.findall(command)
+    for raw in islice(tokens, PATH_TOKENS):
         token = raw.strip("\"'")
+        if token != raw and ("$(" in token or "`" in token):
+            tokens.extend(TOKEN.findall(token))
         if not PATH_LIKE.search(token):
             continue
         for candidate in (token, *token.split("=", 1)[1:], token.removeprefix("@")):
@@ -140,6 +203,46 @@ def _command_targets(command: str, cwd: Path) -> tuple[Path, ...]:
             if _names_path(path, directory):
                 targets.append(_resolved(path, directory))
     return tuple(targets)
+
+
+def _read_only(command: str) -> bool:
+    # This recognizes only literal inspection pipelines, not arbitrary shell code.
+    # Uncertain syntax retains the existing conservative target scan.
+    if any(value in command for value in ("`", '\\"', "\\'")):
+        return False
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>()\n")
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    lexer.escape = ""
+    lexer.commenters = ""
+    reader = ""
+    seen = False
+    try:
+        for token in lexer:
+            if token and all(character in ";&|\n" for character in token):
+                if token not in {"&&", "||", "|"} and not all(
+                    character in ";\n" for character in token
+                ):
+                    return False
+                reader = ""
+                continue
+            literal = HOME_VARIABLE.sub("~", token)
+            if any(character in literal for character in "$`{}()<>@&"):
+                return False
+            if not reader:
+                reader = token.lower().removesuffix(".exe")
+                if reader not in READERS:
+                    return False
+                seen = True
+            elif (
+                reader == "rg"
+                and token.startswith("-")
+                and token.partition("=")[0] not in RG_READ_OPTIONS
+            ):
+                return False
+    except ValueError:
+        return False
+    return seen
 
 
 def _names_path(candidate: str, directory: Path) -> bool:

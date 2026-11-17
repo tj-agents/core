@@ -3,7 +3,7 @@
   "sources": {
     "agent": {
       "repository": "tj-agents/agent",
-      "revision": "e7bf9f26177e9d33aaa390059891de297b5ec601",
+      "revision": "551c3375322bf25b650271d90510dd2c37e10d8c",
       "package": "plugins/agent",
       "exports": [
         ".agents/agent/runtime",
