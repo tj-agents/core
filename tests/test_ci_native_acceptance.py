@@ -2,6 +2,7 @@ import base64
 import hashlib
 import importlib.util
 import io
+import json
 from pathlib import Path
 import sys
 import tarfile
@@ -9,6 +10,8 @@ import tempfile
 import unittest
 from unittest import mock
 import zipfile
+
+import pytest
 
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
@@ -65,7 +68,7 @@ class NativeProvisioningTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, mock.patch.object(CI, 'download') as download:
             for system, machine in (('Darwin', 'x86_64'), ('Linux', 'aarch64')):
                 with self.assertRaises(ValueError):
-                    CI.provision(Path(temporary), system, machine)
+                    CI.provision(Path(temporary), system, machine, 'test-token')
             download.assert_not_called()
 
     def test_wrong_native_format_is_not_written(self):
@@ -84,6 +87,44 @@ class NativeProvisioningTests(unittest.TestCase):
                 accept.assert_not_called()
                 artifact = Path(temporary) / 'tj-agents-native-acceptance/artifacts/provision.failure.log'
                 self.assertIn('bad integrity', artifact.read_text(encoding='utf-8'))
+
+
+def test_release_token_is_omitted_from_asset_download(tmp_path: Path) -> None:
+    asset_url = 'https://github.com/openai/codex/releases/download/pinned/codex.tar.gz'
+    calls = []
+
+    def fetch(url: str, *, headers: dict[str, str] | None = None) -> bytes:
+        calls.append((url, headers))
+        if headers is None:
+            raise ValueError('asset download reached')
+        return json.dumps({'assets': [{
+            'name': 'codex-x86_64-unknown-linux-musl.tar.gz',
+            'browser_download_url': asset_url,
+        }]}).encode('utf-8')
+
+    with mock.patch.object(CI, 'download', side_effect=fetch):
+        with pytest.raises(ValueError, match='asset download reached'):
+            CI.provision(tmp_path, 'Linux', 'x86_64', 'test-token')
+    assert calls == [
+        (f'https://api.github.com/repos/openai/codex/releases/tags/rust-v{CI.CODEX_VERSION}',
+         {'Authorization': 'Bearer test-token'}),
+        (asset_url, None),
+    ]
+
+
+def test_native_provisioning_requires_token_before_downloading(tmp_path: Path) -> None:
+    with mock.patch.object(CI, 'download') as fetch:
+        with pytest.raises(ValueError, match='requires GITHUB_TOKEN'):
+            CI.provision(tmp_path, 'Linux', 'x86_64', None)
+    fetch.assert_not_called()
+
+
+def test_downloader_authenticates_the_metadata_request() -> None:
+    with mock.patch.object(CI.urllib.request, 'urlopen', return_value=io.BytesIO(b'metadata')) as fetch:
+        assert CI.download('https://api.github.com/repos/openai/codex/releases',
+                           headers={'Authorization': 'Bearer test-token'}) == b'metadata'
+    request = fetch.call_args.args[0]
+    assert request.get_header('Authorization') == 'Bearer test-token'
 
 
 if __name__ == '__main__':
