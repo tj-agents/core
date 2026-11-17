@@ -163,6 +163,8 @@ jobs:
       - name: Native host startup and discovery acceptance
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: python -B scripts/ci_native_acceptance.py
 
       - name: Upload native host diagnostics
@@ -282,6 +284,8 @@ jobs:
       - name: Native host startup and discovery acceptance
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: python3 -B scripts/ci_native_acceptance.py
 
       - name: Upload native host diagnostics
@@ -316,7 +320,7 @@ jobs:
     needs: [select, guard, guidance-examples, verify-windows, verify-linux, python-standards]
     runs-on: ubuntu-latest
     permissions:
-      actions: read
+      actions: read # Read the default branch's completed CI run for the publication gate.
       contents: read
     steps:
       - name: Require Python standards
