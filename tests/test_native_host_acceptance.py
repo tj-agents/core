@@ -21,6 +21,55 @@ NATIVE = importlib.util.module_from_spec(specification)
 specification.loader.exec_module(NATIVE)
 
 
+def test_hook_trust_receives_the_project_collection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inventory: dict[str, object] = {"installed": []}
+    entries = [{"cwd": str(tmp_path)}]
+    trusted = {"base@tj-agents:startup": {"trusted_hash": "current"}}
+    requests: list[tuple[str, dict[str, object]]] = []
+
+    def request(method: str, params: dict[str, object]) -> dict[str, object]:
+        requests.append((method, params))
+        return {"data": entries} if method == "hooks/list" else {}
+
+    def trust_updates(
+        installed: dict[str, object],
+        hooks: list[dict[str, str]],
+        projects: list[Path],
+        roots: list[object],
+    ) -> dict[str, dict[str, str]]:
+        assert tmp_path.resolve() in projects
+        assert installed == inventory and hooks == entries and roots == []
+        return trusted
+
+    monkeypatch.setattr(
+        NATIVE,
+        "run_native",
+        lambda *args: subprocess.CompletedProcess([], 0, json.dumps(inventory)),
+    )
+    result = NATIVE.trust_current_hooks(
+        SimpleNamespace(request=request),
+        SimpleNamespace(trust_updates=trust_updates),
+        SCRIPT,
+        tmp_path,
+        {},
+        [],
+        1,
+    )
+
+    assert result == trusted
+    assert requests[-1] == (
+        "config/batchWrite",
+        {
+            "edits": [
+                {"keyPath": "hooks.state", "value": trusted, "mergeStrategy": "upsert"}
+            ],
+            "reloadUserConfig": True,
+        },
+    )
+
+
 def test_fixture_selects_required_packages_without_personal(tmp_path: Path) -> None:
     NATIVE.write_fixture(tmp_path)
     value = json.loads((tmp_path / ".agents/plugins.json").read_text(encoding="utf-8"))
