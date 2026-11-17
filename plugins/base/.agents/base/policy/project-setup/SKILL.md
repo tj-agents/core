@@ -21,12 +21,9 @@ Before declaring setup tooling unavailable, inspect the installed Agent skill an
 source checkouts. Use `tj install --help` and `tj install --check --step <name>` to verify machine
 capabilities; an old checkout or a top-level command listing alone does not establish their absence.
 
-Base's typed-file write gate refuses a target owned directly by an installed stack's file or glob
-declaration until that plugin is selected, including the first source file in a new repository. Direct
-schema-v3 file/glob predicates and their `any` alternatives are included. Adoption
-then enables the separate standards-read gate. It does not select profiles automatically or infer stacks
-from content-only or contextual predicates. Shell writes and stacks absent from installed declarations
-still require this setup procedure; the file gate does not establish enforcement for those entry points.
+Selection makes the owning skills available through the host's native discovery. Before editing, choose
+the skills whose descriptions match the task and read their full canonical definitions and needed
+references. Apply the same setup procedure whether editing through a typed tool or a shell command.
 
 ```text
 New car-hunting repository; the request says nothing about personal or work scope.
@@ -34,6 +31,6 @@ Ask which it is before choosing policy profiles. Apply the chosen scope with the
 Write and check the resulting project selection before starting governed code.
 
 Existing repository selects Base but not Python; first write targets install.py.
-The write gate names python@tj-agents. Adopt Python through agent:plugins, pass its check,
-then read Python's required standards and retry the write.
+Adopt Python through agent:plugins and pass its project check.
+Load the Python skills whose descriptions match the install.py task, then make the edit.
 ```
