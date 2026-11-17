@@ -167,3 +167,178 @@ def test_tool_gate_fails_open_on_malformed_input() -> None:
         check=False,
     )
     assert (result.returncode, result.stdout) == (0, "")
+
+
+SETTINGS = (
+    ".claude/settings.json",
+    ".claude/settings.local.json",
+    ".codex/config.toml",
+    ".codex/rules/default.rules",
+)
+
+
+@pytest.fixture
+def settings(machine: Machine) -> Machine:
+    for relative in SETTINGS:
+        (machine.home / relative).parent.mkdir(parents=True, exist_ok=True)
+        (machine.home / relative).write_text("{}\n", encoding="utf-8")
+    return machine
+
+
+def _writer_input(tool: str, target: Path) -> dict[str, object]:
+    match tool:
+        case "Write":
+            return {"file_path": str(target), "content": "{}"}
+        case "Edit":
+            return {"file_path": str(target), "old_string": "{", "new_string": "["}
+        case "MultiEdit":
+            edits = [{"old_string": "{", "new_string": "["}]
+            return {"file_path": str(target), "edits": edits}
+        case "NotebookEdit":
+            return {"notebook_path": str(target), "new_source": "x"}
+        case "apply_patch":
+            patch = f"*** Begin Patch\n*** Update File: {target}\n+x\n*** End Patch"
+            return {"command": patch}
+        case _:
+            raise AssertionError(tool)
+
+
+@pytest.mark.parametrize("relative", SETTINGS)
+def test_boundary_reason_blocks_writes_to_user_host_settings(
+    machine: Machine, relative: str
+) -> None:
+    reason = _reason(
+        machine,
+        "Write",
+        _writer_input("Write", machine.home / relative),
+        machine.personal,
+    )
+    assert "is user-level host settings or machine state" in reason
+    assert "base:machine-agnostic" in reason
+
+
+def test_boundary_reason_blocks_writes_into_the_agent_state_directory(
+    machine: Machine,
+) -> None:
+    target = machine.state / "github-app" / "identity.json"
+    reason = _reason(machine, "Write", _writer_input("Write", target), machine.personal)
+    assert "is user-level host settings or machine state" in reason
+
+
+@pytest.mark.parametrize(
+    "tool", ["Write", "Edit", "MultiEdit", "NotebookEdit", "apply_patch"]
+)
+def test_boundary_reason_blocks_every_file_writer_on_host_settings(
+    settings: Machine, tool: str
+) -> None:
+    target = settings.home / ".codex" / "config.toml"
+    reason = _reason(settings, tool, _writer_input(tool, target), settings.personal)
+    assert "is user-level host settings or machine state" in reason
+
+
+def test_boundary_reason_follows_configured_host_homes(
+    machine: Machine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude home"))
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex home"))
+    for relative in ("claude home/settings.json", "codex home/rules/a.rules"):
+        target = tmp_path / relative
+        reason = _reason(
+            machine, "Write", _writer_input("Write", target), machine.personal
+        )
+        assert "is user-level host settings or machine state" in reason
+
+
+@pytest.mark.parametrize(
+    ("tool", "command"),
+    [
+        ("Bash", "echo '{}' > ~/.claude/settings.json"),
+        ("Bash", 'cp new.toml "$HOME/.codex/config.toml"'),
+        ("PowerShell", "Set-Content $env:USERPROFILE\\.codex\\rules\\new.rules x"),
+        ("PowerShell", "Copy-Item a.json ~/.claude/settings.local.json"),
+    ],
+)
+def test_boundary_reason_blocks_shell_commands_naming_host_settings(
+    settings: Machine, tool: str, command: str
+) -> None:
+    reason = _reason(settings, tool, {"command": command}, settings.personal)
+    assert "is user-level host settings or machine state" in reason
+
+
+def test_boundary_reason_blocks_shell_commands_naming_machine_state(
+    machine: Machine,
+) -> None:
+    command = ["bash", "-lc", f"echo x > {machine.state.as_posix()}/new.json"]
+    reason = _reason(machine, "exec_command", {"command": command}, machine.personal)
+    assert "is user-level host settings or machine state" in reason
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "tj install",
+        "tj install --step 'plugin setup'",
+        "tj plugins update --host claude",
+        'python -B "{claude}" setup --check',
+        'python3 -B "{codex}" setup',
+    ],
+)
+def test_boundary_reason_allows_scripted_commands_that_own_host_settings(
+    settings: Machine, command: str
+) -> None:
+    caches = {
+        "claude": settings.home / ".claude/plugins/cache/tools/agent/1/setup.py",
+        "codex": settings.home / ".codex/plugins/cache/tools/agent/1/setup.py",
+    }
+    for script in caches.values():
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text("", encoding="utf-8")
+    command = command.format(**{host: path.as_posix() for host, path in caches.items()})
+    assert _reason(settings, "Bash", {"command": command}, settings.personal) == ""
+
+
+@pytest.mark.parametrize(
+    "relative", [".claude/settings.json", ".codex/config.toml", ".codex/rules/a.rules"]
+)
+def test_boundary_reason_allows_repository_host_settings(
+    settings: Machine, relative: str
+) -> None:
+    target = settings.personal / relative
+    assert (
+        _reason(settings, "Write", _writer_input("Write", target), settings.personal)
+        == ""
+    )
+
+
+@pytest.mark.parametrize(
+    ("option", "tool", "tool_input"),
+    [
+        ("--write-gate", "Write", {"file_path": "~/.claude/settings.json"}),
+        ("--tool-gate", "Bash", {"command": "echo x > ~/.codex/config.toml"}),
+        ("--record-command", "Bash", {"command": "echo x > ~/.codex/config.toml"}),
+    ],
+)
+def test_hook_entry_points_deny_host_settings_writes(
+    settings: Machine,
+    monkeypatch: pytest.MonkeyPatch,
+    option: str,
+    tool: str,
+    tool_input: dict[str, object],
+) -> None:
+    monkeypatch.setenv("AGENT_STATE_DIRECTORY", str(settings.state))
+    payload = {
+        "tool_name": tool,
+        "tool_input": tool_input,
+        "cwd": str(settings.personal),
+    }
+    result = subprocess.run(
+        [sys.executable, "-B", str(GATE), option],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+    decision = json.loads(result.stdout)["hookSpecificOutput"]
+    assert decision["permissionDecision"] == "deny"
+    assert "user-level host settings" in decision["permissionDecisionReason"]
