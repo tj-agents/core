@@ -103,9 +103,10 @@ def shell_reader(header: str, syntax: ShellSyntax) -> ShellReader | None:
     program = True
     operand = False
     wrapper = ""
+    uncertain = False
     for word in words:
         if word and all(character in ";&|()\n" for character in word):
-            program, wrapper = True, ""
+            program, wrapper, uncertain = True, "", False
         elif operand:
             operand = False
         elif program:
@@ -135,10 +136,15 @@ def shell_reader(header: str, syntax: ShellSyntax) -> ShellReader | None:
                 return ShellReader(reader_syntax)
             else:
                 program = False
-    if any(word.lower() in {"-c", "-lc", "-command", "/c"} for word in words) or any(
-        ShellSyntax.for_program(word) is not None for word in words
-    ):
-        return ShellReader(None, in_process=True)
+                uncertain = executable(word) not in PASSIVE_PROGRAMS | {
+                    "cat",
+                    "tee",
+                    "set-content",
+                    "add-content",
+                    "out-file",
+                }
+        elif uncertain and ShellSyntax.for_program(word) is not None:
+            return ShellReader(None, in_process=True)
     return None
 
 
