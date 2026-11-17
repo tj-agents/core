@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from enum import Enum
 from pathlib import Path
-from typing import cast
+from typing import Self, cast
 
 import create_worktree
 
@@ -18,6 +18,31 @@ class Mutation(Enum):
         self.command = command
         self.destination = destination
         self.options = options
+
+
+class ShellSyntax(Enum):
+    POSIX = ("\\", True, True, False, ("bash", "sh", "zsh"))
+    POWERSHELL = ("`", True, False, True, ("pwsh", "powershell"))
+    CMD = ("^", False, False, False, ("cmd",))
+
+    def __init__(
+        self,
+        escape: str,
+        expansions: bool,
+        heredocs: bool,
+        here_strings: bool,
+        programs: tuple[str, ...],
+    ) -> None:
+        self.escape = escape
+        self.expansions = expansions
+        self.heredocs = heredocs
+        self.here_strings = here_strings
+        self.programs = programs
+
+    @classmethod
+    def for_program(cls, value: str) -> Self | None:
+        program = executable(value.strip("\"'"))
+        return next((syntax for syntax in cls if program in syntax.programs), None)
 
 
 def literal(value: str) -> str:
@@ -38,54 +63,95 @@ def shell_words(command: str) -> list[str]:
     return list(lexer)
 
 
-def is_shell_executable(value: str) -> bool:
-    return executable(value.strip("\"'")) in {
-        "bash",
-        "sh",
-        "zsh",
-        "pwsh",
-        "powershell",
-        "cmd",
-    }
+def has_shell_reader(header: str) -> bool:
+    programs = "|".join(
+        program for syntax in ShellSyntax for program in syntax.programs
+    )
+    header = re.sub(r"<<-?(?:(['\"])(.*?)\1|\w+)", "", header)
+    return (
+        re.search(
+            r"(?:^|[|;&(])\s*(?:(?:command|env|sudo|doas)\s+"
+            r"(?:-\S+\s+)*(?:\w+=\S+\s+)*)*"
+            rf"(?:\"(?:[^\"\n]*[/\\])?(?:{programs})(?:\.exe)?\"|"
+            rf"'(?:[^'\n]*[/\\])?(?:{programs})(?:\.exe)?'|"
+            rf"(?:[^\s\"']*[/\\])?(?:{programs})(?:\.exe)?)(?=\s|$)",
+            header,
+            re.IGNORECASE,
+        )
+        is not None
+    )
 
 
-def without_literal_documents(command: str) -> str:
+def without_literal_documents(command: str, syntax: ShellSyntax) -> str:
     pieces: list[str] = []
     start = index = 0
     quote = ""
     while index < len(command):
         character = command[index]
         if quote:
-            if quote == '"' and character in "\\`":
+            if quote == '"' and character == syntax.escape:
                 index += 2
                 continue
             if character == quote:
                 quote = ""
-        elif command.startswith(("@'\n", "@'\r\n"), index):
-            closing = re.search(r"(?m)^'@(?=\s|;|$)", command[index + 2 :])
+        elif character == "#" and (index == 0 or command[index - 1].isspace()):
+            newline = command.find("\n", index)
+            index = len(command) if newline == -1 else newline + 1
+            continue
+        elif syntax.here_strings and re.match(r"@(['\"])\r?\n", command[index:]):
+            delimiter = command[index + 1]
+            closing = re.search(rf"(?m)^{delimiter}@(?=\s|;|$)", command[index + 2 :])
             if closing is not None:
                 end = index + 2 + closing.end()
-                pieces.extend((command[start:index], "''"))
+                body = command[index + 2 : index + 2 + closing.start()]
+                if delimiter == '"' and has_placement_expansion(
+                    body, syntax, literal=True
+                ):
+                    raise create_worktree.CreateWorktreeError(
+                        "worktree command substitution"
+                    )
+                blank = re.sub(r"[^\r\n]", " ", command[index + 1 : end - 1])
+                pieces.extend((command[start:index], "'" + blank + "'"))
                 start = index = end
                 continue
-        elif character == "<":
-            opening = re.match(r"<<(-?)(['\"])(.*?)\2", command[index:])
+        elif (
+            syntax.heredocs
+            and character == "<"
+            and (index == 0 or command[index - 1] != "<")
+        ):
+            opening = re.match(
+                r"<<(-?)(?:(['\"])(.*?)\2|(\w+))(?=[\s;|&<>]|$)", command[index:]
+            )
             newline = command.find("\n", index)
+            while newline != -1 and command[:newline].rstrip("\r").endswith("\\"):
+                newline = command.find("\n", newline + 1)
             if opening is not None and newline != -1:
-                header = command[command.rfind("\n", 0, index) + 1 : index]
-                if not any(is_shell_executable(word) for word in shell_words(header)):
+                line = command.rfind("\n", 0, index) + 1
+                while line and command[:line].rstrip("\r\n").endswith("\\"):
+                    line = command.rfind("\n", 0, line - 1) + 1
+                header = command[line:newline].replace("\\\r\n", "").replace("\\\n", "")
+                if not has_shell_reader(header):
                     indent = r"\t*" if opening[1] else ""
                     closing = re.search(
-                        rf"(?m)^{indent}{re.escape(opening[3])}\r?$",
+                        rf"(?m)^{indent}{re.escape(opening[3] or opening[4])}\r?$",
                         command[newline + 1 :],
                     )
                     if closing is not None:
-                        pieces.append(command[start : newline + 1])
+                        body = command[newline + 1 : newline + 1 + closing.start()]
+                        if not opening[2] and has_placement_expansion(
+                            body, syntax, literal=True
+                        ):
+                            raise create_worktree.CreateWorktreeError(
+                                "worktree command substitution"
+                            )
+                        end = newline + 1 + closing.end()
+                        blank = re.sub(r"[^\r\n]", " ", command[newline + 1 : end])
+                        pieces.extend((command[start : newline + 1], blank))
                         start = index = newline + 1 + closing.end()
                         continue
         elif character in "\"'":
             quote = character
-        elif character == "\\":
+        elif character == syntax.escape:
             index += 2
             continue
         index += 1
@@ -93,13 +159,14 @@ def without_literal_documents(command: str) -> str:
     return "".join(pieces)
 
 
-def substitution_end(command: str, start: int) -> int:
+def substitution_end(command: str, start: int, syntax: ShellSyntax) -> int:
+    command = command[:start] + without_literal_documents(command[start:], syntax)
     quotes = [""]
     index = start
     while index < len(command):
         character = command[index]
         quote = quotes[-1]
-        if character == "\\" and quote != "'":
+        if character == syntax.escape and quote != "'":
             index += 2
             continue
         if character in "\"'" and (not quote or character == quote):
@@ -118,26 +185,36 @@ def substitution_end(command: str, start: int) -> int:
     raise ValueError("unclosed command substitution")
 
 
-def has_placement_expansion(command: str) -> bool:
+def has_placement_expansion(
+    command: str,
+    syntax: ShellSyntax,
+    *,
+    literal: bool = False,
+) -> bool:
+    if not syntax.expansions:
+        return False
     quote = ""
     index = 0
     while index < len(command):
         character = command[index]
-        if character == "\\" and quote != "'":
+        if character == syntax.escape and quote != "'":
             index += 2
             continue
-        if character in "\"'" and (not quote or character == quote):
+        if not literal and character in "\"'" and (not quote or character == quote):
             quote = "" if quote else character
-        elif quote != "'" and (command.startswith("$(", index) or character == "`"):
+        elif quote != "'" and (
+            command.startswith("$(", index) or (syntax.heredocs and character == "`")
+        ):
             start = index + (2 if character == "$" else 1)
             end = (
-                substitution_end(command, start)
+                substitution_end(command, start, syntax)
                 if character == "$"
                 else command.find("`", start)
             )
             if end == -1:
                 raise ValueError("unclosed command substitution")
-            if needs_placement_check(command[start:end]):
+            nested = without_literal_documents(command[start:end], syntax)
+            if needs_placement_check(nested, syntax):
                 return True
             index = end
         index += 1
@@ -161,17 +238,20 @@ def placement_alias(value: str) -> bool:
     )
 
 
-def needs_placement_check(command: str) -> bool:
-    if has_placement_expansion(command):
+def needs_placement_check(command: str, syntax: ShellSyntax) -> bool:
+    if has_placement_expansion(command, syntax):
         return True
     words = shell_words(command)
     start = 0
     for index, word in enumerate(words):
+        nested_syntax = ShellSyntax.for_program(words[start])
         if (
             index > start
-            and is_shell_executable(words[start])
+            and nested_syntax is not None
             and words[index - 1].lower() in {"-c", "-lc", "-command", "/c"}
-            and needs_placement_check(without_literal_documents(word))
+            and needs_placement_check(
+                without_literal_documents(word, nested_syntax), nested_syntax
+            )
         ):
             return True
         if placement_alias(word) and (
@@ -325,8 +405,10 @@ def mutates_worktree(words: Sequence[str]) -> bool:
     return bool(action) and literal(action[0]) in {"add", "move"}
 
 
-def check_command(command: str, cwd: Path, deadline: float) -> None:
-    command = without_literal_documents(command)
+def check_command(
+    command: str, cwd: Path, deadline: float, syntax: ShellSyntax
+) -> None:
+    command = without_literal_documents(command, syntax)
     if not re.search(
         r"\b(?:git(?:-wt)?(?:\.exe)?|wt(?:\.exe)?|worktree)\b|\balias\.",
         command,
@@ -334,9 +416,9 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
     ):
         return
     try:
-        if not needs_placement_check(command):
+        if not needs_placement_check(command, syntax):
             return
-        if has_placement_expansion(command):
+        if has_placement_expansion(command, syntax):
             raise create_worktree.CreateWorktreeError(
                 "worktree shell substitutions cannot be verified; use literal arguments"
             )
@@ -382,10 +464,12 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
             check_git(words[1:], cwd, deadline)
         elif is_worktrunk_executable(words[0]):
             check_worktrunk(words[1:])
-        elif is_shell_executable(program):
+        elif (nested_syntax := ShellSyntax.for_program(program)) is not None:
             for index, word in enumerate(words[1:], start=1):
                 if word.lower() in {"-c", "-lc", "-command", "/c"}:
-                    check_command(" ".join(words[index + 1 :]), cwd, deadline)
+                    check_command(
+                        " ".join(words[index + 1 :]), cwd, deadline, nested_syntax
+                    )
                     break
         elif program in {"claude", "codex"} and any(
             word.split("=", 1)[0] in {"--worktree", "-w"} for word in words[1:]
@@ -431,7 +515,14 @@ def check_tool(payload: Mapping[str, object]) -> None:
         raise create_worktree.CreateWorktreeError(
             "worktree hook working directory is missing"
         )
-    check_command(command, Path(cwd), time.monotonic() + 10)
+    syntax = ShellSyntax.for_program(name) or ShellSyntax.for_program(
+        str(arguments.get("shell", ""))
+    )
+    if syntax is None:
+        syntax = (
+            ShellSyntax.POWERSHELL if sys.platform == "win32" else ShellSyntax.POSIX
+        )
+    check_command(command, Path(cwd), time.monotonic() + 10, syntax)
 
 
 def deny(payload: Mapping[str, object], reason: str) -> int:
