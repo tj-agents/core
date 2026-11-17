@@ -133,6 +133,11 @@ def test_direct_git_worktree_add_is_denied_at_a_canonical_destination(
         'printf "%s" "$(git worktree add ../outside)"',
         'rg "$(git worktree move old ../outside)"',
         'git worktree list; echo "$(git worktree add ../outside)"',
+        "cat <<'DOC'\nLiteral git worktree documentation\nDOC\n"
+        "git worktree add ../outside",
+        "bash <<'SH'\ngit worktree add ../outside\nSH",
+        "$text = @'\nLiteral git worktree documentation\n'@\n"
+        "git worktree add ../outside",
     ],
 )
 def test_noncanonical_or_unresolved_mutation_is_denied(
@@ -160,6 +165,28 @@ def test_noncanonical_or_unresolved_mutation_is_denied(
         "cd $project; git status --short",
         "echo 'git worktree add ../outside'",
         "python - <<'PY'\nprint(\"isn't balanced in the shell lexer\")\nPY",
+        pytest.param(
+            "$text = @'\nUse `git worktree add` in the user's guide.\n'@\n"
+            "Set-Content -LiteralPath README.md -Value $text",
+            id="quoted_doc_powershell_here_string",
+        ),
+        pytest.param(
+            "cat <<'DOC' > README.md\nUse `git worktree add`; it isn't executed.\nDOC",
+            id="quoted_doc_posix_here_document",
+        ),
+        pytest.param(
+            'cat <<"DOC" > README.md\n$(git worktree add ../outside) is literal.\nDOC',
+            id="quoted_doc_double_quoted_delimiter",
+        ),
+        pytest.param(
+            "printf '%s' 'Use `git worktree add` or $(git worktree add ../outside)' "
+            "> README.md",
+            id="quoted_doc_single_quoted_argument",
+        ),
+        pytest.param(
+            'Set-Content -LiteralPath README.md -Value "Use git worktree add"',
+            id="quoted_doc_double_quoted_argument",
+        ),
     ],
 )
 def test_nonmutating_commands_and_literal_text_are_allowed(

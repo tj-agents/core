@@ -38,6 +38,112 @@ def shell_words(command: str) -> list[str]:
     return list(lexer)
 
 
+def is_shell_executable(value: str) -> bool:
+    return executable(value.strip("\"'")) in {
+        "bash",
+        "sh",
+        "zsh",
+        "pwsh",
+        "powershell",
+        "cmd",
+    }
+
+
+def without_literal_documents(command: str) -> str:
+    pieces: list[str] = []
+    start = index = 0
+    quote = ""
+    while index < len(command):
+        character = command[index]
+        if quote:
+            if quote == '"' and character in "\\`":
+                index += 2
+                continue
+            if character == quote:
+                quote = ""
+        elif command.startswith(("@'\n", "@'\r\n"), index):
+            closing = re.search(r"(?m)^'@(?=\s|;|$)", command[index + 2 :])
+            if closing is not None:
+                end = index + 2 + closing.end()
+                pieces.extend((command[start:index], "''"))
+                start = index = end
+                continue
+        elif character == "<":
+            opening = re.match(r"<<(-?)(['\"])(.*?)\2", command[index:])
+            newline = command.find("\n", index)
+            if opening is not None and newline != -1:
+                header = command[command.rfind("\n", 0, index) + 1 : index]
+                if not any(is_shell_executable(word) for word in shell_words(header)):
+                    indent = r"\t*" if opening[1] else ""
+                    closing = re.search(
+                        rf"(?m)^{indent}{re.escape(opening[3])}\r?$",
+                        command[newline + 1 :],
+                    )
+                    if closing is not None:
+                        pieces.append(command[start : newline + 1])
+                        start = index = newline + 1 + closing.end()
+                        continue
+        elif character in "\"'":
+            quote = character
+        elif character == "\\":
+            index += 2
+            continue
+        index += 1
+    pieces.append(command[start:])
+    return "".join(pieces)
+
+
+def substitution_end(command: str, start: int) -> int:
+    quotes = [""]
+    index = start
+    while index < len(command):
+        character = command[index]
+        quote = quotes[-1]
+        if character == "\\" and quote != "'":
+            index += 2
+            continue
+        if character in "\"'" and (not quote or character == quote):
+            quotes[-1] = "" if quote else character
+        elif quote != "'" and command.startswith("$(", index):
+            quotes.append("")
+            index += 2
+            continue
+        elif not quote and character == "(":
+            quotes.append("")
+        elif not quote and character == ")":
+            quotes.pop()
+            if not quotes:
+                return index
+        index += 1
+    raise ValueError("unclosed command substitution")
+
+
+def has_placement_expansion(command: str) -> bool:
+    quote = ""
+    index = 0
+    while index < len(command):
+        character = command[index]
+        if character == "\\" and quote != "'":
+            index += 2
+            continue
+        if character in "\"'" and (not quote or character == quote):
+            quote = "" if quote else character
+        elif quote != "'" and (command.startswith("$(", index) or character == "`"):
+            start = index + (2 if character == "$" else 1)
+            end = (
+                substitution_end(command, start)
+                if character == "$"
+                else command.find("`", start)
+            )
+            if end == -1:
+                raise ValueError("unclosed command substitution")
+            if needs_placement_check(command[start:end]):
+                return True
+            index = end
+        index += 1
+    return False
+
+
 def nonplacement_operation(action: str) -> bool:
     return action in {"list", "prune", "remove", "repair", "lock", "unlock", "-h"}
 
@@ -56,10 +162,22 @@ def placement_alias(value: str) -> bool:
 
 
 def needs_placement_check(command: str) -> bool:
+    if has_placement_expansion(command):
+        return True
     words = shell_words(command)
     start = 0
     for index, word in enumerate(words):
-        if placement_alias(word):
+        if (
+            index > start
+            and is_shell_executable(words[start])
+            and words[index - 1].lower() in {"-c", "-lc", "-command", "/c"}
+            and needs_placement_check(without_literal_documents(word))
+        ):
+            return True
+        if placement_alias(word) and (
+            word.startswith(("-c", "--config-env="))
+            or (index > start and words[index - 1] == "-c")
+        ):
             return True
         if word in {"do", "then", "else"} or (
             word and all(character in ";&|()\n" for character in word)
@@ -72,18 +190,14 @@ def needs_placement_check(command: str) -> bool:
             or "=" in words[start]
         ):
             return True
-        if word.startswith("--worktree") or word == "-w":
+        if (word.startswith("--worktree") or word == "-w") and executable(
+            words[start].strip("\"'")
+        ) in {"claude", "codex"}:
             return True
         if (
             word == "worktree"
             and index + 1 < len(words)
             and not nonplacement_operation(words[index + 1])
-        ):
-            return True
-        if (
-            re.search(r"\b(?:worktree|git-wt|wt)\b", word, re.IGNORECASE)
-            and len(word.split()) > 1
-            and needs_placement_check(word)
         ):
             return True
     return False
@@ -212,6 +326,7 @@ def mutates_worktree(words: Sequence[str]) -> bool:
 
 
 def check_command(command: str, cwd: Path, deadline: float) -> None:
+    command = without_literal_documents(command)
     if not re.search(
         r"\b(?:git(?:-wt)?(?:\.exe)?|wt(?:\.exe)?|worktree)\b|\balias\.",
         command,
@@ -221,7 +336,7 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
     try:
         if not needs_placement_check(command):
             return
-        if "`" in command or "$(" in command:
+        if has_placement_expansion(command):
             raise create_worktree.CreateWorktreeError(
                 "worktree shell substitutions cannot be verified; use literal arguments"
             )
@@ -267,7 +382,7 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
             check_git(words[1:], cwd, deadline)
         elif is_worktrunk_executable(words[0]):
             check_worktrunk(words[1:])
-        elif program in {"bash", "sh", "zsh", "pwsh", "powershell", "cmd"}:
+        elif is_shell_executable(program):
             for index, word in enumerate(words[1:], start=1):
                 if word.lower() in {"-c", "-lc", "-command", "/c"}:
                     check_command(" ".join(words[index + 1 :]), cwd, deadline)
