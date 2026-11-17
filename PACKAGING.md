@@ -23,10 +23,10 @@ one authored owner and are covered by each package fingerprint. Runtime referenc
 another plugin or depend on the author checkout.
 
 ```json
-{"plugin":"workflow","source":".agents/dependencies/agent/.agents/agent/resources/lanes","destination":".agents/lanes"}
+{"plugin":"workflow","source":".agents/workflows","destination":"workflows"}
 ```
 
-Workflow loads these embedded lane tables from its own package. Agent owns their source.
+Workflow loads this embedded shared workflow runtime from its own package. Core owns its source.
 
 Resolve shipped files relative to the installed skill or package. Scripts use `$PSScriptRoot`, their own
 file location, or an explicit package-root input. Instructions use `<skill-directory>`. They do not resolve
