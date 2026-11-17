@@ -143,7 +143,10 @@ def shell_reader(header: str, syntax: ShellSyntax) -> ShellReader | None:
                     "add-content",
                     "out-file",
                 }
-        elif uncertain and ShellSyntax.for_program(word) is not None:
+        elif uncertain and (
+            ShellSyntax.for_program(word) is not None
+            or word.lower() in {"-c", "-lc", "-command", "/c"}
+        ):
             return ShellReader(None, in_process=True)
     return None
 
