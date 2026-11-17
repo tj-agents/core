@@ -12,6 +12,7 @@ import signal
 import subprocess
 import sys
 import time
+import tomllib
 import uuid
 
 if sys.version_info < (3, 12):  # noqa: UP036
@@ -20,7 +21,7 @@ if sys.version_info < (3, 12):  # noqa: UP036
 sys.dont_write_bytecode = True
 
 
-def runtime_paths():
+def runtime_workflows():
     here = Path(__file__).resolve()
     if here.parent.parts[-3:] != (".codex", "runtime", "continuation"):
         raise RuntimeError("continuation runtime layout unavailable")
@@ -29,18 +30,16 @@ def runtime_paths():
         raise RuntimeError("continuation package root unavailable")
     if (root / ".codex-plugin" / "plugin.json").is_file():
         workflows = root / "workflows"
-        lanes = root / ".agents" / "lanes" / "codex.json"
     elif (root / ".agents" / "plugins" / "sources.json").is_file():
         workflows = root / ".agents" / "workflows"
-        lanes = root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "resources" / "lanes" / "codex.json"
     else:
         raise RuntimeError("continuation package root unavailable")
     if not all((workflows / name).is_file() for name in ("delivery_runtime.py", "completion.py", "workflow_ops.py", "process_runtime.py")):
         raise RuntimeError("continuation shared runtime unavailable")
-    return workflows, lanes
+    return workflows
 
 
-WORKFLOWS, LANES = runtime_paths()
+WORKFLOWS = runtime_workflows()
 sys.path.insert(0, str(WORKFLOWS))
 from process_runtime import process
 from delivery_runtime import BINDING_FILE, PersistentDeliveryRouter, binding_from_artifact, DeliveryContractViolation
@@ -236,22 +235,31 @@ def observe(state, binding, observer=None):
                          ("pending_evidence", "review", "merge_authorization", "completion_condition")}}
 
 
+def lane_agent(environment=None):
+    """Agent's Codex L4 lane agent, which tj install delivers into the Codex profile."""
+    home = (os.environ if environment is None else environment).get("CODEX_HOME")
+    return (Path(home) if home else Path.home() / ".codex") / "agents" / "lane-l4.toml"
+
+
 def lane_command(state, prompt, executable=None):
     host = state["harness"]
     if host != "codex":
         raise Gate("unsupported-host")
-    if not LANES.is_file():
-        raise Gate("packaged-lane-table-unavailable")
-    lane_path = LANES
-    table = read(lane_path)
-    lane = table["lanes"]["L4"]
+    try:
+        lane = tomllib.loads(lane_agent().read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise Gate("lane-agent-unavailable") from None
+    except (OSError, tomllib.TOMLDecodeError):
+        raise Gate("lane-agent-invalid") from None
+    if not isinstance(lane.get("model"), str) or not isinstance(lane.get("model_reasoning_effort"), str):
+        raise Gate("lane-agent-invalid")
     prefix = executable or [state.get("host_executable") or shutil.which(host) or host]
     if executable is None and not state.get("host_executable") and not shutil.which(host):
         raise Gate("host-cli-unavailable")
     if os.name == "nt" and Path(prefix[0]).suffix.lower() in {".cmd", ".bat"}:
         raise Gate("native-host-executable-required")
     return [*prefix, "exec", "--model", lane["model"], "--config",
-            f'model_reasoning_effort="{lane[table["effort_key"]]}"',
+            f'model_reasoning_effort="{lane["model_reasoning_effort"]}"',
             "--cd", state["worktree"], prompt]
 
 
