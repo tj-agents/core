@@ -1,6 +1,5 @@
 import os
 import sys
-import time
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -20,8 +19,6 @@ def main() -> int:
     )
 
     def boundary(payload: Mapping[str, object]) -> str:
-        if payload.get("tool_name") == "Bash":
-            tier_gate.record_command(payload, state, time.time())
         return tier_gate.boundary_gate(payload, state)
 
     return worktree_gate.main(boundary)
