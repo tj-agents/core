@@ -183,6 +183,7 @@ def test_noncanonical_or_unresolved_mutation_is_denied(
         "bash <<'SH'\necho git worktree add ../outside\nSH",
         "bash <<'SH'\nwt list\nSH",
         "env -i cat <<'DOC' > README.md\nUse git worktree add\nDOC",
+        "env cat -n <<'DOC' > README.md\nUse git worktree add\nDOC",
         pytest.param(
             "cat <<'DOC' > README.md\nUse `git worktree add`; it isn't executed.\nDOC",
             id="quoted_doc_posix_here_document",
