@@ -137,6 +137,9 @@ def test_direct_git_worktree_add_is_denied_at_a_canonical_destination(
         "git worktree add ../outside",
         "bash <<'SH'\ngit worktree add ../outside\nSH",
         "<<'SH' bash\ngit worktree add ../outside\nSH",
+        "FLAG=value bash <<'SH'\ngit worktree add ../outside\nSH",
+        "FLAG='value with spaces'post bash <<'SH'\ngit worktree add ../outside\nSH",
+        "exec bash <<'SH'\ngit worktree add ../outside\nSH",
         "cat <<'SH' | bash\ngit worktree add ../outside\nSH",
         "cat <<'SH' | \\\nbash\ngit worktree add ../outside\nSH",
         "bash \\\n<<'SH'\ngit worktree add ../outside\nSH",
@@ -173,6 +176,8 @@ def test_noncanonical_or_unresolved_mutation_is_denied(
         "cd $project; git status --short",
         "echo 'git worktree add ../outside'",
         "python - <<'PY'\nprint(\"isn't balanced in the shell lexer\")\nPY",
+        "bash <<'SH'\n# Use `git worktree add` in documentation.\nSH",
+        "bash <<'SH'\nprintf '%s' 'Use `git worktree add` literally.'\nSH",
         pytest.param(
             "cat <<'DOC' > README.md\nUse `git worktree add`; it isn't executed.\nDOC",
             id="quoted_doc_posix_here_document",
@@ -214,6 +219,9 @@ def test_nonmutating_commands_and_literal_text_are_allowed(
         ('Write-Output "\\$(git worktree add ../outside)"', True),
         ('Write-Output "Use `$(git worktree add ../outside)"', False),
         ('$text = @"\n$(git worktree add ../outside)\n"@', True),
+        ('pwsh -NoProfile -Command @"\ngit worktree add ../outside\n"@', True),
+        ("pwsh -NoProfile -Command @'\ngit worktree add ../outside\n'@", True),
+        ("pwsh -Command @'\nWrite-Output \"Use git worktree add\"\n'@", False),
     ],
 )
 def test_powershell_literals_and_expansions_use_powershell_syntax(

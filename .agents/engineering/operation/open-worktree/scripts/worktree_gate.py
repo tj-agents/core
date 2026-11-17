@@ -4,6 +4,7 @@ import shlex
 import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Self, cast
@@ -45,6 +46,20 @@ class ShellSyntax(Enum):
         return next((syntax for syntax in cls if program in syntax.programs), None)
 
 
+@dataclass(frozen=True, slots=True)
+class ShellReader:
+    syntax: ShellSyntax | None
+    in_process: bool = False
+
+    def check_context(self, command: str) -> None:
+        if self.syntax is None and re.search(
+            r"\b(?:worktree|git-wt|wt)\b|\balias\.", command, re.IGNORECASE
+        ):
+            raise create_worktree.CreateWorktreeError(
+                "cannot verify worktree commands passed to this shell reader"
+            )
+
+
 def literal(value: str) -> str:
     if not value or re.search(r"[$`%\n\r]", value):
         raise create_worktree.CreateWorktreeError("use literal worktree arguments")
@@ -63,23 +78,41 @@ def shell_words(command: str) -> list[str]:
     return list(lexer)
 
 
-def has_shell_reader(header: str) -> bool:
-    programs = "|".join(
-        program for syntax in ShellSyntax for program in syntax.programs
-    )
-    header = re.sub(r"<<-?(?:(['\"])(.*?)\1|\w+)", "", header)
-    return (
-        re.search(
-            r"(?:^|[|;&(])\s*(?:(?:command|env|sudo|doas)\s+"
-            r"(?:-\S+\s+)*(?:\w+=\S+\s+)*)*"
-            rf"(?:\"(?:[^\"\n]*[/\\])?(?:{programs})(?:\.exe)?\"|"
-            rf"'(?:[^'\n]*[/\\])?(?:{programs})(?:\.exe)?'|"
-            rf"(?:[^\s\"']*[/\\])?(?:{programs})(?:\.exe)?)(?=\s|$)",
-            header,
-            re.IGNORECASE,
-        )
-        is not None
-    )
+def shell_reader(header: str, syntax: ShellSyntax) -> ShellReader | None:
+    if syntax.here_strings and re.fullmatch(
+        r"\s*\$[\w:]+\s*(?:[-+*/%]|\?\?)?=\s*", header
+    ):
+        return None
+    try:
+        words = shell_words(re.sub(r"\d*[<>]&\d+", "", header))
+    except ValueError:
+        return ShellReader(None, in_process=True)
+    program = True
+    operand = False
+    wrapper = False
+    for word in words:
+        if word and all(character in ";&|()\n" for character in word):
+            program, wrapper = True, False
+        elif operand:
+            operand = False
+        elif program:
+            if re.match(r"\d*[<>]", word):
+                operand = re.fullmatch(r"\d*(?:<<-?|>>?|<)", word) is not None
+            elif re.match(r"\w+=", word) or word == "--":
+                continue
+            elif word.startswith("-") or re.search(r"[$`%]", word):
+                return ShellReader(None, in_process=True)
+            elif executable(word) in {"env", "command", "exec", "sudo", "doas"}:
+                wrapper = True
+            elif executable(word) in {"source", ".", "iex", "invoke-expression"}:
+                return ShellReader(syntax, in_process=True)
+            elif (reader_syntax := ShellSyntax.for_program(word)) is not None:
+                return ShellReader(reader_syntax)
+            elif not wrapper:
+                program = False
+    if any(word.lower() in {"-c", "-lc", "-command", "/c"} for word in words):
+        return ShellReader(None, in_process=True)
+    return None
 
 
 def without_literal_documents(command: str, syntax: ShellSyntax) -> str:
@@ -110,6 +143,19 @@ def without_literal_documents(command: str, syntax: ShellSyntax) -> str:
                     raise create_worktree.CreateWorktreeError(
                         "worktree command substitution"
                     )
+                header = command[command.rfind("\n", 0, index) + 1 : index]
+                reader = shell_reader(header, syntax)
+                if reader is not None:
+                    reader.check_context(command)
+                    if reader.syntax is None or reader.in_process:
+                        index = end
+                        continue
+                    script = without_literal_documents(body, reader.syntax)
+                    if needs_placement_check(script, reader.syntax):
+                        raise create_worktree.CreateWorktreeError(
+                            "worktree commands in shell input require "
+                            "the shared creator"
+                        )
                 blank = re.sub(r"[^\r\n]", " ", command[index + 1 : end - 1])
                 pieces.extend((command[start:index], "'" + blank + "'"))
                 start = index = end
@@ -120,7 +166,8 @@ def without_literal_documents(command: str, syntax: ShellSyntax) -> str:
             and (index == 0 or command[index - 1] != "<")
         ):
             opening = re.match(
-                r"<<(-?)(?:(['\"])(.*?)\2|(\w+))(?=[\s;|&<>]|$)", command[index:]
+                r"<<(-?)[\t ]*(?:(['\"])(.*?)\2|(\w+))(?=[\s;|&<>]|$)",
+                command[index:],
             )
             newline = command.find("\n", index)
             while newline != -1 and command[:newline].rstrip("\r").endswith("\\"):
@@ -130,25 +177,36 @@ def without_literal_documents(command: str, syntax: ShellSyntax) -> str:
                 while line and command[:line].rstrip("\r\n").endswith("\\"):
                     line = command.rfind("\n", 0, line - 1) + 1
                 header = command[line:newline].replace("\\\r\n", "").replace("\\\n", "")
-                if not has_shell_reader(header):
-                    indent = r"\t*" if opening[1] else ""
-                    closing = re.search(
-                        rf"(?m)^{indent}{re.escape(opening[3] or opening[4])}\r?$",
-                        command[newline + 1 :],
-                    )
-                    if closing is not None:
-                        body = command[newline + 1 : newline + 1 + closing.start()]
-                        if not opening[2] and has_placement_expansion(
-                            body, syntax, literal=True
-                        ):
+                indent = r"\t*" if opening[1] else ""
+                closing = re.search(
+                    rf"(?m)^{indent}{re.escape(opening[3] or opening[4])}\r?$",
+                    command[newline + 1 :],
+                )
+                if closing is not None:
+                    body = command[newline + 1 : newline + 1 + closing.start()]
+                    if not opening[2] and has_placement_expansion(
+                        body, syntax, literal=True
+                    ):
+                        raise create_worktree.CreateWorktreeError(
+                            "worktree command substitution"
+                        )
+                    reader = shell_reader(header, syntax)
+                    if reader is not None:
+                        reader.check_context(command)
+                        if reader.syntax is None or reader.in_process:
+                            index = newline + 1 + closing.end()
+                            continue
+                        script = without_literal_documents(body, reader.syntax)
+                        if needs_placement_check(script, reader.syntax):
                             raise create_worktree.CreateWorktreeError(
-                                "worktree command substitution"
+                                "worktree commands in shell input require "
+                                "the shared creator"
                             )
-                        end = newline + 1 + closing.end()
-                        blank = re.sub(r"[^\r\n]", " ", command[newline + 1 : end])
-                        pieces.extend((command[start : newline + 1], blank))
-                        start = index = newline + 1 + closing.end()
-                        continue
+                    end = newline + 1 + closing.end()
+                    blank = re.sub(r"[^\r\n]", " ", command[newline + 1 : end])
+                    pieces.extend((command[start : newline + 1], blank))
+                    start = index = end
+                    continue
         elif character in "\"'":
             quote = character
         elif character == syntax.escape:
@@ -166,6 +224,14 @@ def substitution_end(command: str, start: int, syntax: ShellSyntax) -> int:
     while index < len(command):
         character = command[index]
         quote = quotes[-1]
+        if (
+            not quote
+            and character == "#"
+            and (index == 0 or command[index - 1].isspace())
+        ):
+            newline = command.find("\n", index)
+            index = len(command) if newline == -1 else newline + 1
+            continue
         if character == syntax.escape and quote != "'":
             index += 2
             continue
@@ -197,6 +263,15 @@ def has_placement_expansion(
     index = 0
     while index < len(command):
         character = command[index]
+        if (
+            not literal
+            and not quote
+            and character == "#"
+            and (index == 0 or command[index - 1].isspace())
+        ):
+            newline = command.find("\n", index)
+            index = len(command) if newline == -1 else newline + 1
+            continue
         if character == syntax.escape and quote != "'":
             index += 2
             continue
