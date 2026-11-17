@@ -364,7 +364,7 @@ def trust_current_hooks(
     )
     hooks = server.request("hooks/list", {"cwds": [str(project)]})
     updates = trust.trust_updates(
-        inventory, hooks["data"], project.resolve(), verified_roots
+        inventory, hooks["data"], [project.resolve()], verified_roots
     )
     if not updates:
         raise AcceptanceError(
