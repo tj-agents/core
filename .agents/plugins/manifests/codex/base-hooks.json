@@ -29,20 +29,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --write-gate",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --write-gate",
-            "timeout": 30
-          }
-        ]
-      }
-    ],
-    "PostCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --compacted",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --compacted",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --tool-gate",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --tool-gate",
             "timeout": 30
           }
         ]
