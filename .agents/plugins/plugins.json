@@ -181,7 +181,6 @@
         "failing-tests",
         "failure-provenance",
         "feature",
-        "git-auth",
         "incremental-review",
         "merge",
         "merging",
@@ -223,7 +222,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:2861f95e272da407f33ae67de64d415de112dd32b01ef43e9577a1f9739f638a",
+      "digest": "sha256:8d9f19ddae89649d529feb627512903da53cdda6f1c75f29edd5be677c6beae6",
       "harness": {
         "marketplaces": [
           {
