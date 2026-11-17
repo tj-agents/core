@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:bcd702d52c75b3095125685f952fda6094d9b7709c08399bb8cb07b37925f85d",
+      "digest": "sha256:d3a08395b2e2347dc7588ad3d5fcb3f31b879510f6ed0c8f233c71516c0a8a63",
       "harness": {
         "marketplaces": [
           {
@@ -49,6 +49,19 @@
             "hosts": [
               "claude",
               "codex"
+            ]
+          },
+          {
+            "path": "hooks/worktree_tool_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/worktrees/worktree_gate.py",
+            "hosts": [
+              "claude"
             ]
           }
         ],
@@ -210,7 +223,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:04e4b919074ced616bf809ac8772d5821e3cffe2b4cf4f6b1d74c884bf0d466b",
+      "digest": "sha256:2861f95e272da407f33ae67de64d415de112dd32b01ef43e9577a1f9739f638a",
       "harness": {
         "marketplaces": [
           {
