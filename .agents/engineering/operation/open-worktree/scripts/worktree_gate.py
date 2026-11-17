@@ -55,16 +55,13 @@ def needs_placement_check(command: str) -> bool:
         ):
             start = index + 1
             continue
-        if (
-            (is_worktrunk_executable(word)
-            and (
-                index == start
-                or executable(words[start]) in {"env", "command", "git"}
-                or "=" in words[start]
-            ))
-            or word.startswith("--worktree")
-            or word == "-w"
+        if is_worktrunk_executable(word) and (
+            index == start
+            or executable(words[start]) in {"env", "command", "git"}
+            or "=" in words[start]
         ):
+            return True
+        if word.startswith("--worktree") or word == "-w":
             return True
         if (
             word == "worktree"
@@ -172,8 +169,9 @@ def check_git(arguments: Sequence[str], cwd: Path, deadline: float) -> None:
         check_worktrunk(arguments[index + 1 :])
         return
     if arguments[index] != "worktree":
-        if "worktree" in arguments or any(
-            is_worktrunk_executable(word) for word in arguments
+        if arguments[index].startswith("-") and (
+            "worktree" in arguments
+            or any(is_worktrunk_executable(word) for word in arguments)
         ):
             raise create_worktree.CreateWorktreeError("unsupported Git routing options")
         return
