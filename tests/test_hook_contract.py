@@ -37,7 +37,7 @@ class HookContractTests(unittest.TestCase):
         self.assertEqual({"plugins/base/hooks/claude.json", "plugins/base/hooks/codex.json"}, set(hook_manifests))
         for path, manifest in hook_manifests.items():
             with self.subTest(path=path):
-                expected = {"SessionStart", "PreToolUse", "PostCompact"}
+                expected = {"SessionStart", "PreToolUse"}
                 if path.endswith("claude.json"):
                     expected.add("WorktreeCreate")
                 self.assertEqual(expected, set(manifest["hooks"]))

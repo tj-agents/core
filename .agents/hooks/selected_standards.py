@@ -63,6 +63,7 @@ class Standard:
     path: Path
     profile: str
 
+
 def skill_metadata(path: Path) -> dict[str, str]:
     text = path.read_text(encoding="utf-8-sig")
     if not text.startswith("---\n"):
