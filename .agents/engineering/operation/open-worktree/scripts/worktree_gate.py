@@ -47,10 +47,10 @@ def is_worktrunk_executable(value: str) -> bool:
 
 
 def placement_alias(value: str) -> bool:
-    if value.startswith("--config-env=alias."):
-        return True
+    if value.startswith("--config-env="):
+        return value.partition("=")[2].partition("=")[0].casefold().startswith("alias.")
     value = value.removeprefix("-c")
-    return value.startswith("alias.") and bool(
+    return value.partition("=")[0].casefold().startswith("alias.") and bool(
         re.search(r"\b(?:worktree|git-wt|wt)\b", value.partition("=")[2])
     )
 
