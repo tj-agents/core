@@ -3,7 +3,7 @@ import re
 import shlex
 import sys
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from enum import Enum
 from pathlib import Path
 from typing import cast
@@ -46,10 +46,21 @@ def is_worktrunk_executable(value: str) -> bool:
     return executable(value) in {"git-wt", "wt"}
 
 
+def placement_alias(value: str) -> bool:
+    if value.startswith("--config-env=alias."):
+        return True
+    value = value.removeprefix("-c")
+    return value.startswith("alias.") and bool(
+        re.search(r"\b(?:worktree|git-wt|wt)\b", value.partition("=")[2])
+    )
+
+
 def needs_placement_check(command: str) -> bool:
     words = shell_words(command)
     start = 0
     for index, word in enumerate(words):
+        if placement_alias(word):
+            return True
         if word in {"do", "then", "else"} or (
             word and all(character in ";&|()\n" for character in word)
         ):
@@ -171,6 +182,7 @@ def check_git(arguments: Sequence[str], cwd: Path, deadline: float) -> None:
     if arguments[index] != "worktree":
         if arguments[index].startswith("-") and (
             "worktree" in arguments
+            or any(placement_alias(word) for word in arguments)
             or any(is_worktrunk_executable(word) for word in arguments)
         ):
             raise create_worktree.CreateWorktreeError("unsupported Git routing options")
@@ -304,7 +316,25 @@ def check_tool(payload: Mapping[str, object]) -> None:
     check_command(command, Path(cwd), time.monotonic() + 10)
 
 
-def main() -> int:
+def deny(payload: Mapping[str, object], reason: str) -> int:
+    if payload.get("hook_event_name") == "WorktreeCreate":
+        print(reason, file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            }
+        )
+    )
+    return 0
+
+
+def main(extra_check: Callable[[Mapping[str, object]], str] | None = None) -> int:
     if sys.version_info < create_worktree.MINIMUM_PYTHON:
         print("worktree_gate.py requires Python 3.12 or newer", file=sys.stderr)
         return 2
@@ -315,6 +345,8 @@ def main() -> int:
             raise create_worktree.CreateWorktreeError("invalid worktree hook payload")
         payload = value
         check_tool(payload)
+        if extra_check is not None and (reason := extra_check(payload)):
+            return deny(payload, reason)
     except (create_worktree.CreateWorktreeError, ValueError) as error:
         interpreter = "python" if sys.platform == "win32" else "python3"
         script = Path(__file__).with_name("create_worktree.py")
@@ -322,20 +354,7 @@ def main() -> int:
             f"{error}. Use Core's engineering:open-worktree command: "
             f'{interpreter} -B "{script}" --repo <repository> <Type/Name>.'
         )
-        if payload.get("hook_event_name") == "WorktreeCreate":
-            print(reason, file=sys.stderr)
-            return 2
-        print(
-            json.dumps(
-                {
-                    "hookSpecificOutput": {
-                        "hookEventName": "PreToolUse",
-                        "permissionDecision": "deny",
-                        "permissionDecisionReason": reason,
-                    }
-                }
-            )
-        )
+        return deny(payload, reason)
     return 0
 
 

@@ -54,6 +54,11 @@
   "resources": [
     {
       "plugin": "base",
+      "source": ".agents/hooks/worktree_tool_gate.py",
+      "destination": "hooks/worktree_tool_gate.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/engineering/operation/open-worktree/scripts",
       "destination": "hooks/worktrees"
     },

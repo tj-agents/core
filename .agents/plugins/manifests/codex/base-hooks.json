@@ -14,12 +14,12 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|PowerShell|shell|shell_command|exec_command|.*create_worktree",
+        "matcher": "Bash|PowerShell|shell|shell_command|exec_command|mcp__.*|.*create_worktree",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py\"",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/worktree_tool_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/worktree_tool_gate.py\"",
             "timeout": 30
           }
         ]
@@ -31,28 +31,6 @@
             "type": "command",
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --write-gate",
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --write-gate",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --record-command",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --record-command",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --tool-gate",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --tool-gate",
             "timeout": 30
           }
         ]
