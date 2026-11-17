@@ -213,7 +213,9 @@ def mutates_worktree(words: Sequence[str]) -> bool:
 
 def check_command(command: str, cwd: Path, deadline: float) -> None:
     if not re.search(
-        r"\b(?:git(?:-wt)?(?:\.exe)?|wt(?:\.exe)?|worktree)\b", command, re.IGNORECASE
+        r"\b(?:git(?:-wt)?(?:\.exe)?|wt(?:\.exe)?|worktree)\b|\balias\.",
+        command,
+        re.IGNORECASE,
     ):
         return
     try:
@@ -281,6 +283,7 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
             or "=" in words[0]
             or any(executable(word) == "git" for word in words[1:])
             or any(is_worktrunk_executable(word) for word in words[1:])
+            or any(placement_alias(word) for word in words[1:])
             or mutates_worktree(words)
         ):
             raise create_worktree.CreateWorktreeError(
