@@ -44,9 +44,11 @@ def repo(tmp_path: Path) -> Path:
     return path
 
 
-def invoke(repo: Path, tool: str, arguments: dict[str, object]) -> str | None:
+def invoke(
+    repo: Path, tool: str, arguments: dict[str, object], *, script: Path = SCRIPT
+) -> str | None:
     result = subprocess.run(
-        [sys.executable, "-B", str(SCRIPT)],
+        [sys.executable, "-B", str(script)],
         input=json.dumps(
             {
                 "hook_event_name": "PreToolUse",
@@ -104,6 +106,9 @@ def test_direct_git_worktree_add_is_denied_at_a_canonical_destination(
         "git worktree $'add' ../outside",
         "git worktree a${e}dd ../outside",
         "git -c core.worktree=elsewhere worktree add .worktrees/Feature-Bad",
+        'git -c "alias.openwt=worktree add" openwt ../outside Feature/Bypass',
+        "git -calias.openwt=worktree openwt add ../outside Feature/Bypass",
+        "git --config-env=alias.openwt=EXPANSION openwt ../outside Feature/Bypass",
         "git worktree add --unknown .worktrees/Feature-Bad",
         "if true; then git worktree add ../outside; fi",
         "GIT_DIR=elsewhere git worktree add ../outside",
@@ -207,6 +212,47 @@ def test_shared_creator_command_is_allowed(repo: Path) -> None:
     creator = SCRIPT.with_name("create_worktree.py")
     command = f'python -B "{creator}" --repo "{repo}" Feature/Allowed'
     assert invoke(repo, "Bash", {"command": command}) is None
+
+
+@pytest.mark.parametrize("tool", ("Bash", "PowerShell", "exec_command"))
+def test_packaged_base_dispatcher_enforces_the_creator(repo: Path, tool: str) -> None:
+    script = ROOT / "plugins/base/hooks/worktree_tool_gate.py"
+    assert invoke(repo, tool, {"command": "git worktree add ../outside"}, script=script)
+    assert (
+        invoke(repo, tool, {"command": "git worktree list --porcelain"}, script=script)
+        is None
+    )
+
+
+def test_packaged_base_dispatcher_preserves_machine_settings_boundary(
+    repo: Path,
+) -> None:
+    target = Path.home() / ".codex/config.toml"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-B",
+            str(ROOT / "plugins/base/hooks/worktree_tool_gate.py"),
+        ],
+        input=json.dumps(
+            {
+                "tool_name": "PowerShell",
+                "cwd": str(repo),
+                "tool_input": {
+                    "command": f'Set-Content -LiteralPath "{target}" -Value ignored'
+                },
+            }
+        ),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=True,
+    )
+    decision = json.loads(result.stdout)["hookSpecificOutput"]
+    assert decision["permissionDecision"] == "deny"
+    assert "machine state" in decision["permissionDecisionReason"]
 
 
 @pytest.mark.parametrize(
