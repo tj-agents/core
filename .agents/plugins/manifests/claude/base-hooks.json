@@ -24,7 +24,10 @@
             "type": "command",
             "timeout": 30,
             "command": "python",
-            "args": ["-B", "${CLAUDE_PLUGIN_ROOT}/hooks/worktree_tool_gate.py"]
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/worktree_tool_gate.py"
+            ]
           }
         ]
       },
@@ -38,23 +41,7 @@
             "args": [
               "-B",
               "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
-              "--write-gate"
-            ]
-          }
-        ]
-      },
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "if": "Read(//**/SKILL.md)",
-            "timeout": 30,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
-              "--record-read"
+              "--tool-gate"
             ]
           }
         ]
@@ -67,22 +54,9 @@
             "type": "command",
             "timeout": 30,
             "command": "python",
-            "args": ["-B", "${CLAUDE_PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py"]
-          }
-        ]
-      }
-    ],
-    "PostCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 30,
-            "command": "python",
             "args": [
               "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
-              "--compacted"
+              "${CLAUDE_PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py"
             ]
           }
         ]
