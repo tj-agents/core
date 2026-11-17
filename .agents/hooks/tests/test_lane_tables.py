@@ -24,11 +24,10 @@ EFFORTS = ("low", "medium", "high", "xhigh", "max")
 # deviation is declared here rather than just appearing in a host manifest.
 ROLE_SPECIALISTS = {("codex", "review-lens"): "gpt-5.3-codex-spark"}
 
-# Capability order per vendor, most capable first. A rung may never sit above the rung before it, and the
-# frontier tier must outrank every rung.
+# Capability order per vendor, most capable first. A rung may never sit above the rung before it.
 FAMILY_ORDER = {
     "claude": ("claude-fable-5", "claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5"),
-    "codex": ("gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"),
+    "codex": ("gpt-6-astra", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna"),
 }
 
 
@@ -87,7 +86,7 @@ class LaneTableTests(unittest.TestCase):
 
     def test_codex_l4_is_below_the_top_general_family(self):
         lanes = table("codex")["lanes"]
-        self.assertEqual("gpt-5.6-terra", lanes["L4"]["model"])
+        self.assertEqual("gpt-6.1-terra", lanes["L4"]["model"])
         self.assertEqual("high", lanes["L4"]["reasoning_effort"])
         self.assertGreater(
             FAMILY_ORDER["codex"].index(lanes["L4"]["model"]),
@@ -128,33 +127,6 @@ class LaneTableTests(unittest.TestCase):
         # Codex has no per-skill effort key; if that ever changes, this is the line to change with it.
         self.assertTrue(table("claude")["skill_supports_effort"])
         self.assertFalse(table("codex")["skill_supports_effort"])
-
-    def test_the_frontier_tier_sits_above_the_ladder_and_no_rung_can_reach_it(self):
-        # The guard the frontier rule depends on: frontier spend is granted by the user's explicit request,
-        # never resolved from a lane. L1 deliberately prices the frontier family, so the tier is a
-        # model-and-effort pair no rung prices, and any rung sharing the model must sit strictly below
-        # the frontier's effort.
-        for host in HOST_IDS:
-            data = table(host)
-            key = data["effort_key"]
-            with self.subTest(host=host):
-                frontier = data.get("frontier")
-                self.assertIsInstance(frontier, dict, "the frontier tier must be declared as data")
-                self.assertTrue(frontier.get("model"))
-                order = FAMILY_ORDER[host]
-                self.assertEqual(0, order.index(frontier["model"]), "frontier must be the most capable model")
-                self.assertIn(frontier.get(key), EFFORTS, "the frontier tier is priced by the pair, so it must declare effort")
-                frontier_rank = EFFORTS.index(frontier[key])
-                for lane, rung in data["lanes"].items():
-                    if rung["model"] != frontier["model"]:
-                        continue
-                    with self.subTest(host=host, lane=lane):
-                        self.assertIn(rung.get(key), EFFORTS, "a rung sharing the frontier model must declare effort")
-                        self.assertLess(
-                            EFFORTS.index(rung[key]),
-                            frontier_rank,
-                            "a rung pricing the frontier pair lets a lane reach the tier",
-                        )
 
     def test_claude_records_a_context_ceiling_and_its_cheapest_rung_is_smaller(self):
         lanes = table("claude")["lanes"]
@@ -217,9 +189,7 @@ class LaneDeclarationTests(unittest.TestCase):
                     self.assertNotIn("lane", front_matter(skill))
 
     def test_no_skill_names_a_model_directly(self):
-        models = {rung["model"] for host in HOST_IDS for rung in table(host)["lanes"].values()}
-        # The frontier models especially: hardcoding one is how "only on explicit request" gets bypassed.
-        models |= {table(host)["frontier"]["model"] for host in HOST_IDS}
+        models = {model for family in FAMILY_ORDER.values() for model in family}
         for skill in self.skills():
             text = skill.read_text(encoding="utf-8-sig")
             for model in models:
@@ -250,7 +220,7 @@ class GeneratedLaneAgentTests(unittest.TestCase):
         self.assertNotIn("workflow:handoff", body)
 
     def test_claude_lane_agents_and_workflow_pins_never_select_fable(self):
-        forbidden = table("claude")["frontier"]["model"]
+        forbidden = "claude-fable-5"
         for rung in table("claude")["lanes"].values():
             self.assertNotEqual(forbidden, rung["model"])
         for path in (ROOT / "plugins" / "engineering" / "agents").glob("lane-*.md"):

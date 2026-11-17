@@ -197,17 +197,17 @@ class HarnessPermissionValidationTests(unittest.TestCase):
 
     def test_terminal_matchers_allow_only_literal_command_prefixes(self):
         for command in (
-            "Bash(python -B ${PLUGIN_ROOT}/script.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear *)",
+            "Bash(python -B scripts/script.py:*)",
+            "Bash(python -B scripts/script.py --clear:*)",
+            "Bash(python -B scripts/script.py --clear *)",
         ):
             with self.subTest(command=command):
                 harness_permissions.validate_requires(self.requires(command), "test")
 
     def test_optional_setup_declaration_is_strictly_validated(self):
-        requires = self.requires("Bash(python -B ${PLUGIN_ROOT}/script.py:*)")
+        requires = self.requires("Bash(python -B scripts/script.py:*)")
         requires["setup"] = {
-            "script": ".agents/personal/utility/bot-identity/scripts/bot_identity.py"
+            "script": ".agents/example/setup.py"
         }
         harness_permissions.validate_requires(requires, "test")
         for setup in (
@@ -217,26 +217,26 @@ class HarnessPermissionValidationTests(unittest.TestCase):
             {"script": "setup.py", "extra": True},
         ):
             with self.subTest(setup=setup):
-                invalid = self.requires("Bash(python -B ${PLUGIN_ROOT}/script.py:*)")
+                invalid = self.requires("Bash(python -B scripts/script.py:*)")
                 invalid["setup"] = setup
                 with self.assertRaises(harness_permissions.lock_io.LockError):
                     harness_permissions.validate_requires(invalid, "test")
 
     def test_exact_script_rules_preserve_fixed_arguments(self):
         for command in (
-            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear)",
-            'Bash(python -B "${PLUGIN_ROOT}/policy runner.py" --name café)',
+            "Bash(python -B scripts/script.py --clear)",
+            'Bash(python -B "scripts/policy runner.py" --name café)',
         ):
             with self.subTest(command=command):
                 harness_permissions.validate_requires(self.requires(command), "test")
 
     def test_wildcard_arguments_require_a_terminal_matcher_after_a_literal_prefix(self):
         for command in (
-            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear*)",
-            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear:* more)",
-            "Bash(python* -B ${PLUGIN_ROOT}/script.py --clear:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/hooks/*.py --clear:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/script.py * --clear:*)",
+            "Bash(python -B scripts/script.py --clear*)",
+            "Bash(python -B scripts/script.py --clear:* more)",
+            "Bash(python* -B scripts/script.py --clear:*)",
+            "Bash(python -B scripts/hooks/*.py --clear:*)",
+            "Bash(python -B scripts/script.py * --clear:*)",
         ):
             with (
                 self.subTest(command=command),
