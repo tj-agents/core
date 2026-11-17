@@ -7,7 +7,7 @@ RENOVATE_CONFIG = ROOT / ".github/renovate.json"
 RUNTIME_SOURCES = ROOT / ".agents/plugins/runtime-sources.json"
 
 
-def test_renovate_config_extends_the_organization_preset() -> None:
+def test_renovate_config_extends_the_shared_preset() -> None:
     config = json.loads(RENOVATE_CONFIG.read_text(encoding="utf-8"))
     assert config["extends"] == ["github>tj-agents/renovate-config"]
     assert config["customManagers"]

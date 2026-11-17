@@ -1,7 +1,6 @@
 """The lane ladder is the repo's only model decision, so everything that could let it drift is asserted
 here: the two harness tables agreeing rung-for-rung, every declared lane existing, the generated agents
-carrying the resolved values, and the workflow contract's own stage pins still matching the ladder they
-were derived from.
+carrying the resolved values, and the workflow roles' model pins still sitting on the ladder.
 """
 
 import json
@@ -21,15 +20,9 @@ HOSTS = ROOT / ".agents" / "workflows" / "hosts"
 HOST_IDS = ("claude", "codex")
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 
-# The stage vocabulary predates the ladder and stays pinned under the workflow contract's own version.
-# These are the rungs each stage was derived from; the pins must keep agreeing with the ladder.
-STAGE_LANES = {
-    "critical": "L2",
-    "strategic": "L3",
-    "implementation": "L4",
-    "review": "L4",
-    "mechanical": "L5",
-}
+# A role may pin a specialist model for the kind of work it does instead of a ladder rung. Each such
+# deviation is declared here rather than just appearing in a host manifest.
+ROLE_SPECIALISTS = {("codex", "review-lens"): "gpt-5.3-codex-spark"}
 
 # Capability order per vendor, most capable first. A rung may never sit above the rung before it, and the
 # frontier tier must outrank every rung.
@@ -263,8 +256,6 @@ class GeneratedLaneAgentTests(unittest.TestCase):
         for path in (ROOT / "plugins" / "engineering" / "agents").glob("lane-*.md"):
             self.assertNotEqual(forbidden, front_matter(path).get("model"))
         manifest = json.loads((HOSTS / "claude.json").read_text(encoding="utf-8-sig"))
-        for stage in manifest["semantic_stages"].values():
-            self.assertNotEqual(forbidden, stage["model"])
         for role in manifest["roles"].values():
             self.assertNotEqual(forbidden, role["model"])
 
@@ -339,42 +330,24 @@ class PluginDeliveryTests(unittest.TestCase):
         self.assertEqual("agents", claude["plugin_directory"])
         self.assertFalse((ROOT / ".claude" / "agents").exists())
 
-class StagePinTests(unittest.TestCase):
-    """The workflow contract pins its own stage models under its version. It may not drift from the ladder
-    those pins came from -- that would leave two disagreeing answers to one question."""
+class RolePinTests(unittest.TestCase):
+    """Each workflow role pins its model in the host manifest. A pin off the ladder must be a declared
+    specialist, so the ladder stays the one answer to which model a role runs."""
 
-    def test_every_semantic_stage_still_resolves_to_its_lane(self):
+    def test_every_role_resolves_to_a_rung_or_a_declared_specialist(self):
         for host in HOST_IDS:
             data = table(host)
-            manifest = json.loads((HOSTS / f"{host}.json").read_text(encoding="utf-8-sig"))
-            key = data["effort_key"]
-            self.assertEqual(set(STAGE_LANES), set(manifest["semantic_stages"]))
-            for stage, lane in STAGE_LANES.items():
-                pinned = manifest["semantic_stages"][stage]
-                rung = data["lanes"][lane]
-                with self.subTest(host=host, stage=stage):
-                    # A stage may name a specialist model for the KIND of work (Codex review), which is a
-                    # second axis rather than a rung. It then owns its effort too -- the right setting for
-                    # a specialist is a property of that model, not of the rung it sits beside. All the
-                    # ladder requires is that the deviation is declared instead of just appearing.
-                    if pinned.get("specialist"):
-                        self.assertEqual(pinned["model"], pinned["specialist"])
-                        self.assertIn(pinned[key], EFFORTS)
-                    else:
-                        self.assertEqual(rung["model"], pinned["model"])
-                        self.assertEqual(rung.get(key), pinned.get(key))
-
-    def test_every_role_still_resolves_to_a_rung(self):
-        for host in HOST_IDS:
-            data = table(host)
+            rungs = {rung["model"] for rung in data["lanes"].values()}
             manifest = json.loads((HOSTS / f"{host}.json").read_text(encoding="utf-8-sig"))
             for capability, role in manifest["roles"].items():
-                lane = STAGE_LANES[role["default_stage"]]
-                rung = data["lanes"][lane]
                 with self.subTest(host=host, capability=capability):
-                    stage = manifest["semantic_stages"][role["default_stage"]]
-                    expected = stage.get("specialist") or rung["model"]
-                    self.assertEqual(expected, role["model"])
+                    specialist = ROLE_SPECIALISTS.get((host, capability))
+                    if specialist:
+                        self.assertEqual(specialist, role["model"])
+                    else:
+                        self.assertIn(role["model"], rungs)
+                    effort = role.get("effort", role.get("reasoning_effort"))
+                    self.assertIn(effort, EFFORTS)
 
 
 class ResolverTests(unittest.TestCase):

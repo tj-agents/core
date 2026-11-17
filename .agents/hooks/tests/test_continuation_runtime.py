@@ -12,7 +12,6 @@ import unittest
 from unittest import mock
 from types import SimpleNamespace
 
-import tj_cli
 
 ROOT = Path(__file__).resolve().parents[3]
 RUNTIME = ROOT / ".codex/runtime/continuation/continuation_runtime.py"
@@ -377,7 +376,13 @@ class ContinuationTests(unittest.TestCase):
         else:
             self.assertEqual(supervisors[0].pid, observed["pid"])
         self.assertEqual(Path(sys.prefix), Path(observed["prefix"]))
-        self.assertEqual(Path(tj_cli.__file__), Path(observed["dependency"]))
+        # Other test modules may put the vendored runtime first on this process's path; the supervisor is a plain
+        # child of this interpreter, so it must import the tj_cli such a child imports.
+        plain = subprocess.run(
+            [sys.executable, "-B", "-c", "import tj_cli; print(tj_cli.__file__)"],
+            capture_output=True, text=True, check=True, cwd=self.root,
+        )
+        self.assertEqual(Path(plain.stdout.strip()), Path(observed["dependency"]))
         self.assertEqual("complete", state["state"])
 
     @unittest.skipUnless(os.name == "nt", "Windows tj_hook wrapper parent admission")

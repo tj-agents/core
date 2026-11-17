@@ -1,12 +1,12 @@
 ---
 name: open-pr
-description: Create or edit a pull request with explicit nonempty Why and What sections, validating the proposed body before the forge write and the saved body afterward. Use before any PR creation or description edit through a CLI or connector, publishing a correction, showing the corrected review, or handing existing PRs over for approval.
+description: Create or edit a pull request whose body has nonempty Why and What sections, validated before the forge write and again after it. Use before any PR creation or description edit.
 
 kind: operation
 domain: process
 ---
 
-# Opening a pull request
+# Open a pull request
 
 Read and follow the [canonical shared definition](../../../../.agents/engineering/operation/open-pr/SKILL.md) in full.
 This entry point supplies only Claude discovery metadata; the shared procedure is authored once under `.agents/`.

@@ -2,7 +2,6 @@ import io
 import json
 import subprocess
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -80,18 +79,6 @@ class OperationTests(unittest.TestCase):
             value["body"] = "## What\nChange"
             process.return_value.stdout = json.dumps(value)
             self.assertEqual("failed", ops.pr_body_check(Path("."), "42")["exit_state"])
-
-    def test_invalid_remote_body_does_not_mutate_existing_binding(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / ops.delivery_runtime.BINDING_FILE
-            path.parent.mkdir()
-            path.write_text('{"pr":42,"head":"same"}')
-            original = path.read_bytes()
-            for value in ({"body": "## What\nChange"}, {"body": None}, {}):
-                with patch.object(ops, "pull_request_state", return_value=value):
-                    with self.assertRaises(ops.WorkflowOperationError):
-                        ops.delivery_bind(Path(directory), "fixture", 42, "merged", None)
-                self.assertEqual(original, path.read_bytes())
 
 
 if __name__ == "__main__":

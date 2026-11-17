@@ -1,8 +1,5 @@
 {
-  "contract_version": "v2",
   "host": "codex",
-  "status": "available-with-parent-fallback",
-  "model_override_agent_name": "default",
   "delivery": {
     "profile_environment": "CODEX_HOME",
     "profile_default": "~/.codex",
@@ -14,84 +11,12 @@
     "plugin_loading": "unsupported-use-profile-installer",
     "project_scope": "supported-for-project-owned-distinct-roles"
   },
-  "probe": {
-    "command": "codex",
-    "version_arguments": [
-      "--version"
-    ]
-  },
-  "concurrency": {
-    "readers": "parallel",
-    "writers": "serialized",
-    "nested_dispatch": false
-  },
-  "fallback_reasons": [
-    "host-unavailable",
-    "role-unavailable",
-    "model-unavailable",
-    "unsupported-capability",
-    "invalid-result",
-    "cancelled"
-  ],
-  "semantic_stages": {
-    "strategic": {
-      "model": "gpt-6.1-sol",
-      "reasoning_effort": "high",
-      "unavailable": "decision"
-    },
-    "implementation": {
-      "model": "gpt-5.6-terra",
-      "reasoning_effort": "high",
-      "unavailable": "typed-parent-fallback"
-    },
-    "mechanical": {
-      "model": "gpt-6-luna",
-      "reasoning_effort": "high",
-      "unavailable": "typed-parent-fallback"
-    },
-    "review": {
-      "model": "gpt-5.3-codex-spark",
-      "specialist": "gpt-5.3-codex-spark",
-      "fallback_models": [
-        "gpt-5.6-terra"
-      ],
-      "reasoning_effort": "medium",
-      "unavailable": "decision"
-    },
-    "critical": {
-      "model": "gpt-6.1-sol",
-      "reasoning_effort": "xhigh",
-      "unavailable": "decision"
-    }
-  },
-  "continuation": {
-    "turns": "goal",
-    "wake": "native-scheduled-interface-when-exposed",
-    "scheduled_management": [
-      "desktop",
-      "supported-web"
-    ],
-    "scheduled_management_unavailable": [
-      "cli",
-      "ide"
-    ],
-    "durable_cli": ".codex/runtime/continuation/continuation_runtime.py",
-    "scope": "canonical-goal-and-exact-delivery-identity",
-    "unsupported_gate": "product-capability-unavailable"
-  },
   "roles": {
     "evidence-explorer": {
       "agent_name": "evidence_explorer",
       "filename": "evidence-explorer.toml",
       "description": "Read-only repository evidence explorer for one bounded workflow question.",
       "body": "../roles/evidence-explorer.md",
-      "default_stage": "mechanical",
-      "allowed_stages": [
-        "strategic",
-        "implementation",
-        "mechanical",
-        "critical"
-      ],
       "model": "gpt-6-luna",
       "reasoning_effort": "high",
       "sandbox_mode": "read-only",
@@ -102,12 +27,6 @@
       "filename": "log-analyst.toml",
       "description": "Read-only analyst for reducing supplied logs into evidence without diagnosing the fix.",
       "body": "../roles/log-analyst.md",
-      "default_stage": "mechanical",
-      "allowed_stages": [
-        "implementation",
-        "mechanical",
-        "critical"
-      ],
       "model": "gpt-6-luna",
       "reasoning_effort": "high",
       "sandbox_mode": "read-only",
@@ -118,11 +37,6 @@
       "filename": "test-impact-analyst.toml",
       "description": "Read-only analyst for affected tests, gaps, and repository-supported validation commands.",
       "body": "../roles/test-impact-analyst.md",
-      "default_stage": "implementation",
-      "allowed_stages": [
-        "implementation",
-        "review"
-      ],
       "model": "gpt-5.6-terra",
       "reasoning_effort": "high",
       "sandbox_mode": "read-only",
@@ -134,10 +48,6 @@
       "description": "Read-only independent review lens over one immutable diff and bounded concern.",
       "body": "../roles/review-lens.md",
       "model": "gpt-5.3-codex-spark",
-      "default_stage": "review",
-      "allowed_stages": [
-        "review"
-      ],
       "reasoning_effort": "medium",
       "sandbox_mode": "read-only",
       "kind": "review"
@@ -147,10 +57,6 @@
       "filename": "mechanical-worker.toml",
       "description": "Serialized mechanical writer restricted to one parent-approved writer lease.",
       "body": "../roles/mechanical-worker.md",
-      "default_stage": "mechanical",
-      "allowed_stages": [
-        "mechanical"
-      ],
       "model": "gpt-6-luna",
       "reasoning_effort": "high",
       "sandbox_mode": "workspace-write",

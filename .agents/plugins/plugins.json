@@ -17,9 +17,9 @@
       ],
       "skills": [
         "agent-files",
+        "machine-agnostic",
         "project-setup",
-        "solution-assessment",
-        "task-routing"
+        "solution-assessment"
       ],
       "dependencies": {
         "required": [],
@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:6ff6691458ecf53e91562b2a618625e04f36254156fec12932566455a2b1c129",
+      "digest": "sha256:bcd702d52c75b3095125685f952fda6094d9b7709c08399bb8cb07b37925f85d",
       "harness": {
         "marketplaces": [
           {
@@ -104,7 +104,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:a8c4c7b54dd1c5ad0bd562c1c63f93b90dfbe6fd89856caed0b8f7fcd98818df",
+      "digest": "sha256:c731267dd2a392a0339af4e8ca45db1c2f8afae88b76da4e7321447315ab364f",
       "harness": {
         "marketplaces": [
           {
@@ -120,95 +120,8 @@
         ],
         "hooks": [],
         "permissions": {
-          "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/status/scripts/status.py:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/codex-skills/status/scripts/status.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)"
-          ],
-          "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python3"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
-                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
-                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py"
-                ]
-              ],
-              "justification": "Read work-item tracker state and supporting plans without changing them.",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/status/scripts/status.py",
-                  "payments"
-                ],
-                [
-                  "python3",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/workflow/utility/status/scripts/status.py",
-                  "payments",
-                  "20",
-                  "all"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/writer.py"
-                ],
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/skills/status/scripts/status.py",
-                  "payments"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ],
-              "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/workflows/completion.py"
-                ]
-              ]
-            }
-          ]
+          "claude_allow": [],
+          "codex_prefix_rules": []
         }
       },
       "external_dependencies": {
@@ -256,17 +169,13 @@
         "failure-provenance",
         "feature",
         "git-auth",
-        "guide",
-        "guide-build",
         "incremental-review",
         "merge",
-        "merge-docs",
         "merging",
         "open-pr",
         "open-worktree",
         "plans",
         "pr-preflight",
-        "pr-screenshots",
         "prune-worktrees",
         "pull",
         "push",
@@ -275,12 +184,8 @@
         "review",
         "review-lifecycle",
         "session",
-        "stack",
-        "staged-review",
-        "staged-review-all",
         "sync-checkout",
-        "unmerged",
-        "update-roadmap"
+        "unmerged"
       ],
       "dependencies": {
         "required": [
@@ -305,7 +210,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:171fba22d41d5ca1b6e7fdb19ffcff2e592bd734b36c1009a1302f372b3e1ac5",
+      "digest": "sha256:04e4b919074ced616bf809ac8772d5821e3cffe2b4cf4f6b1d74c884bf0d466b",
       "harness": {
         "marketplaces": [
           {
@@ -322,167 +227,8 @@
         ],
         "hooks": [],
         "permissions": {
-          "claude_allow": [
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-            "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py --repo:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py --repo:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
-            "Bash(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
-            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)",
-            "PowerShell(python3 -B ${PLUGIN_ROOT}/workflows/pr_body.py --body-file:*)"
-          ],
-          "codex_prefix_rules": [
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
-                  "${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py",
-                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
-                ]
-              ],
-              "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; a delivered report and verified idle session remain separate prerequisites for retained-session closure",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
-                ],
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                [
-                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/worktree_sweep.py",
-                  "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
-                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/worktree_sweep.py"
-                ],
-                "--repo"
-              ],
-              "justification": "engineering:merge Step 5 removes proven-merged worktrees for one repository; it never forces, keeps worktrees in use, and archives leftovers first",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/skills/merge/scripts/worktree_sweep.py",
-                  "--repo",
-                  "C:/repo"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/skills/merge/scripts/other.py",
-                  "--repo",
-                  "C:/repo"
-                ]
-              ]
-            },
-            {
-              "pattern": [
-                [
-                  "python",
-                  "python.exe",
-                  "python3",
-                  "py"
-                ],
-                "-B",
-                "${PLUGIN_ROOT}/workflows/pr_body.py",
-                "--body-file"
-              ],
-              "justification": "Reads a proposed PR description and rejects missing or empty What and Why sections before any forge write; no repository or remote state changes",
-              "match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/workflows/pr_body.py",
-                  "--body-file",
-                  "body.md"
-                ]
-              ],
-              "not_match": [
-                [
-                  "python",
-                  "-B",
-                  "${PLUGIN_ROOT}/workflows/pr_body.py"
-                ]
-              ]
-            }
-          ],
-          "auto_merge": {
-            "claude_allow": [
-              "Bash(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")",
-              "PowerShell(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")"
-            ],
-            "codex_prefix_rules": [
-              {
-                "pattern": [
-                  [
-                    "python",
-                    "python.exe",
-                    "python3",
-                    "py"
-                  ],
-                  "-B",
-                  "${PLUGIN_ROOT}/workflows/auto_merge.py",
-                  "--root",
-                  "${PROJECT_ROOT}"
-                ],
-                "justification": "Rechecks required authorization, checkout identity, readiness, review, and security evidence before arming auto-merge for this declared checkout.",
-                "match": [
-                  [
-                    "python",
-                    "-B",
-                    "${PLUGIN_ROOT}/workflows/auto_merge.py",
-                    "--root",
-                    "${PROJECT_ROOT}"
-                  ]
-                ],
-                "not_match": [
-                  [
-                    "python",
-                    "-B",
-                    "${PLUGIN_ROOT}/workflows/auto_merge.py",
-                    "--root"
-                  ]
-                ]
-              }
-            ]
-          }
+          "claude_allow": [],
+          "codex_prefix_rules": []
         }
       },
       "external_dependencies": {
@@ -508,14 +254,13 @@
       "id": "tj-agents/docs",
       "name": "docs",
       "package_path": "plugins/docs",
-      "description": "Layout, diagram and design-page conventions for pages people read.",
+      "description": "Layout and diagram conventions for pages people read.",
       "platforms": [
         "windows",
         "linux",
         "macos"
       ],
       "skills": [
-        "design",
         "diagram",
         "layout"
       ],
@@ -527,7 +272,7 @@
         "required": [],
         "optional": []
       },
-      "digest": "sha256:d39e2dfd3ebc58213e2e1c1dbeabf80ec3246764d9c8b1b6e0b8d35ed2a0a3c3",
+      "digest": "sha256:1fcee295bb17946ca4d86757366e455d07bbcbcf41505fe726287cbfeb1717c6",
       "harness": {
         "marketplaces": [
           {

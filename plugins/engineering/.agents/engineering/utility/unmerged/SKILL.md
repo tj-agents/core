@@ -1,12 +1,14 @@
 ---
 name: unmerged
-description: Inventory every local branch + worktree and say what's genuinely left to merge vs. safe to bin — then do the safe cleanup. Classifies branches into truly-unmerged (has new content), squash-merge ghosts (content already in master under a different SHA — the bulk of branch clutter), and fully-merged; cross-references open PRs; surfaces uncommitted work stranded in worktrees; flags stale platform-sync branches; then deletes the dead ones with a case-collision guard so it never nukes a branch a worktree still holds. Use when Tommy says "/unmerged", "what's left to merge", "what code is still unmerged", "clean up my branches", "why do I have so many branches", or "prune merged branches". Works in any repo; personal git/gh only.
+description: Inventory local branches and worktrees, report what is genuinely unmerged, and delete only merged or squash-ghost refs no worktree holds. Use for what's left to merge or cleaning up branches.
 
 kind: utility
 domain: process
 ---
 
-Answer "what's actually left to merge, and what's just clutter?" — then clear the clutter safely.
+# unmerged
+
+Owns answering what is genuinely left to merge, then deleting only the provably dead branch refs.
 
 The trap this skill exists to avoid: **`git branch --merged` lies under a squash-merge workflow.** A
 branch whose commits were squash- or rebase-merged into the main branch lands under a *new* SHA, so its
@@ -129,7 +131,7 @@ one line each — branch · PR#/none · age · one-line what · what's blocking 
 "where did all these come from" answer: *squash-merged, ref never pruned*). List names only if asked.
 
 **⚠️ Needs a human** — only if found: case-collision pairs, an uncommitted worktree, a months-old
-UNMERGED branch with no PR (abandoned?), a stale/red platform-sync. Skip the heading if empty.
+UNMERGED branch with no PR (abandoned?). Skip the heading if empty.
 
 **Directory cleanup** — only if dead worktree dirs remain that the sandbox couldn't delete: the ready-
 to-paste `\\?\` PowerShell block, dirs confirmed safe.
