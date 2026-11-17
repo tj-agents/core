@@ -11,6 +11,19 @@ from typing import Self, cast
 
 import create_worktree
 
+PASSIVE_PROGRAMS = frozenset(
+    {
+        "rg",
+        "grep",
+        "findstr",
+        "select-string",
+        "echo",
+        "printf",
+        "write-output",
+        "write-host",
+    }
+)
+
 
 class Mutation(Enum):
     MOVE = ("move", 1, frozenset[str]())
@@ -89,26 +102,38 @@ def shell_reader(header: str, syntax: ShellSyntax) -> ShellReader | None:
         return ShellReader(None, in_process=True)
     program = True
     operand = False
-    wrapper = False
+    wrapper = ""
     for word in words:
         if word and all(character in ";&|()\n" for character in word):
-            program, wrapper = True, False
+            program, wrapper = True, ""
         elif operand:
             operand = False
         elif program:
             if re.match(r"\d*[<>]", word):
                 operand = re.fullmatch(r"\d*(?:<<-?|>>?|<)", word) is not None
-            elif re.match(r"\w+=", word) or word == "--":
+            elif (
+                re.match(r"\w+=", word)
+                or word == "--"
+                or (
+                    (wrapper == "env" and word in {"-i", "--ignore-environment"})
+                    or (wrapper == "command" and word == "-p")
+                    or (wrapper == "exec" and word in {"-c", "-l"})
+                )
+            ):
                 continue
+            elif (wrapper == "env" and word in {"-u", "--unset"}) or (
+                wrapper == "exec" and word == "-a"
+            ):
+                operand = True
             elif word.startswith("-") or re.search(r"[$`%]", word):
                 return ShellReader(None, in_process=True)
             elif executable(word) in {"env", "command", "exec", "sudo", "doas"}:
-                wrapper = True
+                wrapper = executable(word)
             elif executable(word) in {"source", ".", "iex", "invoke-expression"}:
                 return ShellReader(syntax, in_process=True)
             elif (reader_syntax := ShellSyntax.for_program(word)) is not None:
                 return ShellReader(reader_syntax)
-            elif not wrapper:
+            else:
                 program = False
     if any(word.lower() in {"-c", "-lc", "-command", "/c"} for word in words):
         return ShellReader(None, in_process=True)
@@ -344,13 +369,17 @@ def needs_placement_check(command: str, syntax: ShellSyntax) -> bool:
             or executable(words[start]) in {"env", "command", "git"}
             or "=" in words[start]
         ):
-            return True
+            try:
+                check_worktrunk(words[index + 1 :])
+            except create_worktree.CreateWorktreeError:
+                return True
         if (word.startswith("--worktree") or word == "-w") and executable(
             words[start].strip("\"'")
         ) in {"claude", "codex"}:
             return True
         if (
             word == "worktree"
+            and executable(words[start]) not in PASSIVE_PROGRAMS
             and index + 1 < len(words)
             and not nonplacement_operation(words[index + 1])
         ):
@@ -506,16 +535,7 @@ def check_command(
         return
     for words in commands:
         program = executable(words[0])
-        if program in {
-            "rg",
-            "grep",
-            "findstr",
-            "select-string",
-            "echo",
-            "printf",
-            "write-output",
-            "write-host",
-        }:
+        if program in PASSIVE_PROGRAMS:
             continue
         if program in {"cd", "chdir", "set-location", "push-location", "pushd"}:
             arguments = [
