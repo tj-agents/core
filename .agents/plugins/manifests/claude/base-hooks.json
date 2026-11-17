@@ -18,6 +18,17 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "Bash|PowerShell|shell|shell_command|exec_command|mcp__.*|EnterWorktree|Agent|Task|.*create_worktree",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "python",
+            "args": ["-B", "${CLAUDE_PLUGIN_ROOT}/hooks/worktree_tool_gate.py"]
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
@@ -28,21 +39,6 @@
               "-B",
               "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
               "--write-gate"
-            ]
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|PowerShell|mcp__.*",
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 30,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
-              "--tool-gate"
             ]
           }
         ]
@@ -60,6 +56,18 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
               "--record-read"
             ]
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "python",
+            "args": ["-B", "${CLAUDE_PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py"]
           }
         ]
       }
