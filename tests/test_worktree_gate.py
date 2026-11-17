@@ -143,6 +143,8 @@ def test_direct_git_worktree_add_is_denied_at_a_canonical_destination(
         "env nice bash <<'SH'\ngit worktree add ../outside\nSH",
         "nice bash <<'SH'\ngit worktree add ../outside\nSH",
         "env timeout 10 bash <<'SH'\ngit worktree add ../outside\nSH",
+        "python -c 'import sys;exec(sys.stdin.read())' <<'PY'\n"
+        "import os; os.system('git worktree add ../outside')\nPY",
         "cat <<'SH' | bash\ngit worktree add ../outside\nSH",
         "cat <<'SH' | \\\nbash\ngit worktree add ../outside\nSH",
         "bash \\\n<<'SH'\ngit worktree add ../outside\nSH",
@@ -187,6 +189,7 @@ def test_noncanonical_or_unresolved_mutation_is_denied(
         "env cat -n <<'DOC' > README.md\nUse git worktree add\nDOC",
         "cat <<'DOC' > bash\ngit worktree add is documented here\nDOC",
         "cat <<'DOC' | grep bash\ngit worktree add is documented here\nDOC",
+        "cat <<'DOC' | grep -c bash\ngit worktree add is documented here\nDOC",
         pytest.param(
             "cat <<'DOC' > README.md\nUse `git worktree add`; it isn't executed.\nDOC",
             id="quoted_doc_posix_here_document",
