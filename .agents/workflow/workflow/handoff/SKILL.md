@@ -1,11 +1,11 @@
 ---
 name: handoff
-description: Transfer responsibility for a goal or a separate workstream to an independent session with one self-contained prompt. Use for an actual ownership transfer; work returning here uses a subagent.
+description: Transfer responsibility for a goal or a separate workstream to a new session with one self-contained prompt and an explicit parent relationship or independence. Use for an actual ownership transfer; work returning here uses a subagent.
 kind: workflow
 domain: process
 ---
 
-# Hand off to an independent session
+# Hand off ownership to a new session
 
 Owns the boundary between native subagent delegation and an ownership transfer, and the transfer itself.
 
@@ -37,7 +37,10 @@ verified checkout; the successor owns its design and setup, including isolation 
 1. Checkpoint the canonical goal, then stop writing owned paths.
 2. Respect a named harness; otherwise use `agent:handoff --host codex`, resolved through native discovery,
    never a guessed path. Keep a user-chosen model, effort or harness; otherwise select a lane the launcher
-   accepts through `agent:lanes` and record it with a one-line reason.
+   accepts through `agent:lanes` and record it with a one-line reason. Choose the relationship explicitly:
+   `--parent <host:id>` for continuing coordination with that session, or `--independent` for an owner
+   working directly with the user without inherited reporting duties. Preserve the user's choice in the
+   prompt and verify the recorded parent or null parent after launch; ambient identity is not a choice.
 3. Write the prompt to a UTF-8 file and invoke the launcher once. Never relaunch because startup is slow;
    reconcile an interrupted or ambiguous launch instead of retrying it.
 4. Report submission as launch only; it does not prove the successor read the prompt.
@@ -54,6 +57,8 @@ Input: get a fresh assessment of the cache design and return it so this agent fi
 Route: native subagent; this agent keeps billing.
 Input: transfer the migration to a successor through completion.
 Route: checkpoint, stop writing, launch one successor with the self-contained prompt.
+Input: transfer to a fully independent Codex owner with no reporting obligation here.
+Route: agent:handoff --host codex with --independent; verify its recorded parent is null.
 Input: the user chose Redis; the predecessor proposed a custom coordinator.
 Prompt: Redis as the user's decision with its source; the coordinator as an assumption to assess.
 ```

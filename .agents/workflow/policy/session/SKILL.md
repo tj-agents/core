@@ -50,6 +50,21 @@ only for an actual transfer of ownership.
 Finish only when delivery, validation and any authorized handoff are done. A merged PR, a Stop event or a
 question about a missed close-out is not completion. A new mistake callout is answered and corrected first.
 
+In a managed TJ session, completion has two parts: request it with `tj finish` once the whole authorized
+outcome is delivered, then send the final response. The host records that exact turn's response; TJ delivers
+it to an explicit parent when present, checks ownership and authored changes, completes the linked item,
+and saves a durable closeout receipt. A successful `tj finish` confirms intent only. Use `tj receipt` or
+`tj status` to distinguish the recorded result from completed cleanup. A missing invocation leaves the
+session visibly incomplete; it never causes a synthetic prompt or another model turn.
+
+Before yielding with genuine pending work, record `tj wait user|child|ci|approval "reason"`. Resume the
+same authorized outcome when its dependency resolves. When the user asks to keep the session open, record
+`tj hold`; release it with `tj hold --release` only when that request is withdrawn. A hold survives new
+input and permits final-result delivery while preventing closure. New user input cancels pending completion.
+Do not mark the work item Done separately as a substitute for this protocol. Agent owns the
+[managed-session commands](https://github.com/tj-agents/agent#managed-sessions); the CLI enforces their
+state and cleanup rules.
+
 ```text
 A: add report export. B: an unrelated terminal-close bug is reported.
 Keep A's next action; tell the user about B and record it through the selected profile.
