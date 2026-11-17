@@ -25,16 +25,6 @@
       "test": "test_the_installer_writes_the_same_variable_at_user_scope",
       "source": ".agents/hooks/tests/test_goal_preflight.py",
       "reason": "Concertable project/user-scope provisioning remains owned and tested there; shared runtime tests only effective prerequisite resolution in disposable profiles."
-    },
-    {
-      "test": "test_selected_plan_applies_the_general_prelaunch_guard_to_existing_instructions",
-      "source": ".agents/hooks/tests/test_plan_graph.py",
-      "reason": "Selected-plan pre-launch replacement policy remains in Concertable, whose original module and assertions are unchanged. Shared plan_graph validates structural ledger/ownership only and must permit published compatibility windows (P2 item 2). This is not retired product coverage."
-    },
-    {
-      "test": "test_selected_plan_accepts_a_direct_replacement",
-      "source": ".agents/hooks/tests/test_plan_graph.py",
-      "reason": "Selected-plan pre-launch replacement policy remains in Concertable, whose original module and assertions are unchanged. Shared plan_graph validates structural ledger/ownership only and must permit published compatibility windows (P2 item 2). This is not retired product coverage."
     }
   ],
   "pending_acceptance": [],

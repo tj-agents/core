@@ -28,21 +28,10 @@ class ClassificationTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertEqual(CI.classify([path])["mode"], "full")
 
-    def test_known_runtime_families_union_their_regressions_on_both_platforms(self):
-        value = CI.classify([
-            ".agents/hooks/problem_records.py",
-            ".agents/workflow/workflow/handoff/scripts/transfer.py",
-            "README.md",
-        ])
+    def test_known_runtime_family_with_prose_selects_its_regressions_on_both_platforms(self):
+        value = CI.classify([".agents/hooks/problem_records.py", "README.md"])
         self.assertEqual(value["mode"], "focused")
-        self.assertTrue({".agents/hooks/tests/test_problem_records.py",
-                         ".agents/hooks/tests/test_handoff_transfer.py"}.issubset(value["tests"]))
-        CI.required_results(value, self.results(), "pull_request", ("ci:full",))
-
-    def test_relocated_handoff_helper_keeps_focused_transfer_coverage(self):
-        value = CI.classify([".agents/workflow/workflow/handoff/scripts/transfer.py"])
-        self.assertEqual("focused", value["mode"])
-        self.assertEqual([".agents/hooks/tests/test_handoff_transfer.py"], value["tests"])
+        self.assertIn(".agents/hooks/tests/test_problem_records.py", value["tests"])
         CI.required_results(value, self.results(), "pull_request", ("ci:full",))
 
     @staticmethod

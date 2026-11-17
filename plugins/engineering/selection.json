@@ -35,17 +35,13 @@
     "failure-provenance",
     "feature",
     "git-auth",
-    "guide",
-    "guide-build",
     "incremental-review",
     "merge",
-    "merge-docs",
     "merging",
     "open-pr",
     "open-worktree",
     "plans",
     "pr-preflight",
-    "pr-screenshots",
     "prune-worktrees",
     "pull",
     "push",
@@ -54,11 +50,7 @@
     "review",
     "review-lifecycle",
     "session",
-    "stack",
-    "staged-review",
-    "staged-review-all",
     "sync-checkout",
-    "unmerged",
-    "update-roadmap"
+    "unmerged"
   ]
 }

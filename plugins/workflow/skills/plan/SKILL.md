@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Design substantive work and produce its implementation-ready canonical plan. Use when asked to plan, phase, design, revise a substantive plan, or choose what to plan next.
+description: Design substantive work and produce its implementation-ready canonical plan. Use when asked to plan, phase, design, revise a substantive plan or choose what to plan next.
 kind: workflow
 domain: process
 ---

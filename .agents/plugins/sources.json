@@ -84,6 +84,11 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/hooks/boundary.py",
+      "destination": "hooks/boundary.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/hooks/check_tier_payload.py",
       "destination": "hooks/check_tier_payload.py"
     },
@@ -129,11 +134,6 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
-      "destination": "workflows/host_coverage.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".codex/install-workflow-agents.ps1",
       "destination": "scripts/install-codex-agents.ps1"
     },
@@ -169,16 +169,6 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/merge_review_gate.py",
-      "destination": "hooks/merge_review_gate.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/plan_graph.py",
-      "destination": "hooks/plan_graph.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/hooks/docs_reachability.py",
       "destination": "hooks/docs_reachability.py"
     },
@@ -193,6 +183,11 @@
       "destination": "hooks/selected_standards.py"
     },
     {
+      "plugin": "engineering",
+      "source": ".agents/hooks/boundary.py",
+      "destination": "hooks/boundary.py"
+    },
+    {
       "plugin": "base",
       "source": ".agents/tiers/base.json",
       "destination": "tier.json"
@@ -201,36 +196,6 @@
       "plugin": "engineering",
       "source": ".agents/tiers/engineering.json",
       "destination": "tier.json"
-    },
-    {
-      "plugin": "base",
-      "source": ".agents/hooks/project_facts.py",
-      "destination": "hooks/project_facts.py"
-    },
-    {
-      "plugin": "base",
-      "source": ".agents/hooks/standards_context.py",
-      "destination": "hooks/standards_context.py"
-    },
-    {
-      "plugin": "base",
-      "source": ".agents/schemas/standards-context.schema.json",
-      "destination": "schemas/standards-context.schema.json"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/project_facts.py",
-      "destination": "hooks/project_facts.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/standards_context.py",
-      "destination": "hooks/standards_context.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/schemas/standards-context.schema.json",
-      "destination": "schemas/standards-context.schema.json"
     },
     {
       "plugin": "workflow",
@@ -274,11 +239,6 @@
     },
     {
       "plugin": "workflow",
-      "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
-      "destination": "resources/plan-artifacts/host_coverage.py"
-    },
-    {
-      "plugin": "workflow",
       "source": ".agents/tiers/workflow.json",
       "destination": "tier.json"
     },
@@ -301,16 +261,6 @@
       "plugin": "workflow",
       "source": ".agents/workflows",
       "destination": "workflows"
-    },
-    {
-      "plugin": "workflow",
-      "source": ".agents/workflow/contract/plan-artifacts/scripts/host_coverage.py",
-      "destination": "workflows/host_coverage.py"
-    },
-    {
-      "plugin": "workflow",
-      "source": ".agents/hooks/merge_review_gate.py",
-      "destination": "hooks/merge_review_gate.py"
     },
     {
       "plugin": "workflow",
