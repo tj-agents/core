@@ -133,9 +133,11 @@ def shell_reader(header: str, syntax: ShellSyntax) -> ShellReader | None:
                 return ShellReader(syntax, in_process=True)
             elif (reader_syntax := ShellSyntax.for_program(word)) is not None:
                 return ShellReader(reader_syntax)
-            elif not wrapper:
+            else:
                 program = False
-    if any(word.lower() in {"-c", "-lc", "-command", "/c"} for word in words):
+    if any(word.lower() in {"-c", "-lc", "-command", "/c"} for word in words) or any(
+        ShellSyntax.for_program(word) is not None for word in words
+    ):
         return ShellReader(None, in_process=True)
     return None
 
