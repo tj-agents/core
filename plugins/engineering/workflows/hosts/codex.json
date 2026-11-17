@@ -37,7 +37,7 @@
       "filename": "test-impact-analyst.toml",
       "description": "Read-only analyst for affected tests, gaps, and repository-supported validation commands.",
       "body": "../roles/test-impact-analyst.md",
-      "model": "gpt-5.6-terra",
+      "model": "gpt-6.1-terra",
       "reasoning_effort": "high",
       "sandbox_mode": "read-only",
       "kind": "review"
