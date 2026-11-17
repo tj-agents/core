@@ -51,6 +51,7 @@ filterwarnings = ["error"]
 raises-require-match-for = ["*"]
 
 [tool.ruff.lint.per-file-ignores]
+".agents/hooks/worktree_tool_gate.py" = ["E402", "TID251"]
 "tests/test_workspace_tiers.py" = ["TID251"]
 "tests/test_workflow_status.py" = ["E501", "PLR6301", "PT009", "TID251", "UP031"]
 "tests/test_workflow_session_hooks.py" = ["E501", "I001", "PLR6301", "PT009", "TID251"]
