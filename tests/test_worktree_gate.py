@@ -71,12 +71,23 @@ def invoke(repo: Path, tool: str, arguments: dict[str, object]) -> str | None:
 
 
 @pytest.mark.parametrize("tool", ["Bash", "PowerShell", "exec_command"])
-@pytest.mark.parametrize("operation", ["add -b Feature/Allowed", "move old"])
-def test_literal_canonical_destination_is_allowed(
-    repo: Path, tool: str, operation: str
-) -> None:
-    command = f'git worktree {operation} ".worktrees/Feature-Allowed"'
+def test_literal_canonical_move_is_allowed(repo: Path, tool: str) -> None:
+    command = 'git worktree move old ".worktrees/Feature-Allowed"'
     assert invoke(repo, tool, {"command": command}) is None
+    assert not (repo / ".worktrees").exists()
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git worktree add -b Feature/Allowed .worktrees/Feature-Allowed",
+        "git.exe worktree add .worktrees/Feature-Allowed",
+    ],
+)
+def test_direct_git_worktree_add_is_denied_at_a_canonical_destination(
+    repo: Path, command: str
+) -> None:
+    assert invoke(repo, "Bash", {"command": command}) is not None
     assert not (repo / ".worktrees").exists()
 
 
@@ -144,6 +155,58 @@ def test_nonmutating_commands_and_literal_text_are_allowed(
 
 
 @pytest.mark.parametrize(
+    "command",
+    [
+        "wt switch Feature/Bad",
+        "wt.exe switch Feature/Bad",
+        "WT.EXE switch Feature/Bad",
+        "git-wt switch Feature/Bad",
+        "git-wt.exe switch Feature/Bad",
+        "GIT-WT.EXE switch Feature/Bad",
+        "git wt switch Feature/Bad",
+        "git.exe wt switch Feature/Bad",
+        "bash -c 'wt switch Feature/Bad'",
+        "pwsh -Command 'git-wt switch Feature/Bad'",
+        "cmd.exe /c 'git wt switch Feature/Bad'",
+        "env SETTING=value wt switch Feature/Bad",
+        "command -p git-wt switch Feature/Bad",
+        "git -c wt.setting=value wt switch Feature/Bad",
+    ],
+)
+def test_worktrunk_mutation_entry_points_are_denied(repo: Path, command: str) -> None:
+    assert invoke(repo, "Bash", {"command": command}) is not None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "wt list",
+        "wt.exe list",
+        "git-wt list",
+        "git-wt.exe list",
+        "git wt list",
+        "git.exe wt list",
+        "wt step diff",
+        "git-wt step diff",
+        "git wt step diff",
+        "bash -c 'wt list'",
+        "pwsh -Command 'git-wt list'",
+        "cmd.exe /c 'git wt list'",
+    ],
+)
+def test_worktrunk_passive_inventory_entry_points_are_allowed(
+    repo: Path, command: str
+) -> None:
+    assert invoke(repo, "Bash", {"command": command}) is None
+
+
+def test_shared_creator_command_is_allowed(repo: Path) -> None:
+    creator = SCRIPT.with_name("create_worktree.py")
+    command = f'python -B "{creator}" --repo "{repo}" Feature/Allowed'
+    assert invoke(repo, "Bash", {"command": command}) is None
+
+
+@pytest.mark.parametrize(
     ("skill", "block"),
     [("prune-worktrees", 0), ("prune-worktrees", 1), ("unmerged", 3)],
 )
@@ -160,7 +223,7 @@ def test_shipped_inventory_and_pruning_commands_are_allowed(
 def test_git_directory_switch_resolves_the_target_repository(
     repo: Path, tmp_path: Path
 ) -> None:
-    command = f'git -C "{repo}" worktree add ".worktrees/Feature-Allowed"'
+    command = f'git -C "{repo}" worktree move old ".worktrees/Feature-Allowed"'
     assert invoke(tmp_path, "exec_command", {"cmd": command}) is None
 
 
@@ -168,7 +231,7 @@ def test_git_directory_switch_resolves_the_target_repository(
 def test_shell_directory_switch_resolves_the_target_repository(
     repo: Path, tmp_path: Path, prefix: str
 ) -> None:
-    command = f'{prefix} "{repo}"; git worktree add .worktrees/Feature-Allowed'
+    command = f'{prefix} "{repo}"; git worktree move old .worktrees/Feature-Allowed'
     assert invoke(tmp_path, "PowerShell", {"command": command}) is None
 
 
@@ -177,11 +240,14 @@ def test_linked_checkout_uses_the_primary_repository(repo: Path) -> None:
     git(repo, "worktree", "add", "-b", "Feature/First", str(linked))
     canonical = repo / ".worktrees" / "Feature-Second"
     assert (
-        invoke(linked, "Bash", {"command": f'git worktree add "{canonical}"'}) is None
+        invoke(linked, "Bash", {"command": f'git worktree move old "{canonical}"'})
+        is None
     )
     assert (
         invoke(
-            linked, "Bash", {"command": "git worktree add .worktrees/Feature-Second"}
+            linked,
+            "Bash",
+            {"command": "git worktree move old .worktrees/Feature-Second"},
         )
         is not None
     )
@@ -195,7 +261,7 @@ def test_tool_workdir_takes_precedence_over_session_directory(
             tmp_path,
             "exec_command",
             {
-                "cmd": "git worktree add .worktrees/Feature-Allowed",
+                "cmd": "git worktree move old .worktrees/Feature-Allowed",
                 "workdir": str(repo),
             },
         )
@@ -253,7 +319,7 @@ def test_git_timeout_returns_denial_before_the_host_deadline(
             json.dumps(
                 {
                     "tool_name": "exec_command",
-                    "tool_input": {"cmd": "git worktree add ../outside"},
+                    "tool_input": {"cmd": "git worktree move old ../outside"},
                     "cwd": str(repo),
                 }
             )

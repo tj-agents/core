@@ -12,7 +12,6 @@ import create_worktree
 
 
 class Mutation(Enum):
-    ADD = ("add", 0, frozenset({"-b", "-B", "--reason"}))
     MOVE = ("move", 1, frozenset[str]())
 
     def __init__(self, command: str, destination: int, options: frozenset[str]) -> None:
@@ -28,7 +27,7 @@ def literal(value: str) -> str:
 
 
 def executable(value: str) -> str:
-    return value.replace("\\", "/").rsplit("/", 1)[-1].removesuffix(".exe").lower()
+    return value.replace("\\", "/").rsplit("/", 1)[-1].lower().removesuffix(".exe")
 
 
 def shell_words(command: str) -> list[str]:
@@ -43,10 +42,29 @@ def nonplacement_operation(action: str) -> bool:
     return action in {"list", "prune", "remove", "repair", "lock", "unlock", "-h"}
 
 
+def is_worktrunk_executable(value: str) -> bool:
+    return executable(value) in {"git-wt", "wt"}
+
+
 def needs_placement_check(command: str) -> bool:
     words = shell_words(command)
+    start = 0
     for index, word in enumerate(words):
-        if word.startswith("--worktree") or word == "-w":
+        if word in {"do", "then", "else"} or (
+            word and all(character in ";&|()\n" for character in word)
+        ):
+            start = index + 1
+            continue
+        if (
+            (is_worktrunk_executable(word)
+            and (
+                index == start
+                or executable(words[start]) in {"env", "command", "git"}
+                or "=" in words[start]
+            ))
+            or word.startswith("--worktree")
+            or word == "-w"
+        ):
             return True
         if (
             word == "worktree"
@@ -54,7 +72,11 @@ def needs_placement_check(command: str) -> bool:
             and not nonplacement_operation(words[index + 1])
         ):
             return True
-        if "worktree" in word and len(word.split()) > 1 and needs_placement_check(word):
+        if (
+            re.search(r"\b(?:worktree|git-wt|wt)\b", word, re.IGNORECASE)
+            and len(word.split()) > 1
+            and needs_placement_check(word)
+        ):
             return True
     return False
 
@@ -118,6 +140,21 @@ def destination(arguments: Sequence[str], mutation: Mutation) -> str:
     return operands[mutation.destination]
 
 
+def check_worktrunk(arguments: Sequence[str]) -> None:
+    if not arguments:
+        raise create_worktree.CreateWorktreeError("unsupported Worktrunk operation")
+    action = literal(arguments[0])
+    if action in {"--help", "-h", "--version", "version", "help", "list"}:
+        return
+    if action == "step" and len(arguments) > 1 and literal(arguments[1]) == "diff":
+        return
+    if len(arguments) > 1 and literal(arguments[1]) in {"--help", "-h"}:
+        return
+    raise create_worktree.CreateWorktreeError(
+        "Worktrunk worktree mutations are not supported"
+    )
+
+
 def check_git(arguments: Sequence[str], cwd: Path, deadline: float) -> None:
     index = 0
     while index < len(arguments):
@@ -131,8 +168,13 @@ def check_git(arguments: Sequence[str], cwd: Path, deadline: float) -> None:
             break
     if index == len(arguments):
         return
+    if arguments[index] == "wt":
+        check_worktrunk(arguments[index + 1 :])
+        return
     if arguments[index] != "worktree":
-        if "worktree" in arguments:
+        if "worktree" in arguments or any(
+            is_worktrunk_executable(word) for word in arguments
+        ):
             raise create_worktree.CreateWorktreeError("unsupported Git routing options")
         return
     if index + 1 == len(arguments):
@@ -140,18 +182,16 @@ def check_git(arguments: Sequence[str], cwd: Path, deadline: float) -> None:
     action = literal(arguments[index + 1])
     if nonplacement_operation(action):
         return
+    if action == "add":
+        raise create_worktree.CreateWorktreeError(
+            "direct git worktree add is not supported"
+        )
     mutation = next((item for item in Mutation if item.command == action), None)
     if mutation is None:
         raise create_worktree.CreateWorktreeError("unsupported worktree operation")
     target = destination(arguments[index + 2 :], mutation)
     repo = create_worktree.repository_root(cwd, deadline=deadline)
     create_worktree.validate_destination(repo, cwd / target)
-
-
-def mentions_worktree(words: Sequence[str]) -> bool:
-    return "worktree" in words or any(
-        word.startswith("--worktree") or word == "-w" for word in words
-    )
 
 
 def mutates_worktree(words: Sequence[str]) -> bool:
@@ -162,7 +202,9 @@ def mutates_worktree(words: Sequence[str]) -> bool:
 
 
 def check_command(command: str, cwd: Path, deadline: float) -> None:
-    if not re.search(r"\b(?:git(?:\.exe)?|worktree)\b", command, re.IGNORECASE):
+    if not re.search(
+        r"\b(?:git(?:-wt)?(?:\.exe)?|wt(?:\.exe)?|worktree)\b", command, re.IGNORECASE
+    ):
         return
     try:
         if not needs_placement_check(command):
@@ -177,8 +219,6 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
             raise create_worktree.CreateWorktreeError(
                 "cannot verify this worktree shell expression"
             ) from error
-        return
-    if not any(mentions_worktree(words) for words in commands):
         return
     for words in commands:
         program = executable(words[0])
@@ -205,10 +245,16 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
         elif program in {"command", "env"} and len(words) > 1:
             if executable(words[1]) == "git":
                 check_git(words[2:], cwd, deadline)
-            elif "worktree" in words:
+            elif is_worktrunk_executable(words[1]):
+                check_worktrunk(words[2:])
+            elif "worktree" in words or any(
+                is_worktrunk_executable(word) for word in words
+            ):
                 raise create_worktree.CreateWorktreeError("unsupported Git environment")
         elif program == "git":
             check_git(words[1:], cwd, deadline)
+        elif is_worktrunk_executable(words[0]):
+            check_worktrunk(words[1:])
         elif program in {"bash", "sh", "zsh", "pwsh", "powershell", "cmd"}:
             for index, word in enumerate(words[1:], start=1):
                 if word.lower() in {"-c", "-lc", "-command", "/c"}:
@@ -224,6 +270,7 @@ def check_command(command: str, cwd: Path, deadline: float) -> None:
             program in {"popd", "pop-location"}
             or "=" in words[0]
             or any(executable(word) == "git" for word in words[1:])
+            or any(is_worktrunk_executable(word) for word in words[1:])
             or mutates_worktree(words)
         ):
             raise create_worktree.CreateWorktreeError(
