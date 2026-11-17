@@ -1,5 +1,5 @@
 name = "lane_l3"
-description = "Runs one delegated task at lane L3. Open investigation or bounded uncertain design with unresolved alternatives."
+description = "Runs one delegated task at lane L3. Open investigation or bounded uncertain design."
 model = "gpt-6.1-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
