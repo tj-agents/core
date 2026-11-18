@@ -50,6 +50,8 @@ The `skills` operation defaults lifecycle names to `.agents/skills/<name>/SKILL.
 
 Resolve when lifecycle discovery uses the canonical scope/kind layout and regression coverage proves `skills --lifecycle feature` records the shipped owner in both source and installed package layouts.
 
+Current repair owner: B006 in BUGS.md and plans/workflow-skill-identities/GOAL.md, branch Fix/ExternalWorkflowSkillIdentities. The selected source/installed resolver is checkpointed at7b5d417 but parent acceptance correction and complete consumer/descriptor verification remain outstanding. Retain this entry until its original source-and-installed resolution condition and source delivery are verified.
+
 ## Codex keeps a merge-cleanup obligation after a failed merge
 
 `merge_cleanup_gate.py` records its obligation at PreToolUse, before `gh pr merge` runs. Claude reports a

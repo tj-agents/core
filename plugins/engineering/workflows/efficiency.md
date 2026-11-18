@@ -30,7 +30,7 @@ and plan scope was implicit.
 | Unchanged remote state | Repeated model turns and polls | Zero model wakes |
 | One remote wait | Foreground watcher plus poll calls | One exact-identity monitor and one terminal or transition wake |
 | Small candidate review | Up to four waves and 14 agents | One wave with native review and only relevant lenses |
-| Skill resolution | Repeated full-body reads | One lifecycle identity plus directly routed technical identities, cached by content hash |
+| Skill resolution | Repeated full-body reads | One lifecycle identity plus directly routed technical identities, cached by complete source identity and raw body hash |
 | Delivery readiness | Many model-orchestrated reads | One `delivery-preflight` result plus bounded forge state |
 
 The monitor writes repository, worktree, branch, head, target kind and ID, workflow, and attempt before its
@@ -44,10 +44,12 @@ and the artifact path. It never returns successful test, migration, build, gener
 full. Both harness hook registrations route those commands through the same shared implementation.
 
 Review preparation synchronizes once immediately before final review and freezes an exact-head descriptor,
-binary patch, path set, materialized Git tree, identity manifest, routed rule hashes, and selected lenses.
-The helper verifies those identities before reconciliation. Base-only movement requires another source review
-only when candidate paths or routed rules overlap the new evidence. A changed candidate head always requires
-review; the merge-group run remains the authority for the combined tree.
+binary patch, path set, materialized Git tree, identity manifest, routed local rules, installed rule
+identities, and selected lenses. Installed identities include the enabled host inventory and exact raw
+manifest, entry, and canonical-body hashes; a later change requires a fresh review run. The helper verifies
+those identities before reconciliation. Base-only movement requires another source review only when candidate
+paths or routed local rules overlap the new evidence. A changed candidate head always requires review; the
+merge-group run remains the authority for the combined tree.
 
 Every `## Next Steps` block states `Scope`, `Current slice`, `Remaining scope`, and `Done when`. The scope must
 say either `whole plan through all remaining phases and terminal delivery` or `current slice only; full plan

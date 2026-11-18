@@ -47,7 +47,7 @@ shared deterministic review preparation operation:
 Run these Python workflow commands with `python` on Windows or `python3` on Linux/macOS:
 
 ```bash
-python <engineering>/workflows/workflow_ops.py --root <repository-root> --workflow-run-id <id> review-prepare --base <actual-base> --head HEAD --synchronize
+python <engineering>/workflows/workflow_ops.py --root <repository-root> --workflow-run-id <id> review-prepare --base <actual-base> --head HEAD --synchronize --host <codex|claude>
 ```
 
 Use the same resolved actual base for preparation, reconciliation and PR preflight. A stack child's
@@ -137,11 +137,13 @@ route-table defect rather than a list to duplicate here. If the candidate contai
 implementation-ready design references, load plans and apply its implementation-design review gate to
 those artifacts, including their implementation-path standards.
 
-Record the owning `review` lifecycle and the helper's routed technical rule identities with
-`<engineering>/workflows/workflow_ops.py skills`. Read only identities returned as `load`; an unchanged
-identity returned as `cached` is already available to this logical workflow and is not reread after
-compaction. The descriptor's hashes prove whether a cached body still matches the frozen candidate. Check
-every changed file against each routed rule; a changed or missing hash requires a new body read.
+Record `engineering:review` and the helper's routed technical rule identities with
+`<engineering>/workflows/workflow_ops.py skills --host <codex|claude> --descriptor <descriptor-path>`.
+Read only identities returned as `load`; an unchanged identity returned as `cached` is already available to
+this logical workflow and is not reread after compaction. The descriptor pins installed identities and
+canonical body hashes, so load reads the returned canonical body path rather than copying a body into the
+candidate tree. Check every changed file against each routed rule; a changed or missing hash requires a new
+body read.
 
 ## Stage 5 — choose and dispatch fresh lenses
 
