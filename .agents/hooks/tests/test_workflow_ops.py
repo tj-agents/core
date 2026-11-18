@@ -706,10 +706,12 @@ class ReviewTests(RepositoryFixture):
 
     def test_incremental_review_with_unchanged_trunk_preserves_review(self):
         descriptor = self.incremental_descriptor()
-        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
-        self.assertFalse(result["review_required"])
-        self.assertFalse(result["base_moved"])
-        self.assertTrue(result["exact_head"])
+        for target in ("origin/main", "refs/remotes/origin/main", "main", "refs/heads/main"):
+            with self.subTest(target=target):
+                result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], target)
+                self.assertFalse(result["review_required"])
+                self.assertFalse(result["base_moved"])
+                self.assertTrue(result["exact_head"])
 
     def test_incremental_review_with_disjoint_trunk_movement_preserves_delivery(self):
         descriptor = self.incremental_descriptor()
@@ -747,7 +749,8 @@ class ReviewTests(RepositoryFixture):
         with mock.patch.object(ops, "trunk_range", return_value=(None, [])):
             descriptor = self.incremental_descriptor()
         result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
-        self.assertEqual(["base-changed-relevant-evidence"], result["reasons"])
+        self.assertIn("upstream-baseline-unverified", result["reasons"])
+        self.assertIn("base-changed-relevant-evidence", result["reasons"])
 
     def test_incremental_review_with_nonancestral_trunk_base_remains_conservative(self):
         tree = self.git("rev-parse", f"{self.base}^{{tree}}")
@@ -755,6 +758,68 @@ class ReviewTests(RepositoryFixture):
         with mock.patch.object(ops, "trunk_range", return_value=(unrelated, [])):
             descriptor = self.incremental_descriptor()
         result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+        self.assertIn("upstream-baseline-unverified", result["reasons"])
+        self.assertIn("base-changed-relevant-evidence", result["reasons"])
+
+    def test_incremental_review_new_file_without_trunk_evidence_requires_review(self):
+        tree = self.git("rev-parse", f"{self.base}^{{tree}}")
+        unrelated = self.git("commit-tree", tree, "-m", "unrelated history")
+        watermark = self.head
+        self.commit("src/new.txt", "new\n", "new incremental file")
+        for baseline in (None, unrelated):
+            with self.subTest(baseline=baseline):
+                with mock.patch.object(ops, "trunk_range", return_value=(baseline, [])):
+                    descriptor = ops.review_prepare(self.root, str(baseline), watermark, "HEAD", False)
+                result = ops.review_reconcile(self.root, str(baseline), descriptor["artifact"], "origin/main")
+                self.assertEqual(["upstream-baseline-unverified"], result["reasons"])
+
+    def test_incremental_review_raw_sha_and_branch_alias_do_not_use_trunk_fallback(self):
+        descriptor = self.incremental_descriptor()
+        self.git("branch", "trunk-alias", self.base)
+        for target in (self.base, "trunk-alias", "origin/main^0"):
+            with self.subTest(target=target):
+                result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], target)
+                self.assertEqual(["base-changed-relevant-evidence"], result["reasons"])
+                self.assertTrue(result["base_moved"])
+
+    def stack_mapping_descriptor(self):
+        self.git("branch", "stack-parent", self.head)
+        self.commit("src/mapping.txt", "child mapping\n", "stack child")
+        return ops.review_prepare(self.root, "run-1", "stack-parent", "HEAD", False)
+
+    def test_stack_review_parent_rollback_to_trunk_requires_review(self):
+        descriptor = self.stack_mapping_descriptor()
+        self.git("update-ref", "refs/heads/stack-parent", self.base)
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "stack-parent")
+        self.assertEqual(["base-changed-relevant-evidence"], result["reasons"])
+        self.assertTrue(result["base_moved"])
+
+    def test_stack_review_divergent_parent_rewrite_requires_review(self):
+        descriptor = self.stack_mapping_descriptor()
+        tree = self.git("rev-parse", f"{self.base}^{{tree}}")
+        rewritten = self.git("commit-tree", tree, "-p", self.base, "-m", "rewritten parent")
+        self.git("update-ref", "refs/heads/stack-parent", rewritten)
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "stack-parent")
+        self.assertEqual(["base-changed-relevant-evidence"], result["reasons"])
+
+    def test_stack_review_unchanged_parent_preserves_review(self):
+        descriptor = self.stack_mapping_descriptor()
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "stack-parent")
+        self.assertFalse(result["review_required"])
+        self.assertFalse(result["base_moved"])
+
+    def test_stack_review_advanced_parent_preserves_disjoint_and_invalidates_relevant_change(self):
+        descriptor = self.stack_mapping_descriptor()
+        self.git("switch", "-q", "stack-parent")
+        self.commit("src/unrelated.txt", "upstream\n", "disjoint parent change")
+        self.git("switch", "-q", "Feature/Workflow-ops")
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "stack-parent")
+        self.assertFalse(result["review_required"])
+        self.assertTrue(result["base_moved"])
+        self.git("switch", "-q", "stack-parent")
+        self.commit("src/mapping.txt", "parent change\n", "relevant parent change")
+        self.git("switch", "-q", "Feature/Workflow-ops")
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "stack-parent")
         self.assertEqual(["base-changed-relevant-evidence"], result["reasons"])
 
     def test_full_review_with_relevant_trunk_movement_requires_review(self):
