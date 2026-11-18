@@ -70,7 +70,8 @@ class PayloadTree(unittest.TestCase):
         self.payload("dotnet")
         self.assertEqual(checker.check(self.root), [])
 
-    def dependencies(self, payload, manifest_dependencies, harness_plugins):
+    @staticmethod
+    def dependencies(payload, manifest_dependencies, harness_plugins):
         (payload / ".claude-plugin").mkdir(exist_ok=True)
         manifest = {"name": payload.name}
         if manifest_dependencies is not None:
