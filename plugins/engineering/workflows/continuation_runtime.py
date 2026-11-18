@@ -85,9 +85,9 @@ def alive(record):
 
 
 @contextlib.contextmanager
-def locked(directory):
-    directory.mkdir(parents=True, exist_ok=True)
-    with (directory / "owner.lock").open("a+b") as stream:
+def locked_file(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+b") as stream:
         stream.seek(0)
         if os.name == "nt":
             import msvcrt
@@ -115,6 +115,100 @@ def locked(directory):
                 msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
             else:
                 fcntl.flock(stream, fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
+def locked(directory):
+    with locked_file(directory / "owner.lock") as acquired:
+        yield acquired
+
+
+def canonical_worktree(path):
+    root = Path(path).resolve()
+    if not root.is_dir() or Path(git(root, "rev-parse", "--show-toplevel")).resolve() != root:
+        raise Gate("canonical-worktree-root-required")
+    return root
+
+
+def canonical_owner(path):
+    owner_path = Path(path).resolve()
+    if owner_path.name != "owner.json" or len(owner_path.parents) < 3:
+        raise Gate("canonical-owner-path-required")
+    root = canonical_worktree(owner_path.parents[2])
+    if owner_path != root / ".agents" / "continuation" / "owner.json":
+        raise Gate("canonical-owner-path-required")
+    return root, owner_path
+
+
+def association_hash(value):
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def session_locator(native_root, session_id):
+    return native_root / ".agents" / "continuation" / "sessions" / f"{association_hash(session_id)}.json"
+
+
+def association_record(owner, owner_path, native_root, session_id):
+    foreground = owner.get("foreground")
+    if owner.get("state") != "working" or not isinstance(foreground, dict):
+        raise Gate("association-owner-not-working")
+    token = foreground.get("token")
+    pid = foreground.get("pid")
+    identity_value = foreground.get("identity")
+    if not isinstance(token, str) or not token or not isinstance(pid, int) or not isinstance(identity_value, str):
+        raise Gate("association-foreground-invalid")
+    if not alive(foreground):
+        raise Gate("association-foreground-not-live")
+    if any(record and alive(record) for record in writer_records(owner)):
+        raise Gate("association-competing-child")
+    return {
+        "version": 1,
+        "session_id_hash": association_hash(session_id),
+        "native_cwd": str(native_root),
+        "owner_id": owner["owner_id"],
+        "owner_path": str(owner_path),
+        "repo": owner["repo"],
+        "worktree": owner["worktree"],
+        "branch": owner["branch"],
+        "head": owner["head"],
+        "goal": owner["goal"],
+        "pid": pid,
+        "identity": identity_value,
+        "generation": association_hash(token),
+    }
+
+
+def associate_session(args):
+    if not args.owner or not args.session_id or not args.token:
+        raise Gate("association-owner-session-and-token-required")
+    native_root = canonical_worktree(args.session_cwd)
+    owner_root, owner_path = canonical_owner(args.owner)
+    locator = session_locator(native_root, args.session_id)
+    with locked_file(locator.parent / "index.lock") as index_locked:
+        if not index_locked:
+            raise Gate("association-index-lock-busy")
+        with locked(owner_path.parent) as owner_locked:
+            if not owner_locked:
+                raise Gate("association-owner-lock-busy")
+            owner = read(owner_path)
+            check_identity(owner)
+            record = association_record(owner, owner_path, native_root, args.session_id)
+            if args.token != owner["foreground"]["token"]:
+                raise Gate("association-foreground-token-invalid")
+            owner_record = owner.get("session_association")
+            locator_record = read(locator) if locator.exists() else None
+            if owner_record is not None and owner_record != record:
+                raise Gate("association-owner-conflict")
+            expected_locator = {"version": 1, "native_cwd": str(native_root),
+                                "session_id_hash": association_hash(args.session_id), "controller": record}
+            if locator_record is not None and locator_record != expected_locator:
+                raise Gate("association-locator-conflict")
+            atomic_json(locator, expected_locator)
+            owner["session_association"] = record
+            save(owner_path, owner, "associate-session")
+            if read(locator) != expected_locator or read(owner_path).get("session_association") != record:
+                raise Gate("association-readback-failed")
+    return {"owner": str(owner_path), "session": record["session_id_hash"], "native_cwd": str(native_root)}
 
 
 def save(path, state, event):
@@ -570,7 +664,7 @@ def operate(path, state, args):
 def parser():
     result = argparse.ArgumentParser()
     subs = result.add_subparsers(dest="operation", required=True)
-    for name in ("init", "claim", "heartbeat", "yield", "checkpoint", "status", "wake", "_child"):
+    for name in ("init", "claim", "heartbeat", "yield", "checkpoint", "status", "wake", "associate-session", "_child"):
         p = subs.add_parser(name)
         p.add_argument("--root")
         p.add_argument("--owner")
@@ -587,6 +681,10 @@ def parser():
                 p.add_argument(f"--{flag}", type=kind, default=default)
         if name == "claim":
             p.add_argument("--pid", type=int)
+        if name == "associate-session":
+            p.add_argument("--token", required=True)
+            p.add_argument("--session-id", required=True)
+            p.add_argument("--session-cwd", required=True)
         if name in {"heartbeat", "yield", "checkpoint"}:
             p.add_argument("--token", required=True)
             p.add_argument("--reason", default="")
@@ -606,6 +704,9 @@ def main(argv=None):
     args = parser().parse_args(argv)
     if args.operation == "_child":
         return child(args)
+    if args.operation == "associate-session":
+        print(json.dumps(associate_session(args), sort_keys=True))
+        return 0
     if not args.root and not args.owner:
         raise Gate("root-or-owner-required")
     path = Path(args.owner).resolve() if args.owner else Path(args.root).resolve() / ".agents/continuation/owner.json"
