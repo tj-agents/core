@@ -63,4 +63,7 @@ Generated from canonical `.agents/` definitions.
 - `worktree` — utility — `.agents/engineering/utility/worktree/SKILL.md`
 - `write-bug` — convention — `.agents/engineering/convention/write-bug/SKILL.md`
 - `write-debt` — convention — `.agents/engineering/convention/write-debt/SKILL.md`
+- `write-feature` — convention — `.agents/engineering/convention/write-feature/SKILL.md`
+- `write-issue` — convention — `.agents/engineering/convention/write-issue/SKILL.md`
 - `write-mistake` — convention — `.agents/engineering/convention/write-mistake/SKILL.md`
+- `write-task` — convention — `.agents/engineering/convention/write-task/SKILL.md`
