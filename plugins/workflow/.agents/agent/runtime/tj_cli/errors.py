@@ -1,2 +1,0 @@
-class TjCliError(Exception):
-    pass
