@@ -2,6 +2,6 @@
 
 Generated from canonical `.agents/` definitions.
 
-- `design` — convention — `.agents/docs/convention/design/SKILL.md`
-- `diagram` — convention — `.agents/docs/convention/diagram/SKILL.md`
-- `layout` — convention — `.agents/docs/convention/layout/SKILL.md`
+- `design` — standard — `.agents/docs/skills/design/SKILL.md`
+- `diagram` — standard — `.agents/docs/skills/diagram/SKILL.md`
+- `layout` — standard — `.agents/docs/skills/layout/SKILL.md`
