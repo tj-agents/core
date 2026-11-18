@@ -125,8 +125,8 @@ def remote_default(checkout: Checkout) -> str | None:
     return None
 
 
-def default_branch(checkout: Checkout) -> str | None:
-    remote = remote_default(checkout)
+def default_branch(checkout: Checkout, *, reachable: bool = True) -> str | None:
+    remote = remote_default(checkout) if reachable else None
     if remote and checkout.succeeds(
         "rev-parse", "--verify", "--quiet", f"refs/remotes/{REMOTE}/{remote}"
     ):
@@ -257,7 +257,7 @@ def report(state: Fetched | None) -> str:
     if state is None:
         return ""
     checkout = state.checkout
-    default = default_branch(checkout)
+    default = default_branch(checkout, reachable=not state.failure)
     lines = []
     if state.failure:
         compared = f"compared with the last fetched {REMOTE}/{default}"
