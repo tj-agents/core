@@ -36,6 +36,6 @@ unavailable, continue independent authorized work in the foreground and retain i
 observable resume condition under `workflow:run`.
 
 Use the selected discipline's existing completion and delivery contract when one applies. Software remote
-delivery uses `engineering:persistent-delivery` for PR identity, completion evidence, repair, review and
-merge authority, including its Codex durable CLI transport. Other goals use their own acceptance evidence;
+delivery reads `references/delivery.md` beside the selected `engineering:merge` entry for PR identity,
+completion evidence, repair, review and merge authority. That package also supplies the Codex CLI transport. Other goals use their own acceptance evidence;
 they do not acquire a PR requirement by selecting this skill.

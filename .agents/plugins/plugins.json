@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:5b24268610a53466e03b699c2f7d6a354892afeeaa640d5eabbf5a325867d6bf",
+      "digest": "sha256:21e235aa211ea939a8c38af71f56b391ad8868c0e3dbd1654706d6e8bcdbe24d",
       "harness": {
         "marketplaces": [
           {
@@ -100,7 +100,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:f6126fdbc05056713f56648f5774e5d6423068fc0527af98b14a229516371e8d",
+      "digest": "sha256:7faeca644dec165573393ad0145813712f913c26062a9f767c632c427ae44b0c",
       "harness": {
         "marketplaces": [
           {
@@ -230,7 +230,6 @@
         "merging",
         "open-pr",
         "open-worktree",
-        "persistent-delivery",
         "plans",
         "pr-preflight",
         "pr-screenshots",
@@ -272,7 +271,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:f6a144a71c690383788aab752e7d8682fa0ef4d82e677adb7ca6b4291ba56fc6",
+      "digest": "sha256:63cf738434fb44ca9ee1bc7d89e70433ceb090ab18f5e03a0e886e9295244e3a",
       "harness": {
         "marketplaces": [
           {

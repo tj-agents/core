@@ -26,7 +26,7 @@ covered: not another repository, not a PR the goal did not create, and never pub
 ## Persistent continuation
 
 When a queue, check, publication, or generated sync will resolve after this turn, enter the current harness's
-`engineering:persistent-delivery` contract and `workflow:continue`. The delivery contract binds this exact
+`workflow:continue` skill. Its software delivery reference beside `engineering:merge` binds this exact
 PR/head/worktree; the continuation selects the native
 continuation mechanism. That owner classifies a real failure by test tier, dispatches its corresponding debug
 skill in a fresh context, rebinds after a push, obtains the required review, and reaches merge under the

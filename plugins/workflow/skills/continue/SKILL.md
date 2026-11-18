@@ -23,5 +23,5 @@ A local loop does not prove execution after session exit. Continue independent f
 required native surface is unavailable. Do not initialize an external supervisor or system scheduler for
 Claude. Reconcile exact existing external registrations before claiming their native migration complete.
 
-Software delivery additionally loads `engineering:persistent-delivery` for its existing PR and authority
-contract. Other goals retain their own acceptance criteria.
+Software delivery reads `references/delivery.md` beside the selected `engineering:merge` entry for its
+PR and authority contract. Other goals retain their own acceptance criteria.
