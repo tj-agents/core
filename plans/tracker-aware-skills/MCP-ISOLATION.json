@@ -1,0 +1,1481 @@
+{
+  "observed_on": "2026-10-19",
+  "status": "applied",
+  "targets": [
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\agent-starter-kit",
+      "repository": "tomjseery/agent-starter-kit",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/agent-starter-kit"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\agent-utilities",
+      "repository": "tomjseery/agent-utilities",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/agent-utilities"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\agent-workboard",
+      "repository": "tomjseery/agent-workboard",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/agent-workboard"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\base-agents",
+      "repository": "tj-agents/core",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/base-agents"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\career",
+      "repository": "tomjseery/career",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/career"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\agents",
+      "repository": "Concertable/agents",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/agents"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\auth",
+      "repository": "Concertable/auth",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/auth"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\b2b",
+      "repository": "Concertable/b2b",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/b2b"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\config",
+      "repository": "Concertable/config",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/config"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\customer",
+      "repository": "Concertable/customer",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/customer"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\docs",
+      "repository": "Concertable/docs",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/docs"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\infra",
+      "repository": "Concertable/infra",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/infra"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\payment",
+      "repository": "Concertable/payment",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/payment"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\pipeline",
+      "repository": "Concertable/pipeline",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/pipeline"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\platform-dotnet",
+      "repository": "Concertable/platform-dotnet",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/platform-dotnet"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\platform-frontend",
+      "repository": "Concertable/platform-frontend",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/platform-frontend"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\search",
+      "repository": "Concertable/search",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/search"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\system",
+      "repository": "Concertable/system",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/system"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\cpp",
+      "repository": "tomjseery/cpp",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/cpp"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\cpp\\windows\\sandbox-hwid",
+      "repository": "tomjseery/sandbox-hwid",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/cpp/windows/sandbox-hwid"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\cpp\\windows\\winwrap",
+      "repository": "tomjseery/winwrap",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/cpp/windows/winwrap",
+          "c:/Users/TommySeery/source/repos/cpp/windows/winwrap"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\cpp-agents",
+      "repository": "tj-agents/cpp",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/cpp-agents"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\marketplace-car-hunter",
+      "repository": "tomjseery/marketplace-car-hunter",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/marketplace-car-hunter"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\onsite-sealants",
+      "repository": "tomjseery/onsite-sealants",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/onsite-sealants"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Reunion",
+      "repository": "tomjseery/Reunion",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Reunion"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\sandbox-azure",
+      "repository": "tomjseery/sandbox-azure",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/sandbox-azure"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\sandbox-dotnet",
+      "repository": "tomjseery/sandbox-dotnet",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/sandbox-dotnet"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\termboard",
+      "repository": "tomjseery/termboard",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/termboard"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\azure",
+      "repository": "tj-agents/azure",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/azure"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\cli",
+      "repository": "tj-agents/cli",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/cli"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\core",
+      "repository": "tj-agents/core",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\core\\.worktrees\\Feature-TrackerAwareSkills",
+      "repository": "tj-agents/core",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\core-incremental-review-reconciliation",
+      "repository": "tj-agents/core",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/core-incremental-review-reconciliation"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\core-transferred-cleanup-obligation",
+      "repository": "tj-agents/core",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/core-transferred-cleanup-obligation"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\cpp",
+      "repository": "tj-agents/cpp",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/cpp"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\cpp-selection-profiles",
+      "repository": "tj-agents/cpp",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/cpp",
+          "C:/Users/TommySeery/source/repos/tj-agents/cpp-selection-profiles"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\docs",
+      "repository": "tj-agents/docs",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/docs"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\dotnet",
+      "repository": "tj-agents/dotnet",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/dotnet"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\github-actions",
+      "repository": "tj-agents/github-actions",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/github-actions"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "repository": "tj-agents/company",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/company"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\marketplace",
+      "repository": "tj-agents/marketplace",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/marketplace"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\nvim",
+      "repository": "tj-agents/nvim",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/nvim"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\personal.worktrees\\Feature-AzureWorkItems",
+      "repository": "tj-agents/personal",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\python",
+      "repository": "tj-agents/python",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/python"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\react",
+      "repository": "tj-agents/react",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/react"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\rust",
+      "repository": "tj-agents/rust",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/rust"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\template",
+      "repository": "tj-agents/template",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/template"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\work",
+      "repository": "tj-agents/work",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/work"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\work-items",
+      "repository": "tj-agents/work-items",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/work-items"
+        ],
+        "ready": false
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tomjseery",
+      "repository": "tomjseery/tomjseery",
+      "preview": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "preview",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tomjseery"
+        ],
+        "ready": false
+      }
+    }
+  ],
+  "baseline_backup": "C:\\Users\\TommySeery\\.claude\\backups\\personal-project-isolation\\e591358de82c5560cd25b161284c55e0492f85bfdebb02eef09006db43612c97.json",
+  "applied": [
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\agent-starter-kit",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\agent-utilities",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\agent-workboard",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\base-agents",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\career",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\agents",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\auth",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\b2b",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\config",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\customer",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\docs",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\infra",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\payment",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/payment"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\pipeline",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/pipeline"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\platform-dotnet",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/platform-dotnet"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\platform-frontend",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/platform-frontend"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\search",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/search"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Concertable\\system",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Concertable/system"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\cpp",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/cpp"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\cpp\\windows\\sandbox-hwid",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/cpp/windows/sandbox-hwid"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\cpp\\windows\\winwrap",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/cpp/windows/winwrap",
+          "c:/Users/TommySeery/source/repos/cpp/windows/winwrap"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\cpp-agents",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/cpp-agents"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\marketplace-car-hunter",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/marketplace-car-hunter"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\onsite-sealants",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/onsite-sealants"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\Reunion",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/Reunion"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\sandbox-azure",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/sandbox-azure"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\sandbox-dotnet",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/sandbox-dotnet"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\termboard",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/termboard"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\azure",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/azure"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\cli",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/cli"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\core",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\core\\.worktrees\\Feature-TrackerAwareSkills",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\core-incremental-review-reconciliation",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/core-incremental-review-reconciliation"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\core-transferred-cleanup-obligation",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/core-transferred-cleanup-obligation"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\cpp",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/cpp"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\cpp-selection-profiles",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/cpp-selection-profiles"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\docs",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/docs"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\dotnet",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/dotnet"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\github-actions",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/github-actions"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/company"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\marketplace",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/marketplace"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\nvim",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/nvim"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\personal.worktrees\\Feature-AzureWorkItems",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\python",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/python"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\react",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/react"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\rust",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/rust"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\template",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/template"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\work",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/work"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\work-items",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tj-agents/work-items"
+        ],
+        "ready": true
+      }
+    },
+    {
+      "root": "C:\\Users\\TommySeery\\source\\repos\\tomjseery",
+      "status": "applied_or_current",
+      "result": {
+        "disabled_servers": [
+          "azure-devops",
+          "azure"
+        ],
+        "mode": "write",
+        "project_scopes": [
+          "C:/Users/TommySeery/source/repos/tomjseery"
+        ],
+        "ready": true
+      }
+    }
+  ],
+  "global_mcp_unchanged": true,
+  "employer_project_settings_unchanged": true,
+  "unrelated_concurrent_usage_keys_changed": [
+    "pluginUsage",
+    "skillUsage"
+  ],
+  "verified_scope_count": 50
+}

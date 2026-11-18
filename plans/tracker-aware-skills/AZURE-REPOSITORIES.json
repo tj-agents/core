@@ -1,0 +1,538 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-10-19",
+  "status": "layout_approved_waiting_for_organization",
+  "organization": null,
+  "policy": "Approved product-based projects in one personal Azure organization: Concertable and TjAgents each share a project/default-team board across their related repositories. Each independent repository under tomjseery has its own project/board by default. Personal is ownership scope only, never a catch-all project or board. Group further repositories only with established product identity or explicit direction. No queue adoption/cutover until the live pilot and migration-owner coordination; archived repos are mapped without automatic activation.",
+  "repositories": [
+    {
+      "repository": "Concertable/agents",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/auth",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/b2b",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/concertable",
+      "azure_project": "Concertable",
+      "archived": true,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/config",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/customer",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/docs",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/infra",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/payment",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/pipeline",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/platform-dotnet",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/platform-frontend",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/search",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/system",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "Concertable/workflow-fixture",
+      "azure_project": "Concertable",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/azure",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/cli",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/core",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/cpp",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/docs",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/dotnet",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/github-actions",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/company",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/marketplace",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/nvim",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/personal",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/python",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/react",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/rust",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/template",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/work",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tj-agents/work-items",
+      "azure_project": "TjAgents",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/agent-starter-kit",
+      "azure_project": "tomjseery-agent-starter-kit",
+      "archived": true,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/agent-tweaks",
+      "azure_project": "tomjseery-agent-tweaks",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/agent-utilities",
+      "azure_project": "tomjseery-agent-utilities",
+      "archived": true,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/agent-workboard",
+      "azure_project": "tomjseery-agent-workboard",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/career",
+      "azure_project": "tomjseery-career",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/computer-peripherals-store",
+      "azure_project": "tomjseery-computer-peripherals-store",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/concertable-app",
+      "azure_project": "tomjseery-concertable-app",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/cpp",
+      "azure_project": "tomjseery-cpp",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/dotfiles",
+      "azure_project": "tomjseery-dotfiles",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/fashion-mnist-cnn",
+      "azure_project": "tomjseery-fashion-mnist-cnn",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/haskell-exercises",
+      "azure_project": "tomjseery-haskell-exercises",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/icon-dropper",
+      "azure_project": "tomjseery-icon-dropper",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/images",
+      "azure_project": "tomjseery-images",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/java-ann",
+      "azure_project": "tomjseery-java-ann",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/lcd-channel-monitor",
+      "azure_project": "tomjseery-lcd-channel-monitor",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/marketplace-car-hunter",
+      "azure_project": "tomjseery-marketplace-car-hunter",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/meditation-app",
+      "azure_project": "tomjseery-meditation-app",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/mlp-image-classification",
+      "azure_project": "tomjseery-mlp-image-classification",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/multi-armed-bandit-simulation",
+      "azure_project": "tomjseery-multi-armed-bandit-simulation",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/note-cli",
+      "azure_project": "tomjseery-note-cli",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/onsite-sealants",
+      "azure_project": "tomjseery-onsite-sealants",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/Reunion",
+      "azure_project": "tomjseery-Reunion",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/sandbox-azure",
+      "azure_project": "tomjseery-sandbox-azure",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/sandbox-dotnet",
+      "azure_project": "tomjseery-sandbox-dotnet",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/sandbox-hwid",
+      "azure_project": "tomjseery-sandbox-hwid",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/skinet",
+      "azure_project": "tomjseery-skinet",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/termboard",
+      "azure_project": "tomjseery-termboard",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/tomjseery",
+      "azure_project": "tomjseery-tomjseery",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/vscode-config",
+      "azure_project": "tomjseery-vscode-config",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/wedding-venue-finder",
+      "azure_project": "tomjseery-wedding-venue-finder",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/wifi-toggle",
+      "azure_project": "tomjseery-wifi-toggle",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/windows-agents",
+      "azure_project": "tomjseery-windows-agents",
+      "archived": true,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/windows-dotfiles",
+      "azure_project": "tomjseery-windows-dotfiles",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    },
+    {
+      "repository": "tomjseery/winwrap",
+      "azure_project": "tomjseery-winwrap",
+      "archived": false,
+      "provisioning": "pending_confirmed_personal_organization",
+      "adoption": "not_selected_by_inventory",
+      "board_scope": "Product project/default-team board; independent apps remain separate. Verify actual backlog/type visibility during live provisioning."
+    }
+  ],
+  "layout_approved_on": "2026-10-19"
+}

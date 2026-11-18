@@ -41,7 +41,7 @@ maintained.
 - **A doc is either imported or summarized, never both.** An import already loads the body, so a summary
   beside it is the second copy.
 - **Never name violation sites in a rule doc.** They get fixed and the citation rots — silently, because
-  nothing checks it. Violations belong in the tech-debt file that owns them, recorded under `write-debt`.
+  nothing checks it. Record violations through `engineering:write-debt` in its selected destination.
 - **Never cite a transient artifact** — a plan filename, a phase number, a ticket — from a durable doc. The
   reference is engineered to dangle.
 - **Check the code before writing the rule down.** Rules that teach what the codebase has already moved past

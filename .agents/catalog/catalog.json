@@ -204,7 +204,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:afa89b78733bbd52251a37332981a123c6a543dde0438b0987d9572f5924294f",
+      "digest": "sha256:cbbfd39217d7dbf8b0790e3eea1c17825e20e3982a61236c0fd6718e7b771bac",
       "harness": {
         "marketplaces": [
           {
