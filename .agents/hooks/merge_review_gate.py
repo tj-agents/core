@@ -568,30 +568,13 @@ def main():
     slug = branch.replace("/", "-")
     review_path = toplevel + "/reviews/" + slug + ".md"
 
-    review = None
-    if target:
-        for ref in (branch, head):
-            try:
-                git("fetch", "origin", ref)
-                break
-            except Exception:  # noqa: BLE001 - deleted branch / unfetchable oid; try the next
-                continue
-        try:
-            review = git("show", head + ":reviews/" + slug + ".md")
-        except Exception:  # noqa: BLE001 - fall through to the working tree
-            review = None
-    if review is None:
-        try:
-            with open(review_path, encoding="utf-8") as fh:
-                review = fh.read()
-        except OSError:
-            review = None
-    if review is None:
+    try:
+        with open(review_path, encoding="utf-8") as fh:
+            review = fh.read()
+    except OSError:
         block(
-            "MERGE GATE (AGENTS.md — review before merge): no review file for "
-            "branch '" + branch + "' at reviews/" + slug + ".md. Run /review "
-            "(or /docs-review for a docs-only branch) and address findings, THEN "
-            "merge. Do NOT merge unreviewed."
+            "MERGE GATE: no local review evidence for branch '" + branch
+            + "' at reviews/" + slug + ".md. Run /review and address findings before merging."
         )
 
     completion_problem = review_completion_problem(review)
@@ -606,8 +589,7 @@ def main():
         block("MERGE GATE: reviews/" + slug + ".md has no unique valid "
               "`Reviewed up to commit:` marker. Re-run /review to stamp it, then merge.")
 
-    if not (head.lower().startswith(reviewed) or reviewed.startswith(head.lower())) \
-            and not review_only(reviewed, head):
+    if not (head.lower().startswith(reviewed) or reviewed.startswith(head.lower())):
         block(
             "MERGE GATE: review is STALE — reviews/" + slug + ".md is stamped at "
             + reviewed + " but HEAD is " + head[:12] + ". Commits landed since the "
@@ -638,7 +620,7 @@ def main():
             )
         if not (head.lower().startswith(sreviewed) or sreviewed.startswith(head.lower())) \
                 and security_no_longer_covered(
-                    sreviewed, head, patterns, "reviews/" + slug + ".md"
+                    sreviewed, head, patterns
                 ):
             block(
                 "MERGE GATE (security layer): security review is STALE — reviews/" + slug + ".md "
