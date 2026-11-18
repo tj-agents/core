@@ -36,6 +36,17 @@ class SyncError(Exception):
     """A Codex standards refresh step failed; the message is the whole report."""
 
 
+def is_recoverable_cache_refresh_failure(error):
+    details = str(error).casefold()
+    return (
+        'plugin marketplace upgrade --json' in details
+        and 'failed to refresh plugin cache' in details
+        and 'failed to back up plugin cache entry' in details
+        and 'access is denied' in details
+        and 'os error 5' in details
+    )
+
+
 def _load_agent_cli():
     path = HERE / 'agent_cli.py'
     if not path.is_file():
@@ -162,8 +173,25 @@ def sync_codex_standards(codex_executable, working_directory, out=print, run=sub
             snapshot = Path(scratch) / 'codex_hook_trust.py'
             shutil.copyfile(helper, snapshot)
 
-            upgrade = invoke_codex_sync_command(codex_executable, ['plugin', 'marketplace', 'upgrade', '--json'],
-                                                 cwd=resolved, run=run, timeout=MARKETPLACE_TIMEOUT_SECONDS)
+            try:
+                upgrade = invoke_codex_sync_command(
+                    codex_executable,
+                    ['plugin', 'marketplace', 'upgrade', '--json'],
+                    cwd=resolved,
+                    run=run,
+                    timeout=MARKETPLACE_TIMEOUT_SECONDS,
+                )
+            except SyncError as error:
+                if not is_recoverable_cache_refresh_failure(error):
+                    raise
+                out('Codex plugin cache refresh was denied; retrying marketplace upgrade once.')
+                upgrade = invoke_codex_sync_command(
+                    codex_executable,
+                    ['plugin', 'marketplace', 'upgrade', '--json'],
+                    cwd=resolved,
+                    run=run,
+                    timeout=MARKETPLACE_TIMEOUT_SECONDS,
+                )
             errors = upgrade.get('errors') or []
             if errors:
                 raise SyncError(f'Codex marketplace upgrade failed: {json.dumps(errors)}')
