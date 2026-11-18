@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -360,21 +361,50 @@ class ContinuationTests(unittest.TestCase):
                 process_identity.assert_not_called()
         self.assertEqual(before, self.state())
 
-    def test_claim_pins_a_valid_host_executable_after_foreground_validation(self):
-        executable = self.root / "codex.exe"
-        executable.touch()
-        state = self.state()
-        args = SimpleNamespace(operation="claim", pid=os.getpid(), host_executable=str(executable))
-        runtime.operate(self.owner, state, args)
-        self.assertEqual(str(executable), state["host_executable"])
-        self.assertEqual(os.getpid(), state["foreground"]["pid"])
+    def test_claim_pins_a_valid_host_executable_for_each_platform(self):
+        baseline = self.state()
+        for windows, name in ((True, "codex.exe"), (False, "codex")):
+            with self.subTest(windows=windows):
+                executable = self.root / name
+                executable.touch()
+                if not windows:
+                    executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
+                state = json.loads(json.dumps(baseline))
+                args = SimpleNamespace(operation="claim", pid=os.getpid(), host_executable=str(executable))
+                runtime.operate(self.owner, state, args, windows=windows)
+                self.assertEqual(str(executable), state["host_executable"])
+                self.assertEqual(os.getpid(), state["foreground"]["pid"])
 
-    def test_claim_rejects_invalid_host_executable_without_mutating_owner(self):
+    def test_claim_rejects_invalid_host_executable_without_mutating_owner_on_each_platform(self):
+        windows_wrapper = self.root / "codex.cmd"
+        windows_wrapper.touch()
         state = self.state()
         before = dict(state)
-        args = SimpleNamespace(operation="claim", pid=os.getpid(), host_executable=str(self.root / "codex.cmd"))
+        args = SimpleNamespace(operation="claim", pid=os.getpid(), host_executable=str(windows_wrapper))
         with self.assertRaisesRegex(runtime.Gate, "foreground-host-executable-invalid"):
-            runtime.operate(self.owner, state, args)
+            runtime.operate(self.owner, state, args, windows=True)
+        self.assertEqual(before, state)
+        self.assertEqual(before, self.state())
+
+        non_executable = self.root / "codex"
+        non_executable.touch()
+        state = self.state()
+        before = dict(state)
+        args = SimpleNamespace(operation="claim", pid=os.getpid(), host_executable=str(non_executable))
+        with mock.patch.object(runtime.os, "access", return_value=False), \
+             self.assertRaisesRegex(runtime.Gate, "foreground-host-executable-invalid"):
+            runtime.operate(self.owner, state, args, windows=False)
+        self.assertEqual(before, state)
+        self.assertEqual(before, self.state())
+
+        wrong_name = self.root / "claude"
+        wrong_name.touch()
+        wrong_name.chmod(wrong_name.stat().st_mode | stat.S_IXUSR)
+        state = self.state()
+        before = dict(state)
+        args = SimpleNamespace(operation="claim", pid=os.getpid(), host_executable=str(wrong_name))
+        with self.assertRaisesRegex(runtime.Gate, "foreground-host-executable-invalid"):
+            runtime.operate(self.owner, state, args, windows=False)
         self.assertEqual(before, state)
         self.assertEqual(before, self.state())
 

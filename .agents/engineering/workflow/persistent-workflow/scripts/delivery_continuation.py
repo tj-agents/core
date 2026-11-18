@@ -8,6 +8,7 @@ if sys.version_info < (3, 9):
 
 import argparse
 import contextlib
+import ctypes
 import importlib.util
 import json
 import os
@@ -89,6 +90,238 @@ def existing_host(owner, explicit, windows=None):
     elif not os.access(str(path), os.X_OK):
         raise scheduler.SchedulerError("pinned POSIX host executable must have execute permission")
     return str(path.resolve())
+
+
+HOST_IMAGE_NAMES = {"codex.exe", "claude.exe"}
+HOST_PROCESS_NAMES = {"codex", "claude"}
+
+
+def _windows_process_table():
+    class ProcessEntry32W(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", ctypes.c_uint32), ("cntUsage", ctypes.c_uint32),
+            ("th32ProcessID", ctypes.c_uint32), ("th32DefaultHeapID", ctypes.c_void_p),
+            ("th32ModuleID", ctypes.c_uint32), ("cntThreads", ctypes.c_uint32),
+            ("th32ParentProcessID", ctypes.c_uint32), ("pcPriClassBase", ctypes.c_long),
+            ("dwFlags", ctypes.c_uint32), ("szExeFile", ctypes.c_wchar * 260),
+        ]
+
+    TH32CS_SNAPPROCESS = 0x00000002
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateToolhelp32Snapshot.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+    kernel.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+    kernel.Process32FirstW.argtypes = [ctypes.c_void_p, ctypes.POINTER(ProcessEntry32W)]
+    kernel.Process32FirstW.restype = ctypes.c_int
+    kernel.Process32NextW.argtypes = [ctypes.c_void_p, ctypes.POINTER(ProcessEntry32W)]
+    kernel.Process32NextW.restype = ctypes.c_int
+    kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+    snapshot = kernel.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if not snapshot or snapshot == -1:
+        raise scheduler.SchedulerError("foreground process snapshot is unavailable")
+    table = {}
+    try:
+        entry = ProcessEntry32W()
+        entry.dwSize = ctypes.sizeof(ProcessEntry32W)
+        found = kernel.Process32FirstW(snapshot, ctypes.byref(entry))
+        while found:
+            table[entry.th32ProcessID] = (entry.th32ParentProcessID, entry.szExeFile)
+            found = kernel.Process32NextW(snapshot, ctypes.byref(entry))
+    finally:
+        kernel.CloseHandle(snapshot)
+    return table
+
+
+def _posix_stat_fields(pid):
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    fields = raw[raw.rfind(")") + 2:].split()
+    return fields if len(fields) > 19 else None
+
+
+def _posix_process_table():
+    table = {}
+    try:
+        candidates = [entry.name for entry in os.scandir("/proc") if entry.name.isdigit()]
+    except OSError:
+        return table
+    for name in candidates:
+        pid = int(name)
+        fields = _posix_stat_fields(pid)
+        if fields is None:
+            continue
+        try:
+            ppid = int(fields[1])
+        except (IndexError, ValueError):
+            continue
+        try:
+            comm = Path(f"/proc/{pid}/comm").read_text(encoding="utf-8", errors="replace").strip()
+        except OSError:
+            comm = ""
+        table[pid] = (ppid, comm)
+    return table
+
+
+def _process_table(windows):
+    return _windows_process_table() if windows else _posix_process_table()
+
+
+def _windows_process_start(pid):
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.restype = ctypes.c_void_p
+    kernel.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+    handle = kernel.OpenProcess(0x1000, False, pid)
+    if not handle:
+        return None
+    try:
+        values = [ctypes.c_uint64() for _ in range(4)]
+        kernel.GetProcessTimes.argtypes = [ctypes.c_void_p] * 5
+        if not kernel.GetProcessTimes(handle, *(ctypes.byref(value) for value in values)):
+            return None
+        return values[0].value
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def _posix_process_start(pid):
+    fields = _posix_stat_fields(pid)
+    if fields is None:
+        return None
+    try:
+        return int(fields[19])
+    except (IndexError, ValueError):
+        return None
+
+
+def _process_start(pid, windows):
+    return _windows_process_start(pid) if windows else _posix_process_start(pid)
+
+
+def _windows_process_image(pid):
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.restype = ctypes.c_void_p
+    kernel.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+    handle = kernel.OpenProcess(0x1000, False, pid)
+    if not handle:
+        return None
+    try:
+        kernel.QueryFullProcessImageNameW.restype = ctypes.c_int
+        kernel.QueryFullProcessImageNameW.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_wchar_p,
+                                                       ctypes.POINTER(ctypes.c_uint32)]
+        size = ctypes.c_uint32(32768)
+        buffer = ctypes.create_unicode_buffer(size.value)
+        if not kernel.QueryFullProcessImageNameW(handle, 0, buffer, ctypes.byref(size)):
+            return None
+        return buffer.value[:size.value]
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def _posix_process_image(pid):
+    try:
+        return os.path.realpath(f"/proc/{pid}/exe")
+    except OSError:
+        return None
+
+
+def _process_image(pid, windows):
+    return _windows_process_image(pid) if windows else _posix_process_image(pid)
+
+
+def _is_host_name(name, windows):
+    if not isinstance(name, str):
+        return False
+    return name.casefold() in HOST_IMAGE_NAMES if windows else name in HOST_PROCESS_NAMES
+
+
+def _host_name(harness, windows):
+    return f"{harness}.exe" if windows else harness
+
+
+def resolve_host_ancestry(table, start_pid, harness, windows):
+    pid, chain, seen = start_pid, [], set()
+    while True:
+        if pid in seen:
+            raise scheduler.SchedulerError("foreground process ancestry contains a cycle")
+        seen.add(pid)
+        chain.append(pid)
+        entry = table.get(pid)
+        if entry is None:
+            raise scheduler.SchedulerError(f"foreground process {pid} is unavailable")
+        parent_pid, name = entry
+        if _is_host_name(name, windows):
+            expected = _host_name(harness, windows)
+            matches = name.casefold() == expected.casefold() if windows else name == expected
+            if not matches:
+                raise scheduler.SchedulerError(f"nearest foreground host is {name}, but owner requires {expected}")
+            return pid, chain
+        if not isinstance(parent_pid, int) or parent_pid in (0, pid):
+            raise scheduler.SchedulerError("no codex or claude process exists in the foreground process ancestry")
+        pid = parent_pid
+
+
+def validate_ancestry_start_times(chain, process_start, windows):
+    previous = None
+    for pid in chain:
+        current = process_start(pid, windows)
+        if current is None:
+            raise scheduler.SchedulerError(f"foreground process {pid} start identity is unavailable")
+        if previous is not None and current > previous:
+            raise scheduler.SchedulerError(
+                f"foreground process {pid} started after its reported descendant; ancestry PID may have been reused")
+        previous = current
+
+
+def resolve_claim_host(owner, windows=None, pid=None, process_table=None, process_start=None, process_image=None):
+    windows = os.name == "nt" if windows is None else windows
+    process_table = process_table or _process_table
+    process_start = process_start or _process_start
+    process_image = process_image or _process_image
+    harness = owner["harness"]
+    start_pid = os.getpid() if pid is None else pid
+    table = process_table(windows)
+    host_pid, chain = resolve_host_ancestry(table, start_pid, harness, windows)
+    validate_ancestry_start_times(chain, process_start, windows)
+    if owner.get("host_executable"):
+        return host_pid, None
+    image = process_image(host_pid, windows)
+    if windows:
+        if not image:
+            raise scheduler.SchedulerError(f"foreground host executable must be an existing absolute {harness}.exe path")
+        candidate = Path(image)
+        if (not candidate.is_absolute() or not candidate.is_file()
+                or candidate.name.casefold() != f"{harness}.exe"):
+            raise scheduler.SchedulerError(f"foreground host executable must be an existing absolute {harness}.exe path")
+        return host_pid, str(candidate)
+    if image and Path(image).is_file() and os.access(image, os.X_OK) and Path(image).name == harness:
+        return host_pid, image
+    return host_pid, None
+
+
+def claim(owner, root, path, args, windows=None, pid=None):
+    windows = os.name == "nt" if windows is None else windows
+    host_pid, pin = resolve_claim_host(owner, windows=windows, pid=pid)
+    host_executable = pin or owner.get("host_executable")
+    if args.dry_run:
+        return {"action": "claim", "dry_run": True, "pid": host_pid, "host_executable": host_executable}
+    runtime = resource("continuation_runtime.py")
+    command = [sys.executable, "-B", str(runtime), "claim", "--owner", str(path), "--pid", str(host_pid)]
+    if pin:
+        command += ["--host-executable", pin]
+    result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8",
+                            errors="replace", timeout=30, check=False)
+    if result.returncode:
+        detail = (result.stderr or result.stdout or "").strip()
+        raise scheduler.SchedulerError("continuation runtime claim failed" + ((": " + detail) if detail else ""))
+    try:
+        payload = json.loads(result.stdout)
+    except ValueError as error:
+        raise scheduler.SchedulerError("continuation runtime claim returned invalid JSON") from error
+    foreground = payload.get("foreground") if isinstance(payload, dict) else None
+    if not isinstance(foreground, dict) or not foreground.get("token") or foreground.get("pid") != host_pid:
+        raise scheduler.SchedulerError("continuation runtime claim returned no foreground lease for the resolved host")
+    return {"action": "claim", "pid": host_pid, "host_executable": host_executable, "foreground": foreground}
 
 
 def prerequisites(owner, host):
@@ -343,7 +576,7 @@ def list_registrations(transport):
 
 def parser():
     result = argparse.ArgumentParser()
-    result.add_argument("command", choices=("register", "remove", "list", "wake"), nargs="?", default="list")
+    result.add_argument("command", choices=("claim", "register", "remove", "list", "wake"), nargs="?", default="list")
     result.add_argument("--owner")
     result.add_argument("--worktree")
     result.add_argument("--interval-minutes", type=int, default=20, choices=range(5, 721))
@@ -365,7 +598,9 @@ def main(argv=None, transport=None):
     with lock as acquired:
         if not acquired:
             raise scheduler.SchedulerError("another scheduler lifecycle operation holds this owner")
-        if args.command == "register":
+        if args.command == "claim":
+            result = claim(owner, root, path, args)
+        elif args.command == "register":
             result = register(owner, root, path, args, transport)
         elif args.command == "remove":
             result = remove(owner, root, path, args, transport)

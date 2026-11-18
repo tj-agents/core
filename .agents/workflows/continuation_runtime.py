@@ -521,7 +521,11 @@ def initialize(path, args):
     return state
 
 
-def operate(path, state, args):
+def is_windows(windows=None):
+    return os.name == "nt" if windows is None else windows
+
+
+def operate(path, state, args, windows=None):
     operation = args.operation
     if operation == "wake":
         try:
@@ -548,8 +552,12 @@ def operate(path, state, args):
             if not isinstance(host_executable, str):
                 raise Gate("foreground-host-executable-invalid")
             candidate = Path(host_executable)
-            if (not candidate.is_absolute() or not candidate.is_file()
-                    or candidate.name.casefold() != f"{state['harness']}.exe"):
+            if is_windows(windows):
+                if (not candidate.is_absolute() or not candidate.is_file()
+                        or candidate.name.casefold() != f"{state['harness']}.exe"):
+                    raise Gate("foreground-host-executable-invalid")
+            elif (not candidate.is_absolute() or not candidate.is_file()
+                    or candidate.name != state["harness"] or not os.access(str(candidate), os.X_OK)):
                 raise Gate("foreground-host-executable-invalid")
         state["foreground"] = {"pid": pid, "identity": creation, "activity": time.time(),
                                "token": uuid.uuid4().hex}
