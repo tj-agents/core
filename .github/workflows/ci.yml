@@ -100,7 +100,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: tj-agents/cli
-          ref: 210f7508a84abc27d6fb512e4205108521ae3ec0
+          ref: 6ad26fe455f9125937a8e49168760eea848e11b4
           path: .tj-cli
           persist-credentials: false
       - name: Build the pinned tj_hook candidate
@@ -231,7 +231,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: tj-agents/cli
-          ref: 210f7508a84abc27d6fb512e4205108521ae3ec0
+          ref: 6ad26fe455f9125937a8e49168760eea848e11b4
           path: .tj-cli
           persist-credentials: false
       - name: Build the pinned tj_hook candidate

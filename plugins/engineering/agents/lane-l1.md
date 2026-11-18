@@ -1,6 +1,6 @@
 ---
 name: lane-l1
-description: Runs one delegated task at lane L1. Routes critical design or a large complex plan to Codex L1.
+description: Runs one delegated task at lane L1. Routes critical analysis and consequential design to Codex L1.
 kind: lane
 model: claude-sonnet-5
 effort: low

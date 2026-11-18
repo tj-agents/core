@@ -124,11 +124,6 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/dependencies/agent/.agents/agent/resources/lanes",
-      "destination": ".agents/lanes"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/workflow/resources/problem-records.md",
       "destination": ".agents/workflow/resources/problem-records.md"
     },
@@ -214,11 +209,6 @@
     },
     {
       "plugin": "workflow",
-      "source": ".agents/dependencies/agent/.agents/agent/runtime",
-      "destination": ".agents/agent/runtime"
-    },
-    {
-      "plugin": "workflow",
       "source": ".agents/hooks/problem_records.py",
       "destination": "hooks/problem_records.py"
     },
@@ -256,11 +246,6 @@
       "plugin": "workflow",
       "source": ".codex/runtime/continuation",
       "destination": ".codex/runtime/continuation"
-    },
-    {
-      "plugin": "workflow",
-      "source": ".agents/dependencies/agent/.agents/agent/resources/lanes",
-      "destination": ".agents/lanes"
     },
     {
       "plugin": "workflow",

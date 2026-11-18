@@ -1436,7 +1436,9 @@ def boundary_reason(payload: Mapping[str, object], state_directory: Path) -> str
     if not tool or not isinstance(tool_input, dict):
         return ""
     cwd = Path(_payload_cwd(payload) or Path.cwd())
-    targets = outgoing_targets(tool, tool_input, cwd)
+    targets = outgoing_targets(
+        tool, tool_input, cwd, rg_configured=bool(os.environ.get("RIPGREP_CONFIG_PATH"))
+    )
     homes = host_homes()
     memory = memory_target(targets, homes)
     if memory is not None:

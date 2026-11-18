@@ -797,30 +797,6 @@ def emit_workflow_agents(root: Path, config: dict, emit):
                 agent_payload(role, body, host),
             )
 
-    lane_body = read(root / ".agents/dependencies/agent/.agents/agent/resources/lanes/agent-body.md").strip()
-    handoff_body = read(root / ".agents/dependencies/agent/.agents/agent/resources/lanes/handoff-agent-body.md").strip()
-    for host in ("claude", "codex"):
-        table = load(root / f".agents/dependencies/agent/.agents/agent/resources/lanes/{host}.json")
-        for lane, rung in table["lanes"].items():
-            body = lane_body
-            if rung.get("handoff"):
-                target = rung["handoff"]
-                body = handoff_body.format(host=target["host"].title(), lane=target["lane"])
-            role = {
-                "agent_name": f"lane-{lane.lower()}" if host == "claude" else f"lane_{lane.lower()}",
-                "description": f"Runs one delegated task at lane {lane}. {rung['summary']}",
-                "kind": "lane",
-                "tools": ["Read", "Glob", "Grep", "Write", "Edit", "Bash"],
-                "sandbox_mode": "workspace-write",
-                **rung,
-            }
-            extension = "md" if host == "claude" else "toml"
-            directory = "agents" if host == "claude" else "codex-agents"
-            emit(
-                f"plugins/{plugin}/{directory}/lane-{lane.lower()}.{extension}",
-                agent_payload(role, body, host),
-            )
-
     fixtures = source / "fixtures"
     template = read(fixtures / "workflow-contract-fixture.template.md")
     rendered = template.replace(

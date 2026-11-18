@@ -26,6 +26,14 @@ spec.loader.exec_module(runtime)
 
 class ContinuationTests(unittest.TestCase):
     def setUp(self):
+        profile = tempfile.TemporaryDirectory()
+        self.addCleanup(profile.cleanup)
+        self.lane_agent = Path(profile.name) / "agents" / "lane-l4.toml"
+        self.lane_agent.parent.mkdir()
+        self.lane_agent.write_text('model = "fixture-l4"\nmodel_reasoning_effort = "high"\n', encoding="utf-8")
+        codex_home = mock.patch.dict(os.environ, {"CODEX_HOME": profile.name})
+        codex_home.start()
+        self.addCleanup(codex_home.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name).resolve()
         for args in (["init", "-b", "feature"], ["config", "user.name", "Fixture"],
@@ -610,10 +618,14 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(self.cli(*self.wake_args(), code=2)["reason"], "unsupported-host")
         state["harness"] = "codex"
         args = runtime.lane_command(state, "test", ["fixture"])
-        lane = json.loads((ROOT / ".agents/dependencies/agent/.agents/agent/resources/lanes/codex.json").read_text())["lanes"]["L4"]
-        self.assertIn(lane["model"], args)
-        self.assertIn(f'model_reasoning_effort="{lane["reasoning_effort"]}"', args)
+        self.assertEqual(["fixture", "exec", "--model", "fixture-l4", "--config", 'model_reasoning_effort="high"'], args[:6])
         self.assertFalse(any("bypass" in arg for arg in args))
+        self.lane_agent.write_text('model = "fixture-l4"\n', encoding="utf-8")
+        with self.assertRaisesRegex(runtime.Gate, "lane-agent-invalid"):
+            runtime.lane_command(state, "test", ["fixture"])
+        self.lane_agent.unlink()
+        with self.assertRaisesRegex(runtime.Gate, "lane-agent-unavailable"):
+            runtime.lane_command(state, "test", ["fixture"])
 
     def test_timeout_kills_writer_before_next_wake(self):
         state = self.state()
