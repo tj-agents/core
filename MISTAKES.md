@@ -193,7 +193,9 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
   can be skipped despite an unambiguous standing obligation.
 - **Source owner:** Core `engineering:session-guidance` callout-repair contract and the host/runtime
   enforcement that must make its required transition observable.
-- **State:** in-progress.
+- **State:** blocked. **Reason:** the prepared single-successor handoff could not create a host process;
+  `os error 1455` reports insufficient paging-file capacity. **Blocked by:** capacity. **Resolver:** machine
+  capacity. **Resume when:** a host process can start and the prepared handoff can be invoked once.
 - **Repair link:** active `Fix-StandardsMistakeCallout` source repair, session
   `01a11698-c02c-7b72-9f67-ec82fd91efb0`.
 - **Next action:** reconcile this incident with the active source repair and make the callout path require
@@ -203,3 +205,29 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
   missing launch or record is surfaced as an actionable failure rather than explained away.
 - **Verification evidence:** this session read the exact `engineering:session-guidance` rule, then returned
   without either action; the peer registry later showed the active source-repair session cited above.
+
+## M015 - Escalating a named owner dependency before attempting owner coordination
+
+- **Kind:** mistake.
+- **Observed/reported:** 2026-10-12; PR #218 was blocked by B006 on named parent PR #209. Rather than first
+  checking whether that parent owner was reachable through in-team collaboration or the scoped peer/recovery
+  utilities, this session asked Tommy whether it should take over the parent work. Only after Tommy asked
+  how messaging works did it inspect the available coordination path.
+- **Cause:** confirmed: the continuation escalation path does not make owner discovery and supported
+  coordination an explicit prerequisite to presenting an external resolver question, and this session did
+  not select the existing peer/coordination utilities on its own.
+- **Impact and priority:** P1; a recoverable coordination step is pushed to Tommy, undermining the
+  agentic ownership and single-writer workflow.
+- **Source owner:** Core `base:goal-continuation`, `engineering:session-guidance`, and the machine peer/
+  follow-up coordination contract.
+- **State:** in-progress.
+- **Repair link:** `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Docs-ProactiveOwnerCoordination/plans/proactive-owner-coordination/GOAL.md`.
+- **Next action:** when capacity recovers, invoke the already-prepared isolated repair handoff once; its
+  owner determines the smallest authoritative rule and verification change.
+- **Resolution condition:** a named blocking owner causes scoped owner discovery and an eligible supported
+  coordination or recovery attempt before any takeover/manual-fallback question; unavailable or ineligible
+  paths retain their concrete evidence and do not create a duplicate writer.
+- **Verification evidence:** current goal `plans/foreign-foreground-stop-order/GOAL.md` records PR #209 as
+  B006's resolver. The session asked for transfer before using `peer-cli`; subsequent scoped inspection
+  found no live parent session to contact. The prepared L3 handoff failed before process creation with
+  `The paging file is too small for this operation to complete. (os error 1455)`; no successor/tab exists.
