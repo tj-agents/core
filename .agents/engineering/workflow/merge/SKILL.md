@@ -1,6 +1,6 @@
 ---
 name: merge
-description: Land the current branch's PR through the merge queue and return to a clean, current base — confirm the PR's own checks are terminal and green, select the end-to-end tier mechanically from whether the diff can break behaviour the hard floor cannot observe, enqueue with auto-merge, monitor the exact binding to one of four terminal states, close the merged worktree, then follow the publish and version-sync consequence to green or migrate its broken consumers. Covers why a queue-gated suite reporting "skipping" on the PR is expected rather than proof it passed, why the admin bypass skips the suites entirely and when it is legitimate, why a skip trailer silently loses to a mandated attribution trailer, and the plan-ledger checkpoints each transition owes. Use whenever the user says merge, merge it, land this PR, or wants the current branch shipped and the repo reset to its base.
+description: Land the current branch's PR through the merge queue and return to a clean, current base — confirm the PR's own checks are terminal and green, select the end-to-end tier mechanically from whether the diff can break behaviour the hard floor cannot observe, enqueue with auto-merge, monitor the exact binding to one of four terminal states, continue any remaining owning work, and perform verified closeout only when the whole work is complete or explicitly closed. Covers why a queue-gated suite reporting "skipping" on the PR is expected rather than proof it passed, why the admin bypass skips the suites entirely and when it is legitimate, why a skip trailer silently loses to a mandated attribution trailer, and the plan-ledger checkpoints each transition owes. Use whenever the user says merge, merge it, land this PR, or wants the current branch shipped and the repo reset to its base.
 
 kind: workflow
 domain: process
@@ -216,15 +216,23 @@ unchanged observations remain silent and never create a model turn or user-facin
 - Reconcile closed-without-merge, failed checks, sustained green-but-unadmitted, and timeout states before the
   next source update. On merge, retain the result as evidence for the next delivery stage.
 
-### 5. Return to a clean base and retire any isolated checkout
+### 5. Resolve whole-work readiness before closeout
 
-Before removing persistent state, inspect the completed delivery binding. A standalone PR removes its
-continuation. A plan-managed binding with a workflow handoff keeps the one existing continuation, closes only
-the merged PR binding, checkpoints the merge, and transfers to the recorded `plan-execution` stage. That
-stage reconciles an existing successor layer or starts the next branch in a checkout selected under
-`engineering:git-branching`, before rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
-watermark or delivery binding into the successor; the successor re-resolves merge authorization from the
-goal's recorded authorization (`engineering:merging`).
+A PR merge is a slice checkpoint, not proof that its owning work is complete. Inspect the canonical goal or
+plan, its `## Next Steps`, pending checks and delivery, and any active user dialogue or answer. When any work
+remains, keep this CLI and its active checkout, close only the merged PR binding, checkpoint the merge, and
+continue the same task. Reconcile an existing successor stack layer or start the next branch from
+`origin/main` in the same or a new checkout selected under `engineering:git-branching`; bind the same task to
+that layer's exact head and runs. Never carry the completed PR's review watermark or delivery binding into the
+successor; it re-resolves merge authorization from the goal's recorded authorization
+(`engineering:merging`). Run Step 6 and all other pending work before returning to checkout cleanup below.
+
+Proceed with whole-work closeout only when the canonical owner state is complete and a fresh `report_ready=True` completion check passes, or the user
+explicitly requests close through the existing `machine:close` arm. The final lifecycle remains incomplete
+until cleanup and verified CLI exit finish. With no goal or plan,
+verify that the task had no work beyond this PR and that no checks, delivery, or user dialogue remain. Never
+infer completion from the merged PR alone. A standalone PR removes its continuation only after this
+readiness decision; plan-managed work retains its existing continuation while work remains.
 
 Resolve the primary checkout from the first `worktree` record in `git worktree list --porcelain`; never
 remove that path. When it sits on the merged branch or the default, move it to the fetched remote default
@@ -336,11 +344,14 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
    current on it, and pre-existing user files must remain. Treat any removal error or residual target path
    as incomplete cleanup; never replace the failed command with a forced removal or raw recursive deletion.
 
-**Step 5 is a blocking post-merge gate. Do not report terminal delivery or leave the cleanup for a later
-session until `finish.py` has run or host retargeting plus the helper or native-Git path has produced the
-final inventory above. Only the `finish.py` path may enter Step 6 first.** The
-worktree-cleanup audit gate and the merge-cleanup gate are backstops that make a missed cleanup visible, not
-a substitute for doing it immediately.
+**Step 5 is a blocking whole-work closeout gate.** Do not run the cleanup procedures above until Step 6,
+all pending checks and delivery are terminal, and the fresh report-ready check plus owner state establish
+completion; resolve any other owning work before the
+start of this step permits closeout. If work remains, keep the CLI and active checkout and continue the same
+task; do not report terminal delivery or demand CLI close because a PR merged. Once completion is established,
+use the detailed removal procedure above, preserving its exact proof and final inventory requirements. The
+worktree-cleanup audit gate and merge-cleanup gate remain backstops; neither establishes completion or
+authorizes forced removal.
 
 If plan work remains, reconcile and continue an existing successor stack layer, including its base,
 head, review evidence and delivery binding. When no successor exists, start the next branch from the
@@ -432,9 +443,9 @@ green at a new version, or sync went red and you migrated its consumers** (which
 "merged, and left a red sync PR behind." If you stopped early, say exactly what is blocking and what is
 needed.
 
-Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
-follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
-select `machine:close` and arm its post-report operation before the final report. Select removal only
-for the verified removable merged worktree; otherwise retain the checkout. After the report and all
-other Stop gates, its `complete` operation invokes `finish.py` or `close.py`. This is required even when Tommy merged
-the PR manually. No preamble.
+Keep it terminal: verify green ? enqueue ? wait for `MERGED` ? sync the base ? follow the sync PR to green or
+migrate it ? complete all owner work and its fresh report-ready completion check ? perform eligible checkout
+cleanup ? summarize ? select `machine:close` and arm its post-report operation before the final report.
+Select removal only for the verified removable merged worktree; otherwise retain the checkout. After the report
+and all other Stop gates, its `complete` operation invokes `finish.py` or `close.py`. A merge alone never
+requires CLI close. No preamble.

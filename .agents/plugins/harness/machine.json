@@ -176,7 +176,7 @@
               "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
             ]
           ],
-          "justification": "engineering:merge Step 5: after cleanup_proof.py, a delivered report and unchanged verified idle session permit finish to remove its merged worktree",
+          "justification": "engineering:merge Step 5: after owner completion state, a fresh report-ready check, Step 6 and cleanup_proof.py, a delivered report and unchanged verified idle session permit finish to remove this merged worktree",
           "match": [
             [
               "python3",
@@ -561,7 +561,7 @@
             ],
             "arm"
           ],
-          "justification": "Prepare or complete only this verified CLI closure after all owned work and Stop gates are satisfied; removal remains receipt-guarded",
+          "justification": "Prepare or complete CLI closure only after all owned work is complete or the user explicitly requests close, and all Stop gates accept; a PR merge alone is insufficient and removal remains receipt-guarded",
           "match": [
             [
               "python",

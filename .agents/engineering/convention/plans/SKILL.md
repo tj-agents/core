@@ -322,9 +322,12 @@ alone does not require that transfer; the context-transfer decision is owned by
 4. **Keep both artifacts after the last local phase while delivery is live.** Make the ledger's exact next
    action the gate that now owns progress — **review comes first: never write a merge as the next step until
    a review is recorded** (a `## Reviews` entry or a review watermark); then PR, merge, publication,
-   dependency, or platform sync. `plan_graph.py` enforces this. Once the PR merges, complete the checkout
-   cleanup under `engineering:merge`; if work remains, reconcile and continue its existing successor layer, or start the next branch from
-   the current remote default in a checkout selected under `engineering:git-branching`. Resume the same ledger.
+   dependency, or platform sync. `plan_graph.py` enforces this. A merged PR checkpoints one delivery slice;
+   retain the active checkout and same CLI while plan `## Next Steps`, checks, delivery, or user dialogue
+   remain. Reconcile and continue its existing successor layer, or start the next branch from the current
+   remote default in a checkout selected under `engineering:git-branching`. Resume the same ledger and run
+   `engineering:merge` cleanup only after owner completion state and a fresh report-ready completion check
+   pass.
 5. **Close out only after the entire lifecycle is terminal.** Planning-only work is terminal only when its
    reviewed artifacts are merged to the default branch through `merge-docs`; planning artifacts updated with
    implementation are terminal only when that delivery PR merges. A local commit, pushed branch, or open PR
@@ -335,8 +338,9 @@ alone does not require that transfer; the context-transfer decision is owned by
 ### Plans outlive delivery branches
 
 A branch owns one PR-sized delivery slice, while the plan survives through the commits merged to the
-default branch. After merge, retire the completed branch and any isolated checkout through
-`engineering:merge`, then continue the reconciled successor layer.
+default branch. After merge, continue the reconciled successor layer in the same CLI and retain its active
+checkout while the plan has remaining work. Retire the merged branch and checkout through
+`engineering:merge` only after owner completion state and a fresh report-ready completion check pass.
 When remaining work has no existing slice, start its branch from the current remote default and select
 its checkout under `engineering:git-branching`; create isolation only when active execution needs it.
 Never reopen a merged branch to append observations; the forge owns remote evidence until a

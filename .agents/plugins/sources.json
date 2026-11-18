@@ -207,6 +207,11 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/hooks/continuation_completion.py",
+      "destination": "hooks/continuation_completion.py"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/hooks/continuation_stop.py",
       "destination": "hooks/continuation_stop.py"
     },

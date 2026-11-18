@@ -8,8 +8,9 @@ route: infer
 
 # Close the completed CLI
 
-This operation applies in every repository consuming Core. A merge, PR, plan, or completion-check
-record is not a prerequisite. Select it whenever this CLI has finished all its owned work.
+This operation applies in every repository consuming Core. A merge alone does not select close; keep the
+CLI open while owned work, a pending answer, approval, check, or delivery remains. Select it when all owned
+work is complete or the user explicitly requests close.
 
 1. Verify the requested outcome, required delivery, validation, cleanup and owned handoffs are complete.
    A pending answer, approval, check or delivery is still owned work. Honor an explicit keep-open request.

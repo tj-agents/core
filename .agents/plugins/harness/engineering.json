@@ -4,6 +4,7 @@
   "source_roots": [
     ".agents/engineering",
     ".agents/engineering/resources/problem-records.md",
+    ".agents/hooks/continuation_completion.py",
     ".agents/hooks/continuation_stop.py",
     ".agents/hooks/docs_reachability.py",
     ".agents/hooks/hook_dispatch.py",
@@ -175,7 +176,7 @@
             "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
             "--clear"
           ],
-          "justification": "Records an evidenced retention disposition for the exact merged checkout after validating the real close refusal and separate fallback; pending cleanup remains incomplete",
+          "justification": "Records an evidenced retention disposition only after whole-work closeout is eligible and the exact close path refused; pending owner work retains the CLI and checkout",
           "match": [
             [
               "python",
@@ -215,7 +216,7 @@
               "${PLUGIN_ROOT}/workflows/completion.py"
             ]
           ],
-          "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
+          "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery; only its passing report-ready result establishes owner completion for closeout, while pending work retains the CLI and checkout",
           "match": [
             [
               "python",
@@ -245,7 +246,7 @@
               "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
             ]
           ],
-          "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; a delivered report and verified idle session remain separate prerequisites for retained-session closure",
+          "justification": "engineering:merge Step 5: proves the exact merged head for removal only after owner completion state and a fresh report-ready check; delivered report and verified idle session remain separate prerequisites for explicit CLI closure",
           "match": [
             [
               "python",
