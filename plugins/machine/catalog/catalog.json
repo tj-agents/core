@@ -193,7 +193,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:f5c4ead046e2abd118092912340a6707f36ee8808db39321f861b501bbbb0a31",
+          "digest": "sha256:e96e13f54e4dad07fbeff067f27a646c8c1e6737b3bcafa5b7e032f077535746",
           "harness": {
             "marketplaces": [
               {
@@ -278,13 +278,15 @@
               {
                 "path": "hooks/merge_review_gate.py",
                 "hosts": [
-                  "claude"
+                  "claude",
+                  "codex"
                 ]
               },
               {
                 "path": "hooks/persistent_workflow_merge_gate.py",
                 "hosts": [
-                  "claude"
+                  "claude",
+                  "codex"
                 ]
               },
               {
