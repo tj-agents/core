@@ -1,0 +1,324 @@
+{
+  "observed_on": "2026-10-19",
+  "status": "native_discovery_verified",
+  "targets": [
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": true,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    },
+    {
+      "tracked": false,
+      "ignored": true,
+      "server_present": false,
+      "personal_server_present": false
+    }
+  ],
+  "boundary": "Existing employer-selected, private ignored native Codex configs only. Preserve all source files, provider declarations, personal scopes and global settings.",
+  "backup_directory": "C:\\Users\\TOMMYS~1\\AppData\\Local\\Temp\\tj-work-mcp-configs-pctzon5q",
+  "results": [
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "already_current"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    },
+    {
+      "change": "added_work_azure_server"
+    }
+  ],
+  "native_discovery": [
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    },
+    {
+      "discovered": true
+    }
+  ]
+}

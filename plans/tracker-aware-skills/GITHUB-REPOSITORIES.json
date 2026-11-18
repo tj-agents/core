@@ -1,0 +1,1395 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-10-19",
+  "status": "approved-layout-prepared-not-provisioned",
+  "personal_account": "tomjseery",
+  "work_types": [
+    "Feature",
+    "Task",
+    "Bug",
+    "Story",
+    "Tech Debt",
+    "Mistake"
+  ],
+  "organization_types_observed": {
+    "tj-agents": [
+      "Task",
+      "Bug",
+      "Feature"
+    ],
+    "Concertable": [
+      "Task",
+      "Bug",
+      "Feature"
+    ]
+  },
+  "schedule_policy": "Do not invent dates. Items without confirmed dates remain unscheduled; board/backlog inclusion is still required.",
+  "credential_gate": "Existing tomjseery credential lacks Projects scopes. No account-wide scope expansion or work-login switch is authorized by this inventory. Establish the supported owner-scoped credential or browser path before provisioning.",
+  "provisioning": "No project, type, item, view, field or consumer declaration has been created or modified.",
+  "projects": [
+    {
+      "owner": "Concertable",
+      "title": "Concertable",
+      "scope": "product",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "Concertable/agents",
+        "Concertable/auth",
+        "Concertable/b2b",
+        "Concertable/concertable",
+        "Concertable/config",
+        "Concertable/customer",
+        "Concertable/docs",
+        "Concertable/infra",
+        "Concertable/payment",
+        "Concertable/pipeline",
+        "Concertable/platform-dotnet",
+        "Concertable/platform-frontend",
+        "Concertable/search",
+        "Concertable/system",
+        "Concertable/workflow-fixture"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "native-organization-type",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tj-agents",
+      "title": "TjAgents",
+      "scope": "product",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tj-agents/azure",
+        "tj-agents/cli",
+        "tj-agents/core",
+        "tj-agents/cpp",
+        "tj-agents/docs",
+        "tj-agents/dotnet",
+        "tj-agents/github-actions",
+        "tj-agents/company",
+        "tj-agents/marketplace",
+        "tj-agents/nvim",
+        "tj-agents/personal",
+        "tj-agents/python",
+        "tj-agents/react",
+        "tj-agents/rust",
+        "tj-agents/template",
+        "tj-agents/work",
+        "tj-agents/work-items"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "native-organization-type",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "agent-starter-kit",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/agent-starter-kit"
+      ],
+      "activate": false,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "agent-tweaks",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/agent-tweaks"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "agent-utilities",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/agent-utilities"
+      ],
+      "activate": false,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "agent-workboard",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/agent-workboard"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "career",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/career"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "computer-peripherals-store",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/computer-peripherals-store"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "concertable-app",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/concertable-app"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "cpp",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/cpp"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "dotfiles",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/dotfiles"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "fashion-mnist-cnn",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/fashion-mnist-cnn"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "haskell-exercises",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/haskell-exercises"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "icon-dropper",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/icon-dropper"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "images",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/images"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "java-ann",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/java-ann"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "lcd-channel-monitor",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/lcd-channel-monitor"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "marketplace-car-hunter",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/marketplace-car-hunter"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "meditation-app",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/meditation-app"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "mlp-image-classification",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/mlp-image-classification"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "multi-armed-bandit-simulation",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/multi-armed-bandit-simulation"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "note-cli",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/note-cli"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "onsite-sealants",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/onsite-sealants"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "Reunion",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/Reunion"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "sandbox-azure",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/sandbox-azure"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "sandbox-dotnet",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/sandbox-dotnet"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "sandbox-hwid",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/sandbox-hwid"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "skinet",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/skinet"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "termboard",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/termboard"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "tomjseery",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/tomjseery"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "vscode-config",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/vscode-config"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "wedding-venue-finder",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/wedding-venue-finder"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "wifi-toggle",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/wifi-toggle"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "windows-agents",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/windows-agents"
+      ],
+      "activate": false,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "windows-dotfiles",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/windows-dotfiles"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    },
+    {
+      "owner": "tomjseery",
+      "title": "winwrap",
+      "scope": "independent-repository",
+      "project_number": null,
+      "project_node_id": null,
+      "url": null,
+      "repositories": [
+        "tomjseery/winwrap"
+      ],
+      "activate": true,
+      "required_views": [
+        "Backlog",
+        "Board",
+        "Roadmap"
+      ],
+      "required_fields": [
+        "Status",
+        "Work type",
+        "Priority",
+        "Start date",
+        "Target date"
+      ],
+      "kind_representation": "project-work-type-field",
+      "live_verification": "pending-projects-access"
+    }
+  ],
+  "repositories": [
+    {
+      "repository": "Concertable/agents",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/auth",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/b2b",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/concertable",
+      "archived": true,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/config",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/customer",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/docs",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/infra",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/payment",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/pipeline",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/platform-dotnet",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/platform-frontend",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/search",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/system",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "Concertable/workflow-fixture",
+      "archived": false,
+      "project_key": "Concertable/Concertable",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/azure",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/cli",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/core",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/cpp",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/docs",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/dotnet",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/github-actions",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/company",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/marketplace",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/nvim",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/personal",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/python",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/react",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/rust",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/template",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/work",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tj-agents/work-items",
+      "archived": false,
+      "project_key": "tj-agents/TjAgents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/agent-starter-kit",
+      "archived": true,
+      "project_key": "tomjseery/agent-starter-kit",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/agent-tweaks",
+      "archived": false,
+      "project_key": "tomjseery/agent-tweaks",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/agent-utilities",
+      "archived": true,
+      "project_key": "tomjseery/agent-utilities",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/agent-workboard",
+      "archived": false,
+      "project_key": "tomjseery/agent-workboard",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/career",
+      "archived": false,
+      "project_key": "tomjseery/career",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/computer-peripherals-store",
+      "archived": false,
+      "project_key": "tomjseery/computer-peripherals-store",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/concertable-app",
+      "archived": false,
+      "project_key": "tomjseery/concertable-app",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/cpp",
+      "archived": false,
+      "project_key": "tomjseery/cpp",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/dotfiles",
+      "archived": false,
+      "project_key": "tomjseery/dotfiles",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/fashion-mnist-cnn",
+      "archived": false,
+      "project_key": "tomjseery/fashion-mnist-cnn",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/haskell-exercises",
+      "archived": false,
+      "project_key": "tomjseery/haskell-exercises",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/icon-dropper",
+      "archived": false,
+      "project_key": "tomjseery/icon-dropper",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/images",
+      "archived": false,
+      "project_key": "tomjseery/images",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/java-ann",
+      "archived": false,
+      "project_key": "tomjseery/java-ann",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/lcd-channel-monitor",
+      "archived": false,
+      "project_key": "tomjseery/lcd-channel-monitor",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/marketplace-car-hunter",
+      "archived": false,
+      "project_key": "tomjseery/marketplace-car-hunter",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/meditation-app",
+      "archived": false,
+      "project_key": "tomjseery/meditation-app",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/mlp-image-classification",
+      "archived": false,
+      "project_key": "tomjseery/mlp-image-classification",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/multi-armed-bandit-simulation",
+      "archived": false,
+      "project_key": "tomjseery/multi-armed-bandit-simulation",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/note-cli",
+      "archived": false,
+      "project_key": "tomjseery/note-cli",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/onsite-sealants",
+      "archived": false,
+      "project_key": "tomjseery/onsite-sealants",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/Reunion",
+      "archived": false,
+      "project_key": "tomjseery/Reunion",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/sandbox-azure",
+      "archived": false,
+      "project_key": "tomjseery/sandbox-azure",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/sandbox-dotnet",
+      "archived": false,
+      "project_key": "tomjseery/sandbox-dotnet",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/sandbox-hwid",
+      "archived": false,
+      "project_key": "tomjseery/sandbox-hwid",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/skinet",
+      "archived": false,
+      "project_key": "tomjseery/skinet",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/termboard",
+      "archived": false,
+      "project_key": "tomjseery/termboard",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/tomjseery",
+      "archived": false,
+      "project_key": "tomjseery/tomjseery",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/vscode-config",
+      "archived": false,
+      "project_key": "tomjseery/vscode-config",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/wedding-venue-finder",
+      "archived": false,
+      "project_key": "tomjseery/wedding-venue-finder",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/wifi-toggle",
+      "archived": false,
+      "project_key": "tomjseery/wifi-toggle",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/windows-agents",
+      "archived": true,
+      "project_key": "tomjseery/windows-agents",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/windows-dotfiles",
+      "archived": false,
+      "project_key": "tomjseery/windows-dotfiles",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    },
+    {
+      "repository": "tomjseery/winwrap",
+      "archived": false,
+      "project_key": "tomjseery/winwrap",
+      "adoption": "preserve-existing-provider-until-coordinated-cutover"
+    }
+  ]
+}
