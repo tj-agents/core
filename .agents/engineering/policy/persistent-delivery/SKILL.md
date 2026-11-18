@@ -79,7 +79,7 @@ stop paths and its hold label still apply; without a table, `human-gate` is the 
 approval cannot add exemptions or bypass a stop. **Re-run the binder on every rebind:** a repaired head
 may add a stop path or hold.
 
-`auto_merge` is a separate optional boolean in that same declaration. Omit it or set it to `false` to keep
+`auto_merge` is a separate optional boolean preference. A present `.agents/configuration.json` version-1 envelope owns `configuration.core.auto_merge`; the legacy declaration supplies it only when that configuration file is absent. Omit it or set it to `false` to keep
 GitHub auto-merge unavailable. With `true`, after the normal green exact-head, independent-review and merge
 authorization decision, invoke only the packaged guarded command:
 

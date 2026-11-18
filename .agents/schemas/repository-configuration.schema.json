@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "configuration"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "configuration": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z][a-z0-9-]*$"},
+      "additionalProperties": {"type": "object"}
+    }
+  }
+}

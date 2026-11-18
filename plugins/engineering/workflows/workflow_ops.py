@@ -2005,7 +2005,7 @@ def standing_authorization(root, changed_paths, labels):
     if not path.is_file():
         resolution = delivery_runtime.StandingMergeAuthorization().resolve(
             {"standing_authorization": "absent", "instruction": None, "hold_label": "human-gate"},
-            changed_paths, labels,
+            changed_paths, labels, root,
         )
         if resolution["stopped_by"] is None:
             resolution["stopped_by"] = {"class": "no-recorded-authorization"}
@@ -2017,7 +2017,7 @@ def standing_authorization(root, changed_paths, labels):
             f"{delivery_runtime.STANDING_AUTHORIZATION_FILE} exists but could not be read: {error}"
         ) from error
     try:
-        return delivery_runtime.StandingMergeAuthorization().resolve(policy, changed_paths, labels)
+        return delivery_runtime.StandingMergeAuthorization().resolve(policy, changed_paths, labels, root)
     except delivery_runtime.DeliveryContractViolation as error:
         raise WorkflowOperationError(str(error)) from error
 
