@@ -1,7 +1,6 @@
 """List, resolve and safely close registered Claude/Codex sessions (Python 3.9+)."""
 import argparse
 import os
-import signal
 import sys
 from pathlib import Path
 
@@ -53,20 +52,17 @@ def select(items, needle):
 
 
 def close_terminal_or_host(target, force):
-    """Close a verified terminal, falling back only when Windows UIA is unavailable."""
+    """Close a verified terminal only when its actual tab can be confirmed closed."""
     terminal = target.get("terminal")
     if not isinstance(terminal, dict):
         return False
     try:
         close_tab.close_entry(target, force=force)
     except close_tab.TerminalUnavailable:
-        if terminal.get("kind") != "windows-terminal":
-            raise
-        if not session_close.verified_live(target["pid"], target.get("pid_started_at")):
-            raise session_close.Refusal("host identity changed before host-only fallback")
-        os.kill(target["pid"], signal.SIGTERM)
-        return True
-    return False
+        raise session_close.Refusal(
+            "cannot report the peer closed without verified actual-tab closure; use close_tab.py --title"
+        )
+    return None
 
 
 def main(argv=None):
@@ -107,12 +103,12 @@ def main(argv=None):
     if not session_close.verified_live(target["pid"], target.get("pid_started_at")):
         raise session_close.Refusal("host identity changed before close")
     if isinstance(terminal, dict):
-        host_only = close_terminal_or_host(target, force=args.force)
+        close_terminal_or_host(target, force=args.force)
     else:
-        os.kill(target["pid"], signal.SIGTERM)
-        host_only = False
-    suffix = " (host only; the tab may remain)." if host_only else "."
-    print("Closed {!r}{}".format(target.get("title") or target["session_id"], suffix))
+        raise session_close.Refusal(
+            "cannot report the peer closed without a recorded terminal identity; use close_tab.py --title"
+        )
+    print("Closed {!r}.".format(target.get("title") or target["session_id"]))
     return 0
 
 
