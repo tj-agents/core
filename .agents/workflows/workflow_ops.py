@@ -974,7 +974,10 @@ def review_reconcile(root, workflow_run_id, descriptor_path, base_ref):
     base_ancestor = run_process(
         ["git", "merge-base", "--is-ancestor", upstream_base, current_base], root, check=False
     )
-    if base_ancestor.returncode == 1:
+    current_base_ref = git(root, "rev-parse", "--symbolic-full-name", base_ref)
+    trunk_target = current_base_ref in {"refs/remotes/origin/main", "refs/heads/main"}
+    upstream_unverified = False
+    if base_ancestor.returncode != 0 and trunk_target:
         trunk_base = (descriptor.get("security") or {}).get("trunk_base")
         if trunk_base and all(
             run_process(
@@ -983,9 +986,13 @@ def review_reconcile(root, workflow_run_id, descriptor_path, base_ref):
             for target in (descriptor["head"], current_base)
         ):
             upstream_base = trunk_base
+        else:
+            upstream_unverified = True
     reasons = []
     if current_head != descriptor["head"]:
         reasons.append("candidate-head-changed")
+    if upstream_unverified:
+        reasons.append("upstream-baseline-unverified")
     if current_base != upstream_base:
         changed = git(root, "diff", "--name-only", upstream_base, current_base).splitlines()
         sensitive = set(descriptor["paths"]) | {rule["path"] for rule in descriptor["rules"]}
