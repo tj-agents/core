@@ -16,7 +16,9 @@ as its payloads with no generator and no payloads.json, per directory found unde
 - every `skills/*/SKILL.md` has front matter whose `name:` matches its directory and whose `kind:`
   is one lowercase word (the taxonomy is open; the shape is not);
 - `INDEX.md` lists exactly the skills that exist;
-- `selection.json` parses and names only skills that exist.
+- `selection.json` parses and names only skills that exist;
+- `.claude-plugin/plugin.json` `dependencies` is the plugin's one dependency declaration, and
+  `harness.json` `requires.plugins` names exactly the plugin itself plus those dependencies.
 
 Exit 0 when everything holds; exit 1 with one line per violation. No dependencies beyond stdlib,
 so any repo's CI can run it straight from the installed base plugin or a checkout of core.
@@ -209,6 +211,47 @@ def check_selection(payload, skills, problems):
         problems.append(f"{payload.name}: selection.json names {name!r} which is not shipped")
 
 
+def read_json(path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, ValueError):
+        return None
+
+
+def check_dependencies(payload, problems):
+    manifest_path = payload / ".claude-plugin" / "plugin.json"
+    harness_path = payload / "harness.json"
+    if not manifest_path.is_file() or not harness_path.is_file():
+        return
+    manifest = read_json(manifest_path)
+    harness = read_json(harness_path)
+    if not isinstance(manifest, dict) or not isinstance(harness, dict):
+        problems.append(f"{payload.name}: .claude-plugin/plugin.json or harness.json is unreadable")
+        return
+    plugin = harness.get("plugin")
+    requires = harness.get("requires")
+    declared = requires.get("plugins") if isinstance(requires, dict) else None
+    dependencies = manifest.get("dependencies", [])
+    if not isinstance(plugin, str) or "/" not in plugin or not isinstance(declared, list):
+        problems.append(f"{payload.name}: harness.json needs a <marketplace>/<name> plugin and requires.plugins")
+        return
+    if not isinstance(dependencies, list) or any(not isinstance(value, str) for value in dependencies):
+        problems.append(f"{payload.name}: .claude-plugin/plugin.json dependencies must be a list of plugin identities")
+        return
+    marketplace = plugin.split("/", 1)[0]
+    expected = {plugin}
+    for dependency in dependencies:
+        name, _, owner = dependency.partition("@")
+        expected.add(f"{owner or marketplace}/{name}")
+    if set(declared) != expected or len(declared) != len(set(declared)):
+        missing = sorted(expected - set(declared))
+        extra = sorted(set(declared) - expected)
+        problems.append(
+            f"{payload.name}: harness.json requires.plugins must be the plugin plus its "
+            f".claude-plugin/plugin.json dependencies (missing {missing}, extra {extra})"
+        )
+
+
 def declared_payloads(root, problems):
     """The payloads the repo declares, or None for a repo authored directly as its payloads.
 
@@ -265,6 +308,7 @@ def check(root):
         skills = check_skills(payload, problems)
         check_index(payload, skills, problems)
         check_selection(payload, skills, problems)
+        check_dependencies(payload, problems)
     return problems
 
 
