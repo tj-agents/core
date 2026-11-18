@@ -53,7 +53,6 @@ def source_bundle(root: Path) -> Path:
         ".agents/workflows",
         ".codex/runtime/continuation",
         ".agents/dependencies/cli",
-        ".agents/dependencies/agent/.agents/agent/resources/lanes",
     ):
         shutil.copytree(
             ROOT / relative,
