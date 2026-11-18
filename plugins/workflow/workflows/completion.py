@@ -2,8 +2,9 @@ import argparse
 import json
 import os
 import re
-import subprocess
 from pathlib import Path
+
+from process_runtime import process
 
 from pr_body import unchecked_tasks
 
@@ -215,7 +216,7 @@ def validate_document(document):
 
 
 def forge_state(delivery, root):
-    result = subprocess.run(
+    result = process.run(
         ["gh", "pr", "view", str(delivery["pr"]), "--repo", delivery["repository"],
          "--json", "number,headRefOid,state,body"],
         cwd=root,
