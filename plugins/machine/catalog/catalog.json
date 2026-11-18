@@ -408,8 +408,12 @@
             "handoff-codex",
             "last-conversation",
             "open-claude",
+            "open-codex",
             "peer-cli",
-            "search"
+            "recover-agents",
+            "search",
+            "search-claude",
+            "search-codex"
           ],
           "dependencies": {
             "required": [
@@ -428,7 +432,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:2837652d89a802ec89dd9e5987911e320e7a6788f8fb2a3d6ae408b51e2afc4c",
+          "digest": "sha256:4b805f4beff2e8fdea97579489ba953f42c3de17f87d45e408e035a3334aa911",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
