@@ -101,6 +101,26 @@ class PayloadTree(unittest.TestCase):
         problems = checker.check(self.root)
         self.assertTrue(any("missing ['tj-agents/docs']" in problem for problem in problems), problems)
 
+    def test_versioned_dependency_objects_are_identities(self):
+        self.declare(["dotnet"])
+        payload = self.payload("dotnet")
+        self.dependencies(payload, [{"name": "base@tj-agents", "version": "^1"}], ["tj-agents/dotnet", "tj-agents/base"])
+        self.assertEqual(checker.check(self.root), [])
+
+    def test_malformed_harness_plugin_ids_are_reported_not_raised(self):
+        self.declare(["dotnet"])
+        payload = self.payload("dotnet")
+        self.dependencies(payload, [], ["tj-agents/dotnet", {"name": "tj-agents/base"}])
+        problems = checker.check(self.root)
+        self.assertTrue(any("requires.plugins ids" in problem for problem in problems), problems)
+
+    def test_a_dependency_declared_twice_fails(self):
+        self.declare(["dotnet"])
+        payload = self.payload("dotnet")
+        self.dependencies(payload, ["base@tj-agents", "base"], ["tj-agents/dotnet", "tj-agents/base"])
+        problems = checker.check(self.root)
+        self.assertTrue(any("more than once" in problem for problem in problems), problems)
+
     def test_a_missing_tier_declaration_fails(self):
         self.declare(["dotnet"])
         self.payload("dotnet", tier=None)
