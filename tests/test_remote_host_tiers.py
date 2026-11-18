@@ -32,7 +32,7 @@ class RemoteHost(unittest.TestCase):
                     "git@github.com:owner/repo.git", "git@github.com:/owner/repo.git", "git@GITHUB.COM.:owner/repo.git"):
             with self.subTest(url=url):
                 self.origin(url)
-                self.assertEqual(gate.repository_host(self.root), "github.com")
+                self.assertEqual(gate.repository_origin(self.root).host, "github.com")
                 result = self.matches("GitHub.COM.")
                 self.assertTrue(result.matched)
                 self.assertEqual(result.evidence, ("origin host github.com",))
@@ -63,14 +63,14 @@ class RemoteHost(unittest.TestCase):
                     "ftp://github.com/owner/repo.git", "git@@github.com:owner/repo.git"):
             with self.subTest(url=url):
                 self.origin(url)
-                self.assertIsNone(gate.repository_host(self.root))
+                self.assertIsNone(gate.repository_origin(self.root))
                 self.assertFalse(self.matches().matched)
         for url in ("https://github.com/owner/repo.git\nsecond", "https://github.com/owner/repo.git\x00"):
             with patch.object(gate, "_git", return_value=url):
-                self.assertIsNone(gate.repository_host(self.root))
+                self.assertIsNone(gate.repository_origin(self.root))
 
     def test_no_origin_git_failure_and_timeout_are_nonmatches(self):
-        self.assertIsNone(gate.repository_host(self.root))
+        self.assertIsNone(gate.repository_origin(self.root))
         self.assertFalse(self.matches().matched)
         for error in (OSError("no git"), subprocess.TimeoutExpired("git", gate.GIT_TIMEOUT)):
             with patch.object(gate.subprocess, "run", side_effect=error):

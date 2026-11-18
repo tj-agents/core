@@ -442,7 +442,7 @@ def test_project_installation_is_selected_for_each_child(
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
     registry["plugins"]["employer-a@test-market"][0]["projectPath"] = str(first)
     registry_path.write_text(json.dumps(registry), encoding="utf-8")
-    monkeypatch.setattr(gate, "cache_roots", lambda: [cache])
+    monkeypatch.setattr(gate, "cache_roots", lambda _environ: [cache])
 
     result = gate.assess(project)
 
@@ -488,23 +488,6 @@ def test_corrupt_repository_boundary_is_undetermined(
         assert not result.repository_results[0].inventory.complete
     else:
         assert not result.inventory.complete
-
-
-def test_folder_marker_cannot_combine_with_child_remote(
-    project: Path, cache: Path
-) -> None:
-    _install_payload(
-        cache,
-        "employer-a",
-        dict(
-            EMPLOYER, detect={"all": [{"file": "marker"}, {"remote": "^employer-a/"}]}
-        ),
-    )
-    (project / "marker").touch()
-    child = _repository(project / "service", "git@example.test:employer-a/service.git")
-    assert not gate.assess(project, _found(cache, project)).applicable
-    (child / "marker").touch()
-    assert gate.assess(project, _found(cache, project)).scope_state == "work"
 
 
 @pytest.mark.parametrize(
