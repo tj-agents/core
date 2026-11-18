@@ -1,0 +1,2 @@
+cd C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-OneCommandLauncher
+Read C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-OneCommandLauncher\plans\one-command-launcher\GOAL.md and execute its ## Next Steps.
