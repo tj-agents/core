@@ -3,7 +3,7 @@
 Status: active
 Branch: Fix/RecoveryClaudeProfile
 Worktree: C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-RecoveryClaudeProfile
-PR: not opened
+PR: #233 https://github.com/tj-agents/core/pull/233
 
 ## Outcome
 
@@ -60,9 +60,9 @@ Fix direction: match only an actual `git worktree add` (any spelling the gate al
 
 ## Next Steps
 
-Lane: L4 (specified fixes with tests). D1 and D2 implementation and focused verification are complete. Commit the source, test and current-goal update; review, push, open the PR and merge through `engineering:merge`. Then fix D3 on a fresh branch from updated `origin/main` the same way.
+Lane: L4 (specified fixes with tests). D1 and D2 are committed, independently reviewed, and open as PR #233 at `f5bd9e38a159fa26b33b95ddccbee2941ff000b3`. Guard and Linux CI passed on run 38318085442; Windows CI remains in progress. Monitor that exact head, merge the PR once every required gate passes, then fix D3 on a fresh branch from updated `origin/main` the same way.
 
 - Scope: whole plan through all remaining phases and terminal delivery.
-- Current slice: D1 and D2 review and delivery.
+- Current slice: D1 and D2 delivery gate on PR #233.
 - Remaining scope: D3 after the D1/D2 PR merges.
 - Done when: both PRs are merged and this goal records their PRs and evidence.
