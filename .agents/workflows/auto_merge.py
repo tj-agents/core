@@ -118,23 +118,17 @@ def current_review(root, binding, changed):
         raise AutoMergeError(str(error)) from error
     slug = binding["branch"].replace("/", "-").replace("\\", "-")
     work_order = f"reviews/{slug}.md"
-    result = workflow_ops.run_process(
-        ["git", "show", f"{binding['remote_head_sha']}:{work_order}"], root, check=False
-    )
-    if result.returncode:
-        try:
-            review = (root / work_order).read_text(encoding="utf-8")
-        except OSError as error:
-            raise AutoMergeError("current review work order is absent") from error
-    else:
-        review = result.stdout
+    try:
+        review = (root / work_order).read_text(encoding="utf-8")
+    except OSError as error:
+        raise AutoMergeError("current local review evidence is absent") from error
     if merge_review_gate.review_completion_problem(review):
         raise AutoMergeError("review work order is incomplete")
     reviewed = merge_review_gate.work_order_sha_field(review, "Reviewed up to commit")
     head = binding["remote_head_sha"]
     if reviewed in {None, "invalid"} or not (
         head.lower().startswith(reviewed) or reviewed.startswith(head.lower())
-    ) and not merge_review_gate.review_only(reviewed, head):
+    ):
         raise AutoMergeError("review evidence is stale")
     if merge_review_gate.unresolved_review_items(review):
         raise AutoMergeError("review has unresolved findings")
