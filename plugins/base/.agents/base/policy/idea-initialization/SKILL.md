@@ -17,10 +17,22 @@ selective reuse, custom implementation, and keeping the current solution against
 outcome; choose the smallest suitable approach.
 
 Solve deterministic work with deterministic code: a script, fixture or dummy process, never a model
-session.
+session. For constraints a machine can verify, prefer controls in the system that owns the action:
+repository rules for merges, permissions for access, and schemas for data. Reuse an existing control
+before adding agent instructions or a custom hook.
+
+Scope a hard gate to the consequential action and the smallest condition it can establish. Preserve
+freedom to inspect, experiment and work locally. Keep judgment with the reviewer or decision maker;
+a deterministic check verifies evidence and identity, not the quality of an agent's own assertion.
+Verify both permitted and refused actions through the supported entry point before claiming enforcement.
 
 ```text
 Test the session-close watcher against `python -c "import time; time.sleep(600)"`, not a Claude session.
+
+Requirement: the PR's current commit must receive an accepted review before merging.
+Choice: a required review check enforced by GitHub, where supported.
+Verification: merging an unreviewed commit is refused; a reviewed commit with green checks is allowed.
+Agent freedom: inspecting code, running experiments and editing the branch remain available.
 ```
 
 Record that the assessment is complete, its useful references, limitations, and rationale in the

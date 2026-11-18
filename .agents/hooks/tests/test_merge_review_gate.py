@@ -522,8 +522,6 @@ class SecurityPatternTests(unittest.TestCase):
 
 
 class JurisdictionTests(unittest.TestCase):
-    """The gate speaks only for a repo that opted in. `reviews/<branch>.md` is a convention a
-    repo adopts; gating a sibling repo demanded a review file it never had."""
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -538,9 +536,9 @@ class JurisdictionTests(unittest.TestCase):
 
     def run_hook(self, command, cwd=None, codex=False):
         payload_data = {
-            "tool_name": "Bash",
+            "tool_name": "exec_command" if codex else "Bash",
             "cwd": str(cwd or self.root),
-            "tool_input": {"command": command},
+            "tool_input": {"cmd" if codex else "command": command},
         }
         if codex:
             payload_data["turn_id"] = "codex-" + self._testMethodName
@@ -553,20 +551,20 @@ class JurisdictionTests(unittest.TestCase):
             cwd=str(cwd or self.root),
         )
 
-    def test_a_repo_that_never_opted_in_is_not_this_gates_business(self):
-        self.assertEqual(0, self.run_hook(M + " 1 --squash").returncode)
+    def test_missing_security_configuration_does_not_disable_review(self):
+        self.assertEqual(2, self.run_hook(M + " 1 --squash").returncode)
 
-    def test_a_non_git_directory_without_an_opt_in_is_not_this_gates_business(self):
+    def test_a_non_git_directory_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
             self.assertEqual(
-                0,
+                2,
                 self.run_hook(M + " 1 --squash", cwd=Path(directory)).returncode,
             )
 
-    def test_a_non_git_directory_without_an_opt_in_ignores_a_named_repository(self):
+    def test_a_non_git_directory_cannot_verify_a_named_repository(self):
         with tempfile.TemporaryDirectory() as directory:
             self.assertEqual(
-                0,
+                2,
                 self.run_hook(
                     M + " 1 --repo other/that --squash", cwd=Path(directory)
                 ).returncode,
@@ -603,16 +601,16 @@ class JurisdictionTests(unittest.TestCase):
         self.assertIn("cannot resolve PR #1", result.stderr)
         self.assertNotIn("cannot prove this merge's checkout", result.stderr)
 
-    def test_codex_canonical_target_outside_an_opted_repo_is_not_review_gated(self):
+    def test_codex_canonical_target_without_security_configuration_is_gated(self):
         other = Path(tempfile.mkdtemp()).resolve()
         self.addCleanup(lambda: None)
         subprocess.run(["git", "init", "-q", str(other)], check=True)
         self.opt_in()
         command = 'pushd "' + str(other) + '" && ' + M + " 1 --squash"
 
-        self.assertEqual(0, self.run_hook(command, codex=True).returncode)
+        self.assertEqual(2, self.run_hook(command, codex=True).returncode)
 
-    def test_claude_canonical_target_outside_an_opted_repo_is_not_review_gated(self):
+    def test_claude_canonical_target_without_security_configuration_is_gated(self):
         other_temp = tempfile.TemporaryDirectory()
         self.addCleanup(other_temp.cleanup)
         other = Path(other_temp.name).resolve()
@@ -620,7 +618,7 @@ class JurisdictionTests(unittest.TestCase):
         self.opt_in()
         command = 'pushd "' + str(other) + '" && ' + M + " 1 --squash"
 
-        self.assertEqual(0, self.run_hook(command).returncode)
+        self.assertEqual(2, self.run_hook(command).returncode)
 
     def test_claude_rejects_a_relative_pushd_target_before_repo_jurisdiction(self):
         command = 'pushd "relative-checkout" && ' + M + " 1 --squash"
@@ -671,7 +669,7 @@ class JurisdictionTests(unittest.TestCase):
         result = self.run_hook(command)
 
         self.assertEqual(2, result.returncode)
-        self.assertIn("Claude cannot prove this merge's pushd checkout", result.stderr)
+        self.assertIn("run one merge per tool call", result.stderr)
         self.assertNotIn("cannot resolve PR #1", result.stderr)
 
     def test_the_opt_in_is_found_from_a_subdirectory(self):
@@ -690,18 +688,19 @@ class JurisdictionTests(unittest.TestCase):
 
         result = self.run_hook('cd "' + str(other) + '" && ' + M + " 1 --squash")
 
-        self.assertEqual(0, result.returncode)
+        self.assertEqual(2, result.returncode)
 
     def set_origin(self, url):
         subprocess.run(["git", "remote", "add", "origin", url], cwd=str(self.root), check=True)
 
-    def test_a_merge_that_names_another_repository_is_not_this_gates_business(self):
+    def test_a_merge_that_names_another_repository_requires_its_own_checkout(self):
         self.opt_in()
         self.set_origin("https://github.com/owner/this.git")
 
         result = self.run_hook(M + " 1 --repo other/that --squash")
 
-        self.assertEqual(0, result.returncode)
+        self.assertEqual(2, result.returncode)
+        self.assertIn("own checkout", result.stderr)
 
     def test_a_merge_that_names_this_repository_is_still_gated(self):
         self.opt_in()

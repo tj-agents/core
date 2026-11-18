@@ -1,6 +1,6 @@
 ---
 name: merge-docs
-description: Land a documentation or meta-only change as its own fast PR, bypassing the merge queue and its end-to-end gate through the sanctioned admin merge, because a diff with zero runtime blast radius has nothing for that gate to prove. Covers the in-scope path list that is a hard precondition rather than a hint, why a comment-only edit to a CI workflow still fails it, the docs review that is the only gate such a change gets and the pure-close-out exemption from it, the skip label that keeps a queue fallback cheap, and confirming no publish fired. Use when the user says merge docs, docs pr, or wants markdown, agent-instruction, plan or skill changes shipped without the full queue — and route anything touching runtime, package, schema, deployment or test-selection paths to the queue instead.
+description: Land a documentation or meta-only change as its own fast PR, bypassing the merge queue and its end-to-end gate through the sanctioned admin merge, because a diff with zero runtime blast radius has nothing for that gate to prove. Covers the in-scope path list that is a hard precondition rather than a hint, why a comment-only edit to a CI workflow still fails it, the docs review that is the only gate such a change gets, the skip label that keeps a queue fallback cheap, and confirming no publish fired. Use when the user says merge docs, docs pr, or wants markdown, agent-instruction, plan or skill changes shipped without the full queue — and route anything touching runtime, package, schema, deployment or test-selection paths to the queue instead.
 
 kind: workflow
 domain: process
@@ -38,13 +38,12 @@ that drifts turns a cheap merge into an unreviewed one.
 
 ## Steps
 
-### 0. Docs review first, unless the branch is a pure close-out
+### 0. Docs review first
 
-A meta PR still gates on a review — just `engineering:docs-review`, not a code review; it has
-no runtime to code-review. A **pure close-out** — net diff deletions only — is exempt, as that doc's own
-scope states, and merges straight through. Otherwise confirm a clean docs review of this branch before the
-admin merge below; if none exists or findings are open, stop and hand off a docs-review prompt naming this
-worktree and branch. **The bypass skips the queue, so this is the only gate the change gets.**
+Confirm completed, current canonical review evidence with no unresolved findings through
+`engineering:docs-review`. This includes deletion-only closeouts. The installed merge-review hook
+checks that evidence before a recognized merge command; `engineering:merging` owns its scope and limits.
+An admin queue bypass still requires the review and green required checks.
 
 ### 1. Branch off the fetched remote base, never a local one
 
@@ -90,12 +89,13 @@ gh pr edit <n> --add-label skip-e2e
 ### 5. Admin-merge — bypass the queue
 
 ```bash
-gh pr merge <n> --merge --admin      # no --delete-branch: the queue rejects that flag
+pushd "<absolute-worktree>" && gh pr merge <n> --merge --admin --match-head-commit <reviewed-full-head-sha>
 gh pr view <n> --json state,mergeCommit
 ```
 
 If `--admin` is refused — an unauthorized local token, most often — fall back to the queue **with the skip
-label**: `gh pr merge <n> --merge --auto`, then poll for `MERGED` per `engineering:merge`'s loop. **Never
+label** and the same checkout/head envelope, replacing `--admin` with `--auto`. Monitor for `MERGED`
+through `engineering:merge`. **Never
 force past a red check.**
 
 ### 6. Return to a clean base and clean up
@@ -106,7 +106,7 @@ git checkout main && git pull --ff-only origin main
 
 Apply `engineering:merge` Step 5's cleanup to the completed branch and any isolated checkout, including
 its native-Git path when the repository ships no worktree helper. Preserve the primary checkout for
-sequential work. The worktree-cleanup audit gate makes skipped isolated-checkout cleanup visible.
+sequential work. Cleanup remains the delivery owner's responsibility.
 
 ### 7. Confirm no publish fired
 

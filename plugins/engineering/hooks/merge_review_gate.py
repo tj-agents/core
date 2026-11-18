@@ -1,36 +1,11 @@
-r"""PreToolUse hook: no `gh pr merge` without a current, clean code-review.
+"""Check Claude and Codex merge attempts against current review evidence (Python 3.9+).
 
-Blocks a Bash tool call that would merge / enable auto-merge on a PR unless a
-review work-order exists for the current branch, is stamped at the exact commit
-being merged, and has zero open `- [ ]` findings. This is the *enforced* form of
-the AGENTS.md rule "do a code-review before you merge" — advisory prose was
-ignored once; a hook cannot be.
+Exit 2 refuses an identified merge when its pinned PR head lacks complete, clean review
+evidence. Other shell work is unaffected. The optional .agents/merge-gate.json extends
+security path classification; installing engineering enables the review check itself.
 
-Scope: only fires on commands containing `gh pr merge`. `--disable-auto` (turning
-a merge OFF) is always allowed — it is the safe direction. Every other merge form
-(`--auto`, `--admin`, `--merge`, `--squash`, `--rebase`, bare) must pass the gate.
-
-Contract: exit 0 = allow; exit 2 = block (stderr is fed back to the agent). For a
-merge command the hook fails CLOSED — any doubt (missing/stale/unclean review, or
-even an internal error) blocks, because letting an unreviewed merge through is the
-exact failure this guard exists to prevent. Non-merge commands always exit 0.
-
-Security layer: when the head being merged touches security-sensitive paths, the merge
-also requires a current `**Security-reviewed up to commit:** \`<sha>\`` marker —
-stamped by `review` Stage 6 after its host security review.
-
-A repo opts in by carrying `.agents/merge-gate.json`; without one the review check exits 0
-and claims no jurisdiction. Codex is the exception at the target-proof boundary: its hook
-payload omits an `exec_command` workdir override, so every Codex merge must use the narrow
-`pushd "<absolute-checkout>" && gh pr merge <number> ...` form below. An ambiguous Codex
-merge is rejected before repository jurisdiction because there is no safe directory in
-which to ask the opt-in question. Claude uses the same canonical target when present,
-while retaining its legacy `cd`/payload-cwd fallback. A `--repo
-<owner>/<name>` naming some other repository is likewise not this gate's business for
-Claude, for the same reason a `cd <other-repo> && merge` is not. The config file also names
-the repo's own security-sensitive paths, which are its inventory rather than this
-mechanism's — the generic patterns below (workflows, auth/secret vocabulary) apply
-everywhere and stay here.
+This is a local omission guard. It cannot authenticate an independent reviewer or inspect
+merges hidden inside scripts, aliases or API calls. GitHub repository rules own that boundary.
 """
 
 import json
@@ -41,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "workflows"))
 import review_evidence
 
+from git_auth_scope_gate import extract_command
 from hook_runtime import (
     NETWORK_COMMAND_TIMEOUT_SECONDS,
     claim_invocation,
@@ -69,10 +45,7 @@ _ENABLE_TOKENS = ("--auto", "--admin", "--merge", "--squash", "--rebase")
 
 CONFIG_FILE = ".agents/merge-gate.json"
 
-# Lowercased, and the hook's whole vocabulary: a harness whose shell tool is not named here
-# cannot be wired to this gate, because a matcher the hook ignores is enforcement that is inert
-# while looking wired. Codex's shell tool name is not established yet, so it carries no entry.
-SHELL_TOOLS = {"bash", "powershell"}
+SHELL_TOOLS = {"bash", "powershell", "shell", "exec_command", "unified_exec", "local_shell"}
 
 # Paths whose change makes a diff security-sensitive — a merge touching any of
 # these needs a current `Security-reviewed up to commit:` marker too. Kept
@@ -87,12 +60,11 @@ _SECURITY_PATTERNS = (
 
 
 class ConfigUnusable(Exception):
-    """The repo opted into the gate and the table cannot be read. Never silently ignored."""
+    """The repository security path inventory cannot be read."""
 
 
 def find_config(cwd):
-    """The opted-in repo root at or above `cwd`, or None. Walking up rather than asking git
-    keeps a worktree, a submodule and a plain checkout on the same answer."""
+    """Find an optional security path inventory at or above cwd."""
     try:
         base = Path(cwd).resolve()
     except OSError:
@@ -100,6 +72,8 @@ def find_config(cwd):
     for candidate in (base, *base.parents):
         if (candidate / CONFIG_FILE).is_file():
             return candidate / CONFIG_FILE
+        if (candidate / ".git").exists():
+            break
     return None
 
 
@@ -131,6 +105,8 @@ def touches_security(changed_paths, patterns=_SECURITY_PATTERNS):
 
 
 _INVOCATION_RE = re.compile(r"(?:^|[;&|\n]|&&|\|\|)\s*(?:[A-Za-z_][\w]*=\S+\s+)*gh\s+pr\s+merge\b")
+_HEREDOC_RE = re.compile(r"<<(-?)\s*(?:'([A-Za-z_][\w]*)'|\"([A-Za-z_][\w]*)\"|([A-Za-z_][\w]*))")
+_HEREDOC_RE = re.compile(r"<<(-?)\s*(?:'([A-Za-z_][\w]*)'|\"([A-Za-z_][\w]*)\"|([A-Za-z_][\w]*))")
 
 
 def mask_quoted(command):
@@ -160,6 +136,34 @@ def mask_quoted(command):
                 index = close + 1
                 continue
         index += 1
+    for match in _HEREDOC_RE.finditer(command):
+        if chars[match.start():match.start() + 2] != ["<", "<"]:
+            continue
+        beginning = command.find("\n", match.end())
+        if beginning < 0:
+            continue
+        delimiter = next(value for value in match.groups()[1:] if value is not None)
+        prefix = r"\t*" if match.group(1) else ""
+        closing = re.search(r"^" + prefix + re.escape(delimiter) + r"\r?(?:\n|$)",
+                            command[beginning + 1:], re.MULTILINE)
+        if closing is not None:
+            for position in range(beginning + 1, beginning + 1 + closing.end()):
+                if chars[position] not in "\r\n":
+                    chars[position] = " "
+    for match in _HEREDOC_RE.finditer(command):
+        if chars[match.start():match.start() + 2] != ["<", "<"]:
+            continue
+        beginning = command.find("\n", match.end())
+        if beginning < 0:
+            continue
+        delimiter = next(value for value in match.groups()[1:] if value is not None)
+        prefix = r"\t*" if match.group(1) else ""
+        closing = re.search(r"^" + prefix + re.escape(delimiter) + r"\r?(?:\n|$)",
+                            command[beginning + 1:], re.MULTILINE)
+        if closing is not None:
+            for position in range(beginning + 1, beginning + 1 + closing.end()):
+                if chars[position] not in "\r\n":
+                    chars[position] = " "
     return "".join(chars)
 
 
@@ -174,23 +178,21 @@ def invokes_merge(command):
     return _INVOCATION_RE.search(mask_quoted(command)) is not None
 
 
+def merge_arguments(command):
+    masked = mask_quoted(command)
+    for invocation in _INVOCATION_RE.finditer(masked):
+        yield re.split(r"[;&|\r\n]", masked[invocation.end():], maxsplit=1)[0]
+
+
 def is_merge_enable(command):
-    if not invokes_merge(command):
-        return False
-    # An enabling form anywhere gates — even in a compound that disables
-    # auto-merge FIRST (`--disable-auto && ... --auto`, the documented re-assert
-    # remedy). A whole-command "--disable-auto is present" test would fail open
-    # on exactly that compound, so check for an enabling token independently.
-    # Strip --disable-auto FIRST: "--auto" is a substring of it, so a naive token scan
-    # matched every disable and made the "safe direction" branch below unreachable.
-    scanned = command.replace("--disable-auto", " ")
-    if any(tok in scanned for tok in _ENABLE_TOKENS):
+    for tail in merge_arguments(command):
+        flags = set(tail.split())
+        if "--help" in flags or "-h" in flags:
+            continue
+        if "--disable-auto" in flags and not flags.intersection(_ENABLE_TOKENS):
+            continue
         return True
-    # A pure --disable-auto (no enabling token) is the safe direction — allow.
-    if "--disable-auto" in command:
-        return False
-    # Bare `gh pr merge` with neither is still a merge attempt — gate it.
-    return True
+    return False
 
 
 def pr_number(command):
@@ -242,15 +244,17 @@ _CD_RE = re.compile(r"(?:^|[;&|]|&&)\s*cd\s+((?:\"[^\"]*\")|(?:\'[^\']*\')|(?:[^
 # restricting the tail to gh's valueless merge switches keeps the target proof exact.
 _CANONICAL_MERGE_RE = re.compile(
     r'\Apushd "(?P<target>[^"\r\n]+)" && gh pr merge (?P<pr>[1-9]\d*)'
-    r'(?P<options>(?: --(?:auto|admin|merge|squash|rebase|delete-branch))*)\Z'
+    r'(?P<options>(?: --(?:auto|admin|merge|squash|rebase|delete-branch)'
+    r'| --match-head-commit [0-9a-fA-F]{40})*)\Z'
 )
 _PUSHD_TOKEN_RE = re.compile(r"\bpushd\b", re.IGNORECASE)
 _CANONICAL_UNSAFE_TARGET_CHARS = frozenset('$%!`&|;<>^\r\n')
 
 
 def is_codex_invocation(data):
-    """Codex hook payloads carry a turn id; Claude hook payloads do not."""
-    return "turn_id" in data or "turnId" in data
+    return ("turn_id" in data or "turnId" in data or
+            str(data.get("tool_name", "")).lower() in
+            {"exec_command", "unified_exec", "local_shell", "shell"})
 
 
 def canonical_merge_target_dir(command):
@@ -500,23 +504,9 @@ def grant_if_trusted(data, canonical_target):
         grant("merge-review-gate: the review is current and clean in a trusted repository.")
 
 
-def main():
-    try:
-        data = json.load(sys.stdin)
-    except ValueError:
-        sys.exit(0)  # not our JSON — don't interfere
-
-    if str(data.get("tool_name", "")).lower() not in SHELL_TOOLS:
-        sys.exit(0)
-
-    command = (data.get("tool_input") or {}).get("command", "")
-    if not isinstance(command, str) or not is_merge_enable(command):
-        sys.exit(0)
-
-    # Both harnesses prefer the canonical target, so the review gate judges the checkout
-    # where the documented command actually merges. Codex requires that proof because its
-    # hook input omits exec_command's workdir; Claude keeps its established cd/payload-cwd
-    # fallback for older callers that do not yet use the envelope.
+def check_merge(command, data):
+    if len(list(_INVOCATION_RE.finditer(mask_quoted(command)))) != 1:
+        block("MERGE GATE: run one merge per tool call so its review and head can be verified.")
     canonical_target = canonical_merge_target_dir(command)
     if is_codex_invocation(data):
         if canonical_target is None:
@@ -545,13 +535,7 @@ def main():
             # Run every git query where the merge runs, not where the hook process happens to sit.
             _GIT_CWD[0] = merge_target_dir(command, data)
 
-    # Only an opted-in repository's merges. `reviews/<branch>.md` is a convention a repo
-    # adopts, and a sibling repo merged from this session has its own rules - gating it here
-    # demanded a review file that repo never had. The question is asked of the directory the
-    # merge RUNS in, so a `cd <other-repo> && merge` is judged by that repo's opt-in.
     config_path = find_config(_GIT_CWD[0])
-    if config_path is None:
-        sys.exit(0)
 
     named = repo_flag(command)
     if named is not None:
@@ -561,9 +545,9 @@ def main():
                   "origin cannot be read, so the gate cannot tell whether the merge is its own; "
                   "refusing until it can.")
         if local != named:
-            sys.exit(0)
+            block("MERGE GATE: the command names another repository. Run the merge from its "
+                  "own checkout so its current review can be verified.")
 
-    # From here on the opted-in command WOULD merge — fail closed on anything unproven.
     try:
         toplevel = git("rev-parse", "--show-toplevel")
     except Exception as exc:  # noqa: BLE001 — a merge with a broken check must not slip through
@@ -573,28 +557,30 @@ def main():
     if not claim_invocation(data, "merge-review-gate"):
         sys.exit(0)
     try:
-        patterns = security_patterns(config_path)
+        patterns = security_patterns(config_path) if config_path is not None else _SECURITY_PATTERNS
     except ConfigUnusable as exc:
         block("MERGE GATE: " + str(exc))
 
-    # Gate the branch being MERGED, not the branch this session happens to sit on.
-    # Resolving the session's checkout meant a worktree PR merged from a main-rooted
-    # session looked for reviews/main.md and blocked, however clean its own review was.
     target = pr_number(command)
-    if target:
-        try:
-            branch = gh_json("pr", "view", target, "--json", "headRefName", "--jq", ".headRefName")
-            head = gh_json("pr", "view", target, "--json", "headRefOid", "--jq", ".headRefOid")
-        except Exception as exc:  # noqa: BLE001
-            block("MERGE GATE: cannot resolve PR #" + target + " (" + str(exc) + "); refusing to "
-                  "merge until its review can be verified.")
-    else:
-        try:
-            branch = git("rev-parse", "--abbrev-ref", "HEAD")
-            head = git("rev-parse", "HEAD")
-        except Exception as exc:  # noqa: BLE001
-            block("MERGE GATE: cannot resolve git state (" + str(exc) + "); refusing to merge "
-                  "until a code-review can be verified.")
+    try:
+        arguments = ["pr", "view", *([target] if target else []), "--json",
+                     "headRefName,headRefOid,baseRefOid"]
+        state = json.loads(gh_json(*arguments))
+        branch, head = state["headRefName"], state["headRefOid"]
+        base_head = state["baseRefOid"]
+        if not isinstance(branch, str) or not branch or not re.fullmatch(r"[0-9a-fA-F]{40}", head):
+            raise ValueError("the PR has no valid branch and full head SHA")
+        if not re.fullmatch(r"[0-9a-fA-F]{40}", base_head):
+            raise ValueError("the PR has no valid full base SHA")
+    except Exception as exc:
+        block("MERGE GATE: cannot resolve PR " + ("#" + target if target else "for this branch")
+              + " (" + str(exc) + "); refusing to merge until its review can be verified.")
+
+    pins = re.findall(r"--match-head-commit(?:\s+|=)([0-9a-fA-F]{40})(?=\s|$)",
+                      next(merge_arguments(command)))
+    if len(pins) != 1 or pins[0].lower() != head.lower():
+        block("MERGE GATE: pin the merge to the current PR head with `--match-head-commit "
+              + head + "`, then retry after reviewing that commit.")
 
     slug = branch.replace("/", "-")
     if target:
@@ -639,10 +625,9 @@ def main():
             "`- [ ]` or `- [~]` item, then merge. First: " + open_findings[0][:120]
         )
 
-    # Security layer: a security-sensitive head also needs a current security marker.
-    # Detection failure fails OPEN (the primary review gate already fired) so an
-    # unresolvable base can't wedge every merge; a resolvable sensitive path fails CLOSED.
-    sensitive = touches_security(changed_against_main(head), patterns)
+    base = git("merge-base", base_head, head)
+    changed = git("diff", "--name-only", base + ".." + head).splitlines()
+    sensitive = touches_security(changed, patterns)
     if sensitive:
         sreviewed = work_order_sha_field(review, "Security-reviewed up to commit")
         if sreviewed in (None, "invalid"):
@@ -664,8 +649,23 @@ def main():
             )
 
     grant_if_trusted(data, canonical_target)
-    grant_if_trusted(data, canonical_target)
     sys.exit(0)  # reviewed, current, clean → allow the merge
+
+
+def main():
+    try:
+        data = json.load(sys.stdin)
+    except (ValueError, UnicodeError):
+        return
+    if not isinstance(data, dict):
+        return
+    command = extract_command(data.get("tool_name", ""), data.get("tool_input"))
+    if not command or not is_merge_enable(command):
+        return
+    try:
+        check_merge(command, data)
+    except Exception as error:
+        block("MERGE GATE: review verification failed (" + str(error) + "); refusing this merge.")
 
 
 if __name__ == "__main__":

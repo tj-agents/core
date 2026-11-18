@@ -110,10 +110,9 @@ def current_authorization(root, binding, value):
 def current_review(root, binding, changed):
     merge_review_gate._GIT_CWD[0] = str(root)
     config = merge_review_gate.find_config(root)
-    if config is None:
-        raise AutoMergeError("canonical merge review configuration is absent")
     try:
-        patterns = merge_review_gate.security_patterns(config)
+        patterns = (merge_review_gate.security_patterns(config) if config is not None
+                    else merge_review_gate._SECURITY_PATTERNS)
     except merge_review_gate.ConfigUnusable as error:
         raise AutoMergeError(str(error)) from error
     slug = binding["branch"].replace("/", "-").replace("\\", "-")

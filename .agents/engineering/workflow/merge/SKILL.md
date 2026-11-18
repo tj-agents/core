@@ -75,7 +75,9 @@ too large for one pass. Commits added after the review require
 
 **Name the checkout in the merge command.** Record the worktree's absolute path and use the single
 cross-shell envelope shown in Step 4: `pushd "<absolute-worktree>" && gh pr merge <n> ...`. It works under
-Bash, cmd and PowerShell and pins the checkout before `gh` runs.
+Bash, cmd and PowerShell and pins the checkout before `gh` runs. The installed merge-review hook verifies
+the canonical review at this boundary, including the full PR head supplied by `--match-head-commit`;
+`engineering:merging` owns its scope and limits.
 
 ### 1. Find the PR for the current branch
 
@@ -170,7 +172,7 @@ present:
   trailer, changes what the *queue* runs.
 
 ```bash
-pushd "<absolute-worktree>" && gh pr merge <n> --merge --auto
+pushd "<absolute-worktree>" && gh pr merge <n> --merge --auto --match-head-commit <reviewed-full-head-sha>
 # no --delete-branch: the queue rejects it
 ```
 
@@ -302,7 +304,7 @@ merge caused, and a causally linked red one is never left behind. The mechanics:
   plan and its owned actions in place. Once
   publication and sync are terminal, record the final transition, delete the plan and ledger, and tick
   the owning roadmap item in one docs-only
-  closeout commit. Review it per `engineering:docs-review` — skipped for a pure close-out — and
+  closeout commit. Review it per `engineering:docs-review` and
   land it through `engineering:merge-docs`.
 
 ## Plan-managed delivery records material boundaries only

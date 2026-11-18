@@ -42,6 +42,13 @@
         ]
       },
       {
+        "path": "hooks/merge_review_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
         "path": "hooks/pre_tool_use_adapter.py",
         "hosts": [
           "codex"

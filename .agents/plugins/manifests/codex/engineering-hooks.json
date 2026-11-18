@@ -1,5 +1,5 @@
 {
-  "description": "Selected engineering mechanisms: an agent never widens the account's GitHub credential.",
+  "description": "Guard credential scope and require current review evidence at merge.",
   "hooks": {
     "PreToolUse": [
       {
@@ -11,7 +11,18 @@
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\""
           }
         ],
-        "matcher": "exec_command|unified_exec|local_shell|shell"
+        "matcher": "Bash|PowerShell|exec_command|unified_exec|local_shell|shell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 60,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/merge_review_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 55 \"${PLUGIN_ROOT}/hooks/merge_review_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell|exec_command|unified_exec|local_shell|shell"
       }
     ]
   }
