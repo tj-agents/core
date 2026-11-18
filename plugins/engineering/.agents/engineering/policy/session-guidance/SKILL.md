@@ -16,15 +16,11 @@ an authorized task has a future decision that may outlive the current session.
 
 ## When the user calls out a mistake
 
-When the user calls out a mistake, before apologizing or drafting feedback, check whether a governing
-standard caused or failed to prevent the mistake. This includes a missing, ambiguous, contradictory,
-mispriced or unenforced standard across every
-consumed `tj-agents` plugin on both hosts. Answer the user's direct question first. If it did,
-launch `engineering:handoff` in bounded
-side-workstream mode in the same turn under the standing authorization, before the original task resumes.
-An apology, a SendFeedback draft or local memory does not substitute for this source-owner repair. Existing
-user limits and scope gates still apply. Questions ask for reasoning: explain and defend recommendations with
-evidence, change them only for new evidence or a stated user decision, and say what changed.
+When the user calls out a mistake, answer the direct question first, then load and follow
+`engineering:self-repair`. It owns whether a consumed Core standard caused or failed to prevent the
+mistake, and the required bounded source-repair handoff. Existing user limits and scope gates still apply.
+Questions ask for reasoning: explain and defend recommendations with evidence, change them only for new
+evidence or a stated user decision, and say what changed.
 
 During normal work, when an applicable standard is ambiguous, silent or improvable, propose its
 refinement in the same turn as a question to the user: name the standard, the gap, concrete wording or a
@@ -117,15 +113,10 @@ Give shared behavior one source owner, preserve published compatibility commitme
 out-of-scope defects with an objective resolution condition in the existing project's debt or plan owner.
 A defect in a consumed standards package or its source repository is the exception: a stale or broken
 standard, including the automation that missed it, is a defect to diagnose, never a manual step to hand
-to the user, and so is a standard that caused or failed to prevent a mistake. Diagnose it and launch
-`engineering:handoff` in bounded side-workstream mode (the side workstream's goal records the defect)
-in the same turn, after answering the user's direct question and before the current task resumes,
-without asking, regardless of that task's own
-authority; announcing a later or separate fix instead of launching is a violation. This rule is the
-standing authorization: it covers implementing, testing, opening the PR and merging once that
-repository's gates pass. Installing into any other scope (the consuming repository included),
-publishing outside that repository, and destructive operations stay gated; explicit user limits still
-hold.
+to the user, and so is a standard that caused or failed to prevent a mistake. Diagnose it and follow
+`engineering:self-repair` in the same turn, after answering the user's direct question and before the
+current task resumes. That workflow owns the repair authorization, admission, disposition, and delivery
+procedure; explicit user limits still hold.
 Before committing or returning a terminal result, check the work against the standards that governed
 it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt
 entry. `engineering:write-debt` defines the selected repository convention. Do not create a second
