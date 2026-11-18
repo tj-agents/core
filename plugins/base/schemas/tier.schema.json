@@ -383,33 +383,31 @@
         }
       ]
     },
-    "nonEmployerPredicate": {
+    "originPredicate": {
       "allOf": [
         {
           "$ref": "#/$defs/predicate"
         },
         {
-          "not": {
-            "required": [
-              "fact"
-            ],
-            "properties": {
-              "fact": {
-                "const": "employer"
-              }
-            }
+          "propertyNames": {
+            "enum": [
+              "all",
+              "any",
+              "remote_host",
+              "remote"
+            ]
           }
         }
       ],
       "properties": {
         "all": {
           "items": {
-            "$ref": "#/$defs/nonEmployerPredicate"
+            "$ref": "#/$defs/originPredicate"
           }
         },
         "any": {
           "items": {
-            "$ref": "#/$defs/nonEmployerPredicate"
+            "$ref": "#/$defs/originPredicate"
           }
         }
       }
@@ -471,7 +469,7 @@
             "const": "stack-present"
           },
           "detect": {
-            "$ref": "#/$defs/nonEmployerPredicate"
+            "$ref": "#/$defs/originPredicate"
           }
         },
         "required": [
