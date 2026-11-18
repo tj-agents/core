@@ -127,7 +127,11 @@
         "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
         "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/operation/open-worktree/scripts/worktrees.py create)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/operation/open-worktree/scripts/worktrees.py create)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/open-worktree/scripts/worktrees.py create)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/open-worktree/scripts/worktrees.py create)"
       ],
       "codex_prefix_rules": [
         {
@@ -162,6 +166,50 @@
             [
               "python",
               "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python.exe",
+              "python3",
+              "py"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/engineering/operation/open-worktree/scripts/worktrees.py",
+              "${PLUGIN_ROOT}/skills/open-worktree/scripts/worktrees.py",
+              "${PLUGIN_ROOT}/codex-skills/open-worktree/scripts/worktrees.py"
+            ],
+            "create"
+          ],
+          "justification": "engineering:open-worktree: creates one validated isolated checkout under the repository common root",
+          "match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/engineering/operation/open-worktree/scripts/worktrees.py",
+              "create"
+            ],
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/codex-skills/open-worktree/scripts/worktrees.py",
+              "create"
+            ]
+          ],
+          "not_match": [
+            [
+              "python",
+              "${PLUGIN_ROOT}/.agents/engineering/operation/open-worktree/scripts/worktrees.py",
+              "create"
+            ],
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/engineering/operation/open-worktree/scripts/worktrees.py"
             ]
           ]
         }

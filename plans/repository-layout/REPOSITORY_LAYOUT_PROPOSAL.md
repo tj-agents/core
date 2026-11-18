@@ -1,6 +1,6 @@
 # Repository-owned plans, worktrees and TJ Agents adoption
 
-Status: approved outcome, execution in progress, 2026-10-07. Codex pickup verified; allocator implemented; restoration correction verified, incremental review next. Producer and consumer acceptance remain.
+Status: approved outcome, execution in progress, 2026-10-07. Codex pickup verified; allocator implemented, verified and locally reviewed through 4fd86e3; automatic harness-grant repair prioritized and delivery resumed. Producer and consumer acceptance remain.
 
 ## Authorization and ownership
 
@@ -167,7 +167,7 @@ Inspected shared plan, authoring, checkpoint and worktree contracts; read canoni
 README, current plan inventory, repo-declared configuration plan/progress and worktree registrations.
 Read the existing aggregate marketplace and kit READMEs. Read-only evidence explorers confirmed source
 ownership, explicit package closure, allocation defaults, host launch constraints and affected test areas.
-The approved outcome is authorized. The allocator design and corrections passed native review through ae60ebf. Implementation review at 6383bbc retained one remote-tracking defect; the L4 correction is implemented and passes the full focused suite; incremental review follows.
+The approved outcome is authorized. The allocator design and corrections passed native review through ae60ebf. Implementation review at 6383bbc retained one remote-tracking defect; the L4 correction is committed at 4fd86e3 and passes the full focused suite. Native review and parent bounded verification of the frozen correction are complete with no new findings.
 
 ## Execution ownership and evidence
 
@@ -415,13 +415,16 @@ including ordinary subsequent fetch, unchanged wildcard mapping and preserved ex
 19-test correction run had two new fixture setup errors and one symlink skip; the fixtures were repaired
 and the final full focused suite passed: 19 tests in 181.583 seconds, one Windows symlink skip.
 Both generated host copies ran outside this author checkout. The generated check (458 files), three
-harness manifests, plan graph and whitespace checks pass. Incremental review follows. Current-main synchronization/delivery stays behind the explicit
+harness manifests, plan graph and whitespace checks pass. Incremental native review and parent bounded verification completed with no new findings at
+4fd86e3772b004022eb924e638215b2158271381. The independent lens reported no defect but its corrected
+envelope still lacked full per-claim immutable-artifact binding, so its formal acceptance was replaced
+by parent fallback. All retained findings are resolved; the canonical review watermark covers 4fd86e3. Current-main synchronization/delivery stays behind the explicit
 pending fetch gate.
 Broader acceptance remains unchanged.
 
 ## Active delivery and side-owner evidence
 
-- Allocator producer: this branch; L4 implementation and restoration correction complete; all 19 allocator tests green with one symlink skip; delta review next,
+- Allocator producer: this branch; L4 implementation and restoration correction complete; 19-test focused suite green with one symlink skip; local review approved through 4fd86e3,
   no PR yet. Guidance remains
   a following Docs slice. No allocator rollout is claimed before both land and native acceptance passes.
 - Claude plan policy: PR #133 merged as `957da2637b1e8c471877b96353b43174f5ddd324` after guard and
@@ -472,43 +475,49 @@ stack-only project settings and no core lock/composed catalog. The inspected C++
 release/harness records. Resolve that source-owner dependency before consumer composition.
 
 
-## Pending external decisions
+## Harness grant correction and resumed authority
 
-The user-facing questions are already pending; no answer has been received. Continue local allocator
-repair/review and receive independent side-owner results while these actions remain gated.
+On 2026-10-08 Tommy explicitly clarified that all skill-owned harness capabilities must be injected
+through the harness grant and be available without routine permission questions. The prior questions
+about ordinary skill setup/delivery are superseded by that direction. The parent treated missing
+harness integration as a user decision; it is now owned as an implementation defect. Actual external
+platform denials still require diagnosis under the host's rules, not an undocumented bypass.
 
-| Blocked action | Resolver and concrete unblock action | Observable resume condition and next action |
-| --- | --- | --- |
-| Core fetch and post-merge synchronization/verification following PR #133 | Tommy decides whether the denied fetch/post-merge outcome may resume. The native classifier explicitly stopped it for `Merge Without Review`. | A direct approval is recorded; perform normal fetch, reconcile the allocator candidate against current main and follow ordinary review/CI delivery gates. |
-| PR #136 monitor/merge | Tommy decides whether its denied delivery may resume. Its scheduler request was rejected for `Merge Without Review`. | A direct approval is recorded; reconcile missing native/frozen review evidence, then monitor exact-head checks and use normal merge gates. |
-| Marketplace native pickup | Tommy approves folder trust for the exact Feature-CoreCatalogAdoption checkout. | Accept only that native trust prompt, verify a real pickup/first action, and continue the existing owner without relaunching. |
+The source repair owns plans/skill-harness-grants/GOAL.md in
+C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-SkillHarnessGrants,
+created with the reviewed allocator from fetched origin/main d3c88e839f9ddbce80e38aaa6ecaaef1f3c78c7d.
+Its native Codex launch has been invoked once; verify its actual launcher result and pickup artifact.
+The repair must connect shipped skill declarations, runtime grants and native startup/launch for both
+hosts, then prove acceptance. PR #100 already owns the base:harness policy; PR #137 owns the Codex
+launcher Python port. Preserve and reconcile both. No second adoption ledger is introduced.
 
-The separate credential-copy hold in the adoption ledger remains in force. None of these decisions is
-inferred from elapsed time, another owner's progress, or a continuation wake. Local continuation owns
-this same goal and must checkpoint the current committed head before releasing its foreground lease.
+The parent resumes the same repository-layout owner and ordinary authorized delivery. Core fetch for
+the isolated repair succeeded under the user's clarification. Recover the existing marketplace session
+through the supported trusted-scope path, repair PR #136's evidence before delivery, and carry genuine
+host capability failures into the source repair. Do not ask Tommy to assemble local permissions.
 
 ## Next Steps
 
 Scope: whole goal through all remaining slices and terminal delivery.
-Current slice: commit and incrementally review the verified allocator correction, then deliver the producer; coordinate the independent
+Current slice: establish the automatic harness-grant repair owner, reconcile current main and deliver the reviewed allocator producer; coordinate the independent
 native policy, source-repair and aggregate owners without overlapping their writes.
 Remaining scope: allocator guidance, cleanup reliability, marketplace/kit delivery, every project and known
 machine migration, both-host acceptance, and verified retirement of obsolete flat checkouts.
 Done when: every acceptance criterion above passes and all resulting authorized PRs/adoption/cleanup gates
 are terminal; source-only changes or one merged PR do not complete this goal.
 
-1. Preserve this full-goal Codex owner and heartbeat its continuation lease. Resolve the post-merge
-   core-fetch approval gate before that denied outcome is retried. Reconcile the L4 worker's
-   completed review at 6383bbc. The ALLOC1 writer has returned and the full 19-test focused rerun passed
-   with one symlink skip; commit the helper/tests/goal correction and run incremental review. Deliver its PR through exact-head CI and normal merge gates when unblocked.
+1. Keep the same full-goal continuation owner claimed. Verify the skill-harness-grants launch/pickup,
+   then reconcile current main against the allocator reviewed through 4fd86e3 and complete normal
+   review/CI/PR delivery. The 19-test focused run passed with one symlink skip. Keep the source repair
+   and allocator paths isolated; the user's clarified grant requirement removes routine permission questions.
 2. Receive results from the existing native side owners using their actual pickup/result artifacts and
    PR heads. Do not launch duplicates. Keep the adoption owner at
    plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md; its continuation checkpoint is present.
 3. Deliver allocator guidance from updated main after the producer. Receive the existing native
    startup-repair owner's protocol/result, preserving the transferred-obligation writer and PR #135.
    Verify delayed acknowledgement, failed startup, shared claims, both native hosts and no late cleanup.
-4. Resolve the aggregate checkout's native folder-trust gate with the user, accept only that exact
-   authorized prompt, then confirm pickup and the producer/identity contract. Use a real Claude handoff for
+4. Recover the exact existing aggregate checkout's native launch using the authorized harness trust
+   path, then confirm pickup and the producer/identity contract. Use a real Claude handoff for
    kit after reconciling PR #4, keeping separate focused PRs and exact release/native acceptance gates.
 5. Extend the existing adoption owner for project/machine batches and goal/reference migrations. Before
    deletion, preserve dirty work, local-only history and active sessions and prove replacement ownership.
