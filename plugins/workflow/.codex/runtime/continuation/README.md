@@ -55,8 +55,10 @@ timer; Windows needs inbox Windows PowerShell's ScheduledTasks. Neither changes 
 continue in the foreground.
 
 Unattended progress is established only by initialization, claim, registration and an observed wake. The
-child runs at the packaged L4 lane. The owner is bound to one worktree and branch and may rebind only a new
-head within them; it never moves to another PR or checkout, and finishing its PR does not finish the goal.
+child runs at the model and effort of Agent's Codex L4 lane agent, `lane-l4.toml` in the Codex profile's
+`agents/` directory, which `tj install` delivers; registration refuses a profile without it. The owner is
+bound to one worktree and branch and may rebind only a new head within them; it never moves to another PR
+or checkout, and finishing its PR does not finish the goal.
 
 Budgets default to six child launches, three consecutive transport failures, a 24-hour deadline and a
 900-second child timeout. Tighter user limits win. Never raise them silently or add bypass-permission
