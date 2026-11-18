@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:f5477a5e0f208bf36e6e44fe9da78b419f2c0c3619f53311bea9a17e23061283",
+      "digest": "sha256:025e61b645ae69641ecee7434e52c976cb49494a823105e1f73592b3be6174f4",
       "harness": {
         "marketplaces": [
           {
@@ -151,15 +151,13 @@
         "sync-checkout",
         "unmerged",
         "update-roadmap",
-        "worktree",
-        "write-bug",
-        "write-debt",
-        "write-mistake"
+        "worktree"
       ],
       "dependencies": {
         "required": [
           "base-agents/base",
-          "base-agents/machine"
+          "base-agents/machine",
+          "work-items-agents/work-items"
         ],
         "optional": []
       },
@@ -174,18 +172,23 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:afd6cd6eb3d65d73590529a2aff44744d58e69094c009ce51270f9dba1abc855",
+      "digest": "sha256:acd5aade173bacad0770ce638bacb4b5ff26f76eecb96bcd9d8be562c6055912",
       "harness": {
         "marketplaces": [
           {
             "id": "base-agents",
             "repository": "tj-agents/core"
+          },
+          {
+            "id": "work-items-agents",
+            "repository": "tj-agents/work-items"
           }
         ],
         "plugins": [
           "base-agents/base",
           "base-agents/engineering",
-          "base-agents/machine"
+          "base-agents/machine",
+          "work-items-agents/work-items"
         ],
         "hooks": [
           {
@@ -355,7 +358,7 @@
                   "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
                 ]
               ],
-              "justification": "Reads the current plan corpus and recorded work-item status to report scoped unfinished work; it does not write repository or session state",
+              "justification": "Reads unselected file-backed plans and local execution status; selected or invalid tracker declarations stop the scan and direct the caller to the canonical provider without writing state",
               "match": [
                 [
                   "python3",
@@ -459,6 +462,16 @@
             ]
           }
         }
+      },
+      "external_dependencies": {
+        "required": [
+          {
+            "id": "work-items-agents/work-items",
+            "marketplace": "work-items-agents",
+            "repository": "tj-agents/work-items"
+          }
+        ],
+        "optional": []
       }
     },
     {
@@ -512,7 +525,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:59a05cc7a883fe2d50f068737075c6f46dae75d40b906ed8f5c41bd6352a5cb6",
+      "digest": "sha256:e9fc9921e36b7d28346c7a23aafc166cf8b1744069f8556667fa813b2e7df968",
       "digest_excludes": [
         "catalog/catalog.json"
       ],

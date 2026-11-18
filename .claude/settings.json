@@ -102,6 +102,10 @@
     "engineering@tj-agents": true,
     "machine@tj-agents": true,
     "personal@tj-agents": true,
-    "work-items@tj-agents": true
+    "work-items@tj-agents": true,
+    "agent-store@tj-agents": true,
+    "agent@tj-agents": true,
+    "cli@tj-agents": true,
+    "workflow@tj-agents": true
   }
 }
