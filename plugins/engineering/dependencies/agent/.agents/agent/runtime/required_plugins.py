@@ -23,6 +23,7 @@ IDENTITY = re.compile(r"[a-z][a-z0-9-]*@[a-z][a-z0-9-]*\Z")
 INVENTORY_TIMEOUT_SECONDS = 20
 MARKETPLACE_NAME = "tj-agents"
 MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
+MARKETPLACE_SPARSE_PATHS = (".agents/plugins", ".claude-plugin", "plugins")
 
 
 def producer_repository(repository: object) -> bool:
@@ -45,7 +46,7 @@ class RequiredPluginsError(RuntimeError):
 
 
 class MissingRequiredPluginsError(RequiredPluginsError):
-    def __init__(self, message, project, missing):
+    def __init__(self, message: str, project: Path, missing: Sequence[str]) -> None:
         super().__init__(message)
         self.project = project
         self.missing = tuple(missing)
@@ -57,6 +58,14 @@ def project_root(project: Path) -> Path:
         if (directory / ".agents/plugins.json").exists() or (directory / ".git").exists():
             return directory
     return project
+
+
+def committed_worktree(project: Path) -> bool:
+    if not (project / ".git").is_file():
+        return False
+    tracked = process.run(["git", "ls-files", "--error-unmatch", "--", ".agents/plugins.json"],
+                          cwd=project, capture_output=True, timeout=10, check=False)
+    return tracked.returncode == 0
 
 
 def launch_context(project: Path, host: Host, arguments) -> tuple[Path | None, tuple[str, ...]]:
@@ -169,7 +178,7 @@ def enabled_roots(plugins: host_plugins.Plugins, project: Path, entries: list) -
 
 
 def check(project: Path, host: Host, executable: str | None = None,
-          inventory_options: tuple[str, ...] = ()) -> dict[str, Path] | None:
+          inventory_options: tuple[str, ...] = (), *, entries: list | None = None) -> dict[str, Path] | None:
     plugins = host_plugins.PLUGINS[host]
     launch_directory = project.resolve()
     project = project_root(launch_directory)
@@ -180,13 +189,14 @@ def check(project: Path, host: Host, executable: str | None = None,
     binary = executable or shutil.which(host.value)
     if not binary:
         raise RequiredPluginsError(f"Required standards cannot be verified: {host} executable is unavailable")
-    roots = inventory_roots(launch_directory, host, binary, inventory_options, identities=required)
+    roots = (enabled_roots(plugins, launch_directory, entries) if entries is not None
+             else inventory_roots(launch_directory, host, binary, inventory_options, identities=required))
     missing = sorted(set(required) - roots.keys())
     if missing:
         raise MissingRequiredPluginsError(
-            f"Required standards unavailable for {host} in {project}: {', '.join(missing)}. "
-            f"Invoke agent:refresh-plugins for {host} in this project; it installs and adopts required plugins automatically. "
-            "Cached files from another host do not establish activation.", project, missing,
+            f"Required standards unavailable for {host} in {project}; not enabled with a complete "
+            f"cached build: {', '.join(missing)}. Run tj install --step 'plugin setup' "
+            "in this project; it reinstalls missing and incomplete builds.", project, missing,
         )
     return {identity: roots[identity] for identity in required}
 
@@ -194,13 +204,21 @@ def check(project: Path, host: Host, executable: str | None = None,
 def inventory_roots(project: Path, host: Host, executable: str | None = None,
                     inventory_options: tuple[str, ...] = (), *, identities: Sequence[str] | None = None) -> dict[str, Path]:
     """Return verified enabled roots, optionally limited to selected marketplaces and identities."""
+    entries = inventory_rows(project, host, executable, inventory_options, identities=identities)
+    roots = enabled_roots(host_plugins.PLUGINS[host], project.resolve(), entries)
+    return roots if identities is None else {identity: root for identity, root in roots.items() if identity in identities}
+
+
+def inventory_rows(project: Path, host: Host, executable: str | None = None,
+                   inventory_options: tuple[str, ...] = (), *, identities: Sequence[str] | None = None) -> list:
+    """Read native inventory without processing installations or writing receipts."""
     plugins = host_plugins.PLUGINS[host]
     launch_directory = project.resolve()
     binary = executable or shutil.which(host.value)
     if not binary:
         raise RequiredPluginsError(f"Required standards cannot be verified: {host} executable is unavailable")
     if identities is None:
-        return enabled_roots(plugins, launch_directory, inventory(binary, plugins, launch_directory, inventory_options))
+        return inventory(binary, plugins, launch_directory, inventory_options)
     plugins.require_inventory_options(inventory_options)
     entries = []
     deadline = time.monotonic() + INVENTORY_TIMEOUT_SECONDS
@@ -209,8 +227,7 @@ def inventory_roots(project: Path, host: Host, executable: str | None = None,
         if remaining <= 0:
             raise RequiredPluginsError(f"Required {host} plugin inventory exceeded its {INVENTORY_TIMEOUT_SECONDS}-second budget")
         entries.extend(inventory(binary, plugins, launch_directory, inventory_options, marketplace, timeout=remaining))
-    return {identity: root for identity, root in enabled_roots(plugins, launch_directory, entries).items()
-            if identity in identities}
+    return entries
 
 
 def inventory(binary: str, plugins: host_plugins.Plugins, launch_directory: Path, inventory_options: tuple[str, ...],
@@ -248,6 +265,7 @@ def inventory(binary: str, plugins: host_plugins.Plugins, launch_directory: Path
 CHECK_TIMEOUT_SECONDS = 90
 ONBOARD_TIMEOUT_SECONDS = 660
 MAX_OUTPUT = 1024
+SETUP_RECORD = "plugin-setup.json"
 
 
 class PluginSetupError(RuntimeError):
@@ -260,6 +278,14 @@ class Target:
     script: Path
     declaration: str
     runtime: bytes
+    converge: bool
+
+
+@dataclass(frozen=True, slots=True)
+class CollectionResult:
+    targets: list[Target]
+    errors: list[str]
+    missing: dict[Host, MissingRequiredPluginsError]
 
 
 def bounded(result: subprocess.CompletedProcess) -> str:
@@ -341,10 +367,32 @@ def declaration(root: Path, identity: str, document: dict | None = None) -> Targ
     setup = requires.get("setup")
     if setup is None:
         return None
-    if not isinstance(setup, dict) or set(setup) != {"script"} or not isinstance(setup["script"], str):
-        raise PluginSetupError(f"{identity}: requires.setup must be {{\"script\": \"relative/path.py\"}}")
+    valid_keys = ({"script"}, {"script", "converge"})
+    if (
+        not isinstance(setup, dict)
+        or set(setup) not in valid_keys
+        or not isinstance(setup["script"], str)
+        or ("converge" in setup and not isinstance(setup["converge"], bool))
+    ):
+        raise PluginSetupError(
+            f'{identity}: requires.setup must be {{"script": "relative/path.py"}}, '
+            'optionally with "converge": a bool'
+        )
     script = private_path(root, setup["script"])
-    return Target(identity, script, setup["script"], runtime_bytes(script.parent))
+    converge = bool(setup.get("converge", False))
+    return Target(
+        identity, script, setup["script"], runtime_bytes(script.parent), converge
+    )
+
+
+def converges(root: Path) -> bool:
+    try:
+        document, _ = harness_document(root)
+    except PluginSetupError:
+        return False
+    requires = document.get("requires")
+    setup = requires.get("setup") if isinstance(requires, dict) else None
+    return isinstance(setup, dict) and setup.get("converge") is True
 
 
 def targets(project: Path, host: Host, executable: str | None) -> list[Target]:
@@ -366,14 +414,16 @@ def targets(project: Path, host: Host, executable: str | None) -> list[Target]:
     return found
 
 
-def collect(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None]) -> tuple[list[Target], list[str]]:
-    discovered, errors = {}, []
+def collect(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None]) -> CollectionResult:
+    discovered, errors, missing = {}, [], {}
     for host in hosts:
         try:
             discovered[host] = {target.identity: target for target in targets(project, host, executables.get(host))}
+        except MissingRequiredPluginsError as error:
+            missing[host] = error
         except (RequiredPluginsError, PluginSetupError, RuntimeError, OSError) as error:
             errors.append(f"{host}: {error}")
-    if not errors and discovered:
+    if not errors and not missing and discovered:
         reference_host = next(iter(discovered))
         reference = discovered[reference_host]
         for host, current in discovered.items():
@@ -382,9 +432,44 @@ def collect(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str
                 continue
             for identity, target in current.items():
                 expected = reference[identity]
-                if expected.declaration != target.declaration or expected.runtime != target.runtime:
+                disagree = (
+                    expected.declaration != target.declaration
+                    or expected.runtime != target.runtime
+                    or expected.converge != target.converge
+                )
+                if disagree:
                     errors.append(f"{identity}: native host runtimes disagree on its setup declaration")
-    return ([] if errors else [reference[key] for key in sorted(reference)]), errors
+    if errors or missing or not discovered:
+        return CollectionResult([], errors, missing)
+    return CollectionResult([reference[key] for key in sorted(reference)], errors, missing)
+
+
+def recorded_setups(state: Path) -> dict[str, str]:
+    """The setup runtime digest of each plugin's last successful setup, keyed by identity."""
+    try:
+        document = json.loads((state / SETUP_RECORD).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(document, dict):
+        return {}
+    return {identity: runtime for identity, runtime in document.items()
+            if isinstance(identity, str) and isinstance(runtime, str)}
+
+
+def record_setups(state: Path, targets: Sequence[Target]) -> None:
+    document = recorded_setups(state) | {target.identity: target.runtime.hex() for target in targets}
+    state.mkdir(parents=True, exist_ok=True)
+    staged = state / f"{SETUP_RECORD}.{os.getpid()}"
+    staged.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    staged.replace(state / SETUP_RECORD)
+
+
+def install_and_recheck(project: Path, host: Host, error: MissingRequiredPluginsError,
+                        executable: str | None = None, inventory_options: tuple[str, ...] = ()) -> dict[str, Path] | None:
+    host_plugins.PLUGINS[host].install(error.project, error.missing)
+    if executable is None:
+        return check(project, host, inventory_options=inventory_options)
+    return check(project, host, executable, inventory_options=inventory_options)
 
 
 def invoke(target: Target, arguments: list[str], timeout: int, project: Path,
@@ -425,7 +510,8 @@ def reconcile_selections(projects: Sequence[Path], *, check_only: bool = False) 
     return []
 
 
-def check_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None]) -> list[str]:
+def check_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None],
+                state: Path) -> list[str]:
     project = project_root(project)
     try:
         drift = reconcile_selection(project, check_only=True)
@@ -433,8 +519,14 @@ def check_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host,
         return [str(error)]
     if drift:
         return drift
-    targets_found, errors = collect(project, hosts, executables)
-    for target in targets_found:
+    collected = collect(project, hosts, executables)
+    errors = collected.errors
+    errors.extend(f"{host}: {error}" for host, error in collected.missing.items())
+    recorded = recorded_setups(state)
+    for target in collected.targets:
+        if recorded.get(target.identity) != target.runtime.hex():
+            errors.append(f"{target.identity}: setup has not succeeded with its current runtime")
+            continue
         try:
             result = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS, project)
             if result.returncode:
@@ -443,26 +535,51 @@ def check_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host,
             errors.append(f"{target.identity}: setup --check could not run: {error}")
     return errors
 
-
-def converge_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None], onboard: bool = False) -> list[str]:
+def converge_setup(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str | None], state: Path,
+                   onboard: bool = False) -> list[str]:
     project = project_root(project)
     try:
         reconcile_selection(project)
     except RequiredPluginsError as error:
         return [str(error)]
-    targets_found, errors = collect(project, hosts, executables)
-    for target in targets_found:
+    collected = collect(project, hosts, executables)
+    errors, missing = collected.errors, collected.missing
+    if errors:
+        errors.extend(f"{host}: {error}" for host, error in missing.items())
+        return errors
+    for host, missing_error in missing.items():
         try:
+            install_and_recheck(project, host, missing_error, executables.get(host))
+        except (RequiredPluginsError, RuntimeError, OSError) as repair_error:
+            errors.append(f"{host}: {repair_error}")
+    if errors:
+        return errors
+    if missing:
+        collected = collect(project, hosts, executables)
+        errors = collected.errors
+    errors.extend(f"{host}: {error}" for host, error in collected.missing.items())
+    recorded = recorded_setups(state)
+    converged = []
+    for target in collected.targets:
+        try:
+            current = recorded.get(target.identity) == target.runtime.hex()
+            if current and not invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS, project).returncode:
+                continue
+            applied = invoke(target, ["--onboard"] if onboard else [],
+                             ONBOARD_TIMEOUT_SECONDS if onboard else CHECK_TIMEOUT_SECONDS, project, inherit=onboard)
+            if applied.returncode:
+                errors.append(f"{target.identity}: setup failed: {bounded(applied)}")
+                continue
             checked = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS, project)
             if checked.returncode:
-                applied = invoke(target, ["--onboard"] if onboard else [],
-                                 ONBOARD_TIMEOUT_SECONDS if onboard else CHECK_TIMEOUT_SECONDS, project, inherit=onboard)
-                if applied.returncode:
-                    errors.append(f"{target.identity}: setup failed: {bounded(applied)}")
-                    continue
-                checked = invoke(target, ["--check"], CHECK_TIMEOUT_SECONDS, project)
-            if checked.returncode:
                 errors.append(f"{target.identity}: setup did not converge: {bounded(checked)}")
+                continue
+            converged.append(target)
         except (OSError, subprocess.SubprocessError) as error:
             errors.append(f"{target.identity}: setup could not run: {error}")
+    if converged:
+        try:
+            record_setups(state, converged)
+        except OSError as error:
+            errors.append(f"plugin setup could not be recorded in {state}: {error}")
     return errors
