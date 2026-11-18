@@ -28,14 +28,15 @@ identical behaviour.
    agents, and self-heal. Core's `engineering` package already ships the router, the gates and
    the agents; `concertable@agent-standards` (`Concertable/agent-standards`,
    `plugins/concertable`) carries duplicates of them. Retire those duplicates so concertable keeps
-   only Concertable-product skills and rules. Order: the Concertable repository first enables
-   core plus concertable in its own project settings, then the duplicates are deleted, so it is
-   never without lanes or gates.
+   only Concertable-product skills and rules. Order: the Concertable repositories first declare
+   the concertable marketplace (which depends on core), then the duplicates are deleted, so
+   they are never without lanes or gates.
 2. **Generated repo config.** A core generator reads a repository's `.agents/` profile and
-   routes and writes its `.claude/settings.json` (`extraKnownMarketplaces` with GitHub sources
-   plus `enabledPlugins`, always including core) and `.codex/config.toml` (same, no local
-   sources). Consumer CI fails when these drift from the generator. Child marketplaces (cpp,
-   react, dotagents) always pull in core.
+   routes and writes its `.claude/settings.json` and `.codex/config.toml` declaring only the
+   repository's domain marketplace (GitHub sources, no local sources). A repository never names
+   core, lanes or core's agents directly: every child marketplace (cpp, react, dotagents,
+   concertable) depends on core, so core arrives transitively. Consumer CI fails when these
+   drift from the generator.
 3. **Self-heal.** When a route's skill is missing, stale or not loaded, core's hook updates the
    declared GitHub marketplace, installs the pinned release, injects the skill's `SKILL.md`
    through hook output and records that as the session proof, so no restart is needed.
