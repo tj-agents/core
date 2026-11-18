@@ -9,6 +9,8 @@ and remote data while migrating actual callers; retain no obsolete skill aliases
 
 The approved public surface is the same three names under each owning namespace:
 then use the applicable Core Engineering lifecycle. Personal owns GitHub behavior and conventions.
+The employer profile owns Azure Boards behavior, native type/field mappings and employer authorization. Debt intent
+creates an existing Technical User Story in the employer profile, not Technical Debt Item. Optional typed meta-entry
 skills are unnecessary for the initial cutover. Work retains employer-neutral communications; remove its
 superseded tracker dispatch/wrapper family. Core owns only the shared SQLite execution/session registry,
 qualified external identity, ownership/status/resume links and reusable engineering workflows. Core does
@@ -25,6 +27,7 @@ externally gated; dependent publication/activation remains coordinated):
    included atb35d86d. Rehome existing GitHub runtime/schemas/receipts, add three current entry points,
    retire typed wrappers/dependency, test packaged CLI and same-record reconciliation. Existing code moves
    are reported separately; stop expansion for split assessment above1000 substantive changed lines.
+2. Employer profile PR, existing employer-plugin worktree,
    fetched main23commits ahead before synchronization. Self-contained Azure helper, existing fixed auth/
    scope/revision/idempotency invariants, three current operations and debt Story mapping. Source tests and
    payload acceptance are independent of the existing employer billing/provenance gate. No live mutations.
@@ -61,6 +64,7 @@ incomplete obligations, with live provisioning requiring the recorded narrow per
 
 ## Source checkpoint — 21 October 2026
 
+Core routing is committed at70146c07; Work wrapper removal atcb2633e. Core source-layout24, harness20, provider8 and selector15 tests pass; examples and three-repository skill-reference closure pass. Work generation49, Template conformance and21 tests pass. Personal/employer provider writers and Core schema4 writer remain in progress. No replacement source has been published or live schema activated.
 
 Review scope uses each PR’s actual current main base, covering the complete remaining branch change rather than unrelated merged-main history. Core has55 paths including generated host deletions and plan artifacts, with ~1200 total changed lines; the existing single recording-boundary cutover remains atomic and removes aliases rather than splitting into inconsistent installed states. Independent review and exact-head checks remain required.
 
@@ -103,6 +107,7 @@ The earlier handoff mistakenly treated delivered tooling and read/admission inte
 1. `write-issue` classifies a request as bug, mistake, debt, feature or task, then delegates to the appropriate specific writer. Keep it a thin entry point: reuse shared classification/record semantics, deterministic templates, selection and transport; do not add a second backlog or duplicate creation logic. Direct specific-skill calls and generic calls must reach the same canonical item and format. Ask only when the available facts cannot resolve a materially different action. Recording must not silently invoke addressing/implementation.
 2. Keep precise kinds: faulty software behavior is a bug; an observed agent/process error is a mistake; an intentional deferred compromise is debt; features/tasks retain their existing requirements and acceptance. One observation is not an instruction to create multiple records. Reconcile existing cause/owner and stable identity before creation; link genuinely distinct related problems without duplicating their repair owner.
 3. In an explicitly adopted personal repository, future recording, discovery/listing, updates, resolution and verification use the selected GitHub tracker and its managed format. Preserve evidence, priority, state, source ownership, repair links, legacy IDs and request identity. Never create parallel BUGS.md/MISTAKES.md/TECH_DEBT.md records or append new live backlog to plans as a second canonical tracker. Retain substantial design plans and curated documentation in source.
+4. Core remains backend-neutral and usable at work. Preserve repository selection, explicit opt-outs, existing unselected-repository contracts, and employer/Azure DevOps ownership. Installing Core or work-items alone must not adopt a tracker or redirect employer evidence to GitHub. Do not modify employer repositories or copy their private content. A selected provider that is unavailable/offline must fail visibly and retain unsent facts under the existing contract without inventing synchronization or silently selecting a file fallback.
 5. Preserve both Codex and Claude discovery, qualified skill references, packaged helpers, host grants, harness manifests and generated catalogs through the owning publisher's normal source/generation process. Edit canonical source, not generated plugins. Preserve compatibility needed by already adopted declarations and migrated issues.
 
 ## ALL affected skills audit and acceptance

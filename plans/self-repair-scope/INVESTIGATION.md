@@ -12,7 +12,8 @@ Core's session, handoff, close and problem-record callers now follow that decisi
 facts while a profile's recording decision is pending or declined. Both self-repair host adapters carry
 the same discovery description. The source-policy checks have been updated to the accepted contract.
 
-`C:/Users/TommySeery/source/repos/tj-agents/company.worktrees/Fix-AzureCreationConsent`, based on its
+The employer plugin source update is isolated on `Fix/AzureCreationConsent` in
+an isolated employer-plugin worktree, based on its
 current `origin/main`. `create-work-item` owns the creation decision; work-context, ship, implement and
 open-pr route to it. Existing intended items are reused. No new tracker item, host hook, runtime consent
 flag or second repair workflow is introduced. This is instruction-level policy, not proof that a model
@@ -32,12 +33,14 @@ tests, 13 packaged engineering-hook tests, and skill packaging. Package generati
 changes on its check pass. Changed guidance passed the installed template example checker. Generated
 packages are validation output and are excluded from authored source commits.
 
+Independent read-only reviews assessed the committed Core and employer plugin changes. They found an obsolete
 source-mutation fixture in the packaged hook tests and a caller that could begin implementing an existing
 item before reconciling its writer. The fixture now mutates current policy wording; implement and ship
 reconcile existing item ownership before editing or switching branches, preserve the established branch,
 and forward the existing identity. The ship guidance also distinguishes Azure creation from the separate
 push decision. Final reviewed candidates and their coverage limits belong to the branch review evidence.
 
+The employer plugin's local suite and Core tier-payload checker passed. Its initially skipped Core parity assertion
 passed when the Core checkout path was supplied explicitly. No Azure create call, issue creation,
 publication or installation was performed. The source checks exercise package contracts and helpers, not
 live model consent compliance. Linux execution and fresh installed Codex/Claude sessions are unverified.
@@ -51,6 +54,7 @@ implementation supersedes their proposed or pending policy decisions.
 
 ## User decision and investigation direction — 22 October 2026
 
+Tommy clarified that autonomous Azure Boards creation is unwanted. When Tommy explicitly requests an item, that request authorizes creation within its stated scope. When the AI proposes an item, it must first ask whether Tommy wants it created and wait for an affirmative answer. Discovering a problem, selecting an employer provider, or having permission to implement code does not supply that answer. An item should represent work Tommy intends to address at some point; an observation alone is insufficient. This employer policy belongs in the employer plugin. Personal-project autonomy should remain available.
 
 The remaining question is the useful scope of self-repair. This investigation recommends separating three decisions: correcting the active task, repairing a reusable agent standard, and creating a tracker item. Permission for one does not imply permission for the others. No Azure Boards or GitHub item was created for this investigation, and no runtime policy was changed.
 
@@ -75,10 +79,13 @@ Keep the reusable repair mechanism in Engineering and limit its subject to agent
 
 Keep high autonomy for explicitly adopted personal projects, including a personally adopted Concertable standards repository. In an employer task, recommend and scope a separate standards repair before diverting that task into a cross-repository repair or source publication. The originating employer task's permissions still apply even when the proposed destination is a personal tooling repository. Stop an actually unsafe affected operation when necessary; a generic P1 source classification should not by itself take over unrelated employer work.
 
+The employer profile owns consent for Azure Boards creation, the requirement that items represent intended future work, and employer-specific metadata. Core's recording contract should defer to that policy and recognize 'awaiting a recording decision' without demanding a replacement issue or another tracker. Personal may retain proactive recording under its own adopted policy. Fixing a reusable agent standard does not itself require a product work item.
 
 ## Additional source findings
 
+- The employer plugin's existing work-context skill already says agent tooling receives no ADO work item. The new consent rule generalizes control over AI-originated employer product items; it should preserve that existing tooling boundary.
 - Core `.agents/engineering/policy/session/SKILL.md`, lines 71 onward, instructs agents to record noticed problems. The selected profile controls record policy, but this call site does not explicitly distinguish selection from consent to create.
+- The employer plugin's newer create-work-item skill asks about assignment, parent and branch. It does not explicitly ask whether an AI-proposed item should exist. Its deterministic helper validates inputs, repository scope and request identity, then can POST; these are not proof of user intent.
 - Both the older `create-devops-item` surface and the newer `create-work-item` surface need to be accounted for by the actual source owner. `open-pr` currently tells the agent to invoke item creation when a linked item is missing; `ship` and `implement` also compose item creation. These paths must respect the same consent policy rather than making missing linkage an independent creation authorization. An existing intended work item should be reused when applicable.
 - `Concertable/agents/README.md` identifies that repository as the owner of reusable product-specific contracts, routes and hooks; its `AGENTS.md` contains explicit Personal adoption and its `.problem-records.json` selects `personal:work-item`. Its composition-testing and always-on skills demonstrate reusable instruction/routing surfaces that could benefit from standards repair. That evidence does not establish Personal adoption in every Concertable consumer; the inspected `Concertable/system` checkout had neither `.agents/plugins.json` nor `.problem-records.json` at its root.
 
@@ -90,9 +97,11 @@ Requested investigation, 22 October 2026. This records policy gaps found by sour
 
 Current behavior: engineering:session routes user mistake callouts to engineering:self-repair after answering the direct question. Self-repair investigates whether a consumed Core standard, skill, hook, workflow or host enforcement caused or failed to prevent the mistake. It reconciles an existing repair owner, records through the selected profile, and repairs in the current session. Unrelated checkouts require a separate worktree of the standards source repository. Handoff requires the user to ask. Standing authority includes implementation, tests, review, PR, merge and source publication after that repository's gates. Explicit user limits remain binding. Shared ownership/completion/handoff/cleanup failures default to P1 and pause unrelated work and new launches until verified correction or explicit deferral. Completion currently permits repaired/tested/committed source or a recorded blocker, then resumption of the original task. Loaded sessions retain their old instructions.
 
+Personal versus work: this is one shared Engineering workflow, applicable when Engineering is selected. Personal requires explicit personal adoption and selects personal:work-item / personal:create-work-item / personal:address-work-item backed by GitHub. Employer scope selects its qualified counterparts backed by Azure Boards and employer-native types. Employer incident evidence must remain with the employer provider; a GitHub owner, personal directory or the employer plugin's source repository does not establish personal scope. Neither installing Core nor repairing a standard authorizes adopting Personal or installing into the consuming repository. Missing/invalid/unavailable provider selection blocks recording and retains unsent facts in active task context with a resolver and resume condition; historical Markdown registers are not a fallback backlog.
 
 ## Expected boundary
 
+The workflow should distinguish investigating a callout from establishing a source defect and explain a truthful no-source-change outcome when the existing rule is adequate. An employer incident does not automatically belong in Azure Boards: retain relevant facts within the authorized employer task, respect the employer creation decision, and identify any separately authorized standards repair without copying confidential evidence. Completion should make source correction, publication and installed/fresh-session verification distinguishable.
 
 ## Findings
 
@@ -123,6 +132,7 @@ A callout can interrupt authorized product work and begin a broadly authorized C
 
 ## Proposed resolution for a future repair
 
+Agree and document the existing workflow's causal decision outcomes, including an adequate-rule/no-source-change result. Define origin incident versus source repair ownership and provider selection without moving employer details to Personal or presuming any new employer item should be created. Apply the user's settled Azure creation policy in the employer plugin source and reconcile Core callers with it. Define proportional source/publication/installed acceptance evidence and preserve explicit user limits, existing live repair ownership and monitoring-only deliveries. Verify representative personal and employer paths, including declined creation, missing providers and an adequate existing rule. Keep the broader self-repair scope redesign pending a decision; this file captures the requested investigation.
 
 ## Record publication
 

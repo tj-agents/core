@@ -6,6 +6,7 @@ Core publishes coherent `workflow:` and `agent-store:` namespaces with one imple
 responsibility. Workflow owns authorized goals, planning, execution, resumption, status and deliberate
 transfer. Agent Store owns the existing SQLite execution/session/ownership registry and deterministic
 operations. Engineering owns software implementation, diagnosis, testing, code review and delivery.
+Machine owns native identity, process observation, host launch and communication. Personal and the employer profile
 retain their distinct GitHub and Azure item operations.
 
 Tommy's 21 October 2026 dispatch explicitly assigns this session architecture decisions, the canonical
@@ -60,6 +61,7 @@ generated-sync PR was present. Other open PRs retain their owners.
 - Hold-removal CI39961057419 failed at unchanged d2c122: Windows job120438915517 raised PermissionError reading the finish-reaper result in test_finish.py:462; 1349 tests ran, one error. Linux and both native startup checks passed. Bounded diagnosis established an unguarded read during asynchronous result publication. Repair2952750d0ce74c83321a0547b1623255f14fa44b is committed and pushed, changing only the two polling reads to existing session_close.read_json; all deadlines and assertions remain. Deterministic temporary-denial/incomplete/final-record checks and compilation pass. Local process execution was blocked before publication by Task Scheduler; actual Windows/Linux process validation belongs to CI39963544250. Native and fresh independent incremental review against d2c122 passed and the canonical receipt is recorded. CI39963544250 subsequently passed the actual Windows/Linux process suites. The same registered continuation owner is rebound to2952750d and foreground-claimed by verified PID1964. Merge remains gated on incremental review and green exact-head checks.
 - Native final review also retained four upstream Machine observations: Claude relaunch can drop explicit tool restrictions; close.arm can race restart with worktree cleanup; verify-only can call mutating legacy cleanup; permission roots choose one globally newest installation instead of each active scope. The three source files are byte-identical to published main4925ad43 (session_relaunch blob13d331096a64968dd17285e0b1919c55470ec028, reload_plugins blobb3b4fcd0e0743daaceff8a0fb0b8c79798f812d7, harness_permissions_sync blob6e3193775140ed8d4a49b86672765f08bfd6e38d). These are not PR355 regressions or verified repairs. Machine source owners should reconcile existing records and reproduce each concern before repair; no new remote record or unrelated source change is authorized by this checkpoint. Full original comments remain in lifecycle-nativeacceptance-native-review.log and the canonical work-order synthesis. Preserve the originating CLI and use no-relaunch for later activation.
 - Marketplace#21 at33b32016 has source/security review and green CI for the explicitly authorized caller removal. Child#24 at48deda3b has green CI. They still depend on Core package publication and native admission.
+- The six requested consumer drafts are published. Personal, employer profile, Docs and selection closures retain their recorded gates. WorkItems remains local-only and its originating worktree/CLI are preserved.
 - Core source layers are merged. Lifecycle causal CI39965800923 completed successfully at14:15:35UTC: Windows120455291486, Linux120455291568, native startup/discovery and aggregate120463096263 pass. Regeneration120455230985 published f03d360482343de2231ca634afed18c87c15d5d9 for merge b1fa5c68a1c532cc2190832828dfdcdca82664e5. Central Marketplace and activation remain incomplete. Marketplace21 is the next dependency; its actual base063a604c and reviewed head33b32016 are unchanged and its Windows/Linux checks remain green. No user packages are activated. The primary Core checkout and unrelated work are preserved.
 
 ## Acceptance
@@ -324,7 +326,9 @@ Readiness: bounded independent reader /root/s1_readiness completed the exact sou
 ### S3: coordinated selection and native acceptance
 
 Core publishes both namespaces. Personal at `09ab438d644552831f9fb9f49162c02798a6a838`
+and the employer profile at its fetched main have no authored retired
 lifecycle/lane calls; their selected GitHub/Azure record operations remain distinct. Personal's actual
+producer requires Engineering and Machine; the employer profile requires Work, Base and Engineering. Retired-name inventory found no old public names in either profile, but a subsequent semantic read found stale whole-goal ownership in both address-work-item skills. A bounded S3 correction must enter workflow:run with the existing canonical item identity and mapped Engineering operation; Workflow owns the goal while Engineering returns software evidence. Preserve native kind mappings, provider read/update/closure helpers and company delivery gates. Personal README must name this boundary; deterministic tracker code stays unchanged. Their own source-project declarations still need coordinated required closure: exact fetched Personal origin/main selects Base, Engineering, GitHub Actions, Machine, Personal, Python and Template, so expansion adds Agent Store and Workflow; exact fetched employer profile origin/main selects only Base and Machine, so expansion adds Agent Store only. Producer dependencies do not establish profile adoption. Prepare only these required additions through the candidate generator in separate isolated S3 source layers, with native review admission/activation explicitly gated.
 
 Marketplace's exact source base is `063a604c86051388cc3889eefe8734a22f19010d`. Its old
 CoreCatalogAdoption goal explicitly records delivery on 8 October 2026 (PR #4); supported native recovery
@@ -343,6 +347,7 @@ Exact changes: order Core entries Base, Agent Store, Machine, Workflow, Engineer
 requirements; Machine requires Base and Agent Store; Workflow requires Base, Agent Store and Machine;
 Engineering requires Base, Workflow, Agent Store and Machine. Keep repository `core` and current-main
 producer references. Reconcile the demonstrated stale profile edges: Personal requires Engineering and
+Machine; the employer profile requires Work, Base and Engineering. Keep all other entries unchanged. Update only
 affected README roster/minimum-selection prose: generic sustained work selects Workflow and its closure,
 software work selects Engineering and its closure, profile adoption remains explicit. Native discovery
 still installs/selects nothing automatically. No aliases, account changes or profile adoption are added.
@@ -358,8 +363,11 @@ Marketplace native catalog CI passed on Windows and Linux. Separate policy jobs 
 The two known profile source repositories also receive bounded declaration-only S3 layers. Fetched
 Personal origin/main remains09ab438d; AGENTS/README identify explicit Personal scope. Its open#14
 changes the adoption utility, not these project declarations. Use Fix/WorkflowSelectionClosure at
+personal/.worktrees/Fix-WorkflowSelectionClosure. Fetched employer profile origin/main is unchanged; its
 AGENTS/README explicitly prohibit Personal adoption. Its open#15 changes design-doc only. Use
+Fix/AgentStoreSelectionClosure in an isolated employer-plugin worktree, outside its
 unignored .worktrees folder. Both branch/path names were absent and primary dirty files are preserved.
+The first bounded writer lease completed and released both declaration diffs. Parent committed Personal6c4962796a59a40c182e39e9694157ba17dadde2 (12 additions,2 removals) and the employer profile (5 additions). Generator write/check and pairing passed for both; Personal generated109 files with no drift, the employer profile's 48 tests passed (one skip) and payload shape passed. That lease owned only .agents/plugins.json,.claude/settings.json and
 .codex/config.toml, generated from existing selection with no requested profile. A new separate specified writer lease now updates only each address-work-item guidance and Personal README,
 plus the Personal generator projections required by that repository. No deterministic tracker code changes. They create no
 independent goal, runtime claim or tracker operation. All native packages unavailable to the host remain
@@ -475,10 +483,15 @@ candidate after focused tests pass. Review, exact-head CI, merge and activation 
 
 Personal's isolated Fix/WorkflowSelectionClosure at0af44a12 contains only the dependency closure and
 profile address guidance (10 paths,47 additions/32 removals including required generated mirrors and one expected-reference correction).
+The employer profile's isolated Fix/AgentStoreSelectionClosure candidate contains only its Agent Store dependency
 and Azure address guidance (4 paths,10 additions/3 removals). These are assessed new delivery slices;
+Personal PR17 and an employer profile PR are pushed drafts with human-gate, passing authoritative body checks and exact-head delivery bindings. Existing Personal3/4/14 and an earlier employer profile PR retain their separate owners. Newly
 observed Personal16 changes tracking policy and another README section; it does not own this caller cutover.
 Both candidates are committed, declarations and focused local tests pass, and exact guidance examples pass.
+Employer profile docs reachability passes. Personal's four reported adoption links are in byte-identical base
 files, outside this delta. Native selected-standard admission explicitly fails for Agent Store/Workflow
+(Personal) and Agent Store (employer profile); frozen work orders remain pending and source host coverage passes.
+Personal CI caught the static external-reference fixture missing workflow:run; the one-line correction passed all five packaging tests and generation/check. Windows/Linux/hosts CI39708517394 is green at0af44a12. Employer profile hosted CI remains manual and was not triggered. Do not substitute candidate discovery for installed admission.
 
 The bounded prior-completion inventory identifies six actual consumers: tomjseery/cpp,
 marketplace-car-hunter, onsite-sealants, Reunion, termboard and tj-agents/docs. Their current supported
@@ -582,6 +595,7 @@ Agent Store/Workflow admission. The final canonical-plan link will identify this
 | Core356 declarations | d258b964 over a6123ed9 | Windows/Linux/required CI39768073830 and source checks pass; native admission and final review held |
 | Marketplace21 | 7cf51be5 | Native catalog CI passes; new-package admission and independent existing policy failure held |
 | Personal17 | 0af44a12 | Windows/Linux/hosts CI passes; native admission and final review held |
+| Employer profile | (private) | Local48 tests/one skip and source checks pass; native admission held; hosted CI is manual |
 | Docs20 | ec40e457 | Standing decision source review and declaration checks pass; incremental native admission held |
 
 All nine PRs remain open with human-gate and no forge auto-merge request. No merge or installation occurred.
@@ -615,6 +629,7 @@ retain the host-only Machine boundary, current sync-plugins/relaunch behavior an
 lanes/handoff debt files. These are integration repairs, not a reopened architecture assessment.
 Fresh fetches show all six consumer bases unchanged. Personal main moved to a2ddbf5460e121c5d9758d38db28315638d69f97
 with relevant tracker/address guidance; its existing isolated candidate is being reconciled separately.
+Employer profile main moved; assess the generated/test-only
 base delta without adopting Personal. Docs base movement only changes record metadata; Marketplace base
 is unchanged. Preserve the two old local delivery-binding files and their absent merge authority.
 The combined Marketplace candidate has a real admission cycle: its new selection requires native
