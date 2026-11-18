@@ -103,8 +103,9 @@ def _text(value):
 
 
 class PredicateResult:
-    def __init__(self, scope, matched=False, evidence=(), prerequisites=(), diagnostics=()):
+    def __init__(self, scope, matched=False, evidence=(), prerequisites=(), diagnostics=(), subject=None):
         self.scope = str(scope)
+        self.subject = subject
         self.matched = matched and not diagnostics
         self.evidence = tuple(dict.fromkeys(evidence))
         self.prerequisites = tuple(dict.fromkeys(prerequisites))
@@ -300,14 +301,33 @@ def load_standards_context(graph, data=None, additional_claims=()):
     return runtime_module("standards_context")["StandardsContext"](graph).load(data, additional_claims)
 
 
+def source_owners(graph, path, intended_project=None):
+    return runtime_module("source_facts")["source_owners"](graph, path, intended_project)
+
+
 def evaluate_project(graph, identity, node, definitions=None, context=None, facts=None, active=()):
+    return _evaluate_scoped(graph, identity, node, definitions, context, facts, active)
+
+
+def evaluate_file(graph, identity, path, node, definitions=None, context=None, facts=None, active=(), intended_project=None):
+    ownership = source_owners(graph, path, intended_project)
+    subject = next((item for item in ownership.subjects if item.project_id == identity), None)
+    relevant = [item for item in ownership.diagnostics if item.get('project') in (None, identity)]
+    if subject is None:
+        return PredicateResult(identity, diagnostics=relevant or [diagnostic("unowned-source", str(path), "Select a source owned by the project")])
+    result = _evaluate_scoped(graph, identity, node, definitions, context, facts, active, subject)
+    return PredicateResult(identity, result.matched, result.evidence, result.prerequisites,
+                           [*relevant, *result.diagnostics], subject)
+
+
+def _evaluate_scoped(graph, identity, node, definitions=None, context=None, facts=None, active=(), subject=None):
     problems = predicate_diagnostics(node)
     if problems or identity not in graph.projects:
         return PredicateResult(identity, diagnostics=problems or [diagnostic("unknown-project", identity, "Select a discovered project manifest")])
     operator, value = next(iter(node.items()))
     definitions = definitions or {}
     if operator in ("all", "any"):
-        children = [evaluate_project(graph, identity, child, definitions, context, facts, active) for child in value]
+        children = [_evaluate_scoped(graph, identity, child, definitions, context, facts, active, subject) for child in value]
         return PredicateResult(identity, all(child.matched for child in children) if operator == "all" else any(child.matched for child in children),
                                [item for child in children if child.matched for item in child.evidence],
                                [item for child in children for item in child.prerequisites],
@@ -326,21 +346,21 @@ def evaluate_project(graph, identity, node, definitions=None, context=None, fact
     if operator == "fact" and value in definitions:
         if value in active:
             return PredicateResult(identity, diagnostics=[diagnostic("cyclic-fact-definition", value, "Remove the fact reference cycle")])
-        result = evaluate_project(graph, identity, definitions[value], definitions, context, facts, active + (value,))
+        result = _evaluate_scoped(graph, identity, definitions[value], definitions, context, facts, active + (value,), subject)
         return PredicateResult(identity, result.matched, result.evidence, [value, *result.prerequisites], result.diagnostics)
     if operator == "context":
-        problems = context.diagnostics_for(identity) if context else []
+        problems = (context.diagnostics_for_path(subject.path) if subject else context.diagnostics_for(identity)) if context else []
         if problems:
             return PredicateResult(identity, diagnostics=problems)
-        values, evidence = context.for_project(identity) if context else ({"architecture": [], "adopted_suites": []}, [])
+        values, evidence = (context.for_path(subject.path) if subject else context.for_project(identity)) if context else ({"architecture": [], "adopted_suites": []}, [])
         if value["key"].startswith("house.") and value["key"] not in values:
             return PredicateResult(identity)
         result = evaluate_predicate(graph.projects[identity].root, node, contexts=values)
-        return PredicateResult(identity, result.matched, evidence if result.matched else (), result.prerequisites, result.diagnostics)
+        return PredicateResult(identity, result.matched, evidence if result.matched else (), result.prerequisites, result.diagnostics, subject)
     if operator == "fact":
         fact = (facts or {}).get(value)
-        if isinstance(fact, PredicateResult) and fact.scope == identity:
-            return PredicateResult(identity, fact.matched, fact.evidence, [value], fact.diagnostics)
+        if isinstance(fact, PredicateResult) and fact.scope == identity and (fact.subject is None or fact.subject == subject):
+            return PredicateResult(identity, fact.matched, fact.evidence, [value], fact.diagnostics, subject)
         return PredicateResult(identity, prerequisites=[value], diagnostics=[diagnostic("unknown-fact", value, "Provide a declared or scoped fact result")])
     return PredicateResult(identity, diagnostics=[diagnostic("project-ownership-required", identity, "Source/file ownership predicates require the subsequent source-facts contract")])
 

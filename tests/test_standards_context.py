@@ -128,7 +128,7 @@ class StandardsContexts(unittest.TestCase):
         sources = json.loads((root / '.agents/plugins/sources.json').read_text(encoding='utf-8'))
         for plugin in ('base', 'engineering'):
             paths = {item['destination'] for item in sources['resources'] if item['plugin'] == plugin}
-            self.assertTrue({'hooks/project_facts.py', 'hooks/standards_context.py', 'schemas/standards-context.schema.json'} <= paths)
+            self.assertTrue({'hooks/project_facts.py', 'hooks/source_facts.py', 'hooks/standards_context.py', 'schemas/standards-context.schema.json'} <= paths)
             import runpy
             runtime = runpy.run_path(str(root / 'plugins' / plugin / 'hooks' / 'tier_gate.py'))
             graph = runtime['discover_projects'](self.root)

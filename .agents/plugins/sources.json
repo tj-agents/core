@@ -296,6 +296,11 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/hooks/source_facts.py",
+      "destination": "hooks/source_facts.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/hooks/standards_context.py",
       "destination": "hooks/standards_context.py"
     },
@@ -308,6 +313,11 @@
       "plugin": "engineering",
       "source": ".agents/hooks/project_facts.py",
       "destination": "hooks/project_facts.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/source_facts.py",
+      "destination": "hooks/source_facts.py"
     },
     {
       "plugin": "engineering",
