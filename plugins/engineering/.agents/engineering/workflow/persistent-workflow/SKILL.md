@@ -89,6 +89,16 @@ missing files and directories are rejected. Keep the goal in place. The owner re
 per-worktree path above. On `canonical-owner-path-required`, retry `init --root ROOT` with `--owner`
 omitted. This recoverable invocation error does not establish that the runtime is unavailable.
 
+To bind a native host session to its already-claimed canonical controller, run the installed-relative
+runtime command:
+
+```text
+python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py associate-session --owner CANONICAL_OWNER --token EXISTING_FOREGROUND_TOKEN --session-id HOST_SESSION_ID --session-cwd NATIVE_EVENT_CWD
+```
+
+It accepts only the exact live foreground token and canonical owner/worktree. It writes a token-hashed
+reciprocal association without creating an owner, releasing a foreground lease, or transferring the goal.
+
 The runtime supports `status --owner OWNER` and `wake --owner OWNER`. After initialization, the current
 foreground session claims the owner with `claim --owner OWNER --pid PID`; PID must identify that
 long-lived session, not a short-lived tool shell. The returned `foreground.token` is required by

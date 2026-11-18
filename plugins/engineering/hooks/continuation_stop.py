@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -76,6 +77,50 @@ def observed_wake(path, owner):
         if event.get("owner_id") == owner.get("owner_id") and event.get("event") == "wake":
             return True
     return False
+
+
+def associated_controller(native_root, session, runtime):
+    session_hash = hashlib.sha256(session.encode("utf-8")).hexdigest()
+    locator_path = native_root / ".agents" / "continuation" / "sessions" / f"{session_hash}.json"
+    locator = read_json(locator_path)
+    if not isinstance(locator, dict) or locator.get("version") != 1:
+        return None
+    record = locator.get("controller")
+    if (locator.get("native_cwd") != str(native_root) or locator.get("session_id_hash") != session_hash
+            or not isinstance(record, dict)):
+        return None
+    try:
+        owner_path = Path(record["owner_path"]).resolve()
+        controller_root = owner_path.parents[2]
+        if owner_path != controller_root / ".agents" / "continuation" / "owner.json":
+            return None
+        owner = read_json(owner_path, required=True)
+    except (IndexError, KeyError, TypeError, ValueError, OSError, RuntimeError):
+        return None
+    if owner.get("session_association") != record:
+        return None
+    if any(owner.get(key) != record.get(key) for key in ("owner_id", "repo", "worktree", "branch", "head", "goal")):
+        return "invalid", "Reconcile the canonical continuation owner before ending this turn: association-controller-identity-changed"
+    try:
+        runtime.check_identity(owner, allow_terminal_release=owner.get("state") in {"complete", "blocked"})
+    except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
+        return "invalid", f"Reconcile the canonical continuation owner before ending this turn: {error}"
+    foreground = owner.get("foreground")
+    if foreground is None:
+        if owner.get("state") in {"waiting", "complete", "blocked"}:
+            return "active", controller_root, owner_path, owner
+        return "invalid", "Reconcile the canonical continuation owner before ending this turn: association-foreground-lease-missing"
+    if not isinstance(foreground, dict):
+        return "invalid", "Reconcile the canonical continuation owner before ending this turn: association-foreground-invalid"
+    token = foreground.get("token")
+    if (foreground.get("pid") != record.get("pid") or foreground.get("identity") != record.get("identity")
+            or not isinstance(token, str) or hashlib.sha256(token.encode("utf-8")).hexdigest() != record.get("generation")):
+        return "invalid", "Reconcile the canonical continuation owner before ending this turn: association-foreground-generation-changed"
+    if owner.get("state") != "working":
+        return "invalid", "Reconcile the canonical continuation owner before ending this turn: association-foreground-state-invalid"
+    if not foreground_owns_current_process(owner, runtime):
+        return None
+    return "active", controller_root, owner_path, owner
 
 
 def supervised(owner):
@@ -187,24 +232,33 @@ def outcome(data):
     matching_receipt = receipt.get("worktree") == str(root)
     if matching_receipt and direct_control(str(receipt.get("prompt", ""))) in {"pause", "cancel", "stop"}:
         return None
-    owner_path = root / ".agents" / "continuation" / "owner.json"
     obligation = matching_receipt and receipt.get("execution_obligation") is True
     if matching_receipt and receipt.get("execution_suspended") is True:
         return None
     try:
-        owner = read_json(owner_path, required=True)
-        binding_path = root / ".agents" / "persistent-workflow-binding.json"
-        binding_artifact = read_json(binding_path, required=True)
-        if owner is None and not obligation and binding_artifact is None:
-            return None
-        if owner is not None and exact_path(owner.get("worktree")) != str(root):
-            return "Reconcile the canonical continuation owner before ending this turn: owner-worktree-changed"
         workflows = workflow_root()
         if str(workflows) not in sys.path:
             sys.path.insert(0, str(workflows))
         runtime = module("continuation_runtime", workflows)
+        association = associated_controller(root, session, runtime)
+        if association and association[0] == "invalid":
+            return association[1]
+        associated = bool(association)
+        if associated:
+            _, controller_root, owner_path, owner = association
+        else:
+            controller_root = root
+            owner_path = root / ".agents" / "continuation" / "owner.json"
+            owner = read_json(owner_path, required=True)
+        binding_path = controller_root / ".agents" / "persistent-workflow-binding.json"
+        binding_artifact = read_json(binding_path, required=True)
+        if owner is None and not obligation and binding_artifact is None:
+            return None
+        if owner is not None and exact_path(owner.get("worktree")) != str(root):
+            if not associated:
+                return "Reconcile the canonical continuation owner before ending this turn: owner-worktree-changed"
         completion = module("completion", workflows)
-        active_binding = binding_active(runtime, root, binding_artifact)
+        active_binding = binding_active(runtime, controller_root, binding_artifact)
         if owner is None:
             if obligation or active_binding:
                 return "Initialize persistent-workflow for the active delivery binding before ending this turn."
@@ -214,7 +268,7 @@ def outcome(data):
         return f"Reconcile the canonical continuation owner before ending this turn: {error}"
     if obligation and owner.get("updated_at", 0) < receipt.get("execution_obligation_at", 0):
         return "The routed execution has no current continuation owner; initialize persistent-workflow before ending this turn."
-    if not obligation and owner.get("foreground") and not foreground_owns_current_process(owner, runtime):
+    if not associated and not obligation and owner.get("foreground") and not foreground_owns_current_process(owner, runtime):
         return None
     if supervised(owner):
         return None
@@ -224,7 +278,7 @@ def outcome(data):
             required = binding
             if required is None and owner.get("pr") is not None:
                 required = {"repository": owner["repo"], "pr": owner["pr"], "head": owner["head"]}
-            result = completion.completion_check(Path(owner["goal"]), required, root)
+            result = completion.completion_check(Path(owner["goal"]), required, controller_root)
         except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
             return f"Verify completion through the canonical completion check before ending this turn: {error}"
         return None if result.get("ready") else "Completion is not verified; continue the canonical goal."
@@ -240,7 +294,7 @@ def outcome(data):
         return "The canonical continuation has a headless writer; wait for its receipt before ending this turn."
     if state == "working":
         return "The canonical continuation is working without a released foreground lease; reconcile it before ending this turn."
-    if not scheduler_ready(owner_path, owner, root) or not observed_wake(owner_path, owner):
+    if not scheduler_ready(owner_path, owner, controller_root) or not observed_wake(owner_path, owner):
         return "Register and enable the matching persistent-workflow scheduler before ending this turn."
     return None
 
