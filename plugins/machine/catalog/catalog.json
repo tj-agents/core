@@ -181,7 +181,10 @@
         "worktree",
         "write-bug",
         "write-debt",
-        "write-mistake"
+        "write-feature",
+        "write-issue",
+        "write-mistake",
+        "write-task"
       ],
       "dependencies": {
         "required": [
@@ -201,7 +204,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:b8dac21646fa5284f6e7f99e863861f40a73f054e765894befe35113710cd2da",
+      "digest": "sha256:1dddfbb473db010d58ebca8ce7e6d63cf9f794bf9ad23217e8aabe2c878e6b70",
       "harness": {
         "marketplaces": [
           {
@@ -475,7 +478,7 @@
                   "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
                 ]
               ],
-              "justification": "Reads the current plan corpus and recorded work-item status to report scoped unfinished work; it does not write repository or session state",
+              "justification": "Reads unselected file-backed plans and local execution status; selected or invalid tracker declarations stop the scan and direct the caller to the canonical provider without writing state",
               "match": [
                 [
                   "python3",
