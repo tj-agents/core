@@ -69,6 +69,9 @@
     "worktree",
     "write-bug",
     "write-debt",
-    "write-mistake"
+    "write-feature",
+    "write-issue",
+    "write-mistake",
+    "write-task"
   ]
 }
