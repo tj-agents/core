@@ -8,9 +8,6 @@ domain: process
 
 # Landing a PR through the merge queue
 
-Read the software delivery evidence in `workflow:continue`'s `references/delivery.md` when binding,
-waiting on or completing a PR.
-
 The executable counterpart of `engineering:merging`: one pass that takes the current branch's PR
 from green to landed and leaves the workstation on a clean, current base ready for the next task. `merging`
 owns *why* — the currency rule, the four terminal states and the trap that hides one behind another, the
@@ -43,7 +40,7 @@ procedure that goes stale in the repo that renames one.
   against current base.
 - **A required approval is Tommy's, and `--auto` waits for it.** Before arming auto-merge, establish
   and observe the supported host continuation through `workflow:continue`, retaining the exact PR/head
-  binding and authorized post-merge steps under `workflow:continue`. Use the guarded command below and report the approval link
+  binding and authorized post-merge steps under `engineering:persistent-delivery`. Use the guarded command below and report the approval link
   once. GitHub's required review remains a waiting dependency; retain the binding and scheduler so a
   merge observation resumes cleanup and publication without another prompt. Never approve or bypass it.
   A missing task authorization or an explicit hold remains a human gate.
@@ -101,7 +98,7 @@ A child targeting an unmerged parent's branch is not eligible: continue the lowe
 record that dependency instead of merging the child into the parent. After the parent lands, verify
 retargeting/restacking, rerun affected checks and refresh the child's delivery binding. Verified native
 stack merging may handle the chain atomically; follow its documented semantics and confirm every layer's
-required review and checks. A green delivery action alone does not override this base gate.
+required review and checks. A green persistent-delivery action alone does not override this base gate.
 
 ### 2. Prove the branch is pushed and preserve the final-review synchronization
 
@@ -178,7 +175,7 @@ present:
   the skip took, because those suites never run on a PR at all; only the label, or a correctly-blocked
   trailer, changes what the *queue* runs.
 
-Use the guarded command from the software delivery evidence in `workflow:continue`'s `references/delivery.md`, with `python` on Windows or `python3`
+Use the guarded command from `engineering:persistent-delivery`, with `python` on Windows or `python3`
 on Linux/macOS. It admits a conflict-free, green PR awaiting required review while retaining the exact-head,
 independent-review, repository preference and authorization checks. GitHub still enforces its ruleset.
 
@@ -213,7 +210,7 @@ identity after interruption. The compact transition or terminal document is the 
 unchanged observations remain silent and never create a model turn or user-facing update.
 
 - **A failed check dispatches; it does not retry.** When `workflow:continue` owns the wake, route the
-  exact failed check/run through its software delivery reference, classify its tier, and immediately dispatch one fresh
+  exact failed check/run through `persistent-delivery`, classify its tier, and immediately dispatch one fresh
   debugging context with the complete binding and failure signature. Only in the explicit foreground fallback
   with no persistent host capability, emit a ready-to-paste dispatch prompt for a dedicated
   debug session — worktree path, branch, PR, failing scenarios, failure signature — as soon as the failure is
@@ -227,7 +224,7 @@ unchanged observations remain silent and never create a model turn or user-facin
 - Reconcile closed-without-merge, failed checks, sustained green-but-unadmitted, and timeout states before the
   next source update. On merge, retain the result as evidence for the next delivery stage.
 
-### 5. Return to a clean base and retire any isolated checkout
+### 5. Return to a clean base and record targeted checkout cleanup
 
 Before removing persistent state, inspect the completed delivery binding. A standalone PR removes its
 continuation. A plan-managed binding with a workflow handoff keeps the one existing continuation, closes only
@@ -235,7 +232,7 @@ the merged PR binding, checkpoints the merge, and transfers to the recorded `wor
 stage reconciles an existing successor layer or starts the next branch in a checkout selected under
 `engineering:branching`, before rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
 watermark or delivery binding into the successor; the successor re-resolves merge authorization from the
-goal's recorded authorization under `workflow:run`.
+goal's recorded authorization (`engineering:merging`).
 
 Resolve the primary checkout from the first `worktree` record in `git worktree list --porcelain`; never
 remove that path. When it sits on the merged branch or the default, move it to the fetched remote default
@@ -247,21 +244,35 @@ git -C <primary-checkout> checkout <default>
 git -C <primary-checkout> pull --ff-only origin <default>
 ```
 
-Then run the worktree sweep for this repository:
+Classify only the checkout this delivery owns. For a linked checkout that must be removed, prepare its
+exact merged-head obligation and launch the deterministic worker before arming frontend release. The worker
+runs from outside the target and removes that one checkout only after verifying every recorded holder released,
+the exact merge/head proof, and the recent-edit guard. It then verifies the target path is absent and writes
+the durable cleanup result outside the target. Do not run a repository-wide sweep as a closeout shortcut.
+
+`unnecessary` and explicitly `retained` cleanup are terminal dispositions. A refused, unverifiable, or
+residual target is `pending`, with its resolver and resume condition; launcher submission, host exit, or a
+partial Git operation is not cleanup success. For a branch developed in the primary checkout, the
+checkout-and-fast-forward above replaces removal; delete the old local branch with
+`git -C <primary-checkout> branch -d <branch>`, or `-D` once exact proof covers a squash merge.
+
+Run the selected package's `scripts/targeted_cleanup.py` from outside the target. Supply every attributable
+holder as `--holder PID:START`, using the recorded process creation time. `prepare` returns the obligation
+path; attach it to `completion.py prepare --cleanup-obligation <obligation>` before release. `launch` must
+return an acknowledged live worker before Agent may arm a release with pending cleanup. Use the selected
+Agent package's peer `session_close.py` as the launcher dependency. A repeated prepare reuses the obligation;
+a launch without acknowledgement remains pending for explicit reconciliation.
 
 ```text
-python -B <skill-directory>/scripts/worktree_sweep.py --repo <primary-checkout>    # Windows
-python3 -B <skill-directory>/scripts/worktree_sweep.py --repo <primary-checkout>   # Linux/macOS
+python -B <merge-skill>/scripts/targeted_cleanup.py prepare --primary <primary> --worktree <target> --branch <branch> --head <merged-head> --pr <pr> --repository <owner/repo> --owner-host codex --owner-session-id <session> --holder <pid>:<started-at> --session-close <agent-peer-skill>/scripts/session_close.py
+python -B <merge-skill>/scripts/targeted_cleanup.py launch --obligation <obligation> --session-close <agent-peer-skill>/scripts/session_close.py
 ```
 
-It removes each merged linked worktree once `cleanup_proof.py` proves its PR merged at exactly its head
-with the merge commit on `origin/<default>`, archiving any leftovers under `<state>/merge-cleanup/set-aside/`
-first. It keeps a worktree while a registered session still works inside it, while an open PR is based on
-its branch, or when the proof refuses, and prints why. A worktree kept because this session is inside it
-is removed by the sweep that runs once the session closes. For a branch developed in the primary
-checkout, the checkout-and-fast-forward above replaces removal; delete the old local branch with
-`git -C <primary-checkout> branch -d <branch>`, or `-D` once the proof covers a squash merge. Report what
-the sweep kept and why; never force a removal.
+Preparation preserves each delivery's obligation and terminal receipt. A later delivery may reuse the
+target path only after earlier obligations are `retained` or `verified` and every previously launched
+worker is observed exited through the same `--session-close` helper. An unacknowledged, live, or unknown
+worker keeps the earlier obligation in force. Launch acknowledgement also accepts an exact `verified`
+receipt when that worker completed and exited before the first poll.
 
 If plan work remains, reconcile and continue an existing successor stack layer, including its base,
 head, review evidence and delivery binding. When no successor exists, start the next branch from the
@@ -316,8 +327,8 @@ merge caused, and a causally linked red one is never left behind. The mechanics:
   blocker, then commit fixes locally, run targeted builds, and make one stable push. GitHub retains replacement
   checks and merge evidence. Never push the source plan's recovery commits to either PR.
 - **Close plan-managed delivery from a checkout selected under `engineering:branching`.** Before
-  deleting the goal, run the fresh completion check above. A missing, invalid, or failing record leaves the
-  plan and its owned actions in place. Once
+  deleting the goal, consume `workflow:run`'s accepted terminal receipt. A missing, invalid, blocked, or
+  stale receipt leaves the plan and its owned actions in place. Once
   publication and sync are terminal, reconcile the linked selected item through
   [the shared recording contract](../../../workflow/resources/problem-records.md) before deleting recovery artifacts.
   Resolve it only after its own acceptance is verified; a delivered PR alone does not close it. Record
@@ -336,26 +347,17 @@ each create a checkpoint. Never create a commit merely to make the ledger agree 
 
 ## Report
 
-Every goal completion and plan closeout requires exactly one fenced `completion` record. A missing or
-invalid record is incomplete. Run a fresh completion check with `python` on Windows or `python3` on
-Linux/macOS before claiming the requested user outcome or deleting its goal:
-
-```bash
-python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree> --bound-repository <owner/repo> --bound-pr <n> --bound-head <forty-character-head>
-```
-
-Resolve `<completion-check>` to `.agents/workflows/completion.py` in source or
-`workflows/completion.py` in an installed engineering package. On a failing result, retain the goal and
-report its owned next actions as incomplete.
+Every goal completion and plan closeout consumes the fresh accepted terminal receipt from `workflow:run`.
+The receipt binds exact sources, ownership aggregate, audit, and cleanup result. A missing, invalid,
+blocked, or stale receipt is incomplete; retain the goal and report its owned next actions.
 
 One short report: the PR that merged (number plus merge commit); whether the full suite ran because a
-positive trigger was present or was skipped by label because none was; that the base is synced; and that the
-branch — and its worktree, if the work was done in one — is cleaned up. For plan-managed work, that the
-close-out PR landed and any isolated checkout was removed. Then the sync outcome: **nothing published, sync merged
-green at a new version, or sync went red and you migrated its consumers** (which files, now green) — never
-"merged, and left a red sync PR behind." If you stopped early, say exactly what is blocking and what is
-needed.
+positive trigger was present or was skipped by label because none was; that the base is synced; and the
+cleanup result (`verified`, `retained`, or a named pending resolver). For plan-managed work, report the
+close-out PR only after it landed. Then the sync outcome: **nothing published, sync merged green at a new
+version, or sync went red and you migrated its consumers** (which files, now green). If you stopped early,
+say exactly what is blocking and what is needed.
 
-Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
-follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
+Keep it terminal: verify green → enqueue → wait for `MERGED` → record targeted cleanup → sync the base →
+follow the sync PR to green or migrate it → land the plan close-out → consume terminal acceptance → summarize →
 report. This applies even when Tommy merged the PR manually. No preamble.

@@ -86,12 +86,12 @@ remain prompt-only. Missing runtime capabilities must be reported accurately, no
 
 ## Finish the session
 
-Before any final reply, select `agent:close` and prepare its assessment of the current input. It owns
-the final-action ordering, keep-open requests and terminal closure. A new mistake callout is answered
-and corrected first; completion is then reassessed.
+At a genuine terminal outcome, let `workflow:run` prepare and accept the terminal evidence before Agent
+arms an attributable frontend release. Persistent keep-open, user dismissal, and refresh restart remain
+distinct intents. A new mistake callout is answered and corrected first; ordinary Stop only records
+activity and never prompts for or decides completion.
 
 ```text
-Delivery and validation complete, no owned wait: apply agent:close before the final reply.
-Question or unfinished cleanup: prepare the assessment and keep closure unarmed.
-User calls out a mistake: answer and correct the active task, then reassess completion.
+Delivery and validation complete: workflow:run accepts the candidate, then Agent may release the exact frontend.
+User calls out a mistake: answer and correct the active task; no terminal release is armed.
 ```

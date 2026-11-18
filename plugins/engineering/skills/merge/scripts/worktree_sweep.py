@@ -264,7 +264,7 @@ def remove(primary: Path, worktree: dict) -> tuple[bool, str]:
                     "origin/" + default).returncode == 0
     git(primary, "branch", "-d" if contained else "-D", worktree["branch"])
     if target.exists():
-        return True, "removed; its empty folder stays until the process using it exits"
+        return False, "removal did not remove the worktree directory"
     return True, "removed"
 
 
