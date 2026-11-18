@@ -105,6 +105,14 @@ PR, worktree or branch. If ordinary merge is approved and GitHub auto-merge is u
 terminal checks and current-head review, then perform the authorized ordinary merge. End the binding with
 `delivery-release --reason <terminal>`.
 
+A completed review work order is committed once as a review-stamp commit. Its `Reviewed up to commit:`
+watermark remains the frozen candidate predecessor when the stamp changes only `reviews/`. Immediately
+after pushing that stamp, rerun `delivery-bind` and checkpoint the existing continuation owner with its
+exact old/new rebind before waiting, invoking guarded auto-merge, or ending the turn. This is the same
+owner updating its own PR, not an external replacement: retain matching scoped or standing merge
+authority while the binder reevaluates fresh stops, checks and settings. A second review-only commit does
+not have that exception and requires normal incremental review.
+
 That command writes the binding to `.agents/persistent-workflow-binding.json` at the owning worktree root — repo
 owner/name, PR number and URL, branch, absolute worktree, full head SHA, the exact check and run IDs, and
 the completion condition. It is per-worktree runtime state, gitignored, and is the discoverable form of the
