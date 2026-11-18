@@ -29,14 +29,15 @@ function Invoke-CodexHookTrust {
 
 function Invoke-HarnessPermissionsSync {
     param(
-        [Parameter(Mandatory)][string] $ScriptRoot
+        [Parameter(Mandatory)][string] $ScriptRoot,
+        [Parameter(Mandatory)][string] $WorkingDirectory
     )
 
     try {
         $packageRoot = Split-Path (Split-Path (Split-Path $ScriptRoot))
         $script = Join-Path $packageRoot '.agents\machine\utility\bootstrap-capabilities\scripts\harness_permissions_sync.py'
         if (Test-Path -LiteralPath $script -PathType Leaf) {
-            & python -B $script --apply 2>&1 | Out-Null
+            & python -B $script --apply --project $WorkingDirectory 2>&1 | Out-Null
         }
     }
     catch {
@@ -88,6 +89,6 @@ function Sync-CodexStandards {
     finally {
         Pop-Location
         if ($trustSnapshot) { Remove-Item -LiteralPath $trustSnapshot -Force }
-        Invoke-HarnessPermissionsSync -ScriptRoot $PSScriptRoot
+        Invoke-HarnessPermissionsSync -ScriptRoot $PSScriptRoot -WorkingDirectory $resolved
     }
 }
