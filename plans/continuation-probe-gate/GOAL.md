@@ -58,8 +58,42 @@ Related PRs: PR226 and PR218 change only continuation_stop.py binding/foreign-fo
 - Side defect found while committing: `worktree_placement_gate.py` `parse_creation` treats any untokenizable segment as an invalid creation, so a compound PowerShell here-string commit mentioning "worktree" is blocked. Side workstream goal prepared at `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-WorktreeGateTokenizeFailure/plans/worktree-gate-tokenize-failure/GOAL.md` (branch Fix/WorktreeGateTokenizeFailure from c91b60c). The Codex L4 launch was interrupted by the 21:27 PC crash; no Codex session ever referenced that checkout. The relaunch after the crash was denied by the auto-mode classifier for `--bypass-hook-trust`, so no successor exists. Resolver: Tommy. Unblock: allow the launcher command or launch it manually. Resume when: a session acknowledges pickup in that goal.
 - 2026-10-12 crash recovery: reconciled; branch local-only at eab0686, no PR, no CI; this session is the only writer in this checkout.
 - Full review pass over c91b60c..6c5acc9 (`reviews/Fix-ContinuationProbeGate.md`): CAT1 (committed generated catalog digest + CRLF writer) and RUN1 (vacuous heartbeat/yield root check) fixed in ab9cdda; adapter failure output also fixed in c183651. Guard `check_generated_paths.py --base c91b60c` now reports no generated paths. Focused runtime/Stop/adapter suites at c183651: 101 passed, 6 skipped.
-- Incremental review over 6c5acc9..9abf00d in progress.
-- Next: finish incremental review, push, open PR, one final required CI, merge, observe causal generated output.
+- Incremental passes: 6c5acc9..9abf00d found INC1 (test after `unittest.main()`), fixed in 167c070; 9abf00d..b59952b no findings. Review complete and approved at b59952b. Focused suites at 167c070: 105 passed, 6 skipped.
+- PR https://github.com/tj-agents/core/pull/232 opened as draft at fcfc4b12b144c0a108968d81df48f8c576d66e17; body check passed; delivery bound with standing auto-merge. Continuation owner e53abeb71722a5ffcdee50df claimed by this Claude session.
+- Next: observe exact-head CI run 38317912871, mark ready, merge through engineering:merge, observe causal generated output.
+
+```completion
+{
+  "outcome": "The continuation runtime keeps stale or Git-failing owners continuable and reports failed commands as failures, delivered to tj-agents/core main.",
+  "acceptance": [
+    {
+      "id": "focused-regressions",
+      "criterion": "Focused regressions reproduce the Git 128 heartbeat, stale live lease, runtime-to-Stop and failure-output paths and pass.",
+      "evidence": [{"source": "pytest runtime/Stop/adapter/catalog suites at 167c070", "result": "105 passed, 6 skipped"}],
+      "owner": "Claude session 71b766a3",
+      "next_action": "None."
+    },
+    {
+      "id": "review",
+      "criterion": "The source fix is independently reviewed with no open findings.",
+      "evidence": [{"source": "reviews/Fix-ContinuationProbeGate.md", "result": "complete, approved at b59952b9f4518c7063b48b7e2108a8bba6b23e22"}],
+      "owner": "Claude session 71b766a3",
+      "next_action": "None."
+    },
+    {
+      "id": "ci-merge",
+      "criterion": "Exact-head required CI passes and PR 232 merges with causal generated output observed.",
+      "evidence": [],
+      "owner": "Claude session 71b766a3",
+      "next_action": "Observe CI run 38317912871, merge PR 232, observe the post-merge regeneration run."
+    }
+  ],
+  "deliveries": [
+    {"repository": "tj-agents/core", "pr": 232, "head": "fcfc4b12b144c0a108968d81df48f8c576d66e17"}
+  ],
+  "open_tasks": []
+}
+```
 ## Acceptance
 Reproduce actual Git128/runtime classification through focused tests. Recoverable internal failures preserve the owner and independent authorized progress; genuinely blocked actions carry correct resolver/unblock/resume evidence. Real runtime/Stop regression proves no malformed blocked owner; both-host source coverage as applicable. Source fix reviewed, final required CI green, merged and causal generated output observed. Do not install it into the parent's profile.
 ## Next Steps
