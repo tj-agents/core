@@ -30,6 +30,13 @@
         ]
       },
       {
+        "path": ".agents/base/policy/harness/scripts/session-context.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
         "path": ".agents/base/policy/plan-artifacts/scripts/session-context.py",
         "hosts": [
           "claude",

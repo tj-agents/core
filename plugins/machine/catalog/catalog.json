@@ -26,6 +26,7 @@
             "agent-files",
             "cd",
             "goal-continuation",
+            "harness",
             "plan-artifacts"
           ],
           "dependencies": {
@@ -38,7 +39,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:c2c0932f8442c5b8740c3d5886a6e05193d903ccf065139bd6e57baa62a08f81",
+          "digest": "sha256:d2a8d4ee27c485d17b11a1e11c34683f7d7ba385f35043258af00e1c1610e382",
           "harness": {
             "marketplaces": [
               {
@@ -59,6 +60,13 @@
               },
               {
                 "path": ".agents/base/policy/goal-continuation/scripts/session-context.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": ".agents/base/policy/harness/scripts/session-context.py",
                 "hosts": [
                   "claude",
                   "codex"
