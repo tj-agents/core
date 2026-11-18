@@ -8,17 +8,26 @@ domain: process
 
 # Merging
 
-## Goal authority and technical gates
+## What authorizes a merge
 
-`workflow:run` owns the user's goal-wide authority, its acceptance condition, and the decision to continue
-after a waiting approval. This policy owns the technical gates: current-head review, green checks, queue
-state, repository stop paths, labels, and recorded delivery rules. Read `workflow:run` for authorization;
-a CI event alone does not grant it.
+Merge authorization is scoped to the goal, not the PR. A user authorization to implement, execute, or
+deliver a goal is merge authorization for every PR that goal itself creates: each lands once its own
+review and required checks pass, with no per-PR re-approval. The authorization survives handoffs, fresh
+sessions, and successive delivery bindings of the same goal — each new PR's binding re-records it as
+mechanics, not a fresh approval. This section owns that scope rule; no delivery standard adds a per-PR
+approval requirement on top of it.
+
+A goal file's bare existence authorizes nothing — the authority is the user's observed instruction,
+recorded with the goal. What still gates a merge keeps its own typed owner: an explicit user limitation
+or merge hold, a repository's stop classes, stop paths, hold labels and stricter recorded delivery rules,
+and the ordinary gates — current-head review and green checks. Outside the goal's own PRs nothing is
+covered: not another repository, not a PR the goal did not create, and never publishing to a package feed.
 
 ## Persistent continuation
 
 When a queue, check, publication, or generated sync will resolve after this turn, enter the current harness's
-`workflow:continue` skill. Its software delivery reference binds this exact PR/head/worktree; the continuation selects the native
+`engineering:persistent-delivery` contract and `workflow:continue`. The delivery contract binds this exact
+PR/head/worktree; the continuation selects the native
 continuation mechanism. That owner classifies a real failure by test tier, dispatches its corresponding debug
 skill in a fresh context, rebinds after a push, obtains the required review, and reaches merge under the
 goal-scoped authorization above. The shared monitor is the only foreground or persistent forge-wait mechanism.
@@ -103,24 +112,21 @@ An adjacent queue entry, a similarly named branch or a newer PR never silently b
 The executable monitor is `.agents/workflows/workflow_ops.py`; `engineering:merge` supplies its exact
 PR and head identity.
 
-## Transferred checkout cleanup
+## Targeted checkout cleanup
 
-Use `engineering:merge` Step 5's `finish` when the current owner can release its checkout itself. When
-that capability is unavailable and an authorized `workflow:handoff` transfers cleanup, the successor owns
-the exact removal, rename or move and final filesystem verification recorded in `## Next Steps`.
-The predecessor ends repository-scoped activity and emits a recorded release marker; it never performs
-the operation after launch. The successor waits for that marker before releasing the predecessor through
-`agent:peer`. Resolve the registry entry by the old checkout and any recorded session or terminal
-identity. The native close operation must verify the recorded PID and start time; tab closure uses its
-exact native terminal identity. An unverifiable entry stays open with the user named as resolver.
+`engineering:merge` Step 5 owns cleanup for the exact checkout attached to the delivery binding. It is
+separate from terminal acceptance and frontend release. After all recorded holders release, an acknowledged
+deterministic worker running outside the target verifies the exact merged head, ownership, and recent-edit
+guards, removes that one target, verifies its filesystem absence, and records the result outside the target.
 
-Run the filesystem operation from a verified surviving checkout after the predecessor no longer holds
-the old directory. Treat a command error or residual path as incomplete cleanup. Launcher submission or
-partial Git cleanup does not establish release of the host or removal of the directory.
+`unnecessary` and deliberate `retained` dispositions are terminal. A command error, an unverified holder,
+or a residual path is `pending`, with a resolver and observable resume condition. Host exit, scheduler
+submission, or partial Git cleanup is not evidence of removal. Do not create a routine handoff or new
+session for cleanup; an explicit transfer remains a normal `workflow:handoff` decision.
 
 ```text
-Next Steps: wait for the predecessor's recorded release, verify and close that exact native session,
-then remove the named old checkout from the surviving checkout and verify the old path is absent.
+Cleanup result: pending — the recorded holder is still live.
+Resume: after its verified release, run the exact-target worker and prove the path is absent.
 ```
 
 ## Whoever merges owns only the generated downstream PR that merge caused
@@ -156,8 +162,7 @@ nothing.
 
 Marking a PR ready for review changes its review state, not its merge authorization. **No CI workflow may
 enable auto-merge or merge an ordinary PR in response to a PR lifecycle event** — `opened`, `reopened`,
-`synchronize`, or `ready_for_review`. A user-authorized `workflow:run` goal enters delivery after its
-source and technical gates are ready; the CI event itself never starts it. The one
+`synchronize`, or `ready_for_review`. Only an explicit merge instruction starts the delivery. The one
 exception is a repository-owned **generated** PR — the `platform-sync`/version-bump kind above: its own
 workflow may arm auto-merge for itself as part of the already-authorized producer chain, and that scoped
 automation must never generalise to ordinary PRs.

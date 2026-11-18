@@ -79,8 +79,8 @@ A plan, ledger, roadmap, or handoff may sequence delivery, but anonymous procedu
 push`, `do not open a PR`, or `do not merge` has no authority to suppress the standing plan-delivery contract.
 Location alone never makes a restriction stale: preserve an explicit current user limitation, recorded
 repository authorization, named PR/head security or validation hold, merge hold, or repository stop class as
-a typed delivery gate. When no such live authority is identified, `workflow:run` continues the
-user-authorized goal through merged default-branch state.
+a typed delivery gate. When no such live authority is identified, continue to merged default-branch state
+(`engineering:merging` owns the goal-wide merge-authorization scope).
 
 ## Shape of a plan
 
@@ -236,10 +236,22 @@ Workflow runtime dependency. Run `plan_graph.py` for every selected Engineering 
 before trusting recovery state. A Concertable profile may impose its additional pre-launch adapter rule; other
 repositories do not select that profile implicitly.
 
-Before foreground or meta closeout, reporting done, or deleting recovery artifacts, invoke the existing
-completion-record contract when the canonical goal contains a fenced `completion` record. This applies
-independently of scheduling. `workflow:continue`'s software delivery reference owns its completion
-contract and fields.
+Before foreground or meta closeout, reporting done, or deleting recovery artifacts, use `workflow:run`'s
+terminal acceptance checkpoint. Its candidate receipt binds the exact goal, artifacts, delivery evidence,
+known responsibility aggregate, audit result, and cleanup disposition. A missing, invalid, blocked, or
+stale receipt keeps the recovery artifacts. `engineering:persistent-delivery` retains its own delivery
+binding and does not become a second completion authority.
+
+On an accepted current receipt, record retirement permission before deleting the goal or its eligible
+plan-and-ledger pair. Declare the companion plan as an `--artifact` during preparation, then name it with
+`--retire-source` at retirement; repeat that option for each eligible declared plan artifact being removed.
+This consumes the same audit. Only the goal and explicitly named artifacts may use preserved snapshots;
+the responsibility aggregate and other evidence remain live. Engineering removes those eligible files
+afterward, while the external acceptance checkpoint remains the recovery source.
+
+```text
+python -B <core-runtime>/completion.py retire-goal --receipt <accepted-current-receipt> --retire-source <declared-companion-plan>
+```
 
 Terminal selected Engineering evidence names implementation, validation, review, PR, merge commit, remaining
 durable state, and implementation authority. A commit, pushed branch, or open PR is not terminal while
@@ -375,10 +387,12 @@ alone does not require that transfer; the context-transfer decision is owned by
    the current remote default in a checkout selected under `engineering:branching`. Resume the same ledger.
 5. **Close out only after the entire lifecycle is terminal.** Planning-only work is terminal only when its
    reviewed artifacts are merged to the default branch through `merge-docs`; planning artifacts updated with
-   implementation are terminal only when that delivery PR merges. A local commit, pushed branch, or open PR
-   is not completion. Record the final transition and delete the
-   plan and ledger in the next substantive commit or one final docs-only closeout. Never push a commit whose
-   only purpose is to record a remote observation.
+   implementation are terminal only when that delivery PR merges. Reuse `workflow:run`'s accepted receipt
+   and the recorded cleanup result, then run `retire-goal --receipt <receipt>`. That records permitted
+   retirement but does not delete the goal. A local commit, pushed branch, or open PR is not completion.
+   Record the final transition and remove the eligible plan and ledger in the next substantive commit or one
+   final docs-only closeout; retain the external acceptance checkpoint as recovery evidence. Never push a
+   commit whose only purpose is to record a remote observation.
 
 ### Plans outlive delivery branches
 
@@ -420,15 +434,10 @@ coherent, and the user's existing authorization covers the next phase. The paren
 Move directly into that work after the durable
 checkpoint; do not stop for a handoff merely because planning or another phase completed.
 
-For a massive plan whose design was a substantial phase of its own, write a durable phased execution plan
-and normally hand execution to one fresh harness, even when the checkout stays the same. The successor
-resumes that plan as its owner. Judge plans between these cases by the size and complexity of the remaining
-execution, how much planning context is useful, and whether a fresh owner can act from the checkpoint.
-Record the reason when choosing the less usual path; plan length alone is not a mechanical threshold.
-
-`workflow:plan` owns the critical-plan readiness decision and compact execution goalpost.
-Apply it before a substantial-design transfer. `workflow:handoff` owns the matching acknowledgement
-and first-action evidence; launcher submission alone does not establish an accountable executor.
+For a massive plan whose design was a substantial phase of its own, keep the execution owner unless an
+actual transfer condition below applies. Use bounded native background work for independent implementation
+or residual acceptance judgment while the parent retains the goal. Plan length or a completed design phase
+does not create a handoff requirement.
 
 Transfer to a fresh context only when at least one of these conditions is true:
 
@@ -437,8 +446,6 @@ Transfer to a fresh context only when at least one of these conditions is true:
   requires an independent context for unbiased review or isolated judgment;
 - the next plan section is materially separate and the earlier reasoning would distract from, rather than
   help with, the new work;
-- a massive plan has completed substantial design and its durable phased plan makes execution ready for a
-  fresh owner, even when the repository and worktree stay the same;
 - the context is genuinely degraded: repeated compaction has lost needed detail, important facts are being
   re-derived, conflicting stale assumptions remain loaded, or too little usable capacity remains to execute
   the next slice safely.
@@ -450,9 +457,11 @@ does not transfer ownership. Do not select a handoff as routine phase-ending cer
 
 ## Finishing, superseding, abandoning
 
-Before retiring recovery artifacts, reconcile and update the linked selected item through the shared
-recording contract. Resolve it only after its own acceptance condition is verified; a delivered PR or
-retired plan alone does not close it. Preserve unresolved item ownership and next action.
+Before retiring recovery artifacts, consume the same accepted terminal receipt through `workflow:run` and
+run `retire-goal --receipt <receipt>`, then reconcile and update the linked selected item through the shared
+recording contract. Do not dispatch or request a second audit for retirement. Resolve it only after its own
+acceptance condition is verified; a delivered PR or retired plan alone does not close it. Preserve unresolved
+item ownership and next action.
 
 - **Finished** → delete the plan and its ledger, once the whole lifecycle is terminal — not merely once the
   final local phase is committed.
