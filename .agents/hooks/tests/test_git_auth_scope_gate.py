@@ -5,7 +5,7 @@ import subprocess
 import sys
 import unittest
 import uuid
-from contextlib import ExitStack
+from contextlib import ExitStack, redirect_stderr
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -161,6 +161,89 @@ class CommandExtractionTests(unittest.TestCase):
 
     def test_a_non_shell_tool_claims_no_jurisdiction(self):
         self.assertIsNone(gate.extract_command("Write", {"command": "gh auth refresh -s admin:org"}))
+
+    def test_declared_unix_profiles_select_only_the_command_operand(self):
+        script = "gh auth login"
+        cases = (
+            ["bash", "--noprofile", "-lc", script, "trailing"],
+            ["bash", "+help", "-c", script],
+            ["bash", "-ooec", "errexit", "nounset", script],
+            ["bash", "-Oc", "completion_strip_exe", script],
+            ["dash", "-p", "-c", script],
+            ["dash", "-o", "priv", "-c", script],
+            ["zsh", "--sh-word-split", "-c", script],
+            ["zsh", "--emulate", "sh", "-e", "-b", "-c", script],
+            ["zsh", "--emulate", "sh", "-bc", script],
+            ["zsh", "-co", "errexit", script],
+        )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                self.assertEqual(script, gate.extract_command("exec_command", {"command": payload}))
+
+    def test_known_nonliteral_boundaries_are_not_scanned(self):
+        script = "gh auth login"
+        cases = (
+            ["bash", "script.sh", "-c", script],
+            ["bash", "--", "-c", script],
+            ["dash", "-", "-c", script],
+            ["zsh", "--emulate", "sh", "-b", "-c", script],
+            ["pwsh", "script.ps1", "-Command", script],
+            ["powershell", "-File", "script.ps1", "-Command", script],
+            ["pwsh", "-EncodedCommand", "Z2ggYXV0aCBsb2dpbg=="],
+        )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                self.assertIsNone(gate.extract_command("exec_command", {"command": payload}))
+
+    def test_unresolved_active_launcher_options_refuse(self):
+        cases = (
+            ["bash", "--future-vendor-option", "-c", "SCRIPT"],
+            ["bash", "+future-vendor-option", "-c", "SCRIPT"],
+            ["bash", "-o", "future_option", "-c", "SCRIPT"],
+            ["dash", "-q", "-c", "SCRIPT"],
+            ["dash", "--future", "-c", "SCRIPT"],
+            ["zsh", "--future-option", "-c", "SCRIPT"],
+            ["zsh", "-o", "sh-word-split", "-c", "SCRIPT"],
+            ["sh", "-coerrexit", "errexit", "SCRIPT"],
+            ["sh", "-oerrexit", "-c", "SCRIPT"],
+            ["pwsh", "-FutureVendorCommand", "-Command", "SCRIPT"],
+            ["pwsh", "-CommandWithArg", "SCRIPT"],
+            ["powershell", "-CWA", "SCRIPT"],
+            ["pwsh", "-ExecutionPol", "FuturePolicy", "-Command", "SCRIPT"],
+        )
+        for payload in cases:
+            with self.subTest(payload=payload), redirect_stderr(io.StringIO()) as stderr:
+                with self.assertRaises(SystemExit) as exit_info:
+                    gate.extract_command("exec_command", {"command": payload})
+            self.assertIn("SHELL EXTRACTION GATE", stderr.getvalue())
+
+    def test_powershell_prefixes_and_host_specific_version_arity(self):
+        script = "Write-Output SCRIPT"
+        command_prefixes = ("c", "co", "com", "comm", "comma", "comman", "command")
+        for prefix in command_prefixes:
+            for marker in ("-", "/"):
+                with self.subTest(prefix=prefix, marker=marker):
+                    self.assertEqual(
+                        script + " ;",
+                        gate.extract_command(
+                            "exec_command",
+                            {"command": ["powershell", "-NoProfile", marker + prefix, script, ";"]},
+                        ),
+                    )
+        self.assertEqual(
+            script,
+            gate.extract_command("exec_command", {"command": ["powershell", "-Version", "5.1", "-Command", script]}),
+        )
+        self.assertIsNone(gate.extract_command("exec_command", {"command": ["pwsh", "-Version", "-Command", script]}))
+        self.assertEqual(
+            script,
+            gate.extract_command("exec_command", {"command": ["pwsh", "-CWA", script, "trailing"]}),
+        )
+
+    def test_sh_agreement_uses_operand_index_and_text(self):
+        with redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as exit_info:
+                gate.extract_command("exec_command", {"command": ["sh", "-coerrexit", "errexit", "SCRIPT"]})
 
 
 class EndToEndTests(unittest.TestCase):
