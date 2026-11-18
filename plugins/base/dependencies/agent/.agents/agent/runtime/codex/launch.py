@@ -1,15 +1,19 @@
 """Codex executable selection, daemon-attached launch arguments and thread liveness."""
 
 import glob
+import json
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
+from collections.abc import Mapping
 
 from tj_cli import process
+from codex import startup
 
-from launch_contract import Liveness
+import agent_store
+from launch_contract import Liveness, PreparedLaunch
 from launch_errors import LaunchError
 from native_executable import is_script
 
@@ -19,6 +23,46 @@ TAB_CLEARED: tuple[str, ...] = ("TERM",)
 TAB_FORCED: dict[str, str] = {}
 DAEMON_TIMEOUT_SECONDS = 10
 _CODEX_VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?")
+
+
+def record_session_environment(
+    session_id: str, environ: Mapping[str, str], *, cleared: tuple[str, ...] = ()
+) -> None:
+    return None
+
+
+def registered_session(session_id: str) -> dict[str, object] | None:
+    handle = f"codex:{session_id}"
+    try:
+        shown = agent_store.run("show", handle)
+    except agent_store.AgentStoreError as error:
+        if error.code == "not-found":
+            return None
+        raise
+    session = shown.get("session")
+    if not isinstance(session, dict):
+        raise LaunchError(f"agent-store returned an invalid session for {handle}")
+    launch_id = session.get("launch_id")
+    if launch_id is None or session.get("state") == "ended":
+        return None
+    if (
+        not isinstance(launch_id, str) or not launch_id
+        or session.get("session") != handle
+        or session.get("host") != "codex"
+        or session.get("native_id") != session_id
+    ):
+        raise LaunchError(f"agent-store returned an invalid launch binding for {handle}")
+    bound = agent_store.run("show", "--launch-id", launch_id)
+    launch, session = bound.get("launch"), bound.get("session")
+    if (
+        not isinstance(launch, dict) or not isinstance(session, dict)
+        or launch.get("launch_id") != launch_id
+        or launch.get("host") != "codex" or launch.get("session") != handle
+        or session.get("session") != handle or session.get("host") != "codex"
+        or session.get("native_id") != session_id or session.get("launch_id") != launch_id
+    ):
+        raise LaunchError(f"agent-store launch and session bindings do not match for {handle}")
+    return None if session.get("state") == "ended" else session
 
 
 def parse_version(text):
@@ -77,29 +121,36 @@ def npm_global_prefix():
     return prefix or None
 
 
+def path_executables():
+    """Every `codex` on PATH in PATH order, so a stale copy early on PATH cannot hide a newer one later."""
+    found = []
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        if directory and (hit := shutil.which("codex", path=directory)):
+            found.append(hit)
+    return found
+
+
 def candidate_paths(
-    which=shutil.which, local_app_data=None, npm_prefix=npm_global_prefix
+    on_path=path_executables, local_app_data=None, npm_prefix=npm_global_prefix
 ):
     name = "codex.exe" if IS_WINDOWS else "codex"
     candidates = []
 
-    shim = which("codex")
+    shims = on_path()
 
-    if not shim and not IS_WINDOWS:
+    if not shims and not IS_WINDOWS:
         prefix = npm_prefix()
         if prefix:
             direct = Path(prefix) / "bin" / name
             if direct.is_file():
-                shim = str(direct)
+                shims = [str(direct)]
 
-    if shim and (
-        (IS_WINDOWS and Path(shim).suffix.casefold() == ".exe")
-        or (not IS_WINDOWS and not is_script(os.path.realpath(shim)))
-    ):
-        candidates.append(shim)
-        candidates.append(os.path.realpath(shim))
-
-    if shim:
+    for shim in shims:
+        if (IS_WINDOWS and Path(shim).suffix.casefold() == ".exe") or (
+            not IS_WINDOWS and not is_script(os.path.realpath(shim))
+        ):
+            candidates.append(shim)
+            candidates.append(os.path.realpath(shim))
         roots = [
             Path(shim).parent / "node_modules" / "@openai" / "codex",
             Path(os.path.realpath(shim)).parent.parent,
@@ -173,27 +224,58 @@ def executable() -> str:
     return resolve_executable()[0]
 
 
+def prepare(directory: Path, title: str, arguments: list[str], cli: str, environ: Mapping[str, str]) -> PreparedLaunch:
+    minimum = "0.154.0" if arguments[2:3] == ["resume"] else startup.MINIMUM_VERSION
+    native = str(resolve_executable(minimum=minimum)[0])
+    return startup.prepare(directory, title, arguments, cli, native, environ)
+
+
+def abandon(prepared: PreparedLaunch, launch_id: str, dispatched: bool) -> None:
+    startup.abandon(prepared, launch_id, dispatched)
+
+
+def confirm(prepared: PreparedLaunch, arguments: list[str], launch_id: str) -> None:
+    startup.confirm(prepared, arguments, launch_id)
+
+
 def start_arguments(directory, title, prompt, model, effort):
     arguments = ["--cd", str(directory)]
     if model:
         arguments += ["--model", model]
-    return arguments if effort else [*arguments, prompt]
+    if effort:
+        arguments += ["-c", f"model_reasoning_effort={effort}"]
+    return [*arguments, prompt]
 
 
 def resume_arguments(directory, title, session_id):
     return ["--cd", str(directory), "resume", session_id]
 
 
-def _daemon():
+def daemon(timeout=DAEMON_TIMEOUT_SECONDS):
     from codex import hook_trust
 
-    return hook_trust.AppServer(executable(), Path.cwd(), timeout=DAEMON_TIMEOUT_SECONDS, existing=True)
+    return hook_trust.AppServer(executable(), Path.cwd(), timeout=timeout, existing=True)
 
 
-def liveness() -> dict[str, Liveness]:
+def liveness(*, strict: bool = False) -> dict[str, Liveness]:
     """Threads loaded in the shared app-server daemon, by thread id; an absent daemon has none."""
     try:
-        with _daemon() as server:
+        if strict:
+            result = process.run(
+                [executable(), "app-server", "daemon", "version"],
+                capture_output=True, text=True, encoding="utf-8",
+                timeout=DAEMON_TIMEOUT_SECONDS, check=False,
+            )
+            if result.returncode:
+                detail = result.stderr.strip() or result.stdout.strip()
+                if "failed to connect to" in detail and any(
+                    f"(os error {code})" in detail for code in (2, 111, 10061)
+                ):
+                    return {}
+                raise LaunchError(f"Cannot determine Codex daemon state: {detail}")
+            if not isinstance(json.loads(result.stdout), dict):
+                raise LaunchError("Codex daemon version returned invalid JSON")
+        with daemon() as server:
             loaded, cursor = [], None
             while True:
                 page = server.request("thread/loaded/list", {"cursor": cursor})
@@ -203,7 +285,12 @@ def liveness() -> dict[str, Liveness]:
                     break
             statuses = {thread: server.request("thread/read", {"threadId": thread})["thread"]["status"]["type"]
                         for thread in loaded}
-    except (OSError, RuntimeError, LaunchError, KeyError, TypeError):
+    except (
+        OSError, subprocess.SubprocessError, RuntimeError, LaunchError,
+        ValueError, KeyError, TypeError,
+    ) as error:
+        if strict:
+            raise LaunchError(f"Cannot determine Codex liveness: {error}") from error
         return {}
     return {thread: Liveness(alive=status != "notLoaded", activity=status) for thread, status in statuses.items()}
 
@@ -213,16 +300,5 @@ def respawn(background):
 
 
 def name_session(session_id, title):
-    with _daemon() as server:
+    with daemon() as server:
         server.request("thread/name/set", {"threadId": session_id, "name": title})
-
-
-def deliver(session_id, prompt, model, effort):
-    """Start the thread's first turn through the daemon, the only way to choose its reasoning effort."""
-    with _daemon() as server:
-        server.request("turn/start", {
-            "threadId": session_id,
-            "input": [{"type": "text", "text": prompt}],
-            **({"model": model} if model else {}),
-            **({"effort": effort} if effort else {}),
-        })

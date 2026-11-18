@@ -1,9 +1,11 @@
-"""Session hooks: SessionStart registers this session in agent-store, SessionEnd ends it, and each prompt
-cancels a pending no-PR closeout of the `tj run` tab (`tj done --cancel`).
+"""Session hooks: SessionStart registers this session in agent-store, and SessionEnd ends it for an
+explicit user exit and otherwise leaves it active for `tj recover`.
 
-A session started by `tj run` binds to its launch (`TJ_RUN_LAUNCH_ID`) and inherits the launch's title,
-parent, terminal, wrapper and work item. A Codex thread is also named after its title, so it is
-addressable by name. Exit 0 always: bookkeeping never stops a session.
+A session owned by a `tj run` launch, as `tj launch` reports it, binds to that launch and inherits its title,
+parent, terminal, wrapper and work item; a session that only inherited `tj run` environment registers
+unbound. When `tj launch` cannot answer, the session is left unregistered and the failure reported, never
+registered unbound beside the launch it may own. A Codex thread is also named after its title, so it is addressable by name. Exit 0 always:
+bookkeeping never stops a session.
 """
 
 from __future__ import annotations
@@ -13,7 +15,6 @@ from collections.abc import Mapping
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 
@@ -21,13 +22,18 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from tj_agent.host import Host
+from tj_agent import worktrees
+from codex import launch as codex_launch
+import agent_cli
 import agent_store
+import owned_launch
 from tj_cli import process
 
 LAUNCH_ENV = "TJ_RUN_LAUNCH_ID"
 TITLE_ENV = "AGENT_CLI_TAB_TITLE"
 WRAPPER_PID_ENV = "TJ_RUN_PID"
 WRAPPER_STARTED_AT_ENV = "TJ_RUN_STARTED_AT"
+EXPLICIT_EXIT_REASONS = frozenset({"clear", "resume", "logout", "prompt_input_exit"})
 
 
 def payload() -> dict:
@@ -61,11 +67,6 @@ def title_arguments(environ: Mapping[str, str]) -> list[str]:
     return []
 
 
-def wrapper_arguments(environ: Mapping[str, str]) -> list[str]:
-    pid, started_at = environ.get(WRAPPER_PID_ENV), environ.get(WRAPPER_STARTED_AT_ENV)
-    return ["--wrapper-pid", pid, "--wrapper-started-at", started_at] if pid and started_at else []
-
-
 def register(host: Host, session_id: str, cwd: str, root: str | None, arguments: list[str]) -> dict:
     base = ["register", "--session", f"{host}:{session_id}", "--cwd", cwd]
     if root:
@@ -75,52 +76,55 @@ def register(host: Host, session_id: str, cwd: str, root: str | None, arguments:
 
 def start(host: Host, session_id: str, cwd: str, environ: Mapping[str, str]) -> dict:
     root = worktree(cwd)
-    launch = environ.get(LAUNCH_ENV)
-    if launch:
-        try:
+    adapter = agent_cli.host_launch(host)
+    session = codex_launch.registered_session(session_id) if host is Host.CODEX else None
+    inherited = environ.get(LAUNCH_ENV)
+    cleared: tuple[str, ...] = ()
+    launch = owned_launch.for_session(f"{host}:{session_id}") if session is None and inherited else None
+    environ = {name: value for name, value in environ.items() if name != LAUNCH_ENV}
+    if session is None and inherited and launch is None:
+        cleared = tuple(
+            name for name in (*environ, LAUNCH_ENV)
+            if name.startswith("TJ_RUN_") or name in {TITLE_ENV, "WT_SESSION", "TMUX_PANE"}
+        )
+        environ = {
+            name: value for name, value in environ.items()
+            if not name.startswith("TJ_RUN_") and name not in {TITLE_ENV, "WT_SESSION", "TMUX_PANE"}
+        }
+    if session is None:
+        if launch:
+            environ[LAUNCH_ENV] = launch
             session = register(host, session_id, cwd, root, ["--launch-id", launch])
-        except agent_store.AgentStoreError as error:
-            if error.code != "not-found":
-                raise
-            print(f"agent-store: launch {launch} was not recorded; registering {host}:{session_id} by title "
-                  "instead", file=sys.stderr)
-            session = register(host, session_id, cwd, root,
-                                [*terminal(environ), *title_arguments(environ), *wrapper_arguments(environ)])
+        else:
+            session = register(host, session_id, cwd, root, [*terminal(environ), *title_arguments(environ)])
     else:
-        session = register(host, session_id, cwd, root, [*terminal(environ), *title_arguments(environ)])
-    if host is Host.CODEX and session.get("title"):
-        import agent_cli
-
-        agent_cli.host_launch(host).name_session(session_id, session["title"])
+        environ = {host.session_variable: session_id, LAUNCH_ENV: session["launch_id"]}
+    try:
+        if host is Host.CODEX and session.get("title"):
+            adapter.name_session(session_id, session["title"])
+    finally:
+        adapter.record_session_environment(session_id, environ, cleared=cleared)
+        if root:
+            worktrees.claim_started_worktree(host, session_id, Path(root), environ)
     return session
 
 
-def end(host: Host, session_id: str) -> None:
+def end(host: Host, session_id: str, reason: str | None) -> None:
+    if reason not in EXPLICIT_EXIT_REASONS:
+        return
     try:
-        agent_store.run("end", "--session", f"{host}:{session_id}")
+        agent_store.run("end", "--session", f"{host}:{session_id}", "--reason", reason)
     except agent_store.AgentStoreError as error:
         if error.code not in ("not-found", "conflict"):
             raise
 
 
-def prompt() -> None:
-    tj = shutil.which("tj")
-    if tj:
-        process.run([tj, "done", "--cancel"], capture_output=True, timeout=8, check=False)
-
-
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("event", choices=("start", "prompt", "end"))
+    parser.add_argument("event", choices=("start", "end"))
     parser.add_argument("--host", type=Host, choices=list(Host), required=True)
     args = parser.parse_args(argv)
     data = payload()
-    if args.event == "prompt":
-        try:
-            prompt()
-        except (OSError, subprocess.SubprocessError) as error:
-            print(f"tj done --cancel: {error}", file=sys.stderr)
-        return 0
     session_id = data.get("session_id") or data.get("sessionId")
     if not isinstance(session_id, str) or not session_id:
         return 0
@@ -128,7 +132,8 @@ def main(argv=None) -> int:
         if args.event == "start":
             start(args.host, session_id, data.get("cwd") or os.getcwd(), os.environ)
         else:
-            end(args.host, session_id)
+            reason = data.get("reason")
+            end(args.host, session_id, reason if isinstance(reason, str) else None)
     except Exception as error:  # noqa: BLE001 - bookkeeping never stops a session
         print(f"agent-store {args.event}: {error}", file=sys.stderr)
     return 0
