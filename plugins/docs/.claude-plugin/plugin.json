@@ -1,0 +1,14 @@
+{
+  "name": "docs",
+  "description": "Layout conventions for pages people read.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tj-agents/core",
+  "keywords": [
+    "docs",
+    "layout"
+  ],
+  "displayName": "Documentation",
+  "skills": "./skills/"
+}
