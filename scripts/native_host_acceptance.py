@@ -631,7 +631,7 @@ def install_claude_plugins(executable, marketplace, project, environment, timeou
         "Claude marketplace registration",
         timeout,
     )
-    for identity in IDENTITIES:
+    for identity in (*external_dependencies(marketplace), *IDENTITIES):
         run_native(
             [
                 *native_command(executable),
@@ -787,7 +787,9 @@ def accept_codex(
     expected_context=CONTEXT_PROBE,
 ):
     install_codex_plugins(executable, marketplace, project, environment, timeout)
-    runtime = root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime"
+    runtime = (
+        root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "runtime"
+    )
     if str(runtime) not in sys.path:
         sys.path.insert(0, str(runtime))
     trust = load_module(
@@ -1052,7 +1054,41 @@ def fixture_marketplace(
         target = directory / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
+    add_external_stand_ins(directory)
     return directory
+
+
+def dependency_names(marketplace: Path) -> set[str]:
+    needed = set()
+    for manifest in (marketplace / "plugins").glob("*/.claude-plugin/plugin.json"):
+        for dependency in json.loads(manifest.read_text(encoding="utf-8")).get(
+            "dependencies", []
+        ):
+            name = dependency["name"] if isinstance(dependency, dict) else dependency
+            needed.add(name.partition("@")[0])
+    return needed
+
+
+def external_dependencies(marketplace: Path) -> list[str]:
+    return [
+        f"{name}@tj-agents"
+        for name in sorted(dependency_names(marketplace) - set(PACKAGES))
+    ]
+
+
+def add_external_stand_ins(directory: Path) -> None:
+    catalog_path = directory / ".claude-plugin/marketplace.json"
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    shipped = {entry["name"] for entry in catalog["plugins"]}
+    for name in sorted(dependency_names(directory) - shipped):
+        manifest = directory / "plugins" / name / ".claude-plugin/plugin.json"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(
+            json.dumps({"name": name, "description": "Acceptance stand-in"}) + "\n",
+            encoding="utf-8",
+        )
+        catalog["plugins"].append({"name": name, "source": f"./plugins/{name}"})
+    catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
 
 
 def context_marketplace(root: Path, marketplace: Path, directory: Path) -> Path:
