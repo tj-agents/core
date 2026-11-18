@@ -1,6 +1,7 @@
 # core
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
+Repository-scoped preferences use the versioned [configuration envelope](docs/workflows/REPOSITORY_CONFIGURATION.md); a preference does not grant delivery authority.
 The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core); the marketplace ID remains `base-agents`.
 The repository publishes a minimal `base` package and optional `engineering` and `machine` packages.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.

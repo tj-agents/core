@@ -234,9 +234,9 @@ def auto_merge_enabled(project: Path | None) -> bool:
         return False
     try:
         validator.validate(policy)
-    except validator.PolicyViolation:
+        return validator.auto_merge_preference(project, policy)
+    except ValueError:
         return False
-    return policy.get("auto_merge") is True
 
 
 def own_payload_root() -> Path | None:
@@ -418,7 +418,14 @@ def codex_auto_merge_roots(environ: dict, project: Path, trust, published: dict)
 
 
 def auto_merge_roots(environ: dict, project: Path | None, warnings: list[str]) -> tuple[set[Path], set[Path]]:
-    if not auto_merge_enabled(project) or not safe_project_root(project):
+    if not safe_project_root(project):
+        return set(), set()
+    try:
+        enabled = auto_merge_enabled(project)
+    except Exception as error:
+        warnings.append(f"auto-merge configuration is unavailable ({error})")
+        return set(), set()
+    if not enabled:
         return set(), set()
     trust = machine_module("codex_hook_trust.py")
     if trust is None:

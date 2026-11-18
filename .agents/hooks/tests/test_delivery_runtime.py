@@ -67,6 +67,13 @@ class StandingMergeAuthorizationTests(unittest.TestCase):
         resolution = self.authorization.resolve(policy, [self.stop_paths["auth"]])
         self.assertEqual("auth", resolution["stopped_by"]["class"])
 
+    def test_repository_configuration_is_never_an_exemptible_stop_class(self):
+        resolution = self.authorization.resolve(
+            self.policy(authorized_stop_classes=sorted(self.stop_paths)),
+            [".agents/configuration.json"],
+        )
+        self.assertEqual("repository-configuration", resolution["stopped_by"]["class"])
+
     def test_an_overlapping_path_stops_for_an_unexempted_class(self):
         resolution = self.authorization.resolve(
             self.policy(authorized_stop_classes=["ci-workflow"]),

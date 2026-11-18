@@ -1,4 +1,7 @@
+import importlib.util
 import re
+import sys
+from pathlib import Path
 
 
 AUTHORIZATION_KEYS = {
@@ -27,6 +30,17 @@ class PolicyViolation(ValueError):
     pass
 
 
+def _configuration_reader():
+    path = Path(__file__).resolve().with_name("repository_configuration.py")
+    spec = importlib.util.spec_from_file_location("base_agents_repository_configuration", path)
+    if spec is None or spec.loader is None:
+        raise PolicyViolation("repository configuration reader is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def validate(policy):
     if not isinstance(policy, dict):
         raise PolicyViolation("standing authorization table must be an object")
@@ -34,7 +48,7 @@ def validate(policy):
     if unknown:
         raise PolicyViolation(f"standing authorization table has unknown keys {sorted(unknown)!r}")
     mode = policy.get("standing_authorization")
-    if mode not in {"absent", "auto", "merge"}:
+    if not isinstance(mode, str) or mode not in {"absent", "auto", "merge"}:
         raise PolicyViolation("standing authorization mode is invalid")
     instruction = policy.get("instruction")
     if mode == "absent":
@@ -74,3 +88,8 @@ def validate(policy):
     if "auto_merge" in policy and type(policy["auto_merge"]) is not bool:
         raise PolicyViolation("`auto_merge` must be a boolean when present")
     return policy
+
+
+def auto_merge_preference(root, policy):
+    validate(policy)
+    return _configuration_reader().auto_merge(root, policy)

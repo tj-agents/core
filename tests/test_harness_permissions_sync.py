@@ -398,7 +398,10 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertFalse(any("gh pr merge" in entry for entry in enabled))
         self.assertIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
 
-        policy.write_text(json.dumps({"standing_authorization": "auto", "instruction": "merge", "auto_merge": False}), encoding="utf-8")
+        (project / ".agents" / "configuration.json").write_text(
+            json.dumps({"schema_version": 1, "configuration": {"core": {"auto_merge": False}}}),
+            encoding="utf-8",
+        )
         SYNC.synchronize(self.environ, "apply", project)
 
         disabled = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
@@ -536,8 +539,9 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
                 (package / "harness.json").write_text("{}", encoding="utf-8")
                 shutil.copy2(SCRIPT, script_dir / "harness_permissions_sync.py")
                 shutil.copy2(SCRIPT.parent / "harness_permissions.py", script_dir / "harness_permissions.py")
-                for name in ("delivery_policy.py", "codex_hook_trust.py"):
-                    shutil.copy2(ROOT / ".agents/workflows/delivery_policy.py" if name == "delivery_policy.py" else ROOT / ".agents/machine/scripts/codex_hook_trust.py", resource_dir / name)
+                for name in ("delivery_policy.py", "repository_configuration.py", "codex_hook_trust.py"):
+                    source = ROOT / ".agents/workflows" / name if name != "codex_hook_trust.py" else ROOT / ".agents/machine/scripts/codex_hook_trust.py"
+                    shutil.copy2(source, resource_dir / name)
                 spec = importlib.util.spec_from_file_location(f"host_sync_{host_directory}", script_dir / "harness_permissions_sync.py")
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
