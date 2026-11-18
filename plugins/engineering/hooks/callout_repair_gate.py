@@ -4,8 +4,21 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+import uuid
 
 from workflow_route import HOST_GENERATED_PROMPTS, prompt_text
+
+
+try:
+    from handoff_admission import validate as validate_disposition
+except ModuleNotFoundError:
+    HANDOFF_SCRIPTS = Path(__file__).resolve().parents[1] / "engineering" / "workflow" / "handoff" / "scripts"
+    if str(HANDOFF_SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(HANDOFF_SCRIPTS))
+    try:
+        from admission import validate as validate_disposition
+    except ModuleNotFoundError:
+        validate_disposition = None
 
 
 CALLOUT = re.compile(
@@ -31,10 +44,10 @@ LAUNCH_SUCCESS = re.compile(r"Launched (?:codex-cli\s+\S+|codex handoff tab|clau
 TAIL_BYTES = 1 << 20
 MESSAGE = (
     "CALLOUT REPAIR: answer the user's direct question first. Check the governing standard and "
-    "if it caused or failed to prevent the mistake, launch engineering:handoff in bounded "
-    "side-workstream mode for the responsible source owner "
-    "in this same turn. An apology, automatic SendFeedback, or memory update does not replace "
-    "repair. A skill load, a promised launch, or a failed launcher is not launch evidence. "
+    "if it caused or failed to prevent the mistake, follow engineering:self-repair. Admit runnable "
+    "work through engineering:handoff; otherwise record a current typed disposition with "
+    "scripts/admission.py check. An apology, automatic SendFeedback, or memory update does not replace "
+    "repair. A skill load, a promised launch, or a stale disposition is not evidence. "
     "Respect explicit user limits."
 )
 
@@ -65,10 +78,13 @@ def load_state(session):
     return value if isinstance(value, dict) else {}
 
 
-def save_state(session, prompt, pending, resolved=False):
+def save_state(session, prompt, pending, resolved=False, callout_id=""):
     if not session:
         return
-    state_path(session).write_text(json.dumps({"prompt": prompt, "pending": pending, "resolved": resolved}), encoding="utf-8")
+    state_path(session).write_text(
+        json.dumps({"prompt": prompt, "pending": pending, "resolved": resolved, "callout_id": callout_id}),
+        encoding="utf-8",
+    )
 
 
 def transcript_records(path):
@@ -111,6 +127,11 @@ def human_prompt(record):
         return None
     content = value.get("content")
     if isinstance(content, list):
+        if not any(
+            isinstance(item, dict) and item.get("type") in ("input_text", "text")
+            for item in content
+        ):
+            return None
         content = [dict(item, type="text") if isinstance(item, dict) and item.get("type") == "input_text"
                    else item for item in content]
     return prompt_text(content)
@@ -231,6 +252,104 @@ def successful_result(value, tool_input):
     return source_owner_handoff(tool_input)
 
 
+def prompt_digest(prompt):
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+
+
+def command_text(value):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return "\n".join(texts(value))
+    return ""
+
+
+def disposition_command(value):
+    text = command_text(value)
+    if not re.search(r"(?:^|[\\/])admission\.py\b|\bhandoff_admission\.py\b", text, re.I):
+        return None
+    fields = {}
+    for flag in ("record", "id", "session", "prompt-sha256", "callout-id"):
+        match = re.search(rf"--{flag}\s+('([^']+)'|\"([^\"]+)\"|([^\s,;)]+))", text, re.I)
+        if match is None:
+            return None
+        fields[flag.replace("-", "_")] = next(item for item in match.groups()[1:] if item is not None)
+    if not re.search(r"\bcheck\b", text, re.I):
+        return None
+    return fields
+
+
+def result_json(value):
+    parts = list(texts(value.get("content", value.get("output", ""))))
+    for text in list(parts):
+        try:
+            decoded = json.loads(text)
+        except ValueError:
+            continue
+        if isinstance(decoded, (dict, list)):
+            parts.extend(texts(decoded))
+    for part in parts:
+        for line in str(part).splitlines():
+            try:
+                decoded = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(decoded, dict) and decoded.get("event") == "agent-handoff-disposition":
+                return decoded
+    return None
+
+
+def valid_disposition(records, session, prompt, callout_id):
+    if validate_disposition is None or not callout_id:
+        return False
+    expected = {
+        "session": session,
+        "prompt_sha256": prompt_digest(prompt),
+        "callout_id": callout_id,
+    }
+    pending = {}
+    for record in records:
+        value = message(record)
+        if value.get("type") in ("custom_tool_call", "function_call"):
+            command = disposition_command(value.get("input", value.get("arguments")))
+            if command and value.get("call_id"):
+                pending[value["call_id"]] = command
+        elif value.get("type") in ("custom_tool_call_output", "function_call_output"):
+            command = pending.pop(value.get("call_id"), None)
+            receipt = result_json(value)
+            if command and receipt and not value.get("is_error") and not value.get("error"):
+                if all(command.get(key) == value_ for key, value_ in expected.items()):
+                    try:
+                        result = validate_disposition(
+                            command["record"], command["id"], session, expected["prompt_sha256"], callout_id
+                        )
+                    except (OSError, ValueError, TypeError):
+                        result = {"valid": False}
+                    if result.get("valid") and all(receipt.get(key) == result.get(key) for key in result):
+                        return True
+        for block in value.get("content", []) if isinstance(value.get("content"), list) else []:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "tool_use":
+                command = disposition_command(block.get("input"))
+                if command and block.get("id"):
+                    pending[block["id"]] = command
+            elif block.get("type") == "tool_result":
+                command = pending.pop(block.get("tool_use_id"), None)
+                receipt = result_json(block)
+                if command and receipt and not block.get("is_error"):
+                    if all(command.get(key) == value_ for key, value_ in expected.items()):
+                        try:
+                            result = validate_disposition(
+                                command["record"], command["id"], session, expected["prompt_sha256"], callout_id
+                            )
+                        except (OSError, ValueError, TypeError):
+                            result = {"valid": False}
+                        if result.get("valid") and all(receipt.get(key) == result.get(key) for key in result):
+                            return True
+    return False
+
+
 def emit(event, context, deny=False):
     output = {"hookEventName": event, "additionalContext": context}
     if deny:
@@ -256,9 +375,14 @@ def main():
         if isinstance(origin, dict) and origin.get("kind") not in (None, "human"):
             return 0
         pending = bool(CALLOUT.search(prompt) and STANDARDS_CONTEXT.search(prompt)) and not REPAIR_LIMIT.search(prompt)
-        save_state(session, prompt, pending)
+        callout_id = str(uuid.uuid4()) if pending else ""
+        save_state(session, prompt, pending, callout_id=callout_id)
         if pending:
-            emit(event, MESSAGE)
+            emit(
+                event,
+                f"{MESSAGE}\nAdmission binding: session={session}; callout_id={callout_id}; "
+                f"prompt_sha256={prompt_digest(prompt)}",
+            )
         return 0
     if event not in ("PreToolUse", "Stop"):
         return 0
@@ -278,14 +402,22 @@ def main():
     if launch_succeeded(records):
         save_state(session, prompt, False, resolved=True)
         return 0
+    if valid_disposition(records, session, prompt, state.get("callout_id", "")):
+        return 0
     if event == "PreToolUse":
         if feedback:
-            save_state(session, prompt, bool(pending))
+            save_state(session, prompt, bool(pending), callout_id=state.get("callout_id", ""))
             emit(event, MESSAGE, deny=True)
         elif launcher_call(data.get("tool_input")) and not assistant_answer(records):
             emit(event, "Answer the user's direct question before launching the callout repair handoff.", deny=True)
     elif not (data.get("stop_hook_active") or data.get("stopHookActive")):
-        print(json.dumps({"decision": "block", "reason": MESSAGE}))
+        binding = ""
+        if state.get("callout_id"):
+            binding = (
+                f" Admission binding: session={session}; callout_id={state['callout_id']}; "
+                f"prompt_sha256={prompt_digest(prompt)}"
+            )
+        print(json.dumps({"decision": "block", "reason": MESSAGE + binding}))
     return 0
 
 

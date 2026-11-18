@@ -1,13 +1,13 @@
 # Self-repair handoff priority and deferral
 
-Status: both HIGH linkage findings remediated; focused and package validation passed; commit and incremental review are next.
+Status: successor pickup acknowledged; reconcile current main, finish the selectable self-repair workflow and enforcement, then validate and independently review PR #199.
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-SessionGuidanceHandoffCompliance
 Branch: Fix/SessionGuidanceHandoffCompliance
 PR: https://github.com/tj-agents/core/pull/199
-Native owner: 01a12ad4-3f5b-7c72-ad11-ea65007cdd0c
+Native owner: 01a1375e-ad81-7321-af6e-c9d005469b4e
 Coordinator: 01a12b10-3519-7f41-8e4f-7afa6828fef0
-Updated: 2026-10-11
-Lane: L4 implementation complete; L4 independent review next, then L7 delivery operations.
+Updated: 2026-10-13
+Lane: L3 pickup investigation; L4 bounded implementation and independent review next; L7 delivery operations.
 
 ## Outcome and authority
 
@@ -132,6 +132,30 @@ is registered. An explicit supported wake returned `working` while the foregroun
 native owner and no headless child was launched.
 
 ## Next Steps
+
+Pickup acknowledged on 2026-10-13 by session `01a1375e-ad81-7321-af6e-c9d005469b4e`, the only
+verified live native session in this checkout (PID 31484). Tommy's RESUME_PROMPT refinement controls:
+preserve the distinct selectable `engineering:self-repair` workflow; session-guidance retains its
+lifecycle pointer instead of the full procedure. Every covered callout must receive a verified single
+repair owner/launch or a current typed capability/dependency/conflict/capacity disposition before normal
+continuation or terminal close. Reject explanations, intent, unverified launch and forged/stale evidence.
+Four live machine sessions alone do not prove capacity exhaustion; only an explicit budget can do so.
+
+PR #199 is OPEN/DRAFT at `cb6825236d97784f28e8286f56e99981911e4f89`; local HEAD is `ffeecf7`,
+which already commits the prior HIGH-finding remediation. Fetched main is 201 commits ahead of this
+branch's base. Preserve all generated changes and the untracked RESUME_PROMPT. Reconcile main before
+implementation, retaining this branch and PR. The separate session-registration repair and originating
+Feature-WorkItemSessions checkout remain excluded.
+
+The existing continuation owner `17877fd10dfe84f96751c57e` is blocked, has no foreground/child writer,
+and still records head `259e022`. A supported claim with verified PID 31484 rejected `owner-head-changed`.
+Its finite deadline has expired. Do not invent a second owner, extend its budgets, or claim unattended
+continuation. Continue authorized foreground work; preserve this exact recovery limitation until a
+supported reconciliation is available. No duplicate native writer was observed.
+
+Current action: reconcile main and implement the specified self-repair/gate correction at L4, then
+focused validation and independent review against the resulting immutable candidate. The saved older
+steps below are historical inputs, superseded where they conflict with this pickup.
 
 Pickup acknowledged on 2026-10-11 by native session `01a12ad4-3f5b-7c72-ad11-ea65007cdd0c`;
 `CODEX_THREAD_ID` matches the recorded owner. Normal sandboxed reads succeeded for this goal, the
