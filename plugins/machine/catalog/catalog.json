@@ -192,7 +192,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:af2d307db0a29bd62a75f80d4c5e58e8bdb903d334c82c66468d484edb5b9de6",
+          "digest": "sha256:9f9b3915c4e936bb2ba2cd954542085f460d2e25fab2cc9305531bd87ae50dbc",
           "harness": {
             "marketplaces": [
               {
@@ -392,7 +392,47 @@
                     ]
                   ]
                 }
-              ]
+              ],
+              "auto_merge": {
+                "claude_allow": [
+                  "Bash(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")",
+                  "PowerShell(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")"
+                ],
+                "codex_prefix_rules": [
+                  {
+                    "pattern": [
+                      [
+                        "python",
+                        "python.exe",
+                        "python3",
+                        "py"
+                      ],
+                      "-B",
+                      "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                      "--root",
+                      "${PROJECT_ROOT}"
+                    ],
+                    "justification": "rechecks the declared opt-in, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
+                    "match": [
+                      [
+                        "python",
+                        "-B",
+                        "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                        "--root",
+                        "${PROJECT_ROOT}"
+                      ]
+                    ],
+                    "not_match": [
+                      [
+                        "python",
+                        "-B",
+                        "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                        "--root"
+                      ]
+                    ]
+                  }
+                ]
+              }
             }
           }
         },
@@ -441,7 +481,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:6598d7c2d90bfb5ab930b6571dd18fb94994818477f73aa4cd182cbba5621559",
+          "digest": "sha256:abb02ebcf490e147b578cd1f28194916b067893328a3e1a777a386b680761180",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
