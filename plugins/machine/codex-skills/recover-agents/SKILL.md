@@ -1,6 +1,6 @@
 ---
 name: recover-agents
-description: Inventory local Codex and Claude sessions for relevant work, then reopen only explicitly selected sessions.
+description: Recover interrupted Codex and Claude agents through the deterministic local session-registry script. Use after a crash or reboot, to reopen all interrupted agents, or to resume a specific recorded work item or historical session.
 kind: utility
 domain: machine
 route: infer
