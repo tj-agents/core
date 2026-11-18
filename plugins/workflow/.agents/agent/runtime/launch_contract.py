@@ -13,6 +13,13 @@ class Liveness:
     background: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class PreparedLaunch:
+    command: tuple[str, ...]
+    session: str | None = None
+    created: bool = False
+
+
 class Launch(Protocol):
     SESSION_ENVIRONMENT: tuple[str, ...]
     TAB_CLEARED: tuple[str, ...]
@@ -20,15 +27,23 @@ class Launch(Protocol):
 
     def executable(self) -> str: ...
 
+    def prepare(self, directory: Path, title: str, arguments: list[str], cli: str, environ: Mapping[str, str]) -> PreparedLaunch: ...
+
+    def abandon(self, prepared: PreparedLaunch, launch_id: str, dispatched: bool) -> None: ...
+
+    def confirm(self, prepared: PreparedLaunch, arguments: list[str], launch_id: str) -> None: ...
+
     def start_arguments(self, directory: Path, title: str, prompt: str, model: str | None,
                         effort: str | None) -> list[str]: ...
 
     def resume_arguments(self, directory: Path, title: str, session_id: str) -> list[str]: ...
 
-    def liveness(self) -> dict[str, Liveness]: ...
+    def liveness(self, *, strict: bool = False) -> dict[str, Liveness]: ...
 
     def respawn(self, background: str) -> None: ...
 
     def name_session(self, session_id: str, title: str) -> None: ...
 
-    def deliver(self, session_id: str, prompt: str, model: str | None, effort: str | None) -> None: ...
+    def record_session_environment(
+        self, session_id: str, environ: Mapping[str, str], *, cleared: tuple[str, ...] = ()
+    ) -> None: ...

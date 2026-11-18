@@ -7,6 +7,7 @@ Every agent tab runs under `tj run`, opened in Windows Terminal or tmux; a launc
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 import importlib.util
 import os
 from pathlib import Path
@@ -16,16 +17,17 @@ import subprocess
 import sys
 import time
 import uuid
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from tj_agent.host import Host
 from launch_contract import Launch
-from launch_errors import LaunchError, LaunchTimeout
+from launch_errors import LaunchError, LaunchTimeout, cleanup_failed_launch
 from package_root import find_package_root
 import agent_store
+import owned_launch
 import work_item
 
 LAUNCH_ID_ENVIRONMENT = 'TJ_RUN_LAUNCH_ID'
@@ -77,7 +79,7 @@ def launch_environment(clear=(), force=None):
     handler starts the command from an already-running terminal process that never sees ours.
     """
     session_state = (name for host in Host for name in host_launch(host).SESSION_ENVIRONMENT)
-    cleared = list(dict.fromkeys((*session_state, 'WORKBOARD_LAUNCH_TOKEN', 'WORKBOARD_WORKFLOW_TOKEN', *clear)))
+    cleared = list(dict.fromkeys((*session_state, 'NO_COLOR', 'WORKBOARD_LAUNCH_TOKEN', 'WORKBOARD_WORKFLOW_TOKEN', *clear)))
     forced = dict(force or {})
     return [name for name in cleared if name not in forced], forced
 
@@ -122,6 +124,11 @@ def report_launch_failure(exc, err=None):
     if err is None:
         err = sys.stderr
     print(str(exc), file=err)
+    failure = exc
+    while failure is not None:
+        for note in getattr(failure, "__notes__", ()):
+            print(note, file=err)
+        failure = failure.__cause__
     if isinstance(exc, LaunchTimeout):
         print('The tab may already have opened; check the terminal before launching another.', file=err)
         return 3
@@ -147,27 +154,19 @@ def _lanes_module():
     return module
 
 
-# Lane -> model for a chosen harness, from the canonical lane tables, the repo's only model-name owner.
-# Resolution never picks the lane: a caller that supplies neither a lane nor a model gets the CLI's own
-# configured default, because guessing a lane from a prompt is how an expensive model ends up serving a
-# rename. frontier resolves the tier above the ladder, which no lane resolves to: its selection is the
-# user's explicit request, never task shape.
-def resolve_lane(host, lane=None, frontier=False):
-    if not lane and not frontier:
-        raise LaunchError('resolve_lane needs a lane or frontier.')
-    if lane and frontier:
-        raise LaunchError('A lane and the frontier tier are mutually exclusive.')
+def resolve_lane(host: Host, lane: str) -> dict[str, Any]:
+    if not lane:
+        raise LaunchError('resolve_lane needs a lane.')
     lanes = _lanes_module()
     try:
-        entry = lanes.frontier(host) if frontier else lanes.resolve(host, lane)
+        entry = lanes.resolve(host, lane)
     except SystemExit as exc:
         raise LaunchError(str(exc)) from None
-    return entry
+    return cast(dict[str, Any], entry)
 
 
-def resolve_lane_model(host, lane=None, frontier=False):
-    """(model, effort) for a lane or the frontier tier; effort is None when the table prices none."""
-    entry = resolve_lane(host, lane=lane, frontier=frontier)
+def resolve_lane_model(host: Host, lane: str) -> tuple[str, str | None]:
+    entry = resolve_lane(host, lane=lane)
     return entry['model'], entry.get('effort')
 
 
@@ -223,7 +222,8 @@ def posix_inner_command(directory, cleared, forced, executable, arguments):
     return ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh', str(directory), 'env', *env_args, executable, *arguments]
 
 
-def _client(run, command, what, **kwargs):
+def _client(run: Callable[..., subprocess.CompletedProcess[str]], command: list[str],
+            what: str, **kwargs: Any) -> str:
     """Run a terminal's own control command; every way it can fail is a LaunchError naming `what`."""
     try:
         result = run(command, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30, **kwargs)
@@ -248,17 +248,37 @@ TJ_RUN_TIMEOUT_SECONDS = 30
 SESSION_TIMEOUT_SECONDS = 180
 
 
-def _launch_tmux(directory, title, command, cleared, forced, environ, run):
+def _launch_tmux(directory, title, command, cleared, forced, environ, run, session=None):
     inner = posix_inner_command(directory, cleared, forced, command[0], command[1:])
-    window = _client(run, ['tmux', 'new-window', '-n', title, '-P', '-F', '#{window_id}', '--', *inner],
-                     'tmux new-window')
+    target = ["-t", f"={session}:"] if session and not environ.get("TMUX") else []
+    operation = ["new-window", *target]
+    if session and not environ.get("TMUX"):
+        try:
+            _client(
+                run, ["tmux", "has-session", "-t", f"={session}"], "tmux has-session"
+            )
+        except LaunchError:
+            operation = ["new-session", "-d", "-s", session]
+    window = _client(
+        run,
+        ["tmux", *operation, "-n", title, "-P", "-F", "#{window_id}", "--", *inner],
+        "tmux new-window",
+    )
     if window:
-        _client(run, ['tmux', 'set-option', '-w', '-t', window, 'automatic-rename', 'off'], 'tmux set-option')
-        _client(run, ['tmux', 'set-option', '-w', '-t', window, 'allow-rename', 'off'], 'tmux set-option')
+        _client(
+            run,
+            ["tmux", "set-option", "-w", "-t", window, "automatic-rename", "off"],
+            "tmux set-option",
+        )
+        _client(
+            run,
+            ["tmux", "set-option", "-w", "-t", window, "allow-rename", "off"],
+            "tmux set-option",
+        )
 
 
 def _launch_windows_terminal(directory, title, command, cleared, forced, environ, run):
-    terminal = shutil.which('wt.exe')
+    terminal = shutil.which("wt.exe")
     if not terminal:
         raise LaunchError('wt.exe was not found on PATH.')
     # --window 0 is the most recently focused window; omitting it opens a separate OS window.
@@ -268,16 +288,31 @@ def _launch_windows_terminal(directory, title, command, cleared, forced, environ
             env=_environment_for(environ, cleared, forced))
 
 
-def open_tab(directory, title, command, cleared=(), forced=None, environ=os.environ, run=subprocess.run):
+def open_tab(
+    directory,
+    title,
+    command,
+    cleared=(),
+    forced=None,
+    environ=os.environ,
+    run=subprocess.run,
+    tmux_session=None,
+):
     """Open `command` as a new tab titled `title`, in Windows Terminal or the current tmux server."""
-    if run is subprocess.run and 'PYTEST_CURRENT_TEST' in os.environ:
-        raise LaunchError('Refusing to open a real terminal tab under pytest; inject a fake run.')
+    if run is subprocess.run and "PYTEST_CURRENT_TEST" in os.environ:
+        raise LaunchError(
+            "Refusing to open a real terminal tab under pytest; inject a fake run."
+        )
     forced = dict(forced or {})
     if IS_WINDOWS:
-        return _launch_windows_terminal(directory, title, command, cleared, forced, environ, run)
-    if environ.get('TMUX'):
-        return _launch_tmux(directory, title, command, cleared, forced, environ, run)
-    raise LaunchError('Agent tabs open in Windows Terminal or tmux; start tmux first.')
+        return _launch_windows_terminal(
+            directory, title, command, cleared, forced, environ, run
+        )
+    if environ.get("TMUX") or tmux_session:
+        return _launch_tmux(
+            directory, title, command, cleared, forced, environ, run, tmux_session
+        )
+    raise LaunchError("Agent tabs open in Windows Terminal or tmux; start tmux first.")
 
 
 def await_launch(launch_id, want_session=False, timeout=TJ_RUN_TIMEOUT_SECONDS,
@@ -304,29 +339,115 @@ def await_launch(launch_id, want_session=False, timeout=TJ_RUN_TIMEOUT_SECONDS,
         wait(0.5)
 
 
-def launch(host, directory, title, arguments, item=None, parent=None, want_session=False,
-           environ=os.environ, run=subprocess.run):
+def launch(
+    host,
+    directory,
+    title,
+    arguments,
+    item=None,
+    parent=None,
+    want_session=False,
+    environ=os.environ,
+    run=subprocess.run,
+    tmux_session=None,
+):
     """Open a `tj run` tab for one agent and return its confirmed launch."""
     adapter = host_launch(host)
-    tj = shutil.which('tj')
+    tj = shutil.which("tj")
     if not tj:
-        raise LaunchError('tj is not on PATH; run the Agent install.')
+        raise LaunchError("tj is not on PATH; run the Agent install.")
     launch_id = uuid.uuid4().hex
-    clear = [name for name in adapter.TAB_CLEARED if IS_WINDOWS or name != 'TERM']
-    force = {name: value for name, value in adapter.TAB_FORCED.items() if IS_WINDOWS or name != 'TERM'}
+    clear = [name for name in adapter.TAB_CLEARED if IS_WINDOWS or name != "TERM"]
+    force = {
+        name: value
+        for name, value in adapter.TAB_FORCED.items()
+        if IS_WINDOWS or name != "TERM"
+    }
     cleared, forced = launch_environment(clear=clear, force=force)
-    command = [tj, 'run', '--host', str(host), '--title', title, '--cwd', str(directory),
-               *(['--item', item] if item else []), '--launch-id', launch_id,
-               *(['--parent', parent] if parent else []), '--', adapter.executable(), *arguments]
-    open_tab(directory, title, command, cleared, forced, environ, run)
-    return await_launch(launch_id, want_session=want_session)
+    prepared = adapter.prepare(directory, title, arguments, tj, environ)
+    dispatched, completed = False, False
+
+    def dispatch(command, **options):
+        nonlocal dispatched
+        if run is subprocess.run and "PYTEST_CURRENT_TEST" in os.environ:
+            raise LaunchError("Refusing to open a real terminal tab under pytest; inject a fake run.")
+        dispatched = True
+        return run(command, **options)
+
+    try:
+        shown = _launch_prepared(
+            host, directory, title, prepared, tj, launch_id, item, parent, want_session,
+            cleared, forced, environ, dispatch, tmux_session,
+        )
+        adapter.confirm(prepared, arguments, launch_id)
+        completed = True
+        return shown
+    finally:
+        if not completed:
+            cleanup_failed_launch(
+                sys.exception(), lambda: adapter.abandon(prepared, launch_id, dispatched)
+            )
+
+
+def _launch_prepared(
+    host, directory, title, prepared, tj, launch_id, item, parent, want_session,
+    cleared, forced, environ, run, tmux_session,
+):
+    command = [
+        tj,
+        "run",
+        "--host",
+        str(host),
+        "--title",
+        title,
+        "--cwd",
+        str(directory),
+        *(["--item", item] if item else []),
+        "--launch-id",
+        launch_id,
+        *(["--parent", parent] if parent else []),
+        *(["--session", prepared.session] if prepared.session else []),
+        "--",
+        *prepared.command,
+    ]
+    options = {"tmux_session": tmux_session} if tmux_session else {}
+    open_tab(directory, title, command, cleared, forced, environ, run, **options)
+    shown = await_launch(launch_id, want_session=want_session or prepared.session is not None)
+    record = shown.get("launch")
+    session = shown.get("session")
+    if prepared.session is not None and (
+        not isinstance(record, dict)
+        or record.get("state") == "ended"
+        or not isinstance(session, dict)
+        or session.get("session") != prepared.session
+        or session.get("launch_id") != launch_id
+    ):
+        raise LaunchError(f"Launch {launch_id} did not bind the exact prepared session {prepared.session}")
+    return shown
+
+
+def attach_tmux(
+    session: str, run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run
+) -> None:
+    if run is subprocess.run and "PYTEST_CURRENT_TEST" in os.environ:
+        raise LaunchError(
+            "Refusing to attach a real terminal under pytest; inject a fake run."
+        )
+    result = run(["tmux", "attach-session", "-t", f"={session}"], check=False)
+    if result.returncode:
+        raise LaunchError(
+            f"tmux attach-session failed; attach with: tmux attach -t {session}"
+        )
 
 
 def parent_session(value):
     """The parent's `host:id`: as given, else the calling session as `tj approve` resolves it, else None."""
     if value is not None:
         return value
-    launch_id = os.environ.get(LAUNCH_ID_ENVIRONMENT)
+    try:
+        launch_id = owned_launch.current()
+    except owned_launch.OwnedLaunchError as error:
+        raise LaunchError(f'Cannot determine the calling launch: {error}') from error
     if launch_id:
         try:
             shown = agent_store.run('show', '--launch-id', launch_id)
@@ -337,28 +458,24 @@ def parent_session(value):
             session = shown.get('session')
             if session:
                 return session['session']
-    for host in Host:
-        if session_id := os.environ.get(host.session_variable):
-            return f'{host}:{session_id}'
-    return None
+    identities = [f'{host}:{session_id}' for host in Host
+                  if (session_id := os.environ.get(host.session_variable))]
+    if len(identities) > 1:
+        raise LaunchError('Cannot determine the calling session from multiple inherited identities')
+    return identities[0] if identities else None
 
 
-def resolve_item(item, title, cwd, parent, fields):
-    """The handoff's work item ref: `item` as given, or a new item titled `title` under `cwd`."""
-    if item:
-        if fields:
-            raise LaunchError('--item-field applies only to the work item created when --item is omitted.')
-        return item
+def resolve_item(item: str | None, cwd: Path, parent: str | None) -> str:
+    """Link a handoff to an explicit or unambiguous existing work item."""
+    if item is not None:
+        return work_item.reference(cwd, item)
     parent_ref = work_item.parent_item_ref(parent) if parent else None
-    return work_item.create(cwd, title, parent_ref, dict(fields))
-
-
-def item_field(value):
-    """One `NAME=VALUE` create field for the handoff's new work item."""
-    name, separator, field_value = value.partition('=')
-    if not separator or not name or not field_value:
-        raise argparse.ArgumentTypeError(f'expected NAME=VALUE, got {value!r}')
-    return name, field_value
+    if parent_ref:
+        return parent_ref
+    raise LaunchError(
+        "No existing work item was found. Pass --item with its URL or reference. "
+        "If a new item is needed, use the project's work-item workflow and its creation policy first."
+    )
 
 
 def parent_rule(parent):
@@ -370,5 +487,6 @@ def parent_rule(parent):
     except agent_store.AgentStoreError:
         title = None
     name = f'"{title}" ({parent})' if title else parent
-    return (f' Standing rule: the session {name} started you. Message it with agent:message when you finish, '
-            "when you are blocked, and whenever Tommy's approval is needed, without waiting to be asked.")
+    return (f' Standing rule: the session {name} started you. Report to it with agent:message '
+            'only for your final result, a blocker you cannot resolve or an '
+            "approval Tommy must give; never send it status updates.")

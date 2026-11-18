@@ -12,12 +12,13 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from tj_agent.host import Host
+from tj_agent import worktrees
 import agent_cli
 import agent_store
 import lifecycle
+import required_plugins
 
 IN_PROGRESS = "In Progress"
-WORKTREE_PATH = 'worktree-path = "{{ repo_path }}/../{{ repo }}.worktrees/{{ branch | sanitize }}"'
 SLUG_WORDS = 6
 
 
@@ -29,26 +30,27 @@ def branch_name(card: dict) -> str:
     return f"{prefix}/{native_id}-{slug}" if slug else f"{prefix}/{native_id}"
 
 
-def worktrunk_config(environ=os.environ) -> Path:
-    if os.name == "nt":
-        return Path(environ["APPDATA"]) / "worktrunk" / "config.toml"
-    return Path(environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "worktrunk" / "config.toml"
-
-
-def seed_worktrunk(path: Path) -> None:
-    """Give worktrunk the sibling `<repo>.worktrees/<Branch-Name>` layout unless its config chose one."""
-    text = path.read_text(encoding="utf-8") if path.is_file() else ""
-    if re.search(r"^\s*worktree-path\s*=", text, re.MULTILINE):
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(WORKTREE_PATH + "\n" + text, encoding="utf-8")
-
-
-def create_worktree(repository: Path, branch: str) -> str:
-    seed_worktrunk(worktrunk_config())
-    output = lifecycle.command(["git-wt", "switch", "--create", branch, "--no-cd", "--format", "json"],
-                               cwd=repository)
-    return json.loads(output.splitlines()[0])["path"]
+def create_worktree(repository: Path, branch: str, host: Host) -> str:
+    roots = required_plugins.inventory_roots(
+        repository, host, identities=("base@tj-agents",)
+    )
+    root = roots.get("base@tj-agents")
+    if root is None:
+        raise lifecycle.LifecycleError(
+            "Core's worktree creator requires an enabled Base plugin; run tj install"
+        )
+    try:
+        creator = required_plugins.private_path(root, "hooks/worktrees/create_worktree.py")
+    except required_plugins.PluginSetupError as error:
+        raise lifecycle.LifecycleError(
+            "Core's published worktree creator is unavailable; run tj install"
+        ) from error
+    output = lifecycle.command([sys.executable, "-B", str(creator), branch], cwd=repository)
+    result = json.loads(output)
+    if (not isinstance(result, dict) or not isinstance(result.get("path"), str)
+            or not Path(result["path"]).is_absolute()):
+        raise lifecycle.LifecycleError("Core's worktree creator returned no path")
+    return result["path"]
 
 
 def unique_title(base: str) -> str:
@@ -64,24 +66,30 @@ def prompt(card: dict) -> str:
             f"Read it first with `tj item resolve {card['ref']} --body`, then follow the repository's workflow.")
 
 
-def start(item_reference: str, host: Host, cwd: Path, lane: str | None = None, model: str | None = None) -> dict:
+def start(item_reference: str, host: Host, cwd: Path, lane: str, *,
+          owner: worktrees.Owner | None = None) -> dict:
+    if lane == "L7":
+        raise agent_cli.LaunchError("L7 is for in-session clerical work and cannot open a session.")
+    entry = agent_cli.resolve_lane(host, lane=lane)
+    route = entry.get("handoff")
+    if route:
+        raise agent_cli.LaunchError(f"Lane {lane} routes to {route['host']} {route['lane']}; use --{route['host']}.")
+    model, effort = entry["model"], entry.get("effort")
     card = lifecycle.tj_item("resolve", item_reference, cwd=cwd)
     linked = lifecycle.open_items([card["ref"]], cwd=cwd)
     existing = linked[0].worktree if linked else None
-    worktree = existing if existing and Path(existing).is_dir() else create_worktree(cwd, branch_name(card))
+    if existing is not None and Path(existing).is_dir():
+        worktree, created = existing, False
+    else:
+        worktree, created = create_worktree(cwd, branch_name(card), host), True
     lifecycle.tj_item("progress", card["ref"], "--state", IN_PROGRESS, cwd=cwd)
-    effort = None
-    if lane:
-        model, effort = agent_cli.resolve_lane_model(str(host), lane=lane)
     title = unique_title(f"{lifecycle.repository_name(cwd)}#{card['ref'].rsplit(':', 1)[1]}")
     adapter = agent_cli.host_launch(host)
     directory = Path(worktree)
-    deliver = bool(effort) and host is Host.CODEX
-    shown = agent_cli.launch(host, directory, title,
-                             adapter.start_arguments(directory, title, prompt(card), model, effort),
-                             item=card["ref"], want_session=deliver)
-    if deliver:
-        adapter.deliver(shown["session"]["native_id"], prompt(card), model, effort)
+    arguments = adapter.start_arguments(directory, title, prompt(card), model, effort)
+    if created and owner is not None:
+        agent_store.run("release-worktree", *owner.arguments(), "--path", str(directory))
+    shown = agent_cli.launch(host, directory, title, arguments, item=card["ref"])
     return {"item": card["ref"], "worktree": worktree, "title": title, "host": str(host),
             "launch_id": shown["launch"]["launch_id"]}
 
@@ -92,15 +100,16 @@ def main(argv=None) -> int:
     hosts = parser.add_mutually_exclusive_group()
     hosts.add_argument("--claude", dest="host", action="store_const", const=Host.CLAUDE)
     hosts.add_argument("--codex", dest="host", action="store_const", const=Host.CODEX)
-    selection = parser.add_mutually_exclusive_group()
-    selection.add_argument("--lane", choices=("L1", "L2", "L3", "L4", "L5", "L6"))
-    selection.add_argument("--model")
+    parser.add_argument("--lane", choices=("L1", "L2", "L3", "L4", "L5", "L6"), required=True)
     args = parser.parse_args(argv)
     try:
-        result = start(args.item, args.host or Host.CLAUDE, Path.cwd(), args.lane, args.model)
+        owner = worktrees.current_owner(os.environ)
+        result = start(args.item, args.host or Host.CLAUDE, Path.cwd(), args.lane, owner=owner)
     except agent_cli.LaunchError as error:
         return agent_cli.report_launch_failure(error)
-    except (lifecycle.LifecycleError, agent_store.AgentStoreError, KeyError, ValueError) as error:
+    except (lifecycle.LifecycleError, agent_store.AgentStoreError,
+            required_plugins.RequiredPluginsError, required_plugins.PluginSetupError,
+            worktrees.OwnershipError, KeyError, ValueError) as error:
         print(f"tj start: {error}", file=sys.stderr)
         return 1
     print(json.dumps(result))
