@@ -347,7 +347,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:cc6a5c4f504064d7d4ae967baaa244fc7806ff64f656056c9da9b26802edfb2d",
+          "digest": "sha256:9efe8551651570a683dcd9233734cab89c197517143bd67ec9408e54c3956048",
           "digest_excludes": [
             "catalog/catalog.json"
           ],

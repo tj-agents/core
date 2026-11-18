@@ -6,19 +6,27 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from contextvars import ContextVar, copy_context
 from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
 import re
 import shutil
-import subprocess
 import sys
 import time
+
+try:
+    from . import bounded_process
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import bounded_process
 
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
 STATE_FILE = "claude-standards-sync.json"
 LOCK_FILE = "claude-standards-sync.lock"
+SYNC_TIMEOUT_SECONDS = 60
+SYNC_DEADLINE = ContextVar("sync_deadline", default=None)
 REMOTE_TIMEOUT_SECONDS = 20
 MARKETPLACE_TIMEOUT_SECONDS = 180
 PLUGIN_TIMEOUT_SECONDS = 120
@@ -205,26 +213,11 @@ def external_groups(markets: list[Marketplace]) -> list[Marketplace]:
 
 
 def run(command: list[str], cwd: Path | None = None, timeout: float = REMOTE_TIMEOUT_SECONDS) -> tuple[int | None, str, str]:
+    deadline = SYNC_DEADLINE.get()
+    if deadline is not None:
+        timeout = min(timeout, deadline - time.monotonic())
     environment = dict(os.environ, GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never")
-    options = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
-    try:
-        completed = subprocess.run(
-            command,
-            cwd=cwd,
-            env=environment,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            **options,
-        )
-    except subprocess.TimeoutExpired:
-        return None, "", f"timed out after {timeout:g}s"
-    except OSError as error:
-        return None, "", str(error)
-    return completed.returncode, completed.stdout, completed.stderr
+    return bounded_process.run(command, cwd=cwd, timeout=timeout, env=environment)
 
 
 def last_line(*texts: str) -> str:
@@ -386,7 +379,7 @@ def update(market: Marketplace, remote: str, executable: str, project: Path, plu
     return len(failed)
 
 
-def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, executable: str | None,
+def _synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, executable: str | None,
                 check: bool = False, out=sys.stdout, lock_wait: float = LOCK_WAIT_SECONDS) -> int:
     owned = marketplaces(plugins, installs(plugins, project, enabled_plugins(config, project)))
     groups = external_groups(owned)
@@ -394,7 +387,9 @@ def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, exe
     if not markets:
         return 0
     with ThreadPoolExecutor(max_workers=min(8, len(markets))) as pool:
-        probes = list(pool.map(probe, markets))
+        contexts = [copy_context() for _ in markets]
+        futures = [pool.submit(context.run, probe, market) for context, market in zip(contexts, markets)]
+        probes = [future.result() for future in futures]
     state = load_state(state_dir)
     problems = 0
     stale = []
@@ -414,6 +409,9 @@ def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, exe
         print("standards: the claude executable was not found; this session loads the installed plugins", file=out)
         return 1
     try:
+        deadline = SYNC_DEADLINE.get()
+        if deadline is not None:
+            lock_wait = min(lock_wait, max(0, deadline - time.monotonic()))
         with exclusive(state_dir, lock_wait) as renew:
             state = load_state(state_dir)
             for market, remote in stale:
@@ -423,6 +421,16 @@ def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, exe
         print(f"standards: {error}; this session loads the installed plugins", file=out)
         return 1
     return int(bool(problems))
+
+
+def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, executable: str | None,
+                check: bool = False, out=sys.stdout, lock_wait: float = LOCK_WAIT_SECONDS,
+                timeout: float = SYNC_TIMEOUT_SECONDS) -> int:
+    token = SYNC_DEADLINE.set(time.monotonic() + timeout)
+    try:
+        return _synchronize(config, plugins, project, state_dir, executable, check, out, lock_wait)
+    finally:
+        SYNC_DEADLINE.reset(token)
 
 
 def main(argv: list[str] | None = None) -> int:
