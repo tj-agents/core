@@ -127,3 +127,89 @@ A callout can interrupt authorized product work and begin a broadly authorized C
 ## Record publication
 
 The selected Core provider resolves to personal:work-item. Existing open Core records were inspected successfully; none matched this investigation. Automatic approval review rejected the initial attempt to create a GitHub issue because it considered the payload, external destination and Personal-provider use insufficiently authorized. No issue was published. Tommy's subsequent direction is to investigate actual use cases and prevent AI-originated employer backlog creation without a decision. This file preserves that investigation; no publication is part of the current scope.
+
+## Delivery acceptance
+
+The user requested both merges. This moving record tracks that delivery; installed-session loading is
+
+```completion
+{
+  "acceptance": [
+    {
+      "id": "core-policy",
+      "criterion": "Automatic self-repair is limited to authorized personal tj-agents tooling with adequate-rule no-change outcomes.",
+      "evidence": [
+        {
+          "source": "ba1fe441262e63506aef83e03a16cd76194fbb4b and canonical private source review",
+          "result": "Focused source checks passed; final independent review found no remaining defects."
+        }
+      ],
+      "owner": "current session",
+      "next_action": "Retain the accepted source policy."
+    },
+    {
+      "id": "azure-policy",
+      "criterion": "AI-proposed Azure items need affirmative consent; existing intended items and execution owners are reused.",
+      "evidence": [
+        {
+          "source": "tj-agents/company PR #20 at 62bfdde5dfa83eb489545ad54773c8b36ade06b1",
+          "result": "Merged as 0b98ea0a03f18523769bbd0d2c28f4d327e5c3fe; 54 tests and source checks passed; no work item was created."
+        }
+      ],
+      "owner": "current session",
+      "next_action": "Retain the accepted source policy."
+    },
+    {
+      "id": "core-merge",
+      "criterion": "Core PR #430 merges at the reviewed head after its exact-head checks pass.",
+      "evidence": [
+        {
+          "source": "tj-agents/core PR #430 at ba1fe441262e63506aef83e03a16cd76194fbb4b",
+          "result": "All PR checks, including Windows, Linux and ci-required, passed. Merged as 65538d8975d3b4bb5d6204d2f172a3967a3f4475 through normal permissions."
+        }
+      ],
+      "owner": "current session",
+      "next_action": "Retain the merged source."
+    },
+    {
+      "id": "package-generation",
+      "criterion": "Core package generation caused by its merge completes successfully.",
+      "evidence": [
+        {
+          "source": "ci run 39809964625, regenerate job 119933254083, triggered by 65538d8975d3b4bb5d6204d2f172a3967a3f4475",
+          "result": "Publication job completed successfully and pushed generated commit 3eaad99a7179379be414222a15c7dde7032916d0 to main. There is no downstream version-sync PR in this workflow."
+        }
+      ],
+      "owner": "current session",
+      "next_action": "Use the generated packages on main; installed-session loading remains outside this acceptance."
+    },
+    {
+      "id": "delivery-cleanup",
+      "criterion": "The two delivery branches are retired and the task-owned isolated checkout is removed.",
+      "evidence": [
+        {
+        }
+      ],
+      "owner": "current session",
+      "next_action": "Retain unrelated working state."
+    }
+  ],
+  "deliveries": [
+    {
+      "repository": "tj-agents/core",
+      "pr": 430,
+      "head": "ba1fe441262e63506aef83e03a16cd76194fbb4b"
+    },
+    {
+      "repository": "tj-agents/company",
+      "pr": 20,
+      "head": "62bfdde5dfa83eb489545ad54773c8b36ade06b1"
+    }
+  ],
+  "open_tasks": []
+}
+```
+
+Delivery finished on 22 October 2026. The enclosing post-merge Core CI workflow still had its remaining
+validation running when the successful publication job and generated commit were verified. Publication
+acceptance above is the regenerate job; no result is claimed for the enclosing workflow or fresh hosts.

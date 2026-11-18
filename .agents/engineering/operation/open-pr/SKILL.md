@@ -96,14 +96,15 @@ Push only when the delivery branch has no upstream or has unpublished commits.
 
   ```text
   ## Why
-  <the problem or gap this closes, what prompted it, and what was true before; link the PR or issue it
-  follows>
+  <the problem or gap this closes, in 1-3 sentences; link the PR or issue it follows>
 
   ## What
-  - **<area or behaviour>** — <what changed, with its reason wherever the diff alone would not say>
+  - **<area or behaviour>** — <what changed, in one line, with its reason only where the diff alone
+    would not say it>
 
   ### Decisions worth the reviewer's attention
-  <each non-obvious choice, the alternative it rejected, and why>
+  - <a choice a reviewer would otherwise stop and ask about, one line: the choice and why — not every
+    choice>
 
   ## Not in this PR
   - <deliberately excluded scope, known follow-ups, pre-existing failures a reviewer will hit>
@@ -116,9 +117,15 @@ Push only when the delivery branch has no upstream or has unpublished commits.
   - <a non-default end-to-end tier and why; a version-sync consequence if publishable source changed>
   ```
 
-  A small change uses the labelled paragraphs defined above. Drop optional sections with nothing
-  to say. State what was verified and what was not; never claim an unobserved result. A visible
-  UI change attaches screenshots per `engineering:pr-screenshots`. Keep the mandated attribution footer.
+  A small change uses the labelled paragraphs defined above. **Default to omitting every optional
+  section** (Decisions, Not in this PR, Notes); include one only when skipping it would leave the
+  reviewer asking the question it answers. Within a section, one line beats a paragraph, and a short
+  paragraph beats an essay — this is a summary for a reviewer, not a design doc, and its length should
+  track the diff's, not the decision's backstory. When a body already carries stale content (a
+  resolved blocker, a merged dependency, a decision no longer in play), strip it on the same edit
+  rather than letting it accumulate. State what was verified and what was not; never claim an
+  unobserved result. A visible UI change attaches screenshots per `engineering:pr-screenshots`. Keep
+  the mandated attribution footer.
 
 ### 5. Update the owning PR or create the assessed slice's review
 
