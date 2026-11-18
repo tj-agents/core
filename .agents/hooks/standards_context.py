@@ -26,6 +26,12 @@ class StandardsContext:
                 if item["code"] != "invalid-dependency-evidence" and (project is None or project == identity)
                 and (affected_root is None or root.is_relative_to(affected_root))]
 
+    def diagnostics_for_path(self, path):
+        candidate = self._path(path)
+        return [item for item, affected_root, project in self.issues
+                if item["code"] != "invalid-dependency-evidence" and project is None
+                and (affected_root is None or candidate.is_relative_to(affected_root))]
+
     def load(self, data=None, additional_claims=()):
         path = self.graph.repository / '.agents' / 'standards-context.json'
         if data is None:
@@ -109,11 +115,14 @@ class StandardsContext:
             self.report(problem('invalid-dependency-evidence', path, str(error)))
 
     def for_project(self, identity):
-        project = self.graph.projects[identity]
+        return self.for_path(self.graph.projects[identity].root)
+
+    def for_path(self, path):
+        candidate = self._path(path)
         values = {'architecture': [], 'adopted_suites': []}
         evidence = []
         for claim in self.claims:
-            if project.root.is_relative_to(claim['root']):
+            if candidate.is_relative_to(claim['root']):
                 evidence.append(claim['path'])
                 for key, value in claim['values'].items():
                     if isinstance(value, list):
@@ -121,3 +130,10 @@ class StandardsContext:
                     elif key not in values:
                         values[key] = value
         return values, evidence
+
+    def _path(self, path):
+        if isinstance(path, Path):
+            candidate = path.resolve()
+            candidate.relative_to(self.graph.repository)
+            return candidate
+        return repository_path(self.graph.repository, path, strict=True)
