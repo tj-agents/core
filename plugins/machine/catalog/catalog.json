@@ -414,7 +414,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:a614655c4cb2cbf82e85ed2e6c1b188e36dea7dbbaaf91215746f4ec5024c9b8",
+      "digest": "sha256:a4c76ee9f61e14056a3c3d563bc9603eee9da3db8fa22eea21200ad3595cedb7",
       "harness": {
         "marketplaces": [
           {
@@ -919,7 +919,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:2d4e66780893a878dd9e8800e6664f02c1be427bcbf0898bbe5815dafce78cf6",
+      "digest": "sha256:81dd0f0d97a461d222ea7966493c88f9398fd92dfcd70eeecf01fadf4ef36548",
       "digest_excludes": [
         "catalog/catalog.json"
       ],

@@ -26,8 +26,8 @@ GIT_TIMEOUT_SECONDS = 30
 SWEEP_TIMEOUT_SECONDS = 1800
 SCRIPT_NAME = "plugin_autoupdate.py"
 RUNTIME = ("plugin_autoupdate.py", "machine_events.py", "launch_check.py", "reload_plugins.py", "agent_cli.py",
-           "codex_hook_trust.py", "codex_websocket.py", "required_plugins.py", "startup_binding.py",
-           "launch_status.py", "terminal_command.py", "register_session.py", "cli_client.py")
+           "codex/__init__.py", "codex/hook_trust.py", "codex/websocket.py", "required_plugins.py",
+           "startup_binding.py", "launch_status.py", "terminal_command.py", "register_session.py", "cli_client.py")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 CLI_TIMEOUT_SECONDS = 60
 STILL_ACTIVE = 259
@@ -657,16 +657,17 @@ def packaged_copies(codex_config: dict) -> list[Path]:
 
 def self_update(current: Path, codex_config: dict) -> bool:
     candidates = [path for path in packaged_copies(codex_config) if path.resolve() != current.resolve()
-                  and all(path.with_name(name).is_file() for name in RUNTIME)]
+                  and all((path.parent / name).is_file() for name in RUNTIME)]
     if not candidates:
         return False
     newest = max(candidates, key=lambda path: path.stat().st_mtime)
     try:
         changed = False
         for name in RUNTIME:
-            source, target = newest.with_name(name), current.with_name(name)
+            source, target = newest.parent / name, current.parent / name
             if target.is_file() and source.read_bytes() == target.read_bytes():
                 continue
+            target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target.with_name(target.name + ".next"))
             os.replace(target.with_name(target.name + ".next"), target)
             changed = True

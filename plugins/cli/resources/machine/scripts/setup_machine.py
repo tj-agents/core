@@ -619,6 +619,7 @@ def install_runtime(directory: Path, source: Path = Path(__file__).resolve().par
     for name in plugin_autoupdate.RUNTIME:
         target = directory / name
         temporary = target.with_suffix(".next")
+        target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(plugin_autoupdate.runtime_file(source, name), temporary)
         os.replace(temporary, target)
     return directory / "launch_check.py"
