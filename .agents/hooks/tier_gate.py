@@ -15,7 +15,8 @@ the moment it is installed, with no change here and no release of `base`.
 Plugin and marketplace identity come from the installed path, never from the declaration, so a
 declaration cannot claim to be a plugin it is not.
 
-`--session-context` names the repository and its selected plugins. Skills load on demand
+`--session-context` names the repository and its selected plugins, led by any checkout freshness
+notice from `checkout_freshness.py`. Skills load on demand
 from their descriptions; the agent reads the applicable bodies before making a relevant edit.
 The context is routing information, never a preload of every stack standard.
 
@@ -52,6 +53,7 @@ from boundary import (
     settings_reason,
     settings_target,
 )
+from checkout_freshness import begin as begin_checkout_freshness
 from host_cli import plugin_inventory_command
 from selected_standards import (
     PluginSelection,
@@ -1415,12 +1417,17 @@ def main():
     if arguments.project:
         payload["cwd"] = arguments.project
 
-    context = statement(project_root(payload))
-    if not context:
+    project = project_root(payload)
+    finish_checkout_freshness = begin_checkout_freshness(project)
+    context = statement(project)
+    freshness = finish_checkout_freshness()
+    combined = "\n\n".join(part for part in (freshness, context) if part)
+    if not combined:
         return 0
-    print(json.dumps({"hookSpecificOutput": {
-        "hookEventName": "SessionStart", "additionalContext": context
-    }}, ensure_ascii=True))
+    output = {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": combined}}
+    if freshness:
+        output["systemMessage"] = freshness
+    print(json.dumps(output, ensure_ascii=True))
     return 0
 
 
