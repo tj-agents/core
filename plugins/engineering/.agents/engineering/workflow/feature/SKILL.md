@@ -41,6 +41,11 @@ Promotion changes persistence, not the requested outcome.
 
 ## Execute the lifecycle
 
+Read [the shared recording contract](../../resources/problem-records.md). When a provider is selected,
+reconcile the canonical item through `engineering:write-feature` or `engineering:write-task`, preserving
+its requirements and acceptance criteria. Update its progress and verified acceptance through that
+contract before reporting it resolved; a delivered PR alone does not close the item.
+
 1. Discover repository ownership, applicable standards, analogous implementations, dependencies, and test
    impact. Parallelize only independent bounded reads.
 2. Keep requirement interpretation, architecture, public contracts, data/security/migration implications,
