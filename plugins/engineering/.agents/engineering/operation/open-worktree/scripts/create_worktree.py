@@ -158,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--from",
         dest="start_point",
-        help="verified parent ref for a new layer (default: fetched remote default)",
+        help="start ref for a new branch (default: fetched remote default)",
     )
     arguments = parser.parse_args(argv)
     try:
