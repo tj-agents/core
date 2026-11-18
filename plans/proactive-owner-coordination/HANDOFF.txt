@@ -1,0 +1,2 @@
+cd C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Docs-ProactiveOwnerCoordination
+Read C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Docs-ProactiveOwnerCoordination/plans/proactive-owner-coordination/GOAL.md and execute its Next Steps as the sole bounded standards-repair owner. Acknowledge pickup before deliverable edits. Do not adopt the originating PR #218 or parent PR #209 workstreams.
