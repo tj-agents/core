@@ -1,8 +1,10 @@
 # Codex-first lanes: stop burning Claude usage
 
-Status: PR #148 merged, generated packages installed, and post-merge CI passed. Fresh Sonnet routing acceptance failed by implementing locally. Successor `Fix/CodexFirstLanesRuntime` is local and unpublished; its L4 review repairs passed all 40 router tests. Further live Claude tests are blocked pending explicit approval and available usage. The goal remains open.
+Status: PR #148 merged and installed. PR #159 remains draft. CI run 37847464779 exposed three failures; repaired in 8d7af8f84ede6b2c7258335099295bcf31a55348. Focused tests passed (21 dispatcher, 13 engineering hooks, 4 hook budget), generated candidates refreshed, and two independent L4 lenses found no defects at that exact head. The repaired candidate is pushed; exact CI run 37856916814 is being monitored. Delivery and continuation bind to 8d7af8f84ede6b2c7258335099295bcf31a55348. Personal Claude login is reported rate-limited; pause further login/email/code attempts. Existing work Team profile is authenticated. One bounded Team test is prepared but unapproved. The goal remains open.
 
-PR: https://github.com/tj-agents/core/pull/148
+Current PR: https://github.com/tj-agents/core/pull/159
+
+Historical completed delivery: https://github.com/tj-agents/core/pull/148
 
 ## Authority
 
@@ -45,10 +47,26 @@ One Claude session on 2026-10-07/08 spent about 20% of Tommy's Claude usage on a
 
 ## Next Steps
 
-1. Checkpoint and incrementally review the consolidated local R4/R5 fixes using in-session Codex workers. Earlier R1-R3 repairs are independently accepted through `73bad3bab46fc3525c6b522b15fe83dacde3916c`. The latest patch keeps quoted delegation/implementation/phase discussion conversational, routes ordinary delegated code review to Codex and denies its local Task dispatch, and treats `Can you build this utility?` as work with local deliverable writes denied. Explicit Claude choice, informational questions, negation, planning-only requests, tiny edits, reads, goal preparation and Codex behavior remain covered. All 40 router tests and the scoped diff check pass; generated candidates are refreshed and the generated hook matches source. No further Claude model calls are authorized by the latest response: Tommy raised scarce subscription usage and billing concerns rather than approving the pending probe. Automatic approval review also rejected sending the candidate plugins and synthetic workspace to Anthropic without explicit payload/destination authorization. Keep that test blocked and stop its continuation after independent local work is complete. Resume only after later explicit approval and available Claude usage; then require actual Codex launch and child results before publication.
-2. Causally linked post-merge CI run `37795175405` passed, including regeneration job `113372642356` and verify job `113372641549`. The generated commit is a direct child of landing commit `fa9f7400d939ba9cbf57048d2f94787aeaca864e`; primary checkout fast-forwarded with pre-existing files preserved.
-3. Record actual acceptance evidence, pass the completion check, release the completed delivery and scheduler, then close this session (`finish.ps1` after a removable `cleanup_proof.py`).
+1. Reviewed CI repair 8d7af8f84ede6b2c7258335099295bcf31a55348 is published to existing PR #159 and exact delivery/continuation bindings are refreshed. Observe CI run 37856916814, attempt 1. Read-only L6 worker ci_monitor_l6 owns the active bounded monitor; last observed state is in_progress. Goal-wide merge authority is now recorded in the supported delivery binding from the exact original scratchpad instruction; this does not bypass live acceptance. The three CI failures were fixed by reusing selected() for grouped hooks, restoring eight shell matchers, and updating host-specific route expectations. Reuse passed focused tests and completed review unless source inputs change. Generated output stays uncommitted.
+2. The live Claude test alone remains blocked pending explicit approval of sending candidate plugins and the synthetic workspace to Anthropic with the expected Codex handoff. Automatic approval review previously rejected that transmission, and the user's billing/usage concern did not approve it. A fresh concise approval question is pending. Do not launch Claude, enable extra usage, change authentication/billing, or silently retry while it is pending. Once explicitly approved and Claude usage is available, verify the saved candidate and run the unchanged bounded test, requiring actual Codex launch and child results. Retain live acceptance as an unresolved validation item before merge/installed-success claims.
+   Current account checkpoint: both PowerShell 7 and Windows PowerShell 5.1 now load the account commands; the latter was repaired in Documents/WindowsPowerShell/profile.ps1 and verified in a fresh powershell.exe. The existing work profile still reports claude.ai/Team logged in. Personal remains logged out. User reports repeated browser verification failures and now too many login attempts; pause further personal login/email/code attempts. A clean Chrome profile was opened at AppData/Local/ClaudeAccountBrowser/Personal with extensions disabled, but the user reports it did not resolve login. Live Claude testing has not run and remains unapproved. The saved work login is a potential alternative only with explicit approval to send candidate plugins/test workspace to Anthropic and consume Team allowance.
+   Continuation checkpoint: the scheduled wake hit native-host-executable-required and removed its scheduler receipt. Foreground ownership is reclaimed through the supported claim operation; no unattended progress is currently claimed. The native codex.exe exists and can be supplied to the supported wake --host-command for a bounded future continuation; do not edit owner fields manually or expand its budgets.
+3. Causally linked PR #148 post-merge CI run `37795175405` passed, including regeneration job `113372642356` and verify job `113372641549`. The generated commit is a direct child of landing commit `fa9f7400d939ba9cbf57048d2f94787aeaca864e`; primary checkout fast-forwarded with pre-existing files preserved.
+4. Record actual acceptance evidence, pass the completion check, release the completed delivery and scheduler, then close this session (`finish.ps1` after a removable `cleanup_proof.py`).
 
+Resumed delivery assessment: PR #159 was published with explicit approval on 2026-10-08
+(user reply `Publish the draft PR`, question call_912a7633abe64fc2ae056ecf3e15412b, question 0).
+The branch tracks its own origin branch. The initial missing CI was explained by GitHub
+mergeable=false, mergeable_state=dirty, not an absent workflow trigger. Main integration is
+committed at 65b09c1ddb34a8f9d0100492e828f70c2a773e86 and reviewed in
+reviews/Fix-CodexFirstLanesRuntime.md. Generation passed; callout tests passed in 31.797s.
+The original 40 router tests passed at 20806b89; unchanged router source retains that evidence.
+Interrupted integration reruns establish no new pass or failure. Scoped stash retained as a backup;
+all generated conflicts cleared and generated paths unstaged. No live Claude test was run.
+
+Account command setup is complete at C:/Users/TommySeery/Documents/PowerShell/claude-accounts.ps1.
+claude-work preserves the existing Team login. claude-personal uses a separate .claude-personal
+profile and needs the user's one-time `claude-personal auth login --claudeai` login.
 ## Selected design and execution checkpoint
 
 The owner read the canonical lane, handoff, session guidance, packaging and generation contracts.
@@ -198,3 +216,5 @@ authentication and a Team subscription; the current process has no `ANTHROPIC_AP
 by this work. CLI dollar figures are estimated token costs, not evidence of an invoice. The earlier
 probes consumed Claude usage; the organisation's existing extra-usage setting was not verified.
 No further Claude model call was made for this check.
+
+Prepared Team probe: C:/Users/TommySeery/AppData/Local/Temp/pr148-team-claude-candidate-7b27f281f26b4d7fbf57b68eb457dcae/run_candidate.py, SHA256 FF93130D875379BCFED4C527F95415744DB0A5E015C7A9F149D3A5A13065E97C. Pinned head 8d7af8f84ede6b2c7258335099295bcf31a55348; package check passed (487 files, 73 definitions, zero changed/pruned), prompt matches the prior valid baseline. Native Claude with exact claude-sonnet-5, low effort, 180 seconds, one attempt, no retries, auto permissions, normal subscription credentials at C:/Users/TommySeery/.claude. Parent verified runner explicitly selects that work Team directory despite a worker summary's mistaken personal-profile wording. No model launch occurred. Only after explicit approval of Team allowance consumption and candidate-plugin/synthetic-workspace transmission to Anthropic with expected Codex handoff, set PR148_TEAM_PROBE_APPROVED=yes and run the prepared runner through workflow_ops run. Do not enable API billing/extra usage or attempt personal authentication. Preserve actual Sonnet init, handoff invocation, Codex child pickup/results, and usage evidence.
