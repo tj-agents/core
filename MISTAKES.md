@@ -147,3 +147,17 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 **Resolution condition:** the committed runtime and later guidance slices contain no generated digest or package deltas, the generated-path guard and exact-head CI pass, and causal post-merge publication owns regeneration.
 
 **Verification evidence:** authoritative gh run view38183296901 failed-step logs name .agents/catalog/catalog.json digest of base-agents/engineering and base-agents/machine. scripts/check_generated_paths.py reads merge-base digest values and explicitly rejects these changes.
+
+## M012 - Repeated a stale Stop-hook gate instead of containing it
+
+**Kind:** mistake. **Observed/reported:** 2026-10-12. A stale installed engineering Stop hook repeatedly injected `binding-head-changed` after the source correction was committed. I treated each injection as a fresh instruction and kept explaining/reconciling it, creating an avoidable loop and cognitive load.
+
+**Impact and priority:** P1; an active user-directed handoff was obscured by repeated false completion gates.
+
+**Source owner:** tj-agents/core continuation Stop and handoff recovery behavior. **State:** in-progress. **Repair link:** plans/controller-goal-association/GOAL.md and PR209.
+
+**Next action:** carry the exact stale-cache and stale-transfer evidence into the Claude handoff; finish the source review and delivery, then repair any remaining unsupported stale-transfer recovery through its own bounded source workstream.
+
+**Resolution condition:** a stale installed hook or absent prior successor produces one actionable recovery path rather than repeated host-gate prompts, while verified active writers remain protected.
+
+**Verification evidence:** direct source `binding_active` accepts the exact `remote_head_sha`; the installed cached hook still rejects it, and peer inventory contains no recorded prior transfer successor.
