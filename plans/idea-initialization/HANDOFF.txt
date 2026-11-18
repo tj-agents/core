@@ -1,0 +1,2 @@
+﻿cd C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-IdeaInitialization
+Read C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-IdeaInitialization\plans\idea-initialization\GOAL.md and execute its authorized source correction through validation, review and delivery. This is the one bounded side-workstream owner. First acknowledge pickup in that goal. Preserve its once-per-idea requirement and small scope.
