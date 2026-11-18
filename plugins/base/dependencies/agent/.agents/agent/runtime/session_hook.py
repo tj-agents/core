@@ -1,5 +1,6 @@
-"""Session hooks: SessionStart registers this session in agent-store, SessionEnd ends it, and each prompt
-cancels a pending no-PR closeout of the `tj run` tab (`tj done --cancel`).
+"""Session hooks: SessionStart registers this session in agent-store, SessionEnd ends it for an explicit
+user exit and otherwise leaves it active for `tj recover`, and each prompt cancels a pending no-PR
+closeout of the `tj run` tab (`tj done --cancel`).
 
 A session started by `tj run` binds to its launch (`TJ_RUN_LAUNCH_ID`) and inherits the launch's title,
 parent, terminal, wrapper and work item. A Codex thread is also named after its title, so it is
@@ -21,6 +22,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from tj_agent.host import Host
+from tj_agent import worktrees
+import agent_cli
 import agent_store
 from tj_cli import process
 
@@ -28,6 +31,7 @@ LAUNCH_ENV = "TJ_RUN_LAUNCH_ID"
 TITLE_ENV = "AGENT_CLI_TAB_TITLE"
 WRAPPER_PID_ENV = "TJ_RUN_PID"
 WRAPPER_STARTED_AT_ENV = "TJ_RUN_STARTED_AT"
+EXPLICIT_EXIT_REASONS = frozenset({"clear", "resume", "logout", "prompt_input_exit"})
 
 
 def payload() -> dict:
@@ -88,14 +92,20 @@ def start(host: Host, session_id: str, cwd: str, environ: Mapping[str, str]) -> 
                                 [*terminal(environ), *title_arguments(environ), *wrapper_arguments(environ)])
     else:
         session = register(host, session_id, cwd, root, [*terminal(environ), *title_arguments(environ)])
-    if host is Host.CODEX and session.get("title"):
-        import agent_cli
-
-        agent_cli.host_launch(host).name_session(session_id, session["title"])
+    adapter = agent_cli.host_launch(host)
+    try:
+        if host is Host.CODEX and session.get("title"):
+            adapter.name_session(session_id, session["title"])
+    finally:
+        adapter.record_session_environment(session_id, environ)
+        if root:
+            worktrees.claim_started_worktree(host, session_id, Path(root), environ)
     return session
 
 
-def end(host: Host, session_id: str) -> None:
+def end(host: Host, session_id: str, reason: str | None) -> None:
+    if reason not in EXPLICIT_EXIT_REASONS:
+        return
     try:
         agent_store.run("end", "--session", f"{host}:{session_id}")
     except agent_store.AgentStoreError as error:
@@ -111,10 +121,16 @@ def prompt() -> None:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("event", choices=("start", "prompt", "end"))
+    parser.add_argument("event", choices=("start", "prompt", "idle", "end"))
     parser.add_argument("--host", type=Host, choices=list(Host), required=True)
     args = parser.parse_args(argv)
     data = payload()
+    if args.event == "idle":
+        if args.host is Host.CLAUDE:
+            from claude import idle
+
+            return idle.run(data, bool(os.environ.get(LAUNCH_ENV)))
+        return 0
     if args.event == "prompt":
         try:
             prompt()
@@ -128,7 +144,8 @@ def main(argv=None) -> int:
         if args.event == "start":
             start(args.host, session_id, data.get("cwd") or os.getcwd(), os.environ)
         else:
-            end(args.host, session_id)
+            reason = data.get("reason")
+            end(args.host, session_id, reason if isinstance(reason, str) else None)
     except Exception as error:  # noqa: BLE001 - bookkeeping never stops a session
         print(f"agent-store {args.event}: {error}", file=sys.stderr)
     return 0

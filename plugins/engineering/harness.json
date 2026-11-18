@@ -11,7 +11,8 @@
     ".agents/workflow/resources/problem-records.md",
     ".agents/workflows",
     ".agents/workflows/review_evidence.py",
-    ".agents/workflows/workflow_runtime.py"
+    ".agents/workflows/workflow_runtime.py",
+    "install.ps1"
   ],
   "requires": {
     "marketplaces": [

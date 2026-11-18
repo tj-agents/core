@@ -59,17 +59,38 @@ def run(*arguments: str, stdin: str | None = None) -> dict:
     return document["data"]
 
 
+def receipt_path() -> Path:
+    return executable().with_name(".agent-store.json")
+
+
+def write_receipt(version: str, binary: bytes) -> None:
+    receipt = {"version": version, "sha256": hashlib.sha256(binary).hexdigest()}
+    receipt_path().write_text(json.dumps(receipt), encoding="utf-8")
+
+
 def installed_version() -> str | None:
-    path = executable()
-    if not path.is_file():
-        return None
     try:
-        result = process.run([str(path), "--version"], capture_output=True, text=True, timeout=10,
-                                check=False)
-    except (OSError, subprocess.SubprocessError):
+        receipt = json.loads(receipt_path().read_text(encoding="utf-8"))
+        binary = executable().read_bytes()
+    except (OSError, ValueError):
         return None
-    words = result.stdout.split()
-    return f"v{words[1]}" if len(words) == 2 and words[0] == "agent-store" else None
+    if not isinstance(receipt, dict) or receipt.get("sha256") != hashlib.sha256(binary).hexdigest():
+        return None
+    version = receipt.get("version")
+    return version if isinstance(version, str) else None
+
+
+def release(version: str) -> tuple[int, ...]:
+    try:
+        return tuple(int(part) for part in version.removeprefix("v").split("."))
+    except ValueError as error:
+        raise AgentStoreError("unexpected", f"agent-store version {version!r} is not a release") from error
+
+
+def current(pinned: str) -> str | None:
+    """The installed release when it is the pin or newer; an older pin never replaces it."""
+    version = installed_version()
+    return version if version is not None and release(version) >= release(pinned) else None
 
 
 def asset_name(version: str) -> str:
@@ -106,6 +127,9 @@ def _extract(name: str, archive: bytes) -> bytes:
 def install(download=_download) -> str:
     """Install the pinned release, verified against its published SHA-256; returns the version."""
     version = pinned_version()
+    present = current(version)
+    if present is not None:
+        return present
     name = asset_name(version)
     base = f"https://github.com/{REPOSITORY}/releases/download/{version}/{name}"
     archive = download(base)
@@ -123,10 +147,11 @@ def install(download=_download) -> str:
         os.replace(staged, target)
     finally:
         staged.unlink(missing_ok=True)
+    write_receipt(version, binary)
     return version
 
 
 def pending() -> str | None:
     version = pinned_version()
-    return None if installed_version() == version else f"install agent-store {version} into {executable().parent}"
+    return None if current(version) else f"install agent-store {version} into {executable().parent}"
 

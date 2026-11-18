@@ -23,6 +23,7 @@ IDENTITY = re.compile(r"[a-z][a-z0-9-]*@[a-z][a-z0-9-]*\Z")
 INVENTORY_TIMEOUT_SECONDS = 20
 MARKETPLACE_NAME = "tj-agents"
 MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
+MARKETPLACE_SPARSE_PATHS = (".agents/plugins", ".claude-plugin", "plugins")
 
 
 def producer_repository(repository: object) -> bool:
@@ -45,7 +46,7 @@ class RequiredPluginsError(RuntimeError):
 
 
 class MissingRequiredPluginsError(RequiredPluginsError):
-    def __init__(self, message, project, missing):
+    def __init__(self, message: str, project: Path, missing: Sequence[str]) -> None:
         super().__init__(message)
         self.project = project
         self.missing = tuple(missing)
@@ -185,7 +186,7 @@ def check(project: Path, host: Host, executable: str | None = None,
     if missing:
         raise MissingRequiredPluginsError(
             f"Required standards unavailable for {host} in {project}: {', '.join(missing)}. "
-            f"Invoke agent:refresh-plugins for {host} in this project; it installs and adopts required plugins automatically. "
+            "Run tj install --step 'plugin setup' in this project to install the required plugins. "
             "Cached files from another host do not establish activation.", project, missing,
         )
     return {identity: roots[identity] for identity in required}
@@ -260,6 +261,7 @@ class Target:
     script: Path
     declaration: str
     runtime: bytes
+    converge: bool
 
 
 def bounded(result: subprocess.CompletedProcess) -> str:
@@ -341,10 +343,32 @@ def declaration(root: Path, identity: str, document: dict | None = None) -> Targ
     setup = requires.get("setup")
     if setup is None:
         return None
-    if not isinstance(setup, dict) or set(setup) != {"script"} or not isinstance(setup["script"], str):
-        raise PluginSetupError(f"{identity}: requires.setup must be {{\"script\": \"relative/path.py\"}}")
+    valid_keys = ({"script"}, {"script", "converge"})
+    if (
+        not isinstance(setup, dict)
+        or set(setup) not in valid_keys
+        or not isinstance(setup["script"], str)
+        or ("converge" in setup and not isinstance(setup["converge"], bool))
+    ):
+        raise PluginSetupError(
+            f'{identity}: requires.setup must be {{"script": "relative/path.py"}}, '
+            'optionally with "converge": a bool'
+        )
     script = private_path(root, setup["script"])
-    return Target(identity, script, setup["script"], runtime_bytes(script.parent))
+    converge = bool(setup.get("converge", False))
+    return Target(
+        identity, script, setup["script"], runtime_bytes(script.parent), converge
+    )
+
+
+def converges(root: Path) -> bool:
+    try:
+        document, _ = harness_document(root)
+    except PluginSetupError:
+        return False
+    requires = document.get("requires")
+    setup = requires.get("setup") if isinstance(requires, dict) else None
+    return isinstance(setup, dict) and setup.get("converge") is True
 
 
 def targets(project: Path, host: Host, executable: str | None) -> list[Target]:
@@ -382,7 +406,12 @@ def collect(project: Path, hosts: Sequence[Host], executables: Mapping[Host, str
                 continue
             for identity, target in current.items():
                 expected = reference[identity]
-                if expected.declaration != target.declaration or expected.runtime != target.runtime:
+                disagree = (
+                    expected.declaration != target.declaration
+                    or expected.runtime != target.runtime
+                    or expected.converge != target.converge
+                )
+                if disagree:
                     errors.append(f"{identity}: native host runtimes disagree on its setup declaration")
     return ([] if errors else [reference[key] for key in sorted(reference)]), errors
 

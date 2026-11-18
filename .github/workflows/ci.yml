@@ -127,7 +127,6 @@ jobs:
           $pythonDirectory = Split-Path -Parent (uv run --locked python -c "import sys; print(sys.executable)")
           $pythonDirectory >> $env:GITHUB_PATH
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         with:
           repository: tj-agents/template
           ref: main
@@ -147,6 +146,10 @@ jobs:
       - name: Generated files are current
         shell: pwsh
         run: ./.agents/sync-generated.ps1 -Check
+
+      - name: Protected global configuration has an owning installer
+        shell: pwsh
+        run: python -B .template/.agents/template/utility/check/scripts/check_global_writes.py --root .
 
       - name: Tier payloads conform to the shipped shape
         shell: pwsh
@@ -256,6 +259,13 @@ jobs:
           $pythonDirectory = Split-Path -Parent (uv run --locked python -c "import sys; print(sys.executable)")
           $pythonDirectory >> $env:GITHUB_PATH
 
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: tj-agents/template
+          ref: main
+          path: .template
+          persist-credentials: false
+
       - name: Regenerate the workspace from authored sources
         shell: pwsh
         run: |
@@ -269,6 +279,10 @@ jobs:
       - name: Generated files are current
         shell: pwsh
         run: ./.agents/sync-generated.ps1 -Check
+
+      - name: Protected global configuration has an owning installer
+        shell: pwsh
+        run: python -B .template/.agents/template/utility/check/scripts/check_global_writes.py --root .
 
       - name: Tier payloads conform to the shipped shape
         run: python -B .agents/hooks/check_tier_payload.py --root .
@@ -316,7 +330,7 @@ jobs:
     needs: [select, guard, guidance-examples, verify-windows, verify-linux, python-standards]
     runs-on: ubuntu-latest
     permissions:
-      actions: read
+      actions: read # Reads the default-branch CI run used by the required-check gate.
       contents: read
     steps:
       - name: Require Python standards
