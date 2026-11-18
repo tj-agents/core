@@ -1,5 +1,6 @@
 """List, resolve and safely close registered Claude/Codex sessions (Python 3.9+)."""
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -22,9 +23,11 @@ def scoped(items, all_items, under):
     return items if root is None else [item for item in items if not item.get("cwd") or session_close.under_or_equal(item["cwd"], root)]
 
 
-def records():
+def records(ids=None):
     result = []
     for _path, entry in session_close.entries():
+        if ids and entry.get("session_id") not in ids:
+            continue
         value = dict(entry)
         value["alive"] = session_close.liveness(value)
         result.append(value)
@@ -73,10 +76,18 @@ def main(argv=None):
     parser.add_argument("--under")
     parser.add_argument("--include-unrecorded", action="store_true")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--id", action="append", help="list only these session ids")
     args = parser.parse_args(argv)
-    items = records()
+    if args.id and args.action != "list":
+        parser.error("--id filters list only")
+    items = records(set(args.id)) if args.id else records()
     if args.include_unrecorded:
         items += unrecorded(items)
+    if args.action == "list" and args.json:
+        fields = ("session_id", "host", "title", "cwd", "pid", "alive")
+        print(json.dumps([{key: item.get(key) for key in fields} for item in scoped(items, args.all, args.under)]))
+        return 0
     if args.action == "list":
         for item in scoped(items, args.all, args.under):
             print("{title}\t{session}\t{alive}\t{pid}\t{cwd}".format(title=item.get("title") or "", session=item.get("session_id") or "", alive="?" if item["alive"] is None else item["alive"], pid=item.get("pid", ""), cwd=item.get("cwd") or ""))

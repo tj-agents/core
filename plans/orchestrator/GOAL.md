@@ -99,8 +99,14 @@ A restarted orchestrator runs `tick` and continues.
   subagents, a single sweep, empty-rollup green, and the PowerShell-hostile report command. Rejected:
   reusing `workflow_ops.parse_status_checks`, because Workflow must not depend on the Engineering runtime.
 
+- Incremental reviews of `88091ea1..e9187254`, `e9187254..891c24d0` and `891c24d0..c513029f` have been fixed
+  through `7c3d1be9`. Report attribution was simplified to ignore only another worker's session. `claim`
+  needs `--confirm-ended` unless the old orchestrator has visibly ended. The last full local suite was
+  killed for low memory, so CI must prove `7c3d1be9`.
+
 ## Next Steps
 
-Commit the review fixes, run incremental review on the delta, push. Merge
+Watch #439 CI at `7c3d1be9`, then run incremental review on `c513029f..7c3d1be9`. Merge main after #355 and
+resolve the overlap, switching the handoff reference to `workflow:handoff`. Then Tommy says "merge #439". Merge
 main after #355 and resolve the catalog/harness overlap. Run a live three-worker acceptance with real tabs
 when Tommy picks the work. Merge #439 after Tommy says "merge #439".
