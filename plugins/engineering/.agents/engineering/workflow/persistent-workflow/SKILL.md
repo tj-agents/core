@@ -89,6 +89,16 @@ missing files and directories are rejected. Keep the goal in place. The owner re
 per-worktree path above. On `canonical-owner-path-required`, retry `init --root ROOT` with `--owner`
 omitted. This recoverable invocation error does not establish that the runtime is unavailable.
 
+To bind a native host session to its already-claimed canonical controller, run the installed-relative
+runtime command:
+
+```text
+python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py associate-session --owner CANONICAL_OWNER --token EXISTING_FOREGROUND_TOKEN --session-id HOST_SESSION_ID --session-cwd NATIVE_EVENT_CWD
+```
+
+It accepts only the exact live foreground token and canonical owner/worktree. It writes a token-hashed
+reciprocal association without creating an owner, releasing a foreground lease, or transferring the goal.
+
 The runtime supports `status --owner OWNER` and `wake --owner OWNER`. After initialization, the current
 foreground session claims the owner with `claim --owner OWNER --pid PID`; PID must identify that
 long-lived session, not a short-lived tool shell. The returned `foreground.token` is required by
@@ -136,6 +146,16 @@ outside this runtime.
 Runtime budgets default to six child launches, three consecutive transport failures, a 24-hour deadline,
 and a 900-second child timeout. Tighter limits already recorded by the user take precedence. Do not
 increase them silently or add bypass-permission flags.
+
+When a blocked owner reports `continuation-budget-exhausted` and the user explicitly renews the task's
+finite authority, renew that same owner rather than deleting or reinitializing it:
+
+```text
+python -B <engineering-package-root>/workflows/continuation_runtime.py renew --owner OWNER --deadline-hours HOURS --reason "explicit user renewal" --next-action "concrete next action"
+```
+
+`HOURS` must be greater than zero and no more than 24. Renewal requires no foreground or child writer,
+preserves the owner identity and recorded limits, and is available only for the exhausted-budget state.
 
 For remote delivery, preserve one exact PR/head/worktree/run identity and one continuation. Route every
 remote decision through `persistent-delivery`; reject observations from another identity. An exact-head

@@ -114,4 +114,14 @@ Stop recovery: the valid delivery artifact stores its exact bound SHA as `remote
 
 Continuation recovery: the active owner then reached its finite deadline while the goal was still incomplete and the user explicitly renewed the work. The runtime had no guarded way to preserve that owner while recording a new finite budget. It now provides `renew`, which is available only to a blocked `continuation-budget-exhausted` owner with no foreground or child writer, requires a nonempty reason, next action and 1–24 hour deadline, and preserves owner identity and recorded limits. B005 records this causal defect and the focused runtime coverage proves both renewal and duplicate-renewal rejection.
 
-Next action: commit the exact-head CI, Stop-binding and continuation-budget recoveries; refresh the delivery binding and reconcile/renew the exact owner; then obtain a fresh frozen incremental review and rerun exact-head Windows/Linux CI before normal delivery steps.
+Next action: obtain a fresh frozen review of exact head `e7df895d41a2faaab73743f98978b08212a99bc0`, then rerun exact-head Windows/Linux CI before normal delivery steps.
+
+## Transfer update â€” 2026-10-12
+
+Lane: L4 â€” the remaining review and delivery work is bounded, testable and needs ordinary code-level judgment. Tommy explicitly selected Claude for this non-frontier handoff.
+
+The actual source repairs are committed and pushed through `e7df895d41a2faaab73743f98978b08212a99bc0`: narrow harness permissions, stale-owner reconciliation, the Stop binding-field correction, and explicit finite owner renewal. Focused continuation Stop/runtime and harness-manifest checks passed after generated-output refresh; generated output remains uncommitted.
+
+This session exposed two related runtime facts that the successor must retain. First, the installed `base-agents` engineering cache still executes the pre-fix Stop hook, which compares a missing normalized `head` field instead of `remote_head_sha`; it repeatedly emits false `binding-head-changed` gates even though the source hook and delivery binding match. This is the already-recorded B004 source defect; do not patch the installed cache or disable hooks without an explicit installation authorization. Second, the older `controller-association-transfer.json` names an absent Codex successor but remains `active`; its helper has no active-to-recovery transition and its stale lock blocks status. Peer inventory confirms the recorded successor is absent. Treat that record as stale evidence, never as a live writer, and do not launch a second successor from it.
+
+Claude handoff scope: continue this PR from the exact current checkout and head, preserve the one-writer rule, first reconcile the stale handoff record through a supported runtime recovery if available, then perform the frozen review and exact-head CI. Do not edit generated `plugins/*` or `.agents/catalog/catalog.json` into a commit. The cached-hook issue is source-owned by this Goal's B004/PR #209 delivery; causal cache publication occurs only after normal merge.
