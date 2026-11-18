@@ -11,5 +11,10 @@
     "plans"
   ],
   "displayName": "Workflow status",
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "dependencies": [
+    "base@tj-agents",
+    "agent@tj-agents",
+    "cli@tj-agents"
+  ]
 }

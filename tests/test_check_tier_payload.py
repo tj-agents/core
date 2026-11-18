@@ -70,6 +70,57 @@ class PayloadTree(unittest.TestCase):
         self.payload("dotnet")
         self.assertEqual(checker.check(self.root), [])
 
+    @staticmethod
+    def dependencies(payload, manifest_dependencies, harness_plugins):
+        (payload / ".claude-plugin").mkdir(exist_ok=True)
+        manifest = {"name": payload.name}
+        if manifest_dependencies is not None:
+            manifest["dependencies"] = manifest_dependencies
+        (payload / ".claude-plugin" / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
+        harness = {"plugin": f"tj-agents/{payload.name}", "requires": {"plugins": harness_plugins}}
+        (payload / "harness.json").write_text(json.dumps(harness), encoding="utf-8")
+
+    def test_harness_plugins_matching_the_manifest_dependencies_pass(self):
+        self.declare(["dotnet"])
+        payload = self.payload("dotnet")
+        self.dependencies(payload, ["base@tj-agents", "engineering"],
+                          ["tj-agents/engineering", "tj-agents/dotnet", "tj-agents/base"])
+        self.assertEqual(checker.check(self.root), [])
+
+    def test_a_harness_dependency_missing_from_the_manifest_fails(self):
+        self.declare(["dotnet"])
+        payload = self.payload("dotnet")
+        self.dependencies(payload, None, ["tj-agents/dotnet", "tj-agents/base"])
+        problems = checker.check(self.root)
+        self.assertTrue(any("extra ['tj-agents/base']" in problem for problem in problems), problems)
+
+    def test_a_manifest_dependency_missing_from_the_harness_fails(self):
+        self.declare(["dotnet"])
+        payload = self.payload("dotnet")
+        self.dependencies(payload, ["base@tj-agents", "docs@tj-agents"], ["tj-agents/dotnet", "tj-agents/base"])
+        problems = checker.check(self.root)
+        self.assertTrue(any("missing ['tj-agents/docs']" in problem for problem in problems), problems)
+
+    def test_versioned_dependency_objects_are_identities(self):
+        self.declare(["dotnet"])
+        payload = self.payload("dotnet")
+        self.dependencies(payload, [{"name": "base@tj-agents", "version": "^1"}], ["tj-agents/dotnet", "tj-agents/base"])
+        self.assertEqual(checker.check(self.root), [])
+
+    def test_malformed_harness_plugin_ids_are_reported_not_raised(self):
+        self.declare(["dotnet"])
+        payload = self.payload("dotnet")
+        self.dependencies(payload, [], ["tj-agents/dotnet", {"name": "tj-agents/base"}])
+        problems = checker.check(self.root)
+        self.assertTrue(any("requires.plugins ids" in problem for problem in problems), problems)
+
+    def test_a_dependency_declared_twice_fails(self):
+        self.declare(["dotnet"])
+        payload = self.payload("dotnet")
+        self.dependencies(payload, ["base@tj-agents", "base"], ["tj-agents/dotnet", "tj-agents/base"])
+        problems = checker.check(self.root)
+        self.assertTrue(any("more than once" in problem for problem in problems), problems)
+
     def test_a_missing_tier_declaration_fails(self):
         self.declare(["dotnet"])
         self.payload("dotnet", tier=None)
