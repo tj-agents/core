@@ -4,18 +4,22 @@
 import argparse
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import re
 import socket
 import subprocess
 import sys
+import time
 
 HERE = Path(__file__).resolve().parent
 WORK_ITEM_RE = re.compile(r"^(?P<feature>[a-z0-9]+(?:-[a-z0-9]+)*)/(?P<item>[a-z0-9]+(?:-[a-z0-9]+)*)$")
 WORK_ITEM_STATUSES = ("proposed", "active", "blocked", "paused", "delivery-gated", "done")
 END_REASONS = ("finished", "closed", "handed_off")
 HEAD_CHECK_TIMEOUT = 5
+BULK_REGISTRATION_TIMEOUT = 15
+BULK_REGISTRATION_INTERVAL = 0.25
 _BOUNDED_ROLE_RE = re.compile(r"^bounded: (?P<scope>.+)$")
 
 _SESSION_STORE = None
@@ -152,6 +156,8 @@ def _worktree_status(row):
     worktree = row.get("cwd")
     if not worktree or not Path(worktree).is_dir():
         return "stale"
+    if row.get("repo") is None and row.get("branch") is None and row.get("head") is None:
+        return "live"
     branch = _session_store()._git(worktree, "branch", "--show-current")
     if branch is None:
         return "unknown"
@@ -183,7 +189,9 @@ def _read_time_status(row, machine):
 
 
 def _pid_is_dead(pid, pid_started_at):
-    if not isinstance(pid, int) or pid_started_at is None:
+    if not isinstance(pid, int) or isinstance(pid, bool) or not isinstance(pid_started_at, (int, float)) or isinstance(pid_started_at, bool):
+        return False
+    if not math.isfinite(pid_started_at):
         return False
     try:
         process = _register_session().build_process_lookup()(pid)
@@ -192,9 +200,51 @@ def _pid_is_dead(pid, pid_started_at):
     if process is None:
         return True
     started = getattr(process, "started_at", None)
-    if started is None:
+    if isinstance(started, bool) or not isinstance(started, (int, float)) or not math.isfinite(started):
         return False
     return started != pid_started_at
+
+
+def _pid_is_live(pid, pid_started_at):
+    if not isinstance(pid, int) or isinstance(pid, bool) or isinstance(pid_started_at, bool) or not isinstance(pid_started_at, (int, float)):
+        return False
+    if not math.isfinite(pid_started_at):
+        return False
+    try:
+        process = _register_session().build_process_lookup()(pid)
+    except Exception:
+        return False
+    if process is None:
+        return False
+    started = getattr(process, "started_at", None)
+    return isinstance(started, (int, float)) and not isinstance(started, bool) and started == pid_started_at
+
+
+def _started_after(value, previous):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return False
+    if previous is None:
+        return True
+    return value > previous
+
+
+def _wait_for_fresh_registration(handle, previous_started_at, timeout=BULK_REGISTRATION_TIMEOUT,
+                                 interval=BULK_REGISTRATION_INTERVAL, clock=time.monotonic, wait=time.sleep):
+    deadline = clock() + timeout
+    while True:
+        connection = _session_store().connect()
+        try:
+            row = _session_store().get_session(connection, handle)
+        finally:
+            connection.close()
+        if row and _started_after(row.get("started_at"), previous_started_at) and _pid_is_live(
+            row.get("pid"), row.get("pid_started_at"),
+        ):
+            return row
+        remaining = deadline - clock()
+        if remaining <= 0:
+            return None
+        wait(min(interval, remaining))
 
 
 def _resume_roots(row):
@@ -318,22 +368,96 @@ def cmd_resume(work_item, handle=None, cwd=None, prompt=None, prompt_path=None, 
     )
 
 
-def cmd_interrupted(resume_handles=None, cwd=None):
+def _interrupted_rows(all_repos, cwd):
     store = _session_store()
-    repo = _require_repo(cwd or Path.cwd())
+    repo = None if all_repos else _require_repo(cwd or Path.cwd())
     connection = store.connect()
     try:
-        candidates = store.interrupted_candidates(connection, repo=repo)
+        if repo is None:
+            rows = connection.execute("SELECT * FROM sessions ORDER BY handle").fetchall()
+        else:
+            rows = connection.execute("SELECT * FROM sessions WHERE repo = ? ORDER BY handle", (repo,)).fetchall()
         item_names = {}
-        for row in candidates:
+        item_statuses = {}
+        for row in rows:
             if row["work_item"] and row["work_item"] not in item_names:
                 item_row = store.get_work_item(connection, row["work_item"])
                 item_names[row["work_item"]] = f"{item_row['feature']}/{item_row['item']}" if item_row else row["work_item"]
+                item_statuses[row["work_item"]] = item_row["status"] if item_row else None
     finally:
         connection.close()
+    return [dict(row) for row in rows], item_names, item_statuses
+
+
+def _bulk_skip_reason(row, machine, recovery, item_statuses):
+    if row.get("ended_at") is not None:
+        return "ended"
+    if (row.get("machine") or "").casefold() != machine.casefold():
+        return "foreign"
+    if item_statuses.get(row.get("work_item")) == "done":
+        return "done"
+    if not _pid_is_dead(row.get("pid"), row.get("pid_started_at")):
+        return "live"
+    if recovery.liveness({"host": row["host"], "session": row["session_id"]}) != "closed":
+        return "unknown"
+    worktree = _worktree_status(row)
+    if worktree != "live":
+        return worktree
+    return None
+
+
+def _is_pending_launch(error):
+    return "pending or ambiguous" in str(error).casefold() or type(error).__name__ == "LaunchTimeout"
+
+
+def _resume_all(rows, item_statuses, machine):
+    recovery = _agent_recovery()
+    outcomes = []
+    failed = False
+    for row in rows:
+        try:
+            skip = _bulk_skip_reason(row, machine, recovery, item_statuses)
+        except Exception as error:
+            outcomes.append({"handle": row["handle"], "outcome": "failed", "reason": str(error)})
+            failed = True
+            continue
+        if skip:
+            outcomes.append({"handle": row["handle"], "outcome": "skipped", "reason": skip})
+            continue
+        previous_started_at = row.get("started_at")
+        try:
+            launched = recovery.open_session(
+                row["host"], row["session_id"], prompt="Continue the requested work.", roots=_resume_roots(row),
+            )
+        except Exception as error:
+            if _is_pending_launch(error):
+                outcomes.append({"handle": row["handle"], "outcome": "pending", "reason": str(error)})
+            elif "verified live" in str(error).casefold():
+                outcomes.append({"handle": row["handle"], "outcome": "skipped", "reason": "live"})
+            else:
+                outcomes.append({"handle": row["handle"], "outcome": "failed", "reason": str(error)})
+            failed = failed or outcomes[-1]["outcome"] != "skipped"
+            continue
+        try:
+            registered = _wait_for_fresh_registration(row["handle"], previous_started_at)
+        except Exception as error:
+            outcomes.append({"handle": row["handle"], "outcome": "pending", "reason": str(error), "launch": launched})
+            failed = True
+            continue
+        if registered is None:
+            outcomes.append({"handle": row["handle"], "outcome": "pending", "launch": launched})
+            failed = True
+        else:
+            outcomes.append({"handle": row["handle"], "outcome": "resumed", "launch": launched})
+    return outcomes, failed
+
+
+def cmd_interrupted(resume_handles=None, resume_all=False, all_repos=False, cwd=None):
+    rows, item_names, item_statuses = _interrupted_rows(all_repos, cwd)
     machine = socket.gethostname()
     dead = [
-        row for row in candidates
+        row for row in rows
+        if row.get("ended_at") is None
         if (row.get("machine") or "").casefold() == machine.casefold()
         and _pid_is_dead(row.get("pid"), row.get("pid_started_at"))
     ]
@@ -361,6 +485,10 @@ def cmd_interrupted(resume_handles=None, cwd=None):
                 row["host"], row["session_id"], prompt="Continue the requested work.", roots=_resume_roots(row),
             ))
         result["resumed"] = resumed
+    if resume_all:
+        outcomes, failed = _resume_all(rows, item_statuses, machine)
+        result["bulk"] = outcomes
+        result["bulk_failed"] = failed
     return result
 
 
@@ -421,7 +549,10 @@ def _build_parser():
     resume_parser.add_argument("--title")
 
     interrupted_parser = subparsers.add_parser("interrupted")
-    interrupted_parser.add_argument("--resume", dest="resume_handles", action="append", default=[])
+    interrupted_parser.add_argument("--all-repos", action="store_true")
+    interrupted_resume = interrupted_parser.add_mutually_exclusive_group()
+    interrupted_resume.add_argument("--resume", dest="resume_handles", action="append", default=[])
+    interrupted_resume.add_argument("--resume-all", action="store_true")
 
     end_parser = subparsers.add_parser("end")
     end_parser.add_argument("--host", required=True, choices=("claude", "codex"))
@@ -451,7 +582,9 @@ def main(argv=None):
                 prompt_path=args.prompt_path, title=args.title,
             )
         elif args.command == "interrupted":
-            result = cmd_interrupted(resume_handles=args.resume_handles)
+            result = cmd_interrupted(
+                resume_handles=args.resume_handles, resume_all=args.resume_all, all_repos=args.all_repos,
+            )
         elif args.command == "end":
             result = cmd_end(args.host, args.reason, successor=args.successor)
         elif args.command == "item":
@@ -462,7 +595,7 @@ def main(argv=None):
         print(json.dumps({"error": str(exc)}))
         return 1
     print(json.dumps(result, default=str))
-    return 0
+    return 1 if args.command == "interrupted" and args.resume_all and result.get("bulk_failed") else 0
 
 
 if __name__ == "__main__":

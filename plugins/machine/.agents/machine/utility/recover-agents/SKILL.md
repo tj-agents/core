@@ -1,12 +1,29 @@
 ---
 name: recover-agents
-description: Inventory local Codex and Claude sessions for relevant work, then reopen only explicitly selected sessions.
+description: Recover interrupted Codex and Claude agents through the deterministic local session-registry script. Use after a crash or reboot, to reopen all interrupted agents, or to resume a specific recorded work item or historical session.
 kind: utility
 domain: machine
 route: infer
 ---
 
 # Recover agent work
+
+For a crash, reboot, or request to reopen all interrupted agents, execute this command directly. The
+script selects sessions from SQLite, checks their identity and checkout, and resumes eligible agents
+serially. It reports skipped sessions and individual failures. Do not assemble the session selection
+with AI or search transcripts before running it. Use `python` on Windows and `python3` on Linux/macOS.
+
+```sh
+python -B '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' interrupted --all-repos --resume-all
+```
+
+Omit `--resume-all` for an inventory without launching agents. Repeated runs skip live agents and retain
+pending or ambiguous launch safeguards. A recovered session is successful only after its fresh native
+registration is verified. The database initializes itself when absent; a new PC starts with an empty
+registry and needs its native histories to resume sessions from another machine. Historical JSON files
+do not distinguish completed work from crash interruption and are not automatically reopened.
+
+## Recover a specific historical session
 
 Use `search-codex` and `search-claude` for the requested topic or checkout, then use `open-codex` and
 `open-claude` for the relevant exact sessions with a concise instruction to continue. The user's recovery
