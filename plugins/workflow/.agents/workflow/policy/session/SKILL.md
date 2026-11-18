@@ -53,20 +53,21 @@ Keep report export active and read Incidental problems before routing B.
 
 Coordinate with another agent when its verified responsibility needs the information. Before sending,
 establish the exact recipient, its current responsibility from an owned goal, work-item binding or explicit
-assignment, and the concrete decision or action the message supports. Shared checkout, parent conversation,
+assignment, and the concrete decision or action the message supports: a final result, a blocker the sender
+cannot resolve or a required user approval, never progress. Shared checkout, parent conversation,
 similar title and convenience do not establish that relationship. Unknown or irrelevant ownership keeps the
 information with the current task while ownership is reconciled. Existing task authority covers necessary
 coordination with a verified responsible recipient; do not add a confirmation step to every message.
 
-Correct a mistaken route in the original recipient's conversation by identifying and retracting the earlier
-assignment. That correction does not assign it the repair. Resolve the actual owner before routing work again.
-`agent:message` implements admission and delivery evidence for independent Codex sessions; native
-in-conversation messaging follows the same responsibility decision.
+Correct a mistaken route by posting a retraction of the earlier assignment to the original recipient. That
+correction does not assign it the repair. Resolve the actual owner before routing work again.
+`agent:message` posts to the recipient's feed, which the recipient reads on demand; never inject a message
+into another session's conversation.
 
 ```text
 The repair goal names session A as owner; session B shares its repository but owns a naming migration.
 Send repair evidence to A because it changes A's next diagnostic step. Keep B out of the repair.
-If an earlier message assigned B the repair, retract that assignment in B using its original delivery receipt.
+If an earlier message assigned B the repair, post B a retraction that names that message.
 ```
 
 When preparation or approved design has resolved the next action, enter that action through the owning
