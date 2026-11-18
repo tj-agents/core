@@ -162,6 +162,19 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertEqual(["tj-agents/agent", "tj-agents/base", "tj-agents/cli", "tj-agents/engineering", "tj-agents/workflow"], harness["requires"]["plugins"])
         selection = json.loads(output["plugins/engineering/selection.json"].decode("utf-8"))
         self.assertEqual(engineering["external_dependencies"]["required"], selection["external_prerequisites"])
+        manifest = json.loads(output["plugins/engineering/.claude-plugin/plugin.json"].decode("utf-8"))
+        self.assertEqual(
+            ["base@tj-agents", "workflow@tj-agents", "agent@tj-agents", "cli@tj-agents"], manifest["dependencies"]
+        )
+        base = json.loads(output["plugins/base/.claude-plugin/plugin.json"].decode("utf-8"))
+        self.assertNotIn("dependencies", base)
+
+    def test_authored_host_manifests_may_not_declare_dependencies(self):
+        path = self.root / ".agents/plugins/manifests/claude/workflow.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        path.write_text(json.dumps({**manifest, "dependencies": ["base@tj-agents"]}), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "declare dependencies in .agents/plugins/plugins.json"):
+            SYNC.build(self.root)
 
     def test_hidden_hook_runtime_prerequisites_are_declared_by_every_consumer(self):
         roster = json.loads((self.root / ".agents/plugins/plugins.json").read_text(encoding="utf-8"))
