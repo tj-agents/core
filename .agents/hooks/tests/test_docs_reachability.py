@@ -111,10 +111,10 @@ class DocsReachabilityTests(unittest.TestCase):
 
         self.assertEqual([], report["errors"])
 
-    def test_plugin_agent_directory_registration_includes_generated_lane_agents(self):
+    def test_plugin_agent_directory_registration_includes_generated_role_agents(self):
         self.write("CLAUDE.md", "@AGENTS.md\n")
         self.write("AGENTS.md", "# Root\n")
-        self.write("plugins/example/agents/lane-l1.md", "# Lane\n")
+        self.write("plugins/example/agents/review-lens.md", "# Review lens\n")
         manifest = {
             "delivery": {"plugin_directory": "agents"},
             "roles": {},

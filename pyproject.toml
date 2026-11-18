@@ -13,7 +13,7 @@ members = ["packages/tj-base"]
 
 [tool.uv.sources]
 tj-base = { workspace = true }
-tj-cli = { git = "https://github.com/tj-agents/cli", rev = "210f7508a84abc27d6fb512e4205108521ae3ec0", subdirectory = "packages/tj-cli" }
+tj-cli = { git = "https://github.com/tj-agents/cli", rev = "6ad26fe455f9125937a8e49168760eea848e11b4", subdirectory = "packages/tj-cli" }
 
 [dependency-groups]
 dev = ["mypy>=2.4.1", "pytest>=9.1.1", "ruff>=0.17.4", "pytest-socket>=0.7.0"]
@@ -83,7 +83,6 @@ raises-require-match-for = ["*"]
 "tests/test_ci_native_acceptance.py" = ["E501", "I001", "PLR6301", "PT009", "SIM117", "TID251"]
 "tests/test_check_tier_payload.py" = ["E501", "I001", "PT009", "TID251"]
 "tests/test_check_generated_paths.py" = ["E501", "I001", "PT009", "TID251"]
-"tests/test_catch_up.py" = ["PLR6301", "PT009", "TID251"]
 "tests/test_background_processes.py" = ["I001"]
 "tests/test_agent_files.py" = ["E501", "I001", "PT009", "TID251"]
 "tests/native_plugin_inventory.py" = ["E501", "I001"]
@@ -111,7 +110,6 @@ raises-require-match-for = ["*"]
 ".agents/workflows/delivery_runtime.py" = ["E501", "I001", "N818", "PLR6301"]
 ".agents/workflows/completion.py" = ["B904", "E501", "I001", "RUF059"]
 ".agents/workflow/utility/status/scripts/status.py" = ["B904", "E501", "I001", "TID251", "UP031"]
-".agents/workflow/utility/catch-up/scripts/catch_up.py" = ["TID251"]
 ".agents/hooks/tier_gate.py" = ["B904", "BLE001", "C401", "E501", "E731", "RUF005", "TID251", "TRY300", "UP036"]
 ".agents/hooks/tests/test_worktree_sweep.py" = ["E402", "E501", "I001", "PLR6301", "PT009", "PTH104", "TID251"]
 ".agents/hooks/tests/test_workflow_ops.py" = ["B023", "E501", "F811", "I001", "PLR6301", "PT009", "SIM117", "TID251"]

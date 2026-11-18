@@ -4,7 +4,6 @@
     "log-analyst.toml",
     "mechanical-worker.toml",
     "review-lens.toml",
-    "test-impact-analyst.toml",
-    "lane-*.toml"
+    "test-impact-analyst.toml"
   ]
 }
