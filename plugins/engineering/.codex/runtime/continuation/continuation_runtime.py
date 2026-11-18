@@ -13,7 +13,30 @@ import time
 import uuid
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+
+def runtime_paths():
+    here = Path(__file__).resolve()
+    if here.parent.parts[-3:] != (".codex", "runtime", "continuation"):
+        raise RuntimeError("continuation runtime layout unavailable")
+    root = here.parents[3]
+    if not (root / ".agents" / "engineering").is_dir():
+        raise RuntimeError("continuation package root unavailable")
+    if (root / ".codex-plugin" / "plugin.json").is_file():
+        workflows = root / "workflows"
+        lanes = root / ".agents" / "lanes" / "codex.json"
+    elif (root / ".agents" / "plugins" / "sources.json").is_file():
+        workflows = root / ".agents" / "workflows"
+        lanes = root / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "resources" / "lanes" / "codex.json"
+    else:
+        raise RuntimeError("continuation package root unavailable")
+    if not all((workflows / name).is_file() for name in ("delivery_runtime.py", "completion.py", "workflow_ops.py")):
+        raise RuntimeError("continuation shared runtime unavailable")
+    return workflows, lanes
+
+
+WORKFLOWS, LANES = runtime_paths()
+sys.path.insert(0, str(WORKFLOWS))
 from delivery_runtime import BINDING_FILE, PersistentDeliveryRouter, binding_from_artifact, DeliveryContractViolation
 from completion import CompletionError, completion_check
 from workflow_ops import atomic_json, parse_status_checks, repository_slug, retry_windows_sharing_violation
@@ -137,6 +160,8 @@ def identity(root):
 
 
 def check_identity(state, allow_terminal_release=False):
+    if state.get("harness") != "codex":
+        raise Gate("unsupported-host")
     root = Path(state["worktree"])
     current = identity(root)
     for key in ("repo", "worktree", "branch", "head"):
@@ -194,16 +219,11 @@ def observe(state, binding, observer=None):
 
 def lane_command(state, prompt, executable=None):
     host = state["harness"]
-    if host not in {"codex", "claude"}:
+    if host != "codex":
         raise Gate("unsupported-host")
-    base = Path(__file__).resolve().parent.parent
-    tables = [
-        base / "dependencies" / "agent" / ".agents" / "agent" / "resources" / "lanes" / f"{host}.json",
-        base / ".agents" / "lanes" / f"{host}.json",
-    ]
-    lane_path = next((p for p in tables if p.is_file()), None)
-    if lane_path is None:
+    if not LANES.is_file():
         raise Gate("packaged-lane-table-unavailable")
+    lane_path = LANES
     table = read(lane_path)
     lane = table["lanes"]["L4"]
     prefix = executable or [state.get("host_executable") or shutil.which(host) or host]
@@ -211,11 +231,9 @@ def lane_command(state, prompt, executable=None):
         raise Gate("host-cli-unavailable")
     if os.name == "nt" and Path(prefix[0]).suffix.lower() in {".cmd", ".bat"}:
         raise Gate("native-host-executable-required")
-    if host == "codex":
-        return [*prefix, "exec", "--model", lane["model"], "--config",
-                f'model_reasoning_effort="{lane[table["effort_key"]]}"',
-                "--cd", state["worktree"], prompt]
-    return [*prefix, "-p", prompt, "--model", lane["model"], "--effort", lane[table["effort_key"]]]
+    return [*prefix, "exec", "--model", lane["model"], "--config",
+            f'model_reasoning_effort="{lane[table["effort_key"]]}"',
+            "--cd", state["worktree"], prompt]
 
 
 def apply_receipt(state, receipt):
@@ -283,6 +301,8 @@ def child(args):
     until = time.monotonic() + 10
     while time.monotonic() < until:
         state = read(path)
+        if state.get("harness") != "codex":
+            raise Gate("unsupported-host")
         if (state.get("child") or {}).get("pid") == os.getpid():
             break
         time.sleep(0.05)
@@ -489,6 +509,8 @@ def wake(path, state, args):
 
 
 def initialize(path, args):
+    if args.harness != "codex":
+        raise Gate("unsupported-host")
     if not args.root:
         raise Gate("init-root-required")
     root = Path(args.root).resolve()
@@ -633,6 +655,8 @@ def main(argv=None):
         raise Gate("canonical-owner-path-required: omit --owner and use --root to select .agents/continuation/owner.json")
     if Path(git(root, "rev-parse", "--show-toplevel")).resolve() != root:
         raise Gate("canonical-worktree-root-required")
+    if args.operation != "init" and read(path).get("harness") != "codex":
+        raise Gate("unsupported-host")
     if args.operation == "status":
         print(json.dumps(read(path), sort_keys=True))
         return 0
