@@ -1,8 +1,10 @@
 # Codex-first lanes: stop burning Claude usage
 
-Status: PR #148 merged, generated packages installed, and post-merge CI passed. Fresh Sonnet routing acceptance failed by implementing locally. Successor `Fix/CodexFirstLanesRuntime` is local and unpublished; its L4 review repairs passed all 40 router tests. Further live Claude tests are blocked pending explicit approval and available usage. The goal remains open.
+Status: PR #148 merged, generated packages installed, and post-merge CI passed. Fresh Sonnet routing acceptance failed by implementing locally. Successor PR #159 is published as a draft at exact head `20806b89b453ce1177a02f656ee42c711e8a252e`; both independent L4 reviews approve and all 40 router tests pass. PR monitor `dc590754a3c38d4338eeebd76075046209c1d35e19e50259300f6d2eb85060b1` observed it open with no pending or failing checks; exact-head GitHub Actions run discovery returned `[]`. `.github/workflows/ci.yml` does trigger verification on `pull_request`, so the missing run/status is unexplained and CI remains unobserved. Live Claude acceptance is blocked pending explicit approval and available usage. The goal remains open.
 
-PR: https://github.com/tj-agents/core/pull/148
+Current PR: https://github.com/tj-agents/core/pull/159
+
+Historical completed delivery: https://github.com/tj-agents/core/pull/148
 
 ## Authority
 
@@ -45,9 +47,32 @@ One Claude session on 2026-10-07/08 spent about 20% of Tommy's Claude usage on a
 
 ## Next Steps
 
-1. Checkpoint and incrementally review the consolidated local R4/R5 fixes using in-session Codex workers. Earlier R1-R3 repairs are independently accepted through `73bad3bab46fc3525c6b522b15fe83dacde3916c`. The latest patch keeps quoted delegation/implementation/phase discussion conversational, routes ordinary delegated code review to Codex and denies its local Task dispatch, and treats `Can you build this utility?` as work with local deliverable writes denied. Explicit Claude choice, informational questions, negation, planning-only requests, tiny edits, reads, goal preparation and Codex behavior remain covered. All 40 router tests and the scoped diff check pass; generated candidates are refreshed and the generated hook matches source. No further Claude model calls are authorized by the latest response: Tommy raised scarce subscription usage and billing concerns rather than approving the pending probe. Automatic approval review also rejected sending the candidate plugins and synthetic workspace to Anthropic without explicit payload/destination authorization. Keep that test blocked and stop its continuation after independent local work is complete. Resume only after later explicit approval and available Claude usage; then require actual Codex launch and child results before publication.
-2. Causally linked post-merge CI run `37795175405` passed, including regeneration job `113372642356` and verify job `113372641549`. The generated commit is a direct child of landing commit `fa9f7400d939ba9cbf57048d2f94787aeaca864e`; primary checkout fast-forwarded with pre-existing files preserved.
-3. Record actual acceptance evidence, pass the completion check, release the completed delivery and scheduler, then close this session (`finish.ps1` after a removable `cleanup_proof.py`).
+1. PR #159 draft publication is complete at `20806b89b453ce1177a02f656ee42c711e8a252e`. CI discovery returned no run although the workflow config includes `pull_request`; observe the existing PR/check state through the supported monitor, and do not manufacture a run. Reuse the approved reviews and 40 passing router tests unless inputs change. Generated candidates are refreshed and the generated hook matches source.
+2. The live Claude test alone remains blocked pending explicit approval of sending candidate plugins and the synthetic workspace to Anthropic with the expected Codex handoff. Automatic approval review previously rejected that transmission, and the user's billing/usage concern did not approve it. A fresh concise approval question is pending. Do not launch Claude, enable extra usage, change authentication/billing, or silently retry while it is pending. Once explicitly approved and Claude usage is available, verify the saved candidate and run the unchanged bounded test, requiring actual Codex launch and child results. Retain live acceptance as an unresolved validation item before merge/installed-success claims.
+   Account helper setup is complete at `C:/Users/TommySeery/Documents/PowerShell/claude-accounts.ps1`, with the persisted profile dot-source. `claude-work` uses the existing `.claude` Team login; `claude-personal` uses `.claude-personal` and is logged out. The one-time login command `claude-personal auth login --claudeai` was given to the user. No model call or billing change was made.
+3. Causally linked PR #148 post-merge CI run `37795175405` passed, including regeneration job `113372642356` and verify job `113372641549`. The generated commit is a direct child of landing commit `fa9f7400d939ba9cbf57048d2f94787aeaca864e`; primary checkout fast-forwarded with pre-existing files preserved.
+4. Record actual acceptance evidence, pass the completion check, release the completed delivery and scheduler, then close this session (`finish.ps1` after a removable `cleanup_proof.py`).
+
+Resumed delivery assessment: this branch owns a distinct follow-up PR against `main` for the runtime
+enforcement defect exposed after PR #148, not another update to that merged PR. Exact-head reconciliation
+against fetched main `27596c9a260b0991cd90392bbeee5961a58b9142` found no relevant base movement and
+requires no new source review. Correct the branch's inherited `origin/main` upstream before publishing
+its own remote branch. Authored code is committed; the listed dirty catalog and `plugins/` files are
+generated candidates intentionally excluded under the repository's source-layout rules. Perform the
+supported inline preflight against this explicit slice assessment; this goal is not a provider ledger.
+The user selected simple `claude-work` / `claude-personal` commands. A bounded L4 worker owns that
+machine setup, preserving the existing work login and preparing a separate personal profile without
+running authentication or model calls. Live testing remains unapproved.
+
+Push gate resolved: after automatic approval review rejected the initial push, Tommy explicitly answered
+`Publish the draft PR` to the question naming commit `20806b8`, branch `Fix/CodexFirstLanesRuntime`,
+destination `https://github.com/tj-agents/core.git` and opening its draft PR. Provenance: user reply to
+`request_user_input_async` call `call_912a7633abe64fc2ae056ecf3e15412b`, question 0, on 2026-10-08.
+Proceed with that exact authorized push and draft creation; no additional confirmation is needed.
+The draft body at `%TEMP%/codex-first-lanes-runtime-pr.md` passes body validation. Inline preflight is
+otherwise satisfied: six files / 656 lines, no authored code dirt, no version-sync PR or package cut-over,
+no existing successor branch/PR, and the inherited main upstream is cleared. No push, PR, CI run or
+delivery binding had been created at approval. The prepared push/create/body-check/bind sequence is active.
 
 ## Selected design and execution checkpoint
 
