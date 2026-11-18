@@ -42,6 +42,16 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Resolved when:** The workflow demonstrates continued ownership through a delayed result, including correct reporting when continuation is unavailable.
 
+**2026-10-13 recurrence:** Tommy again reported that no background watcher means he must keep returning to check progress. In this closeout owner, Windows ScheduledTasks enumeration timed out after eight seconds before wake registration; no scheduler was ever registered. The foreground CI monitor ended after the recorded merge hold. The current owner is blocked on the user-deferred policy repair, with no foreground or child and no unattended wake. Saved ownership alone does not provide background continuation.
+
+**Reconciled kind, impact and ownership:** mistake; P1 because repeated manual follow-up defeats the intended unattended delivery. Source owner: tj-agents/core shared continuation activation, scheduler adapter and completion reporting. State: open. The scheduler timeout mechanism is observed; its environmental root cause is unknown. The existing activation repair owns host claim/activation, while the existing scheduler-timeout repair owns the eight-second query failure; these distinct causes are not merged.
+
+**Repair links:** existing `Fix/ContinuationMonitorActivation`, `plans/continuation-monitor-activation/GOAL.md`; existing `Fix/ContinuationSchedulerVerificationTimeout`, `plans/continuation-scheduler-verification-timeout/GOAL.md`, both in Core's corresponding worktrees. This occurrence is retained in `plans/inert-closeout-cadence/GOAL.md`. B009/M016 cover the separate automatic-merge conflict.
+
+**Next action:** reconcile these existing runtime repair owners and verify actual scheduler registration and wake/recovery in the affected host before claiming unattended continuation. Preserve Tommy's repair deferral and seven-session limit; this recording launches no duplicate repair or watcher.
+
+**Verification evidence and unresolved acceptance:** this goal records the registration timeout and absence of a scheduled wake; the current owner has state blocked, foreground null, child null and launches zero. No background progress or repair acceptance is claimed. Resolve M003 only with observed continuation through a delayed delivery result without Tommy polling or restarting it, truthful capability reporting, and preservation of explicit user deferrals.
+
 ## M004 ? Machine repair and repository delivery reported ambiguously
 
 **Status:** Open. **Observed:** 2026-10-11. **Scope:** completion reporting; observed on Codex.
@@ -180,3 +190,22 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 - Next action: repair the verified self-close failure and retain accountable closure evidence/reporting.
 - Resolution condition: actual registered CLI exit is observed through supported observer/process evidence after completion, without closing another/unknown host or claiming an unverified tab closed.
 - Verification evidence: original parent final report followed by worker refusal and cancelled observer; source delivery itself remained verified complete.
+
+
+## M016 - Green authorized Core delivery returned another merge question
+
+**Kind:** mistake. **Observed/reported:** 2026-10-13. After reviewing and pushing PR234, observing passing Windows/Linux CI, and marking it ready, this agent asked Tommy to approve a manual merge despite configuration.core.auto_merge=true and the recorded no-reprompt standing instruction. Tommy called out the ineffective configuration and directed that the defect be recorded for later repair.
+
+**Cause:** confirmed process handling error: the agent treated a fresh built-in published-contract classification of canonical workflow instructions as the final human-decision boundary and reported the hold without first recording and owning the configuration/classification conflict as a standards defect. The regex behavior is directly verified; the appropriate future semantic boundary is not yet implemented.
+
+**Impact and priority:** P1; another unnecessary approval interaction interrupts the already green source delivery and undermines the requested automatic workflow.
+
+**Source owner:** tj-agents/core shared delivery classification and session/merge guidance. **State:** deferred. **Repair link:** BUGS.md B009, the single causal repair owner; PR234 and plans/inert-closeout-cadence/GOAL.md retain the source delivery. M015/Fix-RevalidateRecordedMergeGate concerns stale authority and is related, not duplicated here.
+
+**Deferral:** Tommy explicitly requests documentation now and repair later. **blocked_by:** dependency. **Resolver:** Tommy/Core policy owner. **Resume when:** Tommy resumes B009.
+
+**Next action:** execute B009 under a bounded source-owner repair, verify the guarded consumer's actual effective authorization, and resume the original source delivery without treating the mere presence of a configured true value as proof that merge happened.
+
+**Resolution condition:** B009 passes its configuration/classification and preserved-gate regressions, both-host coverage and required delivery checks; an authorized canonical instruction delivery reaches its permitted merge without a repeated routine question.
+
+**Verification evidence:** PR234 reviewed/remote head df36331066f3ac1011415bce0c268f279f6cf771; run38323860505 guard/Windows/Linux green; final user-facing manual-merge question; binder evidence and precise stop regex recorded in B009. The issue is documented, not repaired.
