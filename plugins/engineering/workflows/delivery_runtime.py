@@ -108,8 +108,8 @@ class StandingMergeAuthorization:
         except delivery_policy.PolicyViolation as error:
             raise DeliveryContractViolation(str(error)) from error
 
-    def stop_patterns(self, policy):
-        authorized_stop_classes = set(policy.get("authorized_stop_classes", []))
+    def stop_patterns(self, policy, scoped_classes: frozenset[str] = frozenset()):
+        authorized_stop_classes = set(policy.get("authorized_stop_classes", [])) | scoped_classes
         patterns = [
             (name, pattern)
             for name, pattern in STOP_CLASSES
@@ -119,8 +119,10 @@ class StandingMergeAuthorization:
             patterns.append(("repository-declared", re.compile(entry)))
         return patterns
 
-    def resolve(self, policy, changed_paths, labels, root):
+    def resolve(self, policy, changed_paths, labels, root, scoped_classes: frozenset[str] = frozenset()):
         self.validate_policy(policy)
+        if scoped_classes - delivery_policy.EXEMPTIBLE_STOP_CLASSES:
+            raise DeliveryContractViolation("scoped stop authorization contains a protected class")
         mode = policy["standing_authorization"]
         try:
             auto_merge = delivery_policy.auto_merge_preference(root)
@@ -133,7 +135,7 @@ class StandingMergeAuthorization:
             if not isinstance(path, str) or not path:
                 raise DeliveryContractViolation("changed path set contains a non-path entry")
             normalized = path.replace("\\", "/")
-            for name, pattern in self.stop_patterns(policy):
+            for name, pattern in self.stop_patterns(policy, scoped_classes):
                 if pattern.search(normalized):
                     return self._stopped(mode, auto_merge, {"class": name, "path": normalized})
         if mode == "absent":

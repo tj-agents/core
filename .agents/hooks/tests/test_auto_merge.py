@@ -4,10 +4,13 @@ import json
 import tempfile
 import unittest
 from contextlib import redirect_stderr
+from dataclasses import dataclass
 from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 import sys
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -18,6 +21,280 @@ SPEC.loader.exec_module(AUTO_MERGE)
 
 
 HEAD = "a" * 40
+
+
+@dataclass(frozen=True, slots=True)
+class ScopedDelivery:
+    approval: dict[str, object]
+    binding: dict[str, object]
+
+
+@pytest.fixture
+def scoped_delivery(tmp_path: Path) -> ScopedDelivery:
+    agents = tmp_path / ".agents"
+    agents.mkdir()
+    (agents / "settings.json").write_text(
+        json.dumps({"configuration": {"core": {"auto_merge": True}}}), encoding="utf-8"
+    )
+    (agents / "delivery-authorization.json").write_text(
+        json.dumps(
+            {
+                "standing_authorization": "auto",
+                "instruction": "merge reviewed work",
+                "hold_label": "human-gate",
+            }
+        ),
+        encoding="utf-8",
+    )
+    approval: dict[str, object] = {
+        "repository": "example/repository",
+        "pr_number": 42,
+        "worktree": str(tmp_path),
+        "branch": "Fix/Workflow",
+        "mode": "auto",
+        "instruction": "Allow the ci-workflow exception for this exact reviewed commit",
+        "source": "Explicit user message after the CI stop was explained",
+        "stop_authorization": {"head": HEAD, "classes": ["ci-workflow"]},
+    }
+    binding: dict[str, object] = {
+        "repository": approval["repository"],
+        "pr_number": 42,
+        "worktree": str(tmp_path),
+        "branch": approval["branch"],
+        "remote_head_sha": HEAD,
+        "auto_merge": True,
+        "merge_authorization": {"mode": "auto", "instruction": approval["instruction"]},
+    }
+    (agents / "delivery-binding.json").write_text(
+        json.dumps({"scoped_approval": approval}), encoding="utf-8"
+    )
+    return ScopedDelivery(approval, binding)
+
+
+def test_exact_head_stop_approval_reaches_guard_without_policy_edits(
+    tmp_path: Path, scoped_delivery: ScopedDelivery
+) -> None:
+    approval, binding = scoped_delivery.approval, scoped_delivery.binding
+    policy = tmp_path / ".agents/delivery-authorization.json"
+    before = policy.read_bytes()
+    paths = [".github/workflows/ci.yml"]
+    with (
+        patch.object(AUTO_MERGE.workflow_ops, "git", return_value=approval["branch"]),
+        patch.object(AUTO_MERGE.workflow_ops, "changed_paths", return_value=paths),
+    ):
+        assert (
+            AUTO_MERGE.current_authorization(tmp_path, binding, {"labels": []}) == paths
+        )
+    assert policy.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "exception",
+    [
+        None,
+        {"head": "b" * 40, "classes": ["ci-workflow"]},
+        {"head": HEAD, "classes": ["migration"]},
+    ],
+)
+def test_ci_stop_requires_the_explicit_current_head_class(
+    tmp_path: Path,
+    scoped_delivery: ScopedDelivery,
+    exception: object,
+) -> None:
+    approval, binding = scoped_delivery.approval, scoped_delivery.binding
+    if exception is None:
+        approval.pop("stop_authorization")
+    else:
+        approval["stop_authorization"] = exception
+    (tmp_path / ".agents/delivery-binding.json").write_text(
+        json.dumps({"scoped_approval": approval}), encoding="utf-8"
+    )
+    with (
+        patch.object(AUTO_MERGE.workflow_ops, "git", return_value=approval["branch"]),
+        patch.object(
+            AUTO_MERGE.workflow_ops,
+            "changed_paths",
+            return_value=[".github/workflows/ci.yml"],
+        ),
+        pytest.raises(AUTO_MERGE.AutoMergeError, match="authorization"),
+    ):
+        AUTO_MERGE.current_authorization(tmp_path, binding, {"labels": []})
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".AGENTS/SETTINGS.JSON",
+        ".agents/delivery-authorization.json",
+        "contracts/api.json",
+        "identity/token.py",
+        "billing/invoice.py",
+        "db/migrations/1.sql",
+        "private/handler.py",
+    ],
+)
+def test_ci_exception_does_not_hide_another_changed_path_stop(
+    tmp_path: Path,
+    scoped_delivery: ScopedDelivery,
+    path: str,
+) -> None:
+    approval, binding = scoped_delivery.approval, scoped_delivery.binding
+    policy = tmp_path / ".agents/delivery-authorization.json"
+    policy.write_text(
+        json.dumps(
+            {
+                "standing_authorization": "auto",
+                "instruction": "merge reviewed work",
+                "always_stop_paths": [r"^private/"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with (
+        patch.object(AUTO_MERGE.workflow_ops, "git", return_value=approval["branch"]),
+        patch.object(
+            AUTO_MERGE.workflow_ops,
+            "changed_paths",
+            return_value=[".github/workflows/ci.yml", path],
+        ),
+        pytest.raises(AUTO_MERGE.AutoMergeError, match="authorization"),
+    ):
+        AUTO_MERGE.current_authorization(tmp_path, binding, {"labels": []})
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        None,
+        {},
+        {"head": HEAD, "classes": []},
+        {"head": HEAD, "classes": ["ci-workflow", "ci-workflow"]},
+        {"head": HEAD, "classes": ["repository-settings"]},
+        {"head": HEAD, "classes": ["standing-authorization"]},
+        {"head": HEAD, "classes": [False]},
+        {"head": "short", "classes": ["ci-workflow"]},
+        {"head": HEAD.upper(), "classes": ["ci-workflow"]},
+        {"head": HEAD, "classes": ["ci-workflow"], "extra": True},
+    ],
+)
+def test_invalid_stop_approval_fails_before_binding(
+    tmp_path: Path,
+    scoped_delivery: ScopedDelivery,
+    invalid: object,
+) -> None:
+    approval = scoped_delivery.approval
+    approval["stop_authorization"] = invalid
+    record = tmp_path / "approval.json"
+    record.write_text(json.dumps(approval), encoding="utf-8")
+    with (
+        patch.object(AUTO_MERGE.workflow_ops, "git", return_value=approval["branch"]),
+        pytest.raises(
+            AUTO_MERGE.workflow_ops.WorkflowOperationError, match="stop authorization"
+        ),
+    ):
+        AUTO_MERGE.workflow_ops.scoped_approval(
+            tmp_path, approval["repository"], 42, approval["branch"], record
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("repository", "other/repository"),
+        ("pr_number", 43),
+        ("branch", "Fix/Other"),
+        ("worktree", "C:/another-checkout"),
+    ],
+)
+def test_stop_approval_cannot_transfer_to_another_delivery(
+    tmp_path: Path,
+    scoped_delivery: ScopedDelivery,
+    field: str,
+    value: object,
+) -> None:
+    approval = scoped_delivery.approval
+    changed = {**approval, field: value}
+    record = tmp_path / "approval.json"
+    record.write_text(json.dumps(changed), encoding="utf-8")
+    with (
+        patch.object(AUTO_MERGE.workflow_ops, "git", return_value=approval["branch"]),
+        pytest.raises(
+            AUTO_MERGE.workflow_ops.WorkflowOperationError,
+            match=r"does not match|requires exact identity",
+        ),
+    ):
+        AUTO_MERGE.workflow_ops.scoped_approval(
+            tmp_path, approval["repository"], 42, approval["branch"], record
+        )
+
+
+def test_binder_and_guard_share_scoped_authority_and_recheck_a_new_hold(
+    tmp_path: Path, scoped_delivery: ScopedDelivery
+) -> None:
+    approval, binding = scoped_delivery.approval, scoped_delivery.binding
+    paths = [".github/workflows/ci.yml"]
+    value = {
+        "number": 42,
+        "headRefName": approval["branch"],
+        "headRefOid": HEAD,
+        "state": "OPEN",
+        "url": "https://github.com/example/repository/pull/42",
+        "body": "## What\nRepair CI\n\n## Why\nUnblock delivery",
+        "labels": [],
+        "files": [{"path": paths[0]}],
+        "changedFiles": 1,
+        "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "SUCCESS"}],
+    }
+    record = tmp_path / "approval.json"
+    record.write_text(json.dumps(approval), encoding="utf-8")
+    with (
+        patch.object(AUTO_MERGE.workflow_ops, "_matching_delivery_bind_context"),
+        patch.object(
+            AUTO_MERGE.workflow_ops,
+            "repository_slug",
+            return_value=approval["repository"],
+        ),
+        patch.object(AUTO_MERGE.workflow_ops, "pull_request_state", return_value=value),
+        patch.object(
+            AUTO_MERGE.workflow_ops, "_changed_paths_for_repository", return_value=paths
+        ),
+        patch.object(AUTO_MERGE.workflow_ops, "changed_paths", return_value=paths),
+        patch.object(AUTO_MERGE.workflow_ops, "git", return_value=approval["branch"]),
+        patch.object(
+            AUTO_MERGE.workflow_ops,
+            "review_binding",
+            return_value={"reviewed_sha": HEAD, "work_order": "review.md", "work_order_order": ["full"]},
+        ),
+        patch.object(AUTO_MERGE.workflow_ops, "append_event"),
+    ):
+        result = AUTO_MERGE.workflow_ops.delivery_bind(
+            tmp_path, "test", 42, "PR merged", None, record
+        )
+        assert result["binding"]["scoped_approval"] == approval
+        assert result["authorization_resolution"]["stopped_by"] is None
+        assert AUTO_MERGE.current_authorization(tmp_path, binding, value) == paths
+        with pytest.raises(AUTO_MERGE.AutoMergeError, match="authorization"):
+            AUTO_MERGE.current_authorization(
+                tmp_path, binding, {**value, "labels": [{"name": "human-gate"}]}
+            )
+
+
+def test_scoped_ci_approval_works_without_a_standing_table(
+    tmp_path: Path, scoped_delivery: ScopedDelivery
+) -> None:
+    approval, binding = scoped_delivery.approval, scoped_delivery.binding
+    (tmp_path / ".agents/delivery-authorization.json").unlink()
+    with (
+        patch.object(AUTO_MERGE.workflow_ops, "git", return_value=approval["branch"]),
+        patch.object(
+            AUTO_MERGE.workflow_ops,
+            "changed_paths",
+            return_value=[".github/workflows/ci.yml"],
+        ),
+    ):
+        assert AUTO_MERGE.current_authorization(tmp_path, binding, {"labels": []}) == [
+            ".github/workflows/ci.yml"
+        ]
 
 
 class AutoMergeTests(unittest.TestCase):
