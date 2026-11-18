@@ -100,3 +100,19 @@
 **Resolution condition:** supported Claude/Codex shell events reject sibling, nested and ambiguous allocation; verified internal creation works from linked checkouts; executable regressions, packaging, independent review and exact-head CI pass; source merges and causal generated distribution is verified.
 
 **Verification evidence:** PR220 merged reviewed head 40ff30d9e006f37f87201fd38ae1c36de9268dd4 as 441a09ab3894ee0e076f6ff8e97d9c61d4a7aca2. Final review found no remaining defects; exact-head CI38286569828 passed Windows, Linux and guard. Twenty-two local placement tests completed with two Windows symlink-capability skips. Causal run38288409546 attempt1 passed Windows, Linux and regeneration; generated commit3b41211db4b6349ca74036e0df3a6d8bc91784f2 carries matching hook and dependency bytes and both host mappings. No external feed or version-sync producer exists. Installed native-host trust and adoption remain unverified.
+
+## B008 - Delivery runtime rejects a review-stamp watermark after a valid rebind
+
+**Kind:** bug. **Observed/reported:** 2026-10-12; `workflow_ops.review_is_current` and the merge-review gate accept a completed review watermark when only the branch work order under `reviews/` changed, but `PersistentDeliveryRouter.decide` rejects that same bound predecessor watermark unless it equals the new remote head.
+
+**Cause:** confirmed inconsistent review-current identity rules across the binder/merge gate and delivery runtime.
+
+**Impact and priority:** P2; an owner that correctly rebinds after the review-stamp commit can still be blocked from its authorized delivery path. The current runtime rejection is fail-closed; no merge bypass is established.
+
+**Source owner:** tj-agents/core delivery runtime and review-binding contract. **State:** open. **Repair link:** [plans/review-delivery-continuation/GOAL.md](plans/review-delivery-continuation/GOAL.md).
+
+**Next action:** design and implement a proof-oriented rule that accepts only a binder-verified review-stamp watermark, with focused delivery-runtime regression coverage.
+
+**Resolution condition:** the delivery runtime accepts only a binding whose recorded frozen review watermark is proven to cover its current review-stamp head, rejects all unrelated or unproven historical watermarks, and passes focused security review and Windows/Linux validation.
+
+**Verification evidence:** source inspection of `workflow_ops.review_is_current`, `merge_review_gate.review_only`, `workflow_ops.delivery_bind`, and `PersistentDeliveryRouter.decide` on 2026-10-12; the direct relaxation patch was rejected by the repository safety control because the existing binding shape does not carry a proof of coverage.

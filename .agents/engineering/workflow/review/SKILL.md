@@ -219,4 +219,9 @@ a fresh incremental watermark after any code change.
 If a plan owns the work, completion of the whole pass is one material review transition; record only its
 artifact and current gate. Report the frozen range, finding counts by severity or lens, canonical work-order
 path, completed watermark, and whether an explicitly authorized remediation transition began. Do not replay
-subordinate output or create a review-only commit.
+subordinate output. Commit the completed work order once as the review-stamp commit; its watermark remains
+the frozen reviewed head. Return immediately to the owning delivery workflow. When a delivery binding and
+continuation owner exist, rerun `delivery-bind` for that same PR and checkpoint the existing owner with the
+old/new exact-head rebind before waiting, arming auto-merge, or ending the turn. That same-PR rebind
+preserves recorded merge authority subject to freshly evaluated stops; it does not require another user
+approval. Do not create another review-only commit.
