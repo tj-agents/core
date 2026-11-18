@@ -24,26 +24,29 @@ def tier_gate():
     raise ValueError("The installed review package is missing hooks/tier_gate.py")
 
 
-def metadata(path):
+def metadata(path, gate=None):
+    gate = gate or tier_gate()
     text = path.read_text(encoding="utf-8-sig")
-    if not text.startswith("---\n"):
-        return {}
-    front = text.split("---", 2)[1]
-    return dict(re.findall(r"^(name|kind):[ \t]*([a-z][a-z0-9-]*)[ \t]*$", front, re.MULTILINE))
+    return gate.skill_fields(gate.front_matter(text))
 
 
-def conventions(declaration):
+def standards(declaration, gate):
     payload = declaration.payload_dir.resolve()
     result = {}
     for path in sorted((payload / "skills").glob("*/SKILL.md")):
         if not path.resolve().is_relative_to(payload):
             raise ValueError(f"Skill escapes its selected payload: {path}")
-        fields = metadata(path)
-        if fields.get("kind") not in ("convention", "contract") or fields.get("name") != path.parent.name:
+        fields = metadata(path, gate)
+        if fields.get("kind") != "standard" or fields.get("name") != path.parent.name:
             continue
         canonical = []
-        for candidate in (payload / ".agents").rglob("SKILL.md"):
-            if candidate.resolve().is_relative_to(payload) and metadata(candidate) == fields:
+        source_root = payload / ".agents" / declaration.plugin / "skills"
+        for candidate in source_root.rglob("SKILL.md"):
+            if not candidate.resolve().is_relative_to(payload):
+                raise ValueError(
+                    f"Canonical skill escapes its selected payload: {candidate}"
+                )
+            if metadata(candidate, gate) == fields:
                 canonical.append(candidate)
         if len(canonical) > 1:
             raise ValueError(f"Ambiguous canonical definition for {declaration.plugin}:{fields['name']}")
@@ -151,7 +154,7 @@ def resolve(project, gate=None, found=None, host=None):
     for declaration in [*selection.ubiquitous, *(item for item, _ in selection.applicable)]:
         if declaration.orphaned:
             raise ValueError("Selected standards payload is orphaned: " + declaration.id)
-        available.update(conventions(declaration))
+        available.update(standards(declaration, gate))
     effective = {
         gate.replacement_skill(selection, name, lambda candidate: candidate in available)
         for name in available
@@ -167,7 +170,11 @@ def main():
     if sys.version_info < (3, 10):
         print(json.dumps({"error": "Review standards resolution requires Python 3.10 or newer"}))
         return 1
-    parser = argparse.ArgumentParser(description="List review conventions from the repository's selected applicable plugins.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "List review standards from the repository's selected applicable plugins."
+        )
+    )
     parser.add_argument("--project", type=Path, required=True)
     parser.add_argument("--host", choices=("codex", "claude"), required=True)
     arguments = parser.parse_args()
