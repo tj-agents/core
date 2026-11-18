@@ -4,6 +4,7 @@
   "source_roots": [
     ".agents/base",
     ".agents/dependencies/cli/.agents/cli/runtime",
+    ".agents/engineering/operation/open-worktree/scripts",
     ".agents/hooks/hook_runtime.py"
   ],
   "requires": {
@@ -19,6 +20,13 @@
     "hooks": [
       {
         "path": "hooks/tier_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/worktrees/worktree_gate.py",
         "hosts": [
           "claude",
           "codex"

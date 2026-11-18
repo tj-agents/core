@@ -1,0 +1,23 @@
+{
+  "head": "c8ffbf8a43d4fb8e69aaf404f41d588fefaccd1d",
+  "files": [
+    {
+      "file": "create_worktree.py",
+      "canonical_sha256": "ed06cc381bfdd8422918464c85d8c9721e4738dd355869bc4424f415399a9592",
+      "installed_sha256": "ed06cc381bfdd8422918464c85d8c9721e4738dd355869bc4424f415399a9592"
+    },
+    {
+      "file": "worktree_gate.py",
+      "canonical_sha256": "d19c9e341c8953395499dfaf77df83a77e429f9a641f11046beec4128e7b92c4",
+      "installed_sha256": "d19c9e341c8953395499dfaf77df83a77e429f9a641f11046beec4128e7b92c4"
+    }
+  ],
+  "codex": "0.163.0-alpha.1",
+  "claude": "2.1.306",
+  "results": [
+    "Codex exec_command sibling placement denied",
+    "Codex installed shared command created and reused canonical checkout with real ownership",
+    "Claude Bash, EnterWorktree, Agent isolation and CLI --worktree denied"
+  ],
+  "remaining": "Actual Desktop create_worktree route needs published Base refresh and a real tool invocation"
+}

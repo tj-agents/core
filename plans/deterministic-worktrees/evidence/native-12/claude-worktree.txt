@@ -1,0 +1,3 @@
+
+[31mError creating worktree: WorktreeCreate hook failed: tj_hook -- python -B ${CLAUDE_PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py: native worktree placement is not supported. Use Core's engineering:open-worktree command: python -B "C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Feature-DeterministicWorktrees\plugins\base\hooks\worktrees\create_worktree.py" --repo <repository> <Type/Name>.[39m
+[31m[39m

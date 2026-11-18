@@ -1,0 +1,720 @@
+[
+  {
+    "method": "remoteControl/status/changed",
+    "params": {
+      "status": "disabled",
+      "serverName": "EngineerTS",
+      "installationId": "373b3327-89fa-405b-b06a-0b8c942eed45",
+      "environmentId": null
+    },
+    "emittedAtMs": 1794492270951
+  },
+  {
+    "method": "thread/started",
+    "params": {
+      "thread": {
+        "id": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+        "environments": [
+          {
+            "environmentId": "local",
+            "cwd": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture",
+            "runtimeWorkspaceRoots": [
+              "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture"
+            ]
+          }
+        ],
+        "extra": null,
+        "sessionId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+        "forkedFromId": null,
+        "parentThreadId": null,
+        "preview": "",
+        "ephemeral": false,
+        "section": null,
+        "sectionEnteredAt": null,
+        "projectId": null,
+        "historyMode": "paginated",
+        "modelProvider": "native_startup",
+        "model": "gpt-6.1-sol",
+        "reasoningEffort": null,
+        "createdAt": 1794492271,
+        "updatedAt": 1794492271,
+        "recencyAt": 1794492271,
+        "status": {
+          "type": "idle"
+        },
+        "path": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\sessions\\2026\\11\\12\\rollout-2026-11-12T14-04-31-01a1d013-09d6-7462-a22d-7360a89d0a0c.jsonl",
+        "cwd": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture",
+        "cliVersion": "0.163.0-alpha.1",
+        "originator": "tj-agents-native-acceptance",
+        "source": "vscode",
+        "canAcceptDirectInput": true,
+        "threadSource": null,
+        "agentNickname": null,
+        "agentRole": null,
+        "gitInfo": null,
+        "name": null,
+        "daybreakEnabled": null,
+        "turns": []
+      }
+    },
+    "emittedAtMs": 1794492271549
+  },
+  {
+    "method": "thread/status/changed",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "status": {
+        "type": "active",
+        "activeFlags": []
+      }
+    },
+    "emittedAtMs": 1794492273894
+  },
+  {
+    "method": "turn/started",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turn": {
+        "id": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+        "rootTurnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+        "items": [],
+        "itemsView": "notLoaded",
+        "status": "inProgress",
+        "error": null,
+        "startedAt": 1794492273,
+        "completedAt": null,
+        "durationMs": null
+      }
+    },
+    "emittedAtMs": 1794492273894
+  },
+  {
+    "method": "hook/started",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "run": {
+        "id": "session-start:3:C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+        "eventName": "sessionStart",
+        "handlerType": "command",
+        "executionMode": "sync",
+        "scope": "thread",
+        "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+        "source": "plugin",
+        "displayOrder": 3,
+        "status": "running",
+        "statusMessage": null,
+        "startedAt": 1794492273,
+        "completedAt": null,
+        "durationMs": null,
+        "entries": []
+      }
+    },
+    "emittedAtMs": 1794492274217
+  },
+  {
+    "method": "hook/completed",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "run": {
+        "id": "session-start:3:C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+        "eventName": "sessionStart",
+        "handlerType": "command",
+        "executionMode": "sync",
+        "scope": "thread",
+        "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+        "source": "plugin",
+        "displayOrder": 3,
+        "status": "completed",
+        "statusMessage": null,
+        "startedAt": 1794492273,
+        "completedAt": 1794492276,
+        "durationMs": 2225,
+        "entries": []
+      }
+    },
+    "emittedAtMs": 1794492276163
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "userMessage",
+        "id": "01a1d013-1dc4-7d31-92da-eff41cd753f8",
+        "clientId": null,
+        "content": [
+          {
+            "type": "text",
+            "text": "Run the supplied disposable worktree interception probe.",
+            "text_elements": []
+          }
+        ]
+      },
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "startedAtMs": 1794492276173
+    },
+    "emittedAtMs": 1794492276173
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "userMessage",
+        "id": "01a1d013-1dc4-7d31-92da-eff41cd753f8",
+        "clientId": null,
+        "content": [
+          {
+            "type": "text",
+            "text": "Run the supplied disposable worktree interception probe.",
+            "text_elements": []
+          }
+        ]
+      },
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "completedAtMs": 1794492276173
+    },
+    "emittedAtMs": 1794492276186
+  },
+  {
+    "method": "hook/started",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "run": {
+        "id": "pre-tool-use:0:C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json:call_probe_1",
+        "eventName": "preToolUse",
+        "handlerType": "command",
+        "executionMode": "sync",
+        "scope": "turn",
+        "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+        "source": "plugin",
+        "displayOrder": 0,
+        "status": "running",
+        "statusMessage": null,
+        "startedAt": 1794492276,
+        "completedAt": null,
+        "durationMs": null,
+        "entries": []
+      }
+    },
+    "emittedAtMs": 1794492276443
+  },
+  {
+    "method": "hook/completed",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "run": {
+        "id": "pre-tool-use:0:C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json:call_probe_1",
+        "eventName": "preToolUse",
+        "handlerType": "command",
+        "executionMode": "sync",
+        "scope": "turn",
+        "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+        "source": "plugin",
+        "displayOrder": 0,
+        "status": "blocked",
+        "statusMessage": null,
+        "startedAt": 1794492276,
+        "completedAt": 1794492277,
+        "durationMs": 1649,
+        "entries": [
+          {
+            "kind": "feedback",
+            "text": "worktrees must be direct children of C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture\\.worktrees: C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture\\..\\outside. Use Core's engineering:open-worktree command: python -B \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\data\\base-tj-agents\\hook-snapshots\\c6acad9020cec6ed0b8dfc7f0a303d667d7d673e595a433633feba349538782b\\hooks\\worktrees\\create_worktree.py\" --repo <repository> <Type/Name>."
+          }
+        ]
+      }
+    },
+    "emittedAtMs": 1794492277871
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 2,
+          "inputTokens": 1,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 1,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 2,
+          "inputTokens": 1,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 1,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      }
+    },
+    "emittedAtMs": 1794492277889
+  },
+  {
+    "method": "account/rateLimits/updated",
+    "params": {
+      "rateLimits": {
+        "limitId": "codex",
+        "limitName": null,
+        "normalModelSlug": null,
+        "primary": null,
+        "secondary": null,
+        "credits": null,
+        "individualLimit": null,
+        "spendControlReached": null,
+        "planType": null,
+        "rateLimitReachedType": null
+      }
+    },
+    "emittedAtMs": 1794492277889
+  },
+  {
+    "method": "hook/started",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "run": {
+        "id": "pre-tool-use:0:C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json:call_probe_2",
+        "eventName": "preToolUse",
+        "handlerType": "command",
+        "executionMode": "sync",
+        "scope": "turn",
+        "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+        "source": "plugin",
+        "displayOrder": 0,
+        "status": "running",
+        "statusMessage": null,
+        "startedAt": 1794492277,
+        "completedAt": null,
+        "durationMs": null,
+        "entries": []
+      }
+    },
+    "emittedAtMs": 1794492278166
+  },
+  {
+    "method": "hook/completed",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "run": {
+        "id": "pre-tool-use:0:C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json:call_probe_2",
+        "eventName": "preToolUse",
+        "handlerType": "command",
+        "executionMode": "sync",
+        "scope": "turn",
+        "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+        "source": "plugin",
+        "displayOrder": 0,
+        "status": "completed",
+        "statusMessage": null,
+        "startedAt": 1794492277,
+        "completedAt": 1794492279,
+        "durationMs": 1661,
+        "entries": []
+      }
+    },
+    "emittedAtMs": 1794492279708
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "commandExecution",
+        "id": "call_probe_2",
+        "pluginId": null,
+        "scriptPath": null,
+        "command": "\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Programs\\\\PowerShell\\\\7\\\\pwsh.exe\" -Command \"& \\\"C:\\\\Python313\\\\python.exe\\\" -B \\\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\codex-home\\\\plugins\\\\cache\\\\tj-agents\\\\engineering\\\\local\\\\codex-skills\\\\open-worktree\\\\scripts\\\\create_worktree.py\\\" --repo \\\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\\\" Feature/NativeAllowed\"",
+        "cwd": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture",
+        "processId": "46317",
+        "source": "unifiedExecStartup",
+        "status": "inProgress",
+        "commandActions": [
+          {
+            "type": "unknown",
+            "command": "& \"C:\\Python313\\python.exe\" -B \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\engineering\\local\\codex-skills\\open-worktree\\scripts\\create_worktree.py\" --repo \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture\" Feature/NativeAllowed"
+          }
+        ],
+        "aggregatedOutput": null,
+        "exitCode": null,
+        "durationMs": null
+      },
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "startedAtMs": 1794492279867
+    },
+    "emittedAtMs": 1794492279870
+  },
+  {
+    "method": "item/commandExecution/outputDelta",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "itemId": "call_probe_2",
+      "delta": "{\r\n  \"repository\": \"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\",\r\n  \"branch\": \"Feature/NativeAllowed\",\r\n  \"path\": \"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\\\\.worktrees\\\\Feature-NativeAllowed\",\r\n  \"head\": \"7f5a23dc4d4840a1fc1710b305bff03978a4a7f3\",\r\n  \"base\": \"main\",\r\n  \"base_head\": \"7f5a23dc4d4840a1fc1710b305bff03978a4a7f3\"\r\n}\r\n"
+    },
+    "emittedAtMs": 1794492285776
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "commandExecution",
+        "id": "call_probe_2",
+        "pluginId": null,
+        "scriptPath": null,
+        "command": "\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Programs\\\\PowerShell\\\\7\\\\pwsh.exe\" -Command \"& \\\"C:\\\\Python313\\\\python.exe\\\" -B \\\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\codex-home\\\\plugins\\\\cache\\\\tj-agents\\\\engineering\\\\local\\\\codex-skills\\\\open-worktree\\\\scripts\\\\create_worktree.py\\\" --repo \\\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\\\" Feature/NativeAllowed\"",
+        "cwd": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture",
+        "processId": "46317",
+        "source": "unifiedExecStartup",
+        "status": "completed",
+        "commandActions": [
+          {
+            "type": "unknown",
+            "command": "& \"C:\\Python313\\python.exe\" -B \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\engineering\\local\\codex-skills\\open-worktree\\scripts\\create_worktree.py\" --repo \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture\" Feature/NativeAllowed"
+          }
+        ],
+        "aggregatedOutput": "{\r\n  \"repository\": \"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\",\r\n  \"branch\": \"Feature/NativeAllowed\",\r\n  \"path\": \"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\\\\.worktrees\\\\Feature-NativeAllowed\",\r\n  \"head\": \"7f5a23dc4d4840a1fc1710b305bff03978a4a7f3\",\r\n  \"base\": \"main\",\r\n  \"base_head\": \"7f5a23dc4d4840a1fc1710b305bff03978a4a7f3\"\r\n}\r\n",
+        "exitCode": 0,
+        "durationMs": 6005
+      },
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "completedAtMs": 1794492285872
+    },
+    "emittedAtMs": 1794492285888
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 4,
+          "inputTokens": 2,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 2,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 2,
+          "inputTokens": 1,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 1,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      }
+    },
+    "emittedAtMs": 1794492285910
+  },
+  {
+    "method": "account/rateLimits/updated",
+    "params": {
+      "rateLimits": {
+        "limitId": "codex",
+        "limitName": null,
+        "normalModelSlug": null,
+        "primary": null,
+        "secondary": null,
+        "credits": null,
+        "individualLimit": null,
+        "spendControlReached": null,
+        "planType": null,
+        "rateLimitReachedType": null
+      }
+    },
+    "emittedAtMs": 1794492285910
+  },
+  {
+    "method": "hook/started",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "run": {
+        "id": "pre-tool-use:0:C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json:call_probe_3",
+        "eventName": "preToolUse",
+        "handlerType": "command",
+        "executionMode": "sync",
+        "scope": "turn",
+        "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+        "source": "plugin",
+        "displayOrder": 0,
+        "status": "running",
+        "statusMessage": null,
+        "startedAt": 1794492285,
+        "completedAt": null,
+        "durationMs": null,
+        "entries": []
+      }
+    },
+    "emittedAtMs": 1794492286331
+  },
+  {
+    "method": "hook/completed",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "run": {
+        "id": "pre-tool-use:0:C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json:call_probe_3",
+        "eventName": "preToolUse",
+        "handlerType": "command",
+        "executionMode": "sync",
+        "scope": "turn",
+        "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+        "source": "plugin",
+        "displayOrder": 0,
+        "status": "completed",
+        "statusMessage": null,
+        "startedAt": 1794492285,
+        "completedAt": 1794492287,
+        "durationMs": 1856,
+        "entries": []
+      }
+    },
+    "emittedAtMs": 1794492287946
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "commandExecution",
+        "id": "call_probe_3",
+        "pluginId": null,
+        "scriptPath": null,
+        "command": "\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Programs\\\\PowerShell\\\\7\\\\pwsh.exe\" -Command \"& \\\"C:\\\\Python313\\\\python.exe\\\" -B \\\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\codex-home\\\\plugins\\\\cache\\\\tj-agents\\\\engineering\\\\local\\\\codex-skills\\\\open-worktree\\\\scripts\\\\create_worktree.py\\\" --repo \\\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\\\" Feature/NativeAllowed\"",
+        "cwd": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture",
+        "processId": "73484",
+        "source": "unifiedExecStartup",
+        "status": "inProgress",
+        "commandActions": [
+          {
+            "type": "unknown",
+            "command": "& \"C:\\Python313\\python.exe\" -B \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\engineering\\local\\codex-skills\\open-worktree\\scripts\\create_worktree.py\" --repo \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture\" Feature/NativeAllowed"
+          }
+        ],
+        "aggregatedOutput": null,
+        "exitCode": null,
+        "durationMs": null
+      },
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "startedAtMs": 1794492288110
+    },
+    "emittedAtMs": 1794492288110
+  },
+  {
+    "method": "item/commandExecution/outputDelta",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "itemId": "call_probe_3",
+      "delta": "{\r\n  \"repository\": \"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\",\r\n  \"branch\": \"Feature/NativeAllowed\",\r\n  \"path\": \"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\\\\.worktrees\\\\Feature-NativeAllowed\",\r\n  \"head\": \"7f5a23dc4d4840a1fc1710b305bff03978a4a7f3\",\r\n  \"base\": \"(existing worktree)\",\r\n  \"base_head\": \"7f5a23dc4d4840a1fc1710b305bff03978a4a7f3\"\r\n}\r\n"
+    },
+    "emittedAtMs": 1794492293147
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "commandExecution",
+        "id": "call_probe_3",
+        "pluginId": null,
+        "scriptPath": null,
+        "command": "\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Programs\\\\PowerShell\\\\7\\\\pwsh.exe\" -Command \"& \\\"C:\\\\Python313\\\\python.exe\\\" -B \\\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\codex-home\\\\plugins\\\\cache\\\\tj-agents\\\\engineering\\\\local\\\\codex-skills\\\\open-worktree\\\\scripts\\\\create_worktree.py\\\" --repo \\\"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\\\" Feature/NativeAllowed\"",
+        "cwd": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture",
+        "processId": "73484",
+        "source": "unifiedExecStartup",
+        "status": "completed",
+        "commandActions": [
+          {
+            "type": "unknown",
+            "command": "& \"C:\\Python313\\python.exe\" -B \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\engineering\\local\\codex-skills\\open-worktree\\scripts\\create_worktree.py\" --repo \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture\" Feature/NativeAllowed"
+          }
+        ],
+        "aggregatedOutput": "{\r\n  \"repository\": \"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\",\r\n  \"branch\": \"Feature/NativeAllowed\",\r\n  \"path\": \"C:\\\\Users\\\\TommySeery\\\\AppData\\\\Local\\\\Temp\\\\deterministic-worktrees-604\\\\native-12\\\\fixture\\\\.worktrees\\\\Feature-NativeAllowed\",\r\n  \"head\": \"7f5a23dc4d4840a1fc1710b305bff03978a4a7f3\",\r\n  \"base\": \"(existing worktree)\",\r\n  \"base_head\": \"7f5a23dc4d4840a1fc1710b305bff03978a4a7f3\"\r\n}\r\n",
+        "exitCode": 0,
+        "durationMs": 5147
+      },
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "completedAtMs": 1794492293258
+    },
+    "emittedAtMs": 1794492293273
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 6,
+          "inputTokens": 3,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 3,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 2,
+          "inputTokens": 1,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 1,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      }
+    },
+    "emittedAtMs": 1794492293298
+  },
+  {
+    "method": "account/rateLimits/updated",
+    "params": {
+      "rateLimits": {
+        "limitId": "codex",
+        "limitName": null,
+        "normalModelSlug": null,
+        "primary": null,
+        "secondary": null,
+        "credits": null,
+        "individualLimit": null,
+        "spendControlReached": null,
+        "planType": null,
+        "rateLimitReachedType": null
+      }
+    },
+    "emittedAtMs": 1794492293298
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "agentMessage",
+        "id": "msg_probe",
+        "text": "Probe completed.",
+        "phase": null,
+        "memoryCitation": null,
+        "delivery": null,
+        "questions": null
+      },
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "startedAtMs": 1794492293315
+    },
+    "emittedAtMs": 1794492293315
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "agentMessage",
+        "id": "msg_probe",
+        "text": "Probe completed.",
+        "phase": null,
+        "memoryCitation": null,
+        "delivery": null,
+        "questions": null
+      },
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "completedAtMs": 1794492293315
+    },
+    "emittedAtMs": 1794492293326
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 8,
+          "inputTokens": 4,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 4,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 2,
+          "inputTokens": 1,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 1,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      }
+    },
+    "emittedAtMs": 1794492293359
+  },
+  {
+    "method": "account/rateLimits/updated",
+    "params": {
+      "rateLimits": {
+        "limitId": "codex",
+        "limitName": null,
+        "normalModelSlug": null,
+        "primary": null,
+        "secondary": null,
+        "credits": null,
+        "individualLimit": null,
+        "spendControlReached": null,
+        "planType": null,
+        "rateLimitReachedType": null
+      }
+    },
+    "emittedAtMs": 1794492293359
+  },
+  {
+    "method": "thread/status/changed",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "status": {
+        "type": "idle"
+      }
+    },
+    "emittedAtMs": 1794492293374
+  },
+  {
+    "method": "turn/completed",
+    "params": {
+      "threadId": "01a1d013-09d6-7462-a22d-7360a89d0a0c",
+      "turn": {
+        "id": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+        "rootTurnId": "01a1d013-123b-7e40-a85d-69d6d9d07860",
+        "items": [
+          {
+            "type": "agentMessage",
+            "id": "msg_probe",
+            "text": "Probe completed.",
+            "phase": null,
+            "memoryCitation": null,
+            "delivery": null,
+            "questions": null
+          }
+        ],
+        "itemsView": "summary",
+        "status": "completed",
+        "error": null,
+        "startedAt": 1794492273,
+        "completedAt": 1794492293,
+        "durationMs": 20131
+      }
+    },
+    "emittedAtMs": 1794492293374
+  }
+]

@@ -1,0 +1,1873 @@
+OpenAI Codex v0.163.0-alpha.1
+--------
+workdir: C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+model: gpt-5.6-terra
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: high
+reasoning summaries: none
+session id: 01a1d014-8100-7b72-95b8-530ecbcdaa2f
+--------
+user
+commit c8ffbf8
+warning: Codex is ignoring 8 unrecognized configuration settings. Check for typos or deprecated settings.
+  user (C:\Users\TommySeery\.codex\config.toml): `hooks.state.agent@tj-agents:hooks/codex.json:session_end:0:0.trusted_content_hash` is ignored.
+  user (C:\Users\TommySeery\.codex\config.toml): `hooks.state.agent@tj-agents:hooks/codex.json:session_start:0:0.trusted_content_hash` is ignored.
+  user (C:\Users\TommySeery\.codex\config.toml): `hooks.state.agent@tj-agents:hooks/codex.json:session_start:1:0.trusted_content_hash` is ignored.
+  ... and 5 more ignored settings.
+warning: Codex is ignoring 8 unrecognized configuration settings. Check for typos or deprecated settings.
+  user (C:\Users\TommySeery\.codex\config.toml): `hooks.state.agent@tj-agents:hooks/codex.json:session_end:0:0.trusted_content_hash` is ignored.
+  user (C:\Users\TommySeery\.codex\config.toml): `hooks.state.agent@tj-agents:hooks/codex.json:session_start:0:0.trusted_content_hash` is ignored.
+  user (C:\Users\TommySeery\.codex\config.toml): `hooks.state.agent@tj-agents:hooks/codex.json:session_start:1:0.trusted_content_hash` is ignored.
+  ... and 5 more ignored settings.
+warning: clamping SessionEnd hook timeout to 3s in C:\Users\TommySeery\.codex\plugins\cache\tj-agents\agent\efd976bca022\hooks\codex.json
+warning: Codex is ignoring 8 unrecognized configuration settings. Check for typos or deprecated settings.
+  user (C:\Users\TommySeery\.codex\config.toml): `hooks.state.agent@tj-agents:hooks/codex.json:session_end:0:0.trusted_content_hash` is ignored.
+  user (C:\Users\TommySeery\.codex\config.toml): `hooks.state.agent@tj-agents:hooks/codex.json:session_start:0:0.trusted_content_hash` is ignored.
+  user (C:\Users\TommySeery\.codex\config.toml): `hooks.state.agent@tj-agents:hooks/codex.json:session_start:1:0.trusted_content_hash` is ignored.
+  ... and 5 more ignored settings.
+warning: clamping SessionEnd hook timeout to 3s in C:\Users\TommySeery\.codex\plugins\cache\tj-agents\agent\efd976bca022\hooks\codex.json
+exec
+"C:\\Users\\TommySeery\\AppData\\Local\\Programs\\PowerShell\\7\\pwsh.exe" -Command "Get-Content 'C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Review-DeterministicWorktrees-26e7e3a3/.codex/skills/engineering/review/SKILL.md'; Write-Output '---STATUS---'; git status --short; Write-Output '---SHOW---'; git show --stat --oneline --decorate --no-renames c8ffbf8a43d4fb8e69aaf404f41d588fefaccd1d; Write-Output '---INSTRUCTIONS---'; Get-ChildItem -Path . -Recurse -Force -File -Include AGENTS.override.md,AGENTS.md | Select-Object -ExpandProperty FullName" in C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+ succeeded in 11651ms:
+---
+name: review
+description: Review a branch, PR, commit range or selected paths with the host's native reviewer and the relevant standards injected into that repository. Use for a full code review or a targeted review; use incremental-review for a later sweep, staged-review for explicit resumable partitioning, and docs-review for documentation.
+
+kind: utility
+domain: process
+---
+
+# Canonical isolated code review
+
+Read and follow the [canonical shared definition](../../../../.agents/engineering/utility/review/SKILL.md) in full.
+This entry point adds only Codex's reviewers; the shared procedure is authored once under `.agents/`.
+
+## Codex reviewers
+
+- **Native layer (Stage 3):** `codex review --base <frozen-base>`, run from a checkout at the frozen head.
+  It cannot take a path scope, so the parent drops findings outside a bounded scope.
+- **Security layer (Stage 6):** use the installed first-party Codex Security change-review plugin when
+  its setup, permissions and reviewed candidate match the frozen scope. Discover its actual installed
+  entry point. The cloud PR security service has separate eligibility and repository setup; invoke it
+  only with authority for that external action. Record which runner and exact range actually ran.
+  Otherwise use the bounded `security` lens over the required frozen range.
+
+```text
+Frozen API change + configured first-party plugin with matching scope -> native security review.
+Plugin unavailable or scope mismatched -> security lens over that same frozen candidate.
+```
+---STATUS---
+---SHOW---
+c8ffbf8a (HEAD, origin/Feature/DeterministicWorktrees, Feature/DeterministicWorktrees) Preserve documented worktree inventory and cleanup commands
+ .../open-worktree/scripts/worktree_gate.py         | 40 ++++++++++++++++++----
+ tests/test_worktree_gate.py                        | 18 ++++++++++
+ 2 files changed, 51 insertions(+), 7 deletions(-)
+---INSTRUCTIONS---
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\.agents\plugins\harness\AGENTS.md
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\AGENTS.md
+
+exec
+"C:\\Users\\TommySeery\\AppData\\Local\\Programs\\PowerShell\\7\\pwsh.exe" -Command "Get-Content '.agents/engineering/utility/review/SKILL.md'; Write-Output '---DIFF---'; git diff c8ffbf8a43d4fb8e69aaf404f41d588fefaccd1d"'^ c8ffbf8a43d4fb8e69aaf404f41d588fefaccd1d --; Write-Output '"'---AGENT---'; Get-Content '.agents/plugins/harness/AGENTS.md'; Write-Output '---FILES---'; git diff-tree --no-commit-id --name-only -r c8ffbf8a43d4fb8e69aaf404f41d588fefaccd1d" in C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+ succeeded in 1829ms:
+---
+name: review
+description: Review a branch, PR, commit range or selected paths with the host's native reviewer and the relevant standards injected into that repository. Use for a full code review or a targeted review; use incremental-review for a later sweep, staged-review for explicit resumable partitioning, and docs-review for documentation.
+
+kind: utility
+domain: process
+---
+
+# Review a candidate
+
+Review is a bounded assessment that returns actionable findings. It can run directly or be called by a
+workflow; it does not own implementation or delivery. Source review is read-only unless `--fix` or the
+calling workflow's existing authorization includes remediation. `--fix` uses lifecycle-backed review
+evidence before remediation, even when invoked directly.
+
+## Arguments and selection
+
+```text
+[low|medium|high|max] [<pr-number>|<branch>|<path>|<base>..<head>] [--comment] [--fix]
+```
+
+Effort sets the confidence and coverage of every reviewer. Reuse the last explicit effort when available.
+No target means the current branch. Resolve a PR's actual base and head; a stack child compares with its
+immediate parent. An explicit path narrows that candidate. `--comment` authorizes posting the finalized
+result to its PR; `--fix` authorizes `address-review` followed by `incremental-review`.
+
+Use `incremental-review` for changes since a completed review, including a design sweep of a rebased
+stack. Use `staged-review` only for explicit resumable area partitioning of a candidate too large for one
+pass, normally hundreds of files. Words such as "big" or "thorough" alone do not select it. Use
+`docs-review` for documentation or agent metadata; Markdown alone does not establish low semantic risk.
+
+`<review-skill>` is the loaded host entry point's directory. `<engineering>` is its plugin root, two
+directories above it. Helpers ship with that package and run against the reviewed repository.
+
+## Stage 1 - resolve the candidate
+
+Resolve full base/head SHAs and the exact paths before reviewing. Keep that candidate fixed; later changes
+belong to a subsequent pass. Read the root and nearest path-specific repository instructions and relevant
+architecture. For an existing frozen bundle, read its exported frozen tree, never the live checkout.
+
+Before running a host reviewer that reads checkout `HEAD`, verify that its checkout is clean at the
+resolved frozen head. Reuse a matching checkout; otherwise create a disposable detached worktree at that
+exact commit and run the reviewer and standards resolver there. Never switch an occupied checkout or
+substitute its current head. Remove the disposable checkout after preserving the result and any required
+evidence. A host that accepts an explicit range may use that range directly.
+
+A current-checkout assessment needs no plan, branch synchronization or review-state machinery. For `--fix`
+or a calling workflow that requires delivery evidence, apply `review-lifecycle` for preparation, the
+immutable bundle, canonical work order and completion proof before dispatch. Preserve a supplied
+descriptor and its scope.
+
+## Stage 2 - select the result destination
+
+Return findings directly for a standalone assessment. `--fix`, staged, incremental and workflow-owned
+reviews use `review-lifecycle`'s canonical artifact, resolved with
+`<engineering>/workflows/workflow_ops.py review-path`. The parent alone writes it and retains earlier
+findings and dispositions. Record the frozen candidate before dispatch and leave interrupted work incomplete.
+
+## Stage 3 - native review
+
+`review`'s host entry point names that reviewer and its invocation. Run it over the fixed candidate and
+scope; reading the diff yourself is not this layer. If it is unavailable, use a fresh read-only
+`review-lens` with `native-general`, or the parent fallback when that capability is unavailable. Record
+which reviewer actually ran. Discard findings outside the requested range and paths.
+
+## Stage 4 - injected standards
+
+The reviewed repository's injected instructions and declared plugin selection define the standards scope.
+Do not replace them with the reviewer's installed skill listing, another repository's selection, or a
+scan of every cached standard. Confirm that the reviewed repository's selected packages are admitted and
+loaded by the current host; an unavailable or conflicting injection is an unresolved scope, not a clean review.
+
+The shipped resolver requires Python 3.10 or newer. Run it with `python` on Windows or `python3` on Linux/macOS:
+
+```bash
+python -B <review-skill>/scripts/review_rules.py --project <repository-root> --host <codex|claude>
+```
+
+Run against a checkout of the frozen head with no working changes affecting selection or applicability.
+Compare the returned selection hash with `.agents/plugins.json` in the frozen candidate; a mismatch must
+be resolved before dispatch. It reads `.agents/plugins.json`, limits applicability and whole-skill employer replacement to those exact
+plugin identities and the named host's enabled inventory, and returns convention paths and hashes. Read the returned conventions whose subjects
+the candidate touches, following their canonical references. Keep injected policies and path-specific
+instructions in force. A route table may add relevant explicit skills and deny-pattern evidence; its
+absence does not remove injected standards or create a route-table defect.
+
+If no plugin selection exists, use the repository's actual injected native instructions and their explicit
+skill references; do not infer a selection from installed caches. Report missing or ambiguous scope.
+For workflow evidence, record the applied qualified names and body hashes beside the candidate. Reuse an earlier body read only when its recorded hash is unchanged. A changed or missing hash requires a
+new body read. Plans also owe their implementation-path standards when assessing a design.
+
+```text
+Repository selects stack:style and company-stack:style; company replacement applies.
+Changed API code -> review company-stack:style plus the injected API standard.
+An unrelated installed frontend standard -> excluded.
+```
+
+## Stage 5 - focused independent checks
+
+Add a fresh specialist lens only for a concrete concern supported by the paths and injected rules, such as
+security, concurrency, API boundaries or a missing behavior assertion. Independent checks may run together;
+each receives the same candidate, applicable rules, captured test evidence, read-only permissions and no
+sibling conclusions. Reuse passed tests unless a concrete concern needs another check. Validate citations
+and result identity before synthesis; an invalid result gets one bounded correction, then parent fallback.
+
+## Stage 6 - security
+
+Use the host security reviewer that `review`'s host entry point names when the candidate touches sensitive
+behavior. For workflow evidence, `review-lifecycle` owns the required security range and marker. A host
+without a matching native security reviewer uses the bounded `security` lens over that same range.
+
+## Stage 7 - synthesize and report
+
+The parent verifies evidence, deduplicates defects, assigns severity and makes the final judgment. Retain
+concrete fixes with file/line evidence and an applicable rule or demonstrated behavior failure. Drop
+pre-existing defects outside scope, unsupported preferences and issues the compiler or CI already reports.
+Report findings first, then the reviewed scope, standards applied and material coverage limits. State when
+there are no findings. A clean result does not claim checks or reviewers that did not run.
+
+A calling workflow completes its work order, host coverage and security evidence through `review-lifecycle`
+before advancing. Standalone assessment ends with its findings. `--fix` completes its canonical review before
+`address-review` resolves those findings and `incremental-review` checks the repairs. Post only under
+`--comment` or prior explicit authority; remediate only under the authorization above and review the resulting delta again.
+---DIFF---
+diff --git a/.agents/engineering/operation/open-worktree/scripts/worktree_gate.py b/.agents/engineering/operation/open-worktree/scripts/worktree_gate.py
+index c77a85a6..fc90d743 100644
+--- a/.agents/engineering/operation/open-worktree/scripts/worktree_gate.py
++++ b/.agents/engineering/operation/open-worktree/scripts/worktree_gate.py
+@@ -31,13 +31,37 @@ def executable(value: str) -> str:
+     return value.replace("\\", "/").rsplit("/", 1)[-1].removesuffix(".exe").lower()
+ 
+ 
+-def segments(command: str) -> list[list[str]]:
++def shell_words(command: str) -> list[str]:
+     lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|()\n")
+     lexer.whitespace = " \t\r"
+     lexer.whitespace_split = True
+     lexer.escape = ""
++    return list(lexer)
++
++
++def nonplacement_operation(action: str) -> bool:
++    return action in {"list", "prune", "remove", "repair", "lock", "unlock", "-h"}
++
++
++def needs_placement_check(command: str) -> bool:
++    words = shell_words(command)
++    for index, word in enumerate(words):
++        if word.startswith("--worktree") or word == "-w":
++            return True
++        if (
++            word == "worktree"
++            and index + 1 < len(words)
++            and not nonplacement_operation(words[index + 1])
++        ):
++            return True
++        if "worktree" in word and len(word.split()) > 1 and needs_placement_check(word):
++            return True
++    return False
++
++
++def segments(command: str) -> list[list[str]]:
+     groups: list[list[str]] = [[]]
+-    for token in lexer:
++    for token in shell_words(command):
+         if token and all(character in ";&|()\n" for character in token):
+             if "(" in token or ")" in token or "||" in token:
+                 raise ValueError("unsupported shell control flow")
+@@ -114,7 +138,7 @@ def check_git(arguments: Sequence[str], cwd: Path, deadline: float) -> None:
+     if index + 1 == len(arguments):
+         return
+     action = literal(arguments[index + 1])
+-    if action in {"list", "prune", "remove", "repair", "lock", "unlock", "-h"}:
++    if nonplacement_operation(action):
+         return
+     mutation = next((item for item in Mutation if item.command == action), None)
+     if mutation is None:
+@@ -140,11 +164,13 @@ def mutates_worktree(words: Sequence[str]) -> bool:
+ def check_command(command: str, cwd: Path, deadline: float) -> None:
+     if not re.search(r"\b(?:git(?:\.exe)?|worktree)\b", command, re.IGNORECASE):
+         return
+-    if "worktree" in command.lower() and ("`" in command or "$(" in command):
+-        raise create_worktree.CreateWorktreeError(
+-            "worktree shell substitutions cannot be verified; use literal arguments"
+-        )
+     try:
++        if not needs_placement_check(command):
++            return
++        if "`" in command or "$(" in command:
++            raise create_worktree.CreateWorktreeError(
++                "worktree shell substitutions cannot be verified; use literal arguments"
++            )
+         commands = segments(command)
+     except ValueError as error:
+         if "worktree" in command.lower():
+diff --git a/tests/test_worktree_gate.py b/tests/test_worktree_gate.py
+index 5ce34ebc..60b48017 100644
+--- a/tests/test_worktree_gate.py
++++ b/tests/test_worktree_gate.py
+@@ -1,5 +1,6 @@
+ import io
+ import json
++import re
+ import runpy
+ import subprocess
+ import sys
+@@ -109,6 +110,7 @@ def test_literal_canonical_destination_is_allowed(
+         'echo "`git worktree add ../outside`"',
+         'printf "%s" "$(git worktree add ../outside)"',
+         'rg "$(git worktree move old ../outside)"',
++        'git worktree list; echo "$(git worktree add ../outside)"',
+     ],
+ )
+ def test_noncanonical_or_unresolved_mutation_is_denied(
+@@ -128,6 +130,8 @@ def test_noncanonical_or_unresolved_mutation_is_denied(
+         "rg worktree $path",
+         "rg git worktree",
+         "g worktree list",
++        "main=$(git symbolic-ref --short refs/remotes/origin/HEAD); git worktree prune",
++        'echo "$(git worktree list --porcelain)"',
+         "cd $project; git status --short",
+         "echo 'git worktree add ../outside'",
+         "python - <<'PY'\nprint(\"isn't balanced in the shell lexer\")\nPY",
+@@ -139,6 +143,20 @@ def test_nonmutating_commands_and_literal_text_are_allowed(
+     assert invoke(repo, "Bash", {"command": command}) is None
+ 
+ 
++@pytest.mark.parametrize(
++    ("skill", "block"),
++    [("prune-worktrees", 0), ("prune-worktrees", 1), ("unmerged", 3)],
++)
++def test_shipped_inventory_and_pruning_commands_are_allowed(
++    repo: Path, skill: str, block: int
++) -> None:
++    source = ROOT / ".agents/engineering/utility" / skill / "SKILL.md"
++    commands = re.findall(
++        r"```bash\n(.*?)\n```", source.read_text(encoding="utf-8"), re.DOTALL
++    )
++    assert invoke(repo, "Bash", {"command": commands[block]}) is None
++
++
+ def test_git_directory_switch_resolves_the_target_repository(
+     repo: Path, tmp_path: Path
+ ) -> None:
+---AGENT---
+# Harness manifests
+
+Every command a shipped skill tells an agent to run that needs host approval is declared in its package's
+manifest here, in the same change, for both hosts (`permissions.claude_allow`, `permissions.codex_prefix_rules`),
+matching the exact invocation. `harness_permissions_sync.py` applies them to every installed harness on each
+`./setup.ps1` or `./setup.sh` run, and `tests/test_harness_manifests.py` pins the declared inventory. Never rely on a classifier retry.
+
+```json
+"claude_allow": ["Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)"]
+```
+---FILES---
+.agents/engineering/operation/open-worktree/scripts/worktree_gate.py
+tests/test_worktree_gate.py
+
+exec
+"C:\\Users\\TommySeery\\AppData\\Local\\Programs\\PowerShell\\7\\pwsh.exe" -Command "Write-Output '---README---'; Get-Content README.md -TotalCount 220; Write-Output '---CONVENTIONS---'; Get-Content CODE_CONVENTIONS.md -TotalCount 260; Write-Output '---RULES---'; python -B .codex/skills/engineering/review/scripts/review_rules.py --project . --host codex; Write-Output '---CONFIG---'; Get-Content .agents/plugins.json; Write-Output '---GATE---'; Get-Content .agents/engineering/operation/open-worktree/scripts/worktree_gate.py; Write-Output '---TEST---'; Get-Content tests/test_worktree_gate.py" in C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+ succeeded in 1852ms:
+---README---
+# core
+
+Core is the judgement half of [TJ Agents](https://github.com/tj-agents): Tommy's agentic engineering standards
+for Claude Code and Codex, with harness parity between the two. Where `tj-agents/agent` and `tj-agents/cli`
+are the deterministic layer (CLI scripts and thin trigger skills), Core's plugins hold the conventions a model
+applies judgement against — they call the lifecycle verbs rather than reimplementing them. Every repository
+that selects Core is a personal project (GitHub Issues/Projects, the bot identity); a repository outside the
+org gets its context from an injected profile instead.
+
+Core authors and publishes the `base`, `workflow`, `engineering` and `docs` plugins for Codex and Claude, from
+[`tj-agents/core`](https://github.com/tj-agents/core) through
+[`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
+
+- `base` is always-on agent behavior: routing, project setup, solution assessment and paired agent files.
+- `workflow` is goal and plan ownership: plans, runs, resumption, status and handoff.
+- `engineering` is the software lifecycle: features, bug fixes, review, committing, PRs and merging.
+- `docs` is how pages people read are laid out.
+
+Core does not own agent sessions, recovery, refresh or machine installation (`tj-agents/agent`), CLI and OS
+mechanics such as closing terminals or the clipboard (`tj-agents/cli`), plugin generation and checks
+(`tj-agents/template`), or stack standards (their stack repositories). Agent runtime reaches Core only as the
+staged, git-ignored `.agents/dependencies/` export.
+
+Marketplace owns the canonical plugin roster and dependency graph in
+[`plugins.json`](https://github.com/tj-agents/marketplace/blob/main/plugins.json). Do not edit plugin names
+or dependencies in Core.
+
+`skill:new` resolves a new skill's owner, name, sizing and discovery trigger before native authoring;
+`skill:update` applies the same selection rules to updates, splits, consolidations, renames and
+retirements. `skill:check` owns skill content and executable assets; the
+[`template:check` validator](https://github.com/tj-agents/template) owns repository layout and metadata
+validation. `engineering:docs` owns the generic guidance-writing convention.
+
+Global architecture and cross-repository designs live in [`tj-agents/docs`](https://github.com/tj-agents/docs).
+Core-specific implementation plans and operational documentation stay here; shared plans link to their
+source owners.
+
+`workflow:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
+`base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
+[`base:project-setup`](.agents/base/policy/project-setup/SKILL.md) owns standards selection for new
+repositories and new technology stacks, including the personal/work scope question.
+[`base:solution-assessment`](.agents/base/policy/solution-assessment/SKILL.md) owns the once-per-idea
+assessment of existing capabilities and solutions; [`workflow:run`](.agents/workflow/workflow/run/SKILL.md)
+owns continued goal ownership and carries that recorded decision forward.
+The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
+Known bugs, mistakes and debt follow the selected problem-record profile.
+The [recording contract](.agents/workflow/resources/problem-records.md) routes remote work-item
+Azure Boards records and native type policy. Agent publishes the shared SQLite registry as Agent Store;
+Core publishes generic work status as Workflow and reusable engineering lifecycles as Engineering.
+Installing Engineering does not select or install a recording
+profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
+registers remain evidence only.
+Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.12+
+interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
+current manifest uses `python` on all platforms. Core packages also require the CLI-provided `tj_hook`
+executable on PATH; Agent must install CLI before it activates Core packages. Codex skips new or
+changed plugin hooks until they are reviewed and trusted in `/hooks`; a fresh missing-marketplace write
+probe is required before claiming enforcement.
+Codex hook commands use a per-session temporary snapshot preseeded for the running session's hooks.
+This lets those hooks keep running after a plugin update replaces an inactive package cache entry.
+New sessions create a fresh snapshot from the verified package; snapshots outside the plugin cache are
+left in place. A changed hook definition still requires Codex trust review before it runs.
+
+Codex hook commands use a short readable Python authenticator instead of encoded executable source.
+It checks the shipped snapshot verifier's SHA-256 before staging those authenticated bytes in a temporary
+directory and loading the Python file. Python isolated mode prevents the caller's directory from supplying
+bootstrap imports. The verified runtime then checks package identity, package bytes and snapshot bytes.
+Codex [trusts the hook definition](https://github.com/openai/codex/blob/rust-v0.157.0/codex-rs/hooks/src/engine/discovery.rs),
+so invoking a mutable verifier directly would allow it to skip its own checks. The inline authenticator
+retains that boundary without Base64 or explicit `exec`. These checks do not protect against an attacker
+who can modify the user's trusted configuration or race files inside the same user's temporary/snapshot
+directories, and source tests do not establish antivirus acceptance.
+
+
+The packages have no release line or compatibility promise: machines follow each publisher's `main`
+through automatic updates. Selection stays an
+independent user and repository setting; adding a marketplace does not select its full roster.
+
+## Repository auto-merge
+
+An engineering-enabled repository opts into guarded agent auto-merge in `.agents/settings.json`:
+
+```json
+{"configuration":{"core":{"auto_merge":true}}}
+```
+
+Omit `configuration.core.auto_merge`, or set it to `false`, to disable the capability. The setting only
+permits the guarded workflow command to request GitHub auto-merge; it does not authorize a merge. Standing
+or scoped merge authority, every stop class and hold label, exact-head checks, current independent review,
+security review, and checkout identity must still pass. The guarded workflow rereads settings at execution
+time, so disabling it after a delivery binding prevents arming auto-merge. See
+[repository settings](docs/workflows/REPOSITORY_CONFIGURATION.md) for the complete contract.
+
+## Repository routine design approval
+
+`configuration.core.auto_approve` is separately `false` for every supported routine category when
+absent. Its only currently supported category is `design`, including routine convention choices. A
+design-only opt-in is:
+
+```json
+{"configuration":{"core":{"auto_approve":{"design":true}}}}
+```
+
+An all-categories opt-in is:
+
+```json
+{"configuration":{"core":{"auto_approve":{"all":true}}}}
+```
+
+An explicit `design` value overrides `all`, and omitted members default to `false`; an empty
+`auto_approve` object disables design approval. When enabled, an agent may make and record routine design
+or convention choices within work already authorized by the user. It does not override an explicit user
+reservation, task scope, stricter repository rule, or any merge, publication, installation, or permission
+gate. Source verification does not establish installed-host trust or acceptance.
+
+## Layout
+
+- `.agents/` is the canonical host-neutral source for Base, Workflow, Engineering and Docs.
+- `.codex/` contains only Codex entry points and host configuration; `.claude/` contains only Claude entry
+  points and host configuration. Their skills reference canonical `.agents/` definitions.
+- [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md) defines the source, adapter and distribution boundary.
+- [`SKILL_KINDS.md`](SKILL_KINDS.md) defines the shared skill taxonomy.
+- [`PACKAGING.md`](PACKAGING.md) is the rule that a utility skill's runtime dependencies ship with it.
+- `.agents/plugins/plugins.json` records Core's package definitions and digests. The generated
+  [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index.
+- `plugins/*` is generated distribution output assembled from canonical shared definitions and the
+  selected host adapter. Nothing under it is an authored source.
+
+A PR carries authored sources only. CI's guard job rejects generated paths, PR CI regenerates its own
+workspace before testing, and the post-merge `regenerate` job commits the refreshed `plugins/*`,
+plugin digests, marketplace bridges and `CAPABILITIES.md` to main. To refresh a local tree for tests,
+run the same two commands and leave their output uncommitted:
+
+```powershell
+python -B scripts/update_plugin_digests.py
+pwsh .agents/sync-generated.ps1
+```
+
+The Windows and Linux test suites run only on a PR labelled `ci:full`; every other PR and main run
+selection, the generated-path guard and guidance examples. With the label, `scripts/ci_selection.py`
+(Python 3.9+) classifies the PR's own change from its merge base. Inert prose runs the documentation
+reachability check. Changes to mapped problem-record and handoff-transfer code run their regression modules on Windows and Linux, with generation and packaging
+checks. Changed test modules include their import consumers. Unknown paths, shared infrastructure,
+executable guidance, binary changes, unresolved ranges and broad changes run the full matrix. Adding or
+removing the label reevaluates selection.
+
+`scripts/runtime_sources.py` stages `tj-agents/agent` and `tj-agents/cli` from the exact commit pinned
+in `.agents/plugins/runtime-sources.json`, never their moving `main`, and Renovate bumps that pin
+through a `ci:full`-labelled PR.
+
+`ci-required` runs after selection, the generated-path guard and both platform jobs. It fails if
+classification or any selected job fails, disappears or is cancelled, or skips on a `ci:full` PR. While
+main's latest completed run is not green, `regenerate` publishes nothing, so a PR without `ci:full` fails
+`ci-required` with that run's link. Configure branch protection
+to require this check when enabling server-side enforcement. Existing all-checks merge validation also
+consumes its result. Selection never cancels a prior run or transfers a previous head's test success.
+
+Repositories select plugins with `agent:plugins`, and machines are installed by Agent's `install`; see
+[`tj-agents/agent`](https://github.com/tj-agents/agent).
+
+Plugin roster entries have no release or manifest version. `sha256-tree-v1` hashes the sorted package paths,
+lengths and bytes of each package.
+---CONVENTIONS---
+# Code conventions
+
+Read these conventions before changing runtime scripts, hook wiring, or launchers.
+
+Use the language and runtime appropriate to the repository and host; for this repository's shipped code,
+that is set by [Supported platforms](#supported-platforms). Assess the execution mechanism,
+inputs and trust boundary when choosing a safe implementation.
+
+Prefer ordinary function calls, imports, script files and structured APIs over executing source-code
+strings with `exec`, `eval` or `Invoke-Expression`. Use dynamic execution only when a documented requirement
+cannot reasonably be met through those alternatives. Never execute untrusted input as source code.
+
+Launch processes with an argument list and without a shell where the platform supports it. Use a shell
+only when required shell behavior cannot be expressed through ordinary process or filesystem APIs.
+Do not encode executable source as Base64 to work around quoting or command limits.
+
+Keep launch commands readable and their trust boundaries explicit. Trusting a command does not necessarily
+authenticate the file it references. Validate inputs and authenticate executable dependencies where the
+required integrity boundary depends on them; fail clearly when verification fails.
+
+Use standard libraries and explicit prerequisites. Resolve repository-owned dependencies relative to the
+installed package. Do not rely on an unshipped machine-local helper.
+
+## Supported platforms
+
+Everything this repository ships runs on Windows and Linux: skill scripts, hooks, launchers, and the
+tests that cover them. macOS is best effort. A change that works on only one of Windows and Linux is
+incomplete.
+
+- New shipped runtime code is Python using the standard library. Do not add a PowerShell script for
+  shipped behaviour. The one exception is behaviour that exists only on Windows, such as Windows
+  Terminal UI Automation. Run it through Windows' built-in `powershell.exe`, called from a Python entry
+  point that has its own Linux path.
+- Do not add behaviour to an existing shipped PowerShell script. Port it, or add the behaviour to its
+  Python replacement. Until a skill is ported, its SKILL.md
+  states that it is Windows-only, and its Windows commands are not presented as universal.
+- Skill and workflow instructions name the interpreter per platform: `python3` on Linux and macOS,
+  `python` on Windows, where `python3` is usually the Microsoft Store alias stub. Never tell an agent
+  to run `powershell.exe`, `pwsh` or `wt.exe` without saying which platform the instruction is for.
+
+  ```text
+  python3 -B scripts/update_plugin_digests.py   # Linux and macOS
+  python -B scripts/update_plugin_digests.py    # Windows
+  ```
+
+- Open terminal tabs through `agent_cli.launch_tab` (Windows Terminal, tmux, kitty, Konsole), never by
+  calling a terminal program directly.
+- Find the home directory with `Path.home()`. Gate Windows-only locations such as `LOCALAPPDATA` behind
+  a platform check. POSIX executables have no `.exe`.
+- CI runs `verify-windows` on Windows and `verify-linux` on Linux. A test that only one platform can run gives
+  a skip reason, and the behaviour it covers also has a test on the other platform. Tests whose
+  behaviour differs by platform pin the platform explicitly.
+
+Repository tooling (`.agents/sync-generated.ps1`, `.codex/install-workflow-agents.ps1`) may use PowerShell 7
+(`pwsh`), but it must run under `pwsh` on Linux as well as on Windows.
+
+## Python and portability
+
+Follow [PEP 8](https://peps.python.org/pep-0008/) with clear names and small, cohesive functions. Declare the
+minimum supported Python version for each utility and fail with an actionable message when it is unavailable.
+
+Use `pathlib` or `os.path` to compose filesystem paths. Resolve shipped resources relative to the script or
+an explicit package root. Avoid hardcoded drive letters, usernames, separators and assumptions about the
+caller's working directory.
+
+Specify encodings for text files and subprocess output; use UTF-8 for repository-owned text. Choose newline
+handling deliberately when editing existing files or computing integrity hashes.
+
+Use `subprocess` argument lists with `shell=False` for ordinary process launches. Use `sys.executable` when
+starting another Python process that should use the same interpreter. Check exit status and set timeouts
+where a stalled child would block the caller indefinitely. Keep shell invocation limited to an actual host
+integration requirement.
+
+Keep platform-specific APIs behind explicit platform checks and import them only on supported platforms.
+Do not assume PowerShell, cmd.exe, Bash, Windows registry APIs or executable filename extensions exist on
+every host. Verify shared runtime behavior on Windows and Linux, including paths containing spaces and
+non-ASCII text; use disposable directories for filesystem and configuration tests.
+
+## Security controls and comments
+
+Do not bypass security controls to make code run. Investigate a blocked command and validate its replacement;
+source tests do not establish antivirus acceptance.
+
+Default to no code comments. Names express behavior; commit messages carry design decisions. Add a
+comment only for a non-obvious invariant, upstream workaround, or legacy constraint needed at that line.
+
+References: [Python dynamic execution](https://docs.python.org/3/library/functions.html#exec),
+[Python process security](https://docs.python.org/3/library/subprocess.html#security-considerations),
+and [PowerShell's AvoidUsingInvokeExpression rule](https://learn.microsoft.com/en-us/powershell/utility-modules/psscriptanalyzer/rules/avoidusinginvokeexpression).
+---RULES---
+C:\Python313\python.exe: can't open file 'C:\\Users\\TommySeery\\source\\repos\\tj-agents\\core\\.worktrees\\Review-DeterministicWorktrees-26e7e3a3\\.codex\\skills\\engineering\\review\\scripts\\review_rules.py': [Errno 2] No such file or directory
+---CONFIG---
+{
+  "schema_version": 1,
+  "marketplaces": {
+    "tj-agents": {
+      "repository": "tj-agents/marketplace"
+    }
+  },
+  "plugins": [
+    "agent-store@tj-agents",
+    "agent@tj-agents",
+    "base@tj-agents",
+    "cli@tj-agents",
+    "engineering@tj-agents",
+    "personal@tj-agents",
+    "python@tj-agents",
+    "skill@tj-agents",
+    "template@tj-agents",
+    "workflow@tj-agents"
+  ]
+}
+---GATE---
+import json
+import re
+import shlex
+import sys
+import time
+from collections.abc import Mapping, Sequence
+from enum import Enum
+from pathlib import Path
+from typing import cast
+
+import create_worktree
+
+
+class Mutation(Enum):
+    ADD = ("add", 0, frozenset({"-b", "-B", "--reason"}))
+    MOVE = ("move", 1, frozenset[str]())
+
+    def __init__(self, command: str, destination: int, options: frozenset[str]) -> None:
+        self.command = command
+        self.destination = destination
+        self.options = options
+
+
+def literal(value: str) -> str:
+    if not value or re.search(r"[$`%\n\r]", value):
+        raise create_worktree.CreateWorktreeError("use literal worktree arguments")
+    return value
+
+
+def executable(value: str) -> str:
+    return value.replace("\\", "/").rsplit("/", 1)[-1].removesuffix(".exe").lower()
+
+
+def shell_words(command: str) -> list[str]:
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|()\n")
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    lexer.escape = ""
+    return list(lexer)
+
+
+def nonplacement_operation(action: str) -> bool:
+    return action in {"list", "prune", "remove", "repair", "lock", "unlock", "-h"}
+
+
+def needs_placement_check(command: str) -> bool:
+    words = shell_words(command)
+    for index, word in enumerate(words):
+        if word.startswith("--worktree") or word == "-w":
+            return True
+        if (
+            word == "worktree"
+            and index + 1 < len(words)
+            and not nonplacement_operation(words[index + 1])
+        ):
+            return True
+        if "worktree" in word and len(word.split()) > 1 and needs_placement_check(word):
+            return True
+    return False
+
+
+def segments(command: str) -> list[list[str]]:
+    groups: list[list[str]] = [[]]
+    for token in shell_words(command):
+        if token and all(character in ";&|()\n" for character in token):
+            if "(" in token or ")" in token or "||" in token:
+                raise ValueError("unsupported shell control flow")
+            if groups[-1]:
+                groups.append([])
+        else:
+            groups[-1].append(token)
+    return [group for group in groups if group]
+
+
+def destination(arguments: Sequence[str], mutation: Mutation) -> str:
+    operands = []
+    index = 0
+    options = True
+    while index < len(arguments):
+        value = literal(arguments[index])
+        index += 1
+        if options and value == "--":
+            options = False
+        elif options and value in mutation.options:
+            if index == len(arguments):
+                raise create_worktree.CreateWorktreeError(
+                    f"missing argument for {value}"
+                )
+            literal(arguments[index])
+            index += 1
+        elif options and value.startswith("--reason="):
+            continue
+        elif options and value.startswith("-"):
+            if value not in {
+                "-f",
+                "-ff",
+                "--force",
+                "--detach",
+                "-d",
+                "--checkout",
+                "--no-checkout",
+                "--lock",
+                "--quiet",
+                "-q",
+                "--track",
+                "--no-track",
+                "--guess-remote",
+                "--no-guess-remote",
+                "--orphan",
+            } and not value.startswith("--track="):
+                raise create_worktree.CreateWorktreeError(
+                    f"unsupported worktree option: {value}"
+                )
+        else:
+            operands.append(value)
+    if len(operands) <= mutation.destination:
+        raise create_worktree.CreateWorktreeError("worktree destination is missing")
+    return operands[mutation.destination]
+
+
+def check_git(arguments: Sequence[str], cwd: Path, deadline: float) -> None:
+    index = 0
+    while index < len(arguments):
+        value = literal(arguments[index])
+        if value == "-C" and index + 1 < len(arguments):
+            cwd = (cwd / literal(arguments[index + 1])).resolve()
+            index += 2
+        elif value in {"--no-pager", "--literal-pathspecs", "--no-optional-locks"}:
+            index += 1
+        else:
+            break
+    if index == len(arguments):
+        return
+    if arguments[index] != "worktree":
+        if "worktree" in arguments:
+            raise create_worktree.CreateWorktreeError("unsupported Git routing options")
+        return
+    if index + 1 == len(arguments):
+        return
+    action = literal(arguments[index + 1])
+    if nonplacement_operation(action):
+        return
+    mutation = next((item for item in Mutation if item.command == action), None)
+    if mutation is None:
+        raise create_worktree.CreateWorktreeError("unsupported worktree operation")
+    target = destination(arguments[index + 2 :], mutation)
+    repo = create_worktree.repository_root(cwd, deadline=deadline)
+    create_worktree.validate_destination(repo, cwd / target)
+
+
+def mentions_worktree(words: Sequence[str]) -> bool:
+    return "worktree" in words or any(
+        word.startswith("--worktree") or word == "-w" for word in words
+    )
+
+
+def mutates_worktree(words: Sequence[str]) -> bool:
+    if "worktree" not in words:
+        return False
+    action = words[words.index("worktree") + 1 :]
+    return bool(action) and literal(action[0]) in {"add", "move"}
+
+
+def check_command(command: str, cwd: Path, deadline: float) -> None:
+    if not re.search(r"\b(?:git(?:\.exe)?|worktree)\b", command, re.IGNORECASE):
+        return
+    try:
+        if not needs_placement_check(command):
+            return
+        if "`" in command or "$(" in command:
+            raise create_worktree.CreateWorktreeError(
+                "worktree shell substitutions cannot be verified; use literal arguments"
+            )
+        commands = segments(command)
+    except ValueError as error:
+        if "worktree" in command.lower():
+            raise create_worktree.CreateWorktreeError(
+                "cannot verify this worktree shell expression"
+            ) from error
+        return
+    if not any(mentions_worktree(words) for words in commands):
+        return
+    for words in commands:
+        program = executable(words[0])
+        if program in {
+            "rg",
+            "grep",
+            "findstr",
+            "select-string",
+            "echo",
+            "printf",
+            "write-output",
+            "write-host",
+        }:
+            continue
+        if program in {"cd", "chdir", "set-location", "push-location", "pushd"}:
+            arguments = [
+                word for word in words[1:] if word not in {"-LiteralPath", "-Path"}
+            ]
+            if len(arguments) != 1:
+                raise create_worktree.CreateWorktreeError(
+                    "cannot resolve shell directory"
+                )
+            cwd = (cwd / literal(arguments[0])).resolve()
+        elif program in {"command", "env"} and len(words) > 1:
+            if executable(words[1]) == "git":
+                check_git(words[2:], cwd, deadline)
+            elif "worktree" in words:
+                raise create_worktree.CreateWorktreeError("unsupported Git environment")
+        elif program == "git":
+            check_git(words[1:], cwd, deadline)
+        elif program in {"bash", "sh", "zsh", "pwsh", "powershell", "cmd"}:
+            for index, word in enumerate(words[1:], start=1):
+                if word.lower() in {"-c", "-lc", "-command", "/c"}:
+                    check_command(" ".join(words[index + 1 :]), cwd, deadline)
+                    break
+        elif program in {"claude", "codex"} and any(
+            word.split("=", 1)[0] in {"--worktree", "-w"} for word in words[1:]
+        ):
+            raise create_worktree.CreateWorktreeError(
+                "native worktree placement is not supported"
+            )
+        elif (
+            program in {"popd", "pop-location"}
+            or "=" in words[0]
+            or any(executable(word) == "git" for word in words[1:])
+            or mutates_worktree(words)
+        ):
+            raise create_worktree.CreateWorktreeError(
+                "cannot verify this worktree shell expression"
+            )
+
+
+def check_tool(payload: Mapping[str, object]) -> None:
+    name = str(payload.get("tool_name", ""))
+    raw_input = payload.get("tool_input", {})
+    if isinstance(raw_input, str):
+        raw_input = json.loads(raw_input)
+    if not isinstance(raw_input, dict):
+        raise create_worktree.CreateWorktreeError("invalid worktree hook tool input")
+    arguments = cast(dict[str, object], raw_input)
+    if (
+        payload.get("hook_event_name") == "WorktreeCreate"
+        or name == "EnterWorktree"
+        or name.endswith("create_worktree")
+        or arguments.get("isolation") == "worktree"
+    ):
+        raise create_worktree.CreateWorktreeError(
+            "native worktree placement is not supported"
+        )
+    command = arguments.get("command", arguments.get("cmd", ""))
+    cwd = arguments.get("workdir", arguments.get("cwd", payload.get("cwd")))
+    if not isinstance(command, str) or not command:
+        return
+    if not isinstance(cwd, str) or not cwd:
+        raise create_worktree.CreateWorktreeError(
+            "worktree hook working directory is missing"
+        )
+    check_command(command, Path(cwd), time.monotonic() + 10)
+
+
+def main() -> int:
+    if sys.version_info < create_worktree.MINIMUM_PYTHON:
+        print("worktree_gate.py requires Python 3.12 or newer", file=sys.stderr)
+        return 2
+    payload: dict[str, object] = {}
+    try:
+        value = json.load(sys.stdin)
+        if not isinstance(value, dict):
+            raise create_worktree.CreateWorktreeError("invalid worktree hook payload")
+        payload = value
+        check_tool(payload)
+    except (create_worktree.CreateWorktreeError, ValueError) as error:
+        interpreter = "python" if sys.platform == "win32" else "python3"
+        script = Path(__file__).with_name("create_worktree.py")
+        reason = (
+            f"{error}. Use Core's engineering:open-worktree command: "
+            f'{interpreter} -B "{script}" --repo <repository> <Type/Name>.'
+        )
+        if payload.get("hook_event_name") == "WorktreeCreate":
+            print(reason, file=sys.stderr)
+            return 2
+        print(
+            json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "deny",
+                        "permissionDecisionReason": reason,
+                    }
+                }
+            )
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+---TEST---
+import io
+import json
+import re
+import runpy
+import subprocess
+import sys
+from collections.abc import Callable
+from pathlib import Path
+from typing import cast
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / ".agents/engineering/operation/open-worktree/scripts/worktree_gate.py"
+
+
+def git(cwd: Path, *arguments: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(cwd), *arguments],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=True,
+    ).stdout.strip()
+
+
+@pytest.fixture
+def repo(tmp_path: Path) -> Path:
+    path = tmp_path / "repo ü space"
+    path.mkdir()
+    git(path, "init", "-q", "-b", "main")
+    git(
+        path,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "--allow-empty",
+        "-qm",
+        "initial",
+    )
+    return path
+
+
+def invoke(repo: Path, tool: str, arguments: dict[str, object]) -> str | None:
+    result = subprocess.run(
+        [sys.executable, "-B", str(SCRIPT)],
+        input=json.dumps(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": tool,
+                "tool_input": arguments,
+                "cwd": str(repo),
+            }
+        ),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=True,
+    )
+    if not result.stdout:
+        return None
+    decision = json.loads(result.stdout)["hookSpecificOutput"]
+    assert decision["permissionDecision"] == "deny"
+    reason = str(decision["permissionDecisionReason"])
+    assert "create_worktree.py" in reason
+    return reason
+
+
+@pytest.mark.parametrize("tool", ["Bash", "PowerShell", "exec_command"])
+@pytest.mark.parametrize("operation", ["add -b Feature/Allowed", "move old"])
+def test_literal_canonical_destination_is_allowed(
+    repo: Path, tool: str, operation: str
+) -> None:
+    command = f'git worktree {operation} ".worktrees/Feature-Allowed"'
+    assert invoke(repo, tool, {"command": command}) is None
+    assert not (repo / ".worktrees").exists()
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git worktree add ../repo.worktrees/Feature-Bad",
+        "git worktree add .claude/worktrees/Feature-Bad",
+        "git worktree add .codex/worktrees/Feature-Bad",
+        "git worktree add .worktrees/Feature/Bad",
+        "git worktree add .worktrees/../../outside",
+        "git worktree move old ../outside",
+        'git worktree add "$target"',
+        "git worktree $'add' ../outside",
+        "git worktree a${e}dd ../outside",
+        "git -c core.worktree=elsewhere worktree add .worktrees/Feature-Bad",
+        "git worktree add --unknown .worktrees/Feature-Bad",
+        "if true; then git worktree add ../outside; fi",
+        "GIT_DIR=elsewhere git worktree add ../outside",
+        "GIT_DIR=elsewhere; git worktree add .worktrees/Feature-Bad",
+        "(cd elsewhere); git worktree add .worktrees/Feature-Bad",
+        "cd elsewhere || git worktree add .worktrees/Feature-Bad",
+        "pushd elsewhere; popd; git worktree add .worktrees/Feature-Bad",
+        "claude --worktree=example",
+        "$GIT worktree add ../outside",
+        "& $env:GIT worktree add ../outside",
+        "g worktree add ../outside",
+        "g worktree a${e}dd ../outside",
+        "& $env:GIT worktree $action ../outside",
+        "rg `git worktree add ../outside`",
+        'echo "`git worktree add ../outside`"',
+        'printf "%s" "$(git worktree add ../outside)"',
+        'rg "$(git worktree move old ../outside)"',
+        'git worktree list; echo "$(git worktree add ../outside)"',
+    ],
+)
+def test_noncanonical_or_unresolved_mutation_is_denied(
+    repo: Path, command: str
+) -> None:
+    assert invoke(repo, "Bash", {"command": command}) is not None
+    assert not (repo / ".worktrees").exists()
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git worktree list --porcelain",
+        "git worktree prune --dry-run",
+        "git status --short",
+        "rg worktree",
+        "rg worktree $path",
+        "rg git worktree",
+        "g worktree list",
+        "main=$(git symbolic-ref --short refs/remotes/origin/HEAD); git worktree prune",
+        'echo "$(git worktree list --porcelain)"',
+        "cd $project; git status --short",
+        "echo 'git worktree add ../outside'",
+        "python - <<'PY'\nprint(\"isn't balanced in the shell lexer\")\nPY",
+    ],
+)
+def test_nonmutating_commands_and_literal_text_are_allowed(
+    repo: Path, command: str
+) -> None:
+    assert invoke(repo, "Bash", {"command": command}) is None
+
+
+@pytest.mark.parametrize(
+    ("skill", "block"),
+    [("prune-worktrees", 0), ("prune-worktrees", 1), ("unmerged", 3)],
+)
+def test_shipped_inventory_and_pruning_commands_are_allowed(
+    repo: Path, skill: str, block: int
+) -> None:
+    source = ROOT / ".agents/engineering/utility" / skill / "SKILL.md"
+    commands = re.findall(
+        r"```bash\n(.*?)\n```", source.read_text(encoding="utf-8"), re.DOTALL
+    )
+    assert invoke(repo, "Bash", {"command": commands[block]}) is None
+
+
+def test_git_directory_switch_resolves_the_target_repository(
+    repo: Path, tmp_path: Path
+) -> None:
+    command = f'git -C "{repo}" worktree add ".worktrees/Feature-Allowed"'
+    assert invoke(tmp_path, "exec_command", {"cmd": command}) is None
+
+
+@pytest.mark.parametrize("prefix", ["cd", "Set-Location -LiteralPath"])
+def test_shell_directory_switch_resolves_the_target_repository(
+    repo: Path, tmp_path: Path, prefix: str
+) -> None:
+    command = f'{prefix} "{repo}"; git worktree add .worktrees/Feature-Allowed'
+    assert invoke(tmp_path, "PowerShell", {"command": command}) is None
+
+
+def test_linked_checkout_uses_the_primary_repository(repo: Path) -> None:
+    linked = repo / ".worktrees" / "Feature-First"
+    git(repo, "worktree", "add", "-b", "Feature/First", str(linked))
+    canonical = repo / ".worktrees" / "Feature-Second"
+    assert (
+        invoke(linked, "Bash", {"command": f'git worktree add "{canonical}"'}) is None
+    )
+    assert (
+        invoke(
+            linked, "Bash", {"command": "git worktree add .worktrees/Feature-Second"}
+        )
+        is not None
+    )
+
+
+def test_tool_workdir_takes_precedence_over_session_directory(
+    repo: Path, tmp_path: Path
+) -> None:
+    assert (
+        invoke(
+            tmp_path,
+            "exec_command",
+            {
+                "cmd": "git worktree add .worktrees/Feature-Allowed",
+                "workdir": str(repo),
+            },
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments"),
+    [
+        ("EnterWorktree", {"name": "bad"}),
+        ("Agent", {"isolation": "worktree"}),
+        ("Task", {"isolation": "worktree"}),
+        ("mcp__codex_tui__create_worktree", {}),
+    ],
+)
+def test_native_creation_routes_to_core(
+    repo: Path, tool: str, arguments: dict[str, object]
+) -> None:
+    assert invoke(repo, tool, arguments) is not None
+
+
+def test_claude_worktree_create_event_refuses_default_placement(repo: Path) -> None:
+    result = subprocess.run(
+        [sys.executable, "-B", str(SCRIPT)],
+        input=json.dumps(
+            {"hook_event_name": "WorktreeCreate", "name": "example", "cwd": str(repo)}
+        ),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "create_worktree.py" in result.stderr
+    assert not result.stdout
+
+
+def test_git_timeout_returns_denial_before_the_host_deadline(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def stalled_git(
+        command: list[str], *, timeout: float, **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        assert 0 < timeout <= 10
+        raise subprocess.TimeoutExpired(command, timeout)
+
+    monkeypatch.syspath_prepend(str(SCRIPT.parent))
+    monkeypatch.setattr(subprocess, "run", stalled_git)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(
+            json.dumps(
+                {
+                    "tool_name": "exec_command",
+                    "tool_input": {"cmd": "git worktree add ../outside"},
+                    "cwd": str(repo),
+                }
+            )
+        ),
+    )
+    main = cast(Callable[[], int], runpy.run_path(str(SCRIPT))["main"])
+    assert main() == 0
+    decision = json.loads(capsys.readouterr().out)["hookSpecificOutput"]
+    assert decision["permissionDecision"] == "deny"
+    assert "timed out" in decision["permissionDecisionReason"]
+
+exec
+"C:\\Users\\TommySeery\\AppData\\Local\\Programs\\PowerShell\\7\\pwsh.exe" -Command "Get-ChildItem -Recurse -File -Filter review_rules.py | Select-Object -ExpandProperty FullName; Get-ChildItem -Recurse -File -Filter '*review*rules*' | Select-Object -ExpandProperty FullName; Get-ChildItem '.codex/skills/engineering/review' -Recurse -Force | Select-Object FullName; Write-Output '---HEAD/PARENT---'; git rev-parse HEAD HEAD"'^; Write-Output '"'---CODEx---'; Get-Command codex -ErrorAction SilentlyContinue | Format-List *" in C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+ succeeded in 2366ms:
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\.agents\engineering\utility\review\scripts\review_rules.py
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\plugins\engineering\.agents\engineering\utility\review\scripts\review_rules.py
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\plugins\engineering\codex-skills\review\scripts\review_rules.py
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\plugins\engineering\skills\review\scripts\review_rules.py
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\.agents\engineering\utility\review\scripts\review_rules.py
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\plugins\engineering\.agents\engineering\utility\review\scripts\review_rules.py
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\plugins\engineering\codex-skills\review\scripts\review_rules.py
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\plugins\engineering\skills\review\scripts\review_rules.py
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\tests\test_review_rules.py
+
+c8ffbf8a43d4fb8e69aaf404f41d588fefaccd1d
+442dba6a79aa35275dc76f030ba4520b39f23832
+FullName
+--------
+C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\.codex\skills\engine…
+---HEAD/PARENT---
+---CODEx---
+
+
+HelpUri            : 
+FileVersionInfo    : File:             C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/bin\codex.exe
+                     InternalName:     
+                     OriginalFilename: 
+                     FileVersion:      
+                     FileDescription:  
+                     Product:          
+                     ProductVersion:   
+                     Debug:            False
+                     Patched:          False
+                     PreRelease:       False
+                     PrivateBuild:     False
+                     SpecialBuild:     False
+                     Language:         
+                     
+Path               : C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/bin\codex.exe
+Extension          : .exe
+Definition         : C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/bin\codex.exe
+Source             : C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/bin\codex.exe
+Version            : 0.0.0.0
+Visibility         : Public
+OutputType         : {System.String}
+Name               : codex.exe
+CommandType        : Application
+ModuleName         : 
+Module             : 
+RemotingCapability : PowerShell
+Parameters         : 
+ParameterSets      : 
+
+
+exec
+"C:\\Users\\TommySeery\\AppData\\Local\\Programs\\PowerShell\\7\\pwsh.exe" -Command "Write-Output '---RESOLVER---'; python -B .agents/engineering/utility/review/scripts/review_rules.py --project . --host codex; Write-Output '---RELEVANT DOCS---'; Get-Content '.agents/engineering/utility/prune-worktrees/SKILL.md'; Get-Content '.agents/engineering/utility/unmerged/SKILL.md'; Write-Output '---HISTORY---'; git log --oneline --decorate -12; Write-Output '---BLAME---'; git blame -L 25,90 c8ffbf8a43d4fb8e69aaf404f41d588fefaccd1d -- .agents/engineering/operation/open-worktree/scripts/worktree_gate.py; Write-Output '---TEST RUN---'; python -m pytest tests/test_worktree_gate.py -q" in C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+ exited 1 in 3560ms:
+---RESOLVER---
+Traceback (most recent call last):
+  File "C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\.agents\engineering\utility\review\scripts\review_rules.py", line 124, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\.agents\engineering\utility\review\scripts\review_rules.py", line 115, in main
+    result = resolve(arguments.project, host=arguments.host)
+  File "C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\.agents\engineering\utility\review\scripts\review_rules.py", line 88, in resolve
+    gate = gate or tier_gate()
+                   ~~~~~~~~~^^
+  File "C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\.agents\engineering\utility\review\scripts\review_rules.py", line 20, in tier_gate
+    spec.loader.exec_module(module)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 1026, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\.agents\hooks\tier_gate.py", line 54, in <module>
+    from tj_cli import process
+ModuleNotFoundError: No module named 'tj_cli'
+---RELEVANT DOCS---
+---
+name: prune-worktrees
+description: Sweep ALL git worktrees at once and delete the dead ones — the bulk counterpart to the per-branch `worktree remove`. Classifies every worktree by content (merged / squash-ghost / genuinely unmerged), refuses anything dirty, detached-unsafe, or still carrying work, then tears down the provably-dead ones properly — unlinking .Codex junctions first so deletion can't recurse into the main checkout's real skill files, handling Windows MAX_PATH, pruning admin state, sweeping orphaned leftover folders a removed worktree left behind, and dropping the orphaned branch. Use when Tommy says "prune worktrees", "/prune-worktrees", "delete unused worktrees", "clean up my worktrees", "why do I have so many worktrees", "get rid of these worktrees", or "remove all the dead worktrees". Works in any repo; personal git/gh only. For ONE named worktree use `worktree remove`; for branch-ref clutter use `unmerged`.
+
+kind: utility
+domain: process
+---
+
+# prune-worktrees
+
+Answer "which of these worktrees are dead, and can I bin them?" — then bin exactly those.
+
+Sibling skills, so you pick the right one: **`worktree`** is per-worktree lifecycle (create/list/remove
+one by name). **`unmerged`** classifies and deletes *branch refs*. **This** is the bulk *worktree*
+sweep — many trees, one pass, disk actually reclaimed.
+
+The trap this exists to avoid: a worktree looks disposable because its branch looks merged, but the
+tree holds **uncommitted work nothing else on earth has a copy of**, or its branch was squash-merged so
+`--merged` misreports it. Classify by content and by tree state, never by the directory name or vibes.
+
+## 1. Detect main, refresh refs
+
+```bash
+main=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#origin/##'); main=${main:-master}
+git fetch origin --prune --quiet 2>/dev/null
+git worktree prune          # always safe: drops admin entries whose directory is already gone
+```
+
+## 2. Inventory + classify every worktree (one Bash call)
+
+`git cherry` marks each commit `+` (content NOT in main) or `-` (already in main under another SHA —
+the squash-merge ghost). That, plus the dirty count, decides everything.
+
+```bash
+git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt; do
+  br=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || echo "(detached)")
+  dirty=$(git -C "$wt" status --porcelain 2>/dev/null | wc -l)
+  untracked=$(git -C "$wt" status --porcelain 2>/dev/null | grep -c '^??')
+  if [ "$br" = "(detached)" ]; then
+    sha=$(git -C "$wt" rev-parse HEAD 2>/dev/null)
+    git merge-base --is-ancestor "$sha" "origin/$main" 2>/dev/null && cls="DETACHED-safe" || cls="DETACHED-UNSAFE"
+  else
+    ahead=$(git rev-list --count "origin/$main".."$br" 2>/dev/null)
+    if [ "${ahead:-0}" -eq 0 ]; then cls="MERGED"
+    else
+      newc=$(git cherry "origin/$main" "$br" 2>/dev/null | grep -c '^+')
+      [ "$newc" -eq 0 ] && cls="GHOST" || cls="UNMERGED(new=$newc)"
+    fi
+  fi
+  case "$wt" in *"/.Codex/worktrees/agent-"*) kind=HARNESS;; *) kind=USER;; esac
+  printf '%s\t%s\t%s\t%s\tdirty=%s\tuntracked=%s\t%s\n' \
+    "$wt" "$kind" "$br" "$cls" "$dirty" "$untracked" "$(git -C "$wt" log -1 --format='%cr' 2>/dev/null)"
+done
+```
+
+The **first** line of `git worktree list` is the main checkout — it is never a candidate, whatever its
+state. Cross-reference open PRs for anything UNMERGED:
+
+```bash
+gh pr list --state open --json number,headRefName,mergeStateStatus,isDraft \
+  --jq '.[] | "PR #\(.number)\t\(.headRefName)\t\(if .isDraft then "draft" else "ready" end)\t\(.mergeStateStatus)"' 2>/dev/null
+```
+
+## 3. The gates — a worktree is DEAD only if it clears every one
+
+Delete only when **all** hold. Any failure ⇒ it goes in the report, not the bin.
+
+1. **Not the main checkout.** Line 1 of the worktree list, always excluded.
+2. **Clean tree** — `dirty=0`. Uncommitted work is at-risk work; nothing but that disk holds it.
+   Untracked files count as dirty (a stray plan/investigation `.md` is often the only copy).
+3. **Content is in main** — `MERGED`, `GHOST`, or `DETACHED-safe`. `UNMERGED(new>0)` is real work and
+   is **never** auto-removed, no matter how old.
+4. **No open PR** on its branch. An open PR means in-flight, regardless of merge state.
+5. **HARNESS worktrees** (`.Codex/worktrees/agent-*`) — harness-owned ephemeral agent trees. Only ever
+   candidates when clean AND content-in-main AND **stale (>1 day)**; a recent one may belong to a
+   *running* agent and removing it breaks that agent mid-flight. Report them as their own group.
+
+`force` as an arg relaxes gate 3 **only** (never 1, 2, or 4), and only for a worktree Tommy names
+explicitly — never as a blanket sweep.
+
+## 4. Remove each dead worktree — junctions FIRST
+
+```bash
+WT="$1"; BR="$2"
+# Junctions (Git Bash sees them as -type l) point at the MAIN checkout's real skill dirs.
+# Unlink before deleting or a follow-through deletes your actual skills. rmdir drops the link only.
+find "$WT/.Codex" -type l 2>/dev/null | while read -r j; do
+  MSYS_NO_PATHCONV=1 cmd /c rmdir "$(cygpath -w "$j")" >/dev/null 2>&1 && echo "  unlinked: ${j#$WT/}"
+done
+git worktree remove --force "$WT" 2>/dev/null && echo "  removed: $WT" || echo "  RETRY-NEEDED: $WT"
+```
+
+**Windows MAX_PATH.** `node_modules`/`obj`/`bin` trees blow past 260 chars and `git worktree remove`
+fails with "Filename too long". The delete that works is PowerShell with the long-path prefix, then
+prune the now-orphaned admin entry:
+
+```powershell
+Remove-Item -LiteralPath "\\?\C:\path\to\worktree" -Recurse -Force
+```
+
+```bash
+git worktree prune     # reconciles admin state after any manual directory delete
+```
+
+If the sandbox blocks the recursive delete, **don't fight it** — hand Tommy one ready-to-paste block
+listing only dirs already confirmed dead, and say the admin entries are pruned once he runs it.
+
+## 5. Then drop the orphaned branch
+
+Removing a worktree does **not** delete its branch. Reconcile both — a stranded ref is the clutter
+`unmerged` would otherwise have to clean up later.
+
+```bash
+git branch -d "$BR" 2>/dev/null && echo "  deleted branch: $BR" \
+  || { git branch -D "$BR" && echo "  deleted ghost branch: $BR"; }
+```
+
+`-d` refuses a GHOST ("not fully merged") because it checks ancestry, not content. `-D` is safe **only**
+for a branch proven GHOST by `git cherry` in step 2. Never blanket-`-D`.
+
+> **Case-collision guard (Windows).** `Refactor/Foo` and `refactor/foo` are the same ref file. Never
+> delete a branch any *surviving* worktree holds, matched **case-insensitively** — deleting the twin
+> drops that worktree to detached HEAD. If two branches differ only by case, delete neither; name it.
+
+## 6. Sweep orphaned leftover folders (the actual pile-up)
+
+`git worktree list` only shows *registered* worktrees, so steps 1–5 are **structurally blind** to the
+folders that actually pile up: a removed worktree whose **directory was left behind** — admin entry
+pruned, tree still on disk. That is the Windows "can't delete a directory a process is cwd'd in" failure,
+and nothing above can see it. Catch it by diffing on-disk folders against the registered set:
+
+```bash
+root=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')   # main checkout
+reg=$(git worktree list --porcelain | awk '/^worktree /{print $2}')
+for base in "$root/.worktrees" "$(dirname "$root")/$(basename "$root").worktrees"; do
+  [ -d "$base" ] || continue
+  for d in "$base"/*/; do d="${d%/}"; [ -e "$d" ] || continue
+    printf '%s\n' "$reg" | grep -qxF "$d" && continue           # still registered → not an orphan
+    br=$(basename "$d" | sed 's#-#/#')                          # slug -> branch (Type/Name)
+    if git show-ref --verify --quiet "refs/heads/$br" && ! git merge-base --is-ancestor "$br" "origin/$main" 2>/dev/null; then
+      echo "  ✋ ORPHAN KEPT — branch '$br' not merged; verify no uncommitted work, then delete by hand: $d"
+    else
+      cd "$root"                                                # never delete a tree you're standing in
+      rm -rf "$d" 2>/dev/null || MSYS_NO_PATHCONV=1 cmd /c rmdir /s /q "$(cygpath -w "$d")" >/dev/null 2>&1
+      [ -d "$d" ] && echo "  ⚠️ ORPHAN LOCKED (a live process holds it): $d" || echo "  🗑 orphan folder removed: $d"
+    fi
+  done
+done
+```
+
+A true orphan has no valid worktree admin, so step 2's classifier never sees it — this folder-vs-registered
+diff is the only thing that catches it. Auto-remove **only** when its branch is merged or already gone
+(committed work is then safe in refs). An unmerged orphan is **kept and reported**: a leftover tree with a
+dead `.git` can't be checked for uncommitted work, so it needs a human's eye before deletion.
+
+## Report
+
+**🗑 Pruned** — one line each: path · branch · why it was dead (merged / ghost / stale agent tree).
+Finish with disk reclaimed if easily had (`du -sh` before, or just the count).
+
+**✋ Kept** — the interesting half, most-urgent first:
+- **uncommitted work** — path + `git -C <wt> status --short` output, by name. Loudest item; nothing but
+  that disk holds it.
+- **unmerged content** — branch · `new=N` commits · age · open PR or none · the next step (merge it, or
+  it's abandoned and wants an explicit call).
+- **open PR / in-flight** — leave it, say which PR.
+- **harness agent trees still live** — recent ones skipped on purpose.
+
+**⚠️ Needs a human** — only if found: case-collisions, `DETACHED-UNSAFE`, a MAX_PATH dir needing the
+paste-block. Skip the heading when empty.
+
+Keep it tight — the pruned list is a count plus names, the kept list is where the judgment goes.
+
+## Rules
+
+- **Safety is absolute: never the main checkout, never a dirty tree, never `UNMERGED` content, never a
+  branch with an open PR, never a branch a surviving worktree holds.** Unsure ⇒ report it, don't bin it.
+- **Classify by content, not ancestry.** `git branch --merged` misses squash-merge ghosts entirely; a
+  sweep built on it would both miss clutter and mislabel shipped work as unmerged.
+- **Untracked files make a tree dirty.** Scratch investigation markdown is routinely the only copy of
+  an afternoon's thinking — treat `??` exactly like modified.
+- **Unlink `.Codex` junctions before any delete.** Belt-and-braces even where `rm` is junction-safe:
+  one follow-through takes out the main checkout's real skill files.
+- **Harness `.Codex/worktrees/agent-*` trees are not yours by default.** Stale + clean + shipped only,
+  and always reported as a separate group so it's obvious what was touched.
+- Local-only. This never deletes remote branches, never closes PRs, never pushes. Read-only until the
+  classification is done; destructive strictly on the proven-dead set.
+- **Orphan folders are the real pile-up.** A removed worktree whose directory was left behind is
+  invisible to `git worktree list`; step 6 catches it by diffing on-disk folders against the registered
+  set, and auto-deletes only when the branch is merged/gone (keeps + reports an unmerged one).
+- `gh` may be missing or the repo non-GitHub — degrade quietly, carry on git-only, and say PR state was
+  unavailable rather than inventing it.
+---
+name: unmerged
+description: Inventory every local branch + worktree and say what's genuinely left to merge vs. safe to bin — then do the safe cleanup. Classifies branches into truly-unmerged (has new content), squash-merge ghosts (content already in master under a different SHA — the bulk of branch clutter), and fully-merged; cross-references open PRs; surfaces uncommitted work stranded in worktrees; flags stale platform-sync branches; then deletes the dead ones with a case-collision guard so it never nukes a branch a worktree still holds. Use when Tommy says "/unmerged", "what's left to merge", "what code is still unmerged", "clean up my branches", "why do I have so many branches", or "prune merged branches". Works in any repo; personal git/gh only.
+
+kind: utility
+domain: process
+---
+
+Answer "what's actually left to merge, and what's just clutter?" — then clear the clutter safely.
+
+The trap this skill exists to avoid: **`git branch --merged` lies under a squash-merge workflow.** A
+branch whose commits were squash- or rebase-merged into the main branch lands under a *new* SHA, so its
+tip is never an ancestor of master and `--merged` calls it unmerged forever. Most of a long branch list
+is these **ghosts** — the work IS shipped, the ref is just litter. The skill classifies by *content*
+(`git cherry`), not ancestry, so ghosts are correctly identified as deletable.
+
+## Detect the main branch first
+
+```bash
+main=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#origin/##'); main=${main:-master}
+git fetch origin --prune --quiet 2>/dev/null
+```
+
+## Classify every local branch (one Bash call)
+
+For each branch, `git cherry <main> <branch>` marks each commit `+` (content NOT in main) or `-`
+(content already in main, i.e. squash/cherry-equivalent). That's the real signal.
+
+```bash
+for b in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
+  [ "$b" = "$main" ] && continue
+  ahead=$(git rev-list --count "$main".."$b" 2>/dev/null)
+  if [ "${ahead:-0}" -eq 0 ]; then cls="MERGED(ancestor)"; new=0
+  else
+    new=$(git cherry "$main" "$b" 2>/dev/null | grep -c '^+')
+    if [ "$new" -eq 0 ]; then cls="GHOST(squash-merged)"; else cls="UNMERGED"; fi
+  fi
+  age=$(git log -1 --format='%cr' "$b" 2>/dev/null)
+  printf '%-46s %-22s new=%-4s %s\n' "$b" "$cls" "$new" "$age"
+done | sort -k2
+```
+
+- **MERGED(ancestor)** — tip is in main. Dead ref, delete.
+- **GHOST(squash-merged)** — `new=0` but tip isn't an ancestor: content shipped under another SHA. **Dead
+  ref, delete** — this is the bulk of the clutter and the thing `--merged` misses.
+- **UNMERGED** (`new>0`) — genuinely carries content not in main. This is the *real* answer to "what's
+  left to merge." Keep; report each with what it is.
+
+## Then, for the UNMERGED set only, add context (one Bash call)
+
+```bash
+# open PRs, keyed by head branch
+gh pr list --state open --json number,headRefName,title,isDraft,mergeStateStatus \
+  --jq '.[] | "PR #\(.number)\t\(.headRefName)\t\(if .isDraft then "draft" else "ready" end)\t\(.mergeStateStatus)\t\(.title)"' 2>/dev/null
+```
+
+- Match each UNMERGED branch to an open PR by head ref. **UNMERGED + open PR** = in-flight, the top of
+  the "left to merge" list. **UNMERGED + no PR** = either genuine WIP or an abandoned experiment — judge
+  by age (days = live, months = probably dead) and commit subjects; never auto-delete these.
+- Apply repository-owned policy when identifying superseded generated update branches; do not infer product pins from branch names.
+
+## Worktrees — check for uncommitted work BEFORE judging anything deletable
+
+A branch can look thin while an entire feature sits uncommitted in its worktree. Never delete a branch,
+or call a worktree dead, without checking its tree.
+
+```bash
+git worktree list --porcelain | grep '^worktree ' | sed 's|^worktree ||' | while read -r wt; do
+  br=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || echo "(detached)")
+  dirty=$(git -C "$wt" status --porcelain 2>/dev/null | wc -l)
+  printf '%s\tbranch=%s\tuncommitted=%s\n' "$wt" "$br" "$dirty"
+done
+```
+
+- **Uncommitted files in a worktree = at-risk work.** Surface it loudly and by name (`git -C <wt> status
+  --short`); it's more urgent than any branch, because nothing but that disk holds it. Never delete/clean
+  a worktree with a dirty tree without explicit say-so.
+- A **detached-HEAD** worktree usually means its branch was deleted out from under it (see the case-
+  collision guard) — verify its HEAD is in main (`git merge-base --is-ancestor <sha> origin/$main`) so
+  no work is lost, then it's a dead worktree.
+
+## The case-collision guard — the footgun that WILL bite on Windows
+
+Windows' filesystem is case-insensitive, so `Refactor/Foo` and `refactor/foo` are the **same ref file**.
+Deleting the lowercase twin removes the ref the uppercase worktree is pinned to → that worktree drops to
+detached HEAD and breaks. Before deleting ANY branch:
+
+- **Never delete a branch that is checked out in a worktree** (any casing). Build the set of
+  worktree-held branches from the worktree list above and exclude them from deletion — matched
+  **case-insensitively**.
+- If two local branches differ only by case, treat them as one and delete neither automatically — name
+  the collision and let Tommy resolve it.
+
+## Delete the dead refs (only after the guard)
+
+Collect MERGED + GHOST branches, minus anything a worktree holds (case-insensitive), then:
+
+```bash
+# $b is safe: content in main AND not held by any worktree
+git branch -d "$b"     # -d refuses if git thinks it's unmerged — GHOSTs need -D
+```
+
+`git branch -d` will refuse GHOSTs ("not fully merged") because it checks ancestry, not content. For a
+branch **confirmed GHOST by `git cherry` above** (`new=0`), `git branch -D` is safe and correct — the
+content is provably in main. Do the ancestor-merged ones with `-d`, the confirmed ghosts with `-D`, and
+say which is which in the report. Don't blanket-`-D`.
+
+## Dead worktrees & their leftover directories
+
+After removing a worktree branch, the worktree itself may need `git worktree remove --force <path>`
+then `git worktree prune`. Two platform gotchas, both real on this setup:
+
+- **Windows MAX_PATH:** `node_modules`/`obj` trees blow past 260 chars, so `git worktree remove` and
+  `Remove-Item` both fail with "Filename too long". The working delete is PowerShell with the long-path
+  prefix: `Remove-Item -LiteralPath "\\?\$dir" -Recurse -Force`. If the sandbox classifier blocks the
+  recursive delete, **don't fight it** — hand Tommy the exact command to paste, listing only dirs
+  confirmed git-unregistered with content in main.
+- Removing a worktree does **not** delete its branch, and vice-versa. Reconcile both: `git worktree
+  list` for live trees, then the branch classifier for refs.
+
+## Report
+
+Lead with the answer to "what's left to merge" — the UNMERGED set only, nothing else up top:
+
+**🔧 Left to merge** (most-actionable first: open ready PR → recent WIP → uncommitted-in-worktree):
+one line each — branch · PR#/none · age · one-line what · what's blocking or the next step.
+
+**🗑 Cleaned up** — count of MERGED + GHOST deleted, with the ghost count called out (that's the
+"where did all these come from" answer: *squash-merged, ref never pruned*). List names only if asked.
+
+**⚠️ Needs a human** — only if found: case-collision pairs, an uncommitted worktree, a months-old
+UNMERGED branch with no PR (abandoned?), a stale/red platform-sync. Skip the heading if empty.
+
+**Directory cleanup** — only if dead worktree dirs remain that the sandbox couldn't delete: the ready-
+to-paste `\\?\` PowerShell block, dirs confirmed safe.
+
+## Rules
+
+- **Classify by content, never by `--merged` alone.** The whole point is catching squash-merge ghosts;
+  a skill that just runs `git branch --merged` would miss most of the clutter and mislabel it as work.
+- **Safety is absolute: never delete a branch a worktree holds (any casing), never delete UNMERGED,
+  never touch a dirty worktree, never `-D` a branch not proven ghost by `git cherry`.** When unsure,
+  list it under "needs a human" rather than deleting.
+- Deletion is local-only (`git branch -d/-D`). This skill never deletes remote branches or closes PRs —
+  those are the merge/PR flow's job. Read-only until the classification is done; destructive only on
+  the proven-dead set.
+- `gh` may be absent / repo non-GitHub — PR context degrades quietly; carry on git-only and say PR state
+  was unavailable rather than inventing it.
+- Keep it tight. The headline is the UNMERGED list; the cleanup is a count, not a wall of branch names.
+---HISTORY---
+c8ffbf8a (HEAD, origin/Feature/DeterministicWorktrees, Feature/DeterministicWorktrees) Preserve documented worktree inventory and cleanup commands
+442dba6a Deny shell substitutions before exempting worktree searches
+8c7a9512 Reject expanded worktree actions through shell aliases
+7981028e Align the Renovate assertion with the adopted organization preset
+35ea9fe2 Allow repository searches through the worktree guard
+d742a364 Close worktree gate indirection and timeout gaps
+26e7e3a3 Make Core worktree placement reusable and enforce host destinations
+6339abcf (origin/main, origin/HEAD) Merge pull request #601 from tj-agents/Fix/RenovateNeverNeedsApproval
+0cf441a1 (origin/Fix/RenovateNeverNeedsApproval, Fix/RenovateNeverNeedsApproval) Extend the org Renovate preset from the repository config
+dab78bb9 Regenerate packages for 2b9db926f5022e7b044317a2d807649da7cb3e14
+2b9db926 Merge pull request #599 from tj-agents/Fix/ClaimCreatedWorktrees
+4fcb2893 (origin/Fix/ClaimCreatedWorktrees, Fix/ClaimCreatedWorktrees) Merge remote-tracking branch 'origin/main' into Fix/ClaimCreatedWorktrees
+---BLAME---
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 25)     if not value or re.search(r"[$`%\n\r]", value):
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 26)         raise create_worktree.CreateWorktreeError("use literal worktree arguments")
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 27)     return value
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 28) 
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 29) 
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 30) def executable(value: str) -> str:
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 31)     return value.replace("\\", "/").rsplit("/", 1)[-1].removesuffix(".exe").lower()
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 32) 
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 33) 
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 34) def shell_words(command: str) -> list[str]:
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 35)     lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|()\n")
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 36)     lexer.whitespace = " \t\r"
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 37)     lexer.whitespace_split = True
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 38)     lexer.escape = ""
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 39)     return list(lexer)
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 40) 
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 41) 
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 42) def nonplacement_operation(action: str) -> bool:
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 43)     return action in {"list", "prune", "remove", "repair", "lock", "unlock", "-h"}
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 44) 
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 45) 
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 46) def needs_placement_check(command: str) -> bool:
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 47)     words = shell_words(command)
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 48)     for index, word in enumerate(words):
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 49)         if word.startswith("--worktree") or word == "-w":
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 50)             return True
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 51)         if (
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 52)             word == "worktree"
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 53)             and index + 1 < len(words)
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 54)             and not nonplacement_operation(words[index + 1])
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 55)         ):
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 56)             return True
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 57)         if "worktree" in word and len(word.split()) > 1 and needs_placement_check(word):
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 58)             return True
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 59)     return False
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 60) 
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 61) 
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 62) def segments(command: str) -> list[list[str]]:
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 63)     groups: list[list[str]] = [[]]
+c8ffbf8a4 (Tommy Seery 2026-11-12 14:03:22 +0000 64)     for token in shell_words(command):
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 65)         if token and all(character in ";&|()\n" for character in token):
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 66)             if "(" in token or ")" in token or "||" in token:
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 67)                 raise ValueError("unsupported shell control flow")
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 68)             if groups[-1]:
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 69)                 groups.append([])
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 70)         else:
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 71)             groups[-1].append(token)
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 72)     return [group for group in groups if group]
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 73) 
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 74) 
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 75) def destination(arguments: Sequence[str], mutation: Mutation) -> str:
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 76)     operands = []
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 77)     index = 0
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 78)     options = True
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 79)     while index < len(arguments):
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 80)         value = literal(arguments[index])
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 81)         index += 1
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 82)         if options and value == "--":
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 83)             options = False
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 84)         elif options and value in mutation.options:
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 85)             if index == len(arguments):
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 86)                 raise create_worktree.CreateWorktreeError(
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 87)                     f"missing argument for {value}"
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 88)                 )
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 89)             literal(arguments[index])
+26e7e3a31 (Tommy Seery 2026-11-12 12:06:31 +0000 90)             index += 1
+---TEST RUN---
+ERROR: usage: python -m pytest [options] [file_or_dir] [file_or_dir] [...]
+python -m pytest: error: unrecognized arguments: --disable-socket
+  inifile: C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3\pyproject.toml
+  rootdir: C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+
+
+exec
+"C:\\Users\\TommySeery\\AppData\\Local\\Programs\\PowerShell\\7\\pwsh.exe" -Command "Write-Output '---PYPROJECT---'; Get-Content pyproject.toml; Write-Output '---PREVIOUS---'; git show c8ffbf8a"'^:.agents/engineering/operation/open-worktree/scripts/worktree_gate.py | Select-Object -First 220; Write-Output '"'---PARSER PROBES---'; @'
+import importlib.util
+from pathlib import Path
+p=Path('.agents/engineering/operation/open-worktree/scripts/worktree_gate.py')
+s=importlib.util.spec_from_file_location('wg',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+items=[
+'git worktree list',
+'git worktree list; echo \""'$(git worktree add ../outside)"'"',
+'git worktree list; x=\""'$(git worktree add ../outside)"'"',
+'git worktree list \""'$(git worktree add ../outside)"'"',
+'echo \"git worktree add ../outside\"',
+'git worktree --help',
+'git -C somewhere worktree list',
+'git worktree list; "'$(git worktree add ../outside)'"',
+'git worktree list; "'`git worktree add ../outside`'"',
+'git worktree list; git worktree add ../outside',
+'git worktree list; git worktree "'$x ../outside'"',
+]
+for x in items:
+  try: print(repr(x),m.shell_words(x),m.needs_placement_check(x))
+  except Exception as e: print(repr(x),type(e).__name__,str(e))
+'@ | python -B -; Write-Output '---NATIVE REVIEW---'; codex review --base 442dba6a79aa35275dc76f030ba4520b39f23832" in C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+exec
+"C:\\Users\\TommySeery\\AppData\\Local\\Programs\\PowerShell\\7\\pwsh.exe" -Command '$env:PYTHONPATH = (Resolve-Path '"'.agents/engineering/operation/open-worktree/scripts').Path; @'
+import importlib.util
+from pathlib import Path
+p=Path('.agents/engineering/operation/open-worktree/scripts/worktree_gate.py')
+s=importlib.util.spec_from_file_location('wg',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+items=[
+'git worktree list',
+'git worktree list; echo \""'$(git worktree add ../outside)"'"',
+'git worktree list; x=\""'$(git worktree add ../outside)"'"',
+'git worktree list \""'$(git worktree add ../outside)"'"',
+'echo \"git worktree add ../outside\"',
+'git worktree --help',
+'git -C somewhere worktree list',
+'git worktree list; "'$(git worktree add ../outside)'"',
+'git worktree list; "'`git worktree add ../outside`'"',
+'git worktree list; git worktree add ../outside',
+'git worktree list; git worktree "'$x ../outside'"',
+]
+for x in items:
+  try: print(repr(x),m.shell_words(x),m.needs_placement_check(x))
+  except Exception as e: print(repr(x),type(e).__name__,str(e))
+'@ | python -B -; python -m pytest -o addopts='' tests/test_worktree_gate.py -q" in C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+exec
+"C:\\Users\\TommySeery\\AppData\\Local\\Programs\\PowerShell\\7\\pwsh.exe" -Command 'codex review --base 442dba6a79aa35275dc76f030ba4520b39f23832' in C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+ succeeded in 44070ms:
+'git worktree list' ['git', 'worktree', 'list'] False
+'git worktree list; echo "$(git worktree add ../outside)"' ['git', 'worktree', 'list', ';', 'echo', '$(git worktree add ../outside)'] True
+'git worktree list; x="$(git worktree add ../outside)"' ['git', 'worktree', 'list', ';', 'x=$(git worktree add ../outside)'] True
+'git worktree list "$(git worktree add ../outside)"' ['git', 'worktree', 'list', '$(git worktree add ../outside)'] True
+'echo "git worktree add ../outside"' ['echo', 'git worktree add ../outside'] True
+'git worktree --help' ['git', 'worktree', '--help'] True
+'git -C somewhere worktree list' ['git', '-C', 'somewhere', 'worktree', 'list'] False
+'git worktree list; $(git worktree add ../outside)' ['git', 'worktree', 'list', ';', '$', '(', 'git', 'worktree', 'add', '../outside', ')'] True
+'git worktree list; `git worktree add ../outside`' ['git', 'worktree', 'list', ';', '`git', 'worktree', 'add', '../outside`'] True
+'git worktree list; git worktree add ../outside' ['git', 'worktree', 'list', ';', 'git', 'worktree', 'add', '../outside'] True
+'git worktree list; git worktree $x ../outside' ['git', 'worktree', 'list', ';', 'git', 'worktree', '$x', '../outside'] True
+............................................................             [100%]
+60 passed in 41.45s
+
+exec
+"C:\\Users\\TommySeery\\AppData\\Local\\Programs\\PowerShell\\7\\pwsh.exe" -Command "Write-Output '---REFERENCES---'; rg -n -C 3 'worktree_gate|needs_placement|worktree shell substitutions' . --glob '"'!plugins/**'"'; Write-Output '---HOOK CONFIG---'; rg -n -C 5 'worktree_gate' .agents .codex .claude --glob '"'!plugins/**'"'; Write-Output '---GIT HELP---'; git worktree -h; Write-Output '---PROCESS---'; Get-Process codex,python -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,Path,StartTime" in C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+ succeeded in 2011ms:
+---REFERENCES---
+.\tests\test_worktree_gate.py-11-import pytest
+.\tests\test_worktree_gate.py-12-
+.\tests\test_worktree_gate.py-13-ROOT = Path(__file__).resolve().parents[1]
+.\tests\test_worktree_gate.py:14:SCRIPT = ROOT / ".agents/engineering/operation/open-worktree/scripts/worktree_gate.py"
+.\tests\test_worktree_gate.py-15-
+.\tests\test_worktree_gate.py-16-
+.\tests\test_worktree_gate.py-17-def git(cwd: Path, *arguments: str) -> str:
+---HOOK CONFIG---
+.agents\engineering\operation\open-worktree\scripts\worktree_gate.py-259-    check_command(command, Path(cwd), time.monotonic() + 10)
+.agents\engineering\operation\open-worktree\scripts\worktree_gate.py-260-
+.agents\engineering\operation\open-worktree\scripts\worktree_gate.py-261-
+.agents\engineering\operation\open-worktree\scripts\worktree_gate.py-262-def main() -> int:
+.agents\engineering\operation\open-worktree\scripts\worktree_gate.py-263-    if sys.version_info < create_worktree.MINIMUM_PYTHON:
+.agents\engineering\operation\open-worktree\scripts\worktree_gate.py:264:        print("worktree_gate.py requires Python 3.12 or newer", file=sys.stderr)
+.agents\engineering\operation\open-worktree\scripts\worktree_gate.py-265-        return 2
+.agents\engineering\operation\open-worktree\scripts\worktree_gate.py-266-    payload: dict[str, object] = {}
+.agents\engineering\operation\open-worktree\scripts\worktree_gate.py-267-    try:
+.agents\engineering\operation\open-worktree\scripts\worktree_gate.py-268-        value = json.load(sys.stdin)
+.agents\engineering\operation\open-worktree\scripts\worktree_gate.py-269-        if not isinstance(value, dict):
+--
+.agents\plugins\harness\base.json-24-          "claude",
+.agents\plugins\harness\base.json-25-          "codex"
+.agents\plugins\harness\base.json-26-        ]
+.agents\plugins\harness\base.json-27-      },
+.agents\plugins\harness\base.json-28-      {
+.agents\plugins\harness\base.json:29:        "path": "hooks/worktrees/worktree_gate.py",
+.agents\plugins\harness\base.json-30-        "hosts": ["claude", "codex"]
+.agents\plugins\harness\base.json-31-      }
+.agents\plugins\harness\base.json-32-    ],
+.agents\plugins\harness\base.json-33-    "permissions": {
+.agents\plugins\harness\base.json-34-      "claude_allow": [],
+--
+.agents\plugins\manifests\codex\base-hooks.json-16-      {
+.agents\plugins\manifests\codex\base-hooks.json-17-        "matcher": "Bash|PowerShell|shell|shell_command|exec_command|.*create_worktree",
+.agents\plugins\manifests\codex\base-hooks.json-18-        "hooks": [
+.agents\plugins\manifests\codex\base-hooks.json-19-          {
+.agents\plugins\manifests\codex\base-hooks.json-20-            "type": "command",
+.agents\plugins\manifests\codex\base-hooks.json:21:            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py\"",
+.agents\plugins\manifests\codex\base-hooks.json:22:            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py\"",
+.agents\plugins\manifests\codex\base-hooks.json-23-            "timeout": 30
+.agents\plugins\manifests\codex\base-hooks.json-24-          }
+.agents\plugins\manifests\codex\base-hooks.json-25-        ]
+.agents\plugins\manifests\codex\base-hooks.json-26-      },
+.agents\plugins\manifests\codex\base-hooks.json-27-      {
+--
+.agents\plugins\manifests\claude\base-hooks.json-22-        "hooks": [
+.agents\plugins\manifests\claude\base-hooks.json-23-          {
+.agents\plugins\manifests\claude\base-hooks.json-24-            "type": "command",
+.agents\plugins\manifests\claude\base-hooks.json-25-            "timeout": 30,
+.agents\plugins\manifests\claude\base-hooks.json-26-            "command": "python",
+.agents\plugins\manifests\claude\base-hooks.json:27:            "args": ["-B", "${CLAUDE_PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py"]
+.agents\plugins\manifests\claude\base-hooks.json-28-          }
+.agents\plugins\manifests\claude\base-hooks.json-29-        ]
+.agents\plugins\manifests\claude\base-hooks.json-30-      },
+.agents\plugins\manifests\claude\base-hooks.json-31-      {
+.agents\plugins\manifests\claude\base-hooks.json-32-        "matcher": "Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep",
+--
+.agents\plugins\manifests\claude\base-hooks.json-49-        "hooks": [
+.agents\plugins\manifests\claude\base-hooks.json-50-          {
+.agents\plugins\manifests\claude\base-hooks.json-51-            "type": "command",
+.agents\plugins\manifests\claude\base-hooks.json-52-            "timeout": 30,
+.agents\plugins\manifests\claude\base-hooks.json-53-            "command": "python",
+.agents\plugins\manifests\claude\base-hooks.json:54:            "args": ["-B", "${CLAUDE_PLUGIN_ROOT}/hooks/worktrees/worktree_gate.py"]
+.agents\plugins\manifests\claude\base-hooks.json-55-          }
+.agents\plugins\manifests\claude\base-hooks.json-56-        ]
+.agents\plugins\manifests\claude\base-hooks.json-57-      }
+.agents\plugins\manifests\claude\base-hooks.json-58-    ],
+.agents\plugins\manifests\claude\base-hooks.json-59-    "PostCompact": [
+---GIT HELP---
+usage: git worktree add [-f] [--detach] [--checkout] [--lock [--reason <string>]]
+                        [--orphan] [(-b | -B) <new-branch>] <path> [<commit-ish>]
+   or: git worktree list [-v | --porcelain [-z]]
+   or: git worktree lock [--reason <string>] <worktree>
+   or: git worktree move <worktree> <new-path>
+   or: git worktree prune [-n] [-v] [--expire <expire>]
+   or: git worktree remove [-f] <worktree>
+   or: git worktree repair [<path>...]
+   or: git worktree unlock <worktree>
+
+---PROCESS---
+
+   Id ProcessName Path                                                                          StartTime
+   -- ----------- ----                                                                          ---------
+ 9336 codex       C:\Users\TommySeery\AppData\Local\OpenAI\Codex\bin\f71a721e0e6193a9\codex.exe 12/11/2026 11:19:24
+ 9500 codex       C:\Users\TommySeery\AppData\Local\OpenAI\Codex\bin\f71a721e0e6193a9\codex.exe 12/11/2026 11:24:54
+13704 codex       C:\Users\TommySeery\.local\share\codex\runtimes\0.163.0-alpha.1\bin\codex.exe 12/11/2026 14:08:07
+16108 codex       C:\Users\TommySeery\.local\share\codex\runtimes\0.163.0-alpha.1\bin\codex.exe 12/11/2026 14:06:06
+30660 codex       C:\Users\TommySeery\.local\share\codex\runtimes\0.163.0-alpha.1\bin\codex.exe 12/11/2026 14:09:31
+37624 codex       C:\Users\TommySeery\AppData\Local\OpenAI\Codex\bin\f71a721e0e6193a9\codex.exe 12/11/2026 11:28:58
+15748 python      C:\Python313\python.exe                                                       12/11/2026 10:44:49
+34400 python      C:\Python313\python.exe                                                       12/11/2026 10:44:48
+
+
+exec
+"C:\\Users\\TommySeery\\AppData\\Local\\Programs\\PowerShell\\7\\pwsh.exe" -Command '$env:PYTHONPATH = (Resolve-Path '"'.agents/engineering/operation/open-worktree/scripts').Path; @'
+import importlib.util
+from pathlib import Path
+p=Path('.agents/engineering/operation/open-worktree/scripts/worktree_gate.py')
+s=importlib.util.spec_from_file_location('wg',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+for c in [
+'git worktree list; (git worktree add ../outside)',
+'git worktree list && (git worktree add ../outside)',
+'git worktree list || (git worktree add ../outside)',
+'git worktree list; sh -c \"git worktree add ../outside\"',
+'git worktree list; bash -c \"git worktree add ../outside\"',
+'git worktree list; powershell -Command \"git worktree add ../outside\"',
+'git worktree list; cmd /c \"git worktree add ../outside\"',
+'git worktree list; git worktree list --porcelain',
+]:
+ try: print(m.needs_placement_check(c), c)
+ except Exception as e: print(type(e).__name__, c, e)
+'@ | python -B -; git diff --check c8ffbf8a43d4fb8e69aaf404f41d588fefaccd1d"'^ c8ffbf8a43d4fb8e69aaf404f41d588fefaccd1d; git status --short' in C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Review-DeterministicWorktrees-26e7e3a3
+ succeeded in 2162ms:
+True git worktree list; (git worktree add ../outside)
+True git worktree list && (git worktree add ../outside)
+True git worktree list || (git worktree add ../outside)
+True git worktree list; sh -c "git worktree add ../outside"
+True git worktree list; bash -c "git worktree add ../outside"
+True git worktree list; powershell -Command "git worktree add ../outside"
+True git worktree list; cmd /c "git worktree add ../outside"
+False git worktree list; git worktree list --porcelain
+
+codex
+The placement-check prefilter preserves validation for add/move operations while allowing documented inventory and pruning commands. No actionable regressions were identified in the changed code.
+The placement-check prefilter preserves validation for add/move operations while allowing documented inventory and pruning commands. No actionable regressions were identified in the changed code.

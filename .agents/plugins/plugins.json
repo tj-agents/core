@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:6ff6691458ecf53e91562b2a618625e04f36254156fec12932566455a2b1c129",
+      "digest": "sha256:8e7c6b6c71efc203ac2ef2f0dbdbfe6542b15e327beddb365bff974eba7fab7d",
       "harness": {
         "marketplaces": [
           {
@@ -46,6 +46,13 @@
         "hooks": [
           {
             "path": "hooks/tier_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/worktrees/worktree_gate.py",
             "hosts": [
               "claude",
               "codex"
@@ -305,7 +312,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:171fba22d41d5ca1b6e7fdb19ffcff2e592bd734b36c1009a1302f372b3e1ac5",
+      "digest": "sha256:338f4a9257b6529f3ba91ef6f6d45300ea3ca6511ec528ab0c0efc1272eb3dcd",
       "harness": {
         "marketplaces": [
           {

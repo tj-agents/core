@@ -1,0 +1,87 @@
+{
+  "data": [
+    {
+      "cwd": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\fixture",
+      "hooks": [
+        {
+          "key": "base@tj-agents:hooks/codex.json:pre_tool_use:0:0",
+          "eventName": "preToolUse",
+          "handlerType": "command",
+          "command": "tj_hook -- python -I -B -c \"import hashlib, os, runpy, sys, tempfile;from pathlib import Path;package_root = Path(sys.argv[1]);package_digest = sys.argv[2];configured_snapshots = os.environ.get('TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY', '');plugin_data = Path(os.environ.get('PLUGIN_DATA', '')).resolve();snapshots = Path(configured_snapshots) if configured_snapshots else plugin_data / 'hook-snapshots';snapshot_key = hashlib.sha256((str(package_root) + chr(0) + package_digest).encode()).hexdigest();loaders = (base / 'hooks' / 'codex' / 'snapshot.py' for base in (snapshots / snapshot_key, package_root));newline = chr(10).encode();sources = (loader.read_bytes().replace(chr(13).encode() + newline, newline).replace(chr(13).encode(), newline) for loader in loaders if loader.is_file());source = next((candidate for candidate in sources if hashlib.sha256(candidate).hexdigest() == '43b2b800fd10d444f0aea8a865409d31499be16dcbccd3bc0c75f92b623f6acd'), None);source is not None or (sys.stderr.write('Codex hook snapshot loader integrity check failed' + chr(10)), sys.exit(2));workspace = tempfile.TemporaryDirectory();staged = Path(workspace.name) / 'loader.py';staged.write_bytes(source);runpy.run_path(str(staged), run_name='__main__')\" \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\" \"sha256:e48ab983e5c43a81f7006d7436fdedf8178827e2409e6347e522bf08c09c01d5\" \"base\" \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local/hooks/worktrees/worktree_gate.py\"",
+          "async": false,
+          "matcher": "Bash|PowerShell|shell|shell_command|exec_command|.*create_worktree",
+          "timeoutSec": 30,
+          "statusMessage": null,
+          "additionalContextLimit": null,
+          "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+          "source": "plugin",
+          "pluginId": "base@tj-agents",
+          "displayOrder": 0,
+          "enabled": true,
+          "isManaged": false,
+          "currentHash": "sha256:7bee6f7767abb61e7fc0357baa308a04249413f87e9b6f4b86d3ae9222219d5a",
+          "trustStatus": "trusted"
+        },
+        {
+          "key": "base@tj-agents:hooks/codex.json:pre_tool_use:1:0",
+          "eventName": "preToolUse",
+          "handlerType": "command",
+          "command": "tj_hook -- python -I -B -c \"import hashlib, os, runpy, sys, tempfile;from pathlib import Path;package_root = Path(sys.argv[1]);package_digest = sys.argv[2];configured_snapshots = os.environ.get('TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY', '');plugin_data = Path(os.environ.get('PLUGIN_DATA', '')).resolve();snapshots = Path(configured_snapshots) if configured_snapshots else plugin_data / 'hook-snapshots';snapshot_key = hashlib.sha256((str(package_root) + chr(0) + package_digest).encode()).hexdigest();loaders = (base / 'hooks' / 'codex' / 'snapshot.py' for base in (snapshots / snapshot_key, package_root));newline = chr(10).encode();sources = (loader.read_bytes().replace(chr(13).encode() + newline, newline).replace(chr(13).encode(), newline) for loader in loaders if loader.is_file());source = next((candidate for candidate in sources if hashlib.sha256(candidate).hexdigest() == '43b2b800fd10d444f0aea8a865409d31499be16dcbccd3bc0c75f92b623f6acd'), None);source is not None or (sys.stderr.write('Codex hook snapshot loader integrity check failed' + chr(10)), sys.exit(2));workspace = tempfile.TemporaryDirectory();staged = Path(workspace.name) / 'loader.py';staged.write_bytes(source);runpy.run_path(str(staged), run_name='__main__')\" \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\" \"sha256:e48ab983e5c43a81f7006d7436fdedf8178827e2409e6347e522bf08c09c01d5\" \"base\" \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local/hooks/tier_gate.py\" --tool-context",
+          "async": false,
+          "matcher": "apply_patch",
+          "timeoutSec": 30,
+          "statusMessage": null,
+          "additionalContextLimit": 5000,
+          "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+          "source": "plugin",
+          "pluginId": "base@tj-agents",
+          "displayOrder": 1,
+          "enabled": true,
+          "isManaged": false,
+          "currentHash": "sha256:1bb2d64c9d058fe613a796351a997e98c6ac25de7925f8e9f7eb7e92b452acf3",
+          "trustStatus": "trusted"
+        },
+        {
+          "key": "base@tj-agents:hooks/codex.json:post_compact:0:0",
+          "eventName": "postCompact",
+          "handlerType": "command",
+          "command": "tj_hook -- python -I -B -c \"import hashlib, os, runpy, sys, tempfile;from pathlib import Path;package_root = Path(sys.argv[1]);package_digest = sys.argv[2];configured_snapshots = os.environ.get('TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY', '');plugin_data = Path(os.environ.get('PLUGIN_DATA', '')).resolve();snapshots = Path(configured_snapshots) if configured_snapshots else plugin_data / 'hook-snapshots';snapshot_key = hashlib.sha256((str(package_root) + chr(0) + package_digest).encode()).hexdigest();loaders = (base / 'hooks' / 'codex' / 'snapshot.py' for base in (snapshots / snapshot_key, package_root));newline = chr(10).encode();sources = (loader.read_bytes().replace(chr(13).encode() + newline, newline).replace(chr(13).encode(), newline) for loader in loaders if loader.is_file());source = next((candidate for candidate in sources if hashlib.sha256(candidate).hexdigest() == '43b2b800fd10d444f0aea8a865409d31499be16dcbccd3bc0c75f92b623f6acd'), None);source is not None or (sys.stderr.write('Codex hook snapshot loader integrity check failed' + chr(10)), sys.exit(2));workspace = tempfile.TemporaryDirectory();staged = Path(workspace.name) / 'loader.py';staged.write_bytes(source);runpy.run_path(str(staged), run_name='__main__')\" \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\" \"sha256:e48ab983e5c43a81f7006d7436fdedf8178827e2409e6347e522bf08c09c01d5\" \"base\" \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local/hooks/tier_gate.py\" --compacted",
+          "async": false,
+          "matcher": null,
+          "timeoutSec": 30,
+          "statusMessage": null,
+          "additionalContextLimit": null,
+          "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+          "source": "plugin",
+          "pluginId": "base@tj-agents",
+          "displayOrder": 2,
+          "enabled": true,
+          "isManaged": false,
+          "currentHash": "sha256:ab49e5e43f597f4b84de85ee8e1d5cf671b34f7bcf82cb945caeb900def6562d",
+          "trustStatus": "trusted"
+        },
+        {
+          "key": "base@tj-agents:hooks/codex.json:session_start:0:0",
+          "eventName": "sessionStart",
+          "handlerType": "command",
+          "command": "tj_hook -- python -I -B -c \"import hashlib, os, runpy, sys, tempfile;from pathlib import Path;package_root = Path(sys.argv[1]);package_digest = sys.argv[2];configured_snapshots = os.environ.get('TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY', '');plugin_data = Path(os.environ.get('PLUGIN_DATA', '')).resolve();snapshots = Path(configured_snapshots) if configured_snapshots else plugin_data / 'hook-snapshots';snapshot_key = hashlib.sha256((str(package_root) + chr(0) + package_digest).encode()).hexdigest();loaders = (base / 'hooks' / 'codex' / 'snapshot.py' for base in (snapshots / snapshot_key, package_root));newline = chr(10).encode();sources = (loader.read_bytes().replace(chr(13).encode() + newline, newline).replace(chr(13).encode(), newline) for loader in loaders if loader.is_file());source = next((candidate for candidate in sources if hashlib.sha256(candidate).hexdigest() == '43b2b800fd10d444f0aea8a865409d31499be16dcbccd3bc0c75f92b623f6acd'), None);source is not None or (sys.stderr.write('Codex hook snapshot loader integrity check failed' + chr(10)), sys.exit(2));workspace = tempfile.TemporaryDirectory();staged = Path(workspace.name) / 'loader.py';staged.write_bytes(source);runpy.run_path(str(staged), run_name='__main__')\" \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\" \"sha256:e48ab983e5c43a81f7006d7436fdedf8178827e2409e6347e522bf08c09c01d5\" \"base\" \"C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local/hooks/tier_gate.py\" --session-context",
+          "async": false,
+          "matcher": null,
+          "timeoutSec": 30,
+          "statusMessage": null,
+          "additionalContextLimit": null,
+          "sourcePath": "C:\\Users\\TommySeery\\AppData\\Local\\Temp\\deterministic-worktrees-604\\native-12\\codex-home\\plugins\\cache\\tj-agents\\base\\local\\hooks\\codex.json",
+          "source": "plugin",
+          "pluginId": "base@tj-agents",
+          "displayOrder": 3,
+          "enabled": true,
+          "isManaged": false,
+          "currentHash": "sha256:4e2d2c9970ef8c0697227384fdb42e058426e394b38b39aba1a81c6a613ee129",
+          "trustStatus": "trusted"
+        }
+      ],
+      "warnings": [],
+      "errors": []
+    }
+  ]
+}
