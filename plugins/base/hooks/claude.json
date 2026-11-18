@@ -6,8 +6,10 @@
           {
             "type": "command",
             "timeout": 30,
-            "command": "python",
+            "command": "tj_hook",
             "args": [
+              "--",
+              "python",
               "-B",
               "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
               "--session-context"
