@@ -47,3 +47,13 @@ Remaining scope: causal diagnosis, implementation, independent review, Windows/L
 Done when: the focused repair is reviewed and merged with required checks passing.
 
 Acknowledge pickup here with your identity and runtime version before deliverable writes. Load plan-execution and lanes, read repository conventions, and continue this bounded standards-source repair immediately. Diagnose the failed cache transition and assess the inconsistent launcher recovery paths. Use existing source-owner evidence and tests; do not repeat completed archive/runtime verification. Reproduce a focused causal regression with disposable caches or controlled mocks as appropriate, implement the smallest safe recovery, test failures still enforce authenticity/hook-trust/security, validate cross-platform code and deliver through repository gates. Keep this same goal current with actual evidence and next action. No routine continuation approval is required.
+
+## Progress
+
+2026-10-11: Reconciled the active branch and PR #81. This branch had no implementation; PR #81 remains open with a failed verify check and only owns the older PowerShell timeout work, so it is not a dependency for this Python recovery.
+
+Implemented the bounded recovery in `.agents/machine/scripts/codex_marketplace_sync.py`: retry once only when Codex reports the observed `plugin marketplace upgrade` cache-backup access-denied error. The retry repeats the marketplace upgrade before inventory, installation and hook trust continue. All other refresh errors, including hook-trust failures, remain fail-closed. Added regression coverage for the one retry and retained the fatal-error coverage.
+
+Focused validation passed on Windows: `python -B -m unittest tests.test_codex_marketplace_sync tests.test_launch_codex -v` (75 tests passed; 1 symlink test skipped by the filesystem).
+
+Next action: refresh generated package output for validation, run the remaining required checks, commit the focused candidate, then enter independent review and delivery.

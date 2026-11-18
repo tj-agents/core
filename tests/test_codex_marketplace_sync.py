@@ -25,9 +25,11 @@ class FakeCodex:
     """Records every call made to it and answers the same fixed sequence the PowerShell test's
     Invoke-FakeCodex function did, keyed off the command line rather than call order."""
 
-    def __init__(self, fail_upgrade=False, empty_inventory=False, trust_exit=0):
+    def __init__(self, fail_upgrade=False, recoverable_upgrade_failure=False, empty_inventory=False, trust_exit=0):
         self.calls = []
         self.fail_upgrade = fail_upgrade
+        self.recoverable_upgrade_failure = recoverable_upgrade_failure
+        self.upgrade_attempts = 0
         self.empty_inventory = empty_inventory
         self.trust_exit = trust_exit
         self.trust_calls = []
@@ -49,8 +51,19 @@ class FakeCodex:
 
         self.calls.append(' '.join(arguments))
         if arguments == ['plugin', 'marketplace', 'upgrade', '--json']:
+            self.upgrade_attempts += 1
             if self.fail_upgrade:
                 return completed(argv, 1, stdout='upgrade failed')
+            if self.recoverable_upgrade_failure and self.upgrade_attempts == 1:
+                return completed(
+                    argv,
+                    1,
+                    stdout=(
+                        'Failed to upgrade marketplace base-agents: failed to refresh plugin cache for '
+                        'engineering@base-agents: failed to back up plugin cache entry: Access is denied. '
+                        '(os error 5)'
+                    ),
+                )
             return completed(argv, 0, stdout=json.dumps(
                 {'selectedMarketplaces': ['base-agents'], 'upgradedRoots': ['cache'], 'errors': []}
             ))
@@ -148,6 +161,24 @@ class SyncCodexStandardsTests(unittest.TestCase):
         self.assertIn('upgrade failed', str(raised.exception))
         self.assertEqual(fake.calls, ['plugin marketplace upgrade --json'])
         self.assertEqual(fake.trust_calls, [])
+
+    def test_a_cache_backup_access_denied_error_retries_the_marketplace_upgrade_once(self):
+        fake = FakeCodex(recoverable_upgrade_failure=True)
+        selected = SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
+
+        self.assertEqual(selected, ['base@base-agents', 'engineering@base-agents'])
+        self.assertEqual(fake.calls, [
+            'plugin marketplace upgrade --json',
+            'plugin marketplace upgrade --json',
+            'plugin list --available --json',
+            'plugin add base@base-agents --json',
+            'plugin add engineering@base-agents --json',
+        ])
+        self.assertEqual(
+            self.lines,
+            ['Codex plugin cache refresh was denied; retrying marketplace upgrade once.', 'trust tj-agents hooks'],
+        )
+        self.assertEqual(len(fake.trust_calls), 1)
 
     def test_a_marketplace_upgrade_that_reports_errors_in_its_json_also_blocks_the_sync(self):
         def run(argv, cwd=None, **kwargs):
