@@ -1,20 +1,21 @@
 {
-  "description": "Selected engineering mechanisms: an agent never widens the account's GitHub credential.",
+  "description": "Guard credential scope and require current review evidence at merge.",
   "hooks": {
     "PreToolUse": [
       {
         "hooks": [
           {
             "type": "command",
-            "timeout": 30,
+            "timeout": 60,
             "command": "python",
             "args": [
               "-B",
               "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
               "--deadline",
-              "25",
+              "55",
               "--deny-on-timeout",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py@Bash|PowerShell"
+              "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py@Bash|PowerShell",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_review_gate.py@Bash|PowerShell"
             ]
           }
         ],

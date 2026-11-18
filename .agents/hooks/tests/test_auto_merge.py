@@ -256,11 +256,9 @@ class AutoMergeTests(unittest.TestCase):
                     with self.assertRaisesRegex(AUTO_MERGE.AutoMergeError, message):
                         AUTO_MERGE.current_review(root, binding, changed)
 
-    def test_current_review_uses_the_local_canonical_work_order_when_head_tree_lacks_it(self):
+    def test_current_review_without_security_configuration_uses_the_canonical_work_order(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()
-            (root / ".agents").mkdir()
-            (root / ".agents" / "merge-gate.json").write_text(json.dumps({"security_paths": []}), encoding="utf-8")
             binding = self.binding(root)
             review = root / "reviews" / "feature-auto-merge.md"
             review.parent.mkdir()

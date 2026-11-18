@@ -23,6 +23,28 @@ or merge hold, a repository's stop classes, stop paths, hold labels and stricter
 and the ordinary gates — current-head review and green checks. Outside the goal's own PRs nothing is
 covered: not another repository, not a PR the goal did not create, and never publishing to a package feed.
 
+## Review enforcement at merge
+
+The engineering plugin checks recognized `gh pr merge` calls on Claude and Codex immediately before
+execution. It verifies the target PR's current head, completed canonical review evidence, unresolved
+findings and applicable security review. The command must pin that full head with `--match-head-commit`.
+Installing engineering enables this check; `.agents/merge-gate.json` optionally adds security paths.
+An ambiguous target or failed verification refuses the merge. Searches, experiments, edits, help and
+disabling auto-merge remain available. Continuation and cleanup are workflow responsibilities.
+
+```text
+gh pr view <n> --json headRefOid
+pushd "<absolute-worktree>" && gh pr merge <n> --merge --match-head-commit <reviewed-full-head-sha>
+```
+
+This local check verifies evidence consistency, not reviewer identity or judgment. It does not intercept
+the GitHub UI, direct API calls or opaque scripts. Prefer GitHub repository rules for enforcement across
+those entry points. `github-actions:merge-policy` owns that configuration: use native approvals, or a
+required review check with an actual producer bound to the current head and expected GitHub App. Keep
+agent credentials outside admin bypass and verify generated-package writers still work before applying
+the policy. A missing producer, unsupported private-repository plan or unavailable reviewer identity is
+an explicit rollout blocker; never claim an unenforced check name protects the branch.
+
 ## Persistent continuation
 
 When a queue, check, publication, or generated sync will resolve after this turn, enter the current harness's

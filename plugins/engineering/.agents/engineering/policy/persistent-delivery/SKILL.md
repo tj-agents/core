@@ -94,7 +94,8 @@ python -B workflows/auto_merge.py --root ROOT
 
 It reloads fresh settings and authority, the complete remote diff and labels, live PR readiness, exact local and
 remote branch/head/worktree identity, and the canonical review and security evidence before executing its
-fixed GitHub command. Do not run `gh pr merge --auto` directly; the delivery hook directs it to this wrapper.
+fixed, head-pinned GitHub command. Persistent delivery uses this wrapper; the local merge-review hook
+checks recognized direct merge commands independently of continuation state (`engineering:merging`).
 
 The artifact retains matching approval wording and provenance as `scoped_approval` across wakes and
 supported repairs to the same PR, worktree and branch. Each rebind refreshes the remote head, checks and

@@ -38,14 +38,14 @@ path set does not prove its content harmless: escalate to ordinary review for ex
 configuration, security-sensitive or destructive instructions, materially consequential technical claims,
 or any uncertainty about the semantic risk.
 
-A pure closeout whose net diff contains deletions only is exempt because no surviving content remains for
-these lenses:
+Deletion-only closeouts also complete this pipeline and record the current-head watermark before merge.
+Select routine mode only when its semantic and path conditions hold.
 
-```bash
-git diff --diff-filter=ACMRT --name-only "<base>..<head>"
+```text
+Candidate: remove an obsolete prose note.
+Assessment: routine; the deleted note contains no executable or consequential instructions.
+Completion: the focused docs pass records complete status, final judgment and the frozen head.
 ```
-
-Any surviving path requires review in its explicitly assessed mode.
 
 ## Work order and review layer
 
