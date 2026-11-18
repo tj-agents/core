@@ -511,7 +511,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:b53c59fcecdc34611c75ab060c21e9f2246c1e14f762b2e5d4e168e7c318bc65",
+          "digest": "sha256:1846267acf5850e289e274c03e05114152ac8dcfc8639feb722ec10f9be60ec2",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -602,7 +602,15 @@
                 "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
                 "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
                 "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)"
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)"
               ],
               "codex_prefix_rules": [
                 {
@@ -770,6 +778,40 @@
                       "recover",
                       "--host",
                       "codex"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
+                      "${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py",
+                      "${PLUGIN_ROOT}/codex-skills/bootstrap-capabilities/scripts/adopt_repository.py"
+                    ],
+                    "--root"
+                  ],
+                  "justification": "machine:bootstrap-capabilities composes and applies the repository-declared immutable capability selection",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
+                      "--root",
+                      "/workspace/project"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/other.py",
+                      "--root",
+                      "/workspace/project"
                     ]
                   ]
                 }
