@@ -238,7 +238,8 @@ repositories do not select that profile implicitly.
 
 Before foreground or meta closeout, reporting done, or deleting recovery artifacts, invoke the existing
 completion-record contract when the canonical goal contains a fenced `completion` record. This applies
-independently of scheduling. `engineering:persistent-delivery` owns its completion contract and fields.
+independently of scheduling. The software delivery reference beside `engineering:merge` owns its
+completion contract and fields.
 
 Terminal selected Engineering evidence names implementation, validation, review, PR, merge commit, remaining
 durable state, and implementation authority. A commit, pushed branch, or open PR is not terminal while
