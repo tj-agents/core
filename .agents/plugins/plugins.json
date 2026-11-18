@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:d9adb740ea6c4d135ae9b338330246bb6abd809b5618331b3a3da394b2c66ce9",
+      "digest": "sha256:0f7eb3b2bb464707434c4feb15ab6d4e476e656096575eb46ce26afdaebc0750",
       "harness": {
         "marketplaces": [
           {
@@ -124,6 +124,7 @@
         "macos"
       ],
       "skills": [
+        "continue",
         "handoff",
         "plan",
         "plan-artifacts",
@@ -147,7 +148,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:777f5462c1f8c610f014689df4eb12a0f6ef1c193bc5878f53b1c556e7c32e43",
+      "digest": "sha256:fd4f08bda8c9bce80e121ab529ba11a9d7892c7db612531a14e29e29a0880344",
       "harness": {
         "marketplaces": [
           {
@@ -293,7 +294,6 @@
         "open-pr",
         "open-worktree",
         "persistent-delivery",
-        "persistent-workflow",
         "plans",
         "pr-preflight",
         "pr-screenshots",
@@ -336,7 +336,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:a5ad04c378c9c2f430cde468e41428b9cf2721cc7b285fd20fd924f1879a3e1a",
+      "digest": "sha256:d1257ccdaa409e71763e5cc755171a5746f820e70e11a8957e1b6de3fc2532b8",
       "harness": {
         "marketplaces": [
           {

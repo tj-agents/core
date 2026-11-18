@@ -65,8 +65,18 @@
     }
   },
   "continuation": {
-    "wake": "in-chat-scheduled-task",
-    "scope": "same-chat-local-project-worktree",
+    "turns": "goal",
+    "wake": "native-scheduled-interface-when-exposed",
+    "scheduled_management": [
+      "desktop",
+      "supported-web"
+    ],
+    "scheduled_management_unavailable": [
+      "cli",
+      "ide"
+    ],
+    "durable_cli": ".codex/runtime/continuation/continuation_runtime.py",
+    "scope": "canonical-goal-and-exact-delivery-identity",
     "unsupported_gate": "product-capability-unavailable"
   },
   "roles": {
