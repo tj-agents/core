@@ -1,6 +1,6 @@
 ---
 name: open-pr
-description: Create or edit a pull request with explicit nonempty Why and What sections, validating the proposed body before the forge write and the saved body afterward. Use before any PR creation or description edit through a CLI or connector, publishing a correction, or showing the corrected review.
+description: Create or edit a pull request with explicit nonempty Why and What sections, validating the proposed body before the forge write and the saved body afterward. Use before any PR creation or description edit through a CLI or connector, publishing a correction, showing the corrected review, or handing existing PRs over for approval.
 
 kind: operation
 domain: process
@@ -177,8 +177,22 @@ Include a clickable PR URL in the same user-facing message whenever reporting a 
 or requesting its review, approval or merge, even when the link appeared earlier or in tool output.
 Use a Markdown link in rich chat and a plain URL in terminals, outside code formatting.
 
+Before asking for approval of one PR or a batch, lead with one concise plain-language sentence describing
+the overall improvement after every included PR merges. Describe the resulting user experience rather than
+the implementation. Mention a remaining manual step or limitation only when it materially affects that
+outcome; links and review details follow the combined summary.
+
+When handing PRs from explicitly adopted Personal projects over for Tommy's approval, select
+`personal:bot-identity` and follow its approval handoff procedure for the PRs in that response.
+This also applies to later readiness reports and approval requests for existing PRs.
+
 ```text
-Ready for your approval: [PR #123](https://github.com/owner/repo/pull/123).
+Approval request for two PRs:
+When both merge, sessions close reliably without stuck processes or repeated attempts.
+
+[PR #123](https://github.com/owner/repo/pull/123)
+[PR #124](https://github.com/owner/repo/pull/124)
+Personal project: select personal:bot-identity for the approval command accompanying these links.
 ```
 
 Opening a draft is not a context boundary: continue implementing, reviewing, or observing
