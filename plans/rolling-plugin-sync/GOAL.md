@@ -1,8 +1,9 @@
 # Rolling Plugin Sync
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-AlwaysLatestPlugins
-Branch: Fix/RollingPluginSync, originally off baa8f13a; integrated f2dd95ca; merging newer main 6be8c45a.
-PR: https://github.com/tj-agents/core/pull/269 (draft; Tommy owns merge)
+Branch: Fix/RollingPluginSync, originally off baa8f13a; integrated f2dd95ca and newer main 6be8c45a; published head 81dce32e.
+PR: https://github.com/tj-agents/core/pull/269 (ready for review; Tommy owns merge)
+Status: authorized delivery complete on 16 October 2026 at 81dce32ea5f69deb1947ed6136824f33b45132da.
 Owner: Codex session `01a13fa0-a1c6-7051-b3ce-a63fb26916da`;
 work item `always-latest-plugins/implementation` (stable in-flight identifier).
 
@@ -115,6 +116,25 @@ dependencies are selected; an empty initial adoption defaults to base, engineeri
 restore a mandatory all-Core roster or the old project-only refusal. Extend verified rolling refresh and
 permission convergence to explicitly selected Concertable publishers already allowed by PR #270.
 
+Integration committed in 65fc5519 and fd17db49. Focused adoption, source validation, both-host settings,
+Concertable selection and permissions passed; generation, harness closure and the generated-output guard
+passed. Independent integration review completed with no retained finding at fd17db49. Its generated-file
+allegation was rejected against the actual PR base and the passing CI guard. Canonical review:
+`reviews/Fix-RollingPluginSync.md`; integration descriptor `7e7f5613a780ed77cb1d0a83160f913113ecd4bd21309246874f369d3a221b80`.
+
+CI 38822493978 cleared the earlier broad failures: Windows passed the source suite; Linux ran 1,162
+source tests with six failures from one POSIX fake-Codex placement bug. The fixture-only correction is
+7d5e3372, verified by emitted-inventory probe 1a9f7d8da48a1899 and Windows wiring regression 44e7afa6a1748ea2.
+The next Linux run passed the complete source suite. Both platforms then exposed only two obsolete
+shared-runtime assertions: retired aliases and required Codex manifest versions. Those tests were corrected
+in 81dce32e and passed focused validation (8e7fe5cec3d927f9, a70a098143b25ded). Exact-head CI 38824122187 is
+green on both Linux and Windows. Final review is fd17db49..81dce32e, descriptor
+7f59d46ae9d6623b15bf008c8c156357acdd8b2b0de9e0bdea5e09711af3e70d. Native review completed clean in 331.268
+seconds (9ea90e4de2020635-rolling-native-final-test-review.log); parent contract and workflow checks are
+clean. Review and security watermarks cover 81dce32e. Host coverage validates and delivery preflight is
+green: current base, pushed code, correct owning PR and exact reviewed head. No integration installation or restart of
+this original CLI has occurred.
+
 ## Implementation decision and delivery boundary
 
 Use a shared Python rolling synchronizer with host adapters. Git main objects are authoritative; native
@@ -123,7 +143,7 @@ check. Existing per-repository selection behavior remains an input, including se
 identities and explicit disables. Required dependencies come from current package harness declarations.
 
 1. Resolve effective launch directory, settings and selected identities. Authenticate selected catalogs
-   and external publishers as GitHub tj-agents sources; handle only explicitly known old URL migrations.
+   and external publishers as approved GitHub tj-agents or Concertable sources; handle only explicitly known old URL migrations.
 2. Fetch selected catalogs and publisher main commits once per publisher, resolve current package paths
    recursively, and reject missing selections, cycles, unsafe paths and disabled required dependencies.
 3. Produce cache-only native catalog projections preserving plugin identities. Extract exact Git trees,
@@ -151,7 +171,7 @@ project registry entries. The native experiment is captured in the Git-private w
 `952bc814239d7eec-native-claude-versionless-reinstall.log`.
 Codex named profiles use NAME.config.toml and are not accepted directly by app-server; selection must
 honor that format or refuse the option clearly. No live host acceptance of the integrated updater is
-claimed yet. Current main `f2dd95ca` is integrated; preserve that single pre-review synchronization.
+claimed yet. Main `6be8c45a` is integrated; reconcile further base movement against the reviewed candidate.
 
 Release removal: replace release/pin catalog metadata and manual manifest versions with current package
 metadata and automatic host-required identity only. Retire the version-bump command and turn adoption
@@ -206,8 +226,8 @@ No merge or branch installation is authorized by refresh. Preserve this worktree
 ## Next Steps
 
 Scope: whole authorized goal through implementation, verification, review, commit and open PR.
-Current slice: repairs reviewed clean at 38b148ab; integrate newly merged PR #270, then validate the integration head.
-Remaining scope: independent review, exact-head CI and ready PR; Tommy owns merge.
+Current slice: delivered. Reviews, exact-head Windows/Linux CI, host coverage and delivery preflight pass at 81dce32e; PR #269 is ready.
+Remaining authorized implementation work: none. Tommy owns merge and subsequent main publication activates the change.
 Done when: verified implementation and any machine changes are reported with an open reviewed PR.
 
 1. Original session codex:01a13fa0-a1c6-7051-b3ce-a63fb26916da has retaken ownership on Tommy's explicit
@@ -215,12 +235,28 @@ Done when: verified implementation and any machine changes are reported with an 
    follow-up was unavailable with no send attempted. This original live native identity was reattached
    with PID/start-time verification, then the work-item claim atomically removed the replacement owner.
    Preserve the rename and removal already made; do not create refresh-cli or transfer this original task again.
-2. Native acceptance, focused regressions and post-merge generation passed. Main was synchronized once.
-   Review the committed candidate independently,
-   and open the reviewed PR with exact-head Windows/Linux CI. Tommy owns merge. Generated output stays
-   out of authored commits; preserve current test evidence instead of repeating passed suites blindly.
+2. Delivery is complete at 81dce32e. Full/incremental reviews have no retained findings; CI 38824122187
+   passed guard, verify-linux and verify-windows. The authoritative PR body validates and PR #269 is ready,
+   still open, with auto-merge disabled. Generated test output was restored after verification. No further
+   code work or CI repetition is needed unless the candidate changes or a new concern is established.
 3. Separate planning-only research in C:/Users/TommySeery/source/repos/tj-agents/docs/plans/problem-management/PLAN.md
    owns personal problem-record/docs policy. It must not become a universal Core requirement or take over
    this implementation. Core primary BUGS.md B013 records the failed skill/goal reads, uncommitted for batching.
 4. Activation of rolling startup still waits for Tommy's merge and main regeneration. Report actual machine
    changes and unverified native behavior honestly.
+
+## Final delivery evidence ? 16 October 2026
+
+- Head: `81dce32ea5f69deb1947ed6136824f33b45132da`, fully pushed on `Fix/RollingPluginSync`.
+- PR #269 is ready for review, open and not configured for auto-merge; base is main `6be8c45a`.
+- CI run `38824122187`, attempt 1: guard, Windows and Linux successful. Main-only regeneration is skipped
+  on PRs as designed. Shared monitor `e58156d2258c72aea56b4588d4c66095315b39650de6e4d3d2b8a426a2658c3a`
+  observed successful completion.
+- Canonical review and security watermarks cover that head; native final review artifact
+  `9ea90e4de2020635-rolling-native-final-test-review.log` is clean. Earlier R1?R4 are resolved.
+- Host coverage check, delivery preflight and authoritative PR-body validation pass. No base movement or
+  unpushed code remains. Activation is Tommy's merge followed by main's generated publication.
+- Machine changes remain the previously reported published Codex cache refresh, hook-trust configuration
+  and generated rules. This original CLI was not restarted, and this branch's runtime was not installed.
+- Deferred self-repair and personal problem-record policy remain separate work; this delivery does not
+  implement a universal personal bug/debt workflow in Core.

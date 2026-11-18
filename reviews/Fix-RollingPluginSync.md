@@ -2,8 +2,8 @@
 
 **Review status:** `complete`
 **Judgment:** `approved`
-**Reviewed up to commit:** `38b148ab03189aa667ff1c3780bd3deb47f27f70` `(2026-10-15)`
-**Security-reviewed up to commit:** `38b148ab03189aa667ff1c3780bd3deb47f27f70` `(2026-10-15)`
+**Reviewed up to commit:** `81dce32ea5f69deb1947ed6136824f33b45132da` `(2026-10-16)`
+**Security-reviewed up to commit:** `81dce32ea5f69deb1947ed6136824f33b45132da` `(2026-10-16)`
 
 ## Review pass — 2026-10-15 — full
 
@@ -77,7 +77,7 @@ and fixture Git identity; the focused fixture repairs remain a delivery gate alo
 ```agent-host-coverage
 {
   "schema_version": 1,
-  "candidate_head": "38b148ab03189aa667ff1c3780bd3deb47f27f70",
+  "candidate_head": "81dce32ea5f69deb1947ed6136824f33b45132da",
   "shared_source": ".agents/machine/scripts/rolling_plugins.py and startup_binding.py; shared hooks and selection generator",
   "hosts": [
     {
@@ -88,7 +88,7 @@ and fixture Git identity; the focused fixture repairs remain a delivery gate alo
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Frozen repairs reviewed. Rolling runtime: 22 tests, one platform skip (6786223bd000197f); startup binding: 8 passed (024ca2385dff225c); startup integration: 4 passed (68f8ed104308ddd0). Both native disposable adapters previously passed two-generation replacement and deletion (4d722d0af34b3626). Integrated installed-session activation still awaits user merge and main generation."
+        "evidence": "Reviewed clean through 81dce32e. Exact-head Linux CI 38824122187 passes, including generation, source and shared-runtime suites. Final test contracts passed focused checks (8e7fe5cec3d927f9, a70a098143b25ded); POSIX inventory and Windows wiring passed (1a9f7d8da48a1899, 44e7afa6a1748ea2). Multi-source integration checks and earlier actual native two-generation adapter acceptance (4d722d0af34b3626) remain valid. Exact-head Windows CI also passes; integrated installed-session activation awaits user merge and main publication."
       }
     },
     {
@@ -99,7 +99,7 @@ and fixture Git identity; the focused fixture repairs remain a delivery gate alo
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Frozen repairs reviewed. Rolling runtime: 22 tests, one platform skip (6786223bd000197f); startup binding: 8 passed (024ca2385dff225c); startup integration: 4 passed (68f8ed104308ddd0). Both native disposable adapters previously passed two-generation replacement and deletion (4d722d0af34b3626). Integrated installed-session activation still awaits user merge and main generation."
+        "evidence": "Reviewed clean through 81dce32e. Exact-head Linux CI 38824122187 passes, including generation, source and shared-runtime suites. Final test contracts passed focused checks (8e7fe5cec3d927f9, a70a098143b25ded); POSIX inventory and Windows wiring passed (1a9f7d8da48a1899, 44e7afa6a1748ea2). Multi-source integration checks and earlier actual native two-generation adapter acceptance (4d722d0af34b3626) remain valid. Exact-head Windows CI also passes; integrated installed-session activation awaits user merge and main publication."
       }
     }
   ]
@@ -143,3 +143,75 @@ Parent workflow/cache security checks completed against the same frozen delta un
 fallback. The tier gate reported no applicable stack conventions. All prior finding text and first-pass
 judgment are unchanged. Combined rolling runtime suite passed 22 cases (one platform skip) in
 `6786223bd000197f-rolling-final-runtime-regression.log`.
+
+## Review pass — 2026-10-16 — multi-marketplace integration
+
+**Candidate base:** `38b148ab03189aa667ff1c3780bd3deb47f27f70`
+**Candidate head:** `fd17db491c899925ab260ee6ba6d99c268f47bce`
+**Candidate branch:** `Fix/RollingPluginSync`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:d817cca95d991b3b4e73c1dca310754a79d7c117e649454bacf5f4b172c57ed4` `(33 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\zvnSsFw8ZY6I_eujlpT34r\fn9WE6eA7XfLHQqDFg-RMR`
+**Candidate bundle identity:** `sha256:0ae8609070be9be9a753d322e4e0a07eff36ea1b745148a1fc3acc4a13ea8296`
+**Work-order path:** `reviews/Fix-RollingPluginSync.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Descriptor: `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\always-latest-plugins\review\7e7f5613a780ed77cb1d0a83160f913113ecd4bd21309246874f369d3a221b80\descriptor.json`.
+Patch SHA-256: `e0db49a1145f2e2d525fa31624f2fe813b29e7bd68660c036e18bae672121ae0`.
+Native review completed from the frozen detached checkout in 423.531 seconds. Parent workflow and
+publisher-boundary review covered the immutable integration; no new finding is retained. The tier gate reports no
+applicable stack and the router reports no rules or violations. Incoming generated paths are identical
+to the newly integrated main and the generated-path guard passes.
+
+Focused multi-source adoption, selection validation, host settings and permission convergence passed.
+CI run 38822493978 reaches 1,162 source tests on Linux with six failures confined to the POSIX native
+Codex fixture in terminal-profile wiring; this failure is outside the integration delta. The test double
+creates its inventory under a Windows npm path while POSIX bootstrap calls the PATH executable directly.
+The isolated fixture repair is being validated separately; this review candidate remains immutable.
+
+Native evidence: `always-latest-plugins-native-review/artifacts/66fb6aa0da62dd49-rolling-native-marketplace-integration-review.log`.
+The only native allegation concerned generated files inherited by merging PR #270. It is rejected:
+`git diff origin/main..fd17db49 -- plugins` is empty and the exact-head generated-output guard passed
+locally (`6118696b1a4f2779`) and in CI. The watermark delta includes main's generated publication; the
+PR delta does not. No source or policy finding remains. The separate POSIX test-double fix is 7d5e3372,
+with the emitted-inventory probe (1a9f7d8da48a1899) and Windows wiring regression (44e7afa6a1748ea2) passed.
+
+## Review pass — 2026-10-16 — final test contracts
+
+**Candidate base:** `fd17db491c899925ab260ee6ba6d99c268f47bce`
+**Candidate head:** `81dce32ea5f69deb1947ed6136824f33b45132da`
+**Candidate branch:** `Fix/RollingPluginSync`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:9db3061a2994ac49577dc4ae20296955a46cbff3c3e292e5ade89c812fedad6e` `(3 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\zvnSsFw8ZY6I_eujlpT34r\f1nUaunWYjsVvwCMjBVjV6`
+**Candidate bundle identity:** `sha256:460f5014f18b6cd5926e7081437100b72b1de31063c4c2bea4dd16eaf7e0b17b`
+**Work-order path:** `reviews/Fix-RollingPluginSync.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Descriptor: `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\always-latest-plugins\review\7f59d46ae9d6623b15bf008c8c156357acdd8b2b0de9e0bdea5e09711af3e70d\descriptor.json`.
+Patch SHA-256: `76fe4bef42d8ab2b7b6d105f270fb3b56a521eda4a8da0961203bd83efbae8b7`.
+Selected lenses: native-general, api-contract, workflow. The native reviewer consumes this range from a
+clean detached checkout. Unsupported specialist model fallback remains with the parent over the same
+immutable bundle. No routed rules or violations. The unused 7d5e3372-only preparation was superseded
+before dispatch so all three test corrections receive one review.
+
+CI 38823306085 passed all 1,162 Linux source tests, then ran 1,145 shared-runtime tests with two obsolete
+expectations: a retired alias and a required manifest version. Those expectations were updated in 81dce32e;
+both focused tests pass (8e7fe5cec3d927f9, a70a098143b25ded). The POSIX fixture probe and Windows wiring
+regression passed before 7d5e3372. Exact-head full CI remains required.
+
+### Final synthesis
+
+No new findings. Native review completed in 331.268 seconds; artifact
+`always-latest-plugins-native-review/artifacts/9ea90e4de2020635-rolling-native-final-test-review.log`.
+Parent api-contract and workflow passes over the same frozen three-file delta are clean. The changes
+preserve all existing host payload assertions, require versionless manifests and retire shipped aliases,
+while putting the POSIX inventory at the executable bootstrap actually calls. Tier conventions remain
+inapplicable (`c18d03c7cc325450-rolling-final-test-tier-rules.log`). No runtime or trust boundary changed.
+All previous findings retain their original text, severity and disposition. Exact-head Linux and Windows CI are green in run 38824122187. Delivery preflight and host coverage pass;
+PR #269 is ready for review with merge left to Tommy.
+
+Final delivery: CI run 38824122187 passed guard, verify-windows and verify-linux at 81dce32e.
+Authoritative PR-body validation passed; PR #269 is ready, open and has no auto-merge request.
