@@ -1,12 +1,13 @@
 # core
 
-Core authors and publishes the `base`, `workflow` and `engineering` plugins for Codex and Claude, from
+Core authors and publishes the `base`, `workflow`, `engineering` and `docs` plugins for Codex and Claude, from
 [`tj-agents/core`](https://github.com/tj-agents/core) through
 [`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
 
 - `base` is always-on agent behavior: routing, project setup, solution assessment and paired agent files.
 - `workflow` is goal and plan ownership: plans, runs, resumption, status and handoff.
 - `engineering` is the software lifecycle: features, bug fixes, review, committing, PRs and merging.
+- `docs` is how pages people read are laid out.
 
 Core does not own agent sessions, recovery, refresh or machine installation (`tj-agents/agent`), CLI and OS
 mechanics such as closing terminals or the clipboard (`tj-agents/cli`), plugin generation and checks
@@ -105,7 +106,7 @@ gate. Source verification does not establish installed-host trust or acceptance.
 
 ## Layout
 
-- `.agents/` is the canonical host-neutral source for Base, Workflow and Engineering.
+- `.agents/` is the canonical host-neutral source for Base, Workflow, Engineering and Docs.
 - `.codex/` contains only Codex entry points and host configuration; `.claude/` contains only Claude entry
   points and host configuration. Their skills reference canonical `.agents/` definitions.
 - [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md) defines the source, adapter and distribution boundary.
