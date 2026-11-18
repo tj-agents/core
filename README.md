@@ -19,7 +19,7 @@ The richer planning workflows are selected engineering conventions, not prerequi
 Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
 Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
 The [shared recording contract](.agents/engineering/resources/problem-records.md) uses an explicitly
-selected provider for future bugs, mistakes, debt, features and tasks. Without selection, existing
+selected provider for future bugs, mistakes, debt, features, stories and tasks. Without selection, existing
 repository owners and file defaults apply, including root `BUGS.md`/`MISTAKES.md` and area `TECH_DEBT.md`.
 `engineering:write-issue` classifies a recording request and delegates to the corresponding specific
 writer. The problem address workflows reuse the existing repair lifecycle.

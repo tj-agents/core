@@ -71,7 +71,8 @@ first; repeated evidence updates that record. Recording stays within the current
 no separate authority to repair, publish, dispatch, or schedule work. Use the addressing workflow only
 when repair is already authorized, and preserve the original task while the record is updated.
 
-Recording requests for features or tasks select `engineering:write-feature` or `engineering:write-task`;
+Recording requests for features, stories or tasks select `engineering:write-feature`, `engineering:write-story`
+or `engineering:write-task`;
 an untyped recording request selects `engineering:write-issue`. These writers share
 [repository selection and persistence](../../resources/problem-records.md).
 
