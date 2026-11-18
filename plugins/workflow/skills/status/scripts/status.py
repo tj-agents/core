@@ -80,19 +80,24 @@ def git(directory, *arguments):
     return result.stdout.strip() if result.returncode == 0 else None
 
 
-def work_item_reader():
+def agent_store():
     package = package_root()
     source_runtime = package / ".agents" / "dependencies" / "agent" / ".agents" / "agent-store" / "runtime"
     runtime = source_runtime if source_runtime.is_dir() else package / ".agents" / "agent-store" / "runtime"
-    store = owned_module("reader", runtime / "reader.py")
-    identity = owned_module("repository_identity", runtime / "repository_identity.py")
-    reader_type = getattr(store, "ReadOnlyWorkItemStore", None)
+    if not (runtime / "tj_agent_store" / "__init__.py").is_file():
+        raise RuntimeError(f"status capability failure: own Agent Store is unavailable at {runtime}")
+    sys.path.insert(0, str(runtime))
+    try:
+        import tj_agent_store
+    except (ImportError, OSError, ValueError) as error:
+        raise RuntimeError(f"status capability failure: own Agent Store cannot be loaded: {error}") from error
+    reader_type = getattr(tj_agent_store, "ReadOnlyWorkItemStore", None)
     if not all((callable(reader_type),
-                callable(getattr(store, "StoreReadError", None)),
-                callable(getattr(identity, "repository_identity", None)),
+                callable(getattr(tj_agent_store, "StoreReadError", None)),
+                callable(getattr(tj_agent_store, "repository_identity", None)),
                 callable(getattr(reader_type, "work_item", None)))):
         raise RuntimeError("status capability failure: own Agent Store reader lacks work-item support")
-    return store, identity
+    return tj_agent_store
 
 
 def record_selection_reader():
@@ -113,7 +118,7 @@ def record_selection(directory):
 
 
 try:
-    store, identity = work_item_reader()
+    store = agent_store()
     records = record_selection_reader()
     asked = record_selection(here)
 except RuntimeError as error:
@@ -241,7 +246,7 @@ for entry in plan_entries():
         try:
             repository = repositories.get(member)
             if repository is None:
-                repository = identity.repository_identity(member, git)
+                repository = store.repository_identity(member, git)
                 if repository is None:
                     raise RuntimeError("work-item repository identity is unavailable")
                 repositories[member] = repository
