@@ -1,11 +1,12 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
+from pathlib import Path
 
+from tj_cli import process
 
 if sys.version_info < (3, 9):
     raise SystemExit("Problem-record providers require Python 3.9 or later")
@@ -24,14 +25,14 @@ class RecordError(ValueError):
 
 def primary_checkout(directory):
     try:
-        root = subprocess.run(
+        root = process.run(
             ["git", "-C", str(directory), "rev-parse", "--show-toplevel"],
             capture_output=True, text=True, encoding="utf-8", timeout=5, check=False,
         )
         if root.returncode:
             raise RecordError("source repository root could not be resolved")
         worktree = Path(root.stdout.strip()).resolve()
-        listed = subprocess.run(
+        listed = process.run(
             ["git", "-C", str(worktree), "worktree", "list", "--porcelain", "-z"],
             capture_output=True, text=True, encoding="utf-8", timeout=5, check=False,
         )
@@ -125,7 +126,7 @@ def read_record(root, reference, harness):
     if not reader.is_file() or not reader.resolve().is_relative_to(skill_root):
         raise RecordError("selected provider does not ship its record reader")
     try:
-        result = subprocess.run([sys.executable, "-B", str(reader), "--root", str(root), "--record", reference],
+        result = process.run([sys.executable, "-B", str(reader), "--root", str(root), "--record", reference],
                                 capture_output=True, text=True, encoding="utf-8", timeout=15, check=False)
     except (OSError, subprocess.SubprocessError) as error:
         raise RecordError("selected provider record read failed") from error
