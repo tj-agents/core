@@ -89,13 +89,15 @@
       {
         "path": "hooks/merge_review_gate.py",
         "hosts": [
-          "claude"
+          "claude",
+          "codex"
         ]
       },
       {
         "path": "hooks/persistent_workflow_merge_gate.py",
         "hosts": [
-          "claude"
+          "claude",
+          "codex"
         ]
       },
       {
