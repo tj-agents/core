@@ -9,6 +9,9 @@ import math
 import os
 import sys
 
+from continuation_completion import completion_status
+from workflow_route import read_receipt
+
 
 def has_obligations():
     root = os.environ.get("AGENT_STATE_DIRECTORY") or os.path.join(os.path.expanduser("~"), ".agents-state")
@@ -757,8 +760,33 @@ def stamp_transfer(command, data):
             save_obligation(path, obligation)
 
 
+def completion_ready_for_cleanup(obligation):
+    worktree = absolute_path(obligation.get("worktree"))
+    if worktree is None:
+        return False
+    status = completion_status(worktree)
+    if status.get("ready_for_cleanup") is not True:
+        return False
+    session = obligation.get("session_id")
+    owner = status.get("owner")
+    if not isinstance(session, str) or not isinstance(owner, dict):
+        return True
+    receipt = read_receipt(session)
+    if receipt.get("worktree") != str(worktree) or receipt.get("execution_obligation") is not True:
+        return True
+    updated_at = owner.get("updated_at")
+    obligation_at = receipt.get("execution_obligation_at")
+    return (
+        isinstance(updated_at, (int, float))
+        and not isinstance(updated_at, bool)
+        and isinstance(obligation_at, (int, float))
+        and not isinstance(obligation_at, bool)
+        and updated_at >= obligation_at
+    )
+
+
 def evaluate_codex_obligation(obligation, session, cwd, now):
-    if not obligation_pending(obligation):
+    if not obligation_pending(obligation) or not completion_ready_for_cleanup(obligation):
         return None
     disposition = obligation.get("disposition")
     if isinstance(disposition, dict) and disposition.get("reason") == "keep-open" and admitted_disposition(obligation):
@@ -941,6 +969,7 @@ def handle_stop(data):
             and obligation.get("session_id") == session
             and obligation.get("confirmed_merged")
             and obligation_pending(obligation)
+            and completion_ready_for_cleanup(obligation)
             and not admitted_disposition(obligation)
         ):
             json.dump({"decision": "block", "reason": deny_message(obligation, codex)}, sys.stdout)
@@ -949,11 +978,9 @@ def handle_stop(data):
 
 
 def reminder_line(obligation):
-    python = "python" if os.name == "nt" else "python3"
     return (
-        f"merge-cleanup: PR #{obligation.get('pr') or '?'} ({obligation.get('branch') or '?'}) "
-        f"at {obligation.get('worktree')} still needs merge Step 5 cleanup "
-        f"(`{python} -B \"{Path(__file__).resolve()}\" --clear \"{obligation.get('worktree')}\"` to retain the checkout; self-close is still required)."
+        f"merge-cleanup inventory: PR #{obligation.get('pr') or '?'} "
+        f"({obligation.get('branch') or '?'}) at {obligation.get('worktree')} has pending cleanup."
     )
 
 
@@ -985,6 +1012,8 @@ def handle_reminder(event, data):
             matched = [o for o in obligations if o.get("common_dir") == common_dir]
     if matched:
         emit(event, "\n".join(reminder_line(obligation) for obligation in matched))
+    elif obligations:
+        emit(event, f"merge-cleanup inventory: {len(obligations)} other checkout(s) have pending cleanup.")
 
 
 def branch_ref_missing(primary, branch):

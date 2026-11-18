@@ -87,8 +87,10 @@ def violations(output):
     ]
 
 
-def block(reason):
-    json.dump({"decision": "block", "reason": reason}, sys.stdout)
+def advisory(event, reason):
+    json.dump({
+        "hookSpecificOutput": {"hookEventName": event, "additionalContext": reason}
+    }, sys.stdout)
     sys.stdout.write("\n")
 
 
@@ -112,13 +114,13 @@ def main():
     try:
         output = run_audit(audit_command(config_path), config_path.parent.parent)
     except (ValueError, RuntimeError) as error:
-        block(f"WORKTREE CLEANUP GATE: cannot run the configured audit: {error}")
+        advisory(event, f"WORKTREE CLEANUP INVENTORY: audit unavailable: {error}")
         return 0
     found = violations(output)
     if found:
-        block(
-            "WORKTREE CLEANUP GATE: the repository audit found worktrees that need human cleanup. "
-            "Run its `close` or `retire` command after inspecting them; it never deletes automatically.\n"
+        advisory(
+            event,
+            "WORKTREE CLEANUP INVENTORY: audit found worktrees that need human cleanup.\n"
             + "\n".join(found)
         )
     return 0

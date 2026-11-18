@@ -149,11 +149,14 @@ it, or the next material checkpoint falls due.
    package, schema, deployment, or test-selection changes through `engineering:merge`. Reach either
    route through `engineering:open-pr` with the resolved slice and owning review. Waiting on a queue, CI run, publish, or
    the version-sync PR a merge generates is a poll, not a gate; own each to terminal through the current
-   harness persistent-workflow skill when it must outlive this turn, that generated PR included. Then close
-   the merged slice's worktree. For an existing stack, reconcile and continue its next layer; do not
-   duplicate it from main. Otherwise start the next branch from the current remote default and select
-   its checkout under `engineering:git-branching`. A managed host may allocate required isolation;
-   native execution can reuse an available checkout. Bind the same plan identity and continue.
+   harness persistent-workflow skill when it must outlive this turn, that generated PR included. Keep the
+   same CLI and active checkout while any plan `## Next Steps`, check, delivery, or user dialogue remains.
+   Reconcile and continue an existing successor stack layer; do not duplicate it from main. Otherwise start
+   the next branch from the current remote default and select its checkout under
+   `engineering:git-branching`. A managed host may allocate required isolation; native execution can reuse
+   an available checkout. Bind the same plan identity and continue. Close the checkout only after the owner
+   state is complete and a fresh report-ready completion check passes, or an explicit close request routed
+   through the existing `machine:close` arm.
 
 Planning-artifact publication remains part of the authorized plan lifecycle. Anonymous `do not push`, `do
 not open a PR`, or `do not merge` procedure copied into a plan or handoff cannot suppress it. Preserve an
