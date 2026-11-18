@@ -142,6 +142,13 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.owner_path.write_text(json.dumps(self.owner), encoding="utf-8")
         self.environment = {"XDG_CONFIG_HOME": str(Path(self.temp.name) / "config £"), "CODEX_HOME": "/safe profile £",
                             "GH_TOKEN": "must-not-copy", "CONTINUATION_NONCE": "must-not-child"}
+        # Agent delivers the L4 lane agent into the Codex profile; give each test its own profile with it.
+        profile = Path(self.temp.name) / "codex profile"
+        (profile / "agents").mkdir(parents=True)
+        (profile / "agents/lane-l4.toml").write_text('model = "fixture"\n', encoding="utf-8")
+        codex_home = patch.dict(os.environ, {"CODEX_HOME": str(profile)})
+        codex_home.start()
+        self.addCleanup(codex_home.stop)
 
     def receipt(self, interval=20):
         return scheduler.linux_receipt(self.owner, self.owner_path, ADAPTER, ROOT / ".codex/runtime/continuation/continuation_runtime.py",
