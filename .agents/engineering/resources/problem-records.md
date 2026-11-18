@@ -4,22 +4,25 @@ Bug, mistake, and debt records preserve an observed problem until its owning rep
 evidence. They make the next action explicit; they do not create authority to repair, publish, dispatch,
 or schedule work.
 
-The same repository selection governs feature and task records through `engineering:write-feature`
-and `engineering:write-task`. `engineering:write-issue` classifies an untyped request and loads one
-specific writer; it supplies no separate storage or creation path.
+The same repository selection governs feature, story and task records through
+`engineering:write-feature`, `engineering:write-story` and `engineering:write-task`.
+`engineering:write-issue` classifies an untyped request and loads one specific writer; it supplies no
+separate storage or creation path.
 
 ## Repository selection
 
 A committed `.problem-records.json` in the source repository's primary checkout may select an optional
 provider with `{"schema_version":1,"provider":"plugin:utility"}`. Resolve the source primary checkout
 from Git's worktree inventory, including when invoked from a feature worktree or subdirectory. Read
-its declaration before recording, listing, updating, resolving or addressing any of the five kinds.
+its declaration before recording, listing, updating, resolving or addressing any of the six kinds.
 Load that qualified installed skill for the current host and use its
 commands, canonical identities, configuration, publication and retention rules. Keep the common facts,
 repair ownership and evidence below. A missing or invalid selected provider is a blocker; preserve the
 observation in the active goal and report the resolver and resume condition without creating a fallback
 register. Selection requires repository authorization; never adopt a provider merely because it is installed.
-Without a declaration, the existing repository-declared register and file defaults below apply.
+Without a declaration, the existing repository-declared register and file defaults below apply. A story
+uses the repository's declared story or product-backlog convention; if none exists, retain it in the
+active task context and ask for its intended owner rather than changing its kind or creating a new register.
 
 Repository and employer policy controls which tooling may receive evidence. Installing a provider,
 selecting its plugin or opening a feature worktree does not adopt a tracker. An explicit opt-out or

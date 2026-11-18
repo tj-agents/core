@@ -1,6 +1,6 @@
 ---
 name: write-issue
-description: Classify a reported observation or requested backlog item and delegate to its specific bug, mistake, debt, feature or task writer. Use when asked to log, record or write an issue without a precise kind; recording alone does not authorize implementation.
+description: Classify a reported observation or requested backlog item and delegate to its specific bug, mistake, debt, feature, story or task writer. Use when asked to log, record or write an issue without a precise kind; recording alone does not authorize implementation.
 
 kind: convention
 domain: process

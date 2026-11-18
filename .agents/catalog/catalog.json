@@ -184,6 +184,7 @@
         "write-feature",
         "write-issue",
         "write-mistake",
+        "write-story",
         "write-task"
       ],
       "dependencies": {
@@ -204,7 +205,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:afa89b78733bbd52251a37332981a123c6a543dde0438b0987d9572f5924294f",
+      "digest": "sha256:67bad78d5b4aac3cadb30a6b60e2362f5e736d953a40eb635e66474d3b94fa98",
       "harness": {
         "marketplaces": [
           {
