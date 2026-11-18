@@ -12,11 +12,11 @@ agent-authored slice limits, read one existing canonical goal, use `workflow:pla
 one next action, and continue independent authorized work across commits and pull requests. Direct short
 requests remain their selected operation without a ceremonial plan.
 
-Read `machine:lanes` for bounded phase capability. The parent retains design, acceptance, diagnosis, and
+Read `agent:lanes` for bounded phase capability. The parent retains design, acceptance, diagnosis, and
 severity. Delegate only specified implementation or independent evidence under exact disjoint leases, and
 reconcile Git before reusing failed or cancelled leases.
 
-For repository ownership, invoke `machine:recover-agents` through native discovery and its published
+For repository ownership, invoke `agent:recover` through native discovery and its published
 `work-item-sessions.md` contract. Reconcile stored execution and owner state with actual native observation.
 Claim the same execution only after verifying exact native identity and a permitted predecessor. Do not use
 age-based takeover. Standalone work keeps its existing task goal and does not invent Git, provider, or SQLite
@@ -32,7 +32,7 @@ declaring a capability missing or asking the user for a machine. When a selected
 use it while retaining its authentication, trust, and authority constraints; independent authorized work
 continues.
 
-For a deferred command or condition, invoke `agent:background-listener` before parking or moving to
+For a deferred command or condition, invoke `agent:listen` before parking or moving to
 independent work. It owns deterministic background waiting and the native result notification.
 
 Use only a supported host continuation. Do not claim unattended execution before owner, foreground lease, and
@@ -46,6 +46,6 @@ pushed branch, open pull request, phase, or context boundary is not terminal whi
 ```text
 Goal: deliver the approved migration.
 Current slice: ask engineering:feature to add the bounded parser change and return tests.
-Deferred result: give the bounded watcher command to agent:background-listener before parking.
+Deferred result: give the bounded watcher command to agent:listen before parking.
 Next action: consume its completion result, then continue the same goal.
 ```
