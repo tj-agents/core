@@ -28,7 +28,7 @@ a source defect to repair. The user must not assemble machine-local approvals or
 for already-authorized skill workflows. Startup and child-host launch must be included in acceptance.
 Keep grants constrained to the declared capability, verified package and authorized target; changing the
 host's global security mode is not an implementation of skill-scoped grants. Preserve the user's existing
-Infonetica commit/publish policy and separate credential-copy hold, which are outside this defect.
+employer commit/publish policy and separate credential-copy hold, which are outside this defect.
 
 ## Ownership
 

@@ -11,7 +11,7 @@ its own goal and checkout. This successor owns only this goal.
 - Limit: Tommy said launch no extra CLI sessions — this is the only one. Do not launch further sessions,
   schedulers or `claude -p` children.
 - Not covered: Azure writes, edits to `tj-agents/dotnet`, other employer-repository edits, publishing elsewhere.
-- Tommy, 2026-10-13: approved all 15 employer-local settings files in `MIGRATION_PREVIEW.md`;
+- Tommy, 2026-10-13: approved all 15 employer-local settings files in the (since removed) migration preview;
   add the 45 equivalent C++ false flags while preserving all existing choices.
 
 ## Checkout
@@ -71,7 +71,7 @@ completeness check that reports it) so this can't silently strip a session again
 
 Converge the profile on `<plugin>@tj-agents`, remove stale legacy marketplaces once nothing references them,
 and fix whatever installer or migration in core should have done this so it doesn't recur. Local-scope
-`dotnet@dotagents` installs under `infonetica\*` work repos exist; handle them deliberately, don't strand them.
+`dotnet@dotagents` installs under employer work repos exist; handle them deliberately, don't strand them.
 
 ## Out of scope, noted for Tommy
 
@@ -168,7 +168,7 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
 - Live D3/D4: eight healthy user packages are enabled at `@tj-agents`, with mapped legacy preferences
   absent. Engineering has 52 complete skills at published `v2.1.15`, rather than 61 at damaged main.
   Consolidated marketplace pins remain authoritative; no marketplace source repository was edited.
-- Tommy approved all 15 employer-local files and 45 C++ false flags in `MIGRATION_PREVIEW.md`.
+- Tommy approved all 15 employer-local files and 45 C++ false flags in the migration preview.
   Exactly those additions were verified against backups; all other values were preserved. Native user
   C++ migration returned zero, keeping scoped legacy installs/marketplaces while they remain referenced.
 - Fresh-session loading and adoption of these source changes by installed pinned packages are unobserved

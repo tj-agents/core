@@ -135,12 +135,12 @@ class WorkflowStatusHarness(unittest.TestCase):
 
 class NeedleMatchingTests(WorkflowStatusHarness):
     def test_punctuated_needle_finds_its_plan(self):
-        self.plan('demo/AB-28884-country-risk-domain-split.md')
-        self.assertIn('AB-28884-country-risk-domain-split.md', self.listed('AB-28884'))
+        self.plan('demo/AB-4321-order-domain-split.md')
+        self.assertIn('AB-4321-order-domain-split.md', self.listed('AB-4321'))
 
     def test_leading_space_in_the_needle_is_tokenized_away(self):
-        self.plan('demo/AB-28884-country-risk-domain-split.md')
-        self.assertIn('AB-28884-country-risk-domain-split.md', self.listed(' AB-28884'))
+        self.plan('demo/AB-4321-order-domain-split.md')
+        self.assertIn('AB-4321-order-domain-split.md', self.listed(' AB-4321'))
 
     def test_a_pr_number_is_a_needle(self):
         self.plan('demo/PR-633-FOLLOWUP.md')

@@ -375,7 +375,7 @@ under plugins/concertable, with custom PowerShell enforcement and no Template/le
 slice removes that version, changes generator host validation, and updates hook-manifest tests. Integrity
 hashes and schema versions remain. Its separate currency hook can accept a six-hour cache after a fetch
 failure; assess relevance to verified Core startup before expanding that slice. Existing PRs do not overlap
-the narrow files. Infonetica is a distinct Claude-only legacy publisher with active packaging PRs #8/#6;
+the narrow files. The employer plugin is a distinct Claude-only legacy publisher with its own active packaging PRs;
 preserve their ownership and assess its manifest separately. CLI application releases are outside scope.
 
 Core's remaining source pin is .github/workflows/ci.yml ref v2.0.0 for Template. Remove it in a separate
@@ -441,7 +441,7 @@ The single mechanical writer now owns the Dotnet migration. Work-items' supporte
 changes only the selection file, existing two host settings and legacy lock; it preserves exactly
 base/engineering/machine/template@tj-agents. Apply it in that isolated consumer branch alongside Template.
 
-Continue all remaining consumer and custom publisher slices, including CPP/Infonetica/Concertable and
+Continue all remaining consumer and custom publisher slices, including CPP/employer/Concertable and
 Core's CI Template ref. Keep this live Core session/worktree. Native review, current-head CI and ordinary
 explicitly authorized merges remain required for each slice; no separate personal-policy work is adopted.
 
@@ -466,7 +466,7 @@ and focused no-network tests. Generator freshness passed. The writer lease is re
 actual partial diff, run focused tests and workflow verification, commit, then review and observe both
 workflows on the repaired candidate. No merge is authorized before these existing checks pass.
 
-Next publisher slices are CPP, personal tj-agents/infonetica, Concertable/agents, and Core's remaining
+Next publisher slices are CPP, the employer plugin, Concertable/agents, and Core's remaining
 Template CI pin, followed by published refresh/audit. Preserve other owners' work and this active CLI.
 
 Tommy called out this session ending without a concrete unblock action or continuation. This is an

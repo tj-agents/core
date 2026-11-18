@@ -46,16 +46,16 @@ Verification:
   Receipt: C:/Users/TommySeery/AppData/Local/Temp/tj-agents-handoff-2y1kits6/status.json.
 
 Consumer migration: sandbox-dotnet has portable generated selection plus both native settings. Sixteen
-Infonetica consumers are prepared in isolated sparse worktrees; all adoption/check operations and host
+work-repository consumers are prepared in isolated sparse worktrees; all adoption/check operations and host
 selection agreement checks pass, and distinct existing Claude instructions are preserved in sibling AGENTS.
-See [WORK_CONSUMER_MIGRATIONS.md](WORK_CONSUMER_MIGRATIONS.md) for exact scope and paths. No work commits,
+Their exact scope and paths were recorded outside this repository. No work commits,
 pushes or PRs were made. Original consumer checkouts and the original core checkout are preserved.
 
 External conditions and exact resume actions:
-- Work publication: automatic approval review rejected bulk work commits because the Infonetica commit
+- Work publication: automatic approval review rejected bulk work commits because the employer commit
   gate requires explicit go-ahead for the concrete set. Tommy authorizes commit/push/PR for the 16 prepared
   migrations; then commit each reviewed scope, perform independent review, push and open dependent PRs.
-- Infonetica publisher: tj-agents/infonetica#8 supplies native Codex metadata absent from current main.
+- Employer publisher: the employer plugin's Codex PR supplies native Codex metadata absent from current main.
   Retried run 37936207023 fails before starting due failed GitHub payments/spending limit. Publisher/account
   owner resolves billing and Tommy merges when ready; no billing change or merge was attempted here.
 - Isolated Claude acceptance: automatic review rejected reading the OAuth access token into an isolated
@@ -76,7 +76,7 @@ Instruction file checks pass both directions (core three pairs; sandbox one pair
 uncommitted or unpushed; generated output is excluded from the PR.
 
 Next action requires Tommy's bounded approval: (1) commit, push and open PRs for the sixteen prepared
-work migrations in WORK_CONSUMER_MIGRATIONS.md; (2) read the existing Claude OAuth token only into memory
+work migrations; (2) read the existing Claude OAuth token only into memory
 and pass it to the isolated acceptance child, with no credential logging or file copy. Automatic approval
 review rejected both proposed actions for missing explicit work-commit/credential-use authority.
 After approval, continue those two workstreams and their independent review/CI; publisher availability,

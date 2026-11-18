@@ -22,7 +22,7 @@ Current scope:
    from handoff, open and recovery launchers. Preserve existing handoff acknowledgement and pickup.
 3. Give `refresh-cli` a stable skill-local script entry, native fast default and explicit slow verification.
 4. Reconcile current Template and consumer mains before migrating declarations. Migrate remaining
-   Concertable, Infonetica and other known consumers through their owning repositories.
+   Concertable, the employer profile and other known consumers through their owning repositories.
 5. Remove superseded user declarations and legacy marketplaces only after all actual consumers
    have migrated and passed acceptance. Preserve unrelated user settings, credentials and caches
    used by live sessions.

@@ -138,8 +138,8 @@ the `/workboard` skill: repo-group scoping, subject matching, and the corpus rul
 - [x] **WB1 — HIGH — lens:matcher** — `.agents/engineering/utility/workboard/SKILL.md` `matches()`
   The needle was lowercased but never tokenized, while every candidate word came from `[a-z0-9]+`.
   Any punctuation in the needle therefore made all three clauses structurally unsatisfiable, and the
-  run printed zero rows with no diagnostic at all. Demonstrated: `FILTER=AB-28884` from
-  `infonetica/cris-diligence` returned nothing while `cris-diligence/AB-28884-country-risk-domain-split.md`
+  run printed zero rows with no diagnostic at all. Demonstrated: a work-item-number filter from
+  a work repository returned nothing while a plan file carrying that number
   sat in the corpus; `pr-633` and a pasted leading space failed the same way. This is the exact defect
   class the change was made to remove.
 
@@ -181,7 +181,7 @@ the `/workboard` skill: repo-group scoping, subject matching, and the corpus rul
 - [x] **WB5 — LOW — lens:corpus** — same file, scope skip
   A loose root plan gets `group = None`, so the out-of-group skip never fired and all seven listed in
   every session regardless of `SCOPE` — including `vectorized-gathering-pinwheel.md`, which is
-  Infonetica due-diligence work. The prose asserting the guarantee sits in the changed section.
+  employer work. The prose asserting the guarantee sits in the changed section.
 
   **Resolved** in `6a7600f`: an ungrouped root plan is `unfiled`, counted in the one-line notice and
   shown only under `SCOPE=all`. The `"(loose)"` display placeholder no longer feeds the matcher, which
