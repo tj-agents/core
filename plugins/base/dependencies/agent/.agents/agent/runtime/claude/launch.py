@@ -4,10 +4,11 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
-from launch_contract import Liveness
+from launch_contract import Liveness, PreparedLaunch
 from launch_errors import LaunchError
 from native_executable import is_script
 from tj_agent.host import Host
@@ -16,7 +17,6 @@ from tj_cli import process
 HOST = Host.CLAUDE
 IS_WINDOWS = os.name == "nt"
 SESSION_ENVIRONMENT: tuple[str, ...] = (
-    "NO_COLOR",
     "CLAUDECODE",
     "CLAUDE_CODE_CHILD_SESSION",
     "CLAUDE_CODE_ENTRYPOINT",
@@ -27,6 +27,16 @@ SESSION_ENVIRONMENT: tuple[str, ...] = (
 )
 TAB_CLEARED: tuple[str, ...] = ()
 TAB_FORCED = {"FORCE_COLOR": "1", "TERM": "xterm-256color"}
+
+
+def record_session_environment(
+    session_id: str, environ: Mapping[str, str], *, cleared: tuple[str, ...] = ()
+) -> None:
+    if path := environ.get("CLAUDE_ENV_FILE"):
+        with Path(path).open("a", encoding="utf-8") as stream:
+            for name in cleared:
+                stream.write(f"unset {shlex.quote(name)}\n")
+            stream.write(f"export {HOST.session_variable}={shlex.quote(session_id)}\n")
 
 
 def resolve_executable(home=None, which: Callable[[str], str | None] = shutil.which) -> str:
@@ -51,6 +61,18 @@ def executable() -> str:
     return resolve_executable()
 
 
+def prepare(directory: Path, title: str, arguments: list[str], cli: str, environ: Mapping[str, str]) -> PreparedLaunch:
+    return PreparedLaunch((executable(), *arguments))
+
+
+def abandon(prepared: PreparedLaunch, launch_id: str, dispatched: bool) -> None:
+    return None
+
+
+def confirm(prepared: PreparedLaunch, arguments: list[str], launch_id: str) -> None:
+    return None
+
+
 def start_arguments(directory, title, prompt, model, effort):
     arguments = ["--name", title]
     if model:
@@ -64,13 +86,20 @@ def resume_arguments(directory, title, session_id):
     return ["--resume", session_id, "--name", title]
 
 
-def liveness(run=process.run) -> dict[str, Liveness]:
+def liveness(run=process.run, *, strict: bool = False) -> dict[str, Liveness]:
     """Every Claude session the host lists, by session id: alive while it reports a pid."""
     try:
         result = run([executable(), "agents", "--json", "--all"], capture_output=True, text=True,
                      encoding="utf-8", timeout=30, check=False)
-        rows = json.loads(result.stdout) if result.returncode == 0 else []
-    except (OSError, subprocess.SubprocessError, ValueError, LaunchError):
+        if result.returncode:
+            detail = result.stderr.strip() or result.stdout.strip()
+            raise LaunchError(f"Claude liveness failed: {detail}")
+        rows = json.loads(result.stdout)
+        if not isinstance(rows, list):
+            raise LaunchError("Claude liveness returned an invalid session list")
+    except (OSError, subprocess.SubprocessError, ValueError, LaunchError) as error:
+        if strict:
+            raise LaunchError(f"Cannot determine Claude liveness: {error}") from error
         return {}
     return {
         row["sessionId"]: Liveness(
@@ -91,7 +120,3 @@ def respawn(background, run=process.run):
 
 def name_session(session_id, title):
     return None
-
-
-def deliver(session_id, prompt, model, effort):
-    raise LaunchError("Claude takes its first prompt on the command line")
