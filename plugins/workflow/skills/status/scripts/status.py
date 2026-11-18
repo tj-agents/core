@@ -48,12 +48,14 @@ def is_repo(path):
 
 
 def package_root():
-    skill = Path(__file__).resolve().parent.parent
-    if skill.parent.name in {"skills", "codex-skills"}:
-        return skill.parent.parent
-    if (skill.parent.name == "utility" and skill.parent.parent.name == "workflow"
-            and skill.parent.parent.parent.name == ".agents"):
-        return skill.parents[3]
+    declarations = (
+        ".agents/plugins/sources.json",
+        ".claude-plugin/plugin.json",
+        ".codex-plugin/plugin.json",
+    )
+    for directory in Path(__file__).resolve().parents:
+        if any((directory / declaration).is_file() for declaration in declarations):
+            return directory
     raise RuntimeError("status capability failure: the script has no supported runtime anchor")
 
 

@@ -2,4 +2,4 @@
 
 Generated from canonical `.agents/` definitions.
 
-- `layout` — convention — `.agents/docs/convention/layout/SKILL.md`
+- `layout` — standard — `.agents/docs/skills/layout/SKILL.md`
