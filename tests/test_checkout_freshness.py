@@ -319,6 +319,35 @@ def test_any_failure_yields_no_notice(
     assert freshness.begin(tmp_path)() == ""
 
 
+def test_an_unexpected_error_yields_no_notice(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def broken(directory: Path, deadline: float) -> None:
+        raise KeyError(str(directory))
+
+    monkeypatch.setattr(freshness, "fetched", broken)
+
+    assert freshness.begin(tmp_path)() == ""
+
+
+def test_a_stale_cached_default_branch_defers_to_the_remote(remote: Remote) -> None:
+    checkout = remote.clone()
+    git(remote.publisher, "switch", "--quiet", "-c", "trunk")
+    git(remote.publisher, "push", "--quiet", "origin", "HEAD:trunk")
+    git(remote.origin, "symbolic-ref", "HEAD", "refs/heads/trunk")
+    advance(remote.publisher, 1, prefix="trunk")
+    git(remote.publisher, "push", "--quiet", "origin", "HEAD:trunk")
+    git(checkout, "fetch", "--quiet", "origin")
+
+    assert (
+        git(checkout, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+        == "origin/main"
+    )
+    assert (
+        freshness.default_branch(freshness.Checkout(checkout, float("inf"))) == "trunk"
+    )
+
+
 def test_session_start_starts_the_fetch_before_the_standards_statement(
     remote: Remote, monkeypatch: pytest.MonkeyPatch
 ) -> None:
