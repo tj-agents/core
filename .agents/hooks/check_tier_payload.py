@@ -236,14 +236,16 @@ def check_dependencies(payload, problems):
             or any(not isinstance(value, str) for value in declared)):
         problems.append(f"{payload.name}: harness.json needs a <marketplace>/<name> plugin and requires.plugins ids")
         return
-    identities = [value.get("name") if isinstance(value, dict) else value for value in dependencies]         if isinstance(dependencies, list) else None
-    if identities is None or any(not isinstance(value, str) or not value for value in identities):
+    entries = dependencies if isinstance(dependencies, list) else [None]
+    identities = [value.get("name") if isinstance(value, dict) else value for value in entries]
+    names = [value for value in identities if isinstance(value, str) and value]
+    if len(names) != len(identities):
         problems.append(f"{payload.name}: .claude-plugin/plugin.json dependencies must be a list of plugin identities")
         return
     marketplace = plugin.split("/", 1)[0]
     expected = {plugin}
     resolved = []
-    for dependency in identities:
+    for dependency in names:
         name, _, owner = dependency.partition("@")
         resolved.append(f"{owner or marketplace}/{name}")
     if len(resolved) != len(set(resolved)):
