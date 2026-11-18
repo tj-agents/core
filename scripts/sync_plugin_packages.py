@@ -938,7 +938,7 @@ def build(root: Path, validate_plugin_digests: bool = True, roster=None):
                 required = roster_plugins[f"{marketplace}/{plugin}"]["dependencies"]["required"]
                 if required:
                     manifest = {**manifest, "dependencies": claude_dependencies(required)}
-                    emit(f"plugins/{plugin}/.{host}-plugin/plugin.json", json.dumps(manifest, indent=2) + "\n")
+                    emit(f"plugins/{plugin}/.{host}-plugin/plugin.json", json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
                     continue
             emit(f"plugins/{plugin}/.{host}-plugin/plugin.json", read(manifest_path))
         for field in ("name", "description", "author", "repository", "keywords"):

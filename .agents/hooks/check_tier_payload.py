@@ -232,17 +232,23 @@ def check_dependencies(payload, problems):
     requires = harness.get("requires")
     declared = requires.get("plugins") if isinstance(requires, dict) else None
     dependencies = manifest.get("dependencies", [])
-    if not isinstance(plugin, str) or "/" not in plugin or not isinstance(declared, list):
-        problems.append(f"{payload.name}: harness.json needs a <marketplace>/<name> plugin and requires.plugins")
+    if (not isinstance(plugin, str) or "/" not in plugin or not isinstance(declared, list)
+            or any(not isinstance(value, str) for value in declared)):
+        problems.append(f"{payload.name}: harness.json needs a <marketplace>/<name> plugin and requires.plugins ids")
         return
-    if not isinstance(dependencies, list) or any(not isinstance(value, str) for value in dependencies):
+    identities = [value.get("name") if isinstance(value, dict) else value for value in dependencies]         if isinstance(dependencies, list) else None
+    if identities is None or any(not isinstance(value, str) or not value for value in identities):
         problems.append(f"{payload.name}: .claude-plugin/plugin.json dependencies must be a list of plugin identities")
         return
     marketplace = plugin.split("/", 1)[0]
     expected = {plugin}
-    for dependency in dependencies:
+    resolved = []
+    for dependency in identities:
         name, _, owner = dependency.partition("@")
-        expected.add(f"{owner or marketplace}/{name}")
+        resolved.append(f"{owner or marketplace}/{name}")
+    if len(resolved) != len(set(resolved)):
+        problems.append(f"{payload.name}: .claude-plugin/plugin.json dependencies name a plugin more than once")
+    expected.update(resolved)
     if set(declared) != expected or len(declared) != len(set(declared)):
         missing = sorted(expected - set(declared))
         extra = sorted(set(declared) - expected)
