@@ -5,8 +5,7 @@
   ],
   "prerequisites": [
     "base",
-    "workflow",
-    "machine"
+    "workflow"
   ],
   "external_prerequisites": [
     {

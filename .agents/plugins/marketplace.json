@@ -17,18 +17,6 @@
       "category": "Productivity"
     },
     {
-      "name": "machine",
-      "source": {
-        "source": "local",
-        "path": "./plugins/machine"
-      },
-      "policy": {
-        "installation": "INSTALLED_BY_DEFAULT",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Productivity"
-    },
-    {
       "name": "workflow",
       "source": {
         "source": "local",
