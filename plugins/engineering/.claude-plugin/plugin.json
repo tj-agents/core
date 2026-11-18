@@ -11,5 +11,11 @@
     "git"
   ],
   "displayName": "Engineering process",
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "dependencies": [
+    "base@tj-agents",
+    "workflow@tj-agents",
+    "agent@tj-agents",
+    "cli@tj-agents"
+  ]
 }
