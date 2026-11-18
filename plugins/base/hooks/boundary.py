@@ -1,4 +1,4 @@
-"""Keep agent lessons out of host memory."""
+"""Keep agent writes out of host memory, host settings and machine state."""
 
 from __future__ import annotations
 
@@ -14,6 +14,10 @@ TOKEN = re.compile(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'|[^\s;|&<>()]+')
 LEADING_CD = re.compile(
     r'^\s*cd\s+(?:/d\s+)?("[^"]+"|\'[^\']+\'|[^\s;&|]+)\s*(?:&&|;|\|\|)'
 )
+HOME_VARIABLE = re.compile(
+    r"^(?:\$HOME|\$\{HOME\}|\$env:(?:HOME|USERPROFILE)|%USERPROFILE%)(?=[/\\]|$)",
+    re.IGNORECASE,
+)
 FILE_WRITERS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit", "apply_patch"})
 COMMANDS = frozenset({"Bash", "PowerShell", "shell", "exec_command"})
 MEMORY_LESSON = (
@@ -23,32 +27,50 @@ MEMORY_LESSON = (
     "repository when fixing it now would derail the current task. A fact about a "
     "project belongs in that project's documentation."
 )
+SETTINGS_LESSON = (
+    "These are written only by their owning scripted commands (tj install, setup, "
+    "onboard), never by an agent edit; record the choice in the repository instead "
+    "(base:machine-agnostic)."
+)
 
 
-class HostMemory(Enum):
-    CLAUDE = ("projects", "*", "memory")
-    CODEX = ("memories",)
+class Host(Enum):
+    CLAUDE = (("projects", "*", "memory"), ("settings.json", "settings.local.json"))
+    CODEX = (("memories",), ("config.toml", "rules"))
 
-    def __init__(self, *parts: str) -> None:
-        self.parts = parts
+    def __init__(self, memory: tuple[str, ...], settings: tuple[str, ...]) -> None:
+        self.memory = memory
+        self.settings = settings
 
-    def holds(self, home: Path, target: Path) -> bool:
+    def holds_memory(self, home: Path, target: Path) -> bool:
         try:
             relative = target.relative_to(home)
         except ValueError:
             return False
         names = relative.parts
-        return len(names) > len(self.parts) and all(
+        return len(names) > len(self.memory) and all(
             expected in ("*", name)
-            for expected, name in zip(self.parts, names, strict=False)
+            for expected, name in zip(self.memory, names, strict=False)
         )
 
+    def holds_settings(self, home: Path, target: Path) -> bool:
+        return any(target.is_relative_to(home / name) for name in self.settings)
 
-def memory_target(
-    targets: Iterable[Path], homes: Mapping[HostMemory, Path]
+
+def memory_target(targets: Iterable[Path], homes: Mapping[Host, Path]) -> Path | None:
+    for target in targets:
+        if any(host.holds_memory(home, target) for host, home in homes.items()):
+            return target
+    return None
+
+
+def settings_target(
+    targets: Iterable[Path], homes: Mapping[Host, Path], state: Path
 ) -> Path | None:
     for target in targets:
-        if any(host.holds(home, target) for host, home in homes.items()):
+        if target.is_relative_to(state) or any(
+            host.holds_settings(home, target) for host, home in homes.items()
+        ):
             return target
     return None
 
@@ -111,21 +133,21 @@ def _command_targets(command: str, cwd: Path) -> tuple[Path, ...]:
     targets = [directory]
     for raw in TOKEN.findall(command)[:PATH_TOKENS]:
         token = raw.strip("\"'")
-        candidates = [token, *token.split("=", 1)[1:], token.removeprefix("@")]
-        if PATH_LIKE.search(token):
-            targets.extend(
-                _resolved(candidate, directory)
-                for candidate in candidates
-                if _exists(candidate, directory)
-            )
+        if not PATH_LIKE.search(token):
+            continue
+        for candidate in (token, *token.split("=", 1)[1:], token.removeprefix("@")):
+            path = HOME_VARIABLE.sub("~", candidate)
+            if _names_path(path, directory):
+                targets.append(_resolved(path, directory))
     return tuple(targets)
 
 
-def _exists(candidate: str, directory: Path) -> bool:
+def _names_path(candidate: str, directory: Path) -> bool:
     if not candidate or candidate.startswith("-") or len(candidate) > 1024:
         return False
     try:
-        return _resolved(candidate, directory).exists()
+        path = _resolved(candidate, directory)
+        return path.exists() or path.parent.exists()
     except (OSError, ValueError):
         return False
 
@@ -140,4 +162,11 @@ def _resolved(path: str, cwd: Path) -> Path:
 def memory_reason(target: Path) -> str:
     return (
         f"Blocked: {target} is host memory, which agents do not write. {MEMORY_LESSON}"
+    )
+
+
+def settings_reason(target: Path) -> str:
+    return (
+        f"Blocked: {target} is user-level host settings or machine state. "
+        f"{SETTINGS_LESSON}"
     )
