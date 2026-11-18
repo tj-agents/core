@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import json
 import re
+import shutil
 import subprocess
 import sys
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 PULL = re.compile(
@@ -21,9 +20,19 @@ ISSUE = re.compile(
 )
 BRANCH = re.compile(r"(?P<owner>[^/\s:]+)/(?P<repo>[^/\s:]+):(?P<key>\S+)\Z")
 OPEN_STATES = {"OPEN"}
+TOKEN = re.compile(r"[a-z0-9]+")
+PATH_SEPARATOR = re.compile(r"[\\/]")
+STORE_TIMEOUT_SECONDS = 20
+RECOVER_TIMEOUT_SECONDS = 120
 
-Search = Callable[[str], list[dict[str, Any]]]
+Session = dict[str, Any]
 GraphQL = Callable[[str], dict[str, Any]]
+Recorded = Callable[[], list[Session]]
+Closed = Callable[[], set[str]]
+
+
+class CatchUpError(Exception):
+    """A live source the report needs could not be read."""
 
 
 @dataclass(frozen=True)
@@ -85,7 +94,7 @@ def gh_graphql(text: str) -> dict[str, Any]:
         check=False,
     )
     if completed.returncode != 0:
-        raise RuntimeError(completed.stderr.strip() or "gh api graphql failed")
+        raise CatchUpError(completed.stderr.strip() or "gh api graphql failed")
     result: dict[str, Any] = json.loads(completed.stdout)
     return result
 
@@ -142,101 +151,170 @@ def states(items: Sequence[Item], graphql: GraphQL) -> list[dict[str, Any]]:
     return [item_state(item, data.get(f"i{index}")) for index, item in enumerate(items)]
 
 
-def topics_for(
+def subjects_for(
     items: Iterable[dict[str, Any]], extra: Iterable[str]
 ) -> dict[str, bool]:
-    """Map each session-search topic to whether the work it names is still unmerged.
+    """Map each session subject to whether the work it names is still unfinished.
 
-    A branch searches by its last segment: the store matches every topic word, and a
-    prefix such as Refactor/ is not stored with the session.
+    A branch is matched by its last segment, which names its worktree; an issue by
+    the work-item reference Agent links its sessions to.
     """
-    topics: dict[str, bool] = {}
+    subjects: dict[str, bool] = {}
     for item in items:
         branch = item.get("branch")
-        if isinstance(branch, str) and branch:
-            topic = branch.rsplit("/", 1)[-1]
-            unmerged = item.get("state") in OPEN_STATES | {"EXISTS"}
-            topics[topic] = topics.get(topic, False) or unmerged
+        if item["kind"] == "issue":
+            issue = parse("issue", item["reference"])
+            subject = f"github:github.com/{issue.owner}/{issue.repo}:{issue.key}"
+        elif isinstance(branch, str) and branch:
+            subject = branch.rsplit("/", 1)[-1]
+        else:
+            continue
+        unfinished = item.get("state") in OPEN_STATES | {"EXISTS"}
+        subjects[subject] = subjects.get(subject, False) or unfinished
     for topic in extra:
-        topics.setdefault(topic, False)
-    return topics
+        subjects.setdefault(topic, False)
+    return subjects
 
 
-def sessions(topics: dict[str, bool], search: Search) -> list[dict[str, Any]]:
-    found: dict[tuple[str, str], dict[str, Any]] = {}
-    for topic, unmerged in topics.items():
-        for session in search(topic):
-            key = (str(session.get("host")), str(session.get("id")))
+def tokens(value: object) -> set[str]:
+    return set(TOKEN.findall(str(value or "").casefold()))
+
+
+def leaf(path: object) -> str:
+    return PATH_SEPARATOR.split(str(path or "").rstrip("\\/"))[-1]
+
+
+def linked_items(session: Mapping[str, Any]) -> list[str]:
+    references = []
+    for link in session.get("links") or ():
+        item = link.get("item") if isinstance(link, dict) else None
+        reference = item.get("ref") if isinstance(item, dict) else None
+        if isinstance(reference, str):
+            references.append(reference)
+    return references
+
+
+def matched_by(subject: str, session: Mapping[str, Any]) -> list[str]:
+    if subject in linked_items(session):
+        return ["item"]
+    fields = {
+        "title": tokens(session.get("title")),
+        "worktree": tokens(leaf(session.get("worktree"))),
+        "cwd": tokens(leaf(session.get("cwd"))),
+    }
+    wanted = tokens(subject)
+    if not wanted or not wanted <= set().union(*fields.values()):
+        return []
+    return [name for name, found in fields.items() if found & wanted]
+
+
+def activity(session: Mapping[str, Any]) -> str:
+    return str(session.get("ended_at") or session.get("started_at") or "")
+
+
+def sessions(
+    subjects: Mapping[str, bool],
+    recorded: Sequence[Session],
+    closed: Closed,
+    count: int,
+) -> list[dict[str, Any]]:
+    found: dict[str, dict[str, Any]] = {}
+    unfinished: dict[str, bool] = {}
+    for subject, open_work in subjects.items():
+        matches = sorted(
+            (session for session in recorded if matched_by(subject, session)),
+            key=activity,
+            reverse=True,
+        )
+        for session in matches[:count]:
+            handle = str(session.get("session"))
             entry = found.setdefault(
-                key,
+                handle,
                 {
-                    "host": key[0],
-                    "id": key[1],
-                    "status": session.get("status"),
-                    "activity": session.get("activity"),
-                    "work_item": session.get("work_item"),
+                    "host": session.get("host"),
+                    "id": session.get("native_id"),
+                    "title": session.get("title"),
+                    "activity": activity(session) or None,
+                    "items": linked_items(session),
                     "topics": [],
-                    "unmerged": False,
-                    "owner": False,
                 },
             )
-            entry["topics"].append(topic)
-            matched = set(session.get("matched_by") or ())
-            if matched - {"message"}:
-                entry["owner"] = True
-                entry["unmerged"] = entry["unmerged"] or unmerged
-    for entry in found.values():
-        work_item = entry["work_item"] or {}
-        active = work_item.get("status") == "active"
-        owns = entry["owner"] and (active or entry["unmerged"])
-        entry["stalled"] = entry["status"] == "closed" and owns
+            entry["topics"].append(subject)
+            unfinished[handle] = unfinished.get(handle, False) or open_work
+    stopped = closed() if found else set()
+    for handle, entry in found.items():
+        entry["status"] = "closed" if handle in stopped else "live"
+        entry["stalled"] = entry["status"] == "closed" and unfinished[handle]
         if entry["stalled"]:
-            entry["reopen"] = f"agent:open {entry['host']}:{entry['id']}"
-        del entry["unmerged"], entry["owner"]
+            entry["reopen"] = f"agent:open {handle}"
     return sorted(
         found.values(),
         key=lambda entry: (not entry["stalled"], str(entry["activity"] or "")),
     )
 
 
-def agent_runtime() -> Path:
-    here = Path(__file__).resolve()
-    for root in here.parents:
-        for candidate in (
-            root / ".agents" / "agent" / "runtime",
-            root
-            / ".agents"
-            / "dependencies"
-            / "agent"
-            / ".agents"
-            / "agent"
-            / "runtime",
-        ):
-            if (candidate / "tj_agent" / "recovery.py").is_file():
-                return candidate
-    raise RuntimeError(
-        f"Agent's tj_agent.recovery runtime was not found relative to {here}."
-    )
+def run_json(command: Sequence[str], timeout: int) -> object:
+    executable = shutil.which(command[0])
+    if executable is None:
+        raise CatchUpError(
+            f"{command[0]} is not on PATH; install Agent with tj install"
+        )
+    shown = " ".join(command)
+    try:
+        completed = subprocess.run(
+            [executable, *command[1:]],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise CatchUpError(f"{shown} failed: {error}") from error
+    try:
+        result: object = json.loads(completed.stdout)
+    except ValueError as error:
+        detail = completed.stderr.strip() or f"exit {completed.returncode}"
+        raise CatchUpError(f"{shown} printed no JSON: {detail}") from error
+    return result
 
 
-def recovery_search(count: int) -> Search:
-    sys.path.insert(0, str(agent_runtime()))
-    recovery = importlib.import_module("tj_agent.recovery")
+def store_sessions() -> list[Session]:
+    document = run_json(["agent-store", "sessions"], STORE_TIMEOUT_SECONDS)
+    data = document.get("data") if isinstance(document, dict) else None
+    recorded = data.get("sessions") if isinstance(data, dict) else None
+    if not isinstance(recorded, list):
+        raise CatchUpError(f"agent-store sessions failed: {document}")
+    return [session for session in recorded if isinstance(session, dict)]
 
-    def search(topic: str) -> list[dict[str, Any]]:
-        result: list[dict[str, Any]] = recovery.search(topic=topic, count=count)
-        return result
 
-    return search
+def closed_sessions() -> set[str]:
+    """Every recorded session whose agent is not running, by Agent's liveness check."""
+    command = ["tj", "recover", "--dry-run", "--older", "--ended"]
+    rows = run_json(command, RECOVER_TIMEOUT_SECONDS)
+    if not isinstance(rows, list):
+        raise CatchUpError(f"{' '.join(command)} did not list sessions: {rows}")
+    return {
+        row["session"]
+        for row in rows
+        if isinstance(row, dict) and isinstance(row.get("session"), str)
+    }
 
 
 def report(
-    items: Sequence[Item], extra_topics: Sequence[str], graphql: GraphQL, search: Search
+    items: Sequence[Item],
+    extra_topics: Sequence[str],
+    graphql: GraphQL,
+    recorded: Recorded,
+    closed: Closed,
+    count: int,
 ) -> dict[str, Any]:
     item_states = states(items, graphql)
+    subjects = subjects_for(item_states, extra_topics)
     return {
         "items": item_states,
-        "sessions": sessions(topics_for(item_states, extra_topics), search),
+        "sessions": sessions(subjects, recorded() if subjects else [], closed, count),
     }
 
 
@@ -250,16 +328,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--topic", action="append", default=[], help="extra session-store topic"
     )
-    parser.add_argument("--count", type=int, default=10)
+    parser.add_argument(
+        "--count", type=int, default=10, help="newest sessions kept per subject"
+    )
     args = parser.parse_args(argv)
+    if args.count < 1:
+        parser.error("--count must be positive")
     try:
         items = (
             [parse("pr", value) for value in args.pr]
             + [parse("issue", value) for value in args.issue]
             + [parse("branch", value) for value in args.branch]
         )
-        result = report(items, args.topic, gh_graphql, recovery_search(args.count))
-    except (RuntimeError, ValueError) as error:
+        result = report(
+            items, args.topic, gh_graphql, store_sessions, closed_sessions, args.count
+        )
+    except (CatchUpError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1
     print(json.dumps(result, indent=2))

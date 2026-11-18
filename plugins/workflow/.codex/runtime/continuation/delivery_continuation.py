@@ -115,11 +115,10 @@ def prerequisites(owner, host):
     python = Path(sys.executable).resolve()
     if not python.is_file() or not runtime.is_file() or not Path(host).is_file():
         raise scheduler.SchedulerError("registered continuation prerequisite is missing")
-    package = package_root()
-    lanes = (package / ".agents" / "lanes" if (package / ".codex-plugin" / "plugin.json").is_file()
-             else package / ".agents" / "dependencies" / "agent" / ".agents" / "agent" / "resources" / "lanes")
-    if not (lanes / (owner["harness"] + ".json")).is_file():
-        raise scheduler.SchedulerError("package is missing selected host lane resource")
+    home = os.environ.get("CODEX_HOME")
+    lane = (Path(home) if home else Path.home() / ".codex") / "agents" / "lane-l4.toml"
+    if not lane.is_file():
+        raise scheduler.SchedulerError(f"Codex profile is missing Agent's L4 lane agent {lane}; run tj install")
     return runtime, python
 
 

@@ -284,7 +284,7 @@ class WorkflowWiringTests(unittest.TestCase):
                          {"select", "guard", "guidance-examples", "verify-windows", "verify-linux", "python-standards"})
         self.assertIn("CI_NEEDS: ${{ toJSON(needs) }}", jobs["ci-required"])
         self.assertIn("CI_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}", jobs["ci-required"])
-        self.assertIn("      actions: read\n", jobs["ci-required"])
+        self.assertRegex(jobs["ci-required"], r"(?m)^      actions: read(?:[ \t]+#.*)?$")
         self.assertIn("--workflow ci.yml --branch \"$DEFAULT_BRANCH\"", jobs["ci-required"])
         self.assertIn("--event push --status completed --limit 1", jobs["ci-required"])
         self.assertIn("CI_DEFAULT_BRANCH_RUN: ${{ steps.default-branch.outputs.run }}", jobs["ci-required"])

@@ -142,6 +142,13 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.owner_path.write_text(json.dumps(self.owner), encoding="utf-8")
         self.environment = {"XDG_CONFIG_HOME": str(Path(self.temp.name) / "config £"), "CODEX_HOME": "/safe profile £",
                             "GH_TOKEN": "must-not-copy", "CONTINUATION_NONCE": "must-not-child"}
+        # Agent delivers the L4 lane agent into the Codex profile; give each test its own profile with it.
+        profile = Path(self.temp.name) / "codex profile"
+        (profile / "agents").mkdir(parents=True)
+        (profile / "agents/lane-l4.toml").write_text('model = "fixture"\n', encoding="utf-8")
+        codex_home = patch.dict(os.environ, {"CODEX_HOME": str(profile)})
+        codex_home.start()
+        self.addCleanup(codex_home.stop)
 
     def receipt(self, interval=20):
         return scheduler.linux_receipt(self.owner, self.owner_path, ADAPTER, ROOT / ".codex/runtime/continuation/continuation_runtime.py",
@@ -851,10 +858,21 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertFalse((package / "workflows/continuation_runtime.py").exists())
         installed = load("generated_delivery_continuation",
                          package / ".codex/runtime/continuation/delivery_continuation.py")
+        profile = self.root / "codex profile"
+        (profile / "agents").mkdir(parents=True)
+        (profile / "agents/lane-l4.toml").write_text('model = "fixture"\n', encoding="utf-8")
         for module in (adapter, installed):
-            runtime, python = module.prerequisites(self.owner, str(self.host))
+            with patch.dict(os.environ, {"CODEX_HOME": str(profile)}):
+                runtime, python = module.prerequisites(self.owner, str(self.host))
             self.assertEqual(module.package_root() / ".codex/runtime/continuation/continuation_runtime.py", runtime)
             self.assertEqual(Path(sys.executable).resolve(), python)
+
+    def test_registration_requires_agents_codex_l4_lane_agent(self):
+        profile = self.root / "codex profile without lanes"
+        profile.mkdir()
+        with patch.dict(os.environ, {"CODEX_HOME": str(profile)}), \
+                self.assertRaisesRegex(adapter.scheduler.SchedulerError, "missing Agent's L4 lane agent"):
+            adapter.prerequisites(self.owner, str(self.host))
 
     def test_runtime_does_not_use_outer_package_marker_or_shared_resources(self):
         outer = self.root / "outer-runtime"

@@ -20,8 +20,10 @@ CLAUDE_VERSION = "2.1.282"
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def download(url):
-    request = urllib.request.Request(url, headers={"User-Agent": "tj-agents-native-acceptance"})
+def download(url, *, headers=None):
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "tj-agents-native-acceptance", **(headers or {})}
+    )
     with urllib.request.urlopen(request, timeout=60) as response:
         return response.read()
 
@@ -72,10 +74,15 @@ def write_executable(path, payload, magic):
     return path
 
 
-def provision(directory, system, machine):
+def provision(directory, system, machine, github_token):
     target, archive_format, npm_platform, suffix, magic = platform_assets(system, machine)
+    if not github_token:
+        raise ValueError("native CI provisioning requires GITHUB_TOKEN")
     directory.mkdir(parents=True, exist_ok=True)
-    release = json.loads(download(f"https://api.github.com/repos/openai/codex/releases/tags/rust-v{CODEX_VERSION}"))
+    release = json.loads(download(
+        f"https://api.github.com/repos/openai/codex/releases/tags/rust-v{CODEX_VERSION}",
+        headers={"Authorization": f"Bearer {github_token}"},
+    ))
     asset_name = f"codex-{target}.{archive_format}"
     assets = [asset for asset in release.get("assets", []) if asset.get("name") == asset_name]
     if len(assets) != 1:
@@ -108,7 +115,10 @@ def main():
     directory = Path(temporary) / "tj-agents-native-acceptance"
     artifacts = directory / "artifacts"
     try:
-        codex, claude = provision(directory / "tools", platform.system(), platform.machine())
+        codex, claude = provision(
+            directory / "tools", platform.system(), platform.machine(),
+            os.environ.get("GITHUB_TOKEN"),
+        )
     except (OSError, ValueError, KeyError, tarfile.TarError, zipfile.BadZipFile) as error:
         native_host_acceptance.snapshot_diagnostic(artifacts, "provision.failure.log", f"{error}\n")
         print(f"native-host-provision: {error}", file=sys.stderr)
