@@ -67,6 +67,7 @@ function Sync-ClaudeStandards {
         return
     }
 
+    Write-Host 'standards: refreshing Claude plugins (60s maximum)...'
     $arguments = @('-B', $script, '--project', $WorkingDirectory)
     if ($Claude) { $arguments += @('--claude', $Claude) }
     & $python.Source @arguments | ForEach-Object { Write-Host $_ }
