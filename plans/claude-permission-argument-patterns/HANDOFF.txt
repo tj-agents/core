@@ -1,0 +1,2 @@
+cd C:\Users\TommySeery\source\repos\tj-agents\core.worktrees\Fix-ClaudePermissionArgumentPatterns
+Read C:\Users\TommySeery\source\repos\tj-agents\core.worktrees\Fix-ClaudePermissionArgumentPatterns\plans\claude-permission-argument-patterns\GOAL.md and execute its ## Next Steps.
