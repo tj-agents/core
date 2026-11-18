@@ -17,8 +17,11 @@ verifies native resume support, preserves the recorded cwd, refreshes supported 
 uses the native executable directly.
 Run the helper with `python` on Windows or `python3` on Linux/macOS:
 
+`<plugin-root>` is the machine plugin directory that holds `.claude-plugin/` and `.codex-plugin/`, never a
+path resolved from the shared `.agents/` copy.
+
 ```sh
-python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' open --host codex --id '<native-id>' --codex-history-root '<selected-profile>/sessions' --prompt 'Continue the requested work.'
+python -B '<plugin-root>/resources/machine/scripts/agent_recovery.py' open --host codex --id '<native-id>' --codex-history-root '<selected-profile>/sessions' --prompt 'Continue the requested work.'
 ```
 
 For task recovery, follow the shared [task recovery context](../../resources/task-recovery.md). Write its
@@ -26,7 +29,7 @@ private UTF-8 instruction file outside version control, then replace the default
 `--prompt-path '<recovery-prompt-file>'`. Do not pass both arguments.
 
 ```sh
-python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' open --host codex --id '<native-id>' --codex-history-root '<selected-profile>/sessions' --prompt-path '<recovery-prompt-file>'
+python -B '<plugin-root>/resources/machine/scripts/agent_recovery.py' open --host codex --id '<native-id>' --codex-history-root '<selected-profile>/sessions' --prompt-path '<recovery-prompt-file>'
 ```
 
 If status is unknown, reconcile it first. `--confirm-closed` is an explicit acknowledgement that no live writer

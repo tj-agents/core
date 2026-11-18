@@ -20,14 +20,17 @@ has no match, or with `--include-history`. Use the current goal or PR state to i
 select only returned `host:id` values. Do not reopen every old session or infer unfinished work from a final
 transcript message. Run both commands below with `python` on Windows or `python3` on Linux/macOS.
 
+`<plugin-root>` is the machine plugin directory that holds `.claude-plugin/` and `.codex-plugin/`, never a
+path resolved from the shared `.agents/` copy.
+
 ```sh
-python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' recover --topic '<topic>' --checkout '<absolute-checkout>'
+python -B '<plugin-root>/resources/machine/scripts/agent_recovery.py' recover --topic '<topic>' --checkout '<absolute-checkout>'
 ```
 
 `recover` is read-only until an exact selection is supplied:
 
 ```sh
-python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' recover --topic '<topic>' --select 'codex:<native-id>' --prompt 'Continue the requested work.'
+python -B '<plugin-root>/resources/machine/scripts/agent_recovery.py' recover --topic '<topic>' --select 'codex:<native-id>' --prompt 'Continue the requested work.'
 ```
 
 A selected open is reported only after the resumed session registers in the store or writes its native history;

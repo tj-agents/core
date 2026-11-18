@@ -79,39 +79,119 @@ class RefreshCliTests(unittest.TestCase):
         }}
         self.assertEqual(REFRESH.codex_marketplaces(camel), ["base-agents"])
 
-    def test_claude_registry_version_must_name_the_refreshed_install(self):
-        current = self.install("claude", "machine@tj-agents", MAIN, MAIN)
-        self.write(self.root / "claude/plugins/installed_plugins.json", {"version": 2, "plugins": {
-            "machine@tj-agents": [{"scope": "user", "installPath": str(current), "version": "61b5b1ee19f7-aee5d9df"}],
-        }})
+    def catalog(self) -> None:
+        location = self.root / "claude/plugins/marketplaces/tj-agents"
+        self.write(self.root / "claude/plugins/known_marketplaces.json", {
+            "tj-agents": {"source": {"source": "github", "repo": "tj-agents/marketplace"},
+                          "installLocation": str(location)},
+        })
+        self.write(location / ".claude-plugin/marketplace.json", {"plugins": [
+            {"name": name, "source": {"source": "git-subdir", "url": "https://github.com/tj-agents/core.git",
+                                      "path": f"./plugins/{name}", "ref": "main"}}
+            for name in ("machine", "base")
+        ]})
+
+    def registry(self, records: dict[str, list[dict[str, object]]]) -> None:
+        self.write(self.root / "claude/plugins/installed_plugins.json", {"version": 2, "plugins": records})
+
+    def native(self, identity: str, revision: str) -> dict[str, object]:
+        name, marketplace = identity.rsplit("@", 1)
+        directory = self.root / "claude/plugins/cache" / marketplace / name / f"{revision[:12]}-aee5d9df"
+        directory.mkdir(parents=True, exist_ok=True)
+        return {"scope": "user", "installPath": str(directory), "version": directory.name, "gitCommitSha": revision}
+
+    def test_claude_registry_version_must_name_the_install(self):
+        self.catalog()
+        record = self.native("machine@tj-agents", MAIN)
+        self.registry({"machine@tj-agents": [{**record, "version": "61b5b1ee19f7-aee5d9df"}]})
         report = REFRESH.verify("claude", {"machine@tj-agents"}, self.project, lambda _repository: MAIN, self.environ)
         self.assertEqual(len(report["problems"]), 1)
         self.assertIn("so Claude loads another copy", report["problems"][0])
 
-        self.write(self.root / "claude/plugins/installed_plugins.json", {"version": 2, "plugins": {
-            "machine@tj-agents": [{"scope": "user", "installPath": str(current), "version": MAIN}],
-        }})
+        self.registry({"machine@tj-agents": [record]})
         report = REFRESH.verify("claude", {"machine@tj-agents"}, self.project, lambda _repository: MAIN, self.environ)
         self.assertEqual(report["problems"], [])
         self.assertTrue(report["packages"][0]["current"])
 
     def test_a_project_record_loading_an_older_copy_is_reported(self):
-        current = self.install("claude", "machine@tj-agents", MAIN, MAIN)
-        older = current.parent / OLD
-        older.mkdir()
+        self.catalog()
         other = self.root / "elsewhere"
-        self.write(self.root / "claude/plugins/installed_plugins.json", {"version": 2, "plugins": {
-            "machine@tj-agents": [
-                {"scope": "user", "installPath": str(current), "version": MAIN},
-                {"scope": "local", "projectPath": str(self.project), "installPath": str(older), "version": OLD},
-                {"scope": "local", "projectPath": str(other), "installPath": str(older), "version": OLD},
-            ],
-        }})
+        older = self.native("machine@tj-agents", OLD)
+        self.registry({"machine@tj-agents": [
+            self.native("machine@tj-agents", MAIN),
+            {**older, "scope": "local", "projectPath": str(self.project)},
+            {**older, "scope": "local", "projectPath": str(other)},
+        ]})
         report = REFRESH.verify("claude", {"machine@tj-agents"}, self.project, lambda _repository: MAIN,
                                 self.environ)
-        self.assertEqual(report["problems"], [
-            f"machine@tj-agents (local): Claude loads {OLD!r}, but the refreshed install is {MAIN!r}",
-        ])
+        self.assertEqual(report["problems"], [f"machine@tj-agents (local) is at {OLD}, main is {MAIN}"])
+
+    def test_only_stale_installs_are_updated_natively_and_recorded(self):
+        self.catalog()
+        self.write(self.root / "claude/settings.json",
+                   {"enabledPlugins": {"machine@tj-agents": True, "base@tj-agents": True}})
+        self.registry({"machine@tj-agents": [self.native("machine@tj-agents", OLD)],
+                       "base@tj-agents": [self.native("base@tj-agents", MAIN)]})
+        calls = []
+
+        def update(command, cwd, _timeout):
+            calls.append((command, cwd))
+            self.registry({"machine@tj-agents": [self.native("machine@tj-agents", MAIN)],
+                           "base@tj-agents": [self.native("base@tj-agents", MAIN)]})
+
+        resolved = []
+        with mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude.exe"):
+            report = REFRESH.fast_claude(self.project, self.environ,
+                                         lambda repository: resolved.append(repository) or MAIN, update=update)
+        self.assertEqual(resolved, ["tj-agents/core"])
+        self.assertEqual(calls, [(["claude.exe", "plugin", "update", "machine@tj-agents", "--scope", "user", "--json"],
+                                  self.project)])
+        self.assertEqual(report["problems"], [])
+        record = json.loads((self.root / "claude/plugins/cache/.tj-agents-rolling/claude/generations.json")
+                            .read_text(encoding="utf-8"))
+        self.assertEqual([(entry["repository"], entry["revision"]) for entry in record["verified"]],
+                         [("https://github.com/tj-agents/core.git", MAIN)])
+
+    def test_a_current_machine_runs_no_update_and_takes_no_lock(self):
+        self.catalog()
+        self.write(self.root / "claude/settings.json", {"enabledPlugins": {"machine@tj-agents": True}})
+        self.registry({"machine@tj-agents": [self.native("machine@tj-agents", MAIN)]})
+        update = mock.Mock()
+        with mock.patch.object(REFRESH.rolling_plugins, "exclusive") as exclusive:
+            report = REFRESH.fast_claude(self.project, self.environ, lambda _repository: MAIN, update=update)
+        update.assert_not_called()
+        exclusive.assert_not_called()
+        self.assertEqual(report["problems"], [])
+
+    def test_a_failed_update_is_reported_and_not_recorded(self):
+        self.catalog()
+        self.write(self.root / "claude/settings.json", {"enabledPlugins": {"machine@tj-agents": True}})
+        self.registry({"machine@tj-agents": [self.native("machine@tj-agents", OLD)]})
+        update = mock.Mock(side_effect=REFRESH.RefreshError("plugin update failed: offline"))
+        with mock.patch.object(REFRESH.agent_cli, "resolve_claude_executable", return_value="claude.exe"):
+            report = REFRESH.fast_claude(self.project, self.environ, lambda _repository: MAIN, update=update)
+        self.assertEqual(report["problems"], [f"machine@tj-agents (user) is at {OLD}, main is {MAIN}"])
+        record = self.root / "claude/plugins/cache/.tj-agents-rolling/claude/generations.json"
+        self.assertEqual(json.loads(record.read_text(encoding="utf-8"))["verified"], [])
+
+    def test_an_unreachable_main_fails_before_any_update(self):
+        self.catalog()
+        self.write(self.root / "claude/settings.json", {"enabledPlugins": {"machine@tj-agents": True}})
+        self.registry({"machine@tj-agents": [self.native("machine@tj-agents", OLD)]})
+        update = mock.Mock()
+
+        def offline(repository):
+            raise REFRESH.RefreshError(f"main of {repository} could not be resolved: offline")
+
+        with self.assertRaises(REFRESH.RefreshError):
+            REFRESH.fast_claude(self.project, self.environ, offline, update=update)
+        update.assert_not_called()
+
+    def test_default_run_uses_the_fast_path_and_leaves_codex_alone(self):
+        with mock.patch.object(REFRESH, "fast_claude", return_value={"host": "claude", "packages": [], "problems": []})                 as fast, mock.patch.object(REFRESH, "refresh") as full:
+            self.assertEqual(REFRESH.main(["--project", str(self.project)]), 0)
+        fast.assert_called_once()
+        full.assert_not_called()
 
     def test_stale_enabled_packages_are_reported_and_disabled_ones_ignored(self):
         self.install("codex", "machine@base-agents", OLD, "local")

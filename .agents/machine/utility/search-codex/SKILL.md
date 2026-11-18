@@ -12,8 +12,11 @@ Search local Codex history read-only. It returns only bounded metadata for top-l
 the exact native id, original directory, activity, profile and live status. Do not expose raw transcripts.
 Run the helper with `python` on Windows or `python3` on Linux/macOS:
 
+`<plugin-root>` is the machine plugin directory that holds `.claude-plugin/` and `.codex-plugin/`, never a
+path resolved from the shared `.agents/` copy.
+
 ```sh
-python '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' search --host codex --topic '<topic>' --checkout '<absolute-checkout>'
+python '<plugin-root>/resources/machine/scripts/agent_recovery.py' search --host codex --topic '<topic>' --checkout '<absolute-checkout>'
 ```
 
 Use the returned native id and recorded directory with `open-codex`; never infer an id from a preview.

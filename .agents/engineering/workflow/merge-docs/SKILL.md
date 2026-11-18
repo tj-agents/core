@@ -111,7 +111,8 @@ sequential work. The worktree-cleanup audit gate makes skipped isolated-checkout
 ### 7. Confirm no publish fired
 
 A meta-only diff touches no publishable source, so nothing republishes and no version-sync PR opens. Confirm
-it against the repo's own publish path filter rather than assuming, then report and close the session.
+it against the repo's own publish path filter rather than assuming. Refresh this machine's plugins as
+`engineering:merge` Step 6 says, then report and close the session.
 
 ## Report
 

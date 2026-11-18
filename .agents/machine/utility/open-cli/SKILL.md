@@ -16,8 +16,11 @@ the launch primitives it calls; do not use them to answer a user request that na
 
 Run with `python` on Windows or `python3` on Linux/macOS:
 
+`<plugin-root>` is the machine plugin directory that holds `.claude-plugin/` and `.codex-plugin/`, never a
+path resolved from the shared `.agents/` copy.
+
 ```sh
-python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' reopen --target '<session-id | topic | directory>'
+python -B '<plugin-root>/resources/machine/scripts/agent_recovery.py' reopen --target '<session-id | topic | directory>'
 ```
 
 - `--target` is an exact native session id, a case-insensitive topic matched against ids, tab titles and

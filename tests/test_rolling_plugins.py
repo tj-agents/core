@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -551,7 +552,7 @@ class RollingPluginsTests(unittest.TestCase):
     def test_a_record_held_open_by_a_reader_is_retried_and_a_lasting_refusal_leaves_no_temporary(self):
         core = 'https://github.com/tj-agents/core.git'
         record = ROLLING.generation_record.generations_path(self.root / 'plugins', 'codex')
-        write = ROLLING._write_json
+        write = ROLLING.write_json
         attempts = []
 
         def held_once(path, value):
@@ -560,21 +561,21 @@ class RollingPluginsTests(unittest.TestCase):
                 raise PermissionError('in use')
             write(path, value)
 
-        with mock.patch.object(ROLLING, '_write_json', side_effect=held_once), \
+        with mock.patch.object(ROLLING, 'write_json', side_effect=held_once), \
                 mock.patch.object(ROLLING.time, 'sleep'):
-            ROLLING._record_generations(record, [(core, 'a' * 40)])
+            ROLLING.record_generations(record, [(core, 'a' * 40)])
         self.assertEqual(2, len(attempts))
         self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
 
-        with mock.patch.object(ROLLING, '_write_json', side_effect=PermissionError('in use')), \
+        with mock.patch.object(ROLLING, 'write_json', side_effect=PermissionError('in use')), \
                 mock.patch.object(ROLLING.time, 'sleep'):
-            ROLLING._record_generations(record, [(core, 'b' * 40)])
+            ROLLING.record_generations(record, [(core, 'b' * 40)])
         self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
         self.assertEqual([record.name], sorted(path.name for path in record.parent.iterdir()))
 
         with mock.patch.object(ROLLING.generation_record, 'read_record', return_value=('busy', [])), \
                 mock.patch.object(ROLLING.time, 'sleep') as sleep:
-            ROLLING._record_generations(record, [(core, 'b' * 40)])
+            ROLLING.record_generations(record, [(core, 'b' * 40)])
         self.assertEqual(4, sleep.call_count)
         self.assertEqual(['a' * 40], [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
 
@@ -582,16 +583,16 @@ class RollingPluginsTests(unittest.TestCase):
         for newer in (b'{"schema_version": 2, "verified": []}', b'{"schema_version": 2.0}'):
             record.write_bytes(newer)
             with mock.patch.object(ROLLING.time, 'sleep') as sleep:
-                ROLLING._record_generations(record, [(core, 'b' * 40)])
+                ROLLING.record_generations(record, [(core, 'b' * 40)])
             sleep.assert_not_called()
             self.assertEqual(newer, record.read_bytes())
 
         with mock.patch.object(ROLLING.generation_record, 'merged_generations', side_effect=RuntimeError('bug')):
-            ROLLING._record_generations(record, [(core, 'b' * 40)])
+            ROLLING.record_generations(record, [(core, 'b' * 40)])
 
         for corrupt in (b'{', b'\xff\xfe{', b'[' * 100000):
             record.write_bytes(corrupt)
-            ROLLING._record_generations(record, [(core, 'b' * 40)])
+            ROLLING.record_generations(record, [(core, 'b' * 40)])
             self.assertEqual(['b' * 40],
                              [entry['revision'] for entry in ROLLING.generation_record.read_generations(record)])
 
@@ -638,6 +639,26 @@ class RollingPluginsTests(unittest.TestCase):
         ROLLING._prune_native_cache(cache, [pinned], [root])
         self.assertTrue(pinned.is_dir())
         self.assertTrue(unrelated.is_dir())
+
+    def test_a_recent_native_update_root_survives_a_claude_prune(self):
+        cache = self.root / 'cache'
+        active = cache / 'core/base' / ('b' * 40)
+        recent = cache / 'core/base/aaaaaaaaaaaa-7de47327'
+        expired = cache / 'core/base/cccccccccccc-7de47327'
+        superseded = cache / 'core/base' / ('a' * 40)
+        for root in (active, recent, expired, superseded):
+            (root / '.claude-plugin').mkdir(parents=True)
+            (root / '.claude-plugin/plugin.json').write_text(json.dumps({'name': 'base'}), encoding='utf-8')
+        old = time.time() - ROLLING.NATIVE_INSTALL_RETENTION_SECONDS - 60
+        os.utime(expired, (old, old))
+        self.write(active.parent / '.tj-agents-rolling.json', {
+            'identity': 'base@core', 'repository': 'https://github.com/tj-agents/core.git', 'revision': 'b' * 40,
+        })
+        root = ROLLING.VerifiedRoot('base@core', active, 'b' * 40, 'https://github.com/tj-agents/core.git')
+        ROLLING._prune_native_cache(cache, [], [root], retain_recent_native=True)
+        self.assertTrue(recent.is_dir())
+        self.assertFalse(expired.exists())
+        self.assertFalse(superseded.exists())
 
 
 class RollingBoundaryTests(unittest.TestCase):

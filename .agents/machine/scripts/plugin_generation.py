@@ -71,12 +71,28 @@ def ownership(root: Path) -> Mapping[str, object] | None:
     return value
 
 
-def claude_install_paths(environ: Mapping[str, str]) -> list[str]:
+def claude_install_records(environ: Mapping[str, str]) -> list[dict[str, object]]:
     registry = read_json(plugins_root("claude", environ) / "installed_plugins.json")
     plugins = registry.get("plugins") if isinstance(registry, dict) else None
-    return [record["installPath"] for records in (plugins.values() if isinstance(plugins, dict) else ())
+    return [record for records in (plugins.values() if isinstance(plugins, dict) else ())
             if isinstance(records, list) for record in records
             if isinstance(record, dict) and isinstance(record.get("installPath"), str)]
+
+
+def claude_install_paths(environ: Mapping[str, str]) -> list[str]:
+    return [record["installPath"] for record in claude_install_records(environ)]
+
+
+def native_revision(root: Path, repository: str, environ: Mapping[str, str]) -> str | None:
+    loaded = normalized(root)
+    for record in claude_install_records(environ):
+        revision = record.get("gitCommitSha")
+        if normalized(record["installPath"]) == loaded and isinstance(revision, str) and SHA.fullmatch(revision):
+            return revision
+    prefix = root.name.split("-", 1)[0]
+    history = (installed_generations("claude", environ) or {}).get(repository) or []
+    matches = {entry["revision"] for entry in history if len(prefix) >= 12 and entry["revision"].startswith(prefix)}
+    return matches.pop() if len(matches) == 1 else None
 
 
 def claude_binding(root: Path, environ: Mapping[str, str]) -> Binding | None:
@@ -97,7 +113,7 @@ def claude_binding(root: Path, environ: Mapping[str, str]) -> Binding | None:
         return Binding(root.parent.name, str(root.parent), None, str(root),
                        f"this process loaded {root.name}, which the registry no longer installs; it installs "
                        f"{', '.join(replacements)}")
-    revision = root.name if SHA.fullmatch(root.name) else None
+    revision = root.name if SHA.fullmatch(root.name) else native_revision(root, owner["repository"], environ)
     problem = None if revision else "its install directory does not name a verified revision"
     return Binding(owner["identity"], owner["repository"], revision, str(root), problem)
 

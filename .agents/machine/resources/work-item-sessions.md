@@ -40,13 +40,14 @@ ancestor of the worktree's current HEAD), else `closed`. Only `closed` authorize
 ## Commands
 
 `work_item_sessions.py` is the only CLI over the store. Run it with `python -B` on Windows or `python3 -B`
-on Linux/macOS:
+on Linux/macOS. `<plugin-root>` is the machine plugin directory that holds `.claude-plugin/` and
+`.codex-plugin/`:
 
 ```sh
-python -B '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' status '<feature>/<item>'
-python -B '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' resume '<feature>/<item>'
-python -B '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' item '<feature>/<item>' --status proposed --title 'Useful task title'
-python -B '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' claim '<feature>/<item>' --host codex --role owner --status active --title 'Useful task title'
+python -B '<plugin-root>/resources/machine/scripts/work_item_sessions.py' status '<feature>/<item>'
+python -B '<plugin-root>/resources/machine/scripts/work_item_sessions.py' resume '<feature>/<item>'
+python -B '<plugin-root>/resources/machine/scripts/work_item_sessions.py' item '<feature>/<item>' --status proposed --title 'Useful task title'
+python -B '<plugin-root>/resources/machine/scripts/work_item_sessions.py' claim '<feature>/<item>' --host codex --role owner --status active --title 'Useful task title'
 ```
 
 - `claim <feature>/<item> --host claude|codex [--role owner|"bounded: <scope>"] [--predecessor <handle>]

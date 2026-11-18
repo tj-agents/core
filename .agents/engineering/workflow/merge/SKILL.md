@@ -394,6 +394,9 @@ merge caused, and a causally linked red one is never left behind. The mechanics:
   build to discover the rest rather than starting a full local solution build. Record the red state once as a
   blocker, then commit fixes locally, run targeted builds, and make one stable push. GitHub retains replacement
   checks and merge evidence. Never push the source plan's recovery commits to either PR.
+- **Refresh this machine's plugins.** When the merged repository ships plugins this machine has
+  installed, run `machine:refresh-cli` as soon as its publication is on main or nothing published, then
+  tell the user to run `/reload-plugins`.
 - **Close plan-managed delivery from a checkout selected under `engineering:git-branching`.** Before
   deleting the goal, run the fresh completion check above. A missing, invalid, or failing record leaves the
   plan and its owned actions in place. Once
