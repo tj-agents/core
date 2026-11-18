@@ -34,11 +34,11 @@ Real Codex handoff failed its ACK deadline with native hooks marked modified; tr
 
 Remaining: sixteen work consumers are prepared and pass adoption/check, but automatic approval review
 requires explicit work-commit authority before commit/push/PR. Isolated authenticated Claude acceptance
-Codex publisher PR #8 has a pre-start GitHub billing failure. Linux native host acceptance remains
+requires explicitly authorized memory-only OAuth use; no credential was read or copied. The employer plugin's
+Codex publisher PR has a pre-start GitHub billing failure. Linux native host acceptance remains
 unverified; acceptance requires fresh trusted repository-only sessions and real entry-point pickup.
 Both Windows and Linux source CI passed for the final core commit; that is separate evidence.
 
 Keep user fallback wiring until merged consumers, actual stale local callers and host acceptance are
 reconciled. Original checkouts are preserved. Exact scope, receipts, review proof and unblock actions:
-[REPO_DECLARED_CONFIG_PROGRESS.md](REPO_DECLARED_CONFIG_PROGRESS.md) and
-[WORK_CONSUMER_MIGRATIONS.md](WORK_CONSUMER_MIGRATIONS.md).
+[REPO_DECLARED_CONFIG_PROGRESS.md](REPO_DECLARED_CONFIG_PROGRESS.md).

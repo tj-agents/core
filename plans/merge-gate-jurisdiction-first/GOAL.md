@@ -20,6 +20,7 @@ decides whether the merge is its business. Two jurisdiction exits sit after that
 - `find_config(_GIT_CWD[0])`: a directory with no `.agents/merge-gate.json` at or above it claims no
   jurisdiction.
 
+Observed: a Claude session attached to an employer parent folder (a plain folder, not a
 git repo) ran `gh pr merge 13 --squash --delete-branch -R tomjseery/career` and was refused with
 `MERGE GATE: cannot resolve git state (Command '['git', 'rev-parse', '--show-toplevel']' returned non-zero exit status 128.)`.
 `tomjseery/career` has no merge-gate opt-in, so the gate had no jurisdiction.

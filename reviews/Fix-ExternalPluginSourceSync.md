@@ -51,6 +51,7 @@ Not findings, assessed and dismissed:
   override rather than the marketplace's repository: not a defect in this diff. The plan's live cause
   investigation already verified this host behavior directly before this branch existed (`claude plugin
   update rust@tj-agents --scope user` moved the install to the plugin's own commit with the marketplace
+  checkout unchanged), and this PR's own live `--check` acceptance against a work repository confirms the
   detection side now agrees with that behavior.
 - `current()`'s `install.version == remote[:12]` fallback does not match the `<12hex>-<8hex>`
   directory-naming suffix Claude Code uses for externally-sourced git-subdir installs. Pre-existing

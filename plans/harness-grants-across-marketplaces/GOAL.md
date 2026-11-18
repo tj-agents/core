@@ -14,6 +14,7 @@ Current work is tracked through the selected Personal GitHub provider. This docu
 `harness_permissions_sync.py` only discovers `base-agents` packages: Claude roots are filtered to
 `installed_plugins.json` identities ending `@base-agents`, Codex roots to `plugins/cache/base-agents`, and
 the Codex rules land in `base-agents.rules`. Grants declared in any other tj-agents marketplace's
+`harness.json` (`work-agents/work`, the employer marketplace, react, dotnet, …) never reach host settings.
 
 Observed 2026-10-08: posting a pending GitHub review for `draft-comment` was refused by Claude Code's
 auto-mode classifier as an unapproved external write. The grant belongs in `work-agents/work`'s
@@ -49,6 +50,7 @@ Lane: L4 (specified implementation with code-level judgement). The trust boundar
 
 ## Progress
 
+- 2026-10-08: goal written and Codex launched by a work-repository review session.
 - 2026-10-08: implemented marketplace-source trust discovery for Claude and Codex. Installed packages from every GitHub marketplace owned by `tj-agents` now contribute harness grants; foreign marketplaces and unregistered Codex cache entries do not.
 - 2026-10-08: added cross-marketplace application, foreign-marketplace rejection, and grant-withdrawal coverage for both hosts. Focused suite (19 tests), full Python suite, shared-runtime suite, generation, catalog and manifest checks, and local PowerShell CI suites passed. The CLI recovery vault suite passed on a fresh isolated retry after one non-reproducing timing-bound failure.
 - 2026-10-08: native review found no issues. Opened PR #153; merge remains Tommy's decision.

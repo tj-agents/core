@@ -19,6 +19,7 @@ M018: excessive documentation review. Career Azure reading pages were Markdown-o
 
 M019: premature CLI closure. After all five PRs merged (last PR6 at 2026-10-13 19:41:27 UTC, main merge 365dc8e6d53c69bae402eb047a9d93fc70b7c040), parent intentionally invoked installed machine peer-cli close.py before sending the final report. Tool returned aborted and user observed closure, then requested continuation. Existing session-guidance already requires completion report before closure: that ordering was violated. Diagnose missing enforcement/ambiguous host capability separately; do not claim transport failure caused this occurrence. Parent promised no repeat closure. Prior M012/B004 concern failure to close and are distinct, preserve their owners.
 
+The completed docs record is local c33aee3; published final reviewed head c496e88461063843ad12c8662c4a46ed36a2e004. Published reading hub: https://github.com/tomjseery/career/tree/main/interview-prep/technical/azure.
 
 ## Completion expectation
 

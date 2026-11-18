@@ -41,6 +41,7 @@ paths manifest, identity hash and tree-archive hash all reproduce.
   ```
   scope: Concertable. 0 open, showing 0. 0 named and marked done, hidden.
   nothing in ~/.claude/plans is named for 'authz'. Plans and roadmaps kept inside a repo are outside this corpus.
+  out of scope: 18 in the employer group - rerun with SCOPE=all to include.
   ```
 
   Those 18 reached `elsewhere` through `about(folder) or about(path.stem)`, so they are precisely
@@ -66,6 +67,8 @@ paths manifest, identity hash and tree-archive hash all reproduce.
   `authored`←`authz` no, `authored`←`authorization` no, `authoring`←`authorization` no,
   `tenancy`←`tenant` yes, `pos`←`postgres` no, `migration`←`migrate` yes, `policies`←`policy` yes,
   `interface`←`internal` no. PR #24's own regression cases still hold against the real corpus:
+  `reconcile` reports `every plan named for 'reconcile' is marked done`, a work-item-numbered plan resolves to its
+  employer group.
 - The bounded-remainder stem rule is the right shape rather than the plan's suggested bounded
   *difference*. The difference rule separates the two pairs the plan named but still admits
   `interface`/`internal` (remainders `face`/`nal`, difference 1) and `configure`/`confident`
