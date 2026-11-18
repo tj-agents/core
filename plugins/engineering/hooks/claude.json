@@ -53,16 +53,28 @@
               "--deadline",
               "25",
               "--deny-on-timeout",
+              "--hook",
               "${CLAUDE_PLUGIN_ROOT}/hooks/denial_prompt.py",
+              "--hook",
               "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/compact_output_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/forge_poll_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_review_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/persistent_workflow_merge_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_cleanup_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/harness_grant.py@Bash|PowerShell"
+              "--harness",
+              "claude",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/compact_output_gate.py",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/forge_poll_gate.py",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_review_gate.py",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/persistent_workflow_merge_gate.py",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/harness_grant.py"
             ]
           }
         ]
@@ -126,7 +138,9 @@
               "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py",
               "--prompt-context",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py"
+              "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py",
+              "--harness",
+              "claude"
             ]
           }
         ]
