@@ -168,6 +168,10 @@ def roster_marketplaces(packages: dict[str, dict]) -> dict[str, dict[str, str]]:
     return marketplaces
 
 
+def claude_dependencies(required: list[str]) -> list[str]:
+    return [f"{name}@{marketplace}" for marketplace, _, name in (value.partition("/") for value in required)]
+
+
 def roster_index(roster: dict) -> dict[str, dict]:
     if roster.get("schema_version") != 1 or roster.get("digest_format") != "sha256-tree-v1":
         raise ValueError("Unsupported plugin roster schema or digest format")
@@ -926,6 +930,16 @@ def build(root: Path, validate_plugin_digests: bool = True, roster=None):
                     raise ValueError(f"{manifest_path}: hook path disagrees with source map")
             elif "hooks" in manifest:
                 raise ValueError(f"{manifest_path}: undeclared hook source")
+            if "dependencies" in manifest:
+                raise ValueError(
+                    f"{manifest_path}: declare dependencies in .agents/plugins/plugins.json, not the host manifest"
+                )
+            if host == "claude":
+                required = roster_plugins[f"{marketplace}/{plugin}"]["dependencies"]["required"]
+                if required:
+                    manifest = {**manifest, "dependencies": claude_dependencies(required)}
+                    emit(f"plugins/{plugin}/.{host}-plugin/plugin.json", json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
+                    continue
             emit(f"plugins/{plugin}/.{host}-plugin/plugin.json", read(manifest_path))
         for field in ("name", "description", "author", "repository", "keywords"):
             if manifests[plugin]["codex"].get(field) != manifests[plugin]["claude"].get(field):
