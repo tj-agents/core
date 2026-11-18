@@ -14,8 +14,11 @@ is an external input, not an unshipped helper dependency. Unsupported/empty reco
 
 For Codex in the current directory, run the helper with `python` on Windows or `python3` on Linux/macOS:
 
+`<plugin-root>` is the machine plugin directory that holds `.claude-plugin/` and `.codex-plugin/`, never a
+path resolved from the shared `.agents/` copy.
+
 ```text
-python -B "<skill-directory>/../../resources/machine/scripts/history.py" recent --host codex
+python -B "<plugin-root>/resources/machine/scripts/history.py" recent --host codex
 ```
 
 Use `--host claude` for Claude. Respect the requested harness; otherwise use the current host. Options

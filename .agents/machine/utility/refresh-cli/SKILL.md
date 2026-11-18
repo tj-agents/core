@@ -1,6 +1,6 @@
 ---
 name: refresh-cli
-description: Refresh Claude's and Codex's installed tj-agents plugins to current main in one command, repair what each host actually loads, and verify it. Use when a skill or hook is missing or out of date after a merge, when /reload-plugins still shows old standards, or when asked to refresh, update or resync the CLI plugins.
+description: Install the latest merged tj-agents plugins on this machine in seconds with the hosts' native update, and verify what each host loads. Runs automatically after a merge from `engineering:merge`; otherwise use it as a last resort when a skill or hook is missing or out of date after a merge, or when asked to refresh, update or resync the CLI plugins.
 kind: utility
 domain: machine
 route: infer
@@ -8,21 +8,21 @@ route: infer
 
 # Refresh CLI plugins
 
-Run with `python` on Windows or `python3` on Linux/macOS, from the repository whose selection should be
-refreshed:
+`<plugin-root>` is the machine plugin directory that holds `.claude-plugin/` and `.codex-plugin/`, two
+levels above the `skills/refresh-cli/SKILL.md` or `codex-skills/refresh-cli/SKILL.md` entry point the host
+loaded. It is never resolved from the shared `.agents/` copy. Run with `python` on Windows or `python3` on
+Linux/macOS:
 
 ```sh
-python -B '<skill-directory>/../../resources/machine/scripts/refresh_cli.py' --project '<absolute-checkout>'
+python -B '<plugin-root>/resources/machine/scripts/refresh_cli.py' --project '<absolute-checkout>'
 ```
 
-For each host it updates every registered tj-agents marketplace, runs the same verified rolling refresh a
-bound launch performs, and repairs Claude's plugin registry so the recorded `version` names the refreshed
-install. It then compares every enabled tj-agents package with its repository's `main` and prints a JSON
-report. Exit 0 means both hosts are current; otherwise each entry's `problems` names what is stale.
-Bound Codex launches build each session's packages from `main`, so Codex's `unused_stale_cache` lists
-only cached copies that a launch bypassing the tj-agents launcher would load.
+It resolves `main` for each tj-agents source repository and runs `claude plugin update` only for the Claude
+installs behind it, printing each step. It then records the installed generation and prints a JSON report.
+Exit 0 means Claude is current. Afterwards, tell the user to run `/reload-plugins` in each open Claude session.
+Only the user can run it. Each session's next prompt reports a superseded generation until it reloads.
+Codex binds `main` at every launch, so the default run leaves it alone.
 
-Pass `--host claude` or `--host codex` for one host, and `--verify-only` to report without changing
-anything. A refresh takes a few minutes. Afterwards, run `/reload-plugins` in each open Claude session;
-new Codex sessions load the refreshed packages. Each open session reports a superseded generation at its next
-prompt until it adopts the new one.
+`--full` is slow: it updates every marketplace, runs the verified rolling refresh a bound launch performs,
+and repairs Claude's registry for both hosts. Use it only when the default run reports a problem it cannot fix.
+`--verify-only` reports without changing anything. `--host claude|codex|both` limits the hosts.

@@ -638,7 +638,7 @@
               "${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py"
             ]
           ],
-          "justification": "machine:refresh-cli refreshes the user's own tj-agents plugins from their registered marketplaces through the verified rolling refresh and repairs the host plugin registry.",
+          "justification": "machine:refresh-cli updates the user's own stale tj-agents plugins through the native plugin update, or with --full through the verified rolling refresh and registry repair.",
           "match": [
             [
               "python",

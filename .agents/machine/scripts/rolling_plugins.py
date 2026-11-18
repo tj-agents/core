@@ -33,6 +33,7 @@ GIT_TIMEOUT_SECONDS = 90
 OPERATION_TIMEOUT_SECONDS = 300
 LOCK_WAIT_SECONDS = 180
 LOCK_STALE_SECONDS = 900
+NATIVE_INSTALL_RETENTION_SECONDS = 14 * 24 * 60 * 60
 SHA = re.compile(r"^[0-9a-f]{40}$")
 GENERATED_MARKER = ".tj-agents-generated"
 
@@ -1106,7 +1107,7 @@ def _promote(source: Path, destination: Path, expected: Path, cache: Path, root:
                 raise RollingPluginError(f"refusing to replace unowned native plugin cache root {destination}")
             _verified_tree(destination)
         if _tree_bytes(destination) == expected_bytes:
-            _write_json(marker, {
+            write_json(marker, {
                 "schema_version": 1, "identity": root.identity, "repository": root.repository, "revision": root.revision,
             })
             return destination
@@ -1114,7 +1115,7 @@ def _promote(source: Path, destination: Path, expected: Path, cache: Path, root:
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, destination)
     _verified_tree(destination)
-    _write_json(destination.parent / ".tj-agents-rolling.json", {
+    write_json(destination.parent / ".tj-agents-rolling.json", {
         "schema_version": 1, "identity": root.identity, "repository": root.repository, "revision": root.revision,
     })
     return destination
@@ -1200,7 +1201,8 @@ def _pin_claude_cache(config: Path, deadline: Deadline) -> None:
         raise RollingPluginError(f"could not pin the Claude plugin cache: {detail}")
 
 
-def _prune_native_cache(cache: Path, active: Iterable[Path], roots: Iterable[VerifiedRoot]) -> None:
+def _prune_native_cache(cache: Path, active: Iterable[Path], roots: Iterable[VerifiedRoot],
+                        retain_recent_native: bool = False) -> None:
     roots = tuple(roots)
     protected = {path.resolve() for path in active if path.exists()}
     protected.update(root.root.resolve() for root in roots if root.root.exists())
@@ -1226,11 +1228,14 @@ def _prune_native_cache(cache: Path, active: Iterable[Path], roots: Iterable[Ver
             resolved = candidate.resolve()
             if any(resolved == path or _within(path, resolved) or _within(resolved, path) for path in protected):
                 continue
+            if retain_recent_native and not SHA.fullmatch(candidate.name) \
+                    and time.time() - candidate.stat().st_mtime < NATIVE_INSTALL_RETENTION_SECONDS:
+                continue
             _verified_tree(candidate)
             _remove_cache_tree(candidate, cache)
 
 
-def _write_json(path: Path, value: object) -> None:
+def write_json(path: Path, value: object) -> None:
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     _unlinked_ancestors(path)
     _unlinked_ancestors(temporary)
@@ -1437,7 +1442,7 @@ def materialize_native(prepared: Prepared, host: str, target: Path, project: Pat
                 roots.append(VerifiedRoot(identity, promoted, expected.revision, expected.repository))
             registry_written = False
             try:
-                _write_json(registry_path, document)
+                write_json(registry_path, document)
                 registry_written = True
                 inventory = _native([executable, *prepared.launch_args, "plugin", "list", "--json"], project,
                                     prepared.environment, deadline, True)
@@ -1450,11 +1455,12 @@ def materialize_native(prepared: Prepared, host: str, target: Path, project: Pat
                         raise RollingPluginError(f"Claude native inventory did not select the promoted root for {root.identity}")
                 if plugins == target / "plugins":
                     _pin_claude_cache(target, deadline)
-                    _prune_native_cache(actual_cache, _registry_paths(document) | _claude_pinned_paths(), roots)
+                    _prune_native_cache(actual_cache, _registry_paths(document) | _claude_pinned_paths(), roots,
+                                        retain_recent_native=True)
             except BaseException:
                 if registry_written:
                     try:
-                        _write_json(registry_path, before_document)
+                        write_json(registry_path, before_document)
                     except OSError:
                         pass
                 raise
@@ -1481,11 +1487,11 @@ def verify_final(prepared: Prepared, host: str, target: Path, project: Path, arg
         _clone, revision = _fetch_main(source, cache, prepared.deadline)
         if revision != expected_revision:
             raise RollingPluginError(f"publisher main advanced while materializing {source}")
-    _record_generations(generation_record.generations_path(prepared.plugins_root or target / "plugins", host),
+    record_generations(generation_record.generations_path(prepared.plugins_root or target / "plugins", host),
                         ((root.repository, root.revision) for root in prepared.selected_roots))
 
 
-def _record_generations(record: Path, revisions: Iterable[tuple[str, str]], attempts: int = 5) -> None:
+def record_generations(record: Path, revisions: Iterable[tuple[str, str]], attempts: int = 5) -> None:
     revisions = tuple(revisions)
     try:
         _unlinked_ancestors(record)
@@ -1497,7 +1503,7 @@ def _record_generations(record: Path, revisions: Iterable[tuple[str, str]], atte
             try:
                 if state == generation_record.BUSY:
                     raise PermissionError("the existing generation record could not be read")
-                _write_json(record, generation_record.merged_generations(entries, revisions, time.time()))
+                write_json(record, generation_record.merged_generations(entries, revisions, time.time()))
                 return
             except PermissionError:
                 if attempt + 1 == attempts:

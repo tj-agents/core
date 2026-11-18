@@ -10,8 +10,11 @@ domain: machine
 Requires Python 3.9+ and the selected harness's local transcript data. Run the packaged read-only helper
 with `python` on Windows or `python3` on Linux/macOS:
 
+`<plugin-root>` is the machine plugin directory that holds `.claude-plugin/` and `.codex-plugin/`, never a
+path resolved from the shared `.agents/` copy.
+
 ```text
-python -B "<skill-directory>/../../resources/machine/scripts/history.py" search --host codex --pattern "<literal term>"
+python -B "<plugin-root>/resources/machine/scripts/history.py" search --host codex --pattern "<literal term>"
 ```
 
 Select `--host claude` for Claude. Respect the named harness; otherwise use the current host. The default

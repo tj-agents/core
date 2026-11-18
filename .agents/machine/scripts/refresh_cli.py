@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Refresh Claude and Codex tj-agents plugins to current main and verify what each host will load."""
+"""Refresh Claude and Codex tj-agents plugins to current main and verify what each host will load.
+
+The default fast path asks each owned source repository for its main revision and runs Claude's native
+`plugin update` only for installs behind it. `--full` runs the slower verified refresh and repair.
+"""
 
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
@@ -18,6 +24,8 @@ if str(HERE) not in sys.path:
 
 import agent_cli  # noqa: E402
 from codex_marketplace_sync import SyncError, _marketplace_source, codex_config_selection  # noqa: E402
+from generation_record import generations_path  # noqa: E402
+import rolling_plugins  # noqa: E402
 from startup_binding import StartupBindingError, run_session  # noqa: E402
 
 HOSTS = ("claude", "codex")
@@ -25,11 +33,27 @@ OWNER = "tj-agents"
 MARKER = ".tj-agents-rolling.json"
 MARKETPLACE_TIMEOUT_SECONDS = 180
 REMOTE_TIMEOUT_SECONDS = 30
+UPDATE_TIMEOUT_SECONDS = 180
+LOCK_WAIT_SECONDS = 300
+UPDATABLE_SCOPES = ("user", "project", "local")
 GITHUB_REPOSITORY = re.compile(r"github\.com[/:](?P<repository>[^/]+/[^/]+?)(?:\.git)?/?$", re.IGNORECASE)
 
 
 class RefreshError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class Install:
+    identity: str
+    scope: str
+    owner: Path
+    repository: str
+    revision: str | None
+
+
+def progress(message: str) -> None:
+    print(f"refresh-cli: {message}", file=sys.stderr, flush=True)
 
 
 def configuration_root(host: str, environ: Mapping[str, str] = os.environ) -> Path:
@@ -145,46 +169,93 @@ def _applies(record: Mapping[str, object], project: Path) -> bool:
     return True
 
 
-def claude_registry_problems(enabled: set[str], project: Path, environ: Mapping[str, str] = os.environ) -> list[str]:
-    path = plugins_root("claude", environ) / "installed_plugins.json"
+def _plugin_repository(known: Mapping[str, object], identity: str) -> str | None:
+    name, marketplace = identity.rsplit("@", 1)
+    entry = known.get(marketplace)
+    if not isinstance(entry, Mapping):
+        return None
+    marketplace_source = rolling_plugins.source_url(entry.get("source"))
+    location = entry.get("installLocation")
     try:
-        registry = json.loads(path.read_text(encoding="utf-8")).get("plugins", {})
+        catalog = json.loads((Path(location) / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        catalog = {}
+    plugins = catalog.get("plugins") if isinstance(catalog, Mapping) else None
+    listed = next((item for item in plugins or () if isinstance(item, Mapping) and item.get("name") == name), None)
+    source = listed.get("source") if isinstance(listed, Mapping) else None
+    url = rolling_plugins.source_url(source) if isinstance(source, Mapping) else marketplace_source
+    return rolling_plugins.canonical_source(url or "")
+
+
+def _install_owner(record: Mapping[str, object], project: Path) -> Path:
+    owner = record.get("projectPath")
+    return Path(owner) if record.get("scope") in {"project", "local"} and isinstance(owner, str) else project
+
+
+def claude_installs(enabled: set[str], project: Path,
+                    environ: Mapping[str, str] = os.environ) -> tuple[list[Install], list[str]]:
+    root = plugins_root("claude", environ)
+    try:
+        registry = json.loads((root / "installed_plugins.json").read_text(encoding="utf-8")).get("plugins", {})
+        known = json.loads((root / "known_marketplaces.json").read_text(encoding="utf-8"))
     except (OSError, ValueError, AttributeError) as error:
-        return [f"Claude plugin registry could not be read: {error}"]
-    problems = []
+        return [], [f"Claude plugin registry could not be read: {error}"]
+    installs, problems = [], []
     marketplaces = set(claude_marketplaces(environ))
-    for identity, records in registry.items() if isinstance(registry, Mapping) else ():
+    for identity, records in sorted(registry.items()) if isinstance(registry, Mapping) else ():
         if identity not in enabled or identity.rsplit("@", 1)[-1] not in marketplaces:
+            continue
+        repository = _plugin_repository(known, identity)
+        if repository is None or not owned(repository_name(repository)):
             continue
         for record in records if isinstance(records, list) else ():
             if not isinstance(record, Mapping) or not _applies(record, project):
                 continue
-            install = record.get("installPath")
-            scope = record.get("scope")
-            marker = Path(install).parent / MARKER if isinstance(install, str) else None
-            if marker is None or not marker.is_file():
-                problems.append(f"{identity} ({scope}): {install!r} is not a rolling install, so Claude loads "
-                                f"an unrefreshed copy")
-                continue
-            try:
-                revision = json.loads(marker.read_text(encoding="utf-8")).get("revision")
-            except (OSError, ValueError, AttributeError):
+            install, scope = record.get("installPath"), record.get("scope")
+            revision = record.get("gitCommitSha")
+            if not isinstance(install, str) or not Path(install).is_dir():
+                problems.append(f"{identity} ({scope}): its install {install!r} is missing")
                 revision = None
-            if Path(install).name != revision:
-                problems.append(f"{identity} ({scope}): Claude loads {Path(install).name!r}, but the refreshed "
-                                f"install is {revision!r}")
             elif record.get("version") != Path(install).name:
                 problems.append(f"{identity} ({scope}): registry version {record.get('version')!r} does not name "
                                 f"its install directory {Path(install).name!r}, so Claude loads another copy")
-    return problems
+            elif not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+                problems.append(f"{identity} ({scope}): {install!r} records no source revision")
+                revision = None
+            installs.append(Install(identity, str(scope), _install_owner(record, project), repository, revision))
+    return installs, problems
+
+
+def main_revisions(repositories: Iterable[str], resolve: Callable[[str], str] = main_revision) -> dict[str, str]:
+    names = sorted(set(repositories))
+    with ThreadPoolExecutor(max_workers=max(1, len(names))) as pool:
+        return dict(zip(names, pool.map(resolve, names)))
+
+
+def verify_claude(enabled: set[str], project: Path, repositories: Callable[[str], str] = main_revision,
+                  environ: Mapping[str, str] = os.environ) -> dict[str, object]:
+    installs, problems = claude_installs(enabled, project, environ)
+    heads = main_revisions((repository_name(install.repository) for install in installs), repositories)
+    packages = []
+    for install in installs:
+        head = heads[repository_name(install.repository)]
+        packages.append({"identity": install.identity, "scope": install.scope, "repository": install.repository,
+                         "revision": install.revision, "main": head, "current": install.revision == head})
+        if install.revision and install.revision != head:
+            problems.append(f"{install.identity} ({install.scope}) is at {install.revision}, main is {head}")
+    if not packages:
+        problems.append("no tj-agents package is installed for claude")
+    return {"host": "claude", "packages": packages, "problems": problems}
 
 
 def verify(host: str, enabled: set[str], project: Path, repositories: Callable[[str], str] = main_revision,
            environ: Mapping[str, str] = os.environ) -> dict[str, object]:
+    if host == "claude":
+        return verify_claude(enabled, project, repositories, environ)
     heads: dict[str, str] = {}
     packages = []
     unused_stale = []
-    problems = claude_registry_problems(enabled, project, environ) if host == "claude" else []
+    problems = []
     for package in installed_packages(host, environ):
         repository = repository_name(package["repository"])
         if package["identity"] not in enabled or not owned(repository):
@@ -227,21 +298,70 @@ def refresh(host: str, project: Path, verify_only: bool = False, environ: Mappin
         command = "upgrade"
     if not verify_only:
         for name in names:
+            progress(f"{host}: updating marketplace {name}")
             run([executable, "plugin", "marketplace", command, name], project, MARKETPLACE_TIMEOUT_SECONDS)
+        progress(f"{host}: running the verified rolling refresh")
         try:
             status = launch(host, executable, project, ["--version"])
         except StartupBindingError as error:
             raise RefreshError(f"{host} rolling refresh failed: {error}") from None
         if status:
             raise RefreshError(f"{host} rolling refresh exited {status}")
+    progress(f"{host}: comparing installs with main")
     return claude_enabled(project, environ) if host == "claude" else codex_enabled(selection)
+
+
+def _stale(installs: Iterable[Install], heads: Mapping[str, str]) -> list[Install]:
+    return [install for install in installs if install.scope in UPDATABLE_SCOPES
+            and repository_name(install.repository) in heads
+            and install.revision != heads[repository_name(install.repository)]]
+
+
+def fast_claude(project: Path, environ: Mapping[str, str] = os.environ, repositories: Callable[[str], str] = main_revision,
+                lock_wait: float = LOCK_WAIT_SECONDS, update: Callable[..., None] = run) -> dict[str, object]:
+    enabled = claude_enabled(project, environ)
+    installs, _problems = claude_installs(enabled, project, environ)
+    progress(f"claude: resolving main for {len({install.repository for install in installs})} source repositories")
+    heads = main_revisions((repository_name(install.repository) for install in installs), repositories)
+    stale = _stale(installs, heads)
+    if stale:
+        executable = agent_cli.resolve_claude_executable()
+        cache = plugins_root("claude", environ) / "cache" / ".tj-agents-rolling" / "claude"
+        progress("claude: waiting for the plugin lock")
+        try:
+            with rolling_plugins.exclusive(cache, lock_wait):
+                stale = _stale(claude_installs(enabled, project, environ)[0], heads)
+                for install in stale:
+                    head = heads[repository_name(install.repository)]
+                    progress(f"claude: updating {install.identity} ({install.scope}) "
+                             f"{(install.revision or 'unknown')[:12]} -> {head[:12]}")
+                    try:
+                        update([executable, "plugin", "update", install.identity, "--scope", install.scope, "--json"],
+                               install.owner, UPDATE_TIMEOUT_SECONDS)
+                    except RefreshError as error:
+                        progress(f"claude: {install.identity} was not updated: {error}")
+                current = claude_installs(enabled, project, environ)[0]
+                recorded = {(install.repository, install.revision) for install in current
+                            if install.revision and install.revision == heads.get(repository_name(install.repository))}
+                rolling_plugins.record_generations(generations_path(plugins_root("claude", environ), "claude"), recorded)
+        except rolling_plugins.RollingPluginError as error:
+            raise RefreshError(f"Claude plugins are locked: {error}") from None
+    report = verify_claude(enabled, project, lambda repository: heads.get(repository) or repositories(repository),
+                           environ)
+    if stale and not report["problems"]:
+        progress("claude: updated. Run /reload-plugins in each open Claude session to load it.")
+    elif not stale:
+        progress("claude: already current")
+    return report
 
 
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", choices=(*HOSTS, "both"), default="both")
     parser.add_argument("--project", type=Path, default=Path.cwd())
-    parser.add_argument("--verify-only", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--full", action="store_true", help="update marketplaces and run the verified rolling refresh")
+    mode.add_argument("--verify-only", action="store_true")
     arguments = parser.parse_args(list(argv) if argv is not None else None)
     hosts = HOSTS if arguments.host == "both" else (arguments.host,)
     project = arguments.project.resolve()
@@ -249,15 +369,20 @@ def main(argv: Iterable[str] | None = None) -> int:
     failed = False
     for host in hosts:
         try:
-            report = verify(host, refresh(host, project, arguments.verify_only), project)
+            if host == "claude" and not (arguments.full or arguments.verify_only):
+                report = fast_claude(project)
+            elif host == "codex" and not (arguments.full or arguments.verify_only):
+                progress("codex: each launch binds current main; pass --full to also refresh its shared cache")
+                continue
+            else:
+                report = verify(host, refresh(host, project, arguments.verify_only), project)
         except (RefreshError, agent_cli.LaunchError, OSError) as error:
             report = {"host": host, "packages": [], "problems": [str(error)]}
         failed = failed or bool(report["problems"])
         reports.append(report)
     print(json.dumps(reports, indent=2))
-    if "claude" in hosts and not failed:
-        print("Claude: run /reload-plugins in each open session. Codex: new sessions load the refreshed packages.",
-              file=sys.stderr)
+    if arguments.full and "claude" in hosts and not failed:
+        progress("Claude: run /reload-plugins in each open session. Codex: new sessions load the refreshed packages.")
     return 1 if failed else 0
 
 

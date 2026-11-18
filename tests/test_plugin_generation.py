@@ -22,6 +22,7 @@ RECORD = sys.modules['generation_record']
 CORE = 'https://github.com/tj-agents/core.git'
 A = 'a' * 40
 B = 'b' * 40
+C = 'c' * 40
 SESSION = 'd0affffee0995d0898222ed71d806c73'
 
 
@@ -256,6 +257,31 @@ class ClaudeGenerationTests(GenerationHarness):
         output = self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(root)})
 
         self.assertIn('does not name a verified revision', self.context(output))
+
+    def native_root(self, revision):
+        root = self.claude_root('machine', revision).parent / f'{revision[:12]}-aee5d9df'
+        root.mkdir()
+        return root
+
+    def test_a_native_update_root_takes_its_revision_from_the_registry(self):
+        native_b = self.native_root(B)
+        self.write(self.claude / 'plugins/installed_plugins.json', {'version': 2, 'plugins': {'machine@tj-agents': [
+            {'scope': 'user', 'installPath': str(native_b), 'gitCommitSha': B}]}})
+        self.install('claude', A, B)
+
+        self.assertIsNone(self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(native_b)}))
+
+        self.install('claude', C, now=3000.0)
+        self.assertIn(f'runs {B[:12]}, superseded by {C[:12]}',
+                      self.context(self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(native_b)})))
+
+    def test_a_replaced_native_root_is_matched_to_its_unique_recorded_revision(self):
+        native_a = self.native_root(A)
+        self.registry((self.claude_root('machine', B), 'user'))
+        self.install('claude', A, B)
+
+        self.assertIn(f'runs {A[:12]}, superseded by {B[:12]}',
+                      self.context(self.prompt('claude', {'CLAUDE_PLUGIN_ROOT': str(native_a)})))
 
     def test_a_superseded_non_rolling_install_is_still_reported(self):
         loaded = self.claude / 'plugins/cache/market/machine/1.0.0'
