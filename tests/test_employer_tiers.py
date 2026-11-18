@@ -216,27 +216,23 @@ class EmployerScope(unittest.TestCase):
         self.assertEqual(result.applicable, [])
         self.assertEqual(result.employers, ())
 
-    def test_employer_cannot_depend_on_itself_directly_or_in_a_matching_alternative(self):
+    def test_employer_detects_by_origin_only(self):
         (self.project / 'marker').touch()
-        for node in ({'fact': 'employer'}, {'any': [{'file': 'marker'}, {'fact': 'employer'}]},
-                     {'all': [{'file': 'marker'}, {'any': [{'fact': 'employer'}, {'file': 'marker'}]}]}):
+        self.remote('employer-a/service')
+        for node in ({'fact': 'employer'}, {'file': 'marker'}, {'any': [{'file': 'marker'}, {'remote': '^employer-a/'}]},
+                     {'all': [{'remote_host': 'example.test'}, {'any': [{'fact': 'employer'}, {'remote': '^employer-a/'}]}]}):
             with self.subTest(node=node):
                 employer = self.install('employer-a', dict(EMPLOYER, detect=node))
                 result = gate.assess(self.project, self.found(), facts={'employer': gate.PredicateResult(self.project, True)})
                 self.assertEqual(result.applicable, [])
-                self.assertTrue(any(item['code'] == 'employer-self-dependency' for item in result.diagnostics))
+                self.assertTrue(any(item['code'] == 'malformed-employer' for item in result.diagnostics))
                 problems = []
                 checker.check_tier_declaration(employer, problems)
-                self.assertTrue(any('cannot depend' in item for item in problems))
+                self.assertTrue(any('detect by origin only' in item for item in problems))
 
     def test_multiple_matching_employers_are_all_reported(self):
-        subprocess.run(
-            ['git', 'init', '--quiet', str(self.project)],
-            check=True, capture_output=True, timeout=10,
-        )
-        (self.project / 'marker').touch()
-        payloads = [self.install(name, dict(EMPLOYER, tier=name, detect={'file': 'marker'}))
-                    for name in ('employer-a', 'employer-b')]
+        self.remote('employer-a/service')
+        payloads = [self.install(name, dict(EMPLOYER, tier=name)) for name in ('employer-a', 'employer-b')]
         result = gate.assess(self.project, self.found())
         self.assertEqual([item.plugin for item, _ in result.employers], ['employer-a', 'employer-b'])
         context = gate.assessment_statement(self.project, self.found())
@@ -294,10 +290,11 @@ class EmployerScope(unittest.TestCase):
         employer = schema['allOf'][-1]
         self.assertEqual(employer['if'], {'required': ['employer']})
         self.assertEqual(employer['then']['properties']['applies'], {'const': 'stack-present'})
-        recursive = schema['$defs']['nonEmployerPredicate']
-        self.assertEqual(recursive['allOf'][1]['not']['properties']['fact'], {'const': 'employer'})
+        self.assertEqual(employer['then']['properties']['detect'], {'$ref': '#/$defs/originPredicate'})
+        recursive = schema['$defs']['originPredicate']
+        self.assertEqual(recursive['allOf'][1]['propertyNames'], {'enum': ['all', 'any', 'remote_host', 'remote']})
         for operator in ('all', 'any'):
-            self.assertEqual(recursive['properties'][operator]['items'], {'$ref': '#/$defs/nonEmployerPredicate'})
+            self.assertEqual(recursive['properties'][operator]['items'], {'$ref': '#/$defs/originPredicate'})
 
     def test_shipped_base_harness_and_resources_cover_the_shared_gate_contract(self):
         manifest = json.loads((ROOT / '.agents/plugins/harness/base.json').read_text(encoding='utf-8'))

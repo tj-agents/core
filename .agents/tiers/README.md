@@ -69,13 +69,15 @@ An employer plugin declares a gated tier and the slug of its own shipped context
 ship readable `skills/communication-context/SKILL.md` with matching `name:` and lowercase
 `kind:` front matter. Its resolved path must stay inside that payload. The payload checker and
 runtime validate this contract. Employer metadata is supported only in version 3 and requires
-`applies: "stack-present"` with an ordinary positive detection predicate.
+`applies: "stack-present"` with an origin predicate: `remote_host` and `remote` combined only by
+`all` and `any`. Agent's `tj_agent.declarations` finds installed declarations and matches employer
+origins for this gate and for Agent's plugin selection; in an employer predicate `remote` matches
+only a parsed network origin.
 
 The gate derives the reserved `employer` fact from valid installed employer declarations whose
 predicates genuinely match this project. A missing or malformed declaration, missing or invalid
 context skill, orphaned payload, owner-repository exemption, session override or caller-supplied
-`employer` fact cannot establish employer applicability. Employer predicates cannot reference
-`fact: "employer"` directly or within nested `all`/`any`. Version 3 selection does not use owner
+`employer` fact cannot establish employer applicability. Version 3 selection does not use owner
 exemptions or `AGENTS_TIER_OVERRIDE`; versions 1 and 2 retain their existing behavior.
 
 A generic work tier can depend on this fact:

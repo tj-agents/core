@@ -72,11 +72,15 @@ class ReviewRulesTests(unittest.TestCase):
             ["git", "init", "--quiet", str(self.project)],
             check=True, capture_output=True, timeout=10,
         )
+        subprocess.run(
+            ["git", "-C", str(self.project), "config", "remote.origin.url", "git@example.test:company/service.git"],
+            check=True, capture_output=True, timeout=10,
+        )
         self.selection("stack@selected", "company@selected", "company-stack@selected")
-        (self.project / "company.marker").write_text("company\n", encoding="utf-8")
         employer = self.plugin("company", data={
             "schema_version": 3, "tier": "company", "applies": "stack-present",
-            "detect": {"file": "company.marker"}, "employer": {"context_skill": "context"},
+            "detect": {"all": [{"remote_host": "example.test"}, {"remote": "^company/"}]},
+            "employer": {"context_skill": "context"},
         }, kind="knowledge")
         context = employer.payload_dir / "skills/context/SKILL.md"
         context.parent.mkdir()
@@ -181,6 +185,8 @@ class ReviewRulesTests(unittest.TestCase):
         for name in ("tier_gate.py", "boundary.py", "host_cli.py", "selected_standards.py"):
             shutil.copy2(ROOT / ".agents/hooks" / name, hooks / name)
         shutil.copytree(ROOT / ".agents/dependencies/cli/.agents/cli/runtime/tj_cli", hooks / "tj_cli")
+        runtime = ".agents/dependencies/agent/.agents/agent/runtime/tj_agent"
+        shutil.copytree(ROOT / runtime, package / "dependencies/agent/.agents/agent/runtime/tj_agent")
         probe = package / "probe.py"
         probe.write_text(
             "import importlib.util\n"

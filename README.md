@@ -48,7 +48,7 @@ The richer planning workflows are selected engineering conventions, not prerequi
 Known bugs, mistakes and debt follow the selected problem-record profile.
 The [recording contract](.agents/workflow/resources/problem-records.md) routes remote work-item
 operations to the repository's explicitly selected profile. Personal owns GitHub records; a selected
-specific profile owns its own tracker records and native type policy. Agent publishes the shared SQLite
+organization owns its own tracker records and native type policy. Agent publishes the shared SQLite
 registry as Agent Store;
 Core publishes generic work status as Workflow and reusable engineering lifecycles as Engineering.
 Installing Engineering does not select or install a recording
