@@ -13,14 +13,16 @@ not resume, merge, rebase or close anything. Continuing a named goal afterwards 
 1. **Inventory this conversation's leftovers** from its transcript: pull requests, branches, worktrees,
    plan files, records, background tasks and every question or proposal still awaiting the user.
 2. **Re-read each against live state** with the shipped script, one call for every item. It reads PR,
-   issue and branch state in one GitHub query and searches Agent's session store for each branch:
+   issue and branch state in one GitHub query, matches Agent's recorded sessions to each branch's worktree
+   and each issue's linked sessions through `agent-store`, and checks liveness with `tj recover --dry-run`;
+   both come with Agent's install:
 
    ```text
    python -B "<skill-directory>/scripts/catch_up.py" --pr https://github.com/tj-agents/core/pull/551 --branch tj-agents/template:Refactor/SubjectSkillLayout --issue https://github.com/tj-agents/personal/issues/49
    ```
 
    Use `python3` on Linux/macOS. Its JSON lists each item's `state` and every matching session; a
-   `stalled` session is closed while its work item is active or its branch is unmerged, with its `reopen`
+   `stalled` session is closed while its branch is unmerged or its linked issue is open, with its `reopen`
    action. Check local worktrees and plan files directly. The conversation's own account of an item is
    never evidence of its current state.
 3. **Find what happened since on the same subjects.** Search newer commits, PRs and issues in every
