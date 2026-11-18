@@ -88,6 +88,12 @@
       "Edit(/.agents/plugins/marketplace.json)"
     ]
   },
+  "enabledPlugins": {
+    "base@tj-agents": true,
+    "engineering@tj-agents": true,
+    "machine@tj-agents": true,
+    "personal@tj-agents": true
+  },
   "extraKnownMarketplaces": {
     "tj-agents": {
       "source": {
@@ -96,11 +102,5 @@
       },
       "autoUpdate": true
     }
-  },
-  "enabledPlugins": {
-    "base@tj-agents": true,
-    "engineering@tj-agents": true,
-    "machine@tj-agents": true,
-    "personal@tj-agents": true
   }
 }
