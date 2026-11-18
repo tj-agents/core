@@ -2,7 +2,6 @@
   "schema_version": 1,
   "plugin": "tj-agents/workflow",
   "source_roots": [
-    ".agents/dependencies/agent/.agents/agent/resources/lanes",
     ".agents/dependencies/cli/.agents/cli/runtime",
     ".agents/hooks/installed_skills.py",
     ".agents/hooks/problem_records.py",
