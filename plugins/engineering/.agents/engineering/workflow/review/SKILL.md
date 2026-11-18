@@ -71,6 +71,9 @@ manifest, descriptor identity, and hashes before returning.
 Add its paths and identities to every immutable-artifact set. A host without safe read-only Git reads this
 bundle; no reviewer depends on the implementation transcript.
 
+When the descriptor reports `host_coverage.required`, its frozen paths touch an agent surface.
+`base:plan-artifacts` owns the coverage-record shape and evidence requirements.
+
 If the branch moves while work is active, do not widen the pass. Cancel any dispatch whose baseline is no
 longer trustworthy, finish or restart the frozen pass, and leave later commits to `incremental-review`.
 
@@ -185,6 +188,16 @@ Every retained finding is a defect the parent would fix and names one concrete f
 observations. Deduplicate across native, security, concern, and region results by underlying defect and
 evidence, preserving stable IDs. Lenses do not supply final severity or approval; the parent assigns
 severity, writes one judgment, and records findings in the canonical shape from `review-lifecycle`.
+
+Before completing an agent-surface pass, update the canonical work order's one moving coverage record for
+the frozen head, then run with `python` on Windows or `python3` on Linux/macOS:
+
+```bash
+python <engineering>/workflows/workflow_ops.py --root <repository-root> --workflow-run-id <id> review-host-check --descriptor <descriptor-path> --work-order <canonical-work-order>
+```
+
+The command validates that record against the descriptor's frozen paths and exact head. A failed check keeps
+the review incomplete.
 
 On completion, set `Review status` to `complete`, set the current and active-pass judgments, stamp the single
 `Reviewed up to commit:` marker at the frozen head, and stamp the security marker there when required. If

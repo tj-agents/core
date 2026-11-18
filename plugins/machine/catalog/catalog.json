@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:817a1c9e46fff10aa4ca0832a7d1bc31e7847320a608194bc47114b2267bf0ae",
+          "digest": "sha256:7d574ac433118c4afffc4638b4b505b6039702bc35e427f1d9aa1e0fc3b7d9aa",
           "harness": {
             "marketplaces": [
               {
@@ -193,7 +193,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:e55270957edeca1037fc0cae7a7d7d17233702cf95555b0bee4c8372e0b02ffb",
+          "digest": "sha256:213fe230e70c7421f225446391a8bd99dc8b710ed36bc30a578429a8c0c5a33d",
           "harness": {
             "marketplaces": [
               {
@@ -278,13 +278,15 @@
               {
                 "path": "hooks/merge_review_gate.py",
                 "hosts": [
-                  "claude"
+                  "claude",
+                  "codex"
                 ]
               },
               {
                 "path": "hooks/persistent_workflow_merge_gate.py",
                 "hosts": [
-                  "claude"
+                  "claude",
+                  "codex"
                 ]
               },
               {
