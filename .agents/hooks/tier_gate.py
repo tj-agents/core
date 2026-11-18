@@ -1417,9 +1417,8 @@ def main():
     if arguments.project:
         payload["cwd"] = arguments.project
 
-    project = project_root(payload)
-    finish_checkout_freshness = begin_checkout_freshness(project)
-    context = statement(project)
+    finish_checkout_freshness = begin_checkout_freshness(project_root(payload))
+    context = statement(project_root(payload))
     freshness = finish_checkout_freshness()
     combined = "\n\n".join(part for part in (freshness, context) if part)
     if not combined:
