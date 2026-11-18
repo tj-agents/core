@@ -59,3 +59,27 @@
 **Resolution condition:** only an exhausted, lease-free owner can accept an explicit finite renewal; it retains its identity and existing limits, returns to waiting, and passes focused runtime tests, independent review and exact-head Windows/Linux CI.
 
 **Verification evidence:** the exact controller owner was blocked with `continuation-budget-exhausted` after its deadline elapsed. The new focused test proves a one-hour explicit renewal succeeds without changing owner identity or counters and rejects a duplicate renewal.
+
+## B006 - Reconciliation writer-state coverage does not establish head drift
+
+**Kind:** bug. **Observed/reported:** 2026-10-12; PR #218 Linux CI and the focused local runtime test both fail `test_reconcile_rejects_other_writer_states_without_mutation`: the test expects `owner-reconciliation-foreground-active` but receives `owner-reconciliation-not-required`. **Cause:** confirmed: the test invokes `operate(..., reconcile)` without first making the owner's recorded head differ from the current repository head, so the earlier reconciliation precondition rejects it.
+
+**Impact and priority:** P1; stacked parent PR #209 cannot pass its required Windows/Linux CI, preventing the dependent Stop-hook repair from landing.
+
+**Source owner:** tj-agents/core continuation runtime test coverage. **State:** blocked. **Reason:** the causal test is owned by the stack parent and cannot be repaired in this child branch. **Blocked by:** dependency. **Repair link:** plans/controller-goal-association/GOAL.md and PR209. **Resolver:** PR #209's delivery owner. **Resume when:** PR #209 contains the head-drift setup and its exact-head CI passes. **Next action:** repair the parent test on `Fix/ControllerGoalAssociation`, then reconcile PR #218 with the resulting parent head.
+
+**Resolution condition:** the focused test reaches the foreground-active and writer-active guards only after a real recorded-head drift, and PR #209's required CI passes.
+
+**Verification evidence:** local focused execution failed with `owner-reconciliation-not-required`; the Linux CI log for run 38262296588 reports the same assertion after 1,079 tests.
+
+## B006 - Reconciliation writer-state coverage does not establish head drift
+
+**Kind:** bug. **Observed/reported:** 2026-10-12; PR #218 Linux CI and the focused local runtime test both fail `test_reconcile_rejects_other_writer_states_without_mutation`: the test expects `owner-reconciliation-foreground-active` but receives `owner-reconciliation-not-required`. **Cause:** confirmed: the test invokes `operate(..., reconcile)` without first making the owner's recorded head differ from the current repository head, so the earlier reconciliation precondition rejects it.
+
+**Impact and priority:** P1; stacked parent PR #209 cannot pass its required Windows/Linux CI, preventing the dependent Stop-hook repair from landing.
+
+**Source owner:** tj-agents/core continuation runtime test coverage. **State:** blocked. **Reason:** the causal test is owned by the stack parent and cannot be repaired in this child branch. **Blocked by:** dependency. **Repair link:** plans/controller-goal-association/GOAL.md and PR209. **Resolver:** PR #209's delivery owner. **Resume when:** PR #209 contains the head-drift setup and its exact-head CI passes. **Next action:** repair the parent test on `Fix/ControllerGoalAssociation`, then reconcile PR #218 with the resulting parent head.
+
+**Resolution condition:** the focused test reaches the foreground-active and writer-active guards only after a real recorded-head drift, and PR #209's required CI passes.
+
+**Verification evidence:** local focused execution failed with `owner-reconciliation-not-required`; the Linux CI log for run 38262296588 reports the same assertion after 1,079 tests.
