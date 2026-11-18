@@ -10,7 +10,9 @@ The existing parent rollout authorizes Claude and Codex source implementation, r
 
 Phase 1a Source head `261fb009177c558b2a48b8badd3e4a3da3385a4d` landed in Core PR #211 at merge `f25427e678dc1ab384260ffc97ddab4af69dbea5` on 2026-10-12 at 01:27:18 UTC. Exact PR CI `38190837766`, attempt 1, and causal main CI `38191948327`, attempt 1, completed successfully with guard/Windows/Linux as applicable. The causal regenerate log says “Generated output already current.” The merged checkout and its local branch were removed after cleanup proof. This is source publication; installed native activation is not claimed.
 
-This successor is branch `Fix/PowerShellShellOracle`, based on published main `7fed153b078c60fa69b6db4b50ab03c0b3f5d025`. The canonical goal remains `plans/shell-command-operands/GOAL.md` in the active delivery checkout. The parent owns this document. The bounded L4 implementation writer completed and released the four existing fixture/helper/test paths listed below; the parent now owns acceptance and delivery. Preserve original checkpoint `7e8b650f721b3c872446f9205922efe685be81b1` and preserved generated/source stashes; never apply or remove them as part of this slice.
+The descriptor1b.1 predecessor landed as PR217 from approved `d8d9a269111a3640a564c28ddb5b187c4c1c36da` at `8e7110da37540971be623eabd847618ee32ea04c`, 2026-10-12T13:30:49Z. Exact PR38254171393 and causal main38256203994 attempt1 passed Windows/Linux; actual regenerate job114834815103 confirmed generated output already current at2026-10-12T13:31:10.0443520Z. Owned checkout/branch removal was verified. The earlier unchanged Unicode pre-sync failure remains historical/unclassified; no broad local green or installed activation is claimed.
+
+The active successor is `Fix/PowerShellLiteralCases`, based on this published8e7110da. The canonical Goal remains here; parent owns this document and delivery, with one bounded L4 writer assigned only the literal33 fixture/helper/test slice. Preserve checkpoint7e8b650 and every retained source/generated stash; no application or removal is authorized by this slice.
 
 ## Four sequential deliveries
 
@@ -25,13 +27,23 @@ The readable combined phase projects above the 1,000 substantive-addition trigge
 
 Publish in this order from the updated remote default branch. Do not start a successor's source changes before its predecessor's normal merge and causal publication. Metadata describes authored corpus coverage; runtime behavior must not depend on the test slice. Preserve previously published record IDs and semantics. No skipped, expected-failure, environment/head-selected or masked cases. All 80 cases and 42 descriptors remain mandatory before phase 2.
 
-## Current 1b.1 lease and acceptance
+## Published 1b.1 lease and acceptance
 
 Own only `.agents/hooks/tests/fixtures/shell_option_profiles.json`, `.agents/hooks/tests/fixtures/shell_profile_sources.json`, `.agents/hooks/tests/fixtures/shell_profile_oracle.py` and `.agents/hooks/tests/test_shell_profile_oracle.py`. Preserve all 11 Unix groups, nine existing provenance records, existing stable IDs and compatibility test class. Append the PowerShell data below and three primary provenance records. Total profile rows become 436: Bash 105, dash 19, zsh names 197, zsh signed maps 73 and PowerShell 42.
 
 Implement standard-library offline validation and iteration with `pwsh:<name>` IDs, first ordered prefix resolution, explicit aliases, source conditions, Windows common projection/extra/Version override and fixed enums. Add meaningful malformed-copy tests: missing/reordered descriptors, lost or incorrect source conditions/aliases, bad arity/action, wrong source locations/provenance, removed raw/normalized hash distinction, missing immutable documentation metadata and falsely asserted parser revision. Existing facade compatibility covers only already published behavior. Do not add future extractor assertions to that compatibility class.
 
 Do not create `shell_extraction_cases.json` in 1b.1. Do not edit production parser, consumers, native wiring, manifests, catalog, generated packages or either host mapping. The fixture/helper must not fetch sources, import the production gate as a second parser, decode encoded payloads, execute commands or read private host artifacts. Capture focused tests through the workflow run operation; run required source/generation/catalog/harness checks and exact-head Windows/Linux CI. Parent reviews the committed exact candidate before opening its PR.
+
+## Current 1b.2 lease and acceptance
+
+Create `.agents/hooks/tests/fixtures/shell_extraction_cases.json` and extend only the existing fixture helper `.agents/hooks/tests/fixtures/shell_profile_oracle.py` and `.agents/hooks/tests/test_shell_profile_oracle.py`. Parent owns Goal changes. Preserve all published436 profile records, twelve sources,42 ordered descriptors, aliases/projection and old facade compatibility. No production extraction, profiles/source fixture changes, private host reads, network, command execution, payload decoding, manifests, catalog or generated package edits belong here.
+
+Author exactly the33 literal records from the immutable80 table below, in stable ID order, with their unmodified argv/expected/source_rule fields. The schema_version1 fixture records actual published stage1b.2 and six shared primary rule-location links. Its sorted-key compact UTF-8 cases digest is `eacfcde596a9d74a88db8871a82bc977f23e0ce580d48971c095d2369bcbcd98`. Do not add the24 none or23 refusal records yet. They retain their fixed contracts and sequential delivery gates.
+
+Add offline loader/validation of the fixed corpus identity and literal structure: reject bool/string/negative/out-of-range indices; boundary must precede operand; one_operand selects exactly argv[index], joined_remainder joins exactly argv[index:]. Validate expected text and source-rule references. These checks validate recorded data, never infer a second shell parser. Meaningful malformed copies must catch changed argv/expected values, missing/duplicate/reordered IDs, unknown rule/stage, consumed-value selection, CWA joined remainder and truncated Command remainder. Preserve existing facade compatibility tests; future production assertions belong to phase2.
+
+Measure readable substantive additions/deletions separately from Goal before growth or review, with expected745–800 additions and no inherited size exception. More than1000 substantive additions needs parent reassessment before expansion; never minify or reduce coverage. Capture focused tests with the shared run helper; required source/generated/catalog/harness checks and exact-head Windows/Linux CI remain parent delivery gates. Parent validates the committed candidate, reviews, merges and verifies causal publication/owned cleanup before1b.3 source begins.
 
 ## Ordered PowerShell fixture contract
 
@@ -1032,12 +1044,12 @@ Phase 2 starts after all four 1b deliveries publish. It atomically updates the e
     {
       "host": "claude",
       "behavior": "Validate complete source-backed offline shell profiles before the shared extractor change.",
-      "source": "The four fixture/helper/test paths in the current 1b.1 lease.",
+      "source": "The three fixture/helper/test paths in the current1b.2 lease.",
       "mapping": "Existing .agents/plugins/harness/engineering.json shared claude mapping is preserved.",
       "verification": {
         "level": "source",
         "result": "limited",
-        "evidence": "Phase 1a PR #211 and causal main Windows/Linux CI passed. The complete 1b contract is fixed here; 1b.1 implementation and eight focused tests passed; final candidate checks, immutable review and exact-head CI remain pending."
+        "evidence": "Phase1a and descriptor1b.1 PR217 exact PR/causal main Windows/Linux CI passed. Literal33 source implementation, focused corpus verification, immutable review and exact-head CI remain pending in1b.2; later full80 and native acceptance retain their gates."
       },
       "exception": {
         "constraint_evidence": "Test-only source publication does not establish installed native activation.",
@@ -1047,12 +1059,12 @@ Phase 2 starts after all four 1b deliveries publish. It atomically updates the e
     {
       "host": "codex",
       "behavior": "Validate complete source-backed offline shell profiles before the shared extractor change.",
-      "source": "The four fixture/helper/test paths in the current 1b.1 lease.",
+      "source": "The three fixture/helper/test paths in the current1b.2 lease.",
       "mapping": "Existing .agents/plugins/harness/engineering.json shared codex mapping is preserved.",
       "verification": {
         "level": "source",
         "result": "limited",
-        "evidence": "Phase 1a PR #211 and causal main Windows/Linux CI passed. The complete 1b contract is fixed here; 1b.1 implementation and eight focused tests passed; final candidate checks, immutable review and exact-head CI remain pending."
+        "evidence": "Phase1a and descriptor1b.1 PR217 exact PR/causal main Windows/Linux CI passed. Literal33 source implementation, focused corpus verification, immutable review and exact-head CI remain pending in1b.2; later full80 and native acceptance retain their gates."
       },
       "exception": {
         "constraint_evidence": "Test-only source publication does not establish installed native activation.",
@@ -1065,4 +1077,4 @@ Phase 2 starts after all four 1b deliveries publish. It atomically updates the e
 
 ## Execution readiness and next action
 
-The primary-source recovery and fixed full 80-case/42-descriptor contract are complete. Descriptor-only1b.1 implementation is complete and all Source leases are released. Parent acceptance verified unchanged eleven Unix groups and nine prior provenance records, the exact ordered42 descriptors from this Goal,436 total records,24 Windows projection rows and the corrected Version provenance boundary. Actual eight focused tests passed in the shell-profile-oracle-version-provenance workflow capture. Four Source paths are +934/-30 (964 substantive changed lines), separately from the maintained Goal document (+1017/-39 before this progress reconciliation); the readable full total is reported rather than hidden. The four-slice assessment still applies and no source scope grows here. The descriptor implementation is committed, generation/catalog/harness/source checks passed, and the single pre-review synchronization is complete. Eight descriptor and nine adapter tests passed after synchronization. The earlier broad pre-sync package suite ran1070 tests with one unchanged Unicode adapter failure; that case passed isolated and the synchronized adapter suite passed, while its original cause remains unclassified. Fresh immutable full review found no descriptor defect and one stale next-action sentence, corrected by this checkpoint. Review of this documentation correction and exact-head Windows/Linux CI remain required before normal merge and causal publication. Later slices begin only after this delivery is published. Later cases remain sequential deliveries. Parent continues the original rollout through all remaining phases and records every delivery gate in its canonical plan.
+Descriptor1b.1 is delivered and its owned checkout retired. The complete primary-source42descriptor/80case contract and four-slice boundaries remain fixed. Current1b.2 is ready for specified L4 literal33 implementation under its exclusive three-path lease above; parent retains this Goal, acceptance and all delivery decisions. First implement the recorded literal corpus and offline integrity checks, then measure actual readable size, capture meaningful focused validation and required source checks, commit the coherent candidate and release the Source lease. Parent then synchronizes once before immutable review and drives exact-head CI, ordinary authorized merge, causal publication and owned cleanup. Only after that publication may1b.3 append none24; phase2 remains gated on all80 in published1b.4. No new user approval or profile installation is required or claimed. The original rollout retains all repository opt-ins, production consumer repair and native acceptance.
