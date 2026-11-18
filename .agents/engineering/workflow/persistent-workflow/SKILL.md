@@ -89,9 +89,12 @@ missing files and directories are rejected. Keep the goal in place. The owner re
 per-worktree path above. On `canonical-owner-path-required`, retry `init --root ROOT` with `--owner`
 omitted. This recoverable invocation error does not establish that the runtime is unavailable.
 
-The runtime supports `status --owner OWNER` and `wake --owner OWNER`. After initialization, the current
-foreground session claims the owner with `claim --owner OWNER --pid PID`; PID must identify that
-long-lived session, not a short-lived tool shell. The returned `foreground.token` is required by
+The runtime supports `status --owner OWNER` and `wake --owner OWNER`. After initialization, claim the
+foreground owner through the adapter: `python -B "<skill-directory>\scripts\delivery_continuation.py" claim
+--owner OWNER` on Windows, `python3 -B "<skill-directory>/scripts/delivery_continuation.py" claim --owner
+OWNER` on Linux/macOS. It resolves the nearest live host process, passes its PID, and pins the native
+executable when needed. The runtime's own `claim --owner OWNER --pid PID` requires an explicit positive PID
+and never picks the tool-shell parent. The returned `foreground.token` is required by
 `heartbeat`, `yield`, and `checkpoint`. Renew the lease with `heartbeat` while actively working. Yield with
 a reason and next action before waiting so the scheduled writer can take the lease. Checkpoint only a real
 `waiting`, `blocked`, or `complete` state with its reason and next action where applicable. Completion
@@ -110,7 +113,7 @@ harness's permission controls.
 
 The cross-platform adapter is shipped beside each host's `persistent-workflow` entry at
 `<skill-directory>/scripts/delivery_continuation.py`. Initialize and claim the foreground
-owner before `register`; the adapter supports `register`, `remove`, `list`, and `wake`. The Python runtime
+owner before `register`; the adapter supports `claim`, `register`, `remove`, `list`, and `wake`. The Python runtime
 supports `status` and `wake` against `--owner OWNER`. Remove only at a terminal result. Yield the foreground
 lease before waiting. Do not register another task for an
 existing owner or claim unattended progress before the host and scheduler report success. Other platforms

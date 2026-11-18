@@ -263,33 +263,22 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
         claude_allow, codex_rules = self.rendered("engineering")
         root = self.PLUGIN_ROOT.replace("\\", "/")
         runtime = f"{root}/workflows/continuation_runtime.py"
-        adapter_source = f"{root}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1"
-        adapter_skill = f"{root}/skills/persistent-workflow/scripts/delivery-continuation.ps1"
-        adapter_codex = f"{root}/codex-skills/persistent-workflow/scripts/delivery-continuation.ps1"
+        adapter_source = f"{root}/.agents/engineering/workflow/persistent-workflow/scripts/delivery_continuation.py"
+        adapter_skill = f"{root}/skills/persistent-workflow/scripts/delivery_continuation.py"
+        adapter_codex = f"{root}/codex-skills/persistent-workflow/scripts/delivery_continuation.py"
         normalized_allow = [entry.replace("\\", "/") for entry in claude_allow]
         for operation in CONTINUATION_RUNTIME_OPERATIONS:
-            with self.subTest(host="claude", script="runtime", operation=operation):
-                self.assertIn(f"Bash(python -B {runtime} {operation}:*)", normalized_allow)
-                self.assertIn(f"PowerShell(python -B {runtime} {operation}:*)", normalized_allow)
+            for interpreter in ("python", "python3"):
+                with self.subTest(host="claude", script="runtime", operation=operation, interpreter=interpreter):
+                    self.assertIn(f"Bash({interpreter} -B {runtime} {operation}:*)", normalized_allow)
+                    self.assertIn(f"PowerShell({interpreter} -B {runtime} {operation}:*)", normalized_allow)
         for operation in CONTINUATION_ADAPTER_OPERATIONS:
-            with self.subTest(host="claude", script="adapter", operation=operation):
-                self.assertIn(
-                    f"Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_source} {operation}:*)",
-                    normalized_allow,
-                )
-                self.assertIn(
-                    f"PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_source} {operation}:*)",
-                    normalized_allow,
-                )
-                self.assertIn(
-                    f"Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_skill} {operation}:*)",
-                    normalized_allow,
-                )
-                self.assertIn(
-                    f"PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_skill} {operation}:*)",
-                    normalized_allow,
-                )
-        runtime_rules = [rule for rule in codex_rules if runtime in json.dumps(rule).replace("\\\\", "/")]
+            for script in (adapter_source, adapter_skill):
+                for interpreter in ("python", "python3"):
+                    with self.subTest(host="claude", script="adapter", operation=operation, interpreter=interpreter):
+                        self.assertIn(f"Bash({interpreter} -B {script} {operation}:*)", normalized_allow)
+                        self.assertIn(f"PowerShell({interpreter} -B {script} {operation}:*)", normalized_allow)
+        runtime_rules = [rule for rule in codex_rules if runtime in json.dumps(rule["pattern"]).replace("\\\\", "/")]
         self.assertEqual(1, len(runtime_rules))
         self.assertEqual(list(CONTINUATION_RUNTIME_OPERATIONS), runtime_rules[0]["pattern"][-1])
         runtime = runtime.replace("/", chr(92))
@@ -300,16 +289,24 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
             ],
             runtime_rules[0]["not_match"],
         )
-        adapter_rules = [rule for rule in codex_rules if adapter_codex in json.dumps(rule).replace("\\\\", "/")]
+        adapter_rules = [rule for rule in codex_rules if adapter_codex in json.dumps(rule["pattern"]).replace("\\\\", "/")]
         self.assertEqual(1, len(adapter_rules))
         self.assertEqual(list(CONTINUATION_ADAPTER_OPERATIONS), adapter_rules[0]["pattern"][-1])
         self.assertEqual(
             {adapter_source, adapter_skill, adapter_codex},
             {path.replace(chr(92), "/") for path in adapter_rules[0]["pattern"][-2]},
         )
-        adapter_codex = adapter_codex.replace("/", chr(92))
         self.assertEqual(
-            [["powershell.exe", "-NoProfile", "-File", adapter_codex.replace("/", "\\\\"), "unexpected"]],
+            ["python", "python.exe", "python3", "py"],
+            adapter_rules[0]["pattern"][0],
+        )
+        adapter_codex = adapter_codex.replace("/", chr(92))
+        other_script = adapter_codex.replace("delivery_continuation.py", "other.py")
+        self.assertEqual(
+            [
+                ["python", "-B", adapter_codex.replace("/", "\\\\"), "unexpected"],
+                ["python", "-B", other_script.replace("/", "\\\\"), "claim"],
+            ],
             adapter_rules[0]["not_match"],
         )
 

@@ -884,5 +884,211 @@ class DeliveryContinuationTests(unittest.TestCase):
                 self.assertIsNone(json.loads(result.stdout))
 
 
+class ClaimAncestryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="continuation claim ")
+        self.addCleanup(self.temp.cleanup)
+        self.root = (Path(self.temp.name) / "claim root £").resolve()
+        self.root.mkdir()
+        self.owner_path = self.root / ".agents/continuation/owner.json"
+        self.owner_path.parent.mkdir(parents=True)
+        self.owner = {"owner_id": "claim-owner", "worktree": str(self.root), "harness": "codex", "state": "waiting"}
+        self.owner_path.write_text(json.dumps(self.owner), encoding="utf-8")
+
+    def args(self, dry_run=False):
+        values = ["claim", "--owner", str(self.owner_path)]
+        if dry_run:
+            values.append("--dry-run")
+        return adapter.parser().parse_args(values)
+
+    def patched(self, table, start=None, image=None):
+        return patch.multiple(adapter, _process_table=lambda windows: table,
+                              _process_start=start or (lambda pid, windows: 0),
+                              _process_image=image or (lambda pid, windows: None))
+
+    def test_unreadable_ancestor_rejects_claim_without_mutating_owner(self):
+        before = self.owner_path.read_bytes()
+        table = {1: (0, "codex.exe")}
+        with self.patched(table):
+            with self.assertRaisesRegex(RuntimeError, "is unavailable"):
+                adapter.claim(self.owner, self.root, self.owner_path, self.args(), windows=True, pid=99)
+        self.assertEqual(before, self.owner_path.read_bytes())
+
+    def test_ancestry_cycle_is_rejected(self):
+        table = {10: (11, "powershell.exe"), 11: (10, "powershell.exe")}
+        with self.patched(table):
+            with self.assertRaisesRegex(RuntimeError, "cycle"):
+                adapter.claim(self.owner, self.root, self.owner_path, self.args(), windows=True, pid=10)
+
+    def test_no_host_in_ancestry_rejects_near_miss_names(self):
+        table = {1: (2, "powershell.exe"), 2: (3, "codex.exe.bak"), 3: (4, "codex-wrapper"), 4: (0, "explorer.exe")}
+        with self.patched(table):
+            with self.assertRaisesRegex(RuntimeError, "no codex or claude process"):
+                adapter.claim(self.owner, self.root, self.owner_path, self.args(), windows=True, pid=1)
+
+    def test_nearest_host_mismatch_is_rejected_even_when_correct_harness_is_further_up(self):
+        table = {1: (2, "powershell.exe"), 2: (3, "claude.exe"), 3: (0, "codex.exe")}
+        with self.patched(table):
+            with self.assertRaisesRegex(RuntimeError, "nearest foreground host is claude.exe"):
+                adapter.claim(self.owner, self.root, self.owner_path, self.args(), windows=True, pid=1)
+
+    def test_pid_reuse_is_rejected(self):
+        table = {1: (2, "powershell.exe"), 2: (0, "codex.exe")}
+        starts = {1: 100, 2: 200}
+        with self.patched(table, start=lambda pid, windows: starts[pid]):
+            with self.assertRaisesRegex(RuntimeError, "may have been reused"):
+                adapter.claim(self.owner, self.root, self.owner_path, self.args(), windows=True, pid=1)
+
+    def test_windows_wrapper_image_path_rejected_without_mutating_owner(self):
+        before = self.owner_path.read_bytes()
+        table = {1: (0, "codex.exe")}
+        with self.patched(table, image=lambda pid, windows: str(self.root / "codex.cmd")):
+            with self.assertRaisesRegex(RuntimeError, "existing absolute codex.exe path"):
+                adapter.claim(self.owner, self.root, self.owner_path, self.args(), windows=True, pid=1)
+        self.assertEqual(before, self.owner_path.read_bytes())
+
+    def test_windows_pin_is_resolved_from_nearest_host_when_owner_unpinned(self):
+        executable = self.root / "codex.exe"
+        executable.write_text("native", encoding="utf-8")
+        table = {1: (0, "codex.exe")}
+        with self.patched(table, image=lambda pid, windows: str(executable)):
+            pid, pin = adapter.resolve_claim_host(self.owner, windows=True, pid=1)
+        self.assertEqual(1, pid)
+        self.assertEqual(str(executable), pin)
+
+    def test_existing_owner_pin_is_preserved_and_not_resolved(self):
+        owner = dict(self.owner, host_executable=str(self.root / "pinned.exe"))
+
+        def forbidden(pid, windows):
+            raise AssertionError("must not resolve a pin when the owner already has one")
+
+        table = {1: (0, "codex.exe")}
+        with self.patched(table, image=forbidden):
+            pid, pin = adapter.resolve_claim_host(owner, windows=True, pid=1)
+        self.assertEqual(1, pid)
+        self.assertIsNone(pin)
+
+    def test_posix_versioned_or_node_wrapped_executable_claims_without_pin(self):
+        for name in ("2.1.30", "node"):
+            with self.subTest(name=name):
+                executable = self.root / name
+                executable.write_text("#!/bin/sh\n", encoding="utf-8")
+                executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
+                table = {1: (0, "claude")}
+                owner = dict(self.owner, harness="claude")
+                with self.patched(table, image=lambda pid, windows: str(executable)):
+                    pid, pin = adapter.resolve_claim_host(owner, windows=False, pid=1)
+                self.assertEqual(1, pid)
+                self.assertIsNone(pin)
+
+    def test_posix_matching_executable_is_pinned(self):
+        executable = self.root / "codex"
+        executable.write_text("#!/bin/sh\n", encoding="utf-8")
+        executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
+        table = {1: (0, "codex")}
+        with self.patched(table, image=lambda pid, windows: str(executable)):
+            pid, pin = adapter.resolve_claim_host(self.owner, windows=False, pid=1)
+        self.assertEqual(1, pid)
+        self.assertEqual(str(executable), pin)
+
+    def test_dry_run_does_not_call_the_runtime_or_transport(self):
+        executable = self.root / "codex.exe"
+        executable.write_text("native", encoding="utf-8")
+        table = {1: (0, "codex.exe")}
+        with self.patched(table, image=lambda pid, windows: str(executable)), \
+             patch.object(adapter.subprocess, "run") as run:
+            result = adapter.claim(self.owner, self.root, self.owner_path, self.args(dry_run=True), windows=True, pid=1)
+        run.assert_not_called()
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(1, result["pid"])
+        self.assertEqual(str(executable), result["host_executable"])
+
+    def test_runtime_nonzero_exit_is_an_error(self):
+        table = {1: (0, "codex.exe")}
+        owner = dict(self.owner, host_executable=str(self.root / "pinned.exe"))
+        with self.patched(table), \
+             patch.object(adapter.subprocess, "run", return_value=Result(returncode=2, stderr="blocked")):
+            with self.assertRaisesRegex(RuntimeError, "blocked"):
+                adapter.claim(owner, self.root, self.owner_path, self.args(), windows=True, pid=1)
+
+    def test_owner_lock_busy_success_output_is_an_error(self):
+        table = {1: (0, "codex.exe")}
+        owner = dict(self.owner, host_executable=str(self.root / "pinned.exe"))
+        busy = json.dumps({"state": "working", "reason": "owner-lock-busy"})
+        with self.patched(table), \
+             patch.object(adapter.subprocess, "run", return_value=Result(stdout=busy)):
+            with self.assertRaisesRegex(RuntimeError, "no foreground lease"):
+                adapter.claim(owner, self.root, self.owner_path, self.args(), windows=True, pid=1)
+
+    @unittest.skipUnless(os.name == "nt", "Windows ancestry reader; POSIX has its own live smoke test")
+    def test_live_windows_process_table_reports_the_real_parent(self):
+        table = adapter._process_table(True)
+        entry = table.get(os.getpid())
+        self.assertIsNotNone(entry)
+        self.assertEqual(os.getppid(), entry[0])
+
+    @unittest.skipUnless(os.name != "nt", "POSIX ancestry reader; Windows has its own live smoke test")
+    def test_live_posix_process_table_reports_the_real_parent(self):
+        table = adapter._process_table(False)
+        entry = table.get(os.getpid())
+        self.assertIsNotNone(entry)
+        self.assertEqual(os.getppid(), entry[0])
+
+
+class ClaimRuntimeEndToEndTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="continuation claim e2e £ ")
+        self.addCleanup(self.temp.cleanup)
+        self.root = (Path(self.temp.name) / "claim worktree £").resolve()
+        self.root.mkdir()
+        subprocess.run(["git", "init", "--quiet", str(self.root)], check=True)
+        subprocess.run(["git", "-C", str(self.root), "remote", "add", "origin",
+                       "https://github.com/example/isolated-test.git"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                       "commit", "--quiet", "--allow-empty", "-m", "initial"], check=True)
+        self.goal = self.root / "GOAL.md"
+        self.goal.write_text("Wait for isolated acceptance evidence.", encoding="utf-8")
+        init = subprocess.run([sys.executable, "-B", str(ROOT / ".agents/workflows/continuation_runtime.py"),
+                              "init", "--root", str(self.root), "--goal", str(self.goal),
+                              "--completion", "Isolated gate reached", "--actions", "edit", "test",
+                              "--harness", "codex", "--authority", "Isolated test"],
+                             capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(0, init.returncode, init.stderr)
+        self.owner_path = self.root / ".agents/continuation/owner.json"
+        self.host_process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        self.addCleanup(self._stop_host)
+
+    def _stop_host(self):
+        if self.host_process.poll() is None:
+            self.host_process.terminate()
+            try:
+                self.host_process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.host_process.kill()
+                self.host_process.wait(timeout=10)
+
+    def test_real_runtime_claim_through_adapter_with_injected_ancestry(self):
+        windows = os.name == "nt"
+        host_pid = self.host_process.pid
+        caller_pid = os.getpid()
+        host_name = "codex.exe" if windows else "codex"
+        table = {caller_pid: (host_pid, "python.exe" if windows else "python3"), host_pid: (0, host_name)}
+        executable = self.root / host_name
+        executable.write_text("native" if windows else "#!/bin/sh\n", encoding="utf-8")
+        if not windows:
+            executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
+        owner = json.loads(self.owner_path.read_text(encoding="utf-8"))
+        with patch.multiple(adapter, _process_table=lambda w: table, _process_start=lambda pid, w: 0,
+                            _process_image=lambda pid, w: str(executable)):
+            args = adapter.parser().parse_args(["claim", "--owner", str(self.owner_path)])
+            result = adapter.claim(owner, self.root, self.owner_path, args, windows=windows, pid=caller_pid)
+        self.assertEqual(host_pid, result["foreground"]["pid"])
+        self.assertTrue(result["foreground"]["token"])
+        self.assertEqual(str(executable), result["host_executable"])
+        stored = json.loads(self.owner_path.read_text(encoding="utf-8"))
+        self.assertEqual(str(executable), stored["host_executable"])
+        self.assertEqual(host_pid, stored["foreground"]["pid"])
+
+
 if __name__ == "__main__":
     unittest.main()
