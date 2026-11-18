@@ -2,23 +2,19 @@ import importlib
 import importlib.util
 import io
 import json
-import os
-import shutil
 import subprocess
-import sys
-from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-GATE = ROOT / ".agents/hooks/tier_gate.py"
 
 
 def _load_gate() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("selected_standards_gate", GATE)
+    spec = importlib.util.spec_from_file_location(
+        "selected_standards_gate", ROOT / ".agents/hooks/tier_gate.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -27,605 +23,181 @@ def _load_gate() -> ModuleType:
 
 gate = _load_gate()
 selected = importlib.import_module("selected_standards")
-RUST = {
-    "schema_version": 1,
-    "tier": "rust",
-    "applies": "stack-present",
-    "detect": {"files": ["Cargo.toml"], "globs": ["*.rs"]},
-}
-PYTHON = {
-    "schema_version": 1,
-    "tier": "python",
-    "applies": "stack-present",
-    "detect": {"files": ["pyproject.toml"], "globs": ["*.py"]},
-}
-ACTIONS = {
-    "schema_version": 1,
-    "tier": "github-actions",
-    "applies": "stack-present",
-    "detect": {"globs": [".github/workflows/*.yml"]},
-}
-BASE = {"schema_version": 1, "tier": "base", "applies": "always"}
-SELECTED = ("rust@market", "python@market", "github-actions@market", "base@market")
 
 
-@dataclass(frozen=True, slots=True)
-class Skill:
-    name: str
-    kind: str = "convention"
-    profile: str = "core"
-
-
-@dataclass(frozen=True, slots=True)
-class PluginCache:
-    root: Path
-
-    def install(
-        self, plugin: str, tier: dict[str, object], skills: Sequence[Skill]
-    ) -> None:
-        payload = self.root / "market" / plugin / "1.0.0"
-        for skill in skills:
-            header = (
-                f"---\nname: {skill.name}\ndescription: {skill.name} rule.\n"
-                f"kind: {skill.kind}\nprofile: {skill.profile}\n---\n"
-            )
-            discovery = payload / "skills" / skill.name / "SKILL.md"
-            discovery.parent.mkdir(parents=True)
-            discovery.write_text(
-                header + "Read the canonical file.\n", encoding="utf-8"
-            )
-            canonical = payload / ".agents" / plugin / skill.kind / skill.name
-            canonical.mkdir(parents=True)
-            (canonical / "SKILL.md").write_text(
-                header + "Rule body.\n", encoding="utf-8"
-            )
-        (payload / "tier.json").write_text(json.dumps(tier), encoding="utf-8")
-        registry = self.root.parent / "installed_plugins.json"
-        data = (
-            json.loads(registry.read_text(encoding="utf-8"))
-            if registry.exists()
-            else {"plugins": {}}
-        )
-        data["plugins"][plugin + "@market"] = [
-            {"scope": "user", "installPath": str(payload)}
-        ]
-        registry.write_text(json.dumps(data), encoding="utf-8")
-
-    def canonical(self, plugin: str, name: str, kind: str = "convention") -> Path:
-        path = self.root / "market" / plugin / "1.0.0" / ".agents" / plugin
-        return (path / kind / name / "SKILL.md").resolve()
-
-
-@pytest.fixture(autouse=True)
-def cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> PluginCache:
-    plugins = PluginCache(tmp_path / "profile" / "plugins" / "cache")
-    plugins.root.mkdir(parents=True)
-    monkeypatch.setattr(gate, "cache_roots", lambda _environ: [plugins.root])
-    plugins.install(
-        "rust",
-        RUST,
-        [
-            Skill("style"),
-            Skill("testing"),
-            Skill("persistence", profile="persistence"),
-            Skill("scaffold", kind="utility"),
-        ],
+def _git(repository: Path, *arguments: str) -> None:
+    subprocess.run(
+        ["git", "-C", str(repository), *arguments],
+        capture_output=True,
+        encoding="utf-8",
+        check=True,
+        timeout=10,
     )
-    plugins.install("python", PYTHON, [Skill("style")])
-    plugins.install("github-actions", ACTIONS, [Skill("workflows")])
-    plugins.install("base", BASE, [Skill("process")])
-    return plugins
 
 
 @pytest.fixture
-def state(tmp_path: Path) -> Path:
-    return tmp_path / "state"
-
-
-def _repository(path: Path, plugins: Sequence[str] = SELECTED) -> Path:
-    (path / ".git").mkdir(parents=True)
-    (path / ".agents").mkdir()
-    selection = {
-        "schema_version": 1,
-        "marketplaces": {"market": {"repository": "example/marketplace"}},
-        "plugins": list(plugins),
-    }
-    (path / ".agents" / "plugins.json").write_text(
-        json.dumps(selection), encoding="utf-8"
+def worktrees(tmp_path: Path) -> tuple[Path, Path]:
+    primary = tmp_path / "repository café"
+    primary.mkdir()
+    _git(primary, "init", "--quiet")
+    _git(
+        primary,
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.test",
+        "commit",
+        "--quiet",
+        "--allow-empty",
+        "-m",
+        "Fixture",
     )
-    return path
-
-
-@pytest.fixture
-def repository(tmp_path: Path) -> Path:
-    return _repository(tmp_path / "repository")
-
-
-def _write(
-    path: Path | str, cwd: Path, session: str = "session-1", agent: str | None = None
-) -> dict[str, object]:
-    payload: dict[str, object] = {
-        "hook_event_name": "PreToolUse",
-        "session_id": session,
-        "tool_name": "Write",
-        "tool_input": {"file_path": str(path), "content": "fn main() {}\n"},
-        "cwd": str(cwd),
-    }
-    if agent is not None:
-        payload["agent_id"] = agent
-    return payload
-
-
-def _read(path: Path, agent: str | None = None) -> dict[str, object]:
-    payload: dict[str, object] = {
-        "hook_event_name": "PreToolUse",
-        "session_id": "session-1",
-        "tool_name": "Read",
-        "tool_input": {"file_path": str(path)},
-    }
-    if agent is not None:
-        payload["agent_id"] = agent
-    return payload
-
-
-def _listed(reason: str) -> list[str]:
-    return [
-        line[2:].split(": ", 1)[0] for line in reason.splitlines() if line[:2] == "- "
-    ]
-
-
-def _run_main(
-    monkeypatch: pytest.MonkeyPatch, state: Path, flag: str, payload: object
-) -> int:
-    stream = io.TextIOWrapper(
-        io.BytesIO(json.dumps(payload).encode("utf-8")), encoding="utf-8"
+    selection = primary / ".agents/plugins.json"
+    selection.parent.mkdir()
+    selection.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "plugins": ["python@market"],
+                "marketplaces": {"market": {"repository": "example/marketplace"}},
+            }
+        ),
+        encoding="utf-8",
     )
-    monkeypatch.setattr(gate.sys, "stdin", stream)
-    monkeypatch.setattr(gate.sys, "argv", ["tier_gate.py", flag])
-    monkeypatch.setenv(gate.STATE_DIRECTORY_VARIABLE, str(state))
-    result: int = gate.main()
-    return result
+    (primary / ".git/info/exclude").write_text("/.agents/\n", encoding="utf-8")
+    linked = tmp_path / "linked 東京"
+    _git(primary, "worktree", "add", "--quiet", "--detach", str(linked))
+    return primary, linked
 
 
-def test_write_gate_requires_only_the_matching_stack_core_standards(
-    repository: Path, state: Path
+def test_selection_inherits_an_excluded_primary_file(
+    worktrees: tuple[Path, Path],
 ) -> None:
-    reason = gate.write_gate(_write(repository / "src" / "main.rs", repository), state)
+    primary, linked = worktrees
+    assert not (linked / ".agents/plugins.json").exists()
+    selection = selected.PluginSelection.read(linked)
+    assert selection is not None
+    assert selection.path == primary / ".agents/plugins.json"
+    assert selection.identities == ("python@market",)
 
-    assert _listed(reason) == ["rust:style", "rust:testing"]
 
-
-def test_write_gate_lists_each_missing_standard_with_its_canonical_path(
-    repository: Path, state: Path, cache: PluginCache
+def test_invalid_local_selection_is_never_hidden_by_inheritance(
+    worktrees: tuple[Path, Path],
 ) -> None:
-    target = repository / "src" / "main.rs"
-
-    reason = gate.write_gate(_write(target, repository), state)
-
-    assert str(target) in reason
-    assert f"- rust:style: {cache.canonical('rust', 'style')}" in reason
-    assert f"- rust:testing: {cache.canonical('rust', 'testing')}" in reason
-    assert len(reason) < 1_000
+    _, linked = worktrees
+    (linked / ".agents").mkdir()
+    (linked / ".agents/plugins.json").write_text("{", encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid repository plugin selection"):
+        selected.PluginSelection.read(linked)
 
 
-def test_write_gate_allows_the_write_silently_once_every_standard_is_read(
-    repository: Path,
-    state: Path,
-    cache: PluginCache,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+def test_missing_selection_does_not_use_an_enclosing_repository(
+    worktrees: tuple[Path, Path],
 ) -> None:
-    target = repository / "src" / "main.rs"
-    for name in ("style", "testing"):
-        gate.record_read(_read(cache.canonical("rust", name)), state, 0.0)
-
-    assert (
-        _run_main(monkeypatch, state, "--write-gate", _write(target, repository)) == 0
-    )
-    assert capsys.readouterr().out == ""
+    primary, _ = worktrees
+    nested = primary / "nested"
+    nested.mkdir()
+    _git(nested, "init", "--quiet")
+    assert selected.PluginSelection.read(nested) is None
 
 
-def test_write_gate_names_only_the_standards_still_unread(
-    repository: Path, state: Path, cache: PluginCache
-) -> None:
-    gate.record_read(_read(cache.canonical("rust", "style")), state, 0.0)
-
-    reason = gate.write_gate(_write(repository / "lib.rs", repository), state)
-
-    assert _listed(reason) == ["rust:testing"]
-
-
-def test_write_gate_denies_with_the_host_permission_decision_shape(
-    repository: Path,
-    state: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    payload = _write(repository / "main.rs", repository)
-
-    assert _run_main(monkeypatch, state, "--write-gate", payload) == 0
-    output = json.loads(capsys.readouterr().out)
-
-    assert set(output) == {"hookSpecificOutput"}
-    decision = output["hookSpecificOutput"]
-    assert decision["hookEventName"] == "PreToolUse"
-    assert decision["permissionDecision"] == "deny"
-    assert _listed(decision["permissionDecisionReason"]) == [
-        "rust:style",
-        "rust:testing",
-    ]
-
-
-def test_each_agent_must_read_the_standards_itself(
-    repository: Path, state: Path, cache: PluginCache
-) -> None:
-    target = repository / "main.rs"
-    for name in ("style", "testing"):
-        gate.record_read(_read(cache.canonical("rust", name)), state, 0.0)
-
-    assert gate.write_gate(_write(target, repository), state) == ""
-    assert gate.write_gate(_write(target, repository, agent="agent-a"), state)
-    assert gate.write_gate(_write(target, repository, session="session-2"), state)
-
-
-def test_compaction_forgets_only_the_compacted_agent(
-    repository: Path,
-    state: Path,
-    cache: PluginCache,
+def test_session_context_identifies_the_worktree_and_inherited_source(
+    worktrees: tuple[Path, Path],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    target = repository / "main.rs"
-    for agent in (None, "agent-a"):
-        for name in ("style", "testing"):
-            gate.record_read(_read(cache.canonical("rust", name), agent), state, 0.0)
-    compacted = {"hook_event_name": "PostCompact", "session_id": "session-1"}
+    primary, linked = worktrees
+    declaration = gate.Declaration(
+        "python",
+        "market",
+        {
+            "schema_version": 1,
+            "tier": "python",
+            "applies": "stack-present",
+            "detect": {"globs": ["*.py"]},
+        },
+    )
+    monkeypatch.setattr(gate, "declarations", lambda project: [declaration])
 
-    assert _run_main(monkeypatch, state, "--compacted", compacted) == 0
+    def unexpected(*args: object, **kwargs: object) -> None:
+        raise AssertionError("SessionStart must not scan Git for a selected repository")
 
-    assert gate.write_gate(_write(target, repository), state)
-    assert gate.write_gate(_write(target, repository, agent="agent-a"), state) == ""
-
-
-@pytest.mark.parametrize("name", ["README.md", "notes/plan.txt", "Cargo.lock"])
-def test_write_gate_allows_files_no_selected_stack_declares(
-    repository: Path, state: Path, name: str
-) -> None:
-    assert gate.write_gate(_write(repository / name, repository), state) == ""
-
-
-def test_write_gate_requires_stack_adoption_in_a_new_repository(
-    repository: Path, state: Path
-) -> None:
-    (repository / ".agents" / "plugins.json").unlink()
-
-    reason = gate.write_gate(_write(repository / "main.rs", repository), state)
-    assert "rust@market" in reason
-    assert "agent:plugins" in reason
-
-
-def test_write_gate_allows_a_file_outside_any_repository(
-    tmp_path: Path, state: Path
-) -> None:
-    outside = tmp_path / "loose"
-
-    assert gate.write_gate(_write(outside / "main.rs", outside), state) == ""
-
-
-def test_write_gate_requires_an_unselected_stack(tmp_path: Path, state: Path) -> None:
-    repository = _repository(tmp_path / "python-only", ["python@market"])
-
-    missing = gate.write_gate(_write(repository / "main.rs", repository), state)
-    assert "rust@market" in missing
-    assert "repository stack selection" in missing
-    reason = gate.write_gate(_write(repository / "app.py", repository), state)
-    assert _listed(reason) == ["python:style"]
-
-
-def test_reading_python_rules_does_not_adopt_python(
-    tmp_path: Path, state: Path, cache: PluginCache
-) -> None:
-    repository = _repository(tmp_path / "base-only", ["base@market"])
-    gate.record_read(_read(cache.canonical("python", "style")), state, 0.0)
-    reason = gate.write_gate(_write(repository / "install.py", repository), state)
-    assert "python@market" in reason
-    assert "Reading standards alone does not adopt" in reason
+    monkeypatch.setattr(gate, "_git", unexpected)
+    context = gate.statement(linked)
+    assert str(linked) in context
+    assert str(primary / ".agents/plugins.json") in context
+    assert "Selected stacks: python." in context
+    assert "descriptions match the task" in context
 
 
 @pytest.mark.parametrize("tool", ["Write", "apply_patch"])
-def test_packaged_gate_refuses_first_python_write_without_selection(
+def test_normal_writes_do_not_require_a_standards_read_ledger(
+    worktrees: tuple[Path, Path],
     tmp_path: Path,
-    state: Path,
-    cache: PluginCache,
-    tool: str,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tool: str,
 ) -> None:
-    repository = _repository(tmp_path / "base-only", ["base@market"])
-    package = cache.root / "market" / "base" / "1.0.0"
-    shutil.copytree(ROOT / "plugins/base", package, dirs_exist_ok=True)
-    payload = _write(repository / "install.py", repository)
-    if tool == "apply_patch":
-        payload["tool_name"] = tool
-        payload["tool_input"] = {
-            "command": (
-                "*** Begin Patch\n*** Add File: install.py\n+x = 1\n*** End Patch"
-            )
-        }
-    profile = cache.root.parent.parent
-    environment = {
-        "HOME": str(profile),
-        "USERPROFILE": str(profile),
-        "CLAUDE_CONFIG_DIR": str(profile),
-        "CODEX_HOME": str(profile),
-        "CLAUDE_PLUGIN_ROOT": str(package),
-        "CODEX_PLUGIN_ROOT": str(package),
-        "AGENT_STATE_DIRECTORY": str(state),
-    }
-    for name, value in environment.items():
-        monkeypatch.setenv(name, value)
-    result = subprocess.run(
-        [sys.executable, "-B", str(package / "hooks/tier_gate.py"), "--write-gate"],
-        cwd=repository,
-        input=json.dumps(payload),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=30,
-        check=True,
-    )
-    decision = json.loads(result.stdout)["hookSpecificOutput"]
-    assert decision["permissionDecision"] == "deny"
-    assert "python@market" in decision["permissionDecisionReason"]
-    assert not (repository / "install.py").exists()
-
-
-@pytest.mark.parametrize(
-    "predicate",
-    [
-        {"file": "src/item.x"},
-        {"glob": "*.x"},
-        {"any": [{"glob": "*.x"}, {"remote": "^example/"}]},
-    ],
-)
-def test_v3_direct_paths_require_adoption(
-    repository: Path, state: Path, cache: PluginCache, predicate: dict[str, object]
-) -> None:
-    cache.install(
-        "modern",
-        {
-            "schema_version": 3,
-            "tier": "modern",
-            "applies": "stack-present",
-            "detect": predicate,
-        },
-        [Skill("style")],
-    )
-    reason = gate.write_gate(_write(repository / "src/item.x", repository), state)
-    assert "modern@market" in reason
-
-
-def test_v3_contextual_conjunction_does_not_claim_the_path_alone(
-    repository: Path, state: Path, cache: PluginCache
-) -> None:
-    cache.install(
-        "contextual",
-        {
-            "schema_version": 3,
-            "tier": "contextual",
-            "applies": "stack-present",
-            "detect": {"all": [{"glob": "*.x"}, {"remote": "^employer/"}]},
-        },
-        [Skill("style")],
-    )
-    assert gate.write_gate(_write(repository / "src/item.x", repository), state) == ""
-
-
-@pytest.mark.parametrize("schema", [1, 3])
-def test_literal_file_predicates_do_not_claim_nested_files(
-    repository: Path, state: Path, cache: PluginCache, schema: int
-) -> None:
-    detect = {"file": "config.x"} if schema == 3 else {"files": ["config.x"]}
-    cache.install(
-        "literal",
-        {
-            "schema_version": schema,
-            "tier": "literal",
-            "applies": "stack-present",
-            "detect": detect,
-        },
-        [Skill("style")],
-    )
-    assert gate.write_gate(_write(repository / "sub/config.x", repository), state) == ""
-    assert "literal@market" in gate.write_gate(
-        _write(repository / "config.x", repository), state
-    )
-
-
-@pytest.mark.parametrize(
-    ("pattern", "target"),
-    [
-        ("**/*.x", "item.x"),
-        ("src/**/item.x", "src/item.x"),
-        ("**/a/**/item.x", "a/item.x"),
-        ("**/*.x", "sub/item.x"),
-    ],
-)
-def test_recursive_globs_require_adoption_then_standards_reads(
-    repository: Path, state: Path, cache: PluginCache, pattern: str, target: str
-) -> None:
-    cache.install(
-        "recursive",
-        {
-            "schema_version": 3,
-            "tier": "recursive",
-            "applies": "stack-present",
-            "detect": {"glob": pattern},
-        },
-        [Skill("style")],
-    )
-    payload = _write(repository / target, repository)
-    assert "recursive@market" in gate.write_gate(payload, state)
-    selection = repository / ".agents/plugins.json"
-    data = json.loads(selection.read_text(encoding="utf-8"))
-    data["plugins"].append("recursive@market")
-    selection.write_text(json.dumps(data), encoding="utf-8")
-    assert _listed(gate.write_gate(payload, state)) == ["recursive:style"]
-
-
-def test_adoption_then_reading_unblocks_the_first_python_file(
-    tmp_path: Path, state: Path, cache: PluginCache
-) -> None:
-    repository = _repository(tmp_path / "base-only", ["base@market"])
-    payload = _write(repository / "install.py", repository)
-    assert "python@market" in gate.write_gate(payload, state)
-    selection = repository / ".agents/plugins.json"
-    data = json.loads(selection.read_text(encoding="utf-8"))
-    data["plugins"].append("python@market")
-    selection.write_text(json.dumps(data), encoding="utf-8")
-    assert _listed(gate.write_gate(payload, state)) == ["python:style"]
-    gate.record_read(_read(cache.canonical("python", "style")), state, 0.0)
-    assert gate.write_gate(payload, state) == ""
-
-
-def test_missing_selection_uses_the_target_repository(
-    repository: Path, tmp_path: Path, state: Path
-) -> None:
-    other = _repository(tmp_path / "other", ["base@market"])
-    assert "python@market" in gate.write_gate(
-        _write(other / "app.py", repository), state
-    )
-    assert gate.write_gate(_write(other / "README.md", repository), state) == ""
-
-
-def test_content_predicate_does_not_claim_every_matching_extension(
-    repository: Path, state: Path, cache: PluginCache
-) -> None:
-    cache.install(
-        "optional",
-        {
-            "schema_version": 1,
-            "tier": "optional",
-            "applies": "stack-present",
-            "detect": {"content": [{"glob": "*.py", "pattern": "special_dependency"}]},
-        },
-        [Skill("style")],
-    )
-    reason = gate.write_gate(_write(repository / "plain.py", repository), state)
-    assert "optional@market" not in reason
-    assert _listed(reason) == ["python:style"]
-
-
-def test_write_gate_without_a_session_cannot_track_and_allows(
-    repository: Path, state: Path
-) -> None:
-    payload = _write(repository / "main.rs", repository)
-    del payload["session_id"]
-
-    assert gate.write_gate(payload, state) == ""
-
-
-def test_write_gate_covers_codex_apply_patch_targets(
-    repository: Path, state: Path
-) -> None:
+    _, linked = worktrees
+    state = tmp_path / "state"
     payload = {
-        "hook_event_name": "PreToolUse",
-        "session_id": "codex-session",
-        "tool_name": "apply_patch",
+        "session_id": "fresh-session",
+        "cwd": str(linked),
+        "tool_name": tool,
         "tool_input": {
-            "command": (
-                "*** Begin Patch\n*** Add File: docs/notes.md\n+x\n"
-                "*** Add File: src/new.rs\n+fn x() {}\n*** End Patch"
-            )
+            "file_path": str(linked / "new.py"),
+            "command": "*** Begin Patch\n*** Add File: new.py\n+x = 1\n*** End Patch",
         },
-        "cwd": str(repository),
     }
-
-    reason = gate.write_gate(payload, state)
-
-    assert "src/new.rs" in reason
-    assert _listed(reason) == ["rust:style", "rust:testing"]
-
-
-def test_record_read_ignores_files_other_than_skill_definitions(
-    repository: Path, state: Path
-) -> None:
-    gate.record_read(_read(repository / "README.md"), state, 0.0)
-
-    assert not (state / selected.LEDGER_DIRECTORY).exists()
-
-
-def test_codex_shell_command_naming_a_canonical_path_records_it(
-    repository: Path, state: Path, cache: PluginCache
-) -> None:
-    style = cache.canonical("rust", "style")
-    payload = {
-        "hook_event_name": "PreToolUse",
-        "session_id": "session-1",
-        "tool_name": "Bash",
-        "tool_input": {"command": f'cat "{style}" README.md'},
-        "cwd": str(repository),
-    }
-
-    gate.record_command(payload, state, 0.0)
-
-    reason = gate.write_gate(_write(repository / "main.rs", repository), state)
-    assert _listed(reason) == ["rust:testing"]
-
-
-def test_codex_shell_command_without_a_canonical_path_records_nothing(
-    repository: Path, state: Path, cache: PluginCache
-) -> None:
-    discovery = cache.root / "market" / "rust" / "1.0.0" / "skills" / "style"
-    for command in ("git status", f"cat {discovery / 'SKILL.md'}"):
-        payload = {
-            "session_id": "session-1",
-            "tool_name": "Bash",
-            "tool_input": {"command": command},
-            "cwd": str(repository),
-        }
-        gate.record_command(payload, state, 0.0)
-
-    assert not (state / selected.LEDGER_DIRECTORY).exists()
-
-
-def test_hook_errors_fail_open(
-    repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    (repository / ".agents" / "plugins.json").write_text("{", encoding="utf-8")
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("USERPROFILE", str(home))
-    monkeypatch.setenv(gate.STATE_DIRECTORY_VARIABLE, str(tmp_path / "state"))
-    monkeypatch.delenv("CLAUDE_PLUGIN_ROOT", raising=False)
-
-    result = subprocess.run(
-        [sys.executable, "-B", str(GATE), "--write-gate"],
-        input=json.dumps(_write(repository / "main.rs", repository)),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=30,
-        check=False,
+    monkeypatch.setenv(gate.STATE_DIRECTORY_VARIABLE, str(state))
+    monkeypatch.setattr(gate.sys, "argv", ["tier_gate.py", "--tool-gate"])
+    monkeypatch.setattr(
+        gate.sys,
+        "stdin",
+        io.TextIOWrapper(
+            io.BytesIO(json.dumps(payload).encode("utf-8")),
+            encoding="utf-8",
+        ),
     )
+    assert gate.main() == 0
+    assert capsys.readouterr().out == ""
+    assert not state.exists()
 
-    assert result.returncode == 0
-    assert result.stdout == ""
-    assert "Invalid repository plugin selection" in result.stderr
 
-
-def test_stale_ledgers_are_pruned_when_a_new_agent_ledger_starts(state: Path) -> None:
-    old = selected.LoadLedger.for_agent(
-        state, selected.AgentIdentity("old-session", "")
+@pytest.mark.parametrize("host", ["claude", "codex"])
+def test_host_hooks_retain_boundaries_without_read_tracking(host: str) -> None:
+    path = ROOT / ".agents/plugins/manifests" / host / "base-hooks.json"
+    hooks = json.loads(path.read_text(encoding="utf-8"))["hooks"]
+    assert "PostCompact" not in hooks
+    assert all(group.get("matcher") != "Read" for group in hooks["PreToolUse"])
+    write_matcher = (
+        "Edit|Write|MultiEdit|NotebookEdit" if host == "claude" else "apply_patch"
     )
-    old.record(["/standards/style/SKILL.md"], 0.0)
-    os.utime(old.directory, (1_000.0, 1_000.0))
-    current = selected.LoadLedger.for_agent(
-        state, selected.AgentIdentity("new-session", "")
+    group = next(
+        group for group in hooks["PreToolUse"] if group["matcher"] == write_matcher
     )
+    assert "--tool-gate" in json.dumps(group)
 
-    current.record(
-        ["/standards/style/SKILL.md"], 1_000.0 + selected.LEDGER_RETENTION_SECONDS + 1
+
+def test_session_event_directory_takes_precedence_over_the_launch_directory(
+    worktrees: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    primary, linked = worktrees
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(primary))
+    monkeypatch.setattr(gate, "declarations", lambda project: [])
+    monkeypatch.setattr(gate.sys, "argv", ["tier_gate.py", "--session-context"])
+    monkeypatch.setattr(
+        gate.sys,
+        "stdin",
+        io.TextIOWrapper(
+            io.BytesIO(json.dumps({"cwd": str(linked)}).encode("utf-8")),
+            encoding="utf-8",
+        ),
     )
-
-    assert not old.directory.exists()
-    assert current.loaded("/standards/style/SKILL.md")
+    assert gate.main() == 0
+    context = json.loads(capsys.readouterr().out)["hookSpecificOutput"][
+        "additionalContext"
+    ]
+    assert f"Repository standards for {linked}" in context
+    assert str(primary / ".agents/plugins.json") in context

@@ -1,13 +1,10 @@
-"""The lane ladder is the repo's only model decision, so everything that could let it drift is asserted
-here: the two harness tables agreeing rung-for-rung, every declared lane existing, the generated agents
-carrying the resolved values, and the workflow roles' model pins still sitting on the ladder.
+"""Agent owns the lane ladder, its tables and the lane agents, and tests them. Core asserts only what it
+owns against that ladder, read from Agent's tables through the staged dependency: its skills' lane
+declarations, its workflow roles' model pins, and the role agents Core itself generates and delivers.
 """
 
 import json
 import re
-import subprocess
-import sys
-import tomllib
 import unittest
 from fnmatch import fnmatch
 from pathlib import Path
@@ -19,21 +16,19 @@ HOSTS = ROOT / ".agents" / "workflows" / "hosts"
 
 HOST_IDS = ("claude", "codex")
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
+FABLE = "claude-fable-5"
 
 # A role may pin a specialist model for the kind of work it does instead of a ladder rung. Each such
 # deviation is declared here rather than just appearing in a host manifest.
 ROLE_SPECIALISTS = {("codex", "review-lens"): "gpt-5.3-codex-spark"}
 
-# Capability order per vendor, most capable first. A rung may never sit above the rung before it, and the
-# frontier tier must outrank every rung.
-FAMILY_ORDER = {
-    "claude": ("claude-fable-5", "claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5"),
-    "codex": ("gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"),
-}
-
 
 def table(host):
     return json.loads((LANES / f"{host}.json").read_text(encoding="utf-8-sig"))
+
+
+def manifest(host):
+    return json.loads((HOSTS / f"{host}.json").read_text(encoding="utf-8-sig"))
 
 
 def front_matter(path):
@@ -47,124 +42,6 @@ def front_matter(path):
         if key:
             fields[key.group(1)] = key.group(2).strip()
     return fields
-
-
-class LaneTableTests(unittest.TestCase):
-    def test_both_hosts_declare_the_same_rungs_in_order(self):
-        rungs = [list(table(host)["lanes"]) for host in HOST_IDS]
-        self.assertEqual(rungs[0], rungs[1], "the two ladders must pair rung for rung")
-        self.assertEqual(rungs[0], sorted(rungs[0]), "rungs must be authored in order, L1 first")
-        self.assertEqual(rungs[0][0], "L1")
-
-    def test_every_rung_declares_a_model_and_a_yaml_safe_summary(self):
-        for host in HOST_IDS:
-            for lane, rung in table(host)["lanes"].items():
-                with self.subTest(host=host, lane=lane):
-                    self.assertTrue(rung.get("model"), "a rung with no model prices nothing")
-                    summary = rung.get("summary", "")
-                    self.assertTrue(summary)
-                    # The generator renders this into an unquoted YAML scalar in an agent description.
-                    self.assertNotRegex(summary, r":\s", "a colon-space truncates the scalar")
-
-    def test_no_rung_is_more_capable_than_the_rung_above_it(self):
-        for host in HOST_IDS:
-            order = FAMILY_ORDER[host]
-            seen = -1
-            for lane, rung in table(host)["lanes"].items():
-                with self.subTest(host=host, lane=lane):
-                    if rung.get("handoff"):
-                        target = rung["handoff"]
-                        self.assertEqual("claude", host)
-                        self.assertEqual(
-                            table(target["host"])["lanes"][target["lane"]]["model"],
-                            table("codex")["lanes"]["L1"]["model"],
-                        )
-                        continue
-                    self.assertIn(rung["model"], order, "model is not in the declared capability order")
-                    rank = order.index(rung["model"])
-                    self.assertGreaterEqual(rank, seen, "a lower rung names a more capable model")
-                    seen = rank
-
-    def test_codex_l4_is_below_the_top_general_family(self):
-        lanes = table("codex")["lanes"]
-        self.assertEqual("gpt-5.6-terra", lanes["L4"]["model"])
-        self.assertEqual("high", lanes["L4"]["reasoning_effort"])
-        self.assertGreater(
-            FAMILY_ORDER["codex"].index(lanes["L4"]["model"]),
-            FAMILY_ORDER["codex"].index(lanes["L3"]["model"]),
-        )
-
-    def test_l4_is_high_effort_and_differs_from_l3_on_both_hosts(self):
-        for host in HOST_IDS:
-            data = table(host)
-            key = data["effort_key"]
-            with self.subTest(host=host):
-                self.assertEqual("high", data["lanes"]["L4"][key])
-                self.assertNotEqual(
-                    data["lanes"]["L3"]["model"], data["lanes"]["L4"]["model"]
-                )
-
-    def test_effort_is_declared_under_each_host_own_key_and_from_the_known_vocabulary(self):
-        for host in HOST_IDS:
-            data = table(host)
-            key = data["effort_key"]
-            for lane, rung in data["lanes"].items():
-                with self.subTest(host=host, lane=lane):
-                    if key in rung:
-                        self.assertIn(rung[key], EFFORTS)
-                    else:
-                        # The only rung allowed to omit effort is one whose model rejects the parameter,
-                        # and it must say so rather than leaving the omission to look like an oversight.
-                        self.assertTrue(rung.get("no_effort_reason"))
-
-    def test_each_host_declares_whether_a_skill_can_carry_effort(self):
-        # The generator reads this flag instead of testing a host name. An absent flag is falsy, so a table
-        # that forgot it would silently stop stamping effort rather than failing - assert it is declared.
-        for host in HOST_IDS:
-            data = table(host)
-            with self.subTest(host=host):
-                self.assertIn("skill_supports_effort", data)
-                self.assertIsInstance(data["skill_supports_effort"], bool)
-        # Codex has no per-skill effort key; if that ever changes, this is the line to change with it.
-        self.assertTrue(table("claude")["skill_supports_effort"])
-        self.assertFalse(table("codex")["skill_supports_effort"])
-
-    def test_the_frontier_tier_sits_above_the_ladder_and_no_rung_can_reach_it(self):
-        # The guard the frontier rule depends on: frontier spend is granted by the user's explicit request,
-        # never resolved from a lane. L1 deliberately prices the frontier family, so the tier is a
-        # model-and-effort pair no rung prices, and any rung sharing the model must sit strictly below
-        # the frontier's effort.
-        for host in HOST_IDS:
-            data = table(host)
-            key = data["effort_key"]
-            with self.subTest(host=host):
-                frontier = data.get("frontier")
-                self.assertIsInstance(frontier, dict, "the frontier tier must be declared as data")
-                self.assertTrue(frontier.get("model"))
-                order = FAMILY_ORDER[host]
-                self.assertEqual(0, order.index(frontier["model"]), "frontier must be the most capable model")
-                self.assertIn(frontier.get(key), EFFORTS, "the frontier tier is priced by the pair, so it must declare effort")
-                frontier_rank = EFFORTS.index(frontier[key])
-                for lane, rung in data["lanes"].items():
-                    if rung["model"] != frontier["model"]:
-                        continue
-                    with self.subTest(host=host, lane=lane):
-                        self.assertIn(rung.get(key), EFFORTS, "a rung sharing the frontier model must declare effort")
-                        self.assertLess(
-                            EFFORTS.index(rung[key]),
-                            frontier_rank,
-                            "a rung pricing the frontier pair lets a lane reach the tier",
-                        )
-
-    def test_claude_records_a_context_ceiling_and_its_cheapest_rung_is_smaller(self):
-        lanes = table("claude")["lanes"]
-        ceilings = [rung["context_ceiling"] for rung in lanes.values()]
-        self.assertTrue(all(isinstance(c, int) and c > 0 for c in ceilings))
-        self.assertLess(
-            ceilings[-1],
-            ceilings[0],
-            "L7 dropping a family is a context step too; if that stops being true, say so here",
-        )
 
 
 class LaneDeclarationTests(unittest.TestCase):
@@ -217,9 +94,10 @@ class LaneDeclarationTests(unittest.TestCase):
                     self.assertNotIn("lane", front_matter(skill))
 
     def test_no_skill_names_a_model_directly(self):
-        models = {rung["model"] for host in HOST_IDS for rung in table(host)["lanes"].values()}
-        # The frontier models especially: hardcoding one is how "only on explicit request" gets bypassed.
-        models |= {table(host)["frontier"]["model"] for host in HOST_IDS}
+        models = {FABLE, *ROLE_SPECIALISTS.values()}
+        for host in HOST_IDS:
+            models.update(rung["model"] for rung in table(host)["lanes"].values())
+            models.update(role["model"] for role in manifest(host)["roles"].values())
         for skill in self.skills():
             text = skill.read_text(encoding="utf-8-sig")
             for model in models:
@@ -227,72 +105,40 @@ class LaneDeclarationTests(unittest.TestCase):
                     self.assertNotIn(model, text, "declare a lane instead of naming a model")
 
 
-class GeneratedLaneAgentTests(unittest.TestCase):
-    def test_claude_agents_carry_the_resolved_rung(self):
-        lanes = table("claude")["lanes"]
-        for lane, rung in lanes.items():
-            path = ROOT / "plugins" / "engineering" / "agents" / f"lane-{lane.lower()}.md"
-            with self.subTest(lane=lane):
-                self.assertTrue(path.is_file(), f"{path.name} is not generated")
-                fields = front_matter(path)
-                self.assertEqual(f"lane-{lane.lower()}", fields["name"])
-                self.assertEqual(rung["model"], fields["model"])
-                self.assertEqual(rung.get("effort"), fields.get("effort"))
-                self.assertEqual("Agent", fields["disallowedTools"])
+class RolePinTests(unittest.TestCase):
+    """Each workflow role pins its model in the host manifest. A pin off the ladder must be a declared
+    specialist, so the ladder stays the one answer to which model a role runs."""
 
-    def test_claude_l1_agent_only_returns_the_codex_handoff(self):
-        path = ROOT / "plugins" / "engineering" / "agents" / "lane-l1.md"
-        body = path.read_text(encoding="utf-8-sig")
-        self.assertIn("required native handoff request to your parent", body)
-        self.assertIn("The parent owns authorization and context preparation.", body)
-        self.assertIn("Codex L1", body)
-        self.assertIn("Do not inspect, execute, delegate", body)
-        self.assertNotIn("workflow:handoff", body)
+    def test_every_role_resolves_to_a_rung_or_a_declared_specialist(self):
+        for host in HOST_IDS:
+            rungs = {rung["model"] for rung in table(host)["lanes"].values()}
+            for capability, role in manifest(host)["roles"].items():
+                with self.subTest(host=host, capability=capability):
+                    specialist = ROLE_SPECIALISTS.get((host, capability))
+                    if specialist:
+                        self.assertEqual(specialist, role["model"])
+                    else:
+                        self.assertIn(role["model"], rungs)
+                    effort = role.get("effort", role.get("reasoning_effort"))
+                    self.assertIn(effort, EFFORTS)
 
-    def test_claude_lane_agents_and_workflow_pins_never_select_fable(self):
-        forbidden = table("claude")["frontier"]["model"]
-        for rung in table("claude")["lanes"].values():
-            self.assertNotEqual(forbidden, rung["model"])
-        for path in (ROOT / "plugins" / "engineering" / "agents").glob("lane-*.md"):
-            self.assertNotEqual(forbidden, front_matter(path).get("model"))
-        manifest = json.loads((HOSTS / "claude.json").read_text(encoding="utf-8-sig"))
-        for role in manifest["roles"].values():
-            self.assertNotEqual(forbidden, role["model"])
-
-    def test_codex_agents_carry_the_resolved_rung_including_effort(self):
-        for lane, rung in table("codex")["lanes"].items():
-            path = ROOT / "plugins" / "engineering" / "codex-agents" / f"lane-{lane.lower()}.toml"
-            with self.subTest(lane=lane):
-                self.assertTrue(path.is_file(), f"{path.name} is not generated")
-                agent = tomllib.loads(path.read_text(encoding="utf-8-sig"))
-                self.assertEqual(f"lane_{lane.lower()}", agent["name"])
-                self.assertEqual(rung["model"], agent["model"])
-                # Codex has no per-skill effort key, so the agent is the ONLY place its effort lands.
-                self.assertEqual(rung["reasoning_effort"], agent["model_reasoning_effort"])
-
-    def test_both_harnesses_generate_an_agent_for_every_rung_and_no_others(self):
-        expected = {f"lane-{lane.lower()}" for lane in table("claude")["lanes"]}
-        claude = {p.stem for p in (ROOT / "plugins" / "engineering" / "agents").glob("lane-*.md")}
-        codex = {p.stem for p in (ROOT / "plugins" / "engineering" / "codex-agents").glob("lane-*.toml")}
-        self.assertEqual(expected, claude)
-        self.assertEqual(expected, codex)
+    def test_workflow_pins_never_select_claude_fable(self):
+        for capability, role in manifest("claude")["roles"].items():
+            with self.subTest(capability=capability):
+                self.assertNotEqual(FABLE, role["model"])
 
 
-class PluginDeliveryTests(unittest.TestCase):
-    """A consumer installs only the plugin subtree, so anything the shipped skill names has to be inside
-    it. The payloads already carry resolved models; the tables travel for the skill that documents them."""
+class RoleAgentDeliveryTests(unittest.TestCase):
+    """Core generates and delivers only its workflow role agents; Agent publishes the lane agents."""
 
     PLUGIN = ROOT / "plugins" / "engineering"
 
-    def test_the_plugin_ships_the_tables_and_the_resolver(self):
-        for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md", "handoff-agent-body.md"):
-            with self.subTest(name=name):
-                shipped = self.PLUGIN / ".agents" / "lanes" / name
-                self.assertTrue(shipped.is_file(), f"plugins/engineering/.agents/lanes/{name} is not shipped")
-                self.assertEqual(
-                    (LANES / name).read_text(encoding="utf-8-sig"),
-                    shipped.read_text(encoding="utf-8-sig"),
-                )
+    def test_core_generates_exactly_its_workflow_role_agents(self):
+        for host in HOST_IDS:
+            delivery = manifest(host)["delivery"]
+            with self.subTest(host=host):
+                generated = {path.name for path in (self.PLUGIN / delivery["plugin_directory"]).glob("*" + delivery["extension"])}
+                self.assertEqual({role["filename"] for role in manifest(host)["roles"].values()}, generated)
 
     def test_the_codex_installer_covers_every_generated_agent_family(self):
         # Codex cannot load an agent from a plugin, so the profile installer is the only supported route
@@ -305,7 +151,7 @@ class PluginDeliveryTests(unittest.TestCase):
         patterns = delivery["generated_agent_patterns"]
         self.assertNotIn("*.toml", patterns, "the installer must not clobber a consumer's own agents")
 
-        emitted = sorted(p.name for p in (ROOT / "plugins" / "engineering" / "codex-agents").glob("*.toml"))
+        emitted = sorted(p.name for p in (self.PLUGIN / "codex-agents").glob("*.toml"))
         self.assertTrue(emitted)
         for name in emitted:
             with self.subTest(agent=name):
@@ -315,10 +161,7 @@ class PluginDeliveryTests(unittest.TestCase):
                 )
 
     def test_hosts_deliberately_use_different_agent_delivery_surfaces(self):
-        manifests = {
-            host: json.loads((HOSTS / f"{host}.json").read_text(encoding="utf-8-sig"))
-            for host in HOST_IDS
-        }
+        manifests = {host: manifest(host) for host in HOST_IDS}
         codex = manifests["codex"]["delivery"]
         claude = manifests["claude"]["delivery"]
 
@@ -329,62 +172,6 @@ class PluginDeliveryTests(unittest.TestCase):
         self.assertEqual("supported", claude["plugin_loading"])
         self.assertEqual("agents", claude["plugin_directory"])
         self.assertFalse((ROOT / ".claude" / "agents").exists())
-
-class RolePinTests(unittest.TestCase):
-    """Each workflow role pins its model in the host manifest. A pin off the ladder must be a declared
-    specialist, so the ladder stays the one answer to which model a role runs."""
-
-    def test_every_role_resolves_to_a_rung_or_a_declared_specialist(self):
-        for host in HOST_IDS:
-            data = table(host)
-            rungs = {rung["model"] for rung in data["lanes"].values()}
-            manifest = json.loads((HOSTS / f"{host}.json").read_text(encoding="utf-8-sig"))
-            for capability, role in manifest["roles"].items():
-                with self.subTest(host=host, capability=capability):
-                    specialist = ROLE_SPECIALISTS.get((host, capability))
-                    if specialist:
-                        self.assertEqual(specialist, role["model"])
-                    else:
-                        self.assertIn(role["model"], rungs)
-                    effort = role.get("effort", role.get("reasoning_effort"))
-                    self.assertIn(effort, EFFORTS)
-
-
-class ResolverTests(unittest.TestCase):
-    def resolve(self, *args):
-        return subprocess.run(
-            [sys.executable, str(LANES / "resolve.py"), *args],
-            capture_output=True,
-            text=True,
-        )
-
-    def test_resolves_a_lane_to_its_host_model(self):
-        done = self.resolve("--host", "claude", "--lane", "L4")
-        self.assertEqual(0, done.returncode, done.stderr)
-        self.assertEqual(
-            table("claude")["lanes"]["L4"]["model"], json.loads(done.stdout)["model"]
-        )
-
-    def test_claude_l1_exposes_its_codex_handoff(self):
-        done = self.resolve("--host", "claude", "--lane", "L1")
-        self.assertEqual(0, done.returncode, done.stderr)
-        self.assertEqual({"host": "codex", "lane": "L1"}, json.loads(done.stdout)["handoff"])
-
-    def test_codex_l4_resolves_to_the_pinned_model_and_effort(self):
-        done = self.resolve("--host", "codex", "--lane", "L4")
-        self.assertEqual(0, done.returncode, done.stderr)
-        resolved = json.loads(done.stdout)
-        rung = table("codex")["lanes"]["L4"]
-        self.assertEqual(rung["model"], resolved["model"])
-        self.assertEqual(rung["reasoning_effort"], resolved["effort"])
-        self.assertEqual("reasoning_effort", resolved["effort_key"])
-
-    def test_an_unknown_lane_or_host_fails_rather_than_falling_back(self):
-        for args in (("--host", "claude", "--lane", "L99"), ("--host", "nope", "--lane", "L1")):
-            with self.subTest(args=args):
-                done = self.resolve(*args)
-                self.assertNotEqual(0, done.returncode)
-                self.assertNotIn("model", done.stdout)
 
 
 if __name__ == "__main__":

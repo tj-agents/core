@@ -10,21 +10,24 @@ import sys
 import tempfile
 import unittest
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("harness_sync", ROOT / "scripts/sync_harness_manifests.py")
+SPEC = importlib.util.spec_from_file_location(
+    "harness_sync", ROOT / "scripts/sync_harness_manifests.py"
+)
 HARNESS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(HARNESS)
 
-PERMISSIONS_SCRIPTS = ROOT / ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts"
+PERMISSIONS_SCRIPTS = (
+    ROOT / ".agents/dependencies/agent/.agents/agent/utility/plugins/scripts"
+)
 RUNTIME_SCRIPTS = ROOT / ".agents/dependencies/agent/.agents/agent/runtime"
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 import harness_permissions  # noqa: E402
 import plugin_selection  # noqa: E402
-
-INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("workflow", "status.py"))
-HOST_ENTRY_SKILLS = {"engineering": "merge", "workflow": "status"}
 
 
 def validate_harness_schema(documents):
@@ -53,7 +56,10 @@ class HarnessManifestTests(unittest.TestCase):
         manifests = HARNESS.synchronize(ROOT, check=True)
         self.assertEqual({"base", "docs", "engineering", "workflow"}, set(manifests))
         roster = HARNESS.load(ROOT / ".agents/plugins/plugins.json")
-        self.assertEqual({"tj-agents/core"}, {package["owner_repository"] for package in roster["packages"]})
+        self.assertEqual(
+            {"tj-agents/core"},
+            {package["owner_repository"] for package in roster["packages"]},
+        )
         for package in roster["packages"]:
             self.assertEqual(manifests[package["name"]]["requires"], package["harness"])
 
@@ -61,7 +67,10 @@ class HarnessManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             shutil.copytree(ROOT / ".agents", root / ".agents")
-            shutil.copytree(ROOT / ".codex/runtime/continuation", root / ".codex/runtime/continuation")
+            shutil.copytree(
+                ROOT / ".codex/runtime/continuation",
+                root / ".codex/runtime/continuation",
+            )
             path = root / ".agents/plugins/harness/workflow.json"
             original = json.loads(path.read_text(encoding="utf-8"))
             HARNESS.synchronize(root, check=True)
@@ -91,20 +100,47 @@ class HarnessManifestTests(unittest.TestCase):
     def test_engineering_workflow_payload_ships_the_workflow_operations(self):
         sources = HARNESS.load(ROOT / ".agents/plugins/sources.json")["resources"]
         self.assertIn(
-            {"plugin": "engineering", "source": ".agents/workflows", "destination": "workflows"},
+            {
+                "plugin": "engineering",
+                "source": ".agents/workflows",
+                "destination": "workflows",
+            },
             sources,
         )
-        self.assertTrue((ROOT / "plugins/engineering/workflows/workflow_ops.py").is_file())
+        self.assertTrue(
+            (ROOT / "plugins/engineering/workflows/workflow_ops.py").is_file()
+        )
 
     def test_declared_hook_hosts_must_match_host_wiring(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             source = root / ".agents/plugins/manifests/claude/base-hooks.json"
             source.parent.mkdir(parents=True)
-            source.write_text(json.dumps({"hooks": {"SessionStart": [{"hooks": [{
-                "command": 'python "${CLAUDE_PLUGIN_ROOT}/hooks/start.py"',
-            }]}]}}), encoding="utf-8")
-            config = {"host_hook_sources": {"base": {"claude": ".agents/plugins/manifests/claude/base-hooks.json"}}}
+            source.write_text(
+                json.dumps(
+                    {
+                        "hooks": {
+                            "SessionStart": [
+                                {
+                                    "hooks": [
+                                        {
+                                            "command": 'python "${CLAUDE_PLUGIN_ROOT}/hooks/start.py"',
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config = {
+                "host_hook_sources": {
+                    "base": {
+                        "claude": ".agents/plugins/manifests/claude/base-hooks.json"
+                    }
+                }
+            }
             self.assertEqual(
                 [{"path": "hooks/start.py", "hosts": ["claude"]}],
                 HARNESS.expected_hooks(root, config, "base"),
@@ -113,7 +149,9 @@ class HarnessManifestTests(unittest.TestCase):
     def test_foreign_marketplace_owner_is_rejected(self):
         roster = HARNESS.load(ROOT / ".agents/plugins/plugins.json")
         config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
-        requires = json.loads((ROOT / ".agents/plugins/harness/base.json").read_text(encoding="utf-8"))["requires"]
+        requires = json.loads(
+            (ROOT / ".agents/plugins/harness/base.json").read_text(encoding="utf-8")
+        )["requires"]
         requires["marketplaces"][0]["repository"] = "another-org/core"
         with self.assertRaisesRegex(ValueError, "disagrees with plugin roster"):
             HARNESS.validate_requires(ROOT, config, roster, "base", requires)
@@ -123,14 +161,29 @@ class HarnessManifestTests(unittest.TestCase):
 
     def test_core_marketplace_identity_matches_plugin_selection(self):
         config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
-        self.assertEqual(plugin_selection.MARKETPLACE_NAME, HARNESS.PACKAGES.core_marketplace(ROOT, config))
-        self.assertEqual(plugin_selection.MARKETPLACE_REPOSITORY, HARNESS.DISTRIBUTION_REPOSITORY)
+        self.assertEqual(
+            plugin_selection.MARKETPLACE_NAME,
+            HARNESS.PACKAGES.core_marketplace(ROOT, config),
+        )
+        self.assertEqual(
+            plugin_selection.MARKETPLACE_REPOSITORY, HARNESS.DISTRIBUTION_REPOSITORY
+        )
         for path in (ROOT / ".agents/plugins/harness").glob("*.json"):
             with self.subTest(path=path.name):
                 manifest = json.loads(path.read_text(encoding="utf-8"))
-                self.assertEqual(f"{plugin_selection.MARKETPLACE_NAME}/{path.stem}", manifest["plugin"])
-                self.assertEqual([{"id": plugin_selection.MARKETPLACE_NAME, "repository": plugin_selection.MARKETPLACE_REPOSITORY}],
-                                 manifest["requires"]["marketplaces"])
+                self.assertEqual(
+                    f"{plugin_selection.MARKETPLACE_NAME}/{path.stem}",
+                    manifest["plugin"],
+                )
+                self.assertEqual(
+                    [
+                        {
+                            "id": plugin_selection.MARKETPLACE_NAME,
+                            "repository": plugin_selection.MARKETPLACE_REPOSITORY,
+                        }
+                    ],
+                    manifest["requires"]["marketplaces"],
+                )
 
 
 class HarnessPermissionValidationTests(unittest.TestCase):
@@ -144,41 +197,54 @@ class HarnessPermissionValidationTests(unittest.TestCase):
 
     def test_terminal_matchers_allow_only_literal_command_prefixes(self):
         for command in (
-            "Bash(python -B ${PLUGIN_ROOT}/script.py:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear *)",
+            "Bash(python -B scripts/script.py:*)",
+            "Bash(python -B scripts/script.py --clear:*)",
+            "Bash(python -B scripts/script.py --clear *)",
         ):
             with self.subTest(command=command):
                 harness_permissions.validate_requires(self.requires(command), "test")
 
     def test_optional_setup_declaration_is_strictly_validated(self):
-        requires = self.requires("Bash(python -B ${PLUGIN_ROOT}/script.py:*)")
-        requires["setup"] = {"script": ".agents/personal/utility/bot-identity/scripts/bot_identity.py"}
+        requires = self.requires("Bash(python -B scripts/script.py:*)")
+        requires["setup"] = {
+            "script": ".agents/example/setup.py"
+        }
         harness_permissions.validate_requires(requires, "test")
-        for setup in ({}, {"script": "../setup.py"}, {"script": "setup.ps1"}, {"script": "setup.py", "extra": True}):
+        for setup in (
+            {},
+            {"script": "../setup.py"},
+            {"script": "setup.ps1"},
+            {"script": "setup.py", "extra": True},
+        ):
             with self.subTest(setup=setup):
-                invalid = self.requires("Bash(python -B ${PLUGIN_ROOT}/script.py:*)")
+                invalid = self.requires("Bash(python -B scripts/script.py:*)")
                 invalid["setup"] = setup
                 with self.assertRaises(harness_permissions.lock_io.LockError):
                     harness_permissions.validate_requires(invalid, "test")
 
     def test_exact_script_rules_preserve_fixed_arguments(self):
         for command in (
-            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear)",
-            'Bash(python -B "${PLUGIN_ROOT}/policy runner.py" --name café)',
+            "Bash(python -B scripts/script.py --clear)",
+            'Bash(python -B "scripts/policy runner.py" --name café)',
         ):
             with self.subTest(command=command):
                 harness_permissions.validate_requires(self.requires(command), "test")
 
     def test_wildcard_arguments_require_a_terminal_matcher_after_a_literal_prefix(self):
         for command in (
-            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear*)",
-            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear:* more)",
-            "Bash(python* -B ${PLUGIN_ROOT}/script.py --clear:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/hooks/*.py --clear:*)",
-            "Bash(python -B ${PLUGIN_ROOT}/script.py * --clear:*)",
+            "Bash(python -B scripts/script.py --clear*)",
+            "Bash(python -B scripts/script.py --clear:* more)",
+            "Bash(python* -B scripts/script.py --clear:*)",
+            "Bash(python -B scripts/hooks/*.py --clear:*)",
+            "Bash(python -B scripts/script.py * --clear:*)",
         ):
-            with self.subTest(command=command), self.assertRaisesRegex(harness_permissions.lock_io.LockError, "script arguments require :\\*"):
+            with (
+                self.subTest(command=command),
+                self.assertRaisesRegex(
+                    harness_permissions.lock_io.LockError,
+                    "script arguments require :\\*",
+                ),
+            ):
                 harness_permissions.validate_requires(self.requires(command), "test")
 
 
@@ -186,8 +252,13 @@ class HarnessPermissionValidationTests(unittest.TestCase):
 class HarnessManifestSchemaTests(unittest.TestCase):
     def rule(self):
         manifest = json.loads(
-            (ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8")
+            (ROOT / ".agents/plugins/harness/engineering.json").read_text(
+                encoding="utf-8"
+            )
         )
+        manifest["requires"]["permissions"]["codex_prefix_rules"] = [
+            deepcopy(PORTABLE_CODEX_RULE)
+        ]
         return manifest, manifest["requires"]["permissions"]["codex_prefix_rules"][0]
 
     def test_shipped_manifests_validate_against_schema(self):
@@ -224,82 +295,209 @@ class HarnessManifestSchemaTests(unittest.TestCase):
         invalid = deepcopy(manifest)
         invalid["requires"]["permissions"]["codex_prefix_rules"][0]["unexpected"] = True
         invalid_rules.append(invalid)
-        self.assertEqual([False] * len(invalid_rules), validate_harness_schema(invalid_rules))
+        self.assertEqual(
+            [False] * len(invalid_rules), validate_harness_schema(invalid_rules)
+        )
 
 
-class HarnessPermissionCoverageTests(unittest.TestCase):
-    PLUGIN_ROOT = r"C:\scratch\tj-agents-root"
+FORBID_GH_LOGIN = {
+    "pattern": ["gh", "auth", "login"],
+    "justification": "Account-wide scopes reach every organization.",
+    "match": [["gh", "auth", "login"]],
+    "not_match": [["gh", "auth", "status"]],
+}
 
-    def rendered(self, plugin):
-        manifest = json.loads((ROOT / f".agents/plugins/harness/{plugin}.json").read_text(encoding="utf-8"))
-        return harness_permissions.render_permissions(manifest["requires"]["permissions"], self.PLUGIN_ROOT)
+PORTABLE_CODEX_RULE = {
+    "pattern": [["python", "python3"], "-B", "scripts/check.py"],
+    "justification": "A repository-relative script works on every machine.",
+    "match": [["python", "-B", "scripts/check.py"]],
+    "not_match": [["python", "scripts/check.py"]],
+}
 
-    def test_every_instructed_command_is_declared_for_both_hosts(self):
-        for plugin, script in INSTRUCTED_SCRIPTS:
-            with self.subTest(plugin=plugin, script=script):
-                claude_allow, codex_rules = self.rendered(plugin)
-                matching = [entry for entry in claude_allow if script in entry]
-                self.assertTrue(
-                    any(entry.startswith("Bash(") for entry in matching),
-                    f"{plugin}: missing a Bash( entry for {script}",
-                )
-                self.assertTrue(
-                    any(entry.startswith("PowerShell(") for entry in matching),
-                    f"{plugin}: missing a PowerShell( entry for {script}",
-                )
-                matching_rules = [rule for rule in codex_rules if script in json.dumps(rule)]
-                self.assertEqual(1, len(matching_rules), f"{plugin}: expected exactly one Codex rule for {script}")
+MACHINE_PATH_CODEX_RULE = {
+    **PORTABLE_CODEX_RULE,
+    "not_match": [["python", "C:/repo/script.py"]],
+}
 
-    def test_host_entry_and_vendored_script_paths_are_both_declared(self):
-        for plugin, script in INSTRUCTED_SCRIPTS:
-            skill = HOST_ENTRY_SKILLS[plugin]
-            with self.subTest(plugin=plugin, script=script):
-                claude_allow, codex_rules = self.rendered(plugin)
-                matching = [entry.replace("\\", "/") for entry in claude_allow if script in entry]
-                self.assertTrue(
-                    any("/.agents/" in entry for entry in matching),
-                    f"{plugin}: missing the vendored .agents/ path for {script}",
-                )
-                self.assertTrue(
-                    any(f"/skills/{skill}/scripts/{script}" in entry for entry in matching),
-                    f"{plugin}: missing the host-entry skills/ path for {script}",
-                )
-                rules_text = json.dumps(
-                    [rule for rule in codex_rules if script in json.dumps(rule)]
-                ).replace("\\\\", "/")
-                self.assertIn(".agents/", rules_text, f"{plugin}: missing the vendored .agents/ Codex path")
-                self.assertIn(
-                    f"codex-skills/{skill}/scripts/{script}", rules_text,
-                    f"{plugin}: missing the host-entry codex-skills/ Codex path",
-                )
 
-    def test_rendered_codex_rules_load_under_execpolicy_when_available(self):
-        codex = shutil.which("codex")
-        if not codex:
-            self.skipTest("codex CLI not on PATH")
-        rules = []
-        checks = []
-        for plugin in dict.fromkeys(plugin for plugin, _ in INSTRUCTED_SCRIPTS):
-            _, codex_rules = self.rendered(plugin)
-            rules += codex_rules
-            checks.extend((plugin, tokens, True) for rule in codex_rules for tokens in rule["match"])
-            checks.extend((plugin, tokens, False) for rule in codex_rules for tokens in rule["not_match"])
-        with tempfile.TemporaryDirectory() as raw:
-            rules_path = Path(raw) / "tj-agents.rules"
-            rules_path.write_text("\n".join(harness_permissions.codex_rule_lines(rules)), encoding="utf-8")
-            for plugin, tokens, allowed in checks:
-                with self.subTest(plugin=plugin):
-                    result = subprocess.run(
-                        [codex, "execpolicy", "check", "--rules", str(rules_path),
-                         "--resolve-host-executables", "--", *tokens],
-                        capture_output=True, text=True,
-                    )
-                    self.assertEqual(0, result.returncode, result.stderr)
-                    decision = result.stdout.replace(" ", "")
-                    if allowed:
-                        self.assertIn('"decision":"allow"', decision)
-                    else:
-                        self.assertNotIn('"decision":"allow"', decision)
+def base_requires(**permissions: object) -> dict[str, object]:
+    manifest = HARNESS.load(ROOT / ".agents/plugins/harness/base.json")
+    return {
+        **manifest["requires"],
+        "permissions": {"claude_allow": [], "codex_prefix_rules": [], **permissions},
+    }
+
+
+def test_validate_requires_accepts_deny_and_forbidden_rules() -> None:
+    config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
+    roster = HARNESS.load(ROOT / ".agents/plugins/plugins.json")
+    requires = base_requires(
+        claude_deny=["Bash(gh auth login *)"],
+        codex_forbidden_prefix_rules=[FORBID_GH_LOGIN],
+    )
+
+    HARNESS.validate_requires(ROOT, config, roster, "base", requires)
+
+
+@pytest.mark.parametrize(
+    ("permissions", "message"),
+    [
+        (
+            {"claude_deny": ["Bash(x)", "Bash(x)"]},
+            "duplicate Claude permission in claude_deny",
+        ),
+        ({"claude_deny": [""]}, "claude_deny must list non-empty strings"),
+        ({"claude_deny": "Bash(x)"}, "claude_deny must list non-empty strings"),
+        (
+            {"codex_forbidden_prefix_rules": [FORBID_GH_LOGIN, FORBID_GH_LOGIN]},
+            "duplicate Codex prefix rule in codex_forbidden_prefix_rules",
+        ),
+        (
+            {"codex_forbidden_prefix_rules": [{**FORBID_GH_LOGIN, "match": []}]},
+            "require pattern, justification and examples",
+        ),
+        (
+            {
+                "codex_forbidden_prefix_rules": [
+                    {**FORBID_GH_LOGIN, "justification": ""}
+                ]
+            },
+            "require pattern, justification and examples",
+        ),
+        (
+            {"codex_forbidden_prefix_rules": [{"pattern": ["gh"]}]},
+            "invalid Codex prefix rule in codex_forbidden_prefix_rules",
+        ),
+        (
+            {"codex_prefix_rules": [FORBID_GH_LOGIN, FORBID_GH_LOGIN]},
+            "duplicate Codex prefix rule in codex_prefix_rules",
+        ),
+        (
+            {"claude_allow": ["Bash(x)"], "claude_deny": ["Bash(x)"]},
+            "both allowed and denied",
+        ),
+        (
+            {
+                "codex_prefix_rules": [{**FORBID_GH_LOGIN, "justification": "Allow."}],
+                "codex_forbidden_prefix_rules": [FORBID_GH_LOGIN],
+            },
+            "both allowed and forbidden",
+        ),
+        ({"claude_ask": []}, "invalid permissions declaration"),
+        (
+            {"claude_allow": ["Bash(python C:/repo/script.py)"]},
+            "claude_allow embeds a machine-specific path",
+        ),
+        (
+            {"claude_deny": [r"Bash(python \\build-box\share\script.py)"]},
+            "claude_deny embeds a machine-specific path",
+        ),
+        (
+            {"claude_allow": ["Bash(python /home/alice/script.py)"]},
+            "claude_allow embeds a machine-specific path",
+        ),
+        (
+            {"claude_allow": ["Bash(python /Users/alice/script.py)"]},
+            "claude_allow embeds a machine-specific path",
+        ),
+        (
+            {"claude_allow": ["Bash(python /mnt/c/script.py)"]},
+            "claude_allow embeds a machine-specific path",
+        ),
+        (
+            {"claude_allow": ["Bash(python ${HOME}/script.py)"]},
+            "claude_allow embeds a machine-specific path",
+        ),
+        (
+            {"codex_prefix_rules": [MACHINE_PATH_CODEX_RULE]},
+            "codex_prefix_rules not_match embeds a machine-specific path",
+        ),
+        (
+            {"codex_forbidden_prefix_rules": [MACHINE_PATH_CODEX_RULE]},
+            "codex_forbidden_prefix_rules not_match embeds a machine-specific path",
+        ),
+        (
+            {"claude_allow": ["Bash(python -B ${PLUGIN_ROOT}/script.py:*)"]},
+            "claude_allow embeds a machine-specific path",
+        ),
+        (
+            {"claude_deny": ["PowerShell(python ${PROJECT_ROOT}/script.py)"]},
+            "claude_deny embeds a machine-specific path",
+        ),
+        (
+            {
+                "codex_prefix_rules": [
+                    {
+                        **PORTABLE_CODEX_RULE,
+                        "pattern": ["python", "${PLUGIN_ROOT}/script.py"],
+                    }
+                ]
+            },
+            "codex_prefix_rules pattern embeds a machine-specific path",
+        ),
+        (
+            {
+                "codex_forbidden_prefix_rules": [
+                    {
+                        **PORTABLE_CODEX_RULE,
+                        "match": [["python", "${PROJECT_ROOT}/script.py"]],
+                    }
+                ]
+            },
+            "codex_forbidden_prefix_rules match embeds a machine-specific path",
+        ),
+        (
+            {
+                "codex_prefix_rules": [
+                    {
+                        **PORTABLE_CODEX_RULE,
+                        "justification": "Runs ${PLUGIN_ROOT}/script.py.",
+                    }
+                ]
+            },
+            "codex_prefix_rules justification embeds a machine-specific path",
+        ),
+    ],
+)
+def test_validate_permissions_rejects_invalid_deny_and_forbidden_rules(
+    permissions: dict[str, object], message: str
+) -> None:
+    declared = base_requires(**permissions)["permissions"]
+
+    with pytest.raises(ValueError, match=message):
+        HARNESS.validate_permissions("base", declared)
+
+
+def test_validate_permissions_accepts_path_free_rules() -> None:
+    declared = base_requires(
+        claude_allow=["Bash(tj item:*)", "Bash(python -B scripts/check.py:*)"],
+        claude_deny=["Bash(gh auth login *)"],
+        codex_prefix_rules=[PORTABLE_CODEX_RULE],
+        codex_forbidden_prefix_rules=[FORBID_GH_LOGIN],
+    )["permissions"]
+
+    HARNESS.validate_permissions("base", declared)
+
+
+@pytest.mark.skipif(not shutil.which("pwsh"), reason="PowerShell 7 provides Test-Json")
+def test_schema_accepts_deny_and_forbidden_rules_and_rejects_invalid_ones() -> None:
+    manifest = HARNESS.load(ROOT / ".agents/plugins/harness/base.json")
+
+    def declaring(**permissions: object) -> dict[str, object]:
+        return {**manifest, "requires": base_requires(**permissions)}
+
+    documents = [
+        declaring(
+            claude_deny=["Bash(gh auth login *)"],
+            codex_forbidden_prefix_rules=[FORBID_GH_LOGIN],
+        ),
+        declaring(claude_deny=["Bash(x)", "Bash(x)"]),
+        declaring(claude_deny=[""]),
+        declaring(codex_forbidden_prefix_rules=[{**FORBID_GH_LOGIN, "match": []}]),
+        declaring(codex_forbidden_prefix_rules=[FORBID_GH_LOGIN, FORBID_GH_LOGIN]),
+    ]
+
+    assert validate_harness_schema(documents) == [True, False, False, False, False]
 
 
 if __name__ == "__main__":

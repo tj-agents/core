@@ -150,7 +150,6 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `.agents/hooks/tier_gate.py` | `TID251` | 1 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/hooks/tier_gate.py` | `TRY300` | 2 | Consider moving this statement to an `else` block |
 | `.agents/hooks/tier_gate.py` | `UP036` | 1 | Version block is outdated for minimum Python version |
-| `.agents/workflow/utility/catch-up/scripts/catch_up.py` | `TID251` | 1 | `sys.path` is banned: Install the declared dependency; do not modify the import search path. |
 | `.agents/workflow/utility/status/scripts/status.py` | `B904` | 1 | Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling |
 | `.agents/workflow/utility/status/scripts/status.py` | `E501` | 25 | Line too long (95 > 88) |
 | `.agents/workflow/utility/status/scripts/status.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
@@ -261,9 +260,6 @@ Reason: preserve existing implementations during the standards rollout. Each row
 | `tests/test_agent_files.py` | `PT009` | 4 | Use a regular `assert` instead of unittest-style `assertEqual` |
 | `tests/test_agent_files.py` | `TID251` | 1 | `unittest.TestCase` is banned: Use plain pytest functions and bare assertions. |
 | `tests/test_background_processes.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
-| `tests/test_catch_up.py` | `PLR6301` | 1 | Method `report` could be a function, class method, or static method |
-| `tests/test_catch_up.py` | `PT009` | 6 | Use a regular `assert` instead of unittest-style `assertEqual` |
-| `tests/test_catch_up.py` | `TID251` | 2 | `importlib.util.spec_from_file_location` is banned: Import the installed public API; do not load another checkout by path. |
 | `tests/test_check_generated_paths.py` | `E501` | 11 | Line too long (96 > 88) |
 | `tests/test_check_generated_paths.py` | `I001` | 1 | Import block is un-sorted or un-formatted |
 | `tests/test_check_generated_paths.py` | `PT009` | 6 | Use a regular `assert` instead of unittest-style `assertEqual` |

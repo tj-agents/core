@@ -1,19 +1,20 @@
 """Workflow catch-up: live item states and stalled sessions."""
 
-import importlib.util
+import json
+import os
+import runpy
+import shutil
+import subprocess
 import sys
-import unittest
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location(
-    "catch_up", ROOT / ".agents/workflow/utility/catch-up/scripts/catch_up.py"
-)
-assert SPEC is not None and SPEC.loader is not None
-CATCH_UP = importlib.util.module_from_spec(SPEC)
-sys.modules["catch_up"] = CATCH_UP
-SPEC.loader.exec_module(CATCH_UP)
+SCRIPT = ".agents/workflow/utility/catch-up/scripts/catch_up.py"
+PACKAGED_SCRIPT = "skills/catch-up/scripts/catch_up.py"
 
 PR = "https://github.com/tj-agents/core/pull/551"
 ISSUE = "https://github.com/tj-agents/personal/issues/49"
@@ -59,69 +60,186 @@ def graphql_response(text: str) -> dict[str, Any]:
     }
 
 
-SESSIONS = {
-    "SubjectSkillLayout": [
+def session(
+    handle: str,
+    *,
+    worktree: str | None = None,
+    title: str = "",
+    links: tuple[str, ...] = (),
+    started_at: str = "2026-11-01T00:00:00Z",
+) -> dict[str, Any]:
+    host, native_id = handle.split(":", 1)
+    return {
+        "session": handle,
+        "host": host,
+        "native_id": native_id,
+        "title": title,
+        "worktree": worktree,
+        "cwd": worktree or "C:\\Users\\someone\\source\\repos\\notes",
+        "state": "active",
+        "started_at": started_at,
+        "ended_at": None,
+        "links": [{"item": {"ref": ref}, "role": "owner"} for ref in links],
+    }
+
+
+RECORDED = [
+    session(
+        "codex:01a187bc",
+        worktree="C:\\Users\\someone\\source\\repos\\template\\.worktrees\\"
+        "Refactor-SubjectSkillLayout",
+    ),
+    session("claude:36c6da7d", worktree="/home/someone/core.worktrees/Feature-CatchUp"),
+    session(
+        "codex:5e1f0a22",
+        title="approval command",
+        links=("github:github.com/tj-agents/personal:49",),
+    ),
+    session("claude:f8af11f2", title="subject skills and their layout"),
+    session(
+        "claude:9b0c4d11", worktree="/home/someone/core.worktrees/Fix-CatchUpRuntime"
+    ),
+]
+CLOSED = {"codex:01a187bc", "claude:36c6da7d", "codex:5e1f0a22", "claude:f8af11f2"}
+
+
+@pytest.fixture(scope="module")
+def catch_up() -> dict[str, Any]:
+    return runpy.run_path(str(ROOT / SCRIPT))
+
+
+def report(catch_up: dict[str, Any], closed: Callable[[], set[str]]) -> dict[str, Any]:
+    parse = catch_up["parse"]
+    items = [parse("pr", PR), parse("issue", ISSUE), parse("branch", BRANCH)]
+    result: dict[str, Any] = catch_up["report"](
+        items, [], graphql_response, lambda: RECORDED, closed, 10
+    )
+    return result
+
+
+def by_id(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {entry["id"]: entry for entry in result["sessions"]}
+
+
+def test_report_lists_live_item_states(catch_up: dict[str, Any]) -> None:
+    states = {
+        item["reference"]: item["state"]
+        for item in report(catch_up, lambda: CLOSED)["items"]
+    }
+    assert states == {PR: "MERGED", ISSUE: "OPEN", BRANCH: "OPEN"}
+
+
+def test_report_marks_closed_owner_of_unmerged_branch_stalled(
+    catch_up: dict[str, Any],
+) -> None:
+    sessions = by_id(report(catch_up, lambda: CLOSED))
+    assert sessions["01a187bc"]["topics"] == ["SubjectSkillLayout"]
+    assert sessions["01a187bc"]["stalled"]
+    assert sessions["01a187bc"]["reopen"] == "agent:open codex:01a187bc"
+
+
+def test_report_marks_closed_owner_of_open_issue_stalled(
+    catch_up: dict[str, Any],
+) -> None:
+    sessions = by_id(report(catch_up, lambda: CLOSED))
+    assert sessions["5e1f0a22"]["items"] == ["github:github.com/tj-agents/personal:49"]
+    assert sessions["5e1f0a22"]["stalled"]
+
+
+def test_report_leaves_merged_branch_owner_and_unrelated_sessions_alone(
+    catch_up: dict[str, Any],
+) -> None:
+    sessions = by_id(report(catch_up, lambda: CLOSED))
+    assert not sessions["36c6da7d"]["stalled"]
+    assert "reopen" not in sessions["36c6da7d"]
+    assert "f8af11f2" not in sessions
+    assert "9b0c4d11" not in sessions
+
+
+def test_report_never_marks_a_live_session_stalled(catch_up: dict[str, Any]) -> None:
+    sessions = by_id(report(catch_up, set))
+    assert sessions["01a187bc"]["status"] == "live"
+    assert not sessions["01a187bc"]["stalled"]
+
+
+def test_report_skips_liveness_when_no_session_matches(
+    catch_up: dict[str, Any],
+) -> None:
+    def closed() -> set[str]:
+        raise AssertionError("liveness read without a matching session")
+
+    result = catch_up["report"]([], ["Unrelated"], graphql_response, list, closed, 10)
+    assert result == {"items": [], "sessions": []}
+
+
+def test_parse_rejects_a_reference_of_the_wrong_kind(
+    catch_up: dict[str, Any],
+) -> None:
+    with pytest.raises(ValueError, match="pr reference"):
+        catch_up["parse"]("pr", ISSUE)
+
+
+def fake_tools(directory: Path, responses: dict[str, object]) -> Path:
+    directory.mkdir()
+    for name, response in responses.items():
+        (directory / f"{name}.json").write_text(json.dumps(response), encoding="utf-8")
+        if os.name == "nt":
+            (directory / f"{name}.cmd").write_text(
+                f'@type "%~dp0{name}.json"\r\n', encoding="utf-8"
+            )
+        else:
+            launcher = directory / name
+            launcher.write_text(
+                f'#!/bin/sh\ncat "$(dirname "$0")/{name}.json"\n', encoding="utf-8"
+            )
+            launcher.chmod(0o755)
+    return directory
+
+
+def run_script(
+    monkeypatch: pytest.MonkeyPatch, script: Path, tools: Path, *arguments: str
+) -> subprocess.CompletedProcess[str]:
+    monkeypatch.setenv("PATH", os.pathsep.join([str(tools), os.defpath]))
+    return subprocess.run(
+        [sys.executable, "-I", "-B", str(script), *arguments],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=60,
+        check=False,
+    )
+
+
+def test_generated_package_reports_stalled_sessions_from_installed_agent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package = tmp_path / "relocated package ü"
+    shutil.copytree(
+        ROOT / "plugins/workflow", package, ignore=shutil.ignore_patterns("__pycache__")
+    )
+    tools = fake_tools(
+        tmp_path / "tools",
         {
-            "host": "codex",
-            "id": "01a187bc",
-            "status": "closed",
-            "activity": "2026-10-30T01:31:54Z",
-            "matched_by": ["branch"],
-            "work_item": {"status": "active", "title": "Subject layout"},
+            "agent-store": {"ok": True, "data": {"sessions": RECORDED}},
+            "tj": [{"session": handle, "action": "resume"} for handle in CLOSED],
         },
-        {
-            "host": "claude",
-            "id": "f8af11f2",
-            "status": "closed",
-            "activity": "2026-10-20T10:38:30Z",
-            "matched_by": ["message"],
-            "work_item": None,
-        },
-    ],
-    "CatchUp": [
-        {
-            "host": "claude",
-            "id": "36c6da7d",
-            "status": "closed",
-            "activity": "2026-11-03T12:00:00Z",
-            "matched_by": ["branch"],
-            "work_item": None,
-        }
-    ],
-}
+    )
+    result = run_script(
+        monkeypatch, package / PACKAGED_SCRIPT, tools, "--topic", "SubjectSkillLayout"
+    )
+    assert result.returncode == 0, result.stderr
+    sessions = by_id(json.loads(result.stdout))
+    assert set(sessions) == {"01a187bc"}
+    assert sessions["01a187bc"]["status"] == "closed"
 
 
-class CatchUpTests(unittest.TestCase):
-    def report(self) -> dict[str, Any]:
-        items = [
-            CATCH_UP.parse("pr", PR),
-            CATCH_UP.parse("issue", ISSUE),
-            CATCH_UP.parse("branch", BRANCH),
-        ]
-        result: dict[str, Any] = CATCH_UP.report(
-            items, [], graphql_response, lambda topic: SESSIONS.get(topic, [])
-        )
-        return result
-
-    def test_items_report_live_state(self) -> None:
-        states = {item["reference"]: item["state"] for item in self.report()["items"]}
-        self.assertEqual(states, {PR: "MERGED", ISSUE: "OPEN", BRANCH: "OPEN"})
-
-    def test_closed_owner_of_unmerged_branch_is_stalled(self) -> None:
-        sessions = {session["id"]: session for session in self.report()["sessions"]}
-        self.assertTrue(sessions["01a187bc"]["stalled"])
-        self.assertEqual(sessions["01a187bc"]["reopen"], "agent:open codex:01a187bc")
-        self.assertFalse(sessions["36c6da7d"]["stalled"])
-        self.assertNotIn("reopen", sessions["36c6da7d"])
-
-    def test_text_only_match_is_not_an_owner(self) -> None:
-        sessions = {session["id"]: session for session in self.report()["sessions"]}
-        self.assertFalse(sessions["f8af11f2"]["stalled"])
-
-    def test_rejects_a_reference_of_the_wrong_kind(self) -> None:
-        with self.assertRaisesRegex(ValueError, "pr reference"):
-            CATCH_UP.parse("pr", ISSUE)
-
-
-if __name__ == "__main__":
-    unittest.main()
+def test_script_names_the_missing_agent_store(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tools = tmp_path / "empty"
+    tools.mkdir()
+    result = run_script(
+        monkeypatch, ROOT / SCRIPT, tools, "--topic", "SubjectSkillLayout"
+    )
+    assert result.returncode == 1
+    assert "agent-store is not on PATH" in result.stderr

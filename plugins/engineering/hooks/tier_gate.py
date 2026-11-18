@@ -15,17 +15,12 @@ the moment it is installed, with no change here and no release of `base`.
 Plugin and marketplace identity come from the installed path, never from the declaration, so a
 declaration cannot claim to be a plugin it is not.
 
-`--session-context` (SessionStart) prints nothing outside a Git repository. In a repository with
-an `.agents/plugins.json` selection it names the selected stacks whose writes are gated, without
-assessing the repository; in any other repository it states which tiers apply.
+`--session-context` names the repository and its selected plugins. Skills load on demand
+from their descriptions; the agent reads the applicable bodies before making a relevant edit.
+The context is routing information, never a preload of every stack standard.
 
-`--write-gate` (PreToolUse on writes) requires adoption of installed stacks that directly own
-the target file, then requires reading the selected stack's core standards.
-`--record-read` (Claude `Read` of a `SKILL.md`) and `--record-command` (Codex shell commands) record
-which canonical files the agent has read; `--compacted` forgets them. These paths use filesystem
-checks only, never Git, so they stay cheap enough to run on every write.
-
-The write gate, `--tool-gate` and `--record-command` also guard host memory.
+`--tool-gate` guards host memory, user-level host settings and the agent state directory.
+It does not track skill reads or require a fixed standards checklist.
 
 A tier's own authoring repository is exempt, even when its source files do not contain the
 stack's normal project markers.
@@ -50,22 +45,21 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from boundary import (
-    HostMemory,
+    Host,
     memory_reason,
     memory_target,
     outgoing_targets,
+    settings_reason,
+    settings_target,
 )
 from host_cli import plugin_inventory_command
 from selected_standards import (
-    AgentIdentity,
-    LoadLedger,
     PluginSelection,
     Standard,
-    path_key,
     payload_standards,
-    standard_key,
 )
 from tj_cli import process
+from tj_cli.git import repository_file
 
 SCHEMA_VERSIONS = (1, 2, 3)
 DECLARATION_NAME = "tier.json"
@@ -890,9 +884,9 @@ def personal_adoption(root: Path | str) -> PredicateResult:
     boundary, error = _repository_boundary(root)
     if boundary is None or error:
         return PredicateResult(root)
-    path = boundary / ".agents" / "plugins.json"
+    path = repository_file(boundary, ".agents/plugins.json")
     try:
-        if path.is_symlink() or path.parent.is_symlink() or not _local_path(boundary, path):
+        if path.is_symlink() or path.parent.is_symlink() or not _local_path(path.parent.parent, path):
             raise ValueError("Personal adoption must be repository-local")
         value = json.loads(path.read_text(encoding="utf-8-sig"))
         if (not isinstance(value, dict) or type(value.get("schema_version")) is not int
@@ -1406,54 +1400,6 @@ def _target_context(anchor, boundary, result) -> str:
     return "\n".join(lines)
 
 
-def _patch_paths(value: object) -> list[str]:
-    if not isinstance(value, str):
-        return []
-    lines = value.strip().splitlines()
-    if len(lines) < 3 or lines[0] != "*** Begin Patch" or lines[-1] != "*** End Patch":
-        return []
-    paths = []
-    operation = None
-    can_move = False
-    for line in lines[1:-1]:
-        match = re.fullmatch(r"\*\*\* (Update|Add|Delete) File: (.+)", line)
-        if match is not None:
-            operation = match.group(1)
-            can_move = operation == "Update"
-            paths.append(match.group(2))
-            continue
-        match = re.fullmatch(r"\*\*\* Move to: (.+)", line)
-        if match is not None:
-            if not can_move:
-                return []
-            paths.append(match.group(1))
-            can_move = False
-            continue
-        can_move = False
-        if operation == "Add" and line.startswith("+"):
-            continue
-        if operation == "Update" and (line.startswith((" ", "+", "-", "@@"))
-                                      or line == "*** End of File" or line == ""):
-            continue
-        return []
-    return paths
-
-
-def write_paths(payload: Mapping[str, object]) -> list[str]:
-    name = _text(payload.get("tool_name"))
-    tool_input = payload.get("tool_input")
-    if not isinstance(tool_input, dict):
-        return []
-    if name in {"Edit", "Write", "MultiEdit"}:
-        value = _text(tool_input.get("file_path"))
-        return [value] if value else []
-    if name == "NotebookEdit":
-        value = _text(tool_input.get("notebook_path"))
-        return [value] if value else []
-    if name == "apply_patch":
-        return _patch_paths(tool_input.get("command"))
-    return []
-
 
 def _payload_cwd(payload: Mapping[str, object]) -> str:
     tool_input = payload.get("tool_input")
@@ -1474,167 +1420,33 @@ def repository_root(path: Path) -> Path | None:
     return None if error else boundary
 
 
-def selected_stacks(repository: Path) -> list[Declaration]:
-    selection = PluginSelection.read(repository)
-    if selection is None:
-        return []
-    return [declaration for declaration in declarations(project=repository)
-            if declaration.id in selection.identities and declaration.gated
-            and declaration.payload_dir is not None and path_markers(declaration)]
 
-
-def direct_path_predicates(node: object) -> list[tuple[str, str]]:
-    """Paths that independently establish a schema-v3 stack, without context."""
-    if not isinstance(node, dict) or len(node) != 1:
-        return []
-    operator, value = next(iter(node.items()))
-    if operator in ("file", "glob") and isinstance(value, str):
-        return [(operator, value)]
-    if operator == "any" and isinstance(value, list):
-        return [predicate for child in value for predicate in direct_path_predicates(child)]
-    return []
-
-
-def unselected_stacks(target: Path) -> list[str]:
-    """Installed stacks that directly own this file but have not been adopted."""
-    repository = repository_root(target)
-    if repository is None:
-        return []
-    selection = PluginSelection.read(repository)
-    identities = selection.identities if selection is not None else ()
-    relative = PurePosixPath(target.relative_to(repository).as_posix())
-    missing = []
-    for declaration in declarations(project=repository):
-        if (
-            not declaration.gated
-            or declaration.id in identities
-            or declaration.diagnostics
-            or declaration.orphaned
-        ):
-            continue
-        predicates = (
-            direct_path_predicates(declaration.detect)
-            if declaration.schema_version == 3
-            else [(kind, marker) for key, kind in (("files", "file"), ("globs", "glob"))
-                  for marker in _listed(declaration.detect, key)
-                  if isinstance(marker, str) and marker]
-        )
-        if any(
-            os.path.normcase(relative.as_posix()) == os.path.normcase(marker)
-            if kind == "file" else (
-                glob_target_matches(relative.as_posix(), marker)
-                or ("/" not in marker and glob_target_matches(relative.name, marker)))
-            for kind, marker in predicates
-        ):
-            missing.append(declaration.id)
-    return sorted(set(missing))
-
-
-def required_standards(target: Path) -> list[Standard]:
-    """The core standards of each selected stack whose path predicate matches the target."""
-    repository = repository_root(target)
-    if repository is None:
-        return []
-    relative = PurePosixPath(target.relative_to(repository).as_posix())
-    standards: dict[str, Standard] = {}
-    for declaration in selected_stacks(repository):
-        if not declares_path(declaration, relative):
-            continue
-        catalogue = payload_standards(Path(declaration.payload_dir), declaration.plugin, declaration.id)
-        for name, standard in catalogue.items():
-            if standard.required:
-                standards.setdefault(name, standard)
-    return [standards[name] for name in sorted(standards)]
-
-
-def write_gate(payload: Mapping[str, object], state_directory: Path) -> str:
-    """The reason to deny this write, or an empty string when it may proceed."""
-    agent = AgentIdentity.from_payload(payload)
-    if agent is None:
-        return ""
-    ledger = LoadLedger.for_agent(state_directory, agent)
-    cwd = _payload_cwd(payload)
-    missing: dict[str, Standard] = {}
-    trigger = ""
-    for path in write_paths(payload):
-        target = _target(path, cwd)
-        unselected = unselected_stacks(target)
-        if unselected:
-            return (f"Blocked: {path} requires repository stack selection: "
-                    + ", ".join(unselected)
-                    + ". Follow base:project-setup and use agent:plugins to adopt these stacks "
-                    "in the target repository, complete its write and passing check, then retry. "
-                    "Reading standards alone does not adopt their plugins.")
-        for standard in required_standards(target):
-            if standard.name not in missing and not ledger.loaded(standard_key(standard.path)):
-                missing[standard.name] = standard
-                trigger = trigger or path
-    if not missing:
-        return ""
-    listing = "\n".join(f"- {standard.name}: {standard.path}" for standard in missing.values())
-    return (f"Blocked: {trigger} is governed by repository standards this agent has not loaded. "
-            "Read each file below in full by its absolute path (in parallel), apply them, "
-            "then retry the write.\n" + listing)
-
-
-def record_read(payload: Mapping[str, object], state_directory: Path, now: float) -> None:
-    agent = AgentIdentity.from_payload(payload)
-    tool_input = payload.get("tool_input")
-    path = _text(tool_input.get("file_path")) if isinstance(tool_input, dict) else ""
-    if agent is None or Path(path).name.casefold() != "skill.md":
-        return
-    key = standard_key(_target(path, _payload_cwd(payload)))
-    LoadLedger.for_agent(state_directory, agent).record([key], now)
-
-
-def record_command(payload: Mapping[str, object], state_directory: Path, now: float) -> None:
-    """Record each installed stack standard whose canonical path a shell command names."""
-    agent = AgentIdentity.from_payload(payload)
-    tool_input = payload.get("tool_input")
-    command = tool_input.get("command") if isinstance(tool_input, dict) else None
-    if isinstance(command, list):
-        command = " ".join(part for part in command if isinstance(part, str))
-    if agent is None or not isinstance(command, str) or "skill.md" not in command.casefold():
-        return
-    windows = os.name == "nt"
-    text = path_key(command, windows)
-    cwd = Path(_payload_cwd(payload) or Path.cwd())
-    keys = []
-    for declaration in declarations(project=repository_root(cwd) or cwd):
-        if (not declaration.gated or declaration.payload_dir is None
-                or path_key(str(Path(declaration.payload_dir).resolve()), windows) not in text):
-            continue
-        catalogue = payload_standards(Path(declaration.payload_dir), declaration.plugin, declaration.id)
-        keys.extend(standard_key(standard.path) for standard in catalogue.values()
-                    if standard_key(standard.path) in text)
-    LoadLedger.for_agent(state_directory, agent).record(keys, now)
-
-
-def forget_loaded_standards(payload: object, state_directory: Path) -> None:
-    agent = AgentIdentity.from_payload(payload) if isinstance(payload, dict) else None
-    if agent is not None:
-        LoadLedger.for_agent(state_directory, agent).forget()
-
-
-def host_memory_homes() -> dict[HostMemory, Path]:
+def host_homes() -> dict[Host, Path]:
     homes = {
-        HostMemory.CLAUDE: os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude",
-        HostMemory.CODEX: os.environ.get("CODEX_HOME") or Path.home() / ".codex",
+        Host.CLAUDE: os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude",
+        Host.CODEX: os.environ.get("CODEX_HOME") or Path.home() / ".codex",
     }
     return {host: Path(home).expanduser().resolve(strict=False) for host, home in homes.items()}
 
 
 def boundary_reason(payload: Mapping[str, object], state_directory: Path) -> str:
-    """Why this call may not proceed: a host-memory write."""
+    """Why this call may not proceed: a write to host memory, user-level host settings or machine state."""
     tool = _text(payload.get("tool_name"))
     tool_input = payload.get("tool_input")
     if not tool or not isinstance(tool_input, dict):
         return ""
     cwd = Path(_payload_cwd(payload) or Path.cwd())
-    targets = outgoing_targets(tool, tool_input, cwd)
-    memory = memory_target(targets, host_memory_homes())
+    targets = outgoing_targets(
+        tool, tool_input, cwd, rg_configured=bool(os.environ.get("RIPGREP_CONFIG_PATH"))
+    )
+    homes = host_homes()
+    memory = memory_target(targets, homes)
     if memory is not None:
         return memory_reason(memory)
+    state = Path(state_directory).expanduser().resolve(strict=False)
+    settings = settings_target(targets, homes, state)
+    if settings is not None:
+        return settings_reason(settings)
     return ""
 
 
@@ -1657,11 +1469,12 @@ def _deny(reason: str) -> None:
 def selected_statement(repository: Path, selection: PluginSelection, found=None) -> str:
     selected = [declaration for declaration in (declarations(project=repository) if found is None else found)
                 if declaration.id in selection.identities]
-    stacks = sorted(declaration.plugin for declaration in selected if declaration.gated and path_markers(declaration))
-    lines = []
+    stacks = sorted(declaration.plugin for declaration in selected if declaration.gated)
+    lines = [f"Repository standards for {repository} (selection: {selection.path})."]
     if stacks:
-        lines.append("Writes to " + ", ".join(stacks) + " files in this repository are blocked until this "
-                     "agent has read the matching stack's core standards; a blocked write lists the files to read.")
+        lines.append("Selected stacks: " + ", ".join(stacks) + ".")
+    lines.append("Before editing, select skills whose descriptions match the task and read their full bodies. "
+                 "Load additional references when needed; reassess when changing repositories or concerns.")
     lines.extend(declaration.session_context for declaration in selected
                  if not declaration.gated and declaration.session_context)
     return "\n".join(lines)
@@ -1689,11 +1502,7 @@ def _stdin_payload():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--session-context", action="store_true")
-    parser.add_argument("--write-gate", action="store_true")
     parser.add_argument("--tool-gate", action="store_true")
-    parser.add_argument("--record-read", action="store_true")
-    parser.add_argument("--record-command", action="store_true")
-    parser.add_argument("--compacted", action="store_true")
     parser.add_argument("--path", action="append", default=[])
     parser.add_argument("--project", default=None)
     arguments = parser.parse_args()
@@ -1710,33 +1519,16 @@ def main():
         os.environ.get(STATE_DIRECTORY_VARIABLE) or Path.home() / ".agents-state"
     )
 
-    if arguments.write_gate:
-        payload = _stdin_payload()
-        _deny(boundary_gate(payload, state_directory) or write_gate(payload, state_directory))
-        return 0
-
     if arguments.tool_gate:
         _deny(boundary_gate(_stdin_payload(), state_directory))
-        return 0
-
-    if arguments.record_read:
-        record_read(_stdin_payload(), state_directory, time.time())
-        return 0
-
-    if arguments.record_command:
-        payload = _stdin_payload()
-        record_command(payload, state_directory, time.time())
-        _deny(boundary_gate(payload, state_directory))
-        return 0
-
-    if arguments.compacted:
-        forget_loaded_standards(_stdin_payload(), state_directory)
         return 0
 
     if not arguments.session_context:
         return 0
 
-    payload = {}
+    payload = _stdin_payload()
+    if not isinstance(payload, dict):
+        payload = {}
     if arguments.project:
         payload["cwd"] = arguments.project
 

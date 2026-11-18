@@ -16,7 +16,6 @@ Generated from canonical `.agents/` definitions.
 - `failing-tests` — workflow — `.agents/engineering/workflow/failing-tests/SKILL.md`
 - `failure-provenance` — contract — `.agents/engineering/contract/failure-provenance/SKILL.md`
 - `feature` — workflow — `.agents/engineering/workflow/feature/SKILL.md`
-- `git-auth` — policy — `.agents/engineering/policy/git-auth/SKILL.md`
 - `incremental-review` — workflow — `.agents/engineering/workflow/incremental-review/SKILL.md`
 - `merge` — workflow — `.agents/engineering/workflow/merge/SKILL.md`
 - `merging` — policy — `.agents/engineering/policy/merging/SKILL.md`

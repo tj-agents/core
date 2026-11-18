@@ -42,6 +42,8 @@ repositories and new technology stacks, including the personal/work scope questi
 [`base:solution-assessment`](.agents/base/policy/solution-assessment/SKILL.md) owns the once-per-idea
 assessment of existing capabilities and solutions; [`workflow:run`](.agents/workflow/workflow/run/SKILL.md)
 owns continued goal ownership and carries that recorded decision forward.
+[`base:machine-agnostic`](.agents/base/policy/machine-agnostic/SKILL.md) keeps everything working from a fresh clone
+on any machine: local state is only the rebuildable output of a scripted command such as `tj install`.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known bugs, mistakes and debt follow the selected problem-record profile.
 The [recording contract](.agents/workflow/resources/problem-records.md) routes remote work-item
@@ -52,7 +54,10 @@ Core publishes generic work status as Workflow and reusable engineering lifecycl
 Installing Engineering does not select or install a recording
 profile. Missing selection retains unsent facts with a resolver and resume condition; historical Markdown
 registers remain evidence only.
-Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. The same hooks refuse writes to host memory (`.agents/hooks/boundary.py`). Their Python 3.12+
+Packaged SessionStart hooks identify the checkout and its selected standards. Agents select skills by their
+descriptions and read the applicable bodies before editing. A skill listing alone is not a loaded standard;
+the hooks do not track reads or require every core standard. PreToolUse hooks refuse agent writes to host memory,
+user-level host settings and the agent state directory (`.agents/hooks/boundary.py`). Their Python 3.12+
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
 current manifest uses `python` on all platforms. Core packages also require the CLI-provided `tj_hook`
 executable on PATH; Agent must install CLI before it activates Core packages. Codex skips new or
