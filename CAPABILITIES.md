@@ -1,13 +1,7 @@
 # Agent capabilities
 
-Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).
+Generated from [`plugins/packages.json`](plugins/packages.json).
 Select plugins in a project's `.agents/plugins.json`; do not copy definitions between repositories.
-
-## tj-agents/base
-
-Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
-
-Maintained plans and common agent behavior.
 
 ## tj-agents/agent-store
 
@@ -15,11 +9,11 @@ Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
 
 Recorded agent executions, sessions, ownership and references.
 
-## tj-agents/workflow
+## tj-agents/base
 
 Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
 
-Goal lifecycle and recorded work status.
+Maintained plans and common agent behavior.
 
 ## tj-agents/engineering
 
@@ -32,3 +26,9 @@ Selected engineering workflows, reviews and Git operations.
 Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
 
 Explicit harness, history and clipboard utilities.
+
+## tj-agents/workflow
+
+Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
+
+Goal lifecycle and recorded work status.
