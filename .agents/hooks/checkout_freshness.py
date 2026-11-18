@@ -116,7 +116,21 @@ def fetched(directory: Path, deadline: float) -> Fetched | None:
     return Fetched(checkout, lines[1], had_selection, failure)
 
 
+def remote_default(checkout: Checkout) -> str | None:
+    output = checkout.git("ls-remote", "--symref", REMOTE, "HEAD", limit=FETCH_SECONDS)
+    for line in (output or "").splitlines():
+        reference, _, name = line.partition("	")
+        if name == "HEAD" and reference.startswith("ref: refs/heads/"):
+            return reference.removeprefix("ref: refs/heads/")
+    return None
+
+
 def default_branch(checkout: Checkout) -> str | None:
+    remote = remote_default(checkout)
+    if remote and checkout.succeeds(
+        "rev-parse", "--verify", "--quiet", f"refs/remotes/{REMOTE}/{remote}"
+    ):
+        return remote
     head = checkout.git(
         "symbolic-ref", "--quiet", "--short", f"refs/remotes/{REMOTE}/HEAD"
     )
@@ -282,7 +296,7 @@ def begin(directory: Path) -> Callable[[], str]:
     def finish() -> str:
         try:
             return report(future.result(timeout=max(0.0, deadline - time.monotonic())))
-        except FAILURES:
+        except Exception:
             return ""
 
     return finish
