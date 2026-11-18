@@ -92,18 +92,12 @@ def current_authorization(root, binding, value):
     reported = [str(item.get("path")) for item in value.get("files") or [] if item.get("path")]
     changed = workflow_ops.changed_paths(root, binding["pr_number"], reported, value.get("changedFiles"))
     labels = [str(item.get("name")) for item in value.get("labels") or [] if item.get("name")]
-    resolution = workflow_ops.standing_authorization(root, changed, labels)
     approval = workflow_ops.scoped_approval(
         root, binding["repository"], binding["pr_number"], binding["branch"], None
     )
-    if approval is not None and (
-        resolution["stopped_by"] is None
-        or resolution["stopped_by"]["class"] == "no-recorded-authorization"
-    ):
-        resolution["merge_authorization"] = {
-            "mode": approval["mode"], "instruction": approval["instruction"]
-        }
-        resolution["stopped_by"] = None
+    resolution = workflow_ops.standing_authorization(
+        root, changed, labels, approval, binding["remote_head_sha"]
+    )
     if not binding["auto_merge"] or resolution["auto_merge"] is not True:
         raise AutoMergeError("repository auto_merge is not enabled")
     if resolution["stopped_by"] is not None or resolution["merge_authorization"]["mode"] == "absent":

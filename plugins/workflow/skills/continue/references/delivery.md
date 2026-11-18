@@ -128,8 +128,9 @@ the binding artifact. Run this helper with `python` on Windows or `python3` on L
 python -B .agents/workflows/workflow_ops.py --root ROOT --workflow-run-id ID delivery-bind --pr NUMBER [--approval-record PATH]
 ```
 
-The optional approval record has exactly these fields. Replace the illustrative values with the actual
-owning checkout identity, permitted merge mode, user's wording and observed message provenance:
+The optional approval record requires these seven fields and may also carry `stop_authorization` below.
+Replace the illustrative values with the actual owning checkout identity, permitted merge mode, user's
+wording and observed message provenance:
 
 ```json
 {
@@ -152,13 +153,34 @@ each PR the goal creates. Invalid explicit input fails before any standing-autho
 standing instruction, goal authorization, or matching scoped approval, authority remains `absent` and
 merge requires a user decision.
 
+When the user explicitly authorizes an exception for a named built-in stop class on the exact PR and
+head, add `stop_authorization` to that approval record:
+
+```json
+{
+  "stop_authorization": {
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "classes": ["ci-workflow"]
+  }
+}
+```
+
+This object has exactly `head` and `classes`. `head` is the full forty-character lowercase hexadecimal
+commit SHA. `classes` is a nonempty, unique list drawn from `ci-workflow`, `migration`, `auth`, `money`
+and `published-contract`. Keep the user's actual exception instruction and its provenance in the
+record's `instruction` and `source`; a generic GO or GitHub approval alone supplies no exception.
+Once that explicit authorization is observed, record it and continue through the normal guarded delivery
+without requesting it again or editing standing policy.
+
 The binder reads authoritative forge state and resolves `.agents/delivery-authorization.json`, when
 present, against the current changed paths and labels. The authorization table itself always stops.
 With `standing_authorization` set to `auto` or `merge`, its optional `authorized_stop_classes` list may
 name each of `ci-workflow`, `migration`, `auth`, `money` and `published-contract` at most once. Repository
 stop paths and its hold label still apply; without a table, `human-gate` is the hold label. A scoped
-approval cannot add exemptions or bypass a stop. **Re-run the binder on every rebind:** a repaired head
-may add a stop path or hold.
+exception applies only when its head equals the current PR head. Binding and guarded merge reevaluate
+every changed path and label; one exempted class cannot hide another stop. Repository stop paths, hold
+labels, settings edits and standing-authorization edits cannot be exempted. **Re-run the binder on every
+rebind:** a changed head requires fresh explicit authorization for its stop-class exception.
 
 The auto-merge preference comes from `.agents/settings.json` in the actual checkout, at
 `configuration.core.auto_merge`, separately from delivery authority. An absent file or an omitted
@@ -176,8 +198,9 @@ fixed GitHub command. Do not run `gh pr merge --auto` directly; the delivery hoo
 
 The artifact retains matching approval wording and provenance as `scoped_approval` across wakes and
 supported repairs to the same PR, worktree and branch. Each rebind refreshes the remote head, checks and
-review evidence and reevaluates the stops. A stopped head retains the approval record but resolves
-`absent`; it does not authorize unattended merge. A wake or same-PR repair never requires another approval
+review evidence and reevaluates the stops. Ordinary merge authority can persist through those repairs;
+its stop-class exception remains valid only for its recorded head. A stopped head retains the approval
+record but resolves `absent`; it does not authorize unattended merge. A wake or same-PR repair never requires another approval
 solely because the repository lacks a standing table. The record cannot carry into another repository,
 PR, worktree or branch. If ordinary merge is approved and GitHub auto-merge is unavailable, wait for
 terminal checks and current-head review, then perform the authorized ordinary merge. End the binding with

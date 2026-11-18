@@ -1993,23 +1993,35 @@ def review_record(root, workflow_run_id, descriptor_path, work_order):
     return {"operation": "review-record", "head": descriptor["head"], "work_order": str(expected), "private": private}
 
 
-def standing_authorization(root, changed_paths, labels):
+def standing_authorization(root, changed_paths, labels, approval=None, head=""):
     try:
         policy = delivery_policy.load_policy(root)
+        scoped_classes = delivery_policy.scoped_stop_classes(approval, head)
     except delivery_policy.PolicyViolation as error:
         raise WorkflowOperationError(str(error)) from error
     try:
         if policy is None:
             resolution = delivery_runtime.StandingMergeAuthorization().resolve(
                 {"standing_authorization": "absent", "instruction": None, "hold_label": "human-gate"},
-                changed_paths, labels, root,
+                changed_paths, labels, root, scoped_classes,
             )
             if resolution["stopped_by"] is None:
                 resolution["stopped_by"] = {"class": "no-recorded-authorization"}
-            return resolution
-        return delivery_runtime.StandingMergeAuthorization().resolve(policy, changed_paths, labels, root)
+        else:
+            resolution = delivery_runtime.StandingMergeAuthorization().resolve(
+                policy, changed_paths, labels, root, scoped_classes
+            )
+        if approval is not None and (
+            resolution["stopped_by"] is None
+            or resolution["stopped_by"]["class"] == "no-recorded-authorization"
+        ):
+            resolution["merge_authorization"] = {
+                "mode": approval["mode"], "instruction": approval["instruction"]
+            }
+            resolution["stopped_by"] = None
     except delivery_runtime.DeliveryContractViolation as error:
         raise WorkflowOperationError(str(error)) from error
+    return resolution
 
 
 def scoped_approval(root, repository, number, branch, supplied):
@@ -2026,7 +2038,7 @@ def scoped_approval(root, repository, number, branch, supplied):
     if record is None and not explicit:
         return None
     fields = set(expected) | {"mode", "instruction", "source"}
-    if (not isinstance(record, dict) or set(record) != fields
+    if (not isinstance(record, dict) or set(record) - {"stop_authorization"} != fields
             or type(record.get("pr_number")) is not int
             or not isinstance(record.get("mode"), str)
             or record.get("mode") not in {"auto", "merge"}
@@ -2040,6 +2052,10 @@ def scoped_approval(root, repository, number, branch, supplied):
         if explicit:
             raise WorkflowOperationError("approval record does not match this repository/PR/worktree/branch")
         return None
+    try:
+        delivery_policy.scoped_stop_classes(record, "")
+    except delivery_policy.PolicyViolation as error:
+        raise WorkflowOperationError(str(error)) from error
     return record
 
 
@@ -2063,11 +2079,7 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, appr
     changed = _changed_paths_for_repository(root, repository, number, reported, value.get("changedFiles"))
     labels = [str(item.get("name")) for item in value.get("labels") or [] if item.get("name")]
     approval = scoped_approval(root, repository, number, branch, approval_record)
-    resolution = standing_authorization(root, changed, labels)
-    if approval is not None and (resolution["stopped_by"] is None
-                                 or resolution["stopped_by"]["class"] == "no-recorded-authorization"):
-        resolution["merge_authorization"] = {"mode": approval["mode"], "instruction": approval["instruction"]}
-        resolution["stopped_by"] = None
+    resolution = standing_authorization(root, changed, labels, approval, head)
     binding = {
         "repository": repository,
         "pr_url": str(value.get("url") or ""),

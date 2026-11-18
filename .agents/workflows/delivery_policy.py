@@ -2,6 +2,7 @@ import importlib.util
 import json
 import re
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 
@@ -93,6 +94,41 @@ def validate(policy):
             "`authorized_stop_classes` requires auto or merge standing authorization"
         )
     return policy
+
+
+def scoped_stop_classes(
+    approval: Mapping[str, object] | None, head: str
+) -> frozenset[str]:
+    if approval is None or "stop_authorization" not in approval:
+        return frozenset()
+    authorization = approval["stop_authorization"]
+    if not isinstance(authorization, dict) or set(authorization) != {"head", "classes"}:
+        raise PolicyViolation(
+            "stop authorization requires an exact head and named classes"
+        )
+    authorized_head = authorization["head"]
+    classes = authorization["classes"]
+    if (
+        not isinstance(authorized_head, str)
+        or re.fullmatch(r"[0-9a-f]{40}", authorized_head) is None
+    ):
+        raise PolicyViolation(
+            "stop authorization requires a forty-character lowercase commit SHA"
+        )
+    if (
+        not isinstance(classes, list)
+        or not classes
+        or any(not isinstance(name, str) for name in classes)
+    ):
+        raise PolicyViolation(
+            "stop authorization classes must be a nonempty list of strings"
+        )
+    selected = frozenset(classes)
+    if len(selected) != len(classes) or selected - EXEMPTIBLE_STOP_CLASSES:
+        raise PolicyViolation(
+            "stop authorization classes must be unique exemptible classes"
+        )
+    return selected if authorized_head == head else frozenset()
 
 
 def load_policy(root):
