@@ -89,6 +89,11 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/hooks/checkout_freshness.py",
+      "destination": "hooks/checkout_freshness.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/hooks/boundary.py",
       "destination": "hooks/boundary.py"
     },
@@ -181,6 +186,11 @@
       "plugin": "engineering",
       "source": ".agents/hooks/selected_standards.py",
       "destination": "hooks/selected_standards.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/checkout_freshness.py",
+      "destination": "hooks/checkout_freshness.py"
     },
     {
       "plugin": "engineering",

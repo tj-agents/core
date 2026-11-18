@@ -63,6 +63,16 @@ current manifest uses `python` on all platforms. Core packages also require the 
 executable on PATH; Agent must install CLI before it activates Core packages. Codex skips new or
 changed plugin hooks until they are reviewed and trusted in `/hooks`; a fresh missing-marketplace write
 probe is required before claiming enforcement.
+
+Base's SessionStart hook also checks checkout freshness (`.agents/hooks/checkout_freshness.py`). It
+fetches `origin` with a 5-second limit, concurrently with the standards context. A clean default branch
+that is behind is fast-forwarded and reported in one line. A dirty or diverged default branch, and any
+feature branch behind the default, gets a `STALE CHECKOUT` notice at the top of the session context and
+as a host message: commits behind, whether the branch is contained in the default branch, its remote
+branch is gone or its PR merged or closed, and the next action. A feature branch is never changed. A
+checkout without the `.agents/plugins.json` its default branch has is told that plugins will not load.
+A failed or timed-out fetch adds one line and compares with the last fetched ref. This runs only where
+Base is loaded; a checkout that loads no plugins runs no plugin hook at all.
 Codex hook commands use a per-session temporary snapshot preseeded for the running session's hooks.
 This lets those hooks keep running after a plugin update replaces an inactive package cache entry.
 New sessions create a fresh snapshot from the verified package; snapshots outside the plugin cache are
