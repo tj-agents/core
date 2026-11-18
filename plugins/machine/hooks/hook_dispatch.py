@@ -250,6 +250,12 @@ def main(argv: list[str]) -> int:
         if any(not name for name, _ in gates):
             stderr.write("hook-dispatch: each --hook requires a script.\n")
             return 1
+        gates = [
+            (name, script_arguments)
+            for spec, script_arguments in gates
+            for name in [selected(spec, tool)]
+            if name
+        ]
     else:
         gates = [(name, []) for name in (selected(spec, tool) for spec in arguments) if name]
     names = [name for name, _ in gates]
