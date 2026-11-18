@@ -49,6 +49,7 @@ from hook_runtime import (
     is_trusted_checkout,
     run_command,
 )
+from git_auth_scope_gate import extract_command
 
 # This message is what the agent acts on, and Windows defaults these streams to cp1252,
 # which turns the punctuation in it into mojibake.
@@ -73,7 +74,7 @@ CONFIG_FILE = ".agents/merge-gate.json"
 # Lowercased, and the hook's whole vocabulary: a harness whose shell tool is not named here
 # cannot be wired to this gate, because a matcher the hook ignores is enforcement that is inert
 # while looking wired. Codex's shell tool name is not established yet, so it carries no entry.
-SHELL_TOOLS = {"bash", "powershell"}
+SHELL_TOOLS = {"bash", "powershell", "shell", "exec_command", "unified_exec", "local_shell"}
 
 # Paths whose change makes a diff security-sensitive — a merge touching any of
 # these needs a current `Security-reviewed up to commit:` marker too. Kept
@@ -82,7 +83,7 @@ SHELL_TOOLS = {"bash", "powershell"}
 # CONFIG_FILE under `security_paths`.
 _SECURITY_PATTERNS = (
     re.compile(r"^\.github/workflows/"),
-    re.compile(r"(?i)(authoriz|authentic|credential|\bsecret|password|apikey|api_key)"),
+    re.compile(r"(?i)(authoriz|authentic|credential|\bsecret|password|apikey|api_key|permission)"),
 )
 
 
@@ -477,8 +478,8 @@ def main():
     if str(data.get("tool_name", "")).lower() not in SHELL_TOOLS:
         sys.exit(0)
 
-    command = (data.get("tool_input") or {}).get("command", "")
-    if not isinstance(command, str) or not is_merge_enable(command):
+    command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
+    if command is None or not is_merge_enable(command):
         sys.exit(0)
 
     # Both harnesses prefer the canonical target, so the review gate judges the checkout
