@@ -8,6 +8,9 @@ cloud-runtime, Work Items dependency and typed-entry naming decisions below. Pre
 and remote data while migrating actual callers; retain no obsolete skill aliases or runtime wrappers.
 
 The approved public surface is the same three names under each owning namespace:
+`personal:work-item` / `company:work-item` read/list/view through deterministic shipped scripts;
+`personal:create-work-item` / `company:create-work-item` create records without starting execution;
+`personal:address-work-item` / `company:address-work-item` reconcile an existing item and owner,
 then use the applicable Core Engineering lifecycle. Personal owns GitHub behavior and conventions.
 The employer profile owns Azure Boards behavior, native type/field mappings and employer authorization. Debt intent
 creates an existing Technical User Story in the employer profile, not Technical Debt Item. Optional typed meta-entry

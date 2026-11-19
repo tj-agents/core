@@ -125,6 +125,7 @@ Core source at audited commit:
 
 Historical context: local plans/self-repair-admission-deadlock/GOAL.md describes an older callout admission failure. plans/session-store-retention/PLAN.md records the 18 October decision to remove the callout gate, admission.py and forced handoff. Those old plan expectations must not be treated as current runtime behavior.
 
+Validation: python -B -m unittest discover -s .agents/hooks/tests -p test_problem_records.py -v passed all 9 tests on Windows. This verifies provider resolution, primary-worktree selection and rejection paths, not a live work-to-Core repair or model compliance. Installed Personal provider inspection succeeded; existing open Core work items were listed before recording and none matched. Employer replacement provider skills were inspected only in the existing Fix-TjAgentsDependencies source worktree; they were not loaded as this repository's governing profile and their installed-host acceptance was not established. No employer tracker was contacted, profile changed, real agent launched, or runtime repair implemented.
 
 ## Implications
 
