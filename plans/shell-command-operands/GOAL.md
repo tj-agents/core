@@ -8,9 +8,9 @@ The existing parent rollout authorizes Claude and Codex source implementation, r
 
 ## Published predecessor and current owner
 
-Phase 1a Source head `261fb009177c558b2a48b8badd3e4a3da3385a4d` landed in Core PR #211 at merge `f25427e678dc1ab384260ffc97ddab4af69dbea5` on 2026-10-12 at 01:27:18 UTC. Exact PR CI `38190837766`, attempt 1, and causal main CI `38191948327`, attempt 1, completed successfully with guard/Windows/Linux as applicable. The causal regenerate log says “Generated output already current.” The merged checkout and its local branch were removed after cleanup proof. This is source publication; installed native activation is not claimed.
+Phase 1a Source head `530d7f04f5cfaf10ca0493364528de97c7a94e30` landed in Core PR #211 at merge `2f6fac72cc2849ac4036ca2054798f3ebf0ac24e` on 2026-10-12 at 01:27:18 UTC. Exact PR CI `38190837766`, attempt 1, and causal main CI `38191948327`, attempt 1, completed successfully with guard/Windows/Linux as applicable. The causal regenerate log says “Generated output already current.” The merged checkout and its local branch were removed after cleanup proof. This is source publication; installed native activation is not claimed.
 
-This successor is branch `Fix/PowerShellShellOracle`, based on published main `7fed153b078c60fa69b6db4b50ab03c0b3f5d025`. The canonical goal remains `plans/shell-command-operands/GOAL.md` in the active delivery checkout. The parent owns this document. The bounded L4 implementation writer completed and released the four existing fixture/helper/test paths listed below; the parent now owns acceptance and delivery. Preserve original checkpoint `7e8b650f721b3c872446f9205922efe685be81b1` and preserved generated/source stashes; never apply or remove them as part of this slice.
+This successor is branch `Fix/PowerShellShellOracle`, based on published main `98ec68af772b03c618cdb2325a1dc27a17da4eff`. The canonical goal remains `plans/shell-command-operands/GOAL.md` in the active delivery checkout. The parent owns this document. The bounded L4 implementation writer completed and released the four existing fixture/helper/test paths listed below; the parent now owns acceptance and delivery. Preserve original checkpoint `67c73236e3400d5416d30cb9c4a1db41db4bb955` and preserved generated/source stashes; never apply or remove them as part of this slice.
 
 ## Four sequential deliveries
 

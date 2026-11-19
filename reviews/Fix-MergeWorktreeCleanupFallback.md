@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `4d578192648dc5f13917a4b9e4b02a021639ec7f`  `(2026-09-25)`
+**Reviewed up to commit:** `df4ffd116af18126c7e616b24efe2d72e6240095`  `(2026-09-25)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-25 — full
 
-**Candidate base:** `b8566ebe57a3afe1ea2cda3788263c0f6a91804c`
-**Candidate head:** `cbfec336ee70e6cc559ac0c2003b2bd64cc2b07e`
+**Candidate base:** `1ecb56d47aefdb1ad796ddf87f90957a6079801c`
+**Candidate head:** `49c2443660f7884cccdc2188d5ec33ea56316ffc`
 **Candidate branch:** `Fix/MergeWorktreeCleanupFallback`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:9a38503033dde932c380de0f36511cbd64057d213af3baab9dae9c6499d7b61e` `(19 paths)`
@@ -71,8 +71,8 @@ the documented parent fallback over the immutable bundle.
 
 ## Review pass — 2026-09-25 — incremental
 
-**Candidate base:** `cbfec336ee70e6cc559ac0c2003b2bd64cc2b07e`
-**Candidate head:** `4b0166d091550117b4e7c00e4882b44119255d95`
+**Candidate base:** `49c2443660f7884cccdc2188d5ec33ea56316ffc`
+**Candidate head:** `88bdd0604c81301ae7b1f7b9060a93ddfd966d59`
 **Candidate branch:** `Fix/MergeWorktreeCleanupFallback`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:3d68913da8b825f3adcd96fa7871cf01c6335000a1d49dde44aea218adc90010` `(8 paths)`
@@ -97,8 +97,8 @@ eight-path bundle.
 
 ## Review pass — 2026-09-25 — incremental
 
-**Candidate base:** `4b0166d091550117b4e7c00e4882b44119255d95`
-**Candidate head:** `4d578192648dc5f13917a4b9e4b02a021639ec7f`
+**Candidate base:** `88bdd0604c81301ae7b1f7b9060a93ddfd966d59`
+**Candidate head:** `df4ffd116af18126c7e616b24efe2d72e6240095`
 **Candidate branch:** `Fix/MergeWorktreeCleanupFallback`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:31bb8d20ca92e9ebd50ae4a6c7a8605d2e3585df6c6d9be05ec0b9936691bf6e` `(2 paths)`

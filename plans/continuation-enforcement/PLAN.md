@@ -14,7 +14,7 @@ Do not assume the base package alone is sufficient. Determine whether the unmerg
 
 ## Next Steps
 
-Final source 13a22abe36841079c2e07866d8c4148c0ca6595f is pushed in core PR #184. Owner/binding refreshed. Fresh ordinary L4 incremental review b8482a6..13a22ab is in progress; source/package acceptance is recorded below. Exact-head Linux CI is green, Windows is actively monitored. After review and CI gates pass, run current-head PR/body/base preflight, merge, verify causal main regeneration and its complete CI, then complete the canonical goal, remove its owned scheduler/binding and safely close the source worktree. Retain the Rust host checkout and unrelated work.
+Final source 29dd7e168287a0f32029f851677ea988d6ae4f5a is pushed in core PR #184. Owner/binding refreshed. Fresh ordinary L4 incremental review b8482a6..13a22ab is in progress; source/package acceptance is recorded below. Exact-head Linux CI is green, Windows is actively monitored. After review and CI gates pass, run current-head PR/body/base preflight, merge, verify causal main regeneration and its complete CI, then complete the canonical goal, remove its owned scheduler/binding and safely close the source worktree. Retain the Rust host checkout and unrelated work.
 
 ## Deferred tech debt
 
@@ -27,7 +27,7 @@ Codex sandbox setup failed before PowerShell launch (orchestrator_helper_exit_no
 
 ## Source ownership and delivery slice
 
-Source repository: tj-agents/core. Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ContinuationEnforcement. Branch: Fix/ContinuationEnforcement. Base: origin/main at 33fb4155973b8ee1d26a8fd6f2a27d8428f6f166. PR: https://github.com/tj-agents/core/pull/184.
+Source repository: tj-agents/core. Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ContinuationEnforcement. Branch: Fix/ContinuationEnforcement. Base: origin/main at d42ffa3a6b5d42e0fdee0bd19a3ad079319a69ec. PR: https://github.com/tj-agents/core/pull/184.
 
 This slice adds shared continuation Stop enforcement, its execution-obligation receipt, both host hook declarations, shipping requirements and regression tests. Expected under 1,000 substantive lines. It has no dependency on the work-plugin communications changes or the existing monitor-activation PR #161; neither active checkout is an implementation target.
 

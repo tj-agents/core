@@ -29,7 +29,7 @@ This is a new workstream, not a continuation of that completed migration.
 Preserve the primary Core checkout, all unrelated dirty work, the originating CLI and
 `work-items/.worktrees/Refactor-SharedWorkItemRuntime`. Do not modify the old migration goal, the separate
 handoff repair or its branch. Its merged result was read before the namespace move: Core PR #344,
-`ed6d56ffd060a64e7c9e14f5cf57bcddf7c3fc32`, merged 21 October 2026 at 21:49 UTC.
+`1c88cefbd4b84e8776398d088f679c0471faa81d`, merged 21 October 2026 at 21:49 UTC.
 Preserve that dispatch-first behavior when moving its canonical skill.
 No new repository, compatibility aliases, duplicate orchestration, remote issue creation, Azure writes,
 bulk plan conversion, obsolete-PR closure, unrelated workflow deletion or account changes are authorized.
@@ -41,7 +41,7 @@ Agent Workboard is outside scope and is not a dependency.
 - Execution: `github.com/tj-agents/core:workflow/agent-store-architecture`.
 - Canonical execution checkout: `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-WorkflowSelectionClosure`.
 - Branch: `Fix/WorkflowSelectionClosure`.
-- Integrated published Core main `40c5ef88de2b7cc215a2ceadad2a65f5dc972614` at merge `398da857de65b14809a70e4c40963b7aea17f831`. The source delta remains exactly the three selection declarations; incident and goal documents preserve recovery evidence.
+- Integrated published Core main `5638eff8da1f925986e75688c775960ea420258a` at merge `9934b2fb010252c008b6b0286c522a3e9aa2b934`. The source delta remains exactly the three selection declarations; incident and goal documents preserve recovery evidence.
 - PR: Core#356 remains draft pending current parent integration, native admission and final review. Source parents are delivered bottom-up under the existing conditional authority. Current source facts are below; historical checkpoints retain their original evidence.
 - Pickup: exact native identity and first read-only action recorded in the dispatched pickup file.
 
@@ -62,12 +62,12 @@ generated-sync PR was present. Other open PRs retain their owners.
 - Native final review also retained four upstream Machine observations: Claude relaunch can drop explicit tool restrictions; close.arm can race restart with worktree cleanup; verify-only can call mutating legacy cleanup; permission roots choose one globally newest installation instead of each active scope. The three source files are byte-identical to published main4925ad43 (session_relaunch blob13d331096a64968dd17285e0b1919c55470ec028, reload_plugins blobb3b4fcd0e0743daaceff8a0fb0b8c79798f812d7, harness_permissions_sync blob6e3193775140ed8d4a49b86672765f08bfd6e38d). These are not PR355 regressions or verified repairs. Machine source owners should reconcile existing records and reproduce each concern before repair; no new remote record or unrelated source change is authorized by this checkpoint. Full original comments remain in lifecycle-nativeacceptance-native-review.log and the canonical work-order synthesis. Preserve the originating CLI and use no-relaunch for later activation.
 - Marketplace#21 at33b32016 has source/security review and green CI for the explicitly authorized caller removal. Child#24 at48deda3b has green CI. They still depend on Core package publication and native admission.
 - The six requested consumer drafts are published. Personal, employer profile, Docs and selection closures retain their recorded gates. WorkItems remains local-only and its originating worktree/CLI are preserved.
-- Core source layers are merged. Lifecycle causal CI39965800923 completed successfully at14:15:35UTC: Windows120455291486, Linux120455291568, native startup/discovery and aggregate120463096263 pass. Regeneration120455230985 published f03d360482343de2231ca634afed18c87c15d5d9 for merge b1fa5c68a1c532cc2190832828dfdcdca82664e5. Central Marketplace and activation remain incomplete. Marketplace21 is the next dependency; its actual base063a604c and reviewed head33b32016 are unchanged and its Windows/Linux checks remain green. No user packages are activated. The primary Core checkout and unrelated work are preserved.
+- Core source layers are merged. Lifecycle causal CI39965800923 completed successfully at14:15:35UTC: Windows120455291486, Linux120455291568, native startup/discovery and aggregate120463096263 pass. Regeneration120455230985 published 9d20d06df3926270016699e04b3739ce0a58e055 for merge e71a4126d41590da67ebbf0f41112fa06d15e5de. Central Marketplace and activation remain incomplete. Marketplace21 is the next dependency; its actual base063a604c and reviewed head33b32016 are unchanged and its Windows/Linux checks remain green. No user packages are activated. The primary Core checkout and unrelated work are preserved.
 
 ## Acceptance
 
 Current stage transition at14:22UTC on23October2026: Marketplace21 merged reviewed
-33b32016303da9925d024646cdbd44f7159e6d27 at3e6c6eba56402b1ec6e9802a41dbc799b893e13e
+be668582e698f54fdbab59c81ac3afa31a82a441 at3e6c6eba56402b1ec6e9802a41dbc799b893e13e
 at14:19:49UTC. Fresh preflight/body and terminal Windows/Linux checks passed; normal
 exact-head merge used the recorded general and specific caller-removal approvals.
 Causal CI39968697501 passed both platforms and the native catalogs are on main.
@@ -166,7 +166,7 @@ workflow:review, scheduler, store migration, compatibility alias or age-based ow
 
 ### S1: canonical store package and shared readers
 
-PR #352 at `5e815d0658597f031c332e9d2a3e3bb35d886e8a` has completed full and incremental private
+PR #352 at `702542f7cd8be11f6d302b7b412114dea533b53a` has completed full and incremental private
 review and passing Windows/Linux CI (`39695061838`). It is ready with human-gate; merge authority is absent.
 The canonical runtime, schema-4 unchanged writer/identity moves, read-only snapshot inspector, source/
 packaged/staged loaders and package declarations are implemented. Their exact contract is in that PR's
@@ -182,7 +182,7 @@ bundles were removed after successful private review receipts; proofs and logs r
 
 ### S2a: Machine capability boundary
 
-PR #353 at `7c77e7d5b1dc6c419b5096431018079e7c530026` is stacked on #352. Lane policy now belongs
+PR #353 at `fdb5026495b48c02c4428afea0364b96c75bdfc7` is stacked on #352. Lane policy now belongs
 to Machine; native launchers consume caller-prepared dispatches. Model selection, duplicate protection,
 side-goal isolation and the unresolved repair outcome remain. Full and incremental review approved that
 exact head; Windows/Linux/ci-required run `39698190685` passed. Its 17-file source delta is 60 added/64
@@ -221,7 +221,7 @@ Replace preparation calls in native adapters with consumption of an already auth
 
 ### S2b1: Workflow status and recording ownership
 
-PR #354 at `995f5e45caf269ca71ffd7235b4b1e520b9cc940` is stacked on #353. It publishes the hookless
+PR #354 at `52d82cc9e6d777b6350a9576138e9404f06fe2ed` is stacked on #353. It publishes the hookless
 Workflow package, moves status and shared recording ownership, reads Agent Store directly and preserves
 selected tracker read-only behavior. Its full review accepted one active dangling-link defect; the repair
 also corrected four CI adoption expectations. Full plus incremental review and review-record completed;
@@ -325,12 +325,12 @@ Readiness: bounded independent reader /root/s1_readiness completed the exact sou
 
 ### S3: coordinated selection and native acceptance
 
-Core publishes both namespaces. Personal at `09ab438d644552831f9fb9f49162c02798a6a838`
+Core publishes both namespaces. Personal at `45bbbaab4c5add3b93f271c63123057656b76572`
 and the employer profile at its fetched main have no authored retired
 lifecycle/lane calls; their selected GitHub/Azure record operations remain distinct. Personal's actual
 producer requires Engineering and Machine; the employer profile requires Work, Base and Engineering. Retired-name inventory found no old public names in either profile, but a subsequent semantic read found stale whole-goal ownership in both address-work-item skills. A bounded S3 correction must enter workflow:run with the existing canonical item identity and mapped Engineering operation; Workflow owns the goal while Engineering returns software evidence. Preserve native kind mappings, provider read/update/closure helpers and company delivery gates. Personal README must name this boundary; deterministic tracker code stays unchanged. Their own source-project declarations still need coordinated required closure: exact fetched Personal origin/main selects Base, Engineering, GitHub Actions, Machine, Personal, Python and Template, so expansion adds Agent Store and Workflow; exact fetched employer profile origin/main selects only Base and Machine, so expansion adds Agent Store only. Producer dependencies do not establish profile adoption. Prepare only these required additions through the candidate generator in separate isolated S3 source layers, with native review admission/activation explicitly gated.
 
-Marketplace's exact source base is `063a604c86051388cc3889eefe8734a22f19010d`. Its old
+Marketplace's exact source base is `f4b6902dca63b43a64e51e3fd638f5504c43b73b`. Its old
 CoreCatalogAdoption goal explicitly records delivery on 8 October 2026 (PR #4); supported native recovery
 found its Claude owner closed and a current supported worktree find returned no matching owner. The old
 checkout and goal remain untouched. The absent older parent identity is not itself liveness proof.
@@ -352,7 +352,7 @@ affected README roster/minimum-selection prose: generic sustained work selects W
 software work selects Engineering and its closure, profile adoption remains explicit. Native discovery
 still installs/selects nothing automatically. No aliases, account changes or profile adoption are added.
 
-The catalog slice is committed and pushed as `4aeaa7d82cfa299aa9fad51ec1ec63727623ba8a`, [Marketplace #21](https://github.com/tj-agents/marketplace/pull/21), draft with human-gate. The five-file source delta is 75 added/22 removed lines. Generator/drift checks, all 14 existing tests and the native Claude validator passed. Full frozen review completed with M1 changes requested; native catalog CI passed on Windows and Linux. M1 remediation and its fresh review remain pending. The body check passed and binding records absent merge authority.
+The catalog slice is committed and pushed as `eafc5bef4f88602e6c9ecb96e0f0cfd4ea1f2db5`, [Marketplace #21](https://github.com/tj-agents/marketplace/pull/21), draft with human-gate. The five-file source delta is 75 added/22 removed lines. Generator/drift checks, all 14 existing tests and the native Claude validator passed. Full frozen review completed with M1 changes requested; native catalog CI passed on Windows and Linux. M1 remediation and its fresh review remain pending. The body check passed and binding records absent merge authority.
 
 The workstation PowerShell claude function unexpectedly ran its prelaunch refresh before validation. Parent identified that helper, verified it had ended, and removed exactly its four new project-scoped registrations using native uninstall with keep-data. Other registration rows and all native user sessions were preserved; checkout settings were restored with exact semantic/hash guards. Direct native validation then passed without settings changes. Use the native executable for deterministic validation here; do not rerun the refresh wrapper. This event supplies no new-namespace activation evidence.
 
@@ -414,7 +414,7 @@ retain the known limitation rather than reporting the entire plan graph green.
 ## Reviews
 
 Independent S1 readiness review by bounded reader `/root/s1_readiness` passed against base
-`112df9f5f9714acf443c84fe911cc081f9772dc5` and this revised design. Findings on inspection semantics,
+`23381883a7ed823a8beb24a7b1c7455cb22908b4` and this revised design. Findings on inspection semantics,
 detached staging, sweep lookup and package closure were resolved before code work. Runtime tests,
 independent frozen-head implementation review and installed activation remain separate gates.
 
@@ -510,12 +510,12 @@ Native admission and final review remain held until the new packages are availab
 
 | Repository | Branch / base | Candidate |
 | --- | --- | --- |
-| tomjseery/cpp | Fix/WorkflowSelectionClosure / b949bc15 | b5684fafdf19a912c101f6f49ebe4330fcacba36 |
-| tomjseery/marketplace-car-hunter | Fix/WorkflowSelectionClosure / d2633357 | 8da517de889735f64d30fcf2989630f0553bde00 |
-| tomjseery/onsite-sealants | Fix/WorkflowSelectionClosure / 9117f720 | b8668391d7f1f5130f6cd8a19f727766aa4c7081 |
-| tomjseery/Reunion | Fix/WorkflowSelectionClosure / master e058dc8a | 6a48c286cf0e6aef59fe282ab7a0ff41e7a56681 |
-| tomjseery/termboard | Fix/WorkflowSelectionClosure / 8a8914d0 | 647893b3b1b67655657519c0383884b5fe9a52c9 |
-| tj-agents/work | Fix/WorkflowSelectionClosure / 3a92fc11 | 0e003fd73d5de00e3f2dfcc0ea9e83745a1ee50a |
+| tomjseery/cpp | Fix/WorkflowSelectionClosure / b949bc15 | 61446da3f1997bce75c92e68d93e93588d150c6f |
+| tomjseery/marketplace-car-hunter | Fix/WorkflowSelectionClosure / d2633357 | 88a3687eff9257ded809cc5087a8725b9062034d |
+| tomjseery/onsite-sealants | Fix/WorkflowSelectionClosure / 9117f720 | a58d1ca708088f2c2c9ceb8b173a12612ac8a6df |
+| tomjseery/Reunion | Fix/WorkflowSelectionClosure / master e058dc8a | ad47d128503808199bd169fbacfd9a4af5371fa9 |
+| tomjseery/termboard | Fix/WorkflowSelectionClosure / 8a8914d0 | 54d8ad282025dc9da5e730646f62291595b21060 |
+| tj-agents/work | Fix/WorkflowSelectionClosure / 3a92fc11 | 09ff2ff45296f18f5265dd57f1758502d34142df |
 
 Retired WorkItems has a local-only candidate1bb5debdea0522052e3d8740889041e295742036 at
 work-items.worktrees/Fix-WorkflowSelectionClosure, based on the supported422ef8bb checkpoint. Its three
@@ -558,7 +558,7 @@ architecture merge, installation or rejected six-consumer publication authority 
 
 ## Final source preparation checkpoint - 22 October 2026
 
-Lifecycle source at a6123ed93061b9c8d816691ac69f71f711ca2c8a completed full review plus two incremental
+Lifecycle source at fa571a861e0fbdb6ebca0a66ab90fcfdbf0817c8 completed full review plus two incremental
 repair passes. CI1, COV1, COV2 and ST1 are resolved. The final added assertion rejects unrelated fail-closed
 Stop responses; its actual source/generated integration case passes. Native and independent review approve
 the exact head, canonical host coverage and private review-record pass, and Windows/Linux/ci-required
@@ -582,7 +582,7 @@ fresh owner/plan discovery. Do not rewrite the live database or launch an unadmi
 
 The standing decision is published in [Docs20](https://github.com/tj-agents/docs/pull/20). Its decision-only
 head3c013e3846ecc0063e0f10e18bf46b1703a374c7 passed native and independent accuracy/contradiction review;
-86f7969fdfda864857c9bc2ab560e21bb4d9641c then adds its three required declarations with passing canonical
+4e96b6a5c4661de532b718deb534ceb79a38a185 then adds its three required declarations with passing canonical
 preview/write/check and semantic preservation. Its current incremental review is held on actual missing
 Agent Store/Workflow admission. The final canonical-plan link will identify this execution branch.
 
@@ -614,7 +614,7 @@ merge/native-activation authority and the explicitly rejected six-consumer publi
 concrete approval request was pending at resumption. The later explicit answer below now governs delivery.
 
 Fresh forge reads confirm Core352-355 remain open at their recorded reviewed heads. Fetched Core main is
-8c2d9f77ab085387df4b588482029217c6b97559, including the problem-record routing and agentic sync changes.
+6445febb96024c3ad5e8ff9c0d94f8b8a5f5a20c, including the problem-record routing and agentic sync changes.
 The supported S1 review-reconcile reports base-changed-relevant-evidence and requires another review.
 A read-only merge-tree check identifies five conflicts: catalog, compatibility, Engineering/Machine
 harnesses and source-layout tests. S1 is being reconciled in its existing isolated checkout with its
@@ -627,7 +627,7 @@ explicit record-provider precedence into the Workflow-owned recording contract/s
 upstream's demonstrated-defect, personal-scope repair limits and explicit independent-successor authority;
 retain the host-only Machine boundary, current sync-plugins/relaunch behavior and deletion of retired
 lanes/handoff debt files. These are integration repairs, not a reopened architecture assessment.
-Fresh fetches show all six consumer bases unchanged. Personal main moved to a2ddbf5460e121c5d9758d38db28315638d69f97
+Fresh fetches show all six consumer bases unchanged. Personal main moved to b2d97f13ca5366b252f7702a20353a2630112669
 with relevant tracker/address guidance; its existing isolated candidate is being reconciled separately.
 Employer profile main moved; assess the generated/test-only
 base delta without adopting Personal. Docs base movement only changes record metadata; Marketplace base
@@ -654,7 +654,7 @@ Azure write, remote issue creation, or retired WorkItems publication was granted
 
 Personal b36772f9 is pushed to existing draft17. Its repository tests and host validation pass, but
 CI39866415432 fails current Template conformance on old personal-agents producer identities. Fresh
-main fc76273445cc3cc971de215d096800f269d84d78 already contains the separately owned merged identity
+main 12d0063f66d4d30172f021b8f0fddb4ea844d801 already contains the separately owned merged identity
 repair (PR20), with that conformance step green on both platforms in39865524131. Reconcile that landed
 fix instead of duplicating its ownership, then validate and publish one stable updated candidate.
 
@@ -685,22 +685,22 @@ protected originating WorkItems checkout remain untouched. The goal is delivery-
 ## Authorized publication checkpoint - 23 October 2026
 
 Five unchanged consumer candidates are now published as draft PRs with human-gate and passing authoritative
-body checks: cpp #7 at b5684fafdf19a912c101f6f49ebe4330fcacba36; marketplace-car-hunter #3 at
-8da517de889735f64d30fcf2989630f0553bde00; onsite-sealants #13 at b8668391d7f1f5130f6cd8a19f727766aa4c7081;
-Reunion #27 at 6a48c286cf0e6aef59fe282ab7a0ff41e7a56681; termboard #12 at
-647893b3b1b67655657519c0383884b5fe9a52c9. Their native selection admission and final review remain pending.
+body checks: cpp #7 at 61446da3f1997bce75c92e68d93e93588d150c6f; marketplace-car-hunter #3 at
+88a3687eff9257ded809cc5087a8725b9062034d; onsite-sealants #13 at a58d1ca708088f2c2c9ceb8b173a12612ac8a6df;
+Reunion #27 at ad47d128503808199bd169fbacfd9a4af5371fa9; termboard #12 at
+54d8ad282025dc9da5e730646f62291595b21060. Their native selection admission and final review remain pending.
 Work main advanced to 815720c8 after its PR #14 landed; the bounded worker is reconciling that base before
 publishing the sixth approved draft. No employer project receives Personal.
 
 Personal #17 now contains the separately landed producer identity repair from main fc762734. Current pushed
-head is 161478e2982d3bd708410c4625b559b6306c8c0a. The exact Template revision used by the earlier failing
+head is a5814c055c42297b56e89c2b51925b9abe90f60e. The exact Template revision used by the earlier failing
 CI now passes conformance locally; generation check and packaging tests (5 tests plus 2 subtests) pass.
 The replacement CI monitor is active. Earlier b36772f9 CI passed repository tests and native-host validation
 but failed Template conformance; those failures are not represented as passing. Native Workflow/Agent Store
 admission still awaits publication and supported activation.
 
-Marketplace parent is locally 9cb25273176d2c6fb67980d013b653f81c526906; dependent declaration child is
-8715a875901b1ce6da7bf6006586422ea0a34a2e. Parent actual selection admission succeeds. The original M1 remains
+Marketplace parent is locally c7dd0630d2f0ee9bf6d30830b88bbcd61dc41caa; dependent declaration child is
+d8229ba20b18f4131a262cc75cad688f554ab94b. Parent actual selection admission succeeds. The original M1 remains
 with its original work order; its prepared three-file fix is preserved in the child, whose admission/review
 remain incomplete. The superseded 7cf51be5 pending pass is explicitly cancelled without approval. A fresh
 parent incremental native and independent sequencing review uses frozen 4aeaa7d8..9cb25273. The configured
@@ -712,7 +712,7 @@ workstream still has no authority for that unrelated workflow deletion.
 ## Reviewed publication and Core reconciliation - 23 October 2026
 
 All six authorized consumer drafts are open. Work #16 is draft with human-gate at
-31015b1ed3c85a37a40e990ba5809871463336c8 after clean integration of main 815720c8; exact delta is still the
+57fbf0ba8413a0e483c5c036a9d2a387759e8322 after clean integration of main 815720c8; exact delta is still the
 three selection files. Supported adoption checks, 45-file generation check and 6 packaging tests pass;
 Template remains selected and Personal is absent. Authoritative body check passed. Initial CI run39869576835
 was active; no native-admission or final-review approval is implied.
@@ -741,7 +741,7 @@ are in progress. The bounded writer now integrates this parent into S2a #353; it
 
 ## Corrected Core candidates and activation boundaries - 23 October 2026
 
-S1 #352 now publishes ac787c7c5ccc42c728aa09acf601c1250083be15. Its preceding integrated candidate
+S1 #352 now publishes 5783cdd161af9659114545c9b5c8d3becf35f5f9. Its preceding integrated candidate
 fa8b1610 failed exactly the same producer-lock fixture on Windows and Linux: 1,212 tests per platform,
 one failure, with 11 Windows and six Linux skips. The fresh bounded repair confirmed the actual authored
 Agent Store dependency and changed only that expected list; all 16 adoption tests pass locally. Replacement
@@ -749,7 +749,7 @@ CI is run 39871577624. The earlier fa8b1610 preparation was cancelled before cre
 its exact owned process was stopped. The corrected head is being frozen from completed watermark 5e815d06
 through the supported helper, with diagnostics retained for its slow existing-cache cleanup.
 
-S2a #353 now publishes f5a61173271d64883db7b75eade8e7e0d50aa248, incorporating corrected S1. Its layer remains
+S2a #353 now publishes 44edd2eb09d5a3160923642b80b46f9087461547, incorporating corrected S1. Its layer remains
 17 authored paths and no generated distribution changes. Lane, source-layout, harness, recovery/relaunch,
 reload, launcher and adoption checks pass; temporary generation reports 590 files/83 definitions and zero
 drift. Base, exact-head source coverage, preflight and PR-body checks pass. Fresh incremental review is being
@@ -839,7 +839,7 @@ its existing Windows/Linux jobs, using actual startup routing and Machine receip
 and fake inventory cannot substitute for native loading. Any credentials must use supported provisioned
 CI mechanisms without copying local secrets or weakening trust. No new skill or environment framework is needed.
 
-Digest reconciliation now completes locally at S2a ac5c40aa92132b798d6499376db34a4e462fdd14,
+Digest reconciliation now completes locally at S2a 0207a1589cf5bc78dba16541450d83aa8233e29a,
 Status1bd3b0a4215bb627cc78539d61883c45ff2aa395 and Lifecycle8ba9fd2e5a58b53337048d3b7a0cd5ff97db6c0d.
 Each passes the generated-path guard against its exact immediate parent; Status README uses sync-plugins.
 The source writer did not modify selection or GOAL. Current review/CI gates remain pending.
@@ -847,7 +847,7 @@ The source writer did not modify selection or GOAL. Current review/CI gates rema
 
 ## Current source review and general validation repair - 23 October 2026
 
-S1 0adefbdca5e8954113cadd81c6489e6b6ca41180 completes native and independent migration review;
+S1 cee5ea9462d08e6d7b5c45527dc2fc6e151a4522 completes native and independent migration review;
 private exact-head review-record succeeds. Both reviewers observed upstream permission-selection behavior,
 but comparison against actual PR base9578ca3d is empty for that source; this slice neither changes nor
 worsens it, so no unrelated repair was added. Migration/adoption and catalog ownership checks pass.
@@ -872,7 +872,7 @@ Supported installed reload_plugins.py reads the exact supplied project native se
 
 ## Active selection continuation - 23 October 2026
 
-Core356 is retargeted to main and publishes d2ad741d99e4401cd88ab63ee0bb8bc6b9eecf53.
+Core356 is retargeted to main and publishes dd77112549c006066103f990e96a7643d64ecb9d.
 Its source delta remains only three selection declarations; the incident and goal
 documentation ride the same draft. Declaration check and six selection tests pass.
 CI39970650169 owns this exact head and has one supported listener. Keep draft and

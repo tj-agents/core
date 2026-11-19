@@ -2,13 +2,13 @@
 
 **Review status:** `complete`
 **Judgment:** `approved`
-**Reviewed up to commit:** `38b148ab03189aa667ff1c3780bd3deb47f27f70` `(2026-10-15)`
-**Security-reviewed up to commit:** `38b148ab03189aa667ff1c3780bd3deb47f27f70` `(2026-10-15)`
+**Reviewed up to commit:** `c564a3ceacf32fb001957ad9bc5e55b0ba75ef45` `(2026-10-15)`
+**Security-reviewed up to commit:** `c564a3ceacf32fb001957ad9bc5e55b0ba75ef45` `(2026-10-15)`
 
 ## Review pass — 2026-10-15 — full
 
-**Candidate base:** `f2dd95cae5aef351017eea4d7ce3dc39a9fcae76`
-**Candidate head:** `1be576a46f5f07f4688418ae9ecb5c0bdca8b59b`
+**Candidate base:** `b23509c4d0af38a0c6f39de41b55e9d61042497d`
+**Candidate head:** `45ebef3c05e826c95c56c4d0a33d2fc9e7a9a90d`
 **Candidate branch:** `Fix/RollingPluginSync`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:cfac483ab5230be35f21498ba3d9e32930138d4d7d1e5e14764d9ea5c972b827` `(82 paths)`
@@ -77,7 +77,7 @@ and fixture Git identity; the focused fixture repairs remain a delivery gate alo
 ```agent-host-coverage
 {
   "schema_version": 1,
-  "candidate_head": "38b148ab03189aa667ff1c3780bd3deb47f27f70",
+  "candidate_head": "c564a3ceacf32fb001957ad9bc5e55b0ba75ef45",
   "shared_source": ".agents/machine/scripts/rolling_plugins.py and startup_binding.py; shared hooks and selection generator",
   "hosts": [
     {
@@ -124,8 +124,8 @@ Both expiry regressions passed in `165396aa4b823c64-rolling-deadline-review-fix.
 
 ## Review pass — 2026-10-15 — incremental
 
-**Candidate base:** `1be576a46f5f07f4688418ae9ecb5c0bdca8b59b`
-**Candidate head:** `38b148ab03189aa667ff1c3780bd3deb47f27f70`
+**Candidate base:** `45ebef3c05e826c95c56c4d0a33d2fc9e7a9a90d`
+**Candidate head:** `c564a3ceacf32fb001957ad9bc5e55b0ba75ef45`
 **Candidate branch:** `Fix/RollingPluginSync`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:5c860af4e5a9ba56f45f35dad60e0cad674057ba0a8c33053db624fc17812804 (12 paths)`

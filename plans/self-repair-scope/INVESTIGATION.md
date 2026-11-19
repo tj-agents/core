@@ -93,7 +93,7 @@ These findings are source inspection. No live employer operation, installed-host
 
 ## Initial source audit
 
-Requested investigation, 22 October 2026. This records policy gaps found by source inspection; it does not authorize a workflow redesign or report an observed employer-data disclosure. Audited Core main at 412b8d11493dea9ea27ff5fff1a2cc21e5e751d7.
+Requested investigation, 22 October 2026. This records policy gaps found by source inspection; it does not authorize a workflow redesign or report an observed employer-data disclosure. Audited Core main at 482d68885b9c01736c430361a9be68599425c85c.
 
 Current behavior: engineering:session routes user mistake callouts to engineering:self-repair after answering the direct question. Self-repair investigates whether a consumed Core standard, skill, hook, workflow or host enforcement caused or failed to prevent the mistake. It reconciles an existing repair owner, records through the selected profile, and repairs in the current session. Unrelated checkouts require a separate worktree of the standards source repository. Handoff requires the user to ask. Standing authority includes implementation, tests, review, PR, merge and source publication after that repository's gates. Explicit user limits remain binding. Shared ownership/completion/handoff/cleanup failures default to P1 and pause unrelated work and new launches until verified correction or explicit deferral. Completion currently permits repaired/tested/committed source or a recorded blocker, then resumption of the original task. Loaded sessions retain their old instructions.
 
@@ -116,12 +116,12 @@ The workflow should distinguish investigating a callout from establishing a sour
 ## Evidence and verification
 
 Core source at audited commit:
-- https://github.com/tj-agents/core/blob/412b8d11493dea9ea27ff5fff1a2cc21e5e751d7/.agents/engineering/workflow/self-repair/SKILL.md (trigger, repair boundary, authority and completion).
-- https://github.com/tj-agents/core/blob/412b8d11493dea9ea27ff5fff1a2cc21e5e751d7/.agents/engineering/policy/session/SKILL.md (callout selection; questions/reviews alone do not authorize implementation).
-- https://github.com/tj-agents/core/blob/412b8d11493dea9ea27ff5fff1a2cc21e5e751d7/.agents/engineering/resources/problem-records.md (provider selection, employer evidence retention and missing-provider behavior).
-- https://github.com/tj-agents/core/blob/412b8d11493dea9ea27ff5fff1a2cc21e5e751d7/README.md#refresh-and-repository-boundaries (explicit personal adoption and employer scope).
-- https://github.com/tj-agents/core/blob/412b8d11493dea9ea27ff5fff1a2cc21e5e751d7/.agents/plugins/manifests/codex/engineering-hooks.json and corresponding claude/engineering-hooks.json (current wiring).
-- https://github.com/tj-agents/core/blob/412b8d11493dea9ea27ff5fff1a2cc21e5e751d7/.agents/hooks/tests/test_process_standards.py (text assertions, not behavioral host proof).
+- https://github.com/tj-agents/core/blob/482d68885b9c01736c430361a9be68599425c85c/.agents/engineering/workflow/self-repair/SKILL.md (trigger, repair boundary, authority and completion).
+- https://github.com/tj-agents/core/blob/482d68885b9c01736c430361a9be68599425c85c/.agents/engineering/policy/session/SKILL.md (callout selection; questions/reviews alone do not authorize implementation).
+- https://github.com/tj-agents/core/blob/482d68885b9c01736c430361a9be68599425c85c/.agents/engineering/resources/problem-records.md (provider selection, employer evidence retention and missing-provider behavior).
+- https://github.com/tj-agents/core/blob/482d68885b9c01736c430361a9be68599425c85c/README.md#refresh-and-repository-boundaries (explicit personal adoption and employer scope).
+- https://github.com/tj-agents/core/blob/482d68885b9c01736c430361a9be68599425c85c/.agents/plugins/manifests/codex/engineering-hooks.json and corresponding claude/engineering-hooks.json (current wiring).
+- https://github.com/tj-agents/core/blob/482d68885b9c01736c430361a9be68599425c85c/.agents/hooks/tests/test_process_standards.py (text assertions, not behavioral host proof).
 
 Historical context: local plans/self-repair-admission-deadlock/GOAL.md describes an older callout admission failure. plans/session-store-retention/PLAN.md records the 18 October decision to remove the callout gate, admission.py and forced handoff. Those old plan expectations must not be treated as current runtime behavior.
 

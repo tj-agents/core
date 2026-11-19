@@ -6,7 +6,7 @@ Determine and implement the supported Core delivery/recovery path for a stale in
 
 ## Evidence
 
-On 2026-10-12, the controller-association checkout at `Fix/ControllerGoalAssociation` was at `e7df895d41a2faaab73743f98978b08212a99bc0`, matching both its continuation owner and `.agents/persistent-workflow-binding.json`. The source hook now reads `remote_head_sha`, but the installed cache `base-agents/engineering/2.1.16/hooks/continuation_stop.py` still reads `binding.get("head")` after normalization, which guarantees the false failure.
+On 2026-10-12, the controller-association checkout at `Fix/ControllerGoalAssociation` was at `fcd2275b1a397ff3ac9f6948cc67e44e2398cde8`, matching both its continuation owner and `.agents/persistent-workflow-binding.json`. The source hook now reads `remote_head_sha`, but the installed cache `base-agents/engineering/2.1.16/hooks/continuation_stop.py` still reads `binding.get("head")` after normalization, which guarantees the false failure.
 
 The source correction alone does not update a running or stale installed plugin package. The supported recovery must preserve hook trust and package integrity, work on Windows and Linux, and prevent future sessions from being trapped by the obsolete cache.
 
@@ -89,7 +89,7 @@ PR #209 note (not edited here): its `BUGS.md` adds B004 twice; its owner should 
 
 ## Delivery
 
-PR https://github.com/tj-agents/core/pull/226 (draft), head `2ccff70939bbf8265c8dc58f5cece94440eb3510`; standing
+PR https://github.com/tj-agents/core/pull/226 (draft), head `acfd4688e328de1be6cd8292726ce55744896579`; standing
 merge authorization AUTO from the repository table. Independent review lens over `8425d10..2ccff70`: no findings.
 
 ```completion
@@ -116,13 +116,13 @@ merge authorization AUTO from the repository table. Independent review lens over
     }
   ],
   "deliveries": [
-    {"repository": "tj-agents/core", "pr": 226, "head": "2ccff70939bbf8265c8dc58f5cece94440eb3510"}
+    {"repository": "tj-agents/core", "pr": 226, "head": "acfd4688e328de1be6cd8292726ce55744896579"}
   ],
   "open_tasks": [
     {
       "repository": "tj-agents/core",
       "pr": 226,
-      "head": "2ccff70939bbf8265c8dc58f5cece94440eb3510",
+      "head": "acfd4688e328de1be6cd8292726ce55744896579",
       "text": "Exact-head verify-windows / verify-linux CI",
       "owner": "Claude hook-cache-recovery session",
       "next_action": "Monitor exact-head CI and merge through the guarded auto-merge path."

@@ -5,14 +5,14 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `dcf86bb4791dc66d33defa8fbeef7050112e6975`  `(2026-10-10)`
+**Reviewed up to commit:** `19515e3c174fb36e735f3b5d24d11b8dd4fd08ba`  `(2026-10-10)`
 **Judgment:** `approved`
-**Security-reviewed up to commit:** `dbed2b32504ebd9dd9375f863946212e7de369ac`  `(2026-10-10)`
+**Security-reviewed up to commit:** `ba2a38a507bf00cac398331d560f1fba0a134898`  `(2026-10-10)`
 
 ## Review pass — 2026-10-07 — full
 
-**Candidate base:** `61d4920477a313528f855babd2e4ee4ccdf3d8f6`
-**Candidate head:** `a8da4019aab7d17151e1729ab76c34a3bac6d0ad`
+**Candidate base:** `50dcb8f6b1694e5c6abcc581e02d52bbfa51f394`
+**Candidate head:** `cd9d2936a05c6dbb52a0c37d6d4b7119bb11d178`
 **Candidate branch:** `Feature/HandoffCodexPython`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:7ee2d8d23b5f3625333f8285a8a38a90279c7af09cad9ea5b7f79bac1dbb7ac5` `(24 paths)`
@@ -45,11 +45,11 @@ Native layer: Claude Code `code-review` (high), 10 findings verified by the pare
 
 ## Review pass — 2026-10-09 — incremental
 
-**Candidate base:** `49c618c5204140629df7a78dd7f8e47a0bfe749f` (origin/main; the prior watermark `a8da4019a` is still an
+**Candidate base:** `2be7f8a6c16ee7c1c9508813a13a2bf81a2259f9` (origin/main; the prior watermark `a8da4019a` is still an
 ancestor of HEAD, but ~40 unrelated `main`-merge commits sit between it and HEAD, so a literal
 `watermark..HEAD` diff pulls in 153 paths outside this feature's own scope. Reviewed the branch's actual
 diff against current `main` instead — 27 paths, matching `git diff origin/main...HEAD --stat`.)
-**Candidate head:** `cb2193b66f6772cc7d101ccf34d30aba5bed71f0`
+**Candidate head:** `11815feeb3d07ab51eca5c517f9f6c1bf15d3bdd`
 **Candidate branch:** `Feature/HandoffCodexPython`
 **Candidate scope:** `all`
 **Work-order path:** `reviews/Feature-HandoffCodexPython.md`
@@ -78,9 +78,9 @@ efficiency, or convention issues cleared the confirm/plausible bar.
 
 ## Review pass — 2026-10-10 — incremental
 
-**Candidate base:** `28fbce2d0874152b9ec0ffcc55f25465a7216bd5` (the prior pass's own watermark; no further
+**Candidate base:** `e962127420b9937b474080d08630099df53c9317` (the prior pass's own watermark; no further
 unrelated `main` merges landed in between)
-**Candidate head:** `dcf86bb4791dc66d33defa8fbeef7050112e6975`
+**Candidate head:** `19515e3c174fb36e735f3b5d24d11b8dd4fd08ba`
 **Candidate branch:** `Feature/HandoffCodexPython`
 **Candidate scope:** `all`
 **Work-order path:** `reviews/Feature-HandoffCodexPython.md`

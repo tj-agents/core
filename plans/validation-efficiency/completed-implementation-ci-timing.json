@@ -1,6 +1,6 @@
 {
   "run": 38902959829,
-  "head": "5b42318ef0369ef59dcbbdde40505dd21a857ad8",
+  "head": "6f77d8890ab687e2028486960dd7291c3b4a12ec",
   "method": "Gaps between successive verbose unittest completion timestamps within a step; includes setup, teardown and log buffering. Not instrumented fixture timings. Captured from the already-required successful run, without rerunning tests.",
   "suites": [
     {

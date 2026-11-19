@@ -4,20 +4,20 @@ Status: R2 and R3 corrected and validated; stable replacement checkpoint/review 
 Date: 2026-10-11
 Branch: Fix/FollowupRecoveryOwnership
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-FollowupRecoveryOwnership
-Base: origin/main at 73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c
+Base: origin/main at 7ce37574dcfd854be201f7be9c762b9ab20a823f
 Originating session: 01a12ccb-c604-77f1-bb4c-cc8c5e21ead1
 Lane: L3 for bounded recovery-contract investigation; route specified implementation and review to L4.
 
 ## Pickup and delivery slice
 
 Picked up on 2026-10-11 by native Codex session 01a12d05-0e36-7cd2-afac-1936aa63404b
-in the exact recorded worktree and branch at 73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c.
+in the exact recorded worktree and branch at 7ce37574dcfd854be201f7be9c762b9ab20a823f.
 The predecessor retains its settings task. This successor owns only the recovery-contract source repair.
 Investigation selects L3 because eligibility and receipt semantics need reconciliation. Implementation
 and independent review select L4 through bounded lane workers once the correction is specified.
 One slice covers the existing followup-codex/open-codex guidance and any required machine harness
 declaration and no-send helper advice. The source/test slice is 153 additions and 20 deletions across six files; no recovery launcher or transport behavior changed.
-PR: https://github.com/tj-agents/core/pull/207; exact head 36d7374d81cf4620a11c41b7bb31e15b046b8711. Verification: existing receipt and recovery tests, source generation, packaging/harness
+PR: https://github.com/tj-agents/core/pull/207; exact head 19c7c047fb7437207eebda6cde02540962e46f4b. Verification: existing receipt and recovery tests, source generation, packaging/harness
 checks, and exact-head Windows/Linux CI before normal merge and causal generated publication.
 
 ## Outcome and authority
@@ -52,7 +52,7 @@ Current slice: one focused recovery guidance/helper/permission correction.
 Remaining scope: R3 validation, stable replacement checkpoint/review/CI, normal merge and causal generated publication.
 Done when: independent review and Windows/Linux CI pass, the PR is merged and its generated packages are verified.
 
-1. Commit the verified coupled R2/R3 correction through the bounded L7 checkpoint worker, then independently review the fixing delta from watermark 36d7374d81cf4620a11c41b7bb31e15b046b8711. Both host declarations are source-verified; no consumer installation is claimed.
+1. Commit the verified coupled R2/R3 correction through the bounded L7 checkpoint worker, then independently review the fixing delta from watermark 19c7c047fb7437207eebda6cde02540962e46f4b. Both host declarations are source-verified; no consumer installation is claimed.
 2. Reuse captured successful local evidence: 18 recovery, 15 harness and 38 repo-config tests, plus generation/catalog/declaration/packaging/adapter/docs checks. Preserve the Claude script trust boundary and Codex initial command prefix; neither is semantic parsing enforcement. Parent-owned validators remain unchanged.
 3. Push to existing PR 207, refresh delivery/continuation binding and own exact-head Windows/Linux CI through one monitor. Resolve actionable findings; normal merge requires review and checks green.
 4. Verify causal generated publication and report actual PR/head/merge/publication evidence to the parent. Retain its settings goal; no installation or destructive cleanup.
@@ -115,11 +115,11 @@ Done when: independent review and Windows/Linux CI pass, the PR is merged and it
 
 ## Reviews
 
-Full review at 59de0bd924559dcb48836754a1ed732254ed1202 found one deduplicated MEDIUM prompt-example defect. Native reviewer and fresh isolated workflow lens corroborated it; canonical work order is reviews/Fix-FollowupRecoveryOwnership.md. Specialist model unavailable for this account; declared fallback ran successfully. Serial L4 remediation corrected both canonical skills with an explicit blocker-specific recovery prompt; ordinary opening retains its default prompt. Required acknowledgment/release and child-writer reconciliation now appear in the invocation.
+Full review at 03bce69de827671f51dda0bf5eade52d4be3abfc found one deduplicated MEDIUM prompt-example defect. Native reviewer and fresh isolated workflow lens corroborated it; canonical work order is reviews/Fix-FollowupRecoveryOwnership.md. Specialist model unavailable for this account; declared fallback ran successfully. Serial L4 remediation corrected both canonical skills with an explicit blocker-specific recovery prompt; ordinary opening retains its default prompt. Required acknowledgment/release and child-writer reconciliation now appear in the invocation.
 
 R1 validation passed: generation/catalog checks, skill packaging, self-contained payload/adapter checks and documentation reachability (including AGENTS/CLAUDE pairs). Logs use the corresponding -r1 labels in workflow run followup-recovery. Runtime tests are reused because R1 changed only guidance.
 
-Publication evidence: git push/fetch and PR creation/head verification exited 0; local, remote and draft PR heads all equal 36d7374d81cf4620a11c41b7bb31e15b046b8711. Existing continuation owner was explicitly rebound to PR 207 and immediately reclaimed by the same foreground PID. Current token lives only in runtime state.
+Publication evidence: git push/fetch and PR creation/head verification exited 0; local, remote and draft PR heads all equal 19c7c047fb7437207eebda6cde02540962e46f4b. Existing continuation owner was explicitly rebound to PR 207 and immediately reclaimed by the same foreground PID. Current token lives only in runtime state.
 
 Current repair: incremental native review found R2 (dynamic shell prompt quoting); use existing private UTF-8 prompt-file input. Linux CI found R3 (Claude allow rule shape rejected by unchanged consumer validator); fix canonical manifest and meaningful consumer-validation coverage only. Fresh CI diagnosis owns evidence; one serialized L4 writer owns repairs. Do not edit parent-owned settings readers, delivery policy or hook consumers.
 

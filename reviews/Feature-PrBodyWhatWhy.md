@@ -10,8 +10,8 @@
 
 ## Review pass — 2026-09-25 — full (docs)
 
-**Candidate base:** `ce038fb871f736a02e381e0adb0caa66c2ed2a1e`
-**Candidate head:** `ef54d987df47c8a8e89c1f2232ef938860679cb9`
+**Candidate base:** `825b490f260fc7ed0e3e46625f8725f55c78229a`
+**Candidate head:** `25ba79d979715a1b2df510b67123b6ddf3d60ca5`
 **Candidate branch:** `Feature/PrBodyWhatWhy`
 **Candidate scope:** `all` `(4 paths, meta-only)`
 **Work-order path:** `reviews/Feature-PrBodyWhatWhy.md`
@@ -34,7 +34,7 @@ None.
 ## Review pass — 2026-09-25 — incremental
 
 **Candidate base:** `fc7b78e`
-**Candidate head:** `b42de615c8cc0d1cb68f70e3a16be2242a779143`
+**Candidate head:** `ea1f38246743f9cc2e9a54c18316fc901ad3bdd9`
 **Pass judgment:** `approved`
 
 Merge of `origin/main` (#38). The only conflicts were the two catalog digest files, resolved by

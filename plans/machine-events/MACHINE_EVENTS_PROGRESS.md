@@ -25,7 +25,7 @@ Done when: the full requested event channel is shipped and setup owns its lifecy
 
 The configured review-lens model is unsupported in this account. The review workflow explicitly routes role/model unavailability to the parent over the same immutable candidate; use that fallback for the native-general and security checks. Parent inspection found and fixed Linux setup failing when crontab is absent, and pins administrative gh requests to github.com. Final frozen-candidate review is pending. The legacy workflow helper's skill lookup is incompatible with the canonical layout; use the workflow's native-tool fallback.
 
-Final source review used the permitted parent fallback and recorded exact-head private receipts. Publisher #16 merged at 683b05f955e2df735cebe67e8ed252326876d630. A final fixture now verifies identity before every worker action; startup does not require GitHub connectivity. Current PR checks must validate that final core head. Unrelated review-cache housekeeping was deferred while all current-candidate validations were retained.
+Final source review used the permitted parent fallback and recorded exact-head private receipts. Publisher #16 merged at 44faa06316621132ab1248ed754aa663be5677e3. A final fixture now verifies identity before every worker action; startup does not require GitHub connectivity. Current PR checks must validate that final core head. Unrelated review-cache housekeeping was deferred while all current-candidate validations were retained.
 
 Cutover regression fixtures pass: old caches without the listener cannot overwrite the installed runtime; OS-held updater locks recover an orphan file from a stopped legacy task and never expire beneath a live process. Final listener/updater fixtures: 21 + 36.
 

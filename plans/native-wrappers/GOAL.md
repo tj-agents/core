@@ -9,7 +9,7 @@ Codex durable CLI wait -> Codex runtime -> the same shared delivery evidence.
 ```
 
 Authority: the parent approved this bounded implementation at main
-`f847d301722ceb383f43c628d3ae99af82225b5e`. No commit, publication, installation,
+`27d1e93460de16eb7024f3fb1f8733ca17be3479`. No commit, publication, installation,
 live scheduling or session operation belongs to this writer lease. Protected Core #512
 owns routing, hook and workflow-ops changes; those files remain outside this cutover.
 
@@ -47,8 +47,8 @@ Focused verification:
   failures were inherited Git configuration (`missing config value GIT_CONFIG_VALUE_1`) during local
   Git setup or verifier execution. The writer used two child-process diagnostic probes to confirm inherited Git configuration causality; no repository credential or test-isolation changes were made. The changed bytecode test passed independently.
 
-Declared external runtime exports were staged locally for generation (Agent `4fad2409dd872ff7cf69bcc7e7b6f5952ab9f128`,
-CLI `a312194a0aa32dbf2599cc2a98f7c4deffed72a1`). Their generated dependency bytes differ from prior tracked
+Declared external runtime exports were staged locally for generation (Agent `7ebf11e5b2f2fc8be06b3839730130a92a3163f0`,
+CLI `ff7bf1f9c034c3d42aa7065ca9db33c4e06f863f`). Their generated dependency bytes differ from prior tracked
 output and therefore regenerate package hook fingerprints and digests; authored hooks remain untouched.
 No commit, publication, installation, live scheduling or host-session action was performed.
 
@@ -62,7 +62,7 @@ October 27 user correction: remove Agent's redundant memory wrapper and repair t
 `engineering:skill-authoring` rule that encouraged mirroring every native command. The retained review
 and continuation skills own frozen delivery evidence and durable CLI requirements, respectively.
 Their value audit does not justify a separate wrapper for native memory controls. The earlier source
-candidate passed full Windows/Linux CI at `bf287c19d3dcfb00abd6ed9bc314421d344ad38c`; this guidance
+candidate passed full Windows/Linux CI at `f3542f303818a5154c2d0aabfe6762285d5ce14c`; this guidance
 correction requires incremental review and its own exact-head checks.
 
 ```agent-host-coverage
@@ -107,7 +107,7 @@ Keep canonical ownership, both host entries, package assertions and caller refer
 Native incremental review found one shared merge prerequisite naming the Codex transport for both
 hosts; the repair selects host continuation through Workflow and retains PR authority in Engineering.
 
-Integrated main 25309fbfa6161385d8b01637a511eb81b518a8d7. Preserve all upstream hook/routing removals,
+Integrated main 923551034fa0089e37e45c54f5eefa2560ef8c8d. Preserve all upstream hook/routing removals,
 resolve the retired skill-routes definition into the actual 56-skill count, and retain the Workflow
 continuation ownership change. Requalify the combined source candidate on exact-head CI.
 

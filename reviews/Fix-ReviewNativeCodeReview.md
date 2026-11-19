@@ -10,8 +10,8 @@
 
 ## Review pass — 2026-10-01 — full
 
-**Candidate base:** `bcfa25a4f8377d03442febac838cd8af4ef3ff68`
-**Candidate head:** `49b980bbdaf69985d52cddecc69b0798874a4fea`
+**Candidate base:** `afbcb4833e598ca388ab552ac84ce60832874261`
+**Candidate head:** `696111ca99b0d38902a6cd4defe64faf3676aa2c`
 **Candidate branch:** `Fix/ReviewNativeCodeReview`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:ceda9d2780109dd6c887222b5775414c325355a18e7ba3bf03e7b678b6266290` `(38 paths)`
@@ -81,8 +81,8 @@ reconfigures stdout to UTF-8, which is what `workflow_ops` emits anyway. Big-rev
 
 ## Review pass — 2026-10-01 — incremental
 
-**Candidate base:** `49b980bbdaf69985d52cddecc69b0798874a4fea`
-**Candidate head:** `162401871c1a4a6a1ee2a81bced9653dad1d3bf6`
+**Candidate base:** `696111ca99b0d38902a6cd4defe64faf3676aa2c`
+**Candidate head:** `87ee47b23a1ab1f55ef8380418bc8bf5e72eb1ab`
 **Candidate branch:** `Fix/ReviewNativeCodeReview`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:63c98f65e726fe023370cd19f24c0d5d148033735d4e3ee70d1c0f7bbe9b83e6` `(33 paths)`
@@ -132,8 +132,8 @@ synthesis over the same delta. No new path is security-sensitive.
 
 ## Review pass — 2026-10-01 — incremental
 
-**Candidate base:** `162401871c1a4a6a1ee2a81bced9653dad1d3bf6`
-**Candidate head:** `ca107f25271175db546ac69d06f13fe3f3473357`
+**Candidate base:** `87ee47b23a1ab1f55ef8380418bc8bf5e72eb1ab`
+**Candidate head:** `ddecae0bc69ddf58b572bae7a833c978cb98c2c6`
 **Candidate branch:** `Fix/ReviewNativeCodeReview`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:c5fd3e79db8e6f9c7dec52668920ee7e3b90ff7a89ea6f970fbb62eb11b55c1b` `(19 paths)`
@@ -177,8 +177,8 @@ packaged router always ships and returns the dict form.
 
 ## Review pass — 2026-10-01 — incremental
 
-**Candidate base:** `ca107f25271175db546ac69d06f13fe3f3473357`
-**Candidate head:** `1d8eff77e5849aba12201975ffe4d58321b743ac`
+**Candidate base:** `ddecae0bc69ddf58b572bae7a833c978cb98c2c6`
+**Candidate head:** `3669d6e954b63298f66aaf9243a19d490a0b1221`
 **Candidate branch:** `Fix/ReviewNativeCodeReview`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:c5fd3e79db8e6f9c7dec52668920ee7e3b90ff7a89ea6f970fbb62eb11b55c1b` `(19 paths)`
@@ -206,8 +206,8 @@ pattern fallback. No security-sensitive path.
 
 ## Review pass — 2026-10-01 — incremental
 
-**Candidate base:** `1d8eff77e5849aba12201975ffe4d58321b743ac`
-**Candidate head:** `6d1ef4081dd3be2ed7af13e3d77afff7fd68dbb2`
+**Candidate base:** `3669d6e954b63298f66aaf9243a19d490a0b1221`
+**Candidate head:** `7fb00f9b7467e11c62cd026b9cea057cf2638a13`
 **Candidate branch:** `Fix/ReviewNativeCodeReview`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:0c7a70aaf22bbdc30c3facc1a33b6e519b8836533721ae2235124b80814d84cf` `(8 paths)`
@@ -230,8 +230,8 @@ plus ` -- .agents/engineering/workflow/review/SKILL.md`. It returned 1 finding. 
 
 ## Review pass — 2026-10-01 — incremental
 
-**Candidate base:** `6d1ef4081dd3be2ed7af13e3d77afff7fd68dbb2`
-**Candidate head:** `93631227833d1fa8fecd85e9d401a2c5b509e513`
+**Candidate base:** `7fb00f9b7467e11c62cd026b9cea057cf2638a13`
+**Candidate head:** `f9e1b63f099854a3b325d519f04049b93ab21c78`
 **Candidate branch:** `Fix/ReviewNativeCodeReview`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:0c7a70aaf22bbdc30c3facc1a33b6e519b8836533721ae2235124b80814d84cf` `(8 paths)`
@@ -250,8 +250,8 @@ None.
 
 ## Review pass — 2026-10-01 — incremental
 
-**Candidate base:** `93631227833d1fa8fecd85e9d401a2c5b509e513`
-**Candidate head:** `37b4c71ef35821a46774983e47e2bbe85b115e55`
+**Candidate base:** `f9e1b63f099854a3b325d519f04049b93ab21c78`
+**Candidate head:** `8484e891269fbc79611be206db7585c9a8f1f376`
 **Candidate branch:** `Fix/ReviewNativeCodeReview`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:e6f10243e1df011d6c4b52a035debb4509e4491eefb94c197e48a04e35e2f432` `(2 paths)`

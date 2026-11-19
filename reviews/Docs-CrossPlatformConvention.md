@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `bf4ccc05bcf06719e8f6cfb18e9d362e6b7b40cc`  `(2026-10-09)`
+**Reviewed up to commit:** `1887f6935012c4db0acdeb5c07835257f89b70fb`  `(2026-10-09)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-09 — docs
 
-**Candidate base:** `21b482cb43b7e210ba211f262cccd7902715335c`
-**Candidate head:** `07532d92b3fcf3888d79d0c91ce40974214287f9`
+**Candidate base:** `d9f2ce0ecc2979ad9a52adb6e9d5c6fca75bd679`
+**Candidate head:** `81125655143dc07153907ec6480888dac19c8fc9`
 **Candidate branch:** `Docs/CrossPlatformConvention`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:f43271685f508678aa1eb999f2af28a8940f21937d47ffb03615f1690f48190f` `(3 paths)`
@@ -69,8 +69,8 @@ No changed path matched the merge gate's security inventory, so no security mark
 
 ## Review pass — 2026-10-09 — incremental
 
-**Candidate base:** `07532d92b3fcf3888d79d0c91ce40974214287f9`
-**Candidate head:** `03af0efce86ca9a18185621959e83a02000016f8`
+**Candidate base:** `81125655143dc07153907ec6480888dac19c8fc9`
+**Candidate head:** `a3f53caf5e8faa53b2b73bb82b43c7dee6feedc8`
 **Candidate branch:** `Docs/CrossPlatformConvention`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:d2e3bed390dff6db348dfdece9810e5cfdc5ec06a8abf56039b5b06156deb732` `(5 paths)`
@@ -116,8 +116,8 @@ lenses in the parent; `docs_reachability.py` 0 errors. No security-sensitive pat
 
 ## Review pass — 2026-10-09 — incremental
 
-**Candidate base:** `03af0efce86ca9a18185621959e83a02000016f8`
-**Candidate head:** `fb65ab8881ec9908b0874d4d2db31ee4c37d60b3`
+**Candidate base:** `a3f53caf5e8faa53b2b73bb82b43c7dee6feedc8`
+**Candidate head:** `0386c2a77efa101e41f4a52bba28d2a2b6c3bf75`
 **Candidate branch:** `Docs/CrossPlatformConvention`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:24330ff8c7dc18bd21c09546a598559a429ca0798cb781abdb87859f106abade` `(5 paths)`
@@ -154,8 +154,8 @@ Native layer: built-in `code-review` (medium); documentation lenses in the paren
 
 ## Review pass — 2026-10-09 — incremental
 
-**Candidate base:** `fb65ab8881ec9908b0874d4d2db31ee4c37d60b3`
-**Candidate head:** `bf4f3d239f6f6919d931d4a2676559869a6bdbad`
+**Candidate base:** `0386c2a77efa101e41f4a52bba28d2a2b6c3bf75`
+**Candidate head:** `81c9351a96f527a25751a99febb6de93dcd41010`
 **Candidate branch:** `Docs/CrossPlatformConvention`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:24330ff8c7dc18bd21c09546a598559a429ca0798cb781abdb87859f106abade` `(5 paths)`
@@ -176,8 +176,8 @@ parent. No security-sensitive path.
 
 ## Review pass — 2026-10-09 — incremental
 
-**Candidate base:** `65c1ae5098c5c339c97fd1709b55d43e77b64408`
-**Candidate head:** `a06db1be49d73f7a93ea1864b8b8c79fc891960c`
+**Candidate base:** `bdf8e1fc280337a972d154bce6d6b3a9a604ceb4`
+**Candidate head:** `3bdb501b42fecb4a4e2cf2d29013c0b9bc07556a`
 **Candidate branch:** `Docs/CrossPlatformConvention`
 **Candidate scope:** `docs/workflows/TECH_DEBT.md AGENTS.md` (the rest of the 10-path range is `origin/main` brought in by the synchronizing merge)
 **Candidate path-set:** `sha256:fc63b216ab5cdfe2ae65d4231558675d3c1ff7a5d3a13e3c7bdd05bccae7959b` `(10 paths)`
@@ -211,8 +211,8 @@ documentation lenses in the parent. No security-sensitive path.
 
 ## Review pass — 2026-10-09 — incremental
 
-**Candidate base:** `a06db1be49d73f7a93ea1864b8b8c79fc891960c`
-**Candidate head:** `a8291ff3faf97dd154172414616dd2b5101fd26b`
+**Candidate base:** `3bdb501b42fecb4a4e2cf2d29013c0b9bc07556a`
+**Candidate head:** `f1a8c16a512c5d981db1b1c7fe34d917c4a5efc5`
 **Candidate branch:** `Docs/CrossPlatformConvention`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:ee269d56a2ee571fac0d1f39af99327eb8a79ab8e100788ed5b9bdcc4b0457e4` `(2 paths)`
@@ -239,8 +239,8 @@ security-sensitive path.
 
 ## Review pass — 2026-10-09 — incremental
 
-**Candidate base:** `a8291ff3faf97dd154172414616dd2b5101fd26b`
-**Candidate head:** `bf4ccc05bcf06719e8f6cfb18e9d362e6b7b40cc`
+**Candidate base:** `f1a8c16a512c5d981db1b1c7fe34d917c4a5efc5`
+**Candidate head:** `1887f6935012c4db0acdeb5c07835257f89b70fb`
 **Candidate branch:** `Docs/CrossPlatformConvention`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:ee269d56a2ee571fac0d1f39af99327eb8a79ab8e100788ed5b9bdcc4b0457e4` `(2 paths)`

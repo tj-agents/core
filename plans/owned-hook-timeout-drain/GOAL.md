@@ -8,7 +8,7 @@ Implementation and delivery of this bounded Core source defect are authorized th
 
 ## Source boundary and dependency
 
-This is a sequential follow-up from freshly published Core main after the primary delivery-binding budget repair. Base: `38550a7258b6819df139300ae340088babc6098f`. Branch: `Fix/OwnedHookTimeoutDrain`.
+This is a sequential follow-up from freshly published Core main after the primary delivery-binding budget repair. Base: `c9e18c89c49d245f0085ebf0f7be5a904f04fbc3`. Branch: `Fix/OwnedHookTimeoutDrain`.
 
 Own only:
 
@@ -95,7 +95,7 @@ A merge, open PR, or started CI alone does not complete this slice. Record obser
 
 ## Publication preparation correction
 
-Parent caught the committed generated-output guard failure at a275c89ac50b9adf2363f5da9bbb0d3ea710f5b4 before opening the PR: the two catalog package digests were generated output, contrary to Core’s existing AGENTS.md and guard. Restored only those values from actual merge-base `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c`; all runtime/test bytes are unchanged and prior Windows results remain their own evidence. This is a preparation mistake resolved in this same causal Source slice, not a standard exemption. Preserve the generated output stashes, including `25a5412f441c568145c91ff6d58ea364e1995f58`. Commit this bounded catalog/Goal correction, run the committed guard, and incrementally review the new head before Source delivery. Both exact-head platform CI and causal publication remain required.
+Parent caught the committed generated-output guard failure at 81a0ff0165ba23c98c3a9cdd661994f797f587c0 before opening the PR: the two catalog package digests were generated output, contrary to Core’s existing AGENTS.md and guard. Restored only those values from actual merge-base `7ce37574dcfd854be201f7be9c762b9ab20a823f`; all runtime/test bytes are unchanged and prior Windows results remain their own evidence. This is a preparation mistake resolved in this same causal Source slice, not a standard exemption. Preserve the generated output stashes, including `25a5412f441c568145c91ff6d58ea364e1995f58`. Commit this bounded catalog/Goal correction, run the committed guard, and incrementally review the new head before Source delivery. Both exact-head platform CI and causal publication remain required.
 
 ## Shared startup-edge coverage correction
 

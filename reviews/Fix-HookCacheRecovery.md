@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `d3eb7c7a8af1be1cc075921b4f4c5933e96bdce2`  `(2026-10-12)`
+**Reviewed up to commit:** `572ff11e1ee0716d81a56bf9fcaded5b718e39cf`  `(2026-10-12)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-12 — full
 
 **Candidate base:** `8425d10`
-**Candidate head:** `9b866ebf47880c56ce9dbc9ce6d066cf66b71cdc`
+**Candidate head:** `6e1afa6e1d159500f5cd68aab462355afe26b63a`
 **Candidate branch:** `Fix/HookCacheRecovery`
 **Work-order path:** `reviews/Fix-HookCacheRecovery.md`
 **Pass judgment:** `approved`
@@ -30,8 +30,8 @@ No retained findings.
 
 ## Review pass — 2026-10-12 — full
 
-**Candidate base:** `8425d10ce48c77a79eff7a140e8b02561d3186f2`
-**Candidate head:** `d3eb7c7a8af1be1cc075921b4f4c5933e96bdce2`
+**Candidate base:** `b11ee0959bd1ef3e8ef3cc0f18828129bacd9cdf`
+**Candidate head:** `572ff11e1ee0716d81a56bf9fcaded5b718e39cf`
 **Candidate branch:** `Fix/HookCacheRecovery`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:2964f3b07771cb2f2e682a5be98e9f749fd626638200c5d7e13ef541e1e22efe` `(5 paths)`
@@ -48,7 +48,7 @@ direct-control claim against their frozen implementations. The focused suite pas
 conventions and routed-skill checks were empty; no security-sensitive path applies.
 
 ```agent-host-coverage
-{"schema_version":1,"candidate_head":"d3eb7c7a8af1be1cc075921b4f4c5933e96bdce2","shared_source":".agents/hooks/continuation_stop.py","hosts":[{"host":"claude","behavior":"Stop accepts a delivery binding whose remote_head_sha matches HEAD and rejects a divergent head.","source":".agents/hooks/continuation_stop.py","mapping":"Shared hook shipped through the Claude engineering Stop manifest.","verification":{"level":"source","result":"passed","evidence":"The frozen shared-source suite passed 30 tests, including the real-normalization regression."}},{"host":"codex","behavior":"Stop accepts a delivery binding whose remote_head_sha matches HEAD and rejects a divergent head.","source":".agents/hooks/continuation_stop.py","mapping":"Shared hook shipped through the Codex engineering Stop manifest.","verification":{"level":"source","result":"passed","evidence":"The frozen shared-source suite passed 30 tests, including the real-normalization regression."}}]}
+{"schema_version":1,"candidate_head":"572ff11e1ee0716d81a56bf9fcaded5b718e39cf","shared_source":".agents/hooks/continuation_stop.py","hosts":[{"host":"claude","behavior":"Stop accepts a delivery binding whose remote_head_sha matches HEAD and rejects a divergent head.","source":".agents/hooks/continuation_stop.py","mapping":"Shared hook shipped through the Claude engineering Stop manifest.","verification":{"level":"source","result":"passed","evidence":"The frozen shared-source suite passed 30 tests, including the real-normalization regression."}},{"host":"codex","behavior":"Stop accepts a delivery binding whose remote_head_sha matches HEAD and rejects a divergent head.","source":".agents/hooks/continuation_stop.py","mapping":"Shared hook shipped through the Codex engineering Stop manifest.","verification":{"level":"source","result":"passed","evidence":"The frozen shared-source suite passed 30 tests, including the real-normalization regression."}}]}
 ```
 
 ### Findings

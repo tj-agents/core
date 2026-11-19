@@ -2,7 +2,7 @@
 
 Status: active; native execution pickup acknowledged on 2026-10-11.
 Branch: Feature/ProblemSkills
-Base: origin/main at 429ad56751720e2cb369c3aa2e25a3b53b801234
+Base: origin/main at 9b45775b3d7f98f8652cb9a8bd0868f41f84b406
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-ProblemSkills
 PR: https://github.com/tj-agents/core/pull/206
 Originating session: 01a12b10-3519-7f41-8e4f-7afa6828fef0
@@ -84,7 +84,7 @@ originating session's docs checkout or adopt its other workstreams.
 
 ## Next Steps
 
-The foundation and historical-entry correction are approved at 98283b7614114b4e73b02763ecc7c15dfcd1c478.
+The foundation and historical-entry correction are approved at dfb263fcbcb72859012b6db4a12dd37e1efc66d4.
 Push this reviewed head, open the foundation PR and own its exact
 required CI through merge. Observe the causal generated publication on main and record completion here
 so the coordinator can advance the dependent handoff policy. Installed consumer acceptance remains
@@ -107,7 +107,7 @@ separate from the source-contract exercise; this work does not install an orches
 ## Current slice and design
 
 - One coherent foundation PR on the prepared Feature/ProblemSkills branch, base origin/main
-  429ad56751720e2cb369c3aa2e25a3b53b801234; preparation head 62ba9760712429a5e6eeff73371cc3dabd17fab3.
+  9b45775b3d7f98f8652cb9a8bd0868f41f84b406; preparation head a2dc9c65e178970416a6526c87aae2d806a6f5bf.
   Expected size: roughly 450 authored lines across shared guidance, four skills, eight host adapters,
   companion metadata and focused package checks. This is itself guidance delivery, not a guidance
   drive-by mixed into product implementation. No runtime hook, scheduler or dispatch change is included.
@@ -188,8 +188,8 @@ separate from the source-contract exercise; this work does not install an orches
 
 ## Review and remediation
 
-- First candidate: dcbe1a335fbdc7b4cb661a0235858207e9f634c8 against
-  429ad56751720e2cb369c3aa2e25a3b53b801234. One pre-review synchronization observed zero behind.
+- First candidate: 542b15a7b12127bb9de3588c1536499c731c56ef against
+  9b45775b3d7f98f8652cb9a8bd0868f41f84b406. One pre-review synchronization observed zero behind.
 - Native Codex review completed without actionable regressions and independently passed all 21
   source-layout tests, catalog and harness checks. Captured native-review log is in this workflow's
   Git-private artifacts. Applicable tier gate returned no stack conventions; agent file pairing passed.
@@ -207,7 +207,7 @@ separate from the source-contract exercise; this work does not install an orches
   three manifests. The L4 writer released its lease; git diff --check passed. The fixed candidate is ready
   for a fresh incremental watermark before publication.
 
-- Final review complete and approved at 98283b7614114b4e73b02763ecc7c15dfcd1c478. R001 is resolved;
+- Final review complete and approved at dfb263fcbcb72859012b6db4a12dd37e1efc66d4. R001 is resolved;
   the initial pass judgment remains immutable. Both native incremental review and a fresh workflow lens
   found no actionable defects. Final-head host coverage passed; normalized v2 result validation passed.
 - Publication preflight: the richer ledger parser does not accept this canonical legacy GOAL format, so
@@ -218,7 +218,7 @@ separate from the source-contract exercise; this work does not install an orches
 
 ## Delivery recovery
 
-- PR #206 opened as a draft at 98283b7614114b4e73b02763ecc7c15dfcd1c478; exact-head monitor
+- PR #206 opened as a draft at dfb263fcbcb72859012b6db4a12dd37e1efc66d4; exact-head monitor
   reported guard failure in run 38167988381. Windows/Linux checks were still running at that observation.
 - Cause confirmed: authored catalog skill additions were committed together with the generated engineering
   digest. scripts/check_generated_paths.py rejects digest changes because the post-merge job owns them.

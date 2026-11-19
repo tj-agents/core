@@ -4,13 +4,13 @@
 > findings directly and report what changed. Tick each `[x]` as you land it.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `56471f1f0dbcef25eaa10101a956d871f07280b9`  `(2026-10-11)`
+**Reviewed up to commit:** `55b3fcc9ee46393c1b0d93be995af83f6a17462c`  `(2026-10-11)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-11 — code
 
-**Candidate base:** `7a8aa0eab121c80b208378cab282d89349b43cf6`
-**Candidate head:** `56471f1f0dbcef25eaa10101a956d871f07280b9`
+**Candidate base:** `a37aeaddd71223a6eee3967e692109b089ed2445`
+**Candidate head:** `55b3fcc9ee46393c1b0d93be995af83f6a17462c`
 **Candidate branch:** `Fix/CloseTabLinuxFixture`
 **Candidate scope:** `all`
 **Work-order path:** `reviews/Fix-CloseTabLinuxFixture.md`

@@ -5,14 +5,14 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `3ea80014cb5efd60c547eed377b55d8c342711ba`  `(2026-10-04)`
-**Security-reviewed up to commit:** `3ea80014cb5efd60c547eed377b55d8c342711ba`  `(2026-10-04)`
+**Reviewed up to commit:** `b9fddb07c4c4594695633097a4d3b5ee03c36bd8`  `(2026-10-04)`
+**Security-reviewed up to commit:** `b9fddb07c4c4594695633097a4d3b5ee03c36bd8`  `(2026-10-04)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-04 — full
 
-**Candidate base:** `c21cdaf617672e3c8377a60899d0bea24d6b7b91`
-**Candidate head:** `d3e4e8eaa70c7fadcd3ef6c895e1c8240c383f48`
+**Candidate base:** `3eb4050b66d5666e4f1572b63bef125817b3a785`
+**Candidate head:** `dfc004468e2d517d8e5e6e86d48419d359bf4c19`
 **Candidate branch:** `Feature/PostMergeRegenJob`
 **Candidate scope:** `all`
 **Candidate path-set:** `(7 paths)` — descriptor `27f2c3852de93470b03fb933faa6b5f67886a40dda5d1aba761adab912e4da04`
@@ -52,8 +52,8 @@ directions (clean branch exit 0; a range containing `plugins/**` exit 1 with the
 
 ## Review pass — 2026-10-04 — incremental
 
-**Candidate base:** `d3e4e8eaa70c7fadcd3ef6c895e1c8240c383f48`
-**Candidate head:** `3ea80014cb5efd60c547eed377b55d8c342711ba`
+**Candidate base:** `dfc004468e2d517d8e5e6e86d48419d359bf4c19`
+**Candidate head:** `b9fddb07c4c4594695633097a4d3b5ee03c36bd8`
 **Candidate branch:** `Feature/PostMergeRegenJob`
 **Candidate scope:** `.github/workflows/ci.yml, scripts/check_generated_paths.py`
 **Work-order path:** `reviews/Feature-PostMergeRegenJob.md`

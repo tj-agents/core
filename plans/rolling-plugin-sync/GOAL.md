@@ -1,8 +1,8 @@
 # Rolling Plugin Sync
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-AlwaysLatestPlugins
-Branch: Fix/RollingDependencyActivation (follow-up); original reviewed head 17ca22dfeb69d38447172c11b8de4c8b298c2971.
-PR: https://github.com/tj-agents/core/pull/286 (idle-startup correction; prior final head passed review and GitHub CI; reported Claude startup wiring regression being corrected). Previous handoff import/cleanup PR284 merged 17 October 2026 at 14:05:16 UTC as c978ef030e4dbed4c4b49b0be055c85212a3760e and published as 2bc7f61b2ebcd6b3b45615597093d3b3a9d8fa42. Activation #283 and original rolling #269 are already merged. The idle-startup correction continues in this same worktree.
+Branch: Fix/RollingDependencyActivation (follow-up); original reviewed head 54528d5b2bf61bb80b9a9f9fad6dcae4ce076bb7.
+PR: https://github.com/tj-agents/core/pull/286 (idle-startup correction; prior final head passed review and GitHub CI; reported Claude startup wiring regression being corrected). Previous handoff import/cleanup PR284 merged 17 October 2026 at 14:05:16 UTC as 73c11234a1e0579d914a99abfee15be27a61fea4 and published as edf78e8eb7018ec16ad16e25a43bdcd7c2626f6f. Activation #283 and original rolling #269 are already merged. The idle-startup correction continues in this same worktree.
 Owner: Codex session `01a13fa0-a1c6-7051-b3ce-a63fb26916da`;
 work item `always-latest-plugins/implementation` (stable in-flight identifier).
 
@@ -245,15 +245,15 @@ Merged current main while retaining OpenCli focus/reopen behavior and the publis
 
 ## Current merge ownership — 16 October 2026
 
-Tommy explicitly authorized this session to complete and merge PR #269: “AS LONG AS U FULLY COMPLETED IT THEN YEAH FUCKING MERGE”. This supersedes earlier instructions reserving merge. Preserve the other-machine integrations now present at a8d395376120b4232658b1d6f6f7759c4c32dec0 and reconcile the latest main before final review. Do not hand off or divert into personal problem-management policy.
+Tommy explicitly authorized this session to complete and merge PR #269: “AS LONG AS U FULLY COMPLETED IT THEN YEAH FUCKING MERGE”. This supersedes earlier instructions reserving merge. Preserve the other-machine integrations now present at 364a477486f66a9a4495939ef863c627ee9ffcab and reconcile the latest main before final review. Do not hand off or divert into personal problem-management policy.
 
-The canonical review ledger has been restored from the local saved evidence: completed review and security watermark 81dce32ea5f69deb1947ed6136824f33b45132da. Native incremental review artifact 9ea90e4de2020635-rolling-native-final-test-review.log was clean. Exact-head CI run 38824122187 passed both Windows and Linux source/runtime suites. Newer integration commits require fresh review and CI; previous passing evidence is retained rather than discarded.
+The canonical review ledger has been restored from the local saved evidence: completed review and security watermark ddf841610095f10595fc04d5d3ac893d0d5d1787. Native incremental review artifact 9ea90e4de2020635-rolling-native-final-test-review.log was clean. Exact-head CI run 38824122187 passed both Windows and Linux source/runtime suites. Newer integration commits require fresh review and CI; previous passing evidence is retained rather than discarded.
 
 Next: resolve current main, review 81dce32e through the final integration head, verify exact-head platform checks, merge PR #269, and follow main package regeneration to completion. Existing running CLI instructions are not claimed to hot-reload.
 
 ## Merged and published ? 16 October 2026
 
-PR #269 merged at 2ed865e13f071a573d505dacd59c1a482eb5f2bb after completed native/security/workflow review and exact-head Windows/Linux CI 38939776660, including ci-required. Main publication run 38942340043 successfully regenerated, verified and committed packages at a341c197. The generated commit explicitly names this merge as its producer.
+PR #269 merged at ad305cbdef821479174cc30b2009dafbac8ff646 after completed native/security/workflow review and exact-head Windows/Linux CI 38939776660, including ci-required. Main publication run 38942340043 successfully regenerated, verified and committed packages at a341c197. The generated commit explicitly names this merge as its producer.
 
 Local Codex activation is running through the reviewed rolling synchronizer. This active CLI and worktree are retained under Tommy's instruction to continue here without another handoff. The primary checkout contains other work and refused a safe fast-forward; no other owner's files were changed. Origin/main is current. The post-merge validation monitor remains attached while activation completes.
 
@@ -279,7 +279,7 @@ versioning/pins across publisher repositories and consumers. The original main d
 the whole migration is not complete until the follow-ups and real startup verification finish.
 
 
-Follow-up candidate 2ba5da38bc5f577749221934e9606085adac1e0b is published in draft PR #283;
+Follow-up candidate e8cdc90764682ecd06eb8137b60c9b30f53d4b37 is published in draft PR #283;
 CI monitor 38948507536 is attached. The two-file delta has passed 25 rolling tests (one platform skip),
 startup integration, Claude synchronizer tests, package generation/check and harness generation checks.
 The canonical review is repository-private, resolved by workflow_ops review-path. Native Codex review
@@ -291,7 +291,7 @@ but exceeded its deadline, requiring per-stage evidence before further changes.
 
 ## Verified cache optimization - 16 October 2026
 
-Current follow-up head is 31e5e359a92d721d4cb7cbc68490440bebb659ab, with the final cache optimization
+Current follow-up head is c0c5f438de8894ea1060bec25b23a3b195647a25, with the final cache optimization
 under validation in this worktree. Its independent native and parent workflow/security review is
 complete and recorded in the branch-private work order. CI 38949923827 passed Linux; Windows failed
 only when the unchanged session-cleanup test could not read its transient result JSON. Earlier head
@@ -312,7 +312,7 @@ and verify installed startup. Then migrate Template first, followed by publisher
 Keep this live session/worktree; do not create a refresh skill or transfer ownership.
 
 
-Final follow-up head 6ede0b9c7626ba4e457f6d2660c56421ac3eff62 is pushed to PR #283. Native review
+Final follow-up head 9ff2c21862b185fc9283f990176b2381a9b97d7a is pushed to PR #283. Native review
 f71176c712290ba4-rolling-native-verified-reuse-review.log and parent workflow/security review are clean;
 the branch-private work order and review receipt cover this exact head. Generation/check and all three
 harness manifests passed. Final Codex activation passed in 197.713 seconds, artifact
@@ -324,24 +324,24 @@ covers the same runtime bytes. CI 38956716955 is monitored at the exact final he
 
 ## Activation follow-up merged - 16 October 2026
 
-PR #283 merged as de168a43e844c29a1ed0b6bf15c7e16cfc0bf9e1 at 20:04:31 UTC. Exact-head CI
+PR #283 merged as d8015108cf80a2f3a0409aafc268defa37c5a774 at 20:04:31 UTC. Exact-head CI
 38956716955 passed Linux, Windows and ci-required. The final native/parent review receipt, clean delivery
-preflight and fresh What/Why body check covered 6ede0b9c7626ba4e457f6d2660c56421ac3eff62. The causal
+preflight and fresh What/Why body check covered 9ff2c21862b185fc9283f990176b2381a9b97d7a. The causal
 main publication run is 38959576845, currently monitored. Keep this session/worktree under Tommy's explicit
 continue-here instruction; do not run session-close or worktree deletion.
 
 Next publisher slice: Template Refactor/VersionlessPlugins, isolated worktree
 C:/Users/TommySeery/source/repos/tj-agents/template/.worktrees/Refactor-VersionlessPlugins, based on current
-main 4308bafa905c33d007665cabe7c3b585df131a81. A single bounded writer implements versionless host manifests,
+main 2e5f575bc247d59993da6c7653f0cfac79e12492. A single bounded writer implements versionless host manifests,
 versionless Template config, current-main CI callers, exact-content drift checks, and one-time updater
 removal of old version fields; existing layout, schema versions, host CLI pins and validation remain.
 Other owner's Template PR #10 is not a technical prerequisite and remains untouched. CPP main is verified
-4a4c2cde9808f9e30d42f5bff3b95e57dbd2d0d1; its open PR #34 overlaps manifests and package-version ledger,
+b9b50977876cdd7a056fb4c63208be2ddf107982; its open PR #34 overlaps manifests and package-version ledger,
 so its separate migration must preserve that owner's work through an isolated current-main branch.
 
 ## Published activation verified - 16 October 2026
 
-Core PR #283 publication is 9b65ebf5bf55125caa6840483e9bede48cc9550c; the causal main run
+Core PR #283 publication is a4b92b693ca42c17616504de5b26c11d35df3033; the causal main run
 38959576845 is successful on both platforms. The interrupted monitor was reconnected under its existing
 identity and reconciled to that terminal result. Installed Codex activation passed in 171.182 seconds
 using the published runtime. Both PowerShell profiles now contain the current Claude and Codex launcher
@@ -370,7 +370,7 @@ so use isolated current main and reconcile any subsequent merge. Marketplace use
 remove release/revision/commit entries and emit main for every git-subdir source, retaining identity,
 dependency and selection rules. Unlike Core/Template it commits generated catalogs and has no publisher job.
 
-Concertable/agents main ffbc41f53013dde62340824580b5a169ddce7b3d has an authored Codex manifest directly
+Concertable/agents main e4a370641329353e635ecaec2a90971597067603 has an authored Codex manifest directly
 under plugins/concertable, with custom PowerShell enforcement and no Template/ledger/pins. Its narrow
 slice removes that version, changes generator host validation, and updates hook-manifest tests. Integrity
 hashes and schema versions remain. Its separate currency hook can accept a six-hour cache after a fetch
@@ -383,7 +383,7 @@ focused follow-up after Template publication; do not fold new code into the alre
 
 ## Template candidate and independent catalog slice - 17 October 2026
 
-Template PR #18 is open as draft at a0cb5be4dd3469a71c6fc202eafda8c74fa99966. Its 20 authored files
+Template PR #18 is open as draft at 0284ac734bc2cf4d32568bcdf994227da1c46b7f. Its 20 authored files
 contain 104 insertions and 105 deletions; generated output is excluded for the existing publication job.
 Exact-head CI 38966024095 passed Windows, Linux and native Claude/Codex acceptance. All eight real-consumer
 snapshots passed migration, Template conformance and updater idempotence (artifact
@@ -393,7 +393,7 @@ Descriptor lives in Template Git-private always-latest-template/review/34c89ab91
 
 While that immutable review is pending, execute the independently authorized umbrella catalog slice in
 marketplace/.worktrees/Refactor-VersionlessCatalog, branch Refactor/VersionlessCatalog, fresh base
-07c8b399e4c2e70a30340c7b0b11a8a7b1074e80. It has no Template dependency; its only serialized writer owns
+785d7f80d46497f00fe75ae46e7a1dce43c09bb3. It has no Template dependency; its only serialized writer owns
 catalog.json, generate.py, test_generate.py, README.md and the two generated catalogs. This bounded overlap
 uses the review wait and preserves other owners' checkouts. Template remains eligible for immediate merge
 when its required native review finishes; do not delay a ready parent for this independent slice.
@@ -405,7 +405,7 @@ update that operational wording while preserving dated historical evidence. Exis
 Template/plugin-version assertions. Application release/version tests remain unchanged.
 
 Template PR #18 merged on 17 October 2026 at 11:12:31 UTC as
-906e8747a5023bf4e350b3a9cb9e8db49e1a326a. Exact-head review receipt covers a0cb5be; native review's sole
+98ca0a2a5fee45e95b931b0eb8725d6a6fa8cac3. Exact-head review receipt covers a0cb5be; native review's sole
 proposed generated-output finding was dismissed against the existing generate-before-verify and post-merge
 publisher contract, corroborated by all three successful CI jobs. Body check and delivery preflight passed.
 The goal-authorized ordinary merge completed without auto-merge or admin; the standing automatic binder
@@ -416,19 +416,19 @@ goal; existing application/tool/SDK version pins remain outside scope.
 
 ## Versionless publisher rollout - 17 October 2026
 
-Template #18 is fully published at df25a913b1493d985f55f1821117f87ae6baa9a3; main run
+Template #18 is fully published at 8bc65b090e13c43b612617b682c18712f1825c76; main run
 39027813831 passed, the primary main checkout was safely fast-forwarded, and this goal's Template
 migration/review worktrees were removed. The published primary is the updater source for consumers.
 
-Marketplace #14 merged as 9939a2ffa965bc7525ab78e421cdb37b5f3c9aee at 11:32:59 UTC.
+Marketplace #14 merged as 28b86998a64d99e2af5f03cc5cb6461b589dccac at 11:32:59 UTC.
 Exact-head native/workflow review was clean; PR CI39028546633 and causal main CI39029126117 passed.
 All 15 publisher identities/dependencies are preserved and every catalog source now follows main.
 Its generated catalogs are committed by repository contract. Only this goal's completed worktrees were
 removed; the other owner's Feature/WorkPlugin primary remains untouched.
 
-Neovim #7 merged as e3e9aac1de261853096732c46fafc324325a38c3 at 11:37:37 UTC after clean
+Neovim #7 merged as 8e5194ddcc06e34bdea7015e3d8fba339666a3eb at 11:37:37 UTC after clean
 native/workflow/security review at e9b6ab0 and green PR CI39029153315. Main CI39029420259 passed.
-React #19 merged as e4b82e6dc06669fdaed98859be4efdcbc92aaa71 at 11:39:12 UTC after clean
+React #19 merged as 0b27149c9b23672c4fb92f8aef3c55997b527765 at 11:39:12 UTC after clean
 reviews at 509fcce and green PR CI39029204902. Main CI39029520384 passed. Both consumers retain
 schema and application/tool versions while removing plugin/Template pins. Their cleanup remains.
 
@@ -449,17 +449,17 @@ explicitly authorized merges remain required for each slice; no separate persona
 
 Core's rolling startup and real-host activation are verified. The umbrella publisher migration remains
 owned by this session and is unfinished. Neovim and React cleanup is complete. Rust #6 merged as
-1937227612c1445ebe8b5c4d6a6971d250dbfa63; main CI39029930076 passed. Azure #16 merged as
-f70d45f64d6f5b9d317dca7ded9df1b2ba9ddbf2 and Work #8 as
-461ff0409317d8b0cd41a3b4176b8b1ec35e3f78. Their main-run reconciliation and cleanup remain.
+4fc96b387a9de0cee435d0d4e44d510414e6e084; main CI39029930076 passed. Azure #16 merged as
+5649567d79c166e91d8691770128c5774b943d2b and Work #8 as
+b1dd1b5319085e2a9685d262a44b247d9790cc4f. Their main-run reconciliation and cleanup remain.
 
-Dotnet #56 at 2811ead25c38141d65fe197de18965957dec84d3 has successful ci39030434791 and
-Scaffold39030434591. Work-items #13 at f6bf439ceac975b6b6a6cd7981a0bea335bc9586 has
+Dotnet #56 at 65cbeb9ae9e363ae776254fa02637cd25cf2037b has successful ci39030434791 and
+Scaffold39030434591. Work-items #13 at 3643283c57274f9612a08262a7c91e540500c519 has
 successful ci39030455894. Both exact-head results were recovered through the GitHub connector; native
 reviews, receipt completion, delivery preflight and ordinary merges remain. The attempted native-review
 launches failed before execution with Windows process-creation error26; no successful launch is claimed.
 
-GitHub Actions #12 at dd676c00ed938b41c3d84eacd50999555fb81917 has clean native review and
+GitHub Actions #12 at 56e7241735a5cba44349ebca830d5ef630b8d306 has clean native review and
 ordinary CI, but Workflow Writer39029611984 failed on GitHub API anonymous rate limiting. Its bounded
 repair is written and generated: API-only unredirected token headers, lint-step github.token wiring,
 and focused no-network tests. Generator freshness passed. The writer lease is released; inspect the
@@ -488,7 +488,7 @@ the missing native SessionStart acknowledgement and actual Stop invocation, veri
 
 The first submitted repair did not start. Tommy confirmed the absent tab; direct execution of its exact
 isolated Python wrapper reproduced a fatal sibling-import error before native launch. That failure is
-now corrected in Fix-VerifyStopEnforcement at 9d9211f1e93eb3ecc0aaa2c8cb4f4e84528e7744. The source and
+now corrected in Fix-VerifyStopEnforcement at 4940297a5d75ffb7c05702e8be1c6955ba2640f5. The source and
 packaged isolated-import regression passes, as do startup binding (9), shared launcher (84, 17 skips)
 and Codex launcher (39, 1 skip) suites. This transport correction stays with B014's repair; it does not
 by itself prove the original Stop failure corrected.
@@ -497,7 +497,7 @@ One corrected native submission used the fixed wrapper; artifact:
 core/.git/agent-workflow/runs/self-repair-stop-enforcement/artifacts/bef8929d78e12f08-native-successor-corrected-wrapper-launch.log.
 The corrected wrapper started native session 01a149ff-3f79-7de1-969e-de66c35dfed6 at 13:13:50 UTC. It recorded no assistant/tool actions or SessionStart acknowledgement. The wrapper reported a startup failure and timed out terminating PID 34824. Parent verified its exact process creation identity and terminated that child through the same Windows handle; cleanup artifact 31a115c618ec7466-cleanup-failed-native-by-verified-handle.log reports wait_result 0 and identity_after null. This was failed startup, not a completed repair.
 
-Tommy explicitly requested retaining the handoff correction in this worktree. The import fix is included here as a273592e826c7e52c08f639238b755358ce03460. Windows cleanup now falls back to the original child handle on taskkill failure and keeps its final wait bounded; the startup error survives cleanup failures. Startup binding (10 tests), rolling plugins (30 tests, one platform skip), shared launcher (84 tests, 17 skips), and Codex launcher (39 tests, one skip) pass. Actual native SessionStart/Stop acceptance remains open. The parent continues the causal investigation here; no repair child is live.
+Tommy explicitly requested retaining the handoff correction in this worktree. The import fix is included here as 2aad17f1b7cac3dca2c0c298af001715bc956ecd. Windows cleanup now falls back to the original child handle on taskkill failure and keeps its final wait bounded; the startup error survives cleanup failures. Startup binding (10 tests), rolling plugins (30 tests, one platform skip), shared launcher (84 tests, 17 skips), and Codex launcher (39 tests, one skip) pass. Actual native SessionStart/Stop acceptance remains open. The parent continues the causal investigation here; no repair child is live.
 
 The originating session retained its
 canonical continuation owner 447958748ecb7065aa11fcef and verified foreground native PID 28728. No
@@ -507,11 +507,11 @@ next actions above; do not treat a submitted launch or this source checkpoint as
 ## Current handoff repair and native evidence - 17 October 2026
 
 Parent owns this repair in Fix-AlwaysLatestPlugins on Fix/RollingDependencyActivation. PR284 merged
-at c978ef030e4dbed4c4b49b0be055c85212a3760e on 17 October at14:05:16UTC, after exact-head native and
+at 73c11234a1e0579d914a99abfee15be27a61fea4 on 17 October at14:05:16UTC, after exact-head native and
 independent workflow reviews found no defects, current two-host coverage and delivery/body checks passed,
 and CI39037681354 passed Windows/Linux generation and verification. Main publication39039256296
 completed successfully, including both platforms and required checks, and published generated commit
-2bc7f61b2ebcd6b3b45615597093d3b3a9d8fa42. Its shared monitor is terminal. The source fixes remain in
+edf78e8eb7018ec16ad16e25a43bdcd7c2626f6f. Its shared monitor is terminal. The source fixes remain in
 this requested worktree.
 
 The original successor session01a149ff-3f79-7de1-969e-de66c35dfed6 performed no assistant/tool actions.

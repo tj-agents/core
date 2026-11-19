@@ -1,5 +1,5 @@
 {
-  "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+  "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
   "retained_at_product_owner": [
     {
       "test": "test_provisioning_declares_the_terminal_marketplace_roster",

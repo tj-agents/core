@@ -11,7 +11,7 @@
 ## Review pass — 2026-09-27 — full (docs)
 
 **Candidate base:** `81b3340`
-**Candidate head:** `8d288892a28d1fb764fee7e34211f4b635bfabff`
+**Candidate head:** `20704d45501db48ae5b09d159b02ec12971aa329`
 **Candidate branch:** `Fix/OpenWorktreeDeadHelper`
 **Candidate scope:** `all` `(4 paths, meta-only)`
 **Work-order path:** `reviews/Fix-OpenWorktreeDeadHelper.md`

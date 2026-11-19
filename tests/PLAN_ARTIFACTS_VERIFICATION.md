@@ -1,7 +1,7 @@
 # Plan-artifacts P1 verification
 
 Candidate: Codex package 1.2.0; Claude retains commit-based refresh. Source baseline
-`c3572f85163f581a645c0f43d67df6b3563ffa82`; implementation is on `Feature/PlanArtifacts`.
+`c57a46c364841c5c856e48a6a9c1d0d150fa1f5e`; implementation is on `Feature/PlanArtifacts`.
 This is verification evidence, not a second migration plan. The workspace-level
 `AGENT_ECOSYSTEM_MIGRATION_PLAN.md` remains the progress owner.
 
@@ -113,7 +113,7 @@ Codex hook trust, desktop behavior, and Linux behavior remain later adoption che
 
 Live unqualified handoff acceptance also passes on both CLI hosts. The packaged Codex and Claude launchers
 each started exactly one successor in `base-agents/.worktrees/Test-P2-Handoff-Acceptance`, an in-repository
-worktree at implementation commit `5c5e07874b4bfee41ce1238743edbcde98f2c261`. Each successor read the
+worktree at implementation commit `b9c82a59d52757425b1bea8ce1c923a9c3dde8d4`. Each successor read the
 same two-line pointer, created `ACK.md`, reconciled `GOAL.md` to `Status: complete`, and changed no tracked
 repository files. Codex ran as CLI 0.155.1 with Astra/high and invocation-only hook-trust bypass; Claude ran
 as Code 2.1.278 with its configured default and without permission bypass.

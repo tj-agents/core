@@ -10,8 +10,8 @@
 
 ## Review pass — 2026-10-01 — full
 
-**Candidate base:** `6d163f10b7c03aebf789ebdeb9bcab41dab0d3dd`
-**Candidate head:** `a7696a820384336fd98472ad1b7dc8cadd9e9b45`
+**Candidate base:** `c2c5d7ea6e1cdafe1bfb55d02764883537598b93`
+**Candidate head:** `0187c852b29d83cc82b8013ea0ea786823fa265c`
 **Candidate branch:** `Fix/SecurityReviewCheckoutScope`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:4f338de02a0aad2810109049934db3d0fa5f7d732ab560bf1e565f4e0caabc3c` `(8 paths)`

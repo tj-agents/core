@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `fa487c6f31be2a09bf089a84603ab108a67c9dad`  `(2026-09-25)`
+**Reviewed up to commit:** `2d64f62ea1c0ab9b7a87fefc3417c7efab1874f6`  `(2026-09-25)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-25 — full
 
-**Candidate base:** `ce038fb871f736a02e381e0adb0caa66c2ed2a1e`
-**Candidate head:** `a47cea8d9c7300e0ae7195146a253dfac3b9479c`
+**Candidate base:** `825b490f260fc7ed0e3e46625f8725f55c78229a`
+**Candidate head:** `2e028c3598699a6191dad680cb2d9c099f75ef8a`
 **Candidate branch:** `Docs/CloseMergeWorktreeCleanup`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:b54b962a3ab0afeb5199360f34dc09379232ba767b17e0e0b54c050eb8f791d5` `(35 paths)`
@@ -41,8 +41,8 @@ security marker is required.
 
 ## Review pass — 2026-09-25 — incremental
 
-**Candidate base:** `a47cea8d9c7300e0ae7195146a253dfac3b9479c`
-**Candidate head:** `2f9a5eae284230c0efebaad9e3ba141d73542c51`
+**Candidate base:** `2e028c3598699a6191dad680cb2d9c099f75ef8a`
+**Candidate head:** `6ad95f6572c384c9ea74b68c9dc9c83b4474ce9e`
 **Candidate branch:** `Docs/CloseMergeWorktreeCleanup`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:5fe05a00b9019ad5659f63e51ec5eb925afe2f2089c8b355b543f6108e5bf9d7` `(8 paths)`
@@ -65,8 +65,8 @@ marker is required.
 
 ## Review pass — 2026-09-25 — incremental
 
-**Candidate base:** `2f9a5eae284230c0efebaad9e3ba141d73542c51`
-**Candidate head:** `fa487c6f31be2a09bf089a84603ab108a67c9dad`
+**Candidate base:** `6ad95f6572c384c9ea74b68c9dc9c83b4474ce9e`
+**Candidate head:** `2d64f62ea1c0ab9b7a87fefc3417c7efab1874f6`
 **Candidate branch:** `Docs/CloseMergeWorktreeCleanup`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:651722a980e730045d3ba487b1c384e16cfac66877394c00aeaf3543f4e80761` `(2 paths)`

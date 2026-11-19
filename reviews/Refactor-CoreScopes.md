@@ -5,14 +5,14 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `aa3c37209cf5e8065a9162b342dc3f4fb3184a58`  `(2026-09-20)`
-**Security-reviewed up to commit:** `2d20db6eb950ce0b97ab116d7545b402d565b10d`  `(2026-09-20)`
+**Reviewed up to commit:** `03878c60455ab24c3f211981f5c082e31be2325d`  `(2026-09-20)`
+**Security-reviewed up to commit:** `071b3d8998a2a5adf1105f2b0059842c57c562d1`  `(2026-09-20)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-20 — staged:all
 
-**Candidate base:** `c90b6021aecf7f809d240fd6ae7b469b36b9387e`
-**Candidate head:** `a9200fe71c6167fea4dcb7469c001cc7400a2204`
+**Candidate base:** `f192f630cc31d6291a37eedc60413ee007dc4ede`
+**Candidate head:** `6dc8339db8eeab5cff677d099cf6784743945269`
 **Candidate branch:** `Refactor/CoreScopes`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:6a9d5ddadf1ab8dc3eb4b94a88ffdb008a622c2f1812af158fc809c1f966a1bd` `(647 paths)`
@@ -65,7 +65,7 @@
 
 ## Rules manifest
 
-Route source: `.agents/hooks/skill_router.py` at `a9200fe71c6167fea4dcb7469c001cc7400a2204` — missing; tracked as REV-001.
+Route source: `.agents/hooks/skill_router.py` at `6dc8339db8eeab5cff677d099cf6784743945269` — missing; tracked as REV-001.
 
 - Canonical shared contracts and runtime — skills: unavailable pending REV-001; local guidance: `AGENTS.md`; security: yes
 - Canonical hooks, maps, generator, tests and docs — skills: unavailable pending REV-001; local guidance: `AGENTS.md`; security: yes
@@ -110,8 +110,8 @@ and 7 relocated engineering-package tests. Workflow verification, both PowerShel
 `pwsh .agents/sync-generated.ps1 -Check` also pass; generation is stable at 295 files from 58 definitions.
 ## Review pass — 2026-09-20 — incremental:runtime-remediation
 
-**Candidate base:** `a9200fe71c6167fea4dcb7469c001cc7400a2204`
-**Candidate head:** `a086aaf0b8da99f4f98607c19abce17e3556fe2f`
+**Candidate base:** `6dc8339db8eeab5cff677d099cf6784743945269`
+**Candidate head:** `1281fdad51e27e60e215fe82019606b5cd0e99c2`
 **Candidate branch:** `Refactor/CoreScopes`
 **Candidate scope:** `incremental`
 **Candidate path-set:** `sha256:20964a9931a5f391f78a4f7cc6f0cb7b8aaf7b7061e7f1f4cca357e4e121e235` `(37 paths)`
@@ -150,8 +150,8 @@ shadow router that returns a false skill and proves review preparation still res
 All 26 workflow-operation tests and 15 package/source-layout tests pass, and generation remains stable.
 ## Review pass — 2026-09-20 — incremental:trusted-router-remediation
 
-**Candidate base:** `a086aaf0b8da99f4f98607c19abce17e3556fe2f`
-**Candidate head:** `c632a2984f3b1330d4e6205bd1aaf8eec0806e5f`
+**Candidate base:** `1281fdad51e27e60e215fe82019606b5cd0e99c2`
+**Candidate head:** `aa92c8520a59456f74749e7a6b548cde5c545c15`
 **Candidate branch:** `Refactor/CoreScopes`
 **Candidate scope:** `incremental`
 **Candidate path-set:** `sha256:8ab9adc5d6c9ff58b1c1c70acc12770435b9fc5897dd0ed48d39961887005856` `(4 paths)`
@@ -186,8 +186,8 @@ The exact `a086aaf..c632a29` remediation delta is approved with zero new finding
 canonical work order are resolved, and the current review and security watermarks advance to `c632a29`.
 ## Review pass — 2026-09-20 — incremental:large-pr-binding
 
-**Candidate base:** `c632a2984f3b1330d4e6205bd1aaf8eec0806e5f`
-**Candidate head:** `b8e2df716aa0283d58393b82b98ac5eb993db167`
+**Candidate base:** `aa92c8520a59456f74749e7a6b548cde5c545c15`
+**Candidate head:** `d7f376b4aac472c91058ce0735fc90302e7ea74a`
 **Candidate branch:** `Refactor/CoreScopes`
 **Candidate scope:** `incremental`
 **Candidate path-set:** `sha256:8ab9adc5d6c9ff58b1c1c70acc12770435b9fc5897dd0ed48d39961887005856` `(4 paths)`
@@ -223,8 +223,8 @@ tests pass, generation remains stable at 295 files from 58 definitions, and the 
 watermarks advance to `b8e2df7`.
 ## Review pass — 2026-09-20 — incremental:windows-path-identity
 
-**Candidate base:** `b8e2df716aa0283d58393b82b98ac5eb993db167`
-**Candidate head:** `2d20db6eb950ce0b97ab116d7545b402d565b10d`
+**Candidate base:** `d7f376b4aac472c91058ce0735fc90302e7ea74a`
+**Candidate head:** `071b3d8998a2a5adf1105f2b0059842c57c562d1`
 **Candidate branch:** `Refactor/CoreScopes`
 **Candidate scope:** `incremental`
 **Candidate path-set:** `sha256:a1ead035a6bf66aae38142e0e618e1f87d013a2f090f63310d44de478024b545` `(4 paths)`
@@ -260,8 +260,8 @@ security watermarks advance to `2d20db6`.
 
 ## Review pass — 2026-09-20 — incremental:delivery-gate-fixture
 
-**Candidate base:** `2d20db6eb950ce0b97ab116d7545b402d565b10d`
-**Candidate head:** `45616059eb48943489d88cda2bda59a9c064cb57`
+**Candidate base:** `071b3d8998a2a5adf1105f2b0059842c57c562d1`
+**Candidate head:** `fb174347cee3d1d37d3b4122944349d9deb681db`
 **Candidate branch:** `Refactor/CoreScopes`
 **Candidate scope:** `incremental`
 **Candidate path-set:** `sha256:78725d60be3d9a3f87d537d1d3fb7e7cfc50386008a53a3d78b173fd26a3834e` `(2 paths)`
@@ -302,8 +302,8 @@ creates no persistent delivery binding. The focused delivery-binding suite passe
 
 ## Review pass — 2026-09-20 — incremental:changed-file-count-remediation
 
-**Candidate base:** `45616059eb48943489d88cda2bda59a9c064cb57`
-**Candidate head:** `30925db6e35961aba525c9fe5992b57955ac5c6c`
+**Candidate base:** `fb174347cee3d1d37d3b4122944349d9deb681db`
+**Candidate head:** `cc5f4076dfddc28417fcc6c69248e37dfe1bdc52`
 **Candidate branch:** `Refactor/CoreScopes`
 **Candidate scope:** `incremental`
 **Candidate path-set:** `sha256:78725d60be3d9a3f87d537d1d3fb7e7cfc50386008a53a3d78b173fd26a3834e` `(2 paths)`
@@ -344,8 +344,8 @@ count-mismatch error, asserts no missing-path error, and proves no binding is wr
 
 ## Review pass — 2026-09-20 — incremental:isolated-count-remediation
 
-**Candidate base:** `30925db6e35961aba525c9fe5992b57955ac5c6c`
-**Candidate head:** `aa3c37209cf5e8065a9162b342dc3f4fb3184a58`
+**Candidate base:** `cc5f4076dfddc28417fcc6c69248e37dfe1bdc52`
+**Candidate head:** `03878c60455ab24c3f211981f5c082e31be2325d`
 **Candidate branch:** `Refactor/CoreScopes`
 **Candidate scope:** `incremental`
 **Candidate path-set:** `sha256:78725d60be3d9a3f87d537d1d3fb7e7cfc50386008a53a3d78b173fd26a3834e` `(2 paths)`

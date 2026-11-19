@@ -1,7 +1,7 @@
 # Portable native permission defaults
 
 Owner: Codex session 01a16e5b-9e5a-75e1-86d4-fda224713323.
-Source checkout: isolated clone based on Core main d7724c7a5f6f807b5e2fd173451141bbb8808ea1.
+Source checkout: isolated clone based on Core main 30d7af1754378fae4bb5db230179db483907bafe.
 
 The user authorizes bypass permissions by default for Claude and Codex. Store a host-neutral enum at
 `configuration.core.permissions` in `.agents/settings.json`: `bypass` (including when omitted) or

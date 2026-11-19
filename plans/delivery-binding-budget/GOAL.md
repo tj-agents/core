@@ -8,7 +8,7 @@ Repair the shared delivery binder's redundant process startup and its weak hold-
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-DeliveryBindingBudget
 Branch: Fix/DeliveryBindingBudget
-Base: 8b656fb197771916c58aea4418934aaa7648b1c0
+Base: ee773eb39320deb15ebe26d894f1521d4bed0b03
 
 Own only .agents/workflows/workflow_ops.py, .agents/hooks/tests/test_workflow_ops.py, .agents/hooks/tests/test_delivery_binding_gate.py and this goal. Generated output is refreshed for checks and left unstaged per Core. Do not edit binding-hook source, hook_runtime, continuation_runtime, Stop, configuration/preference/permission/validator behavior, manifests or any other checkout. Expected source/test changes250-450 plus this goal; measure the actual complete authored slice against main and stop for parent split assessment before exceeding1000 substantive lines.
 
@@ -90,7 +90,7 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, appr
 ## Next Steps
 
 Scope: this bounded source defect through verified publication and own safe cleanup.
-Current slice: BB01 serial source correction after parent review at `98658d9672fceb2c9cbfc347f8b4fa78147f4e36` requested changes.
+Current slice: BB01 serial source correction after parent review at `7c993ae3054b1b884ba730a9eb876e05d6457815` requested changes.
 Remaining scope: parent-owned fresh incremental review, exact CI, normal merge, causal generated publication and cleanup after this corrected candidate releases.
 Done when: truthful real subprocess hold fixture binds an owner within unchanged10s and preserves absent authority for a hold; context cannot redirect state or reuse stale permission; source review/CI/publication pass. Source delivery does not prove normal-profile activation or complete the parent rollout.
 
@@ -98,7 +98,7 @@ Done when: truthful real subprocess hold fixture binds an owner within unchanged
 
 `test_workflow_ops.py` passed 90 tests during the prior candidate qualification. BB01 changes only the existing delivery-bind summary call to pass its already-captured repository; its focused regression and the complete `test_delivery_binding_gate.py` suite passed 35 tests in 53.789 seconds. The gate suite covers the shared Claude and Codex payload paths and the truthful hold-label subprocess. The unchanged ten-second budget remains in force.
 
-The parent synchronized the source candidate to `eeb369732b34334be41fd602dadcd186ba565c19` before the reviewed head `98658d9672fceb2c9cbfc347f8b4fa78147f4e36`; the source/test diff from `8b656fb197771916c58aea4418934aaa7648b1c0` to that synchronized base was empty. Core184 is already causally published and its checkout retired. This collaboration writer now prepares only the corrected local source commit; the parent resumes fresh incremental review, delivery, publication, and cleanup after release.
+The parent synchronized the source candidate to `92b2a14264ed397123f109212d07c4fa4ae32419` before the reviewed head `7c993ae3054b1b884ba730a9eb876e05d6457815`; the source/test diff from `ee773eb39320deb15ebe26d894f1521d4bed0b03` to that synchronized base was empty. Core184 is already causally published and its checkout retired. This collaboration writer now prepares only the corrected local source commit; the parent resumes fresh incremental review, delivery, publication, and cleanup after release.
 
 1. Before edits, acknowledge pickup here with exact native session identity. Read Core AGENTS/CODE_CONVENTIONS and installed bugfix/lanes/persistent-workflow. Ordinary exec setup currently fails before launch; use sandbox_permissions=require_escalated,login=false. If that supported execution path is unavailable, explicitly record failed-before-edits/no-claim and the precise gate; do not ask the user to retry or leave parent ownership ambiguous.
 2. Implement only accepted regions; meaningful tests cover real linked-worktree/spaces/non-ASCII Git context, malformed/mismatched context, initial and telemetry containment/redirect revalidation, fresh policy/origin/head/labels across invocations and truthful held-label actual subprocess. Keep all affected existing scoped-authority checks. Capture measured actual binder duration/headroom with existing deadline, not count-only success. Reconcile any current-main delta; no blind replacement or broad base sync.

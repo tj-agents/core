@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `146a50a956583097e55ed7a55d09841aa3bc9476`  `(2026-10-15)`
+**Reviewed up to commit:** `d1c86dd94dbd01aa5885c5e5b0c3dafb9b1140e0`  `(2026-10-15)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-15 — full
 
-**Candidate base:** `f2dd95cae5aef351017eea4d7ce3dc39a9fcae76`
-**Candidate head:** `146a50a956583097e55ed7a55d09841aa3bc9476`
+**Candidate base:** `b23509c4d0af38a0c6f39de41b55e9d61042497d`
+**Candidate head:** `d1c86dd94dbd01aa5885c5e5b0c3dafb9b1140e0`
 **Candidate branch:** `Fix/MergeGateForeignRepo`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:307c540359eccaa95a22ad5663694fe68d5845efff8d98fdc8406c26d84674a0` `(6 paths)`

@@ -41,7 +41,7 @@
   flaked once under full-suite load (the 2s git probe returned `None`); both pass alone and on origin/main.
 
 - 2026-10-18: three commits pushed; PR https://github.com/tj-agents/core/pull/295 open at head
-  b2130b5348162c8b21607b0787f65c631d269e00. Continuation owner initialized
+  d1f4522f17ff23407ae55bba637d5d010eddaa5d. Continuation owner initialized
   (`.agents/continuation/owner.json`, id c1cb02bb672099e35ef3e29c) and yielded.
 - Blocker: registering the scheduled wake (`delivery_continuation.py register`) was denied by the Claude Code
   auto-mode classifier as unauthorized persistence. Resolver: Tommy. Resume when he says "merge it" (drive

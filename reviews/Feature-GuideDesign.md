@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `d9afa4c0593d71b2f030e82a907b8449b1b537ae`  `(2026-10-05)`
+**Reviewed up to commit:** `0438eac58721b228d064b9eabce5a9605a68f427`  `(2026-10-05)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-05 — full
 
-**Candidate base:** `df1bc41edf4aec8e6d0b85025c97cf1cfb73f302`
-**Candidate head:** `d8cfd0810665bf3649e03ae652eec25af2ad7b9e`
+**Candidate base:** `985fd74c3df29a7ee2327dcc07511358808f5ca8`
+**Candidate head:** `c0408e7aa850dbc2fa62b35f7bda3838af624020`
 **Candidate branch:** `Feature/GuideDesign`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:8290032643198346dd13ef3d87d80061534f09d1e3b4066e406621ec4f55a6e6` `(15 paths)`
@@ -89,8 +89,8 @@ suite PASS, generation and digests clean. Incremental pass over the remediation 
 
 ## Review pass — 2026-10-05 — incremental
 
-**Candidate base:** `d8cfd0810665bf3649e03ae652eec25af2ad7b9e`
-**Candidate head:** `e7210633575881c282bcbaefbd05d1e6563c2700`
+**Candidate base:** `c0408e7aa850dbc2fa62b35f7bda3838af624020`
+**Candidate head:** `798aadcfee62e5e82335332e5290ef9ae2066454`
 **Candidate branch:** `Feature/GuideDesign`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:5b95b8ec0be52517a583ef5db584864b2b831d5cf73ab858de604d564dcc5481` `(7 paths)`
@@ -121,8 +121,8 @@ builds untouched (new prose-safety test; 24 tests OK, 1 POSIX skip). Incremental
 
 ## Review pass — 2026-10-05 — incremental
 
-**Candidate base:** `e7210633575881c282bcbaefbd05d1e6563c2700`
-**Candidate head:** `55709c246a95c096b49ae95710cdce504fad5395`
+**Candidate base:** `798aadcfee62e5e82335332e5290ef9ae2066454`
+**Candidate head:** `d87257513fd348c261b9c03c64c2421a501bd097`
 **Candidate branch:** `Feature/GuideDesign`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:ece889ba7fea8c1632ee315d4e3c0385eb7bd9869d364efda90bec603d760984` `(4 paths)`
@@ -153,8 +153,8 @@ Fixed on this branch: the Oxford comma is now permitted only after at least one 
 
 ## Review pass — 2026-10-05 — incremental
 
-**Candidate base:** `55709c246a95c096b49ae95710cdce504fad5395`
-**Candidate head:** `b5015684b690bb8affe83f88f3d4f5e26bcd87ae`
+**Candidate base:** `d87257513fd348c261b9c03c64c2421a501bd097`
+**Candidate head:** `847c7aac87fb70949a6b1456f20e933e056b70e9`
 **Candidate branch:** `Feature/GuideDesign`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:ece889ba7fea8c1632ee315d4e3c0385eb7bd9869d364efda90bec603d760984` `(4 paths)`
@@ -176,8 +176,8 @@ branch, and is unchanged by it.
 
 ## Review pass — 2026-10-05 — incremental
 
-**Candidate base:** `b5015684b690bb8affe83f88f3d4f5e26bcd87ae`
-**Candidate head:** `d9afa4c0593d71b2f030e82a907b8449b1b537ae`
+**Candidate base:** `847c7aac87fb70949a6b1456f20e933e056b70e9`
+**Candidate head:** `0438eac58721b228d064b9eabce5a9605a68f427`
 **Candidate branch:** `Feature/GuideDesign`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:833f95c99232a9756c3b34d0c2a69f4a650e0fa495679a1a32af7b2cf1e20694` `(3 paths)`

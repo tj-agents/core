@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `ac6ae88221ba87bfd23676b1490be5a046251575`  `(2026-10-04)`
+**Reviewed up to commit:** `84c0f0de96aaae183b4fe73e2693628195f71ded`  `(2026-10-04)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-04 — docs
 
-**Candidate base:** `06480cfbdf376fac825e4b0581f3b4b6a8e0f5a2`
-**Candidate head:** `ce82032084b320f0101e12db3ca050a6c88801b0`
+**Candidate base:** `4ff7c00ac919d2a2425aeb1c1215d444e734fcd4`
+**Candidate head:** `8d57c042b012004218dfce9fa68b8fcdf549d278`
 **Candidate branch:** `Fix/DefectHandoffDefault`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:23eb7bec86e71c0948352501eb82086e1b0cd9da6ba6174e99561ae0b6c5eb70` `(12 paths)`
@@ -95,8 +95,8 @@ remediation delta follows in the next pass.
 
 ## Review pass — 2026-10-04 — incremental
 
-**Candidate base:** `ce82032084b320f0101e12db3ca050a6c88801b0`
-**Candidate head:** `e58a505a5339f35fb49f73de25fe807b7dcdc9ef`
+**Candidate base:** `8d57c042b012004218dfce9fa68b8fcdf549d278`
+**Candidate head:** `afd0ec57063d8f76b90930a8af4183d434c82af4`
 **Candidate branch:** `Fix/DefectHandoffDefault`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:b8995f44aca4f34cccbfa3870b3cd253ab64bf7c1a37cac40407ecab3a531c08` `(17 paths)`
@@ -152,8 +152,8 @@ over the fixing commit follows.
 
 ## Review pass — 2026-10-04 — incremental (2)
 
-**Candidate base:** `e58a505a5339f35fb49f73de25fe807b7dcdc9ef`
-**Candidate head:** `ac6ae88221ba87bfd23676b1490be5a046251575`
+**Candidate base:** `afd0ec57063d8f76b90930a8af4183d434c82af4`
+**Candidate head:** `84c0f0de96aaae183b4fe73e2693628195f71ded`
 **Candidate branch:** `Fix/DefectHandoffDefault`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:a0acff6dd52bb04895c0da3e5bc9bf7ef8bd95760d3144e59ae010e5368281ee` `(13 paths)`

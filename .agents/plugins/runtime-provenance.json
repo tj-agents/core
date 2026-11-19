@@ -3,137 +3,137 @@
   "files": [
     {
       "path": ".agents/workflows/contract/v2/gates.md",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "bb4fcddfdf6fcf03c51a07b60e6b580e676b24d901407ae1f67170ad83f89834"
     },
     {
       "path": ".agents/workflows/delivery_runtime.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "d0e9ff7df82113348d70989f99e15d6f4a80771ad3fabe49e77e0e93c1ad1fc8"
     },
     {
       "path": ".agents/workflows/fixtures/role-body.md",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "0570a87559dc5aa0c64e584b01dad94d1cd4eebfb74d64f5dc4da280746f0a63"
     },
     {
       "path": ".agents/workflows/fixtures/role.json",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "2baab777885716935d98e7ebcebd4bdbe0de2e20df87573fcb36bb0b7bd3602e"
     },
     {
       "path": ".agents/workflows/fixtures/workflow-contract-fixture.template.md",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "2bdc5705a8bea0091fadffdd94b1852a4b3b4e839efb25813c4f23d6b4c0a769"
     },
     {
       "path": ".agents/workflows/hosts/claude.json",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "dec643a07ede4d587dcc5c39bc36bb5b081fc781efe7b9486226e2e5477a1b77"
     },
     {
       "path": ".agents/workflows/hosts/codex.json",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "db001c048382fe7d7f8a15db60c06f83561e101a72b32c5d094656495292bd53"
     },
     {
       "path": ".agents/workflows/roles/evidence-explorer.md",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "0574bb70739ee68adb077298150cd93cf85a77d054caa7e2541d2d331c2fd2e5"
     },
     {
       "path": ".agents/workflows/roles/log-analyst.md",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "741be3f08550a87e2c5ea4952f76078c1e289e96b9b6bbc5b4d102de3fc66bac"
     },
     {
       "path": ".agents/workflows/roles/mechanical-worker.md",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "462aa5bbb6a43f5c416b805fdcb9572efa58b58034467a971d7ce336bf998f82"
     },
     {
       "path": ".agents/workflows/roles/review-lens.md",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "641c66931bf091086e2aab6a55c0ebc6d199b7c6194ab0f9473c78768a023e51"
     },
     {
       "path": ".agents/workflows/roles/test-impact-analyst.md",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "c9f8a51c41e55fac6c596c059e3a4efbd8b999f6b76bb67fc0f26f645e4a8089"
     },
     {
       "path": ".agents/workflows/workflow_ops.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "1c728732fab31f8b48b4d463e57b8c3f59a96bc71e2aa776b112d6bcea588b1f"
     },
     {
       "path": ".agents/hooks/tests/test_process_standards.py",
-      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "source_commit": "95ca6e605ce9db3488984318ee668a3e3b80f194",
       "sha256": "b7b9400c12e077d49e788980dc793ce6fb008d485e1182f88ecfddca2a786912"
     },
     {
       "path": ".agents/hooks/tests/test_lane_tables.py",
-      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "source_commit": "95ca6e605ce9db3488984318ee668a3e3b80f194",
       "sha256": "1a47d11f950adf3745bb0d7d339bac10ca2c928f12102716503d2a1496288377"
     },
     {
       "path": ".agents/hooks/tests/test_workflow_ops.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "5c5919a468a106d3153d25225a7604124b1a4f579fbcfbf9a56576e899dbc9c4"
     },
     {
       "path": ".agents/hooks/tests/test_delivery_runtime.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "1bac657c9e75e85fc79c8303a92ca06f7abeb3d29f98bc83925ee850ed6fa3a8"
     },
     {
       "path": ".agents/hooks/tests/fixtures/lane_expectations.py",
-      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "source_commit": "95ca6e605ce9db3488984318ee668a3e3b80f194",
       "sha256": "c98c34d5da2dcc46b52f66243959d716879e0c13bded21a737d5247792cbac64"
     },
     {
       "path": ".agents/hooks/tests/fixtures/workflow_efficiency_scenarios.json",
-      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "source_commit": "95ca6e605ce9db3488984318ee668a3e3b80f194",
       "sha256": "35aa3f6a92a4fbf274f522883d9347c865428dffbc0ce49bdef71ba341e50ffc"
     },
     {
       "path": ".codex/install-workflow-agents.ps1",
       "source_path": ".agents/workflows/hosts/install-codex-agents.ps1",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "907aa7179990caac9670215bc0331f346053b2c7ee06fc9d378d3d1b96310893",
       "adaptation": "Codex-only installer is authored under .codex and packaged with the engineering plugin."
     },
     {
       "path": ".codex/agent-delivery.json",
       "source_path": ".agents/workflows/hosts/agent-delivery.json",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "440e8b3d6c4fbede71dae9dafe639d893e3b85ae1279e7cea0eb2af317658ecf",
       "adaptation": "Codex-only delivery configuration is authored under .codex and packaged with the engineering plugin."
     },
     {
       "path": ".claude/skills/workflow/continue/SKILL.md",
       "source_path": ".claude/workflow-skills/persistent-workflow/SKILL.md",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "479a7c0aa2fc47b8563701776e3c794674343f7f23a8fc26f326136ab01a3bd5",
       "adaptation": "Claude host behavior extends and references the canonical .agents workflow definition."
     },
     {
       "path": ".codex/skills/workflow/continue/SKILL.md",
       "source_path": ".codex/workflow-skills/persistent-workflow/SKILL.md",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "7e54dc045b59ab07e2a99b02849362ea1ab60166ebb30b8a70a5290ae42c1e8d",
       "adaptation": "Codex host behavior extends and references the canonical .agents workflow definition."
     },
     {
       "path": ".codex/runtime/continuation/delivery_continuation.py",
       "source_path": "scripts/delivery_continuation.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "0cb3df64b4a9bc7753aab288dc7948f0841e202d635471899ff542ca04bdf1af",
       "adaptation": "Codex durable CLI continuation adapter is authored in the Codex host tree and packaged only in its discovery entry."
     },
     {
       "path": ".agents/hooks/hook_runtime.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "source_commit": "e9b4a6a00c1406d22f376d3fc0d17fb26f47204d",
       "sha256": "946b9aa08d474560c63ba418221f960b9b5d2b188ad4ae720a26fbe7cbec3002"
     }
   ]

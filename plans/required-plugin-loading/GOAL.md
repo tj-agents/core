@@ -46,7 +46,7 @@ Linux, Codex and Claude verification separately and retain any unresolved gate.
 
 ## Next action
 
-Finish Windows exact-head CI for PR #445 at `53b8649eb51e73d29ace697a67fc0be64c43bbbf`;
+Finish Windows exact-head CI for PR #445 at `7293b31eb52fb99b37f9ae9df28844e45845a2d5`;
 Linux and full/incremental source review pass, with no open findings. Then resolve the
 remaining landing identity gate and supported machine deployment. The machine has no
 GitHub App record; Tommy explicitly granted his login exception for push and PR only.
@@ -117,7 +117,7 @@ No shared runtime has been deployed yet.
 
 ## Publication checkpoint
 
-Published and verified head `457ad350c49ffd02760b7f19443628d3d6a38556` at
+Published and verified head `dd77521cbbee4601c487ee96c88daaa3eff75500` at
 https://github.com/tj-agents/core/pull/445 (draft). Body validation passed and delivery
 binding records this exact identity. Windows and Linux CI run `39986038049` is active;
 the generated-output guard and guidance checks passed. Native follow-up review is
@@ -168,9 +168,9 @@ identified by the current audit; exact-head CI and rollout remain open.
 
 ## Complete-candidate review checkpoint
 
-Integrated current main through merge `c24d6fa86fca5e920b5cf14b349c6074609941c2`,
+Integrated current main through merge `5fef60bfcd6c517aaf80827a18fcc8c1e69e55bb`,
 preserving the unrelated dirty primary checkout. Frozen review descriptor and bundle
-were generated against base `3f109a3e1ea9470ea7e68b6e7b82df0cb8637dd3`;
+were generated against base `29c77987da7cfc97fbb50cdb1d1ab6341f7bc329`;
 the full native review ran in a clean detached checkout. Canonical work order and
 private receipt record a completed changes-requested pass with R1 (attached `-C`)
 and R2 (effective launch configuration). The packaged review-lens model was unavailable;
@@ -186,7 +186,7 @@ real verifier is exercised through shell and handoff admission tests. Required-p
 tests pass (19), startup (14; one POSIX skip), launcher (17; one POSIX skip).
 Source remediation still needs an incremental frozen review and exact-head CI.
 
-Incremental review of `20a54197d61859dc2a46d3eed43c071370b14241` confirmed the
+Incremental review of `b478f5430cc4286044d647f1576dbc53dbbcba20` confirmed the
 two fixes and found R3: native inventory cwd had been normalized to the selection
 root, changing the meaning of relative Claude settings/plugin paths. Preserve the
 actual launch directory for native inventory and registration scope, while selecting
@@ -254,10 +254,10 @@ directory; startup_binding is not required in the shell-only runtime file set.
       "next_action": "Complete PR 445 validation, resolve policy-compliant landing and preserve unrelated primary-checkout edits during supported installation."
     }
   ],
-  "deliveries": [{"repository": "tj-agents/core", "pr": 445, "head": "8503ed9682259beac1b6a769bc00e809fe4757aa"}],
+  "deliveries": [{"repository": "tj-agents/core", "pr": 445, "head": "1f5ff7c7fcbcd5a2f5de6b1ffc6fc588fe1ba24a"}],
   "open_tasks": [
-    {"repository": "tj-agents/core", "pr": 445, "head": "8503ed9682259beac1b6a769bc00e809fe4757aa", "text": "Complete Windows exact-head CI.", "owner": "current execution session", "next_action": "Final source review and Linux CI passed; observe run39997465752 for Windows completion. Earlier guard CI passed both platforms."},
-    {"repository": "tj-agents/core", "pr": 445, "head": "8503ed9682259beac1b6a769bc00e809fe4757aa", "text": "Land and deploy the shared runtime through supported machine setup.", "owner": "current execution session; GitHub App setup owned by Tommy", "next_action": "Await the pending explicit landing identity exception (existing exception covers push/PR only), land after all checks pass, then run supported setup from the prepared managed clone and verify fresh hosts. No settings have been applied."}
+    {"repository": "tj-agents/core", "pr": 445, "head": "1f5ff7c7fcbcd5a2f5de6b1ffc6fc588fe1ba24a", "text": "Complete Windows exact-head CI.", "owner": "current execution session", "next_action": "Final source review and Linux CI passed; observe run39997465752 for Windows completion. Earlier guard CI passed both platforms."},
+    {"repository": "tj-agents/core", "pr": 445, "head": "1f5ff7c7fcbcd5a2f5de6b1ffc6fc588fe1ba24a", "text": "Land and deploy the shared runtime through supported machine setup.", "owner": "current execution session; GitHub App setup owned by Tommy", "next_action": "Await the pending explicit landing identity exception (existing exception covers push/PR only), land after all checks pass, then run supported setup from the prepared managed clone and verify fresh hosts. No settings have been applied."}
   ]
 }
 ```

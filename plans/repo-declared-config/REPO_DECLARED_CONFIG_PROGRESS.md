@@ -4,10 +4,10 @@ Status: core and sandbox PRs are green, independently reviewed and ready for Tom
 Owner: current Codex session.
 Branch: Feature/RepoDeclaredPlugins
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-RepoDeclaredPlugins
-Base: 85e3a0d35d07c2f2e1fee780be421aa80cd3e75d (includes Tommy-merged #320)
-Head: 19bb7b20a4027791f836a0d94f40a37d6d1ac70c
+Base: b3494f785bd4b2eb62a63237e3c1bae700431381 (includes Tommy-merged #320)
+Head: 00bf6e4a4178b05c6dc6059c938fb44ceda3b8c2
 Core PR: tj-agents/core#321 (ready for review, all required checks green at final head)
-Sandbox PR: tomjseery/sandbox-dotnet#2 (055b118706c0aaeff1d91355fce50a4b2aeeba43; green, independently reviewed and ready)
+Sandbox PR: tomjseery/sandbox-dotnet#2 (3aa28fb05618002ebafa8f8d7ebf73814858a737; green, independently reviewed and ready)
 Merge authority: Tommy only. This session has merged nothing. The handoff overrides the repository's
 standing auto-merge policy for this goal; no delivery binding or merge watcher is armed.
 
@@ -70,7 +70,7 @@ External conditions and exact resume actions:
 
 Final review: canonical Git-private work order at
 C:/Users/TommySeery/source/repos/tj-agents/core/.git/agent-workflow/reviews/a6eed2852352e5f3becc57dd003a1fac80d5b30f2442d6c23c618c16a695088e/work-order.md
-is approved with watermark 19bb7b20a4027791f836a0d94f40a37d6d1ac70c. Review host coverage and
+is approved with watermark 00bf6e4a4178b05c6dc6059c938fb44ceda3b8c2. Review host coverage and
 private proof pass; disposable bundles are removed. PR body validation and delivery preflight pass.
 Instruction file checks pass both directions (core three pairs; sandbox one pair). No authored code is
 uncommitted or unpushed; generated output is excluded from the PR.

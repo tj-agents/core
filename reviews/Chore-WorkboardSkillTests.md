@@ -10,8 +10,8 @@
 
 ## Review pass — 2026-09-23 — full
 
-**Candidate base:** `b43fa3f205ba7a2e94a6708554db9a55b83a22d5`
-**Candidate head:** `d27f71bf44db4fa1bd89666549ec8be1496f2991`
+**Candidate base:** `84148f265dc1ecd2d919f54c0afc76d99d63da55`
+**Candidate head:** `3067517dc976d35a09e589872af44d519879ee74`
 **Candidate branch:** `Chore/WorkboardSkillTests`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:6c4437c4e39bc712ed446c55f4d284b5eea820d82e7a6fc90f4044c4f8a4e3ba` `(5 paths)`
@@ -104,7 +104,7 @@ paths manifest, identity hash and tree-archive hash all reproduce.
 
 ## Review pass — 2026-09-23 — incremental
 
-**Candidate base:** `d27f71bf44db4fa1bd89666549ec8be1496f2991`
+**Candidate base:** `3067517dc976d35a09e589872af44d519879ee74`
 **Candidate head:** `965344e` *(remediation of WB1 plus this work order)*
 **Candidate branch:** `Chore/WorkboardSkillTests`
 **Candidate scope:** `all`

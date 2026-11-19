@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `7998d732655f1ea24042e1aedfe05b8c69cc0798`  `(2026-09-25)`
+**Reviewed up to commit:** `def322f4681869b48930f867a03f816153c1395d`  `(2026-09-25)`
 **Judgment:** `approved`
 
 ## Review pass ? 2026-09-25 ? docs
 
-**Candidate base:** `fc7b78e6ba032451e974220918e8b91181290496`
-**Candidate head:** `e5b2dd0d9472d6a7b50263b4dbf5365db93a431b`
+**Candidate base:** `dd42d279590456fad6a7fb798e6a83c74fb701b8`
+**Candidate head:** `e3680d9227ab69c6735cb14604f9f25847f22a00`
 **Candidate branch:** `Fix/AutonomousHandoffSelection`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:42297a2c42ae4a4156d0c927549ce992645ff883ca13e48e9c4369adacfb07cb` `(20 paths)`
@@ -30,8 +30,8 @@ regression coverage agree. The frozen-tree documentation-reachability check pass
 
 ## Review pass ? 2026-09-25 ? incremental
 
-**Candidate base:** `e5b2dd0d9472d6a7b50263b4dbf5365db93a431b`
-**Candidate head:** `54b1fd495d309f5271c0555b97779fe48b3795a0`
+**Candidate base:** `e3680d9227ab69c6735cb14604f9f25847f22a00`
+**Candidate head:** `0b0d4fe18b5d6643d8679ceaad4b203164d8a083`
 **Candidate branch:** `Fix/AutonomousHandoffSelection`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:f48db1080434535451a740d3866e96a513eb3ebb7125ba8a7e2ee6167691638e` `(2 paths)`
@@ -50,8 +50,8 @@ Independent review-lens dispatch remains unavailable in this session; the owning
 
 ## Review pass — 2026-09-25 — incremental
 
-**Candidate base:** `54b1fd495d309f5271c0555b97779fe48b3795a0`
-**Candidate head:** `7998d732655f1ea24042e1aedfe05b8c69cc0798`
+**Candidate base:** `0b0d4fe18b5d6643d8679ceaad4b203164d8a083`
+**Candidate head:** `def322f4681869b48930f867a03f816153c1395d`
 **Candidate branch:** `Fix/AutonomousHandoffSelection`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:de2cbc585cfb60fd65dc55a61b59cb77658355aad92dec3efa0a907bb842542e` `(7 paths)`

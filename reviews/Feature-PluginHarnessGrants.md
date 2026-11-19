@@ -11,7 +11,7 @@
 ## Review pass — 2026-09-26 — full
 
 **Candidate base:** `1c9ba93`
-**Candidate head:** `0cc3de61bc15d1a27b43329689806438b2cb5e41`
+**Candidate head:** `0c3d4ebe57007fefceb3d6ba6f4f5c75f11e1c6f`
 **Candidate branch:** `Feature/PluginHarnessGrants`
 **Candidate scope:** `all` `(24 paths)`
 **Work-order path:** `reviews/Feature-PluginHarnessGrants.md`

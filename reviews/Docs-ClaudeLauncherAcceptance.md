@@ -6,7 +6,7 @@
 
 ## Review pass — 2026-09-29 — docs
 
-**Candidate base:** `1f23daa35b1b1c75a6559ac741e8d191deeb4618`
+**Candidate base:** `d4c5fe7cfe88433315a292682dfa3d0993aef8b4`
 **Candidate head:** `4eabf4b`
 **Candidate scope:** `plans/repo-declared-config/CLAUDE_STANDARDS_SYNC.md`
 **Pass judgment:** `approved`

@@ -4,7 +4,7 @@ Authorization: Tommy approved the repository-layout proposal and said "go ahead 
 This is a bounded independent implementation/delivery slice, not ownership of the entire migration.
 Working checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Docs-RepoOwnedPlanConventions
 Branch: Docs/RepoOwnedPlanConventions
-Base: origin/main 61d4920477a313528f855babd2e4ee4ccdf3d8f6.
+Base: origin/main 50dcb8f6b1694e5c6abcc581e02d52bbfa51f394.
 Lane: L4, specified shared-policy change with regression and documentation validation.
 Full goal owner: Codex, Feature/RepositoryOwnedLayout, with the goal at
 C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-RepositoryOwnedLayout/plans/repository-layout/REPOSITORY_LAYOUT_PROPOSAL.md.

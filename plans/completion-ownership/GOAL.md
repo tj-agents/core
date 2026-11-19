@@ -22,7 +22,7 @@ work remains with its prior owner. Current source router tests pass 35; regenera
 6 platform skips; standards routing tests pass 18. Full exact-head remote and installed acceptance remain
 pending. Next action: complete package checks, freeze source review, then push the existing PR #521.
 Native source review and fresh Workflow/API and security readers found no actionable introduced defect
-at `21008147092ca498489f7d6f2e2223752ad0da9f`; the canonical private receipt records that completed pass.
+at `58a88caf33d79eebf27dd240103944ba283d1944`; the canonical private receipt records that completed pass.
 Exact-head CI `41621767120` passed startup/discovery on Windows and Linux, then failed the same two
 packaging fixture assumptions on both platforms. The targeted fixture repairs now pass locally (2 tests):
 preserve the shipped Codex continuation directory when copying source and verify continuation identity
@@ -179,22 +179,22 @@ Current heads and completion gates:
     {
       "repository": "tj-agents/core",
       "pr": 521,
-      "head": "38f4764b254e3429200096723e8c3227d2ab8d78"
+      "head": "0e7093da47c77af8302112cbc0fdfaf521c0a747"
     },
     {
       "repository": "tj-agents/template",
       "pr": 52,
-      "head": "176590c51262c365af7719c4ca2870ed4d923dc2"
+      "head": "d31b7d37bf1fda53aaf1253808447c3f4a4af302"
     },
     {
       "repository": "tj-agents/marketplace",
       "pr": 42,
-      "head": "078969c442586341c1aa373cc42c6fb5dc9ea805"
+      "head": "82b961e6d835385380174cd1f0f72b5f9b92ee17"
     },
     {
       "repository": "tj-agents/agent",
       "pr": 34,
-      "head": "ca4a66e56e0fb6eed173e570c3e3d8ed383a7fdd"
+      "head": "241a0896c7fb22f00872ef929a21e4bac80edf2c"
     }
   ],
   "open_tasks": []
@@ -221,7 +221,7 @@ Next actions: required Marketplace42 GitHub review/publication; fresh selected S
 Before this reply, exact-session prepare was attempted from the Agent36 authored source path and failed before assessment: host_sessions imports claude.sessions but that source command did not have a claude module on its runtime path (ModuleNotFoundError). No close watcher was armed. Preserve this native/source invocation-path observation for package-root diagnosis; CI host admission alone does not establish this command worked. Session remains open for the question and unfinished delivery gates.
 
 
-2026-10-29 authorized merge checkpoint: Tommy approved and requested merging. Marketplace42 merged at c6df0d81dc95dfb2f6455c3c577c779e7560b1b6; main CI40865405715 passed. Agent34 merged at b0954763799140baf091badec134c2d7a9dc66f2; main CI40867044865 and publication40867044820 passed. Agent36 retargeted main after parent landing; parent and new main trees both6a23d3130f29e6a917edd3ee8d148c6927c21e3c, so reviewed/tested child source stayed unchanged. Agent36 merged at aa8c71a93de6bb660f863aaecff81c3b99b1ba1a; publication40867338241 passed. Primary Agent main was fast-forwarded while preserving unrelated local work.
+2026-10-29 authorized merge checkpoint: Tommy approved and requested merging. Marketplace42 merged at f9ce321201591ad6d8e947eb783c1df4e77df88f; main CI40865405715 passed. Agent34 merged at f1f11fcc850d0a25b4b6bcf419491f0964d1fb8c; main CI40867044865 and publication40867044820 passed. Agent36 retargeted main after parent landing; parent and new main trees both6a23d3130f29e6a917edd3ee8d148c6927c21e3c, so reviewed/tested child source stayed unchanged. Agent36 merged at df6cfbc8bf8825a2cdb0ce827112a5c1c6961424; publication40867338241 passed. Primary Agent main was fast-forwarded while preserving unrelated local work.
 
 Correction to previous invocation-path observation: running prepare from the projected Agent package succeeded against exact native session01a17e30-2baa-7343-8416-c212cbd2f523 on2026-10-29, target Temp/close-repair-20261029-assessment.json. The prior raw source path lacked projected Claude/Codex resources. No packaged import failure reproduced, and no watcher was armed. Do not treat that invocation error as an outstanding product defect.
 
@@ -239,8 +239,8 @@ identity, native input cancellation, unfinished-work holds, and closeout's separ
 eligibility. No aliases, foreign checkout imports or second authored implementations.
 
 Necessary dependent work uses CLI Refactor/CloseApi from verified PR17 head
-5f705f76d45d023a53b9e0ae50882cdc0ddb23c3 and Agent Refactor/CloseApi from verified PR29 head
-c1d3550530371656a67ce959cef80d7cd227be4b, each merged with current main in its own isolated checkout.
+4204060c7ad4a78c4c006491b89ce1d99d664c7e and Agent Refactor/CloseApi from verified PR29 head
+4a6853b23a43c5fd84a1a274968317496988e282, each merged with current main in its own isolated checkout.
 These parents already own shared distribution delivery; the child needs that shipping mechanism to prove
 installed close APIs while producer review is pending. Their PRs and existing branches remain untouched.
 The recorded store has no owner bound to either foundation branch; occupied CLI primary and unrelated

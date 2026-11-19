@@ -10,8 +10,8 @@
 
 ## Review pass — 2026-09-28 — full
 
-**Candidate base:** `531c0fdcd90c1688e3f0284fd30e96961ccbffc8`
-**Candidate head:** `826b8835d30bcbb6c3bc17ee0659e530dde1adb2`
+**Candidate base:** `bb15c40f0a467fb81cdaf46d933a48c67f036d63`
+**Candidate head:** `1a972a39d7b51c779da5024dd97f32e2567d6f5e`
 **Candidate branch:** `Fix/ClaudeStandardsSync`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:b76e0e32923da366a60a3239b2774d48b1bac5616c646f686b549b5d5a9097b7` `(35 paths)`
@@ -46,7 +46,7 @@ native `claude.exe`.
 
 ## Review pass — 2026-09-28 — incremental
 
-**Candidate base:** `826b8835d30bcbb6c3bc17ee0659e530dde1adb2`
+**Candidate base:** `1a972a39d7b51c779da5024dd97f32e2567d6f5e`
 **Candidate head:** `0c6a9b5`
 **Candidate branch:** `Fix/ClaudeStandardsSync`
 **Candidate scope:** `all`

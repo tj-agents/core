@@ -95,7 +95,7 @@ must document that host boundary and must not claim installed-host adoption from
 ## Delivery slice and verification
 
 One atomic source/runtime/test slice on `Fix/OutcomeVerifiedCompletion`, based on
-`984ab5f336a06f38a250a676da82150d4c9461be` (`origin/main` at pickup). PR: not opened.
+`6b2673b7dfc698b6d62256b5b542bb586f5b3484` (`origin/main` at pickup). PR: not opened.
 Expected under 1,000 substantive changed lines; reassess before exceeding that size. The validator,
 terminal enforcement, tests, and directly coupled workflow instructions must ship together so consumers
 can produce the required evidence before the new gate is applied. No always-loaded policy edits planned.

@@ -13,7 +13,7 @@ This is implementation authority for the core repair, not merely a request for a
 
 - Repository: tj-agents/core.
 - Existing checkout: C:/Users/TommySeery/source/repos/tj-agents/core.worktrees/Fix-InSessionLaneExecution.
-- Current branch observed: Docs/SequentialDelivery; previously recorded head 0550098bd3767d92f72e6227e0670c8a039e5759. Verify current identity before edits.
+- Current branch observed: Docs/SequentialDelivery; previously recorded head 15cdbbb7101e7009f64d6a10b2ecf4cfbc5dd95c. Verify current identity before edits.
 - Preserve existing sequential-delivery work, reviews/Docs-SequentialDelivery.md, and unrelated untracked plans/in-session-lane-execution/.
 - This core successor exclusively owns generic workflow/standards changes in this checkout. A separate successor owns B2B/.NET naming and DDD; do not edit those checkouts or launch another owner.
 - The user's explicit 2026-09-30 instruction to merge authorizes publication and landing of the completed sequential-delivery and ownership repair. Consumer installation remains held. Inspection found no established review owning this branch's work; publish this assessed slice's review.
@@ -30,7 +30,7 @@ work. It had loaded open-pr/push/pr-preflight, so merely adding more prose is no
 The error cost another round of PR edits and explanations.
 
 Recovery is already complete on the product side: #43 is CLOSED, #38 is OPEN/draft on main at
-7069315a783bfea463abf64f098fcc9ded43cb0b and contains the corrected commits and full naming table.
+6be3ac47a251ae07b55fa1476b034bae89b68fec and contains the corrected commits and full naming table.
 Children #39–#42 and dotnet standards #31 now link to #38. This core task must preserve that recovery;
 the PR numbers above are evidence, never identifiers to hardcode into shared behavior.
 
@@ -108,7 +108,7 @@ gates; they are not this core task's implementation scope.
 
 ## Review checkpoint
 
-The first repair is committed as ed583539a50284c21d15bc0750ccd064e9dc9707. Incremental review used a
+The first repair is committed as 5dacabba713d48e6c7fbc313815eb63c73909127. Incremental review used a
 frozen 0550098..ed58353 candidate, including the synchronized main layout changes. The configured
 independent review-lens model is unsupported on this account; the parent completed the specified
 fallback and retains the findings in the original branch review artifact. No independent review is claimed.
@@ -118,7 +118,7 @@ leading status whitespace and both rename paths; open-pr carries the owning revi
 drafting and retains an existing continuation for metadata-only updates. Binding a published head uses
 its explicit PR number from the delivery checkout. The full 44-case operations suite passed, followed by all 18 affected inspection/ownership cases
 (including the new 45th case) after the final parsing change. Generation, manifests, digests, links
-and payload checks pass. The final incremental pass is complete and approved at 0cc2a7ab1d17dea8b9b58858c446dbbd2d89c34d; both findings are resolved.
+and payload checks pass. The final incremental pass is complete and approved at 98ce7a4ded204cd336bd9d4e9d58d75536d76c27; both findings are resolved.
 
 A live preflight against this checkout returned `ownership.action: assess-scope`, confirming that the
 missing branch PR does not produce a create decision. Subsequent scope assessment and explicit user

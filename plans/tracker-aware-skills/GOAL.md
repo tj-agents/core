@@ -81,12 +81,12 @@ Success is verified future behavior across every affected skill and indirect cal
 - Source owner: tj-agents/core for generic engineering contracts and existing recording/addressing skills; tj-agents/work-items for GitHub-specific templates, transport and tracker behavior.
 - Initial checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-TrackerAwareSkills
 - Branch: Feature/TrackerAwareSkills
-- Fetched baseline: 669d90ef0c6cba79051925b6076377ace96eda09
+- Fetched baseline: 7f443b736303ea6b245dce0d969b6246c3c00e33
 - Work item: work-items/record-writers
 - Dispatching session: codex:01a1415f-6448-7123-8b17-c7fb67aee637
 - Local source writer budget: one successor, with any bounded helpers governed by explicit disjoint ownership.
 - Lane: L3; the coverage audit and generic router have bounded unresolved ownership/routing choices. Route specified implementation and review to the ordinary suitable lanes.
-- Pickup: acknowledged on 18 October 2026 by codex:01a14f1d-abd0-74e0-9b75-b814a208ea87. Supported session-store `claim` succeeded for work-items/record-writers as owner at this exact checkout. No transfer receipt was supplied. Core fast-forwarded cleanly to fetched main 728ea8b2a605981625a12cc787701146630aca53 before implementation.
+- Pickup: acknowledged on 18 October 2026 by codex:01a14f1d-abd0-74e0-9b75-b814a208ea87. Supported session-store `claim` succeeded for work-items/record-writers as owner at this exact checkout. No transfer receipt was supplied. Core fast-forwarded cleanly to fetched main 162b29049e5e2883f4028f450d8f78bb74765ceb before implementation.
 
 The separately running migration owner is codex:01a14ec8-5bdd-70a3-90c1-9d31a71289cf, work item problem-management/personal-policy, canonical docs plan C:/Users/TommySeery/source/repos/tj-agents/docs/plans/problem-management/PLAN.md. Its duties are existing-record migration and consumer adoption; yours are source skills/runtime behavior for future records. Tommy explicitly approved both continuing separately in his latest clarification. Do not pause, claim, close or duplicate that migration owner, or edit its docs plan, consumer settings, .work-items.json, .problem-records.json, plugin selections, tracker records or migration receipts.
 
@@ -132,7 +132,7 @@ Complete isolated native Codex/Claude persisted writer acceptance and the [cover
 
 ## Execution state
 
-The first source inspection confirms provider-first routing already exists in the three problem writers and address workflows. Core's provider runtime currently implements strict current-record reads for handoff admission only; no generic or feature/task writer exists. `list-work` discovers Markdown plans, so tracker-only items are absent. `docs` and `skill-authoring` still require file debt destinations unconditionally. The work-items primary checkout is stale; fetched main bcf57f969a874181ca5327970dc59646ad820a6d contains the delivered five-kind tracker and must be inspected instead. No primary checkout or adoption setting was modified.
+The first source inspection confirms provider-first routing already exists in the three problem writers and address workflows. Core's provider runtime currently implements strict current-record reads for handoff admission only; no generic or feature/task writer exists. `list-work` discovers Markdown plans, so tracker-only items are absent. `docs` and `skill-authoring` still require file debt destinations unconditionally. The work-items primary checkout is stale; fetched main b83d825bfa9f1e83bf7e14ddd104b1e76e129514 contains the delivered five-kind tracker and must be inspected instead. No primary checkout or adoption setting was modified.
 
 Current slice: one coherent Core routing change: thin issue/feature/task skills, shared selected-work contract, affected callers and executable selection/listing verification. Keep GitHub transport and templates in work-items. If its current interface needs correction, isolate a separate source slice; do not expand this Core PR with provider transport. PR: not opened. Expected Core size: below 1,000 substantive lines; reassess before exceeding it. Verification: focused provider/listing tests, generation, independent review, Windows/Linux CI, then isolated native-host acceptance. Design selection remains the user-approved five-kind router; repository routine design approval is false.
 
@@ -141,7 +141,7 @@ Current slice: one coherent Core routing change: thin issue/feature/task skills,
 
 Core now contains the thin generic issue router, concrete feature/task writers, shared selected-writer protocol, corrected indirect callers, matching host adapters and catalog/harness changes. Its file listing helper refuses selected/invalid provider declarations and directs callers to the qualified provider rather than showing a stale Markdown queue. Focused results: 7 primary-selection tests, 49 list-work tests and skill-packaging verification pass; source generation succeeds. The source-owned audit is [COVERAGE.md](COVERAGE.md).
 
-The provider correction is isolated at C:/Users/TommySeery/source/repos/tj-agents/work-items/.worktrees/Fix-PrimaryTrackerSelection on Fix/PrimaryTrackerSelection from bcf57f969a874181ca5327970dc59646ad820a6d. All five kinds now share primary selection across feature and nested invocations. Its 39 tests and 53-file generation check pass. This is a separate provider PR because Core must not own GitHub transport. Both helpers have released their writer leases; this session owns remaining edits. No adoption setting, migration record or primary provider checkout was modified.
+The provider correction is isolated at C:/Users/TommySeery/source/repos/tj-agents/work-items/.worktrees/Fix-PrimaryTrackerSelection on Fix/PrimaryTrackerSelection from b83d825bfa9f1e83bf7e14ddd104b1e76e129514. All five kinds now share primary selection across feature and nested invocations. Its 39 tests and 53-file generation check pass. This is a separate provider PR because Core must not own GitHub transport. Both helpers have released their writer leases; this session owns remaining edits. No adoption setting, migration record or primary provider checkout was modified.
 
 The Core slice is cohesive: one shared selection contract and all contradictory callers must ship together, plus three thin skills and the executable list guard. Provider transport remains a separate source slice. Generated Core plugins remain uncommitted. Independent review, required CI and publication are still outstanding.
 
