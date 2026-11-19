@@ -1,6 +1,6 @@
 # Python standards baseline
 
-Existing violations at `03f99b363e11943cf8918a99b6a7654f5b770edb` are baselined by exact authored file and rule. New files receive all enabled checks. Remove an exception when repairing its source. The tool configuration owns enforcement; this document records the rollout evidence and rationale.
+Existing violations at `465b3f9c68325b7643d6b10809dcbb552d6913d2` are baselined by exact authored file and rule. New files receive all enabled checks. Remove an exception when repairing its source. The tool configuration owns enforcement; this document records the rollout evidence and rationale.
 
 Deleting a baselined file removes its rows here and its `pyproject.toml` entries in the same change:
 

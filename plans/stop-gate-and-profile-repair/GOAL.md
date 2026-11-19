@@ -18,7 +18,7 @@ its own goal and checkout. This successor owns only this goal.
 
 `C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-StopGateAndProfileRepair`, branch
 `Fix/StopGateFailures` from verified parent `Docs/StopGateOwnership`
-`cdd71edd394e5a8afdb4fe0c94fffa75e57eb79d` (PR #236), based on remote main `c95b899fc8119a37dfbde1b25d9e34bacbc3c265`.
+`1c809d596e900ebc78cab0d435cd90a9c63c44fb` (PR #236), based on remote main `6271d6d345a5fad9da54f7b98829201513e54f8e`.
 The same foreground owner continues this goal across its sequential delivery slices.
 
 - PR: not opened.
@@ -99,11 +99,11 @@ Independent correctness/workflow review uses L4 after implementation.
 
 1. Completed `Fix/StopGateAndProfileRepair`: D3/D4 package health, native cache recovery,
    pinned external sources and opt-in user-profile migration, with focused synthetic profile tests.
-   Base: `4090e7d238754b3f1a37cd297142a698129cd3c8`; actual 1,002 substantive code/test lines. The final two-line overage remains atomic with migration safety and its regressions; splitting those would weaken the qualified change.
+   Base: `e7179220ea6c4008e983348ca74ce1bdd8b25d69`; actual 1,002 substantive code/test lines. The final two-line overage remains atomic with migration safety and its regressions; splitting those would weaken the qualified change.
 2. Separate `Docs/StopGateOwnership`: canonical continuation and session-close wording,
    retaining published four-field blocker and `Paused:` formats. Base: updated remote main after slice 1.
 3. Current `Fix/StopGateFailures`: fail-closed Stop dispatch and blocker-boundary enforcement,
-   with real missing-import, deadline and continuation regressions. Parent: PR #236 at `cdd71edd394e5a8afdb4fe0c94fffa75e57eb79d`.
+   with real missing-import, deadline and continuation regressions. Parent: PR #236 at `1c809d596e900ebc78cab0d435cd90a9c63c44fb`.
    Expected fewer than 400 substantive code/test lines; review the child delta and validate the cumulative tree.
    The parent cannot merge automatically because `published-contract` is a recorded stop class. Proceeding
    as a stack completes authorized unblocked repair before the final concrete human delivery decision.
@@ -173,10 +173,10 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
   C++ migration returned zero, keeping scoped legacy installs/marketplaces while they remain referenced.
 - Fresh-session loading and adoption of these source changes by installed pinned packages are unobserved
   under the explicit no-extra-session limit. Native registry/payload checks passed for all eight packages.
-- D3/D4 source: PR #235 merged reviewed head `9690bff537e90f82c3c3a562c1ffa54a57c334e0` at
-  `8b33980747476f9369c1b39497908226c2990b21`; exact-head Windows/Linux CI `38336373168` passed.
+- D3/D4 source: PR #235 merged reviewed head `19e8a2e8e4f55daed54cd65b1c32ef9c289c22f8` at
+  `d150d96f167f951e6ddd36ee50ffbd343f8f5c37`; exact-head Windows/Linux CI `38336373168` passed.
   All ten review findings were resolved. Causal main CI/regeneration `38337890284` passed.
-- Parent PR #236: `cdd71edd394e5a8afdb4fe0c94fffa75e57eb79d`, independent native/contract/workflow
+- Parent PR #236: `1c809d596e900ebc78cab0d435cd90a9c63c44fb`, independent native/contract/workflow
   review approved in `reviews/Docs-StopGateOwnership.md`; frozen reference checks had no errors/warnings.
   Exact-head Windows/Linux CI `38339400959` passed. The binder reserves the changed
   `contract/plan-checkpoint` path under the published-contract stop class; standing authority exempts

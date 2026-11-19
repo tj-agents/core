@@ -10,8 +10,8 @@
 
 ## Review pass — 2026-09-22 — full
 
-**Candidate base:** `0972aae2cf324bc004e6bde4c3d9d65440fc62ac`
-**Candidate head:** `261cde666fe28306966c7e5da57f38fec8403ef4`
+**Candidate base:** `b2e73268ef265f0c30cf5e6c9f57959b5a177fe7`
+**Candidate head:** `3d17f0474f28557efc3466a38293150bfdccdac3`
 **Candidate branch:** `Fix/PluginCacheReconcile`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:2da3c35cebd6fbcd10e2290608a50f6f621a6bb18e58089a24872ab8bd3daa5e` `(94 paths)`
@@ -49,8 +49,8 @@ tree under any path separator.
 
 ## Review pass - 2026-09-22 - incremental
 
-**Candidate base:** `261cde666fe28306966c7e5da57f38fec8403ef4`
-**Candidate head:** `fbcb83dbff5dc347c67ca0e0754aec06b4a954ef`
+**Candidate base:** `3d17f0474f28557efc3466a38293150bfdccdac3`
+**Candidate head:** `29350d9cefb6a8af006c6c3a4ef7390f478272b2`
 **Candidate branch:** `Fix/PluginCacheReconcile`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:1aee893cc5c522574163d9f0a9e010d9cd27612979d44058643c2317832c909b` `(5 paths)`
@@ -70,7 +70,7 @@ already owns. Reconcile tests and both generation checks pass at the frozen head
 
 ## Review pass - 2026-09-22 - incremental
 
-**Candidate base:** `fbcb83dbff5dc347c67ca0e0754aec06b4a954ef`
+**Candidate base:** `29350d9cefb6a8af006c6c3a4ef7390f478272b2`
 **Candidate head:** `a82ed3b`
 **Candidate branch:** `Fix/PluginCacheReconcile`
 **Candidate scope:** `all`
@@ -119,8 +119,8 @@ in the completed pass above keeps its resolution condition.
 
 ## Review pass - 2026-09-23 - incremental
 
-**Candidate base:** `a82ed3bd360c6a2d30ca4a4535d0291582d8ca5c`
-**Candidate head:** `6a7600f9362aaade10231eb336608a7b9962a363`
+**Candidate base:** `63e92055ff8a0fe219717950920bccae86225993`
+**Candidate head:** `ca8c06d2e451833754e25b373339754e44c8a368`
 **Candidate branch:** `Fix/PluginCacheReconcile`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:5344335b3bbe24f5d516b9ba8bd79619286595f131fe5d4b58666a540026fd66` `(9 paths)`

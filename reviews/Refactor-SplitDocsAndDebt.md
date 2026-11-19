@@ -10,7 +10,7 @@
 
 ## Review pass — 2026-10-09 — code
 
-**Candidate base:** `3f9ab37d00f625004287b2e5728f80d154577cd5`
+**Candidate base:** `3ab3c76a83da9890391c1818cea9befc40f2be7d`
 **Candidate head:** `39588f61047c2d78b15b9b125cd59b6e165b4afd`
 **Candidate branch:** `Refactor/SplitDocsAndDebt`
 **Candidate scope:** `all`
@@ -59,7 +59,7 @@ recorded compatibility decision, not a defect in this candidate; no route row in
 The branch was rebased four times onto the moving parent, so pass 1's watermark `39588f6` is no longer an
 ancestor; this pass covers the whole rebased layer rather than an incremental delta.
 
-**Candidate base:** `bf43af58331a565aa586123aef74f3211e3c1722`
+**Candidate base:** `c9d076129b0d8c998a5733376f08d83e24436883`
 **Candidate head:** `847ec60150095556f6b642ca998e85db2119020b`
 **Candidate branch:** `Refactor/SplitDocsAndDebt`
 **Candidate scope:** `all`
@@ -190,7 +190,7 @@ None.
 
 ## Review pass — 2026-10-11 — incremental (main reconciliation and Codex takeover)
 
-**Candidate base:** `7a029f73b963c12547bd59d7958673da40f042b5`
+**Candidate base:** `987c460c50870c23063ab823b770099ba1af1f9f`
 **Candidate head:** `db940ae5d5df4db1caeb0587e8b30e919450156a`
 **Candidate branch:** `Refactor/SplitDocsAndDebt`
 **Candidate scope:** `all`
@@ -349,8 +349,8 @@ None.
 The branch was unstacked from #168 and rebuilt on `main` as two commits; earlier passes reviewed the stacked
 history kept on `backup/SplitDocsAndDebt-stacked`.
 
-**Candidate base:** `38550a7258b6819df139300ae340088babc6098f`
-**Candidate head:** `35ef630c3dc94c34cf5f04b2b8b59a80824363e8`
+**Candidate base:** `c9e18c89c49d245f0085ebf0f7be5a904f04fbc3`
+**Candidate head:** `f09d1b13df3a482367e37b300a692ca201715ee2`
 **Candidate branch:** `Refactor/SplitDocsAndDebt`
 **Candidate scope:** `all`
 **Work-order path:** `reviews/Refactor-SplitDocsAndDebt.md`
@@ -385,8 +385,8 @@ files).
 
 ## Review pass — 2026-10-11 — incremental (base update)
 
-**Candidate base:** `191fd9c890a42c994b640583e2b2e633994a7d2c`
-**Candidate head:** `7a029f73b963c12547bd59d7958673da40f042b5`
+**Candidate base:** `b9e9a5c2d3827e006b9259fc6182965b7b7dd87f`
+**Candidate head:** `987c460c50870c23063ab823b770099ba1af1f9f`
 **Candidate branch:** `Refactor/SplitDocsAndDebt`
 **Candidate scope:** `all`
 **Work-order path:** `reviews/Refactor-SplitDocsAndDebt.md`

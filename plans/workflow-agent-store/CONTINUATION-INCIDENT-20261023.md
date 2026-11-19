@@ -8,7 +8,7 @@ Native conversation: `codex:01a16053-d03d-7753-8ad9-3174781fba89`.
 
 At 12:05:55.505 UTC on 23 October 2026, the owner returned a final response with
 authorized work unfinished, no necessary question, and no verified continuation.
-PR355 remained open at `c6778af225a897afdeeac1d78062b8bcc3a15990`; its exact-head
+PR355 remained open at `9758fbf623c3049ea40971e3c3f90ee5551af801`; its exact-head
 CI39942526220 had passed. Review, merge and installed activation remained pending.
 Tommy had to return to request the merge and call out the missing listener.
 
@@ -24,7 +24,7 @@ records the final response at line13620 and `task_complete` at line13623,
 
 ## Why Core did not prevent it
 
-Commit `40cab46184b379c0588403b892bf564670f9a8bc`, 19 October 2026 at
+Commit `4deb2febbdc251dffe1d05e76d6ecdc050d14fca`, 19 October 2026 at
 20:13:59 UTC, deliberately removed `continuation_stop` and `workflow_route` from
 both host manifests. Its message, "Remove procedural hooks and the pre-launch
 standards refresh", describes them as procedural enforcement and notes eight
@@ -77,11 +77,11 @@ passing dormant unit tests or green source CI does not satisfy that condition.
 This incident remains open until that behavioral acceptance is observed.
 
 PR355 subsequently merged the reviewed polling-repair head `2952750d` at
-`b1fa5c68a1c532cc2190832828dfdcdca82664e5`, 23 October 2026 at 13:59:24 UTC.
+`e71a4126d41590da67ebbf0f41112fa06d15e5de`, 23 October 2026 at 13:59:24 UTC.
 Exact-head CI39963544250 and causal publication39965800923 passed on Windows and
 Linux, including actual native startup/discovery. Publication completed at
 14:15:35 UTC; regeneration job120455230985 published
-`f03d360482343de2231ca634afed18c87c15d5d9`. This completes Core355 delivery;
+`9d20d06df3926270016699e04b3739ce0a58e055`. This completes Core355 delivery;
 continuation-prevention acceptance remains open.
 
 ## Intermediate owner retirement gap

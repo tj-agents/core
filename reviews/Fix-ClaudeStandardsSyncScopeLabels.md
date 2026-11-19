@@ -10,8 +10,8 @@
 
 ## Review pass — 2026-09-28 — full
 
-**Candidate base:** `3a647a5014c06f316cc50d1f54a51d95dcab57f7`
-**Candidate head:** `10a02de898439db6cefcdd66d6ce9110e6bcc44b`
+**Candidate base:** `c30e3ab0782552787f95ed47d185d0ad6305d5e8`
+**Candidate head:** `35b34a57ac61c5f0e01d26a98a3f4bc1adbaf416`
 **Candidate branch:** `Fix/ClaudeStandardsSyncScopeLabels`
 **Candidate scope:** `all`
 **Work-order path:** `reviews/Fix-ClaudeStandardsSyncScopeLabels.md`

@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `589c2c90fc20814dc037673af9870b65a6201028`  `(2026-10-07)`
+**Reviewed up to commit:** `6c2e1beb04fa3f3aba0c072b6c724ff9e50075b7`  `(2026-10-07)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-07 — docs
 
-**Candidate base:** `61d4920477a313528f855babd2e4ee4ccdf3d8f6`
-**Candidate head:** `589c2c90fc20814dc037673af9870b65a6201028`
+**Candidate base:** `50dcb8f6b1694e5c6abcc581e02d52bbfa51f394`
+**Candidate head:** `6c2e1beb04fa3f3aba0c072b6c724ff9e50075b7`
 **Candidate branch:** `Docs/PlanGraphInvocation`
 **Candidate scope:** `all`
 **Candidate path-set:** `.agents/engineering/convention/plans/SKILL.md, .agents/engineering/workflow/plan-authoring/SKILL.md, .agents/engineering/workflow/plan-execution/SKILL.md` `(3 paths)`

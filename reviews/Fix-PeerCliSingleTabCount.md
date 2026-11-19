@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `925bcbfb5346d2fc8127b61f7b8666d295031137`  `(2026-10-07)`
+**Reviewed up to commit:** `cce4503d4f6f670c2e5c410cb5c0e42156345211`  `(2026-10-07)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-07 — full
 
-**Candidate base:** `bc18f68c76eebe31225f2ff0f986a271e5360aad`
-**Candidate head:** `335ffb83c78563ab641dc1b0950ad2d72a2942dd`
+**Candidate base:** `f5317135b3c5c7dc6e55ac8c248978a91b4f1603`
+**Candidate head:** `bb2ca32ad2c4c2f6362297a13a0844adfd6bc81e`
 **Candidate branch:** `Fix/PeerCliSingleTabCount`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:d3eb6ed7d344b7949afc08d734a7993e983609306a82e7459f63aaec55956a6d` `(3 paths)`
@@ -38,8 +38,8 @@
 
 ## Review pass — 2026-10-07 — incremental
 
-**Candidate base:** `335ffb83c78563ab641dc1b0950ad2d72a2942dd`
-**Candidate head:** `925bcbfb5346d2fc8127b61f7b8666d295031137`
+**Candidate base:** `bb2ca32ad2c4c2f6362297a13a0844adfd6bc81e`
+**Candidate head:** `cce4503d4f6f670c2e5c410cb5c0e42156345211`
 **Candidate branch:** `Fix/PeerCliSingleTabCount`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:d3eb6ed7d344b7949afc08d734a7993e983609306a82e7459f63aaec55956a6d` `(3 paths)`

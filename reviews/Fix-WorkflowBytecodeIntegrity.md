@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `1de04c6a4a6dfdf0219b5b57bf0cb15443bb30e0`  `(2026-10-07)`
+**Reviewed up to commit:** `a7163501f2dc1443d3185a40f07611692c80d387`  `(2026-10-07)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-07 — full
 
-**Candidate base:** `830c7891075b322e359e0bed8286add50ecd8b64`
-**Candidate head:** `1de04c6a4a6dfdf0219b5b57bf0cb15443bb30e0`
+**Candidate base:** `8f58c46c576d4541d28b62339dff33b07638298b`
+**Candidate head:** `a7163501f2dc1443d3185a40f07611692c80d387`
 **Candidate branch:** `Fix/WorkflowBytecodeIntegrity`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:460efd7a93fce95cc59b228bac580e01955d887aaa9a93857e3c1008a80b46c0` `(5 paths)`

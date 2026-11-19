@@ -4,7 +4,7 @@ Status: focused verification passed; immutable candidate preparation active.
 Date: 2026-10-12
 Branch: Fix/VerifiedSelfCloseFallback
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-VerifiedSelfCloseFallback
-Base: origin/main at bdb63914c03e6d5d62dcac7edb556d5a79c90b85
+Base: origin/main at 507d2a9786740d9e71cbfc690c7c39f016c695f7
 PR: not opened
 Predecessor: native Codex 01a12d05-0e36-7cd2-afac-1936aa63404b, PID9104/start1791756662.4871101, cwd Fix-FollowupRecoveryOwnership.
 Lane: L3 for bounded diagnosis and safe terminal/process boundary; route specified implementation/review L4 and mechanical delivery L7.
@@ -33,7 +33,7 @@ Existing .agents/machine/TECH_DEBT.md first entry already owns wider registered 
 
 ## Successor pickup
 
-Native Codex session 01a12d92-aec1-75c0-b285-b0ba8cd4a4f3 acknowledges this handoff on 2026-10-12 from the exact recorded checkout and branch Fix/VerifiedSelfCloseFallback, at base bdb63914c03e6d5d62dcac7edb556d5a79c90b85. This session is the sole writer for the isolated repair; predecessor scope and checkout retention remain preserved. Ordinary command execution reports runtime 0.163.0-alpha.1. Existing dirty problem records belong to this repair.
+Native Codex session 01a12d92-aec1-75c0-b285-b0ba8cd4a4f3 acknowledges this handoff on 2026-10-12 from the exact recorded checkout and branch Fix/VerifiedSelfCloseFallback, at base 507d2a9786740d9e71cbfc690c7c39f016c695f7. This session is the sole writer for the isolated repair; predecessor scope and checkout retention remain preserved. Ordinary command execution reports runtime 0.163.0-alpha.1. Existing dirty problem records belong to this repair.
 
 Diagnosis selects L3: the fallback boundary requires checking process identity and terminal refusal semantics. The canonical Codex table resolves L3 to gpt-6.1-sol/high; this matches the handoff's selected lane. No model switch is claimed. Workflow inspection succeeded through supported host-side execution after normal sandbox access to shared Git metadata was denied.
 

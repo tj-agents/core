@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `3f41cf88ed247f55e4a675b907674f4690644d04`  `(2026-10-13)`
+**Reviewed up to commit:** `c6eca33e67f8441074bf742d358152dad88a76fa`  `(2026-10-13)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-12 — full
 
-**Candidate base:** `c91b60c955ad4a3f0f7a9383fc20f1c4a6b58510`
-**Candidate head:** `afa69fa55a938cde389e56d171db21fac8877660`
+**Candidate base:** `218f7be9bcbc04bf735df18e26c16a99bdbfc2a0`
+**Candidate head:** `7cf649a8f42de9d1af6d44fd4bc1fa06c874649c`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:5ce45e3415d8bf786db4b56fd8d0dfd107e22173051442035cf4dd0201f51df8` `(8 paths)`
@@ -55,8 +55,8 @@ Native layer: Claude Code `code-review` skill (medium). Lens: `workflow` (`revie
 
 ## Review pass — 2026-10-12 — incremental
 
-**Candidate base:** `afa69fa55a938cde389e56d171db21fac8877660`
-**Candidate head:** `5c13ab4e7ddca02f36ef5722302011dd6ff2cdd4`
+**Candidate base:** `7cf649a8f42de9d1af6d44fd4bc1fa06c874649c`
+**Candidate head:** `aa3a35c021da31c57fdffc292350027c54327505`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:ab292007ea8fb141ead4411236cb6f4d587d6fd8cffc86ba4640b5f746e0fa46` `(5 paths)`
@@ -82,8 +82,8 @@ Native layer: Claude Code `code-review` skill (medium). Lens: `workflow` (`revie
 
 ## Review pass — 2026-10-12 — incremental
 
-**Candidate base:** `5c13ab4e7ddca02f36ef5722302011dd6ff2cdd4`
-**Candidate head:** `d03b34dd289064840cddebeb07fc6d402ef3ae71`
+**Candidate base:** `aa3a35c021da31c57fdffc292350027c54327505`
+**Candidate head:** `16331c962ca7a22e3b85bd192d76a8007ea73d5a`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:f9d9ce71f4ec2b7bafd2a9fb8c6f4ad04b12884445775173731388ffa46893eb` `(3 paths)`
@@ -101,8 +101,8 @@ No findings. R7 and R8 dispositions verified.
 
 ## Review pass — 2026-10-13 — incremental
 
-**Candidate base:** `d03b34dd289064840cddebeb07fc6d402ef3ae71`
-**Candidate head:** `67b45a87b390a722727dc6f428ff08922113b238`
+**Candidate base:** `16331c962ca7a22e3b85bd192d76a8007ea73d5a`
+**Candidate head:** `a7fe6116768cb0c5bba4f70eeb0007fb6f63d6de`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:69c39bad441c9e92dca09869bdd2cd06515a55c4b229718a1d6ed7f855a4f0c8` `(16 paths)`
@@ -115,7 +115,7 @@ No findings. R7 and R8 dispositions verified.
 Native layer: Claude Code `code-review` skill (high). Lens: `workflow` (`review-lens`). No security-sensitive paths. Resume registration verification is out of scope here (PR #233).
 
 ```agent-host-coverage
-{"schema_version":1,"shared_source":".agents/machine/scripts/session_store.py","candidate_head":"3f41cf88ed247f55e4a675b907674f4690644d04","hosts":[{"host":"claude","behavior":"Hooks record Claude session start, turns, stop and end in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Claude sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Claude machine-hooks.json SessionStart (register_session.py), UserPromptSubmit, Stop and SessionEnd entries; recover-agents routes the CLI.","verification":{"level":"source","result":"passed","evidence":"The shared store retries a transient WAL initialisation lock and closes failed connections; focused regression tests cover both paths."}},{"host":"codex","behavior":"Hooks record Codex session start, turns and stop in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Codex sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Codex machine-hooks.json SessionStart via hook_dispatch (register_session.py), UserPromptSubmit and Stop entries; recover-agents routes the CLI.","verification":{"level":"source","result":"passed","evidence":"The shared store retries a transient WAL initialisation lock and closes failed connections; focused regression tests cover both paths."}}]}
+{"schema_version":1,"shared_source":".agents/machine/scripts/session_store.py","candidate_head":"c6eca33e67f8441074bf742d358152dad88a76fa","hosts":[{"host":"claude","behavior":"Hooks record Claude session start, turns, stop and end in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Claude sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Claude machine-hooks.json SessionStart (register_session.py), UserPromptSubmit, Stop and SessionEnd entries; recover-agents routes the CLI.","verification":{"level":"source","result":"passed","evidence":"The shared store retries a transient WAL initialisation lock and closes failed connections; focused regression tests cover both paths."}},{"host":"codex","behavior":"Hooks record Codex session start, turns and stop in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Codex sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Codex machine-hooks.json SessionStart via hook_dispatch (register_session.py), UserPromptSubmit and Stop entries; recover-agents routes the CLI.","verification":{"level":"source","result":"passed","evidence":"The shared store retries a transient WAL initialisation lock and closes failed connections; focused regression tests cover both paths."}}]}
 ```
 
 ### Findings
@@ -183,8 +183,8 @@ Native layer: Claude Code `code-review` skill (high). Lens: `workflow` (`review-
 
 ## Review pass — 2026-10-13 — incremental
 
-**Candidate base:** `67b45a87b390a722727dc6f428ff08922113b238`
-**Candidate head:** `3df86558f1dfb2193989cd6db054d8596ffb64a3`
+**Candidate base:** `a7fe6116768cb0c5bba4f70eeb0007fb6f63d6de`
+**Candidate head:** `3f0c30c8061d43f1c926e71c7425792e09838bc0`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:586570d98298965c232fa061a28417a1503ff89c34691ea1beb67ff9d2af8bc7` `(16 paths)`
@@ -247,8 +247,8 @@ work order and the host check rejects a second one.
 
 ## Review pass — 2026-10-13 — incremental
 
-**Candidate base:** `3df86558f1dfb2193989cd6db054d8596ffb64a3`
-**Candidate head:** `6c4ed0790ea2f1fec7f822292e1ae88238aadeb0`
+**Candidate base:** `3f0c30c8061d43f1c926e71c7425792e09838bc0`
+**Candidate head:** `bc97dbc95b882969822b2158090b052bb600427b`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:173d86c49119bd50cc9887af969df8e5c47d8eb6eef7f84bfcc2af2606d504a1` `(6 paths)`
@@ -305,8 +305,8 @@ case-folded repository key — `sessions.db` has never shipped, so no recorded r
 
 ## Review pass — 2026-10-13 — incremental
 
-**Candidate base:** `6c4ed0790ea2f1fec7f822292e1ae88238aadeb0`
-**Candidate head:** `e0b1d0da0ea57c374689c08a8f67b6d625861553`
+**Candidate base:** `bc97dbc95b882969822b2158090b052bb600427b`
+**Candidate head:** `531c7a6729d2df5d89c66e0e192a4b9f40a73f70`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:d6dbba39967b6ecd666f368f01c662515abcda56762fb42d5156938af0ecaf06` `(7 paths)`
@@ -326,8 +326,8 @@ Native layer: Codex `codex review` (medium; no findings emitted). Workflow revie
 
 ## Review pass — 2026-10-13 — incremental
 
-**Candidate base:** `e0b1d0da0ea57c374689c08a8f67b6d625861553`
-**Candidate head:** `a5d3787acaf8f664e6a8dc2cfc47153e013ef309`
+**Candidate base:** `531c7a6729d2df5d89c66e0e192a4b9f40a73f70`
+**Candidate head:** `bb4da967468682ec66119408d352ac69ee859b9b`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:93394ee3efcbce9c8c33e3adda1e30bbe766710154720e0200e9b863b22abf69` `(4 paths)`
@@ -350,8 +350,8 @@ Native layer: Codex `codex review` (high). No security-sensitive paths.
 
 ## Review pass — 2026-10-13 — incremental
 
-**Candidate base:** `d15375a3749f01c927921b2860df5c99650d080b`
-**Candidate head:** `b83ac4e41b885b2f73c3526c255908d29024aef1`
+**Candidate base:** `8d2442caa276cdd9b786ff9b5925d9ffd78655bc`
+**Candidate head:** `44e05ee6e947742ef6c1fd61ded19b910eb420e8`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:77926010de35b0789c389620a480a992f8e413a0161ffe6150ab966c8d84eef5` `(51 paths)`
@@ -369,8 +369,8 @@ No retained findings. The native reviewer identified four Claude standards-sync 
 
 ## Review pass - 2026-10-13 - incremental
 
-**Candidate base:** `b83ac4e41b885b2f73c3526c255908d29024aef1`
-**Candidate head:** `ba74c9c932e200a049c92c7a3488930c52a12d57`
+**Candidate base:** `44e05ee6e947742ef6c1fd61ded19b910eb420e8`
+**Candidate head:** `be806b74f7b9559d2d80aa6deeb71c43171dc088`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:5757171c929dbe6a7906548e345d03882d9ffaf7a6e3eb2a388dc61fbff8d0cd` `(22 paths)`
@@ -388,8 +388,8 @@ No retained findings. This is the current-main merge required to refresh the rev
 
 ## Review pass - 2026-10-13 - incremental
 
-**Candidate base:** `b83ac4e41b885b2f73c3526c255908d29024aef1`
-**Candidate head:** `ba74c9c932e200a049c92c7a3488930c52a12d57`
+**Candidate base:** `44e05ee6e947742ef6c1fd61ded19b910eb420e8`
+**Candidate head:** `be806b74f7b9559d2d80aa6deeb71c43171dc088`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:5757171c929dbe6a7906548e345d03882d9ffaf7a6e3eb2a388dc61fbff8d0cd` `(22 paths)`
@@ -407,8 +407,8 @@ No retained findings. This is the current-main merge required to refresh the rev
 
 ## Review pass - 2026-10-13 - incremental
 
-**Candidate base:** `1b1b8d91c7b494f6e7b05d8c809aa3360ef31f12`
-**Candidate head:** `3f41cf88ed247f55e4a675b907674f4690644d04`
+**Candidate base:** `7cf93dd9ebc63fa18a7d1d8aed610bef1ad8af1f`
+**Candidate head:** `c6eca33e67f8441074bf742d358152dad88a76fa`
 **Candidate branch:** `Feature/WorkItemSessions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:8ac8d488dca4145ec1bf6e57d7fd0d21be725baf4170175dcaeae797957c2e7c` `(3 paths)`

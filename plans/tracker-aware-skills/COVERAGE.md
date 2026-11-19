@@ -51,6 +51,6 @@ Core paths below are relative to `.agents/engineering/`; each skill path ends in
 
 Core workflow artifacts are Git-private under `core/.git/agent-workflow/runs/tracker-aware-skills/artifacts/`: `cdd9cdc1ed895120-core-routing-focused.log` (7 tests), `79a1f8ca721b1c1f-list-work-focused.log` (49 tests), `62634ff46616030d-packaging.log` (packaging).
 
-Provider source slice: `C:/Users/TommySeery/source/repos/tj-agents/work-items/.worktrees/Fix-PrimaryTrackerSelection`, branch `Fix/PrimaryTrackerSelection`, base `bcf57f969a874181ca5327970dc59646ad820a6d`. No adoption checkout or migrated record was changed.
+Provider source slice: `C:/Users/TommySeery/source/repos/tj-agents/work-items/.worktrees/Fix-PrimaryTrackerSelection`, branch `Fix/PrimaryTrackerSelection`, base `b83d825bfa9f1e83bf7e14ddd104b1e76e129514`. No adoption checkout or migrated record was changed.
 
 Native acceptance is in progress under temporary isolated Codex/Claude profiles at `C:/Users/TommySeery/AppData/Local/Temp/tracker-native-01a14f1d`. Generated skill and provider bytes are copied unchanged; fixture plugin manifests omit hooks to isolate skill discovery/execution. The provider's real CLI persists through a local GitHub API fixture, not live GitHub. Full trusted-hook activation and consumer rollout are outside this source test. Results, exact source candidates, persisted identities and limitations will be recorded after observation.

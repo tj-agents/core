@@ -62,7 +62,7 @@ confirmed the handoff pointer changed, while this goal's larger correction did n
 Git checkpoint proves that operation passed, not recovery of every later action in this running host.
 
 Next actions: finish the remaining documentation corrections, checkpoint them, review the delta
-from b6830f90c0e2320b0d375ea4d824c49b849bab0e, publish with plain Git/gh, then
+from 3da3065f2c4fd0fbf4edb6d10e42d5c625b25d75, publish with plain Git/gh, then
 merge this documentation-only slice under `engineering:merge-docs` once its gates pass. Remain the
 foreground owner through delivery; initialize supported continuation if a delayed external result
 requires it. Report the actual PR and merge SHA. GitHub confirms configurable auto-merge PR #188
@@ -294,7 +294,7 @@ That directory owns `normal-launch-verification.json`, `normal-launch-submission
 The separate activation backup above supplies exact rollback bytes. Do not rerun the original
 activation script on changed files; its hashes intentionally fail after activation.
 
-GitHub directly confirms PR #188 is merged at `8a2c87945c3665ba68ca012e1d045e42a22db1ec`; the remote
+GitHub directly confirms PR #188 is merged at `0247c4271d474345f6db0e1a00bebf54e0819b9c`; the remote
 default declaration enables `auto_merge: true` under green required checks and independent review.
 This older evidence checkout lacks the new declaration field. No source repair PR was created for
 machine activation, and no further merge permission was requested after Tommy's instruction.

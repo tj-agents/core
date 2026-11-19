@@ -7,7 +7,7 @@ For large critical plans, establish a distinct planning/readiness responsibility
 ## Identity and ownership
 
 - Repository: tj-agents/core; branch Feature/CriticalPlanExecutionHandoff.
-- Checkout: C:\Users\TommySeery\source\repos\tj-agents\core.worktrees\Feature-CriticalPlanExecutionHandoff; fresh fetched origin/main base 6c7f365bbc1ec665f0901f92937543d3f890f8c7.
+- Checkout: C:\Users\TommySeery\source\repos\tj-agents\core.worktrees\Feature-CriticalPlanExecutionHandoff; fresh fetched origin/main base a607cdd32e2e0bde81923de681b04b12c506e5af.
 - Owner: current Codex session in the recorded checkout; pickup acknowledged 2 October 2026 after reading the goal and verifying branch/base identity. No second execution owner.
 - PR: not opened.
 - Related continuation owner: C:\Users\TommySeery\source\repos\tj-agents\core.worktrees\Feature-DefaultGoalContinuation\plans\default-goal-continuation\DEFAULT_GOAL_CONTINUATION.md.
@@ -47,7 +47,7 @@ Done when: the assessed correction is reviewed, validated and published as a dra
 
 ## Current checkpoint
 
-- Ownership and authorization reconciled against the supplied handoff and this checkout. Fetched origin/main remains 6c7f365bbc1ec665f0901f92937543d3f890f8c7; the branch is not behind.
+- Ownership and authorization reconciled against the supplied handoff and this checkout. Fetched origin/main remains a607cdd32e2e0bde81923de681b04b12c506e5af; the branch is not behind.
 - Measured candidate: 525 helper/test additions, 163 instruction/template changed lines, 8 catalog/manifest changed lines, the canonical goal, and 1,217 generated changed lines across 18 output files. The runtime and its invocation contract form one atomic correction; no separate concern or stack dependency is included.
 - One focused delivery slice: readiness/transfer contracts, the smallest enforcing helper or host path needed, associated acceptance tests, harness declarations and generated output. Expected authored surface below 1,000 changed lines; reassess before expanding. Base is origin/main; no stack dependency is established.
 - L1 resolved the bounded mechanism decision; an independent evidence reader mapped adoption and tests. L4 implemented the helper and subprocess cases; L5 executed the isolated pickup fixture. This session retains plan and acceptance ownership.

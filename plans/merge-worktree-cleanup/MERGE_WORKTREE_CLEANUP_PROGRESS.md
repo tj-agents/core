@@ -15,7 +15,7 @@
   remaining topic branch, but a fresh non-recursive removal still fails because another process holds it.
 - Winwrap's primary checkout and other linked worktrees now contain unrelated active work and must not be
   changed by this plan.
-- Core PR #35 merged as `fb1be0a4e2663b34de4cad7f9d08501a367f431c`; exact post-merge CI run
+- Core PR #35 merged as `90b4987f6d3fe93b44c5709fdfa687e5f7a4d72e`; exact post-merge CI run
   `36080559767` completed successfully. Core has no publish workflow, so no version-sync PR was created.
 - The remaining root cause is host ordering: `engineering:merge` removes the linked worktree before applying
   `base:cd`, while per-command `workdir`, shell `cd`, and `git -C` do not retarget Codex or Claude.
@@ -24,7 +24,7 @@
 - The implementation is committed and published: `base:cd`, `handoff`, and merge Step 5 transfer active
   directory removal to a confirmed native retarget or one successor; all three shared launchers resolve the
   deeper packaged canonical layout; the nine generated layouts are exercised; release metadata is 2.1.7.
-- PR #38 merged on `main` as `fc7b78e6ba032451e974220918e8b91181290496`. The predecessor session was
+- PR #38 merged on `main` as `dd42d279590456fad6a7fb798e6a83c74fb701b8`. The predecessor session was
   attached to the linked core worktree; this primary-checkout successor owns its physical removal.
 - The clean linked target was unregistered by non-forced Git removal, but Windows denied deleting its now-empty
   root directory. Its local merged branch remains until that path is physically absent, as the final-inventory
@@ -50,7 +50,7 @@ and worktree inventory are clean.
 - PR #35 cleanup returned core's primary checkout to clean current `main` and deleted its merged local branch.
 - Host-retarget ordering, directory-release handoff ownership, packaged launcher resolution, focused coverage,
   2.1.7 metadata, and generated outputs landed in PR #38.
-- PR #38 merged as `fc7b78e6ba032451e974220918e8b91181290496` after its green `verify` check.
+- PR #38 merged as `dd42d279590456fad6a7fb798e6a83c74fb701b8` after its green `verify` check.
 
 ## Verification
 

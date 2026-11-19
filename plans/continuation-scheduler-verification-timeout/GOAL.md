@@ -18,9 +18,9 @@ PR: not opened.
 
 Successor: native session `01a13562-6a28-73a3-b2bc-d3bbe884dad5`, verified PID32000. Before runtime source writes it read this goal, the full advertised `engineering:address-mistake`, its problem-record contract, `engineering:lanes`, `engineering:handoff`, and `engineering:plan-execution`, reconciled M003 and acknowledged pickup here. No transfer receipt was supplied. Former session `01a12af0-c387-72b1-8346-257a0f2ab630` / PID66440 is dead.
 
-PR237 merged reviewed head `7d6f49a0c50fa9b9aefc11055a48f8a4b616daf1` at 2026-10-13T13:00:06Z. Its session `01a13292-355a-7012-8eb5-308d7421e436` / PID21676 was live during reconciliation and retains its own closure. Consume its merged Stop repair; do not duplicate its source work.
+PR237 merged reviewed head `4b07a9538b7881a28c0310ad31197bfbac3f5702` at 2026-10-13T13:00:06Z. Its session `01a13292-355a-7012-8eb5-308d7421e436` / PID21676 was live during reconciliation and retains its own closure. Consume its merged Stop repair; do not duplicate its source work.
 
-The old clean branch was fast-forwarded from `3cf59c0` to fetched main `35881e4898fb927abb818573f1da030716e802e1`, preserving this goal. Final review will synchronize the five newer main commits now observed. Current checkout `.agents/settings.json` enables `configuration.core.auto_merge`; design auto-approval remains false by default. `.agents/delivery-authorization.json` records standing reviewed-green Core merge authority and exempts auth only.
+The old clean branch was fast-forwarded from `3cf59c0` to fetched main `24b8685548ffd85034545480f012642a4543189f`, preserving this goal. Final review will synchronize the five newer main commits now observed. Current checkout `.agents/settings.json` enables `configuration.core.auto_merge`; design auto-approval remains false by default. `.agents/delivery-authorization.json` records standing reviewed-green Core merge authority and exempts auth only.
 
 ## Causal diagnosis and delivery slice
 

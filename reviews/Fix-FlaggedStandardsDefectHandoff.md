@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `e10d0ed5ccb2d82d9d5294b7bf0a7e37e269e4e6`  `(2026-10-04)`
+**Reviewed up to commit:** `3f5a9276991424fa92ba34eff5ffd01a8cc4bd91`  `(2026-10-04)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-04 — full
 
-**Candidate base:** `0c658509e77a7639aad4eb2ad7b9b7310264396c`
-**Candidate head:** `901e3b9155f59d6efdb5ad097c09039f4c3fdf26`
+**Candidate base:** `bf476d1158fdf01a22d60affd42cfc3612fa736c`
+**Candidate head:** `10558c052574faa8369db71a84028172da6157d0`
 **Candidate branch:** `Fix/FlaggedStandardsDefectHandoff`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:080288ab75e22389f1e7ef151cdbda1dfb0fe85723b630b3f5586aadf92d97f4` `(3 paths)`
@@ -84,8 +84,8 @@ regeneration (output left uncommitted). An incremental pass over the fixing comm
 
 ## Review pass — 2026-10-04 — incremental
 
-**Candidate base:** `901e3b9155f59d6efdb5ad097c09039f4c3fdf26`
-**Candidate head:** `07333b763732c6034903ab9128b2831137a3902d`
+**Candidate base:** `10558c052574faa8369db71a84028172da6157d0`
+**Candidate head:** `ba156d8c39b97939e611472a9fd538ee2ed1f08b`
 **Candidate branch:** `Fix/FlaggedStandardsDefectHandoff`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:eff2fecac7deaf671f469c27812a3d5908bcc656948ac236797076ed185fbf02` `(4 paths)`
@@ -151,8 +151,8 @@ generated root is editable. F15: the subject and carve-out are pinned. Validatio
 
 ## Review pass — 2026-10-04 — incremental (2)
 
-**Candidate base:** `07333b763732c6034903ab9128b2831137a3902d`
-**Candidate head:** `94e4b3f0dac50ecc4c0d1446605663b99c2e9394`
+**Candidate base:** `ba156d8c39b97939e611472a9fd538ee2ed1f08b`
+**Candidate head:** `a23af58324ddac2b173129f8298111abeafb1615`
 **Candidate branch:** `Fix/FlaggedStandardsDefectHandoff`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:a8934002fe71441b09e26341daa8f01f7e672b750905d92be5b80cfcbbaa9600` `(5 paths)`
@@ -210,8 +210,8 @@ and `sync_harness_manifests.py --check` green after local regeneration (output l
 
 ## Review pass — 2026-10-04 — incremental (3)
 
-**Candidate base:** `94e4b3f0dac50ecc4c0d1446605663b99c2e9394`
-**Candidate head:** `b24180ad50a66317ab9d27f498f126262c4bf580`
+**Candidate base:** `a23af58324ddac2b173129f8298111abeafb1615`
+**Candidate head:** `e12850769bde5862c0631c130b6bdd95a9c6bdba`
 **Candidate branch:** `Fix/FlaggedStandardsDefectHandoff`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:a8934002fe71441b09e26341daa8f01f7e672b750905d92be5b80cfcbbaa9600` `(5 paths)`
@@ -268,8 +268,8 @@ it checks. Validation: `test_repository_permissions.py` (3), `test_process_stand
 
 ## Review pass — 2026-10-04 — incremental (4)
 
-**Candidate base:** `b24180ad50a66317ab9d27f498f126262c4bf580`
-**Candidate head:** `508c8d4594cbba1d676fa1b933e9fa56d0b55185`
+**Candidate base:** `e12850769bde5862c0631c130b6bdd95a9c6bdba`
+**Candidate head:** `667e87084bfe1df9edf45b3dcb7d4a0ea50a536a`
 **Candidate branch:** `Fix/FlaggedStandardsDefectHandoff`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:a8934002fe71441b09e26341daa8f01f7e672b750905d92be5b80cfcbbaa9600` `(5 paths)`
@@ -310,8 +310,8 @@ and `run: |-  # note` parses to exactly its two commands. Validation: `test_repo
 
 ## Review pass — 2026-10-04 — incremental (5)
 
-**Candidate base:** `508c8d4594cbba1d676fa1b933e9fa56d0b55185`
-**Candidate head:** `88e492efa9f2f701bb426562ba19032d949a0d4c`
+**Candidate base:** `667e87084bfe1df9edf45b3dcb7d4a0ea50a536a`
+**Candidate head:** `5ef9bb83712026aa4b78b9bb2620ec802572a7f5`
 **Candidate branch:** `Fix/FlaggedStandardsDefectHandoff`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:e19517c5331fbf2c9b8290bfeaf736e1f811c12a6e3e91ab0dace1f14bc749a4` `(3 paths)`
@@ -332,8 +332,8 @@ closes a `- run: |` block, and verified the session-guidance change is a word-fo
 
 ## Review pass — 2026-10-04 — incremental (6, base integration)
 
-**Candidate base:** `88e492efa9f2f701bb426562ba19032d949a0d4c`
-**Candidate head:** `e10d0ed5ccb2d82d9d5294b7bf0a7e37e269e4e6`
+**Candidate base:** `5ef9bb83712026aa4b78b9bb2620ec802572a7f5`
+**Candidate head:** `3f5a9276991424fa92ba34eff5ffd01a8cc4bd91`
 **Candidate branch:** `Fix/FlaggedStandardsDefectHandoff`
 **Candidate scope:** `.agents/engineering/contract/session-guidance/SKILL.md`, `.agents/hooks/tests/test_process_standards.py`, `.claude/**`, `tests/test_repository_permissions.py`
 **Candidate path-set:** `sha256:cd5744cbac526d2c112afd6541509f5adc4a7099bbf3f260b839e4b3f428152d` `(86 paths)`

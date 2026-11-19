@@ -6,7 +6,7 @@ Standing engineering:session-guidance standards-defect authority and Tommy's exp
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-SideHandoffContinuation
 Branch: Fix/SideHandoffContinuation
-Base: 33fb4155973b8ee1d26a8fd6f2a27d8428f6f166
+Base: d42ffa3a6b5d42e0fdee0bd19a3ad079319a69ec
 Owner: one Codex successor selected through engineering:handoff bounded side-workstream mode.
 Lane: L4 for the specified contract correction and regression; reroute any unresolved runtime design to L3.
 Original rollout remains owned by predecessor session 01a122c4-e884-7402-a873-9fa7449e5c37 in Rust/Fix-RustStandardDiscovery. Do not adopt or rewrite that goal.

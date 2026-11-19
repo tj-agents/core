@@ -21,7 +21,7 @@ Persist a receipt before submission. Repeating the command with that receipt per
 ## Progress
 
 - Diagnosis confirmed against local Codex 0.157.1 help, generated protocol schemas and selected profile queue/history stores.
-- Created isolated branch `Fix/VerifiedCodexFollowup` at `61b5b1ee19f7660ad881839525693fa7387809be`.
+- Created isolated branch `Fix/VerifiedCodexFollowup` at `1e219b8e2ce8ffb0409617b1cf95927f40f96d7e`.
 - No new recipient message sent; no profile/config changes.
 - Implemented the canonical skill, both host adapters and skill-local helper. Twenty-four synthetic behavior and real stdio-process regression tests pass.
 - Read-only incident recheck: original message remains queued; matching recipient user-message count is zero.

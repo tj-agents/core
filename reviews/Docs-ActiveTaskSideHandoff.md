@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `1f7133e11dbdbafb0250a0daa60a51343c004a7c`  `(2026-09-27)`
+**Reviewed up to commit:** `2d3c569ac6be083223440dbee3b2f4e4e3462ddc`  `(2026-09-27)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-27 — full
 
-**Candidate base:** `afcbcf77b57469dbe3451b15c5aab029c21bd2a9`
-**Candidate head:** `5ccafdc1428641bbae6ac5f23dea740645aa2a2f`
+**Candidate base:** `653bf5eb06f08cb8a762bda6a075bf176088da8d`
+**Candidate head:** `bfa85f243c8eadadaa99d67ce5803bf4e7d39a9a`
 **Candidate branch:** `Docs/ActiveTaskSideHandoff`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:b04d857e11d2ab1a6ccf7f589ece1c3066ca95ef811c69064f312855e747f130` `(27 paths)`
@@ -28,8 +28,8 @@
 
 ## Review pass — 2026-09-27 — incremental
 
-**Candidate base:** `5ccafdc1428641bbae6ac5f23dea740645aa2a2f`
-**Candidate head:** `b9ea7665c0e9054a92fc238c53d3f0665d1149ea`
+**Candidate base:** `bfa85f243c8eadadaa99d67ce5803bf4e7d39a9a`
+**Candidate head:** `26568eaaa72fe51ef654fccd8265b19f1384fe4b`
 **Candidate branch:** `Docs/ActiveTaskSideHandoff`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:c61c571841c68be1f5941261b0cd87c42398e46a52871aea92388cd003b616ea` `(7 paths)`
@@ -45,8 +45,8 @@ No findings.
 
 ## Review pass — 2026-09-27 — incremental
 
-**Candidate base:** `8178b9cb3eb478149d1173fc4fc6c02843067fff`
-**Candidate head:** `1f7133e11dbdbafb0250a0daa60a51343c004a7c`
+**Candidate base:** `8aeb5d17b8e5d50d25ceb7dadafbe1a78873caaa`
+**Candidate head:** `2d3c569ac6be083223440dbee3b2f4e4e3462ddc`
 **Candidate branch:** `Docs/ActiveTaskSideHandoff`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:4d0c4c77f4707bc6ba44aba459142170973f9a58407bd936411fdf5603cf1d82` `(2 paths)`
@@ -62,8 +62,8 @@ No findings.
 
 ## Review pass — 2026-09-27 — incremental
 
-**Candidate base:** `b9ea7665c0e9054a92fc238c53d3f0665d1149ea`
-**Candidate head:** `e0fd111bf64f9bbf8872b5fc55a66d60b4a4b99f`
+**Candidate base:** `26568eaaa72fe51ef654fccd8265b19f1384fe4b`
+**Candidate head:** `06575da718d9e8e381f99ad6061b1464c8adbff8`
 **Candidate branch:** `Docs/ActiveTaskSideHandoff`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:2b70403b9c4338b8c8a45415f3659d0ce199e379e0e8277683f84349cd5b8439` `(2 paths)`

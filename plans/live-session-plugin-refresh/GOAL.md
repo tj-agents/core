@@ -8,7 +8,7 @@ merge and causal package publication under Core's existing delivery authorizatio
 One successor and one local writer; parent codex:01a1415f-6448-7123-8b17-c7fb67aee637 retains the
 separate concurrent-session-close repair, PR306. Do not adopt, close or rewrite that task.
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-LiveSessionPluginRefresh
-Branch: Fix/LiveSessionPluginRefresh. Fetched baseline: dc1f7415ecb1aaf86d6ae4329d22f9ab34164ca6.
+Branch: Fix/LiveSessionPluginRefresh. Fetched baseline: 498032ccb348b2f599d20e7c8163b4099228efc1.
 Work item: lifecycle/live-session-plugin-refresh. Source owner: tj-agents/core machine rolling/plugin
 coordination and hook/skill generation selection. Lane L3: unresolved live-host update mechanism.
 Tommy explicitly selected Claude; do not bounce this non-frontier task back to Codex.

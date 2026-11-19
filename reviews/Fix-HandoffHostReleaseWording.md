@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `401207e68c64a34bbcf602a9ea0f94960af04e29`  `(2026-10-04)`
+**Reviewed up to commit:** `a6281a36d2755d3ad68435309d969450312a0131`  `(2026-10-04)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-04 — docs
 
-**Candidate base:** `c2df9515fc228cfa87c58108cb3a338e8503d708`
-**Candidate head:** `401207e68c64a34bbcf602a9ea0f94960af04e29`
+**Candidate base:** `df5cc568044c70daa6c42f5ca2b51dd5880cafbf`
+**Candidate head:** `a6281a36d2755d3ad68435309d969450312a0131`
 **Candidate branch:** `Fix/HandoffHostReleaseWording`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:9d3a37656aab948d190e9050d4321a35700990378449a044804074bfd508dd13` `(6 paths)`

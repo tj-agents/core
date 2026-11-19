@@ -15,9 +15,9 @@ injection and plugin-dependency work. No force or hook bypass is authorized.
 
 ## Delivered behavior
 
-Core #285 merged source head `a8d716be16cb1f067b899e4a4f8b7b2bec2876f4` as
-`16d0d994b42664fb727b2518bcf605fcd006b5a2`. The merge-triggered regeneration job published
-`8ecfe3e9c8626638b7c5c5a1637f94c74c4a80f1` with the shared skill and both host mappings.
+Core #285 merged source head `fad5a84925a6493b8d1097affe6d7174356cf53a` as
+`79f6b2dd4368f90ae55140c04395e9a8e4d3f385`. The merge-triggered regeneration job published
+`c48f3560e4e836f231f9a32cc8059f3dfe0a27c6` with the shared skill and both host mappings.
 
 - `agent:close` prepares before the report, routes at Stop, and completes in the foreground after
   other Stop-gate feedback permits closure. Stop itself never signals a process.
@@ -107,7 +107,7 @@ repositories pick up the new shared operation through their normal rolling sessi
       "evidence": [
         {
           "source": "https://github.com/tj-agents/core/actions/runs/39045611951",
-          "result": "Succeeded at merge 16d0d994b42664fb727b2518bcf605fcd006b5a2, including regeneration and Windows/Linux verification; generated publication 8ecfe3e9c8626638b7c5c5a1637f94c74c4a80f1 is on main."
+          "result": "Succeeded at merge 79f6b2dd4368f90ae55140c04395e9a8e4d3f385, including regeneration and Windows/Linux verification; generated publication c48f3560e4e836f231f9a32cc8059f3dfe0a27c6 is on main."
         }
       ],
       "owner": null,
@@ -118,7 +118,7 @@ repositories pick up the new shared operation through their normal rolling sessi
     {
       "repository": "tj-agents/core",
       "pr": 285,
-      "head": "a8d716be16cb1f067b899e4a4f8b7b2bec2876f4"
+      "head": "fad5a84925a6493b8d1097affe6d7174356cf53a"
     }
   ],
   "open_tasks": []

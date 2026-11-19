@@ -10,7 +10,7 @@
 
 ## Review pass — 2026-09-29 — full
 
-**Candidate base:** `68979e5137e681c0ac605e0c02917a47f0d122b4`
+**Candidate base:** `c012e5e15a854a0422e59be09e0cdd1c3fe0ad27`
 **Candidate head:** `bdeb4c3`
 **Candidate branch:** `Fix/ClaudeLauncherFromPlugin`
 **Candidate scope:** `all`

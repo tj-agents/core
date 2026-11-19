@@ -3,7 +3,7 @@
 Authorized by Tommy's 16 October 2026 instruction to implement the work-items proposal.
 Shared design: tj-agents/docs/plans/problem-management/PLAN.md. Source slice owner:
 codex:01a1415f-6448-7123-8b17-c7fb67aee637. PR: not opened.
-Branch Feature/ProblemRecordBackends from 6be8c45a211d6a673ae69025263e787ff7a4895e.
+Branch Feature/ProblemRecordBackends from 8b8d6699e6309b82b1b927e44f15a8f3cd6af462.
 This checkout is isolated from the parent's Fix/RollingPluginSync task and dirty primary checkout.
 
 ## Contract and scope

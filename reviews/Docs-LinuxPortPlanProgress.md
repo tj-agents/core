@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `48d3ce09d0609463eccdc3bb5efec4f33723521c`  `(2026-10-10)`
+**Reviewed up to commit:** `6dc07657496ecb1ed53b12fbdd5ba7073a52c0bb`  `(2026-10-10)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-10 — full
 
-**Candidate base:** `30e70672f0455aaefa7c60c444312f8dd33883a4`
-**Candidate head:** `48d3ce09d0609463eccdc3bb5efec4f33723521c`
+**Candidate base:** `947675532df931de017e8647de45928efad7d2a2`
+**Candidate head:** `6dc07657496ecb1ed53b12fbdd5ba7073a52c0bb`
 **Candidate branch:** `Docs/LinuxPortPlanProgress`
 **Candidate scope:** `all` (1 path: `plans/linux-port/LINUX_PORT_PLAN.md`)
 **Work-order path:** `reviews/Docs-LinuxPortPlanProgress.md`

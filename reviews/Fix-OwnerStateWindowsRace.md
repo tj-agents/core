@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `638411d921aa98b6fe69346cd26c05879f97d0ac`  `(2026-10-10)`
+**Reviewed up to commit:** `f9e35009df402b7f468cae5c40f34bb6cbc78766`  `(2026-10-10)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-10 — full
 
-**Candidate base:** `b4b576fa6a999fd43031e8c49aefaf32aa3a7d05`
-**Candidate head:** `638411d921aa98b6fe69346cd26c05879f97d0ac`
+**Candidate base:** `4a9ae4d3b18623d36351f9cc334b6f3169299518`
+**Candidate head:** `f9e35009df402b7f468cae5c40f34bb6cbc78766`
 **Candidate branch:** `Fix/OwnerStateWindowsRace`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:591f7fb061c9810cf8e48886a6136a00c388e9be86ae14c79035491a6dd61ac7` `(6 paths)`

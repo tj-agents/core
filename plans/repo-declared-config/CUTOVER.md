@@ -10,9 +10,9 @@ Authority: Tommy's 2026-10-20 handoff at ~/.claude/plans/core/handoff-repo-decla
 Commit/push/open PRs; Tommy merges. The handoff supersedes launch-time refresh/self-heal and the
 repository's standing auto-merge policy for this goal. No automatic merge binding is armed.
 
-Core PR tj-agents/core#321 at 19bb7b20a4027791f836a0d94f40a37d6d1ac70c is green,
+Core PR tj-agents/core#321 at 00bf6e4a4178b05c6dc6059c938fb44ceda3b8c2 is green,
 independently reviewed and ready. Sandbox consumer PR tomjseery/sandbox-dotnet#2 at
-055b118706c0aaeff1d91355fce50a4b2aeeba43 is green, independently reviewed and ready.
+3aa28fb05618002ebafa8f8d7ebf73814858a737 is green, independently reviewed and ready.
 This session merged neither.
 
 Assessment complete: reuse the existing plugin-selection generator and Template integration, native

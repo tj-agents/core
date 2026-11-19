@@ -4,7 +4,7 @@
 
 Tommy explicitly authorized diagnosis, verification and permanent Core repair after the job-search-assistant session's sync operation demanded that he manually resume. Preserve the application goal and its private checkpoint; resume it after this repair. No user-run recovery command is the intended outcome.
 
-Source owner: this session, isolated branch `Fix/CodexRefreshRecovery`, initially based on `c89998ac5b406201c45577818ab04dfc9ff80c1c`. Adjacent PR490 owns startup observation, missing-plugin installation and recipient messaging. Its verified live owner retains that work; this repair extends existing self-relaunch, not those source changes. An older AutomaticRefreshContinuation session's last work was an unrelated completed guide handoff, not an active claim on this defect.
+Source owner: this session, isolated branch `Fix/CodexRefreshRecovery`, initially based on `146c3ef6d1ef062cf34a28b22ec2ff17b4e915e5`. Adjacent PR490 owns startup observation, missing-plugin installation and recipient messaging. Its verified live owner retains that work; this repair extends existing self-relaunch, not those source changes. An older AutomaticRefreshContinuation session's last work was an unrelated completed guide handoff, not an active claim on this defect.
 
 ## Verified cause
 

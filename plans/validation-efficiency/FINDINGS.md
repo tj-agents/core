@@ -1,6 +1,6 @@
 # Validation efficiency findings
 
-Investigated on 16 October 2026 against Core main `8bddc8ef158f02704377656ce7c6dce6dfa44979`, confirmed through the remote branch API. Scope: investigation and proposal only. No runtime, hook, CI, plugin installation or consumer changes were made.
+Investigated on 16 October 2026 against Core main `5e502b73b85ea1254a081cfef301a37cde0bdd07`, confirmed through the remote branch API. Scope: investigation and proposal only. No runtime, hook, CI, plugin installation or consumer changes were made.
 
 ## What explains the elapsed time
 

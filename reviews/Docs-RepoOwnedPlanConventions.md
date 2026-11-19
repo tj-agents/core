@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `19f01b7bcfaff27a8131dad874d8aa3eba80977b`  `(2026-10-07)`
+**Reviewed up to commit:** `b26847e6983bf0b2bf9cb511532dc419df09109f`  `(2026-10-07)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-07 — docs
 
-**Candidate base:** `61d4920477a313528f855babd2e4ee4ccdf3d8f6`
-**Candidate head:** `19f01b7bcfaff27a8131dad874d8aa3eba80977b`
+**Candidate base:** `50dcb8f6b1694e5c6abcc581e02d52bbfa51f394`
+**Candidate head:** `b26847e6983bf0b2bf9cb511532dc419df09109f`
 **Candidate branch:** `Docs/RepoOwnedPlanConventions`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:d32e297df5e77b2700939ed2a4b43aad153dce5ab8220e936ea32debcac05114` `(2 paths)`

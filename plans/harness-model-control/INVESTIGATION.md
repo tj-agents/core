@@ -8,7 +8,7 @@ the Concertable/repository-declared plugin migration; do not adopt, edit or clos
 
 - Worktree: `C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Docs-ModelSwitchHandoffInvestigation`
 - Branch: `Docs/ModelSwitchHandoffInvestigation`
-- Base: `a0fe999b3f2efc7380b87b1b6e9e25fbbd554f54` from fetched `origin/main`
+- Base: `e7b7b2fb3dded0d632fdcea73cc9c05a8ce917ad` from fetched `origin/main`
 - Lane: L3, an open investigation without an implementation design yet. The canonical table resolves it to Sol.
 - Status: complete. Investigation merged in PR #65 at `17ac27a`; the handoff-routing correction merged in PR #66 at `838580a` after the full CI check passed.
 

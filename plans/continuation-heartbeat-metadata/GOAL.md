@@ -10,7 +10,7 @@ Standing source-repair authority is engineering:session-guidance: diagnose, impl
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ContinuationHeartbeatMetadata
 Branch: Fix/ContinuationHeartbeatMetadata
-Base: 2dc76412f0794584e36b7440e5cde0bf7a0ce5ac
+Base: b440ad25ac84769c7660f739a0436f7a337b0c5c
 
 Existing Core PR161/Fix-ContinuationMonitorActivation is blocked with no foreground or child. Its runtime changes are confined to claim PID/executable validation and parser claim arguments; the heartbeat defect exists unchanged there. Preserve that owner, its held PR and all files in its checkout. This separate heartbeat hunk must compose with its published claim changes. Do not adopt, merge, rebase or write PR161. Core184/ContinuationEnforcement and Feature/ConfigurableAutoMerge have live independent owners and must remain untouched.
 
@@ -80,7 +80,7 @@ The supported CI-style command `python -B -m unittest discover -s .agents/hooks/
 
 ## Rebased parent requalification
 
-The candidate was rebased onto `origin/main` at `8b656fb197771916c58aea4418934aaa7648b1c0`, producing code commit `d26d1d3`. The focused both-host `ContinuationTests.test_heartbeat_refreshes_recovery_metadata_without_releasing_foreground` passed through `workflow_ops.py` on the rebased tree. `scripts/update_catalog_digests.py`, `.agents/sync-generated.ps1`, and `.agents/sync-generated.ps1 -Check` also passed; the resulting generated output remains uncommitted. The next action is an exact-head independent review, followed by PR delivery if approved.
+The candidate was rebased onto `origin/main` at `ee773eb39320deb15ebe26d894f1521d4bed0b03`, producing code commit `d26d1d3`. The focused both-host `ContinuationTests.test_heartbeat_refreshes_recovery_metadata_without_releasing_foreground` passed through `workflow_ops.py` on the rebased tree. `scripts/update_catalog_digests.py`, `.agents/sync-generated.ps1`, and `.agents/sync-generated.ps1 -Check` also passed; the resulting generated output remains uncommitted. The next action is an exact-head independent review, followed by PR delivery if approved.
 
 ## Delivery gate
 

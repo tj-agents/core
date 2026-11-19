@@ -145,8 +145,8 @@ Ownership transfers to one native Codex successor in this exact worktree. The tr
 will make no further deliverable writes after launcher submission.
 
 Observed delivery state: PR https://github.com/tj-agents/core/pull/173 is OPEN, base `main`, head
-`a12811eb4dce4e9383ab2fedcbdd8ba1c6f737d3`; guard, verify-linux and verify-windows all succeeded.
-The worktree is clean. Review watermark is `7a029f73b963c12547bd59d7958673da40f042b5`;
+`63b4b22da97e34f4efc309b9bd2e3c478c8812b4`; guard, verify-linux and verify-windows all succeeded.
+The worktree is clean. Review watermark is `987c460c50870c23063ab823b770099ba1af1f9f`;
 the following commit records that review. Claude reported 1062 + 1052 tests and all generation checks
 passing. Review and CI evidence must be checked against the actual delivery candidate.
 

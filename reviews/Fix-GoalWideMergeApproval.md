@@ -5,13 +5,13 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `b638954b1bf3ceda0047cb08cf8c7d0d3d8d6597`  `(2026-10-06)`
+**Reviewed up to commit:** `f242ba1ce9748c8c1888081caa80cb2151e18512`  `(2026-10-06)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-06 — docs
 
-**Candidate base:** `fb365abb8478a87eb8f0129312c839b05debbc0a`
-**Candidate head:** `7da0ed7827705dee3873bc44046130e4a1ab97e2`
+**Candidate base:** `1b6f630af3b5eea6650a1d6e07230729e3d249fb`
+**Candidate head:** `796753068f0d662bf6eb3d9b8228edffab44fe3c`
 **Candidate branch:** `Fix/GoalWideMergeApproval`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:7d9f0d580d73cca333c592456a7ff41b7dfc83dfd49fded05d2cea2828952a48` `(9 paths)`
@@ -75,8 +75,8 @@ rewrapped. GW8: pointers folded into the sentences they qualify. Validation: tes
 
 ## Review pass — 2026-10-06 — incremental (inc)
 
-**Candidate base:** `7da0ed7827705dee3873bc44046130e4a1ab97e2`
-**Candidate head:** `a1dba1b2fda68ac8c745c59c1636c7195dfdc6e5`
+**Candidate base:** `796753068f0d662bf6eb3d9b8228edffab44fe3c`
+**Candidate head:** `42d302c2846b0b046cd048c8501ccd572237d119`
 **Candidate branch:** `Fix/GoalWideMergeApproval`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:09906b4f1b7803b8787a8c457c8fc24cc2144b5540ae0d4f625b08fbb2f91539` `(8 paths)`
@@ -108,8 +108,8 @@ directly (small mechanical delta); `docs_reachability.py` on the delta bundle tr
 
 ## Review pass — 2026-10-06 — incremental (inc2)
 
-**Candidate base:** `a1dba1b2fda68ac8c745c59c1636c7195dfdc6e5`
-**Candidate head:** `5fb895f15446bb287a859ac7fbd0c7772177f169`
+**Candidate base:** `42d302c2846b0b046cd048c8501ccd572237d119`
+**Candidate head:** `4c649d96b95951599688ce6fe9cda2e69c01d91c`
 **Candidate branch:** `Fix/GoalWideMergeApproval`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:1b3bfb03a155d60812c0be44b09b63e2920548a03bcf84cd7fec0444eb4764c6` `(4 paths)`
@@ -143,13 +143,13 @@ wait-then-merge), not authority, so the default escalates nothing.
   it stands as its own named check above the loop.
 
 Correction: this pass's candidate head was first transcribed from a 12-character print with a fabricated
-tail; corrected to the descriptor's real `5fb895f15446bb287a859ac7fbd0c7772177f169` before the next pass
+tail; corrected to the descriptor's real `4c649d96b95951599688ce6fe9cda2e69c01d91c` before the next pass
 froze against it.
 
 ## Review pass — 2026-10-06 — incremental (inc3)
 
-**Candidate base:** `5fb895f15446bb287a859ac7fbd0c7772177f169`
-**Candidate head:** `b638954b1bf3ceda0047cb08cf8c7d0d3d8d6597`
+**Candidate base:** `4c649d96b95951599688ce6fe9cda2e69c01d91c`
+**Candidate head:** `f242ba1ce9748c8c1888081caa80cb2151e18512`
 **Candidate branch:** `Fix/GoalWideMergeApproval`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:beccbe2cdd3b404f6ec2061a4ba55fbeb73c14a14ca4be69ef9852cdbcb16726` `(2 paths)`

@@ -35,11 +35,11 @@ employer commit/publish policy and separate credential-copy hold, which are outs
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-SkillHarnessGrants
 Branch: Fix/SkillHarnessGrants
 PR: not opened
-Fresh base: d3c88e839f9ddbce80e38aaa6ecaaef1f3c78c7d (fetched origin/main, 2026-10-08)
+Fresh base: cd23419a8b6568767ffad51e644d8047e35ec28c (fetched origin/main, 2026-10-08)
 Owning goal: plans/skill-harness-grants/GOAL.md in this checkout.
 Launch lane: L1 to decide the host/manifest/bootstrap mechanism; route implementation to L4 afterward.
 Execution owner: Codex session 01a11b14-2ce8-71b1-95c5-0a97f5d383a6, PID 45392.
-Current base: 73fb99cd91a2b7786912c85eea1feb99fcd9724e after a verified fast-forward on 2026-10-08.
+Current base: e5a4feb02c7945869faa762f940084080b0512e1 after a verified fast-forward on 2026-10-08.
 This explicitly assigned goal remains the single progress owner; no roadmap or competing plan is created.
 Parent: Codex session 01a11794-26f3-7fb2-accb-0df87faa5180, Feature/RepositoryOwnedLayout.
 Parent retains the full repository-layout and adoption goals. You own only this grant source repair and
@@ -113,7 +113,7 @@ git-branching, plans, plan-checkpoint and committing. Shared source stays under 
 packages remain uncommitted. Parent retains ownership with bounded workers; no fresh top-level owner
 is needed for these connected slices.
 
-1. Schema compatibility, current branch based on `73fb99cd91a2b7786912c85eea1feb99fcd9724e`.
+1. Schema compatibility, current branch based on `e5a4feb02c7945869faa762f940084080b0512e1`.
    Change `.agents/plugins/harness.schema.json` and focused manifest tests only, estimated under 200
    substantive lines. Both pattern entries and match/not_match examples already accept string lists
    in the runtime and shipped declarations, but the published schema accepts only strings. Each item
@@ -184,8 +184,8 @@ the native regression scenarios pass with the repair shipped and adopted in the 
 
 1. Commit the verified schema candidate, obtain independent review and deliver through the normal
    repository gates. PR #100 remains open
-   at 573b106023dc1f316053646aecb06486f87a4f9c and PR #137 at
-   a8da4019aab7d17151e1729ab76c34a3bac6d0ad; their ownership is preserved.
+   at 29c44415dc1f81fee4d6c339f10a7f6686236720 and PR #137 at
+   cd9d2936a05c6dbb52a0c37d6d4b7119bb11d178; their ownership is preserved.
 2. Reproduce the grant-delivery gaps on safe fixtures, decide the minimal shared mechanism and obtain
    focused readiness/security review where required. Keep source trust/provenance explicit.
 3. Use L4 implementation, meaningful native/focused tests and serial review fixes; deliver focused PRs
