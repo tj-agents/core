@@ -58,7 +58,7 @@
             "not": {
               "properties": {
                 "repository": {
-                  "pattern": "^tj-agents/"
+                  "pattern": "^[tT][jJ]-[aA][gG][eE][nN][tT][sS]/"
                 }
               },
               "required": [

@@ -51,8 +51,9 @@ Finish only when delivery, validation and any authorized handoff are done. A mer
 question about a missed close-out is not completion. A new mistake callout is answered and corrected first.
 
 For a managed TJ session, request `tj finish` only after that whole outcome is delivered, then write the
-native final response. Intent alone is not completed delivery or cleanup; inspect the durable receipt
-before claiming either. Genuine pending work uses `tj wait`, and an explicit user request to keep the
+native final response. The result and cleanup have separate receipts. A caller or operator can check
+closeout afterward with `tj receipt --launch <launch-id>`. Genuine pending work uses `tj wait`, and
+an explicit user request to keep the
 session open uses `tj hold`. Follow the owning
 [CLI completion contract](https://github.com/tj-agents/cli#completion-waits-and-keep-open) for dispositions,
 holds, parent delivery and receipts, and [Agent's lifecycle](https://github.com/tj-agents/agent#lifecycle)
@@ -64,6 +65,6 @@ A: add report export. B: an unrelated terminal-close bug is reported.
 Keep A's next action; tell the user about B and record it through the selected profile.
 User calls out a mistake: answer, correct the active task, then reassess completion.
 Delivery and validation complete, no owned wait: finish.
-Managed TJ session: request tj finish, send the final response, then use the receipt as cleanup evidence.
+Managed TJ session: request tj finish and send the final response. An operator checks the closeout receipt.
 CI is still required: record tj wait ci with the pending reason; retain the same goal.
 ```

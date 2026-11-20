@@ -9,7 +9,7 @@
         "core": {
           "type": "object",
           "properties": {
-            "permissions": {"enum": ["bypass", "standard"], "default": "bypass"},
+            "permissions": {"enum": ["bypass", "standard"]},
             "auto_approve": {
               "type": "object",
               "properties": {
