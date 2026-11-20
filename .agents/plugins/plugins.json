@@ -32,7 +32,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:896c339594e840cac13e38b7889a078052bee55e0a5809dbd871baea30429ce9",
+      "digest": "sha256:829817b7eec5635da841aff5a12b35754b2bffbe46a37ff86c0fc6fea19aef62",
       "harness": {
         "marketplaces": [
           {
@@ -117,7 +117,7 @@
         ],
         "optional": []
       },
-      "digest": "sha256:b76f21d5729c3abad0c33d5cd4f2a4813680ea62e61fac1a53f6264dde7c77eb",
+      "digest": "sha256:52cffa3ed509167f6f2645e36b1a4091239f4c262232fb66a17b36b06498a06b",
       "harness": {
         "marketplaces": [
           {
