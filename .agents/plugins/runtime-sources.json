@@ -13,7 +13,7 @@
     },
     "cli": {
       "repository": "tj-agents/cli",
-      "revision": "02bee06db48a2b3c219a568b5d71ae7d6d455d5e",
+      "revision": "4f6fa250e804e8649af1ba5ef5181015111c20ba",
       "package": "plugins/cli",
       "exports": [
         ".agents/cli/runtime"
