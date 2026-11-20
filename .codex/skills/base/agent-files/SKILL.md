@@ -1,6 +1,6 @@
 ---
 name: agent-files
-description: Keep AGENTS.md and CLAUDE.md paired in every repository, with one shared instruction source. Use when creating, moving, renaming or deleting an AGENTS.md or CLAUDE.md.
+description: Keep AGENTS.md and CLAUDE.md paired within authorized instruction-file changes in projects adopting Base. Use when creating, moving, renaming or deleting an AGENTS.md or CLAUDE.md.
 kind: policy
 domain: behavior
 ---

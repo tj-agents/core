@@ -42,6 +42,12 @@ verified checkout; the successor owns its design and setup, including isolation 
    reconcile an interrupted or ambiguous launch instead of retrying it.
 4. Report submission as launch only; it does not prove the successor read the prompt.
 
+Use the [Agent handoff contract](https://github.com/tj-agents/agent/blob/main/.agents/agent/utility/handoff/SKILL.md)
+for parent and work-item arguments. The calling session is the default parent; preserve a requested
+override and the prompt's standing reporting rules. A work-item link is optional, and a handoff never
+creates one. Verify the recorded relationship without adding an explicit-parent requirement or creating
+a tracker item merely to launch the successor.
+
 Never keep two writers on one checkout. A side workstream gets its own isolation, through the selected
 Engineering worktree operation for software, while the origin keeps its goal, checkout and next action.
 When the transferred checkout must later move or be deleted, put `engineering:merging`'s transferred
