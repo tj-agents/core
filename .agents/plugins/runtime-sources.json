@@ -3,7 +3,7 @@
   "sources": {
     "agent": {
       "repository": "tj-agents/agent",
-      "revision": "d789180f975f10f8be9ddd6ebe1f1676724cfad2",
+      "revision": "61574f15e1ce280e8f905aea6071eb77e06fd249",
       "package": "plugins/agent",
       "exports": [
         ".agents/agent/runtime",
@@ -13,7 +13,7 @@
     },
     "cli": {
       "repository": "tj-agents/cli",
-      "revision": "6ad26fe455f9125937a8e49168760eea848e11b4",
+      "revision": "4f6fa250e804e8649af1ba5ef5181015111c20ba",
       "package": "plugins/cli",
       "exports": [
         ".agents/cli/runtime"

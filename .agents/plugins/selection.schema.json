@@ -19,7 +19,7 @@
       "properties": {
         "repository": {
           "type": "string",
-          "pattern": "^(tj-agents|Concertable)/[A-Za-z0-9_][A-Za-z0-9_.-]*$"
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_][A-Za-z0-9_.-]*$"
         }
       }
     }
@@ -58,7 +58,7 @@
             "not": {
               "properties": {
                 "repository": {
-                  "pattern": "^tj-agents/"
+                  "pattern": "^[tT][jJ]-[aA][gG][eE][nN][tT][sS]/"
                 }
               },
               "required": [

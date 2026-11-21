@@ -19,7 +19,7 @@ env:
 jobs:
   python-standards:
     name: python-standards
-    uses: tj-agents/template/.github/workflows/python-standards.yml@7a06ba176a7245248fee3270842e0c4ed3030653
+    uses: tj-agents/template/.github/workflows/python-standards.yml@16a741dae1ca716c3edc912c70b5d91bc28621a6
 
   select:
     name: select
@@ -100,7 +100,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: tj-agents/cli
-          ref: 6ad26fe455f9125937a8e49168760eea848e11b4
+          ref: 4f6fa250e804e8649af1ba5ef5181015111c20ba
           path: .tj-cli
           persist-credentials: false
       - name: Build the pinned tj_hook candidate
@@ -231,7 +231,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: tj-agents/cli
-          ref: 6ad26fe455f9125937a8e49168760eea848e11b4
+          ref: 4f6fa250e804e8649af1ba5ef5181015111c20ba
           path: .tj-cli
           persist-credentials: false
       - name: Build the pinned tj_hook candidate
